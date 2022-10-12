@@ -1,0 +1,10 @@
+/.git
+/.idea
+/.github
+/venv
+/dist
+.mypy_cache
+Dockerfile
+.dockerignore
+.gitignore
+local.env

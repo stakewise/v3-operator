@@ -1,0 +1,32 @@
+[tool.poetry]
+name = "eth-operator"
+version = "0.1.0"
+description = ""
+authors = ["cyc60 <avsysoev60@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+web3 = "==5.30.0"
+python-decouple = "==3.6"
+backoff = "==2.1.2"
+sentry-sdk = "==1.9.5"
+bandit = "==1.7.4"
+staking-deposit = {git = "https://github.com/ethereum/eth2.0-deposit-cli", rev = "v2.3.0"}
+aiohttp = {version = "==3.8.1", extras = ["speedups"]}
+psycopg2-binary = "==2.9.4"
+
+[tool.poetry.dev-dependencies]
+pylint = "==2.14.5"
+flake8 = "==5.0.4"
+mypy = "==0.971"
+isort = "==5.10.1"
+pytest = "==7.1.2"
+pytest-asyncio = "==0.19.0"
+pre-commit = "==2.20.0"
+
+[tool.bandit]
+exclude_dirs = ["*/tests/*", "src/config/networks.py"]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

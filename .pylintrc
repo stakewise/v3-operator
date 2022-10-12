@@ -1,0 +1,8 @@
+[pre-commit-hook]
+disable=C0114, C0115, C0116, R0801, R0903, W0703, W1514
+
+
+[BASIC]
+
+# Good variable names which should always be accepted, separated by a comma
+good-names=w3,i,el,e,w,f

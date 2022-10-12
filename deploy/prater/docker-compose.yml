@@ -1,0 +1,49 @@
+version: "3.9"
+
+volumes:
+  postgres:
+    driver: local
+
+networks:
+  mainnet:
+    name: mainnet
+    driver: bridge
+
+services:
+  rewards:
+    container_name: oracle_mainnet
+    image: europe-west4-docker.pkg.dev/stakewiselabs/public/eth-oracle:v0.0.1
+    restart: always
+    entrypoint: ["python"]
+    command: ["oracle/main.py"]
+    env_file: [".env"]
+    networks:
+      - mainnet
+  signatures:
+    container_name: oracle_mainnet
+    image: europe-west4-docker.pkg.dev/stakewiselabs/public/eth-oracle:v0.0.1
+    restart: always
+    entrypoint: ["python"]
+    command: ["oracle/main.py"]
+    env_file: [".env"]
+    networks:
+      - mainnet
+
+  prometheus:
+    container_name: prometheus_mainnet
+    image: bitnami/prometheus:2
+    restart: always
+    env_file: [".env"]
+    networks:
+      - mainnet
+
+  postgres:
+    container_name: postgres_mainnet
+    image: postgres:14-alpine
+    restart: always
+    command: ["postgres", "-cshared_preload_libraries=pg_stat_statements"]
+    env_file: [".env"]
+    volumes: ["postgres:/var/lib/postgresql/data"]
+    profiles: ["graph"]
+    networks:
+      - mainnet

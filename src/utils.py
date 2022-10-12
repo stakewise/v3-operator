@@ -1,0 +1,39 @@
+import logging
+import signal
+from collections import OrderedDict
+from typing import Any
+
+logger = logging.getLogger(__name__)
+
+
+class InterruptHandler:
+    """
+    Tracks SIGINT and SIGTERM signals.
+    """
+
+    exit = False
+
+    def __init__(self) -> None:
+        signal.signal(signal.SIGINT, self.exit_gracefully)
+        signal.signal(signal.SIGTERM, self.exit_gracefully)
+
+    # noinspection PyUnusedLocal
+    def exit_gracefully(self, signum: int, frame: Any) -> None:
+        logger.info("Received interrupt signal %s, exiting...", signum)
+        self.exit = True
+
+
+class LimitedSizeDict(OrderedDict):
+    def __init__(self, *args, **kwds):
+        self.size_limit = kwds.pop("size_limit", None)
+        OrderedDict.__init__(self, *args, **kwds)
+        self._check_size_limit()
+
+    def __setitem__(self, key, value):
+        OrderedDict.__setitem__(self, key, value)
+        self._check_size_limit()
+
+    def _check_size_limit(self):
+        if self.size_limit is not None:
+            while len(self) > self.size_limit:
+                self.popitem(last=False)
