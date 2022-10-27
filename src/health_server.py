@@ -9,6 +9,7 @@ health_routes = web.RouteTableDef()
 
 @health_routes.get("/")
 async def health(request):
+    # pylint: disable=unused-argument
     return web.Response(text="OK")
 
 

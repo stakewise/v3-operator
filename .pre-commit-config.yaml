@@ -1,9 +1,8 @@
 repos:
-  - repo: https://gitlab.com/pycqa/flake8
-    rev: 4.0.1
+  - repo: https://github.com/john-hen/Flake8-pyproject
+    rev: 1.1.0
     hooks:
-      - id: flake8
-        args: [--config=setup.cfg]
+      - id: Flake8-pyproject
 
   - repo: https://github.com/timothycrosley/isort
     rev: 5.10.1
