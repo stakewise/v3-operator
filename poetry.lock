@@ -401,6 +401,21 @@ pycodestyle = ">=2.9.0,<2.10.0"
 pyflakes = ">=2.5.0,<2.6.0"
 
 [[package]]
+name = "flake8-pyproject"
+version = "1.1.0.post0"
+description = "Flake8 plug-in loading the configuration from pyproject.toml"
+category = "dev"
+optional = false
+python-versions = ">=3.6"
+
+[package.dependencies]
+Flake8 = ">=5,<6"
+TOMLi = {version = "*", markers = "python_version < \"3.11\""}
+
+[package.extras]
+test = ["pytest", "pytest-cov"]
+
+[[package]]
 name = "frozenlist"
 version = "1.3.1"
 description = "A list-like structure which implements collections.abc.MutableSequence"
@@ -1097,7 +1112,7 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "2c9d625390811ac62d4a9db6c307595564fcf352eed18b0f877e6e8b95d391d9"
+content-hash = "6913dc919a3923f22c69a956b1930bb3510ad81c9aa983a7f3aa84d4602225e0"
 
 [metadata.files]
 aiodns = [
@@ -1333,6 +1348,7 @@ eth-utils = [
 ]
 filelock = []
 flake8 = []
+flake8-pyproject = []
 frozenlist = []
 gitdb = []
 gitpython = []

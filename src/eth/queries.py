@@ -19,8 +19,8 @@ def get_vault_validators_root(block_number: int):
 def get_registered_validators(from_block, to_block) -> int:
     deposit_contract = get_deposit_contract()
     validators = deposit_contract.events.DepositEvent.getLogs(
-            fromBlock=from_block, toBlock=to_block
-        )
+        fromBlock=from_block, toBlock=to_block
+    )
 
     return validators
 

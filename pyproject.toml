@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "eth-operator"
+name = "v3-operator"
 version = "0.1.0"
 description = ""
 authors = ["cyc60 <avsysoev60@gmail.com>"]
@@ -17,15 +17,29 @@ psycopg2-binary = "==2.9.4"
 
 [tool.poetry.dev-dependencies]
 pylint = "==2.14.5"
-flake8 = "==5.0.4"
 mypy = "==0.971"
 isort = "==5.10.1"
 pytest = "==7.1.2"
 pytest-asyncio = "==0.19.0"
 pre-commit = "==2.20.0"
+Flake8-pyproject = "==1.1.0"
 
 [tool.bandit]
 exclude_dirs = ["*/tests/*", "src/config/networks.py"]
+
+[tool.pylint."pre-commit-hook"]
+disable=["C0114", "C0115", "C0116", "R0801", "R0903", "W0703", "W1514"]
+
+[tool.pylint."BASIC"]
+good-names = ["i", "el", "e", "w", "f", "w3"]
+
+[tool.flake8]
+max-line-length = 88
+select = ["E121"]
+
+[tool.mypy]
+ignore_missing_imports = true
+python_version = "3.10"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

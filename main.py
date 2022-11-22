@@ -149,8 +149,8 @@ async def init_checks():
     w3_client = get_web3_client()
     w3_client.isConnected()
     parsed_uri = "{uri.scheme}://{uri.netloc}".format(
-            uri=urlparse(NETWORK_CONFIG["ETH1_ENDPOINT"])
-        )
+        uri=urlparse(NETWORK_CONFIG["ETH1_ENDPOINT"])
+    )
     logger.info("Connected to execution layer node at %s", parsed_uri)
 
     # check consensus layer API connection

@@ -11,20 +11,20 @@ networks:
 
 services:
   rewards:
-    container_name: oracle_mainnet
-    image: europe-west4-docker.pkg.dev/stakewiselabs/public/eth-oracle:v0.0.1
+    container_name: operator_mainnet
+    image: europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v0.0.1
     restart: always
     entrypoint: ["python"]
-    command: ["oracle/main.py"]
+    command: ["operator/main.py"]
     env_file: [".env"]
     networks:
       - mainnet
   signatures:
-    container_name: oracle_mainnet
-    image: europe-west4-docker.pkg.dev/stakewiselabs/public/eth-oracle:v0.0.1
+    container_name: operator_mainnet
+    image: europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v0.0.1
     restart: always
     entrypoint: ["python"]
-    command: ["oracle/main.py"]
+    command: ["operator/main.py"]
     env_file: [".env"]
     networks:
       - mainnet
