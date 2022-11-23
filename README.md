@@ -7,13 +7,6 @@ Operator service is responsible for saving exit signature shards of the new vali
 
 ### Dependencies
 
-#### Graph Node
-
-The [Graph Node](https://github.com/graphprotocol/graph-node) from the Graph Protocol is used for syncing smart
-contracts data and allows oracle to perform complex queries using GraphQL. Either self-hosted (preferred)
-or `https://api.thegraph.com/subgraphs/name/stakewise/stakewise-<network>`
-endpoint can be used.
-
 #### ETH2 Node
 
 The ETH2 node is used to fetch StakeWise validators data (statuses, balances). Any ETH2 client that

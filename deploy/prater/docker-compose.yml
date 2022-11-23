@@ -29,14 +29,6 @@ services:
     networks:
       - mainnet
 
-  prometheus:
-    container_name: prometheus_mainnet
-    image: bitnami/prometheus:2
-    restart: always
-    env_file: [".env"]
-    networks:
-      - mainnet
-
   postgres:
     container_name: postgres_mainnet
     image: postgres:14-alpine

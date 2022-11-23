@@ -5,12 +5,12 @@ import backoff
 import ipfshttpclient
 from aiohttp import ClientSession, ClientTimeout
 
+from src.common.utils import LimitedSizeDict
 from src.config.settings import (INFURA_IPFS_CLIENT_ENDPOINT,
                                  INFURA_IPFS_CLIENT_PASSWORD,
                                  INFURA_IPFS_CLIENT_USERNAME,
                                  IPFS_FETCH_ENDPOINTS,
                                  LOCAL_IPFS_CLIENT_ENDPOINT)
-from src.utils import LimitedSizeDict
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +32,7 @@ async def ipfs_fetch(ipfs_hash: str) -> Optional[Any]:
         async with ClientSession(timeout=timeout) as session:
             for endpoint in IPFS_FETCH_ENDPOINTS:
                 try:
-                    response = await session.get(
-                        f"{endpoint.rstrip('/')}/ipfs/{_ipfs_hash}"
-                    )
+                    response = await session.get(f"{endpoint.rstrip('/')}/ipfs/{_ipfs_hash}")
                     response.raise_for_status()
                     return await response.json()
                 except BaseException as e:  # noqa: E722

@@ -9,22 +9,24 @@ from eth_typing import HexStr
 from web3 import Web3
 from web3.types import BlockNumber
 
-from src.common.beacon import get_finality_checkpoints, get_validator
 from src.common.database import Database, check_db_connection
+from src.common.health_server import (create_health_server_runner,
+                                      health_routes, start_health_server)
 from src.common.ipfs import ipfs_fetch
 from src.common.oracles import send_to_oracle
-from src.config.settings import (CONFIRMATION_BLOCKS, DATABASE_URL,
-                                 ENABLE_HEALTH_SERVER, HEALTH_SERVER_HOST,
-                                 HEALTH_SERVER_PORT, LOG_LEVEL, NETWORK_CONFIG,
-                                 PROCESS_INTERVAL, SENTRY_DSN)
-from src.eth.clients import get_web3_client
-from src.eth.queries import (get_oracles_endpoints, get_registered_validators,
+from src.common.types import ValidatorDepositData
+from src.common.utils import InterruptHandler
+from src.config.settings import (CONSENSUS_ENDPOINT, DATABASE_URL,
+                                 ENABLE_HEALTH_SERVER, EXECUTION_ENDPOINT,
+                                 HEALTH_SERVER_HOST, HEALTH_SERVER_PORT,
+                                 LOG_LEVEL, NETWORK_CONFIG, PROCESS_INTERVAL,
+                                 SENTRY_DSN)
+from src.eth.consensus import get_genesis, get_validator
+from src.eth.deposit_scanner import DepositEventsScanner
+from src.eth.execution import ExecutionClient
+from src.eth.queries import (get_block_number, get_oracles_endpoints,
                              get_vault_balance, get_vault_validators_root)
-from src.health_server import (create_health_server_runner, health_routes,
-                               start_health_server)
 from src.shard.shard import split_to_shards
-from src.types import ValidatorDepositData
-from src.utils import InterruptHandler
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)-8s %(message)s",
@@ -40,31 +42,29 @@ session = aiohttp.ClientSession()
 
 
 async def main() -> None:
+    await init_checks()
     database = Database(
         db_url=DATABASE_URL,
     )
+    database.setup()
 
-    await init_checks()
-
-    # fetch validators
-    await update_validators_state(database)
+    await sync_deposit_events(database)
 
     interrupt_handler = InterruptHandler()
-    w3_client = get_web3_client()
 
     registering_keys = {}
     block_number = 0
 
     while not interrupt_handler.exit:
         try:
-            current_block_number = w3_client.eth.block_number - CONFIRMATION_BLOCKS
+            current_block_number = await get_block_number() - NETWORK_CONFIG.CONFIRMATION_BLOCKS
 
             if current_block_number < block_number + 100:
                 continue
 
             pool_balance = get_vault_balance(block_number)
 
-            if not pool_balance >= NETWORK_CONFIG['VALIDATOR_DEPOSIT']:
+            if not pool_balance >= NETWORK_CONFIG.DEPOSIT_AMOUNT:
                 # not enough balance to register next validator
                 continue
 
@@ -106,34 +106,31 @@ async def send_exit_signature(validator_pubkey, block_number: BlockNumber):
     oracles_endpoints = get_oracles_endpoints(block_number)
 
     shards = split_to_shards(
-        validator_exit_message,
-        len(oracles_endpoints),
-        len(oracles_endpoints) / 3 * 2
+        validator_exit_message, len(oracles_endpoints), len(oracles_endpoints) / 3 * 2
     )
 
     # send shards
     tasks = []
     for index, oracles_endpoint in enumerate(oracles_endpoints):
-        tasks.append(send_to_oracle(
-            url=oracles_endpoint,
-            data={"data": shards[index]},
-            session=session,
-        ))
+        tasks.append(
+            send_to_oracle(
+                url=oracles_endpoint,
+                data={"data": shards[index]},
+                session=session,
+            )
+        )
 
     await asyncio.gather(*tasks)
 
 
-async def process_active_registrations(
-        registering_keys: dict,
-        block_number: BlockNumber
-):
+async def process_active_registrations(registering_keys: dict, block_number: BlockNumber):
     # check active sharding process
     for pub_key, validator_data in registering_keys.items():
         beacon_data = await get_validator(pub_key)
         if not beacon_data:
             continue
 
-        if validator_data['index'] == beacon_data['index']:
+        if validator_data["index"] == beacon_data["index"]:
             del registering_keys[pub_key]
         else:
             await send_exit_signature(pub_key, block_number)
@@ -146,26 +143,22 @@ async def init_checks():
 
     # check ETH1 API connection
     logger.info("Checking connection to execution layer node...")
-    w3_client = get_web3_client()
-    w3_client.isConnected()
-    parsed_uri = "{uri.scheme}://{uri.netloc}".format(
-        uri=urlparse(NETWORK_CONFIG["ETH1_ENDPOINT"])
-    )
+    web3_client = ExecutionClient().get_client()
+    await web3_client.is_connected()
+
+    parsed_uri = "{uri.scheme}://{uri.netloc}".format(uri=urlparse(EXECUTION_ENDPOINT))
     logger.info("Connected to execution layer node at %s", parsed_uri)
 
     # check consensus layer API connection
     logger.info("Checking connection to consensus node...")
-    await get_finality_checkpoints(session)
-    parsed_uri = "{uri.scheme}://{uri.netloc}".format(
-        uri=urlparse(NETWORK_CONFIG["ETH2_ENDPOINT"])
-    )
-    logger.info("Connected to ETH2 node at %s", parsed_uri)
+    await get_genesis()
+    parsed_uri = "{uri.scheme}://{uri.netloc}".format(uri=urlparse(CONSENSUS_ENDPOINT))
+    logger.info("Connected to consensus node at %s", parsed_uri)
 
 
-async def update_validators_state(database):
-    # todo: save last block number
-    validators = get_registered_validators()
-    database.add_validators(validators)
+async def sync_deposit_events(database):
+    genesis_block = NETWORK_CONFIG.DEPOSITS_GENESIS_BLOCK
+    DepositEventsScanner().sync(database, genesis_block)
 
 
 if __name__ == "__main__":
@@ -176,9 +169,7 @@ if __name__ == "__main__":
             daemon=True,
         )
         logger.info(
-            "Starting operator server at http://%s:%s",
-            HEALTH_SERVER_HOST,
-            HEALTH_SERVER_PORT
+            "Starting operator server at http://%s:%s", HEALTH_SERVER_HOST, HEALTH_SERVER_PORT
         )
         t.start()
 
