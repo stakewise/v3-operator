@@ -19,13 +19,13 @@ class InterruptHandler:
     # noinspection PyUnusedLocal
     def exit_gracefully(self, signum: int, *args, **kwargs) -> None:
         # pylint: disable=unused-argument
-        logger.info("Received interrupt signal %s, exiting...", signum)
+        logger.info('Received interrupt signal %s, exiting...', signum)
         self.exit = True
 
 
 class LimitedSizeDict(OrderedDict):
     def __init__(self, *args, **kwds):
-        self.size_limit = kwds.pop("size_limit", None)
+        self.size_limit = kwds.pop('size_limit', None)
         OrderedDict.__init__(self, *args, **kwds)
         self._check_size_limit()
 

@@ -20,14 +20,14 @@ class ExecutionClient(metaclass=Singleton):
 
         self.web3 = Web3(
             Web3.AsyncHTTPProvider(EXECUTION_ENDPOINT),
-            modules={"eth": (AsyncEth,), "net": AsyncNet},
+            modules={'eth': (AsyncEth,), 'net': AsyncNet},
             middlewares=[],
         )
-        logger.warning("Web3 HTTP endpoint=%s", EXECUTION_ENDPOINT)
+        logger.warning('Web3 HTTP endpoint=%s', EXECUTION_ENDPOINT)
 
         if NETWORK_CONFIG.IS_POA:
             self.web3.middleware_onion.inject(async_geth_poa_middleware, layer=0)
-            logger.warning("Injected POA middleware")
+            logger.warning('Injected POA middleware')
 
         return self.web3
 
@@ -46,10 +46,10 @@ class LightExecutionClient(metaclass=Singleton):
         provider.middlewares.clear()
 
         self.web3 = Web3(provider)
-        logger.warning("Light Web3 HTTP endpoint=%s", EXECUTION_ENDPOINT)
+        logger.warning('Light Web3 HTTP endpoint=%s', EXECUTION_ENDPOINT)
 
         if NETWORK_CONFIG.IS_POA:
             self.web3.middleware_onion.inject(async_geth_poa_middleware, layer=0)
-            logger.warning("Injected POA middleware")
+            logger.warning('Injected POA middleware')
 
         return self.web3

@@ -45,6 +45,7 @@ python_version = "3.10"
 
 [tool.black]
 line-length = 100
+skip-string-normalization = true
 include = '\.pyi?$'
 exclude = '''
 /(

@@ -29,11 +29,11 @@ from src.eth.queries import (get_block_number, get_oracles_endpoints,
 from src.shard.shard import split_to_shards
 
 logging.basicConfig(
-    format="%(asctime)s %(levelname)-8s %(message)s",
-    datefmt="%m-%d %H:%M",
+    format='%(asctime)s %(levelname)-8s %(message)s',
+    datefmt='%m-%d %H:%M',
     level=LOG_LEVEL,
 )
-logging.getLogger("backoff").addHandler(logging.StreamHandler())
+logging.getLogger('backoff').addHandler(logging.StreamHandler())
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,7 @@ async def main() -> None:
             # select validator
             validators_deposit_data: list[ValidatorDepositData] = vault_val_data[0]
             if not validators_deposit_data:
-                logger.warning("Run out of validator keys")
+                logger.warning('Run out of validator keys')
                 return
 
             # select validator
@@ -85,8 +85,8 @@ async def main() -> None:
             validator_index: int = 1
 
             registering_keys[public_key] = {
-                "block_number": block_number,
-                "validator_index": validator_index,
+                'block_number': block_number,
+                'validator_index': validator_index,
             }
 
             await send_exit_signature(public_key, block_number)
@@ -115,7 +115,7 @@ async def send_exit_signature(validator_pubkey, block_number: BlockNumber):
         tasks.append(
             send_to_oracle(
                 url=oracles_endpoint,
-                data={"data": shards[index]},
+                data={'data': shards[index]},
                 session=session,
             )
         )
@@ -130,7 +130,7 @@ async def process_active_registrations(registering_keys: dict, block_number: Blo
         if not beacon_data:
             continue
 
-        if validator_data["index"] == beacon_data["index"]:
+        if validator_data['index'] == beacon_data['index']:
             del registering_keys[pub_key]
         else:
             await send_exit_signature(pub_key, block_number)
@@ -138,22 +138,22 @@ async def process_active_registrations(registering_keys: dict, block_number: Blo
 
 async def init_checks():
     # check database connection
-    logger.info("Checking connection to database...")
+    logger.info('Checking connection to database...')
     check_db_connection(DATABASE_URL)
 
     # check ETH1 API connection
-    logger.info("Checking connection to execution layer node...")
+    logger.info('Checking connection to execution layer node...')
     web3_client = ExecutionClient().get_client()
     await web3_client.is_connected()
 
-    parsed_uri = "{uri.scheme}://{uri.netloc}".format(uri=urlparse(EXECUTION_ENDPOINT))
-    logger.info("Connected to execution layer node at %s", parsed_uri)
+    parsed_uri = '{uri.scheme}://{uri.netloc}'.format(uri=urlparse(EXECUTION_ENDPOINT))
+    logger.info('Connected to execution layer node at %s', parsed_uri)
 
     # check consensus layer API connection
-    logger.info("Checking connection to consensus node...")
+    logger.info('Checking connection to consensus node...')
     await get_genesis()
-    parsed_uri = "{uri.scheme}://{uri.netloc}".format(uri=urlparse(CONSENSUS_ENDPOINT))
-    logger.info("Connected to consensus node at %s", parsed_uri)
+    parsed_uri = '{uri.scheme}://{uri.netloc}'.format(uri=urlparse(CONSENSUS_ENDPOINT))
+    logger.info('Connected to consensus node at %s', parsed_uri)
 
 
 async def sync_deposit_events(database):
@@ -161,7 +161,7 @@ async def sync_deposit_events(database):
     DepositEventsScanner().sync(database, genesis_block)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     if ENABLE_HEALTH_SERVER:
         t = threading.Thread(
             target=start_health_server,
@@ -169,7 +169,7 @@ if __name__ == "__main__":
             daemon=True,
         )
         logger.info(
-            "Starting operator server at http://%s:%s", HEALTH_SERVER_HOST, HEALTH_SERVER_PORT
+            'Starting operator server at http://%s:%s', HEALTH_SERVER_HOST, HEALTH_SERVER_PORT
         )
         t.start()
 
@@ -178,6 +178,6 @@ if __name__ == "__main__":
         from sentry_sdk.integrations.logging import ignore_logger
 
         sentry_sdk.init(SENTRY_DSN, traces_sample_rate=0.1)
-        ignore_logger("backoff")
+        ignore_logger('backoff')
 
     asyncio.run(main())

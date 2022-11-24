@@ -18,8 +18,8 @@ class Database:
             with conn.cursor() as cur:
                 execute_values(
                     cur,
-                    "DELETE from scanned_blocks; "
-                    "INSERT INTO scanned_blocks (block_number) VALUES %s",
+                    'DELETE from scanned_blocks; '
+                    'INSERT INTO scanned_blocks (block_number) VALUES %s',
                     [(block_number,)],
                 )
 
@@ -28,11 +28,11 @@ class Database:
         with _get_db_connection(self.db_url) as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "select block_number from scanned_blocks LIMIT 1",
+                    'select block_number from scanned_blocks LIMIT 1',
                 )
                 row = cur.fetchone()
                 if row:
-                    return row["block_number"]
+                    return row['block_number']
 
     # deposit events
     def check_public_key(self, public_key: str) -> bool:
@@ -40,7 +40,7 @@ class Database:
         with _get_db_connection(self.db_url) as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "select public_key from validators where public_key= %s",
+                    'select public_key from validators where public_key= %s',
                     (public_key,),
                 )
                 rows = cur.fetchall()
@@ -59,9 +59,9 @@ class Database:
             with conn.cursor() as cur:
                 execute_values(
                     cur,
-                    "INSERT INTO deposit_events "
-                    "(public_key, signature, index, log_index, transaction_hash, block_number)"
-                    " VALUES %s ON CONFLICT DO NOTHING",
+                    'INSERT INTO deposit_events '
+                    '(public_key, signature, index, log_index, transaction_hash, block_number)'
+                    ' VALUES %s ON CONFLICT DO NOTHING',
                     [
                         (
                             public_key,
@@ -78,7 +78,7 @@ class Database:
         with _get_db_connection(self.db_url) as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "DELETE from deposit_events where block_number >= %s",
+                    'DELETE from deposit_events where block_number >= %s',
                     (since_block,),
                 )
 
@@ -86,10 +86,10 @@ class Database:
     def fetch_validator_private_key(self, public_key: str) -> str:
         with _get_db_connection(self.db_url) as conn:
             with conn.cursor() as cur:
-                cur.execute("select private_key from keys where public_key = %s", public_key)
+                cur.execute('select private_key from keys where public_key = %s', public_key)
                 row = cur.fetchone()
                 if row:
-                    return row["private_key"]
+                    return row['private_key']
 
     def setup(self) -> None:
         with _get_db_connection(self.db_url) as conn:
@@ -131,7 +131,7 @@ class Database:
 def check_db_connection(db_url):
     connection = _get_db_connection(db_url=db_url)
     cur = connection.cursor()
-    cur.execute("SELECT 1")
+    cur.execute('SELECT 1')
 
 
 def _get_db_connection(db_url):

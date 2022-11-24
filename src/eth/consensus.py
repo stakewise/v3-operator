@@ -17,7 +17,7 @@ class ConsensusClient(metaclass=Singleton):
         if self.beacon:
             return self.beacon
 
-        logger.info("Create Consensus client with endpoint=%s", CONSENSUS_ENDPOINT)
+        logger.info('Create Consensus client with endpoint=%s', CONSENSUS_ENDPOINT)
 
         self.beacon = AsyncBeacon(base_url=CONSENSUS_ENDPOINT)
         return self.beacon
@@ -28,13 +28,13 @@ async def get_genesis() -> Dict:
     """Fetches genesis."""
     client = await ConsensusClient().get_client()
     request = await client.get_genesis()
-    return request["data"]
+    return request['data']
 
 
 @backoff.on_exception(backoff.expo, Exception, max_time=300)
 async def get_validator(
     validator_id: str,
-    state_id: str = "head",
+    state_id: str = 'head',
 ) -> Dict:
     """Fetches validators."""
     if not validator_id:
@@ -44,12 +44,12 @@ async def get_validator(
         validator_id=validator_id,
         state_id=state_id,
     )
-    return request["data"]
+    return request['data']
 
 
 @backoff.on_exception(backoff.expo, Exception, max_time=300)
-async def get_finality_checkpoints(state_id: str = "head") -> Dict:
+async def get_finality_checkpoints(state_id: str = 'head') -> Dict:
     """Fetches finality checkpoints."""
     client = await ConsensusClient().get_client()
     request = await client.get_finality_checkpoint(state_id)
-    return request["data"]
+    return request['data']

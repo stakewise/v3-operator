@@ -23,7 +23,7 @@ IPFS_CACHE = LimitedSizeDict(size_limit=CACHE_SIZE)
 @backoff.on_exception(backoff.expo, Exception, max_time=900)
 async def ipfs_fetch(ipfs_hash: str) -> Optional[Any]:
     """Tries to fetch IPFS hash from different sources."""
-    _ipfs_hash = ipfs_hash.replace("ipfs://", "").replace("/ipfs/", "")
+    _ipfs_hash = ipfs_hash.replace('ipfs://', '').replace('/ipfs/', '')
 
     if IPFS_CACHE.get(_ipfs_hash):
         return IPFS_CACHE.get(_ipfs_hash)
@@ -60,4 +60,4 @@ async def ipfs_fetch(ipfs_hash: str) -> Optional[Any]:
         IPFS_CACHE[_ipfs_hash] = data
         return data
 
-    raise RuntimeError(f"Failed to fetch IPFS data at {_ipfs_hash}")
+    raise RuntimeError(f'Failed to fetch IPFS data at {_ipfs_hash}')

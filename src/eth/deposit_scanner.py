@@ -53,16 +53,16 @@ class DatabaseState(EventScannerState):
         block_number = event.blockNumber
 
         self.database.create_deposit_event(
-            public_key=Web3.to_hex(primitive=event["args"]["pubkey"]),
-            signature=Web3.to_hex(primitive=event["args"]["signature"]),
-            index=Web3.to_int(primitive=event["args"]["index"]),
+            public_key=Web3.to_hex(primitive=event['args']['pubkey']),
+            signature=Web3.to_hex(primitive=event['args']['signature']),
+            index=Web3.to_int(primitive=event['args']['index']),
             block_number=block_number,
             log_index=log_index,
             transaction_hash=txhash,
         )
 
         # Return a pointer that allows us to look up this event later if needed
-        return f"{block_number}-{txhash}-{log_index}"
+        return f'{block_number}-{txhash}-{log_index}'
 
 
 class DepositEventsScanner:
@@ -78,7 +78,7 @@ class DepositEventsScanner:
             state=state,
             genesis_block=genesis_block,
             events=[contract.events.DepositEvent],
-            filters={"address": NETWORK_CONFIG.DEPOSIT_CONTRACT_ADDRESS},
+            filters={'address': NETWORK_CONFIG.DEPOSIT_CONTRACT_ADDRESS},
             # How many maximum blocks at the time we request from JSON-RPC
             # and we are unlikely to exceed the response size limit of the JSON-RPC server
             max_chunk_scan_size=10000,
@@ -100,7 +100,7 @@ class DepositEventsScanner:
         end_block = scanner.get_suggested_scan_end_block()
         blocks_to_scan = end_block - start_block
 
-        logger.info(f"Scanning events from blocks {start_block} - {end_block}")
+        logger.info(f'Scanning events from blocks {start_block} - {end_block}')
 
         # Render a progress bar in the console
         start = time.time()
@@ -110,12 +110,12 @@ class DepositEventsScanner:
                 start, end, current, current_block_timestamp, chunk_size, events_count
             ):
                 if current_block_timestamp:
-                    formatted_time = current_block_timestamp.strftime("%d-%m-%Y")
+                    formatted_time = current_block_timestamp.strftime('%d-%m-%Y')
                 else:
-                    formatted_time = "no block time available"
+                    formatted_time = 'no block time available'
                 progress_bar.set_description(
-                    f"Current block: {current} ({formatted_time}), blocks in a scan batch: {chunk_size},"
-                    f" events processed in a batch {events_count}"
+                    f'Current block: {current} ({formatted_time}), blocks in a scan batch: {chunk_size},'
+                    f' events processed in a batch {events_count}'
                 )
                 progress_bar.update(chunk_size)
 
@@ -126,6 +126,6 @@ class DepositEventsScanner:
 
         duration = time.time() - start
         logger.info(
-            f"Scanned total {len(result)} events, in {duration} seconds,"
-            f" total {total_chunks_scanned} chunk scans performed"
+            f'Scanned total {len(result)} events, in {duration} seconds,'
+            f' total {total_chunks_scanned} chunk scans performed'
         )

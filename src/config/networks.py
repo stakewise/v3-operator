@@ -5,9 +5,9 @@ from eth_typing import ChecksumAddress
 from web3 import Web3
 from web3.types import Wei
 
-MAINNET = "mainnet"
-GOERLI = "goerli"
-GNOSIS = "gnosis"
+MAINNET = 'mainnet'
+GOERLI = 'goerli'
+GNOSIS = 'gnosis'
 
 
 @dataclass
@@ -32,10 +32,10 @@ NETWORKS = {
         VAULT_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         ORACLE_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         DEPOSIT_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            "0x00000000219ab540356cBB839Cbe05303d7705Fa"
+            '0x00000000219ab540356cBB839Cbe05303d7705Fa'
         ),
         DEPOSITS_GENESIS_BLOCK=1,
-        DEPOSIT_AMOUNT=Web3.to_wei(32, "ether"),
+        DEPOSIT_AMOUNT=Web3.to_wei(32, 'ether'),
         CONFIRMATION_BLOCKS=15,
         CHAIN_ID=1,
         IS_POA=False,
@@ -48,7 +48,7 @@ NETWORKS = {
         ORACLE_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         DEPOSIT_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         DEPOSITS_GENESIS_BLOCK=1,
-        DEPOSIT_AMOUNT=Web3.to_wei(32, "ether"),
+        DEPOSIT_AMOUNT=Web3.to_wei(32, 'ether'),
         CONFIRMATION_BLOCKS=15,
         CHAIN_ID=1,
         IS_POA=True,
@@ -60,7 +60,7 @@ NETWORKS = {
         VAULT_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         ORACLE_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         DEPOSIT_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
-        DEPOSIT_AMOUNT=Web3.to_wei(1, "ether"),
+        DEPOSIT_AMOUNT=Web3.to_wei(1, 'ether'),
         DEPOSITS_GENESIS_BLOCK=1,
         CONFIRMATION_BLOCKS=15,
         CHAIN_ID=1,

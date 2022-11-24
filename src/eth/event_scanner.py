@@ -132,7 +132,7 @@ class EventScanner:
             # Block was not mined yet,
             # minor chain reorganisation?
             return None
-        last_time = block_info["timestamp"]
+        last_time = block_info['timestamp']
         return datetime.datetime.utcfromtimestamp(last_time)
 
     def get_suggested_scan_start_block(self):
@@ -205,15 +205,15 @@ class EventScanner:
 
             for evt in events:
                 idx = evt[
-                    "logIndex"
+                    'logIndex'
                 ]  # Integer of the log index position in the block, null when its pending
 
                 # We cannot avoid minor chain reorganisations, but
                 # at least we must avoid blocks that are not mined yet
                 if idx is None:
-                    raise RuntimeError("Somehow tried to scan a pending block")
+                    raise RuntimeError('Somehow tried to scan a pending block')
 
-                block_number = evt["blockNumber"]
+                block_number = evt['blockNumber']
 
                 # Get UTC time when this event happened (block mined timestamp)
                 # from our in-memory cache
@@ -250,7 +250,7 @@ class EventScanner:
         """
 
         if start_block > end_block:
-            raise ValueError("Invalid block range")
+            raise ValueError('Invalid block range')
 
         current_block = start_block
 
@@ -269,9 +269,9 @@ class EventScanner:
             # Print some diagnostics to logs to try to fiddle with real world JSON-RPC API performance
             estimated_end_block = current_block + chunk_size
             logger.debug(
-                f"Scanning token transfers for blocks: {current_block} - {estimated_end_block},"
-                f" chunk size {chunk_size}, last chunk scan took {last_scan_duration},"
-                f" last logs found {last_logs_found}"
+                f'Scanning token transfers for blocks: {current_block} - {estimated_end_block},'
+                f' chunk size {chunk_size}, last chunk scan took {last_scan_duration},'
+                f' last logs found {last_logs_found}'
             )
 
             start = time.time()
@@ -332,7 +332,7 @@ def _retry_web3_call(func, start_block, end_block, retries, delay) -> Tuple[int,
             if i < retries - 1:
                 # Give some more verbose info than the default middleware
                 logger.warning(
-                    f"Retrying events for block range {start_block} - {end_block} ({end_block-start_block}) failed with {e} , retrying in {delay} seconds"
+                    f'Retrying events for block range {start_block} - {end_block} ({end_block-start_block}) failed with {e} , retrying in {delay} seconds'
                 )
                 # Decrease the `eth_getBlocks` range
                 end_block = start_block + ((end_block - start_block) // 2)
@@ -340,7 +340,7 @@ def _retry_web3_call(func, start_block, end_block, retries, delay) -> Tuple[int,
                 time.sleep(delay)
                 continue
             else:
-                logger.warning("Out of retries")
+                logger.warning('Out of retries')
                 raise
 
 
@@ -356,7 +356,7 @@ def _fetch_events_for_all_contracts(
     """
 
     if from_block is None:
-        raise TypeError("Missing mandatory keyword argument to getLogs: fromBlock")
+        raise TypeError('Missing mandatory keyword argument to getLogs: fromBlock')
 
     # Currently no way to poke this using a public Web3.py API.
     # This will return raw underlying ABI JSON object for the event
@@ -378,13 +378,13 @@ def _fetch_events_for_all_contracts(
     data_filter_set, event_filter_params = construct_event_filter_params(
         abi,
         codec,
-        address=argument_filters.get("address"),
+        address=argument_filters.get('address'),
         argument_filters=argument_filters,
         fromBlock=from_block,
         toBlock=to_block,
     )
 
-    logger.debug(f"Querying eth_getLogs with the following parameters: {event_filter_params}")
+    logger.debug(f'Querying eth_getLogs with the following parameters: {event_filter_params}')
 
     # Call JSON-RPC API on your Ethereum node.
     # get_logs() returns raw AttributedDict entries

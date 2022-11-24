@@ -10,7 +10,7 @@ from .execution import ExecutionClient, LightExecutionClient
 
 def get_vault_contract() -> Contract:
     """:returns instance of Stakewise Vault contract."""
-    abi_path = "abi/vault.json"
+    abi_path = 'abi/vault.json'
 
     current_dir = os.path.dirname(__file__)
     with open(os.path.join(current_dir, abi_path)) as f:
@@ -25,7 +25,7 @@ def get_vault_contract() -> Contract:
 
 def get_oracle_contract() -> Contract:
     """:returns instance of Stakewise Oracle contract."""
-    abi_path = "abi/oracle.json"
+    abi_path = 'abi/oracle.json'
 
     current_dir = os.path.dirname(__file__)
     with open(os.path.join(current_dir, abi_path)) as f:
@@ -40,7 +40,7 @@ def get_oracle_contract() -> Contract:
 
 def get_deposit_contract() -> Contract:
     """:returns instance of `ETH2 deposit` contract."""
-    abi_path = "abis/deposit.json"
+    abi_path = 'abis/deposit.json'
 
     current_dir = os.path.dirname(__file__)
     with open(os.path.join(current_dir, abi_path)) as f:

@@ -7,10 +7,10 @@ from src.config.settings import HEALTH_SERVER_HOST, HEALTH_SERVER_PORT
 health_routes = web.RouteTableDef()
 
 
-@health_routes.get("/")
+@health_routes.get('/')
 async def health(request):
     # pylint: disable=unused-argument
-    return web.Response(text="OK")
+    return web.Response(text='OK')
 
 
 def start_health_server(runner):
