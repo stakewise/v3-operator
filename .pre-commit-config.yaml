@@ -1,16 +1,16 @@
 repos:
   - repo: https://github.com/john-hen/Flake8-pyproject
-    rev: 1.1.0
+    rev: 1.2.2
     hooks:
       - id: Flake8-pyproject
 
   - repo: https://github.com/timothycrosley/isort
-    rev: 5.10.1
+    rev: 5.11.3
     hooks:
       - id: isort
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.1.0
+    rev: v4.4.0
     hooks:
       - id: end-of-file-fixer
       - id: trailing-whitespace

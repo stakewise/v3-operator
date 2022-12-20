@@ -1,57 +1,42 @@
-from decouple import Csv, config
+from decouple import Choices, Csv, config
+from web3 import Web3
 
-from src.config.networks import MAINNET, NETWORKS
+from src.config.networks import GOERLI, NETWORKS, NetworkConfig
 
-# common
-LOG_LEVEL = config("LOG_LEVEL", default="INFO")
+VAULT_CONTRACT_ADDRESS = Web3.to_checksum_address(config('VAULT_CONTRACT_ADDRESS'))
 
-NETWORK = config(
-    "NETWORK",
-    default=MAINNET,
-)
+# connections
+EXECUTION_ENDPOINT = config('EXECUTION_ENDPOINT')
 
-NETWORK_CONFIG = NETWORKS[NETWORK]
+# postgres
+POSTGRES_DB = config('POSTGRES_DB', default='operator')
+POSTGRES_PORT = config('POSTGRES_PORT', default=5432, cast=int)
+POSTGRES_USER = config('POSTGRES_USER', default='operator')
+POSTGRES_HOSTNAME = config('POSTGRES_HOSTNAME')
+POSTGRES_PASSWORD = config('POSTGRES_PASSWORD')
 
-# health server settings
-ENABLE_HEALTH_SERVER = config("ENABLE_HEALTH_SERVER", default=False, cast=bool)
-HEALTH_SERVER_PORT = config("HEALTH_SERVER_PORT", default=8080, cast=int)
-HEALTH_SERVER_HOST = config("HEALTH_SERVER_HOST", default="127.0.0.1", cast=str)
+# operator
+OPERATOR_PRIVATE_KEY = config('OPERATOR_PRIVATE_KEY')
 
-# required confirmation blocks
-CONFIRMATION_BLOCKS: int = config("CONFIRMATION_BLOCKS", default=15, cast=int)
-
-PROCESS_INTERVAL = config("PROCESS_INTERVAL", default=10, cast=int)
-
-# database
-DATABASE_URL = config("DATABASE_URL")
-
-# ipfs
-
+# IPFS
 IPFS_FETCH_ENDPOINTS = config(
     "IPFS_FETCH_ENDPOINTS",
     cast=Csv(),
-    default="http://cloudflare-ipfs.com,https://ipfs.io,https://gateway.pinata.cloud",
+    default="https://stakewise.infura-ipfs.io/,"
+            "http://cloudflare-ipfs.com,"
+            "https://gateway.pinata.cloud,https://ipfs.io",
 )
 
-LOCAL_IPFS_CLIENT_ENDPOINT = config("LOCAL_IPFS_CLIENT_ENDPOINT", default="")
+# common
+LOG_LEVEL = config('LOG_LEVEL', default='INFO')
+DEPOSIT_AMOUNT = Web3.to_wei(32, 'ether')
+DEPOSIT_AMOUNT_GWEI = int(Web3.from_wei(DEPOSIT_AMOUNT, 'gwei'))
 
-# infura
-INFURA_IPFS_CLIENT_ENDPOINT = config(
-    "INFURA_IPFS_CLIENT_ENDPOINT",
-    default="/dns/ipfs.infura.io/tcp/5001/https",
-)
-INFURA_IPFS_CLIENT_USERNAME = config("INFURA_IPFS_CLIENT_USERNAME", default="")
-INFURA_IPFS_CLIENT_PASSWORD = config("INFURA_IPFS_CLIENT_PASSWORD", default="")
+# network
+NETWORK = config('NETWORK', cast=Choices([GOERLI]))
+NETWORK_CONFIG: NetworkConfig = NETWORKS[NETWORK]
 
-# extra pins to pinata for redundancy
-IPFS_PINATA_PIN_ENDPOINT = config(
-    "IPFS_PINATA_ENDPOINT", default="https://api.pinata.cloud/pinning/pinJSONToIPFS"
-)
-IPFS_PINATA_API_KEY = config("IPFS_PINATA_API_KEY", default="")
-IPFS_PINATA_SECRET_KEY = config(
-    "IPFS_PINATA_SECRET_KEY",
-    default="",
-)
+APPROVAL_MAX_VALIDATORS = config('APPROVAL_MAX_VALIDATORS', default=10, cast=int)
 
 # sentry config
-SENTRY_DSN = config("SENTRY_DSN", default="")
+SENTRY_DSN = config('SENTRY_DSN', default='')
