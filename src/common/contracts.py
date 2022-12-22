@@ -5,7 +5,8 @@ from typing import Dict
 from web3.contract import AsyncContract
 
 from src.common.clients import execution_client
-from src.config.settings import NETWORK_CONFIG, VAULT_CONTRACT_ADDRESS
+from src.config.networks import ETH_NETWORKS
+from src.config.settings import NETWORK, NETWORK_CONFIG, VAULT_CONTRACT_ADDRESS
 
 
 def _load_abi(abi_path: str) -> Dict:
@@ -30,5 +31,17 @@ def get_validators_registry_contract() -> AsyncContract:
     )  # type: ignore
 
 
+def get_keeper_contract() -> AsyncContract:
+    """:returns instance of `Keeper` contract."""
+    if NETWORK in ETH_NETWORKS:
+        abi_path = 'abi/IEthKeeper.json'
+        return execution_client.eth.contract(
+            address=NETWORK_CONFIG.KEEPER_CONTRACT_ADDRESS, abi=_load_abi(abi_path)
+        )  # type: ignore
+
+    raise NotImplementedError('networks other than Ethereum not supported')
+
+
 vault_contract = get_vault_contract()
 validators_registry_contract = get_validators_registry_contract()
+keeper_contract = get_keeper_contract()

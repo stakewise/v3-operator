@@ -1,0 +1,39 @@
+version: "3.9"
+
+volumes:
+  operator_postgres:
+    driver: local
+
+services:
+  # operator services
+  operator:
+    build:
+      context: ..
+      dockerfile: ./Dockerfile
+    image: operator
+    container_name: operator
+    restart: always
+    depends_on:
+      - postgres
+    volumes:
+      - ..:/app
+      - $KEYSTORES_PATH:/keystores
+    env_file:
+      - .env
+    entrypoint: [ "python" ]
+    command: [ "./src/main.py" ]
+    environment:
+      KEYSTORES_PATH: /keystores
+      POSTGRES_HOSTNAME: operator_postgres
+      POSTGRES_PORT: 5432
+
+  postgres:
+    image: postgres:latest
+    container_name: operator_postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    volumes:
+      - "operator_postgres:/var/lib/postgresql/data"
+    env_file:
+      - .env

@@ -7,6 +7,7 @@ VAULT_CONTRACT_ADDRESS = Web3.to_checksum_address(config('VAULT_CONTRACT_ADDRESS
 
 # connections
 EXECUTION_ENDPOINT = config('EXECUTION_ENDPOINT')
+CONSENSUS_ENDPOINT = config('CONSENSUS_ENDPOINT')
 
 # postgres
 POSTGRES_DB = config('POSTGRES_DB', default='operator')
@@ -15,16 +16,25 @@ POSTGRES_USER = config('POSTGRES_USER', default='operator')
 POSTGRES_HOSTNAME = config('POSTGRES_HOSTNAME')
 POSTGRES_PASSWORD = config('POSTGRES_PASSWORD')
 
+# keystores
+KEYSTORES_PASSWORD = config('KEYSTORES_PASSWORD')
+KEYSTORES_PATH = config('KEYSTORES_PATH')
+
 # operator
 OPERATOR_PRIVATE_KEY = config('OPERATOR_PRIVATE_KEY')
 
-# IPFS
+# ENS
+# used to fetch oracles config from ENS when running on Gnosis
+MAINNET_EXECUTION_ENDPOINT = config('MAINNET_EXECUTION_ENDPOINT', default='')
+DAO_ENS_NAME = config('DAO_ENS_NAME', default='stakewise.eth')
+
+# remote IPFS
 IPFS_FETCH_ENDPOINTS = config(
-    "IPFS_FETCH_ENDPOINTS",
+    'IPFS_FETCH_ENDPOINTS',
     cast=Csv(),
-    default="https://stakewise.infura-ipfs.io/,"
-            "http://cloudflare-ipfs.com,"
-            "https://gateway.pinata.cloud,https://ipfs.io",
+    default='https://stakewise.infura-ipfs.io/,'
+    'http://cloudflare-ipfs.com,'
+    'https://gateway.pinata.cloud,https://ipfs.io',
 )
 
 # common
