@@ -62,7 +62,7 @@ def save_deposit_data(deposit_data: list[DepositData]) -> None:
 
 
 def get_deposit_data() -> list[DepositData]:
-    """Fetches `count` deposit data starting from `start_index` validator index."""
+    """Fetches all the deposit data."""
     with db_client.get_db_connection() as conn:
         with conn.cursor(row_factory=class_row(DepositData)) as cur:
             cur.execute(
