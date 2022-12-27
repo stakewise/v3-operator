@@ -1,13 +1,9 @@
 import backoff
-from eth_typing import BlockNumber
 from web3 import Web3
 
 from src.common.clients import ipfs_fetch_client
-from src.config.settings import NETWORK_CONFIG
 from src.validators.typings import DepositData
 
-VAULT_GENESIS_BLOCK: BlockNumber = NETWORK_CONFIG.VAULT_GENESIS_BLOCK
-GENESIS_FORK_VERSION: bytes = NETWORK_CONFIG.GENESIS_FORK_VERSION
 BLS_PUBLIC_KEY_LENGTH = 48
 BLS_SIGNATURE_LENGTH = 96
 
