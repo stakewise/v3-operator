@@ -6,7 +6,6 @@ from src.common.clients import ipfs_fetch_client
 from src.config.settings import NETWORK_CONFIG
 from src.validators.typings import DepositData
 
-VALIDATORS_REGISTRY_GENESIS_BLOCK: BlockNumber = NETWORK_CONFIG.VALIDATORS_REGISTRY_GENESIS_BLOCK
 VAULT_GENESIS_BLOCK: BlockNumber = NETWORK_CONFIG.VAULT_GENESIS_BLOCK
 GENESIS_FORK_VERSION: bytes = NETWORK_CONFIG.GENESIS_FORK_VERSION
 BLS_PUBLIC_KEY_LENGTH = 48
