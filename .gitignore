@@ -3,5 +3,7 @@ venv
 dist
 .mypy_cache
 .idea
+.postgres
 local.env
 *.env
+/logfile

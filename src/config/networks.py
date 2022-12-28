@@ -1,114 +1,89 @@
-from decouple import config
+from dataclasses import dataclass
+from decimal import Decimal
+
+from ens.constants import EMPTY_ADDR_HEX
+from eth_typing import BlockNumber, ChecksumAddress, HexStr
+from sw_utils.typings import Bytes32
 from web3 import Web3
 
-MAINNET = "mainnet"
-GOERLI = "goerli"
-HARBOUR_GOERLI = "harbour_goerli"
-HARBOUR_MAINNET = "harbour_mainnet"
-GNOSIS_CHAIN = "gnosis"
+MAINNET = 'mainnet'
+GOERLI = 'goerli'
+GNOSIS = 'gnosis'
 
-MAINNET_UPPER = MAINNET.upper()
-GOERLI_UPPER = GOERLI.upper()
-HARBOUR_GOERLI_UPPER = HARBOUR_GOERLI.upper()
-HARBOUR_MAINNET_UPPER = HARBOUR_MAINNET.upper()
-GNOSIS_CHAIN_UPPER = GNOSIS_CHAIN.upper()
+ETH_NETWORKS = [MAINNET, GOERLI]
+GNO_NETWORKS = [GNOSIS]
+
+
+@dataclass
+class NetworkConfig:
+    VALIDATORS_REGISTRY_CONTRACT_ADDRESS: ChecksumAddress
+    VALIDATORS_REGISTRY_GENESIS_BLOCK: BlockNumber
+    KEEPER_CONTRACT_ADDRESS: ChecksumAddress
+    GENESIS_VALIDATORS_ROOT: Bytes32
+    VAULT_GENESIS_BLOCK: BlockNumber
+    DAO_ENS_ORACLES_KEY: str
+    SECONDS_PER_BLOCK: Decimal
+    CONFIRMATION_BLOCKS: int
+    GENESIS_FORK_VERSION: bytes
+    IS_POA: bool
+
 
 NETWORKS = {
-    MAINNET: dict(
-        ETH1_ENDPOINT=config("ETH1_ENDPOINT", default=""),
-        ETH2_ENDPOINT=config("ETH2_ENDPOINT", default=""),
-        SLOTS_PER_EPOCH=32,
-        SECONDS_PER_SLOT=12,
-        PRIVATE_KEY=config("PRIVATE_KEY", default=""),
-
-        VAULT_CONTRACT_ADDRESS=Web3.toChecksumAddress(
-            "0x8a887282E67ff41d36C0b7537eAB035291461AcD"
+    MAINNET: NetworkConfig(
+        VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x00000000219ab540356cBB839Cbe05303d7705Fa'
         ),
-        ORACLE_CONTRACT_ADDRESS=Web3.toChecksumAddress(
-            "0x8a887282E67ff41d36C0b7537eAB035291461AcD"
+        VALIDATORS_REGISTRY_GENESIS_BLOCK=BlockNumber(11052983),
+        # TODO: replace with real values once contracts deployed
+        KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        GENESIS_VALIDATORS_ROOT=Bytes32(
+            Web3.to_bytes(
+                hexstr=HexStr('0x4b363db94e286120d76eb905340fdd4e54bfe9f06bf33ff6cf5ad27f511bfe95')
+            )
         ),
-        DEPOSIT_CONTRACT_ADDRESS=Web3.toChecksumAddress(
-            "0x00000000219ab540356cBB839Cbe05303d7705Fa"
-        ),
-        ETH_ORACLES_ENDPOINT=config("ETH_ORACLES_ENDPOINT", default=""),
-        OPERATOR_PRIVATE_KEY=config("OPERATOR_PRIVATE_KEY", default=""),
+        VAULT_GENESIS_BLOCK=BlockNumber(0),
+        DAO_ENS_ORACLES_KEY='eth_oracles_config',
+        SECONDS_PER_BLOCK=Decimal(12),
+        CONFIRMATION_BLOCKS=64,
+        GENESIS_FORK_VERSION=bytes.fromhex('00000000'),
         IS_POA=False,
-        VALIDATOR_DEPOSIT=Web3.toWei(32, "ether")
     ),
-    HARBOUR_MAINNET: dict(
-        ETH1_ENDPOINT=config("ETH1_ENDPOINT", default=""),
-        ETH2_ENDPOINT=config("ETH2_ENDPOINT", default=""),
-        SLOTS_PER_EPOCH=32,
-        SECONDS_PER_SLOT=12,
-        VAULT_CONTRACT_ADDRESS=Web3.toChecksumAddress(
-            "0x8a887282E67ff41d36C0b7537eAB035291461AcD"
+    GOERLI: NetworkConfig(
+        VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0xff50ed3d0ec03aC01D4C79aAd74928BFF48a7b2b'
         ),
-        ORACLE_CONTRACT_ADDRESS=Web3.toChecksumAddress(
-            "0x8a887282E67ff41d36C0b7537eAB035291461AcD"
+        VALIDATORS_REGISTRY_GENESIS_BLOCK=BlockNumber(4367321),
+        # TODO: replace with real values once contracts deployed
+        KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        GENESIS_VALIDATORS_ROOT=Bytes32(
+            Web3.to_bytes(
+                hexstr=HexStr('0x043db0d9a83813551ee2f33450d23797757d430911a9320530ad8a0eabc43efb')
+            )
         ),
-        DEPOSIT_CONTRACT_ADDRESS=Web3.toChecksumAddress(
-            "0x00000000219ab540356cBB839Cbe05303d7705Fa"
+        VAULT_GENESIS_BLOCK=BlockNumber(0),
+        DAO_ENS_ORACLES_KEY='eth_oracles_config',
+        SECONDS_PER_BLOCK=Decimal(12),
+        CONFIRMATION_BLOCKS=64,
+        GENESIS_FORK_VERSION=bytes.fromhex('00001020'),
+        IS_POA=True,
+    ),
+    GNOSIS: NetworkConfig(
+        VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x0B98057eA310F4d31F2a452B414647007d1645d9'
         ),
-        ETH_ORACLES_ENDPOINT=config("ETH_ORACLES_ENDPOINT", default=""),
-        OPERATOR_PRIVATE_KEY=config("OPERATOR_PRIVATE_KEY", default=""),
+        VALIDATORS_REGISTRY_GENESIS_BLOCK=BlockNumber(19469076),
+        # TODO: replace with real values once contracts deployed
+        KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        GENESIS_VALIDATORS_ROOT=Bytes32(
+            Web3.to_bytes(
+                hexstr=HexStr('0xf5dcb5564e829aab27264b9becd5dfaa017085611224cb3036f573368dbb9d47')
+            )
+        ),
+        VAULT_GENESIS_BLOCK=BlockNumber(0),
+        DAO_ENS_ORACLES_KEY='gno_oracles_config',
+        SECONDS_PER_BLOCK=Decimal('6.8'),
+        CONFIRMATION_BLOCKS=24,
+        GENESIS_FORK_VERSION=bytes.fromhex('00000064'),
         IS_POA=False,
-        VALIDATOR_DEPOSIT=Web3.toWei(32, "ether")
-    ),
-    GOERLI: dict(
-        ETH1_ENDPOINT=config("ETH1_ENDPOINT", default=""),
-        ETH2_ENDPOINT=config("ETH2_ENDPOINT", default=""),
-        SLOTS_PER_EPOCH=32,
-        SECONDS_PER_SLOT=12,
-        VAULT_CONTRACT_ADDRESS=Web3.toChecksumAddress(
-            "0x8a887282E67ff41d36C0b7537eAB035291461AcD"
-        ),
-        ORACLE_CONTRACT_ADDRESS=Web3.toChecksumAddress(
-            "0x8a887282E67ff41d36C0b7537eAB035291461AcD"
-        ),
-        DEPOSIT_CONTRACT_ADDRESS=Web3.toChecksumAddress(
-            "0x00000000219ab540356cBB839Cbe05303d7705Fa"
-        ),
-        ETH_ORACLES_ENDPOINT=config("ETH_ORACLES_ENDPOINT", default=""),
-        OPERATOR_PRIVATE_KEY=config("OPERATOR_PRIVATE_KEY", default=""),
-        IS_POA=True,
-        VALIDATOR_DEPOSIT=Web3.toWei(32, "ether")
-    ),
-    HARBOUR_GOERLI: dict(
-        ETH1_ENDPOINT=config("ETH1_ENDPOINT", default=""),
-        ETH2_ENDPOINT=config("ETH2_ENDPOINT", default=""),
-        SLOTS_PER_EPOCH=32,
-        SECONDS_PER_SLOT=12,
-        VAULT_CONTRACT_ADDRESS=Web3.toChecksumAddress(
-            "0x8a887282E67ff41d36C0b7537eAB035291461AcD"
-        ),
-        ORACLE_CONTRACT_ADDRESS=Web3.toChecksumAddress(
-            "0x8a887282E67ff41d36C0b7537eAB035291461AcD"
-        ),
-        DEPOSIT_CONTRACT_ADDRESS=Web3.toChecksumAddress(
-            "0x00000000219ab540356cBB839Cbe05303d7705Fa"
-        ),
-        ETH_ORACLES_ENDPOINT=config("ETH_ORACLES_ENDPOINT", default=""),
-        OPERATOR_PRIVATE_KEY=config("OPERATOR_PRIVATE_KEY", default=""),
-        IS_POA=True,
-        VALIDATOR_DEPOSIT=Web3.toWei(32, "ether")
-    ),
-    GNOSIS_CHAIN: dict(
-        ETH1_ENDPOINT=config("ETH1_ENDPOINT", default=""),
-        ETH2_ENDPOINT=config("ETH2_ENDPOINT", default=""),
-        SLOTS_PER_EPOCH=32,
-        SECONDS_PER_SLOT=12,
-        VAULT_CONTRACT_ADDRESS=Web3.toChecksumAddress(
-            "0x8a887282E67ff41d36C0b7537eAB035291461AcD"
-        ),
-        ORACLE_CONTRACT_ADDRESS=Web3.toChecksumAddress(
-            "0x8a887282E67ff41d36C0b7537eAB035291461AcD"
-        ),
-        DEPOSIT_CONTRACT_ADDRESS=Web3.toChecksumAddress(
-            "0x00000000219ab540356cBB839Cbe05303d7705Fa"
-        ),
-        ETH_ORACLES_ENDPOINT=config("ETH_ORACLES_ENDPOINT", default=""),
-        OPERATOR_PRIVATE_KEY=config("OPERATOR_PRIVATE_KEY", default=""),
-        IS_POA=True,
-        VALIDATOR_DEPOSIT=Web3.toWei(1, "ether")
     ),
 }
