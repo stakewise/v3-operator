@@ -1056,7 +1056,7 @@ pbr = ">=2.0.0,<2.1.0 || >2.1.0"
 
 [[package]]
 name = "sw-utils"
-version = "0.2.7"
+version = "0.2.8"
 description = "StakeWise Python utils"
 category = "main"
 optional = false
@@ -1073,8 +1073,8 @@ web3 = "^6.0.0b9"
 [package.source]
 type = "git"
 url = "https://github.com/stakewise/sw-utils.git"
-reference = "v0.2.7"
-resolved_reference = "75cf4e8a7abaa1a132b58153a60c1e1260205979"
+reference = "v0.2.8"
+resolved_reference = "958d233784dc48e359191add0f0bfa887a100ab2"
 
 [[package]]
 name = "toml"
@@ -1241,7 +1241,7 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "cc8a177d8a9f6ef59160988246e3bd5ac8ac2c071dba8dda78e003b6e56eeb91"
+content-hash = "745d4662b5c3e38447fb8de29edefbef972b48fe586e039d5d6e1e08a5a4562d"
 
 [metadata.files]
 aiohttp = [

@@ -1,9 +1,13 @@
 import psycopg
-from sw_utils import IpfsFetchClient, get_consensus_client, get_execution_client
+from sw_utils import (
+    IpfsFetchClient,
+    construct_async_sign_and_send_raw_middleware,
+    get_consensus_client,
+    get_execution_client,
+)
 from web3 import Web3
 
 from src.common.accounts import operator_account
-from src.common.middlewares import construct_async_sign_and_send_raw_middleware
 from src.config.settings import (
     CONSENSUS_ENDPOINT,
     EXECUTION_ENDPOINT,
