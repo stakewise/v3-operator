@@ -13,7 +13,7 @@ from src.validators.execution import (
     NetworkValidatorsProcessor,
     VaultValidatorsProcessor,
 )
-from src.validators.tasks import register_validators
+from src.validators.tasks import load_genesis_validators, register_validators
 from src.validators.utils import load_private_keys
 
 logging.basicConfig(
@@ -35,6 +35,9 @@ async def get_safe_block_number() -> BlockNumber:
 
 async def main() -> None:
     validators_db_setup()
+
+    # load genesis validators for some networks
+    await load_genesis_validators()
 
     # extract private keys from the keystores
     private_keys = load_private_keys()

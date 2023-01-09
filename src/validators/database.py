@@ -1,3 +1,5 @@
+import logging
+
 from eth_typing import HexStr
 from psycopg.rows import class_row
 from psycopg.sql import SQL, Identifier
@@ -9,6 +11,8 @@ from src.validators.typings import DepositData, NetworkValidator, ValidatorsRoot
 NETWORK_VALIDATORS_TABLE = f'{NETWORK}_network_validators'
 DEPOSIT_DATA_TABLE = f'{NETWORK}_deposit_data'
 VALIDATORS_ROOT_TABLE = f'{NETWORK}_validators_root'
+
+logger = logging.getLogger(__name__)
 
 
 def save_validators_root(root: ValidatorsRoot) -> None:

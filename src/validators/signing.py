@@ -13,7 +13,7 @@ from src.config.settings import NETWORK_CONFIG
 from src.validators.typings import BLSPrivkey, ExitSignatureShards, Oracles
 
 
-def get_polynomial_points(coefficients: list[int], num_points: int) -> list[int]:
+def get_polynomial_points(coefficients: list[int], num_points: int) -> list[bytes]:
     """Calculates polynomial points."""
     points = []
     for x in range(1, num_points + 1):
@@ -25,7 +25,7 @@ def get_polynomial_points(coefficients: list[int], num_points: int) -> list[int]
             term = (coefficients[i] * exponentiation) % curve_order
             y = (y + term) % curve_order
         # add the point to the list of points
-        points.append(y)
+        points.append(y.to_bytes(32, 'big'))
     return points
 
 
@@ -64,14 +64,17 @@ def get_exit_signature_shards(
             exit_signatures=[Web3.to_hex(shard)]
         )
 
-    coefficients = [int(private_key)]
+    coefficients: list[int] = [int.from_bytes(private_key, 'big')]
     for _ in range(oracles.threshold - 1):
         coefficients.append(randint(0, curve_order - 1))
 
     private_keys = get_polynomial_points(coefficients, len(oracles.rsa_public_keys))
     exit_signature_shards: list[HexStr] = []
     for bls_priv_key, rsa_pub_key in zip(private_keys, oracles.rsa_public_keys):
-        shard = encrypt_oracle_data(rsa_pub_key, bls.Sign(bls_priv_key, message))
+        shard = encrypt_oracle_data(
+            public_key=rsa_pub_key,
+            data=bls.Sign(bls_priv_key, message)
+        )
         exit_signature_shards.append(Web3.to_hex(shard))
 
     return ExitSignatureShards(

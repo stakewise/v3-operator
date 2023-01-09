@@ -6,6 +6,11 @@
   },
   {
     "inputs": [],
+    "name": "CapacityExceeded",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "InsufficientAvailableAssets",
     "type": "error"
   },
@@ -36,7 +41,7 @@
   },
   {
     "inputs": [],
-    "name": "MaxTotalAssetsExceeded",
+    "name": "InvalidValidators",
     "type": "error"
   },
   {
@@ -47,16 +52,6 @@
   {
     "inputs": [],
     "name": "NotHarvested",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "NotImplementedError",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "UpgradeFailed",
     "type": "error"
   },
   {
@@ -193,13 +188,26 @@
     "anonymous": false,
     "inputs": [
       {
-        "indexed": false,
+        "indexed": true,
         "internalType": "address",
         "name": "feeRecipient",
         "type": "address"
       }
     ],
     "name": "FeeRecipientUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "metadataIpfsHash",
+        "type": "string"
+      }
+    ],
+    "name": "MetadataUpdated",
     "type": "event"
   },
   {
@@ -416,6 +424,19 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "capacity",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -503,6 +524,25 @@
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "receiver",
+        "type": "address"
+      }
+    ],
+    "name": "deposit",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "shares",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "shares",
         "type": "uint256"
@@ -531,19 +571,6 @@
   },
   {
     "inputs": [],
-    "name": "exitQueueUpdateDelay",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
     "name": "feePercent",
     "outputs": [
       {
@@ -561,19 +588,6 @@
     "outputs": [
       {
         "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "feesEscrow",
-    "outputs": [
-      {
-        "internalType": "contract IFeesEscrow",
         "name": "",
         "type": "address"
       }
@@ -614,11 +628,71 @@
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "capacity",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "validatorsRoot",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "address",
+            "name": "admin",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "mevEscrow",
+            "type": "address"
+          },
+          {
+            "internalType": "uint16",
+            "name": "feePercent",
+            "type": "uint16"
+          },
+          {
+            "internalType": "string",
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "symbol",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "validatorsIpfsHash",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "metadataIpfsHash",
+            "type": "string"
+          }
+        ],
+        "internalType": "struct IEthVault.EthVaultInitParams",
+        "name": "params",
+        "type": "tuple"
+      }
+    ],
+    "name": "initialize",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "keeper",
     "outputs": [
       {
-        "internalType": "contract IBaseKeeper",
+        "internalType": "address",
         "name": "",
         "type": "address"
       }
@@ -628,15 +702,34 @@
   },
   {
     "inputs": [],
-    "name": "maxTotalAssets",
+    "name": "mevEscrow",
     "outputs": [
       {
-        "internalType": "uint256",
+        "internalType": "contract IMevEscrow",
         "name": "",
-        "type": "uint256"
+        "type": "address"
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes[]",
+        "name": "data",
+        "type": "bytes[]"
+      }
+    ],
+    "name": "multicall",
+    "outputs": [
+      {
+        "internalType": "bytes[]",
+        "name": "results",
+        "type": "bytes[]"
+      }
+    ],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -716,6 +809,19 @@
   },
   {
     "inputs": [],
+    "name": "proxiableUUID",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "queuedShares",
     "outputs": [
       {
@@ -758,10 +864,113 @@
   },
   {
     "inputs": [],
+    "name": "redeemableShares",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "validatorsRegistryRoot",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "bytes",
+            "name": "validators",
+            "type": "bytes"
+          },
+          {
+            "internalType": "bytes",
+            "name": "signatures",
+            "type": "bytes"
+          },
+          {
+            "internalType": "string",
+            "name": "exitSignaturesIpfsHash",
+            "type": "string"
+          }
+        ],
+        "internalType": "struct IKeeperValidators.ApprovalParams",
+        "name": "keeperParams",
+        "type": "tuple"
+      },
+      {
+        "internalType": "bytes32[]",
+        "name": "proof",
+        "type": "bytes32[]"
+      }
+    ],
+    "name": "registerValidator",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "validatorsRegistryRoot",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "bytes",
+            "name": "validators",
+            "type": "bytes"
+          },
+          {
+            "internalType": "bytes",
+            "name": "signatures",
+            "type": "bytes"
+          },
+          {
+            "internalType": "string",
+            "name": "exitSignaturesIpfsHash",
+            "type": "string"
+          }
+        ],
+        "internalType": "struct IKeeperValidators.ApprovalParams",
+        "name": "keeperParams",
+        "type": "tuple"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "indexes",
+        "type": "uint256[]"
+      },
+      {
+        "internalType": "bool[]",
+        "name": "proofFlags",
+        "type": "bool[]"
+      },
+      {
+        "internalType": "bytes32[]",
+        "name": "proof",
+        "type": "bytes32[]"
+      }
+    ],
+    "name": "registerValidators",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "registry",
     "outputs": [
       {
-        "internalType": "contract IRegistry",
+        "internalType": "address",
         "name": "",
         "type": "address"
       }
@@ -785,13 +994,26 @@
   {
     "inputs": [
       {
+        "internalType": "string",
+        "name": "metadataIpfsHash",
+        "type": "string"
+      }
+    ],
+    "name": "setMetadata",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "bytes32",
         "name": "_validatorsRoot",
         "type": "bytes32"
       },
       {
         "internalType": "string",
-        "name": "_validatorsIpfsHash",
+        "name": "validatorsIpfsHash",
         "type": "string"
       }
     ],
@@ -908,20 +1130,72 @@
   {
     "inputs": [
       {
-        "internalType": "int256",
-        "name": "validatorAssets",
-        "type": "int256"
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "rewardsRoot",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "int160",
+            "name": "reward",
+            "type": "int160"
+          },
+          {
+            "internalType": "bytes32[]",
+            "name": "proof",
+            "type": "bytes32[]"
+          }
+        ],
+        "internalType": "struct IKeeperRewards.HarvestParams",
+        "name": "harvestParams",
+        "type": "tuple"
       }
     ],
     "name": "updateState",
-    "outputs": [
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
       {
-        "internalType": "int256",
-        "name": "assetsDelta",
-        "type": "int256"
+        "internalType": "address",
+        "name": "receiver",
+        "type": "address"
+      },
+      {
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "rewardsRoot",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "int160",
+            "name": "reward",
+            "type": "int160"
+          },
+          {
+            "internalType": "bytes32[]",
+            "name": "proof",
+            "type": "bytes32[]"
+          }
+        ],
+        "internalType": "struct IKeeperRewards.HarvestParams",
+        "name": "harvestParams",
+        "type": "tuple"
       }
     ],
-    "stateMutability": "nonpayable",
+    "name": "updateStateAndDeposit",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "shares",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "payable",
     "type": "function"
   },
   {
@@ -932,6 +1206,19 @@
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "validatorsRegistry",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
       }
     ],
     "stateMutability": "view",
@@ -961,6 +1248,35 @@
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "assets",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "receiver",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      }
+    ],
+    "name": "withdraw",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "shares",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {

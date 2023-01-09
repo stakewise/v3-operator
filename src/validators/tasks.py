@@ -5,16 +5,23 @@ from eth_typing import HexStr
 from web3 import Web3
 from web3.types import Wei
 
+from src.common.clients import ipfs_fetch_client
 from src.common.utils import MGNO_RATE, WAD
-from src.config.networks import GNOSIS
+from src.config.networks import GNOSIS, GOERLI
 from src.config.settings import (
     APPROVAL_MAX_VALIDATORS,
     DEPOSIT_AMOUNT,
+    GOERLI_GENESIS_VALIDATORS_IPFS_HASH,
     NETWORK,
+    NETWORK_CONFIG,
     VAULT_CONTRACT_ADDRESS,
 )
 from src.validators.consensus import get_consensus_fork
-from src.validators.database import get_next_validator_index
+from src.validators.database import (
+    get_last_network_validator,
+    get_next_validator_index,
+    save_network_validators,
+)
 from src.validators.execution import (
     get_available_assets,
     get_available_deposit_data,
@@ -29,6 +36,7 @@ from src.validators.typings import (
     ApprovalRequest,
     BLSPrivkey,
     DepositData,
+    NetworkValidator,
     OraclesApproval,
 )
 from src.validators.utils import send_approval_requests
@@ -117,3 +125,25 @@ async def get_oracles_approval(
         ipfs_hash=ipfs_hash,
         validators_registry_root=registry_root,
     )
+
+
+async def load_genesis_validators() -> None:
+    """
+    In some test networks (e.g. Goerli) genesis validators
+    are not registered through the registry contract.
+    """
+    if NETWORK != GOERLI or get_last_network_validator() is not None:
+        return
+
+    pub_keys = await ipfs_fetch_client.fetch_bytes(GOERLI_GENESIS_VALIDATORS_IPFS_HASH)
+    genesis_validators: list[NetworkValidator] = []
+    for i in range(0, len(pub_keys), 48):
+        genesis_validators.append(
+            NetworkValidator(
+                public_key=Web3.to_hex(pub_keys[i: i + 48]),
+                block_number=NETWORK_CONFIG.VALIDATORS_REGISTRY_GENESIS_BLOCK,
+            )
+        )
+
+    save_network_validators(genesis_validators)
+    logger.info('Loaded %d Goerli genesis validators', len(genesis_validators))

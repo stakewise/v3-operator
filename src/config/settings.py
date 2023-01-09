@@ -23,11 +23,6 @@ KEYSTORES_PATH = config('KEYSTORES_PATH')
 # operator
 OPERATOR_PRIVATE_KEY = config('OPERATOR_PRIVATE_KEY')
 
-# ENS
-# used to fetch oracles config from ENS when running on Gnosis
-MAINNET_EXECUTION_ENDPOINT = config('MAINNET_EXECUTION_ENDPOINT', default='')
-DAO_ENS_NAME = config('DAO_ENS_NAME', default='stakewise.eth')
-
 # remote IPFS
 IPFS_FETCH_ENDPOINTS = config(
     'IPFS_FETCH_ENDPOINTS',
@@ -36,6 +31,7 @@ IPFS_FETCH_ENDPOINTS = config(
     'http://cloudflare-ipfs.com,'
     'https://gateway.pinata.cloud,https://ipfs.io',
 )
+GOERLI_GENESIS_VALIDATORS_IPFS_HASH = 'QmXSvJeUKXAtWtbH26gt5ruKUqxogUsjUs9rSYs3pg37Fx'
 
 # common
 LOG_LEVEL = config('LOG_LEVEL', default='INFO')

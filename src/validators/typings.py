@@ -67,22 +67,22 @@ class ApprovalRequest:
 
 
 @dataclass
-class SingleValidatorRegistration:
-    vault: ChecksumAddress
+class KeeperApprovalParams:
     validatorsRegistryRoot: HexStr | Bytes32
-    validator: HexStr | bytes
+    validators: HexStr | bytes
     signatures: HexStr | bytes
-    exitSignatureIpfsHash: str
+    exitSignaturesIpfsHash: str
+
+
+@dataclass
+class SingleValidatorRegistration:
+    keeperParams: KeeperApprovalParams
     proof: list[str | HexStr | bytes]
 
 
 @dataclass
 class MultipleValidatorRegistration:
-    vault: ChecksumAddress
-    validatorsRegistryRoot: HexStr | Bytes32
-    validators: HexStr | bytes
-    signatures: HexStr | bytes
-    exitSignatureIpfsHash: str
+    keeperParams: KeeperApprovalParams
     indexes: list[int]
     proofFlags: list[bool]
     proof: list[str | HexStr | bytes]

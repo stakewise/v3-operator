@@ -9,6 +9,7 @@ import backoff
 import milagro_bls_binding as bls
 from eth_typing import ChecksumAddress, HexStr
 from staking_deposit.key_handling.keystore import ScryptKeystore
+from tqdm import tqdm
 from web3 import Web3
 
 from src.config.settings import KEYSTORES_PASSWORD, KEYSTORES_PATH
@@ -52,9 +53,10 @@ async def send_approval_request(
     payload: dict
 ) -> OracleApproval:
     """Requests approval from single oracle."""
-    response = await session.post(url=endpoint, json=payload)
-    response.raise_for_status()
-    data = await response.json()
+    async with session.post(url=endpoint, json=payload) as response:
+        response.raise_for_status()
+        data = await response.json()
+
     return OracleApproval(
         ipfs_hash=data['ipfs_hash'],
         signature=Web3.to_bytes(hexstr=data['signature'])
@@ -64,7 +66,7 @@ async def send_approval_request(
 def load_private_keys() -> dict[HexStr, BLSPrivkey]:
     """Extracts private keys from the keystores."""
     private_keys: dict[HexStr, BLSPrivkey] = {}
-    for file_name in listdir(KEYSTORES_PATH):
+    for file_name in tqdm(listdir(KEYSTORES_PATH)):
         file_path = join(KEYSTORES_PATH, file_name)
         if not (isfile(file_path) and file_name.startswith('keystore')):
             continue
