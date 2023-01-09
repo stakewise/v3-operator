@@ -18,10 +18,9 @@ GNO_NETWORKS = [GNOSIS]
 class NetworkConfig:
     VALIDATORS_REGISTRY_CONTRACT_ADDRESS: ChecksumAddress
     VALIDATORS_REGISTRY_GENESIS_BLOCK: BlockNumber
-    KEEPER_CONTRACT_ADDRESS: ChecksumAddress
+    ORACLES_CONTRACT_ADDRESS: ChecksumAddress
     GENESIS_VALIDATORS_ROOT: Bytes32
     VAULT_GENESIS_BLOCK: BlockNumber
-    DAO_ENS_ORACLES_KEY: str
     SECONDS_PER_BLOCK: Decimal
     CONFIRMATION_BLOCKS: int
     GENESIS_FORK_VERSION: bytes
@@ -35,14 +34,13 @@ NETWORKS = {
         ),
         VALIDATORS_REGISTRY_GENESIS_BLOCK=BlockNumber(11052983),
         # TODO: replace with real values once contracts deployed
-        KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        ORACLES_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         GENESIS_VALIDATORS_ROOT=Bytes32(
             Web3.to_bytes(
                 hexstr=HexStr('0x4b363db94e286120d76eb905340fdd4e54bfe9f06bf33ff6cf5ad27f511bfe95')
             )
         ),
         VAULT_GENESIS_BLOCK=BlockNumber(0),
-        DAO_ENS_ORACLES_KEY='eth_oracles_config',
         SECONDS_PER_BLOCK=Decimal(12),
         CONFIRMATION_BLOCKS=64,
         GENESIS_FORK_VERSION=bytes.fromhex('00000000'),
@@ -53,15 +51,15 @@ NETWORKS = {
             '0xff50ed3d0ec03aC01D4C79aAd74928BFF48a7b2b'
         ),
         VALIDATORS_REGISTRY_GENESIS_BLOCK=BlockNumber(4367321),
-        # TODO: replace with real values once contracts deployed
-        KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        ORACLES_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x1703B25658e0A97ee70DF8Ce2aD146f5a7700D31'
+        ),
         GENESIS_VALIDATORS_ROOT=Bytes32(
             Web3.to_bytes(
                 hexstr=HexStr('0x043db0d9a83813551ee2f33450d23797757d430911a9320530ad8a0eabc43efb')
             )
         ),
-        VAULT_GENESIS_BLOCK=BlockNumber(0),
-        DAO_ENS_ORACLES_KEY='eth_oracles_config',
+        VAULT_GENESIS_BLOCK=BlockNumber(8265639),
         SECONDS_PER_BLOCK=Decimal(12),
         CONFIRMATION_BLOCKS=64,
         GENESIS_FORK_VERSION=bytes.fromhex('00001020'),
@@ -73,14 +71,13 @@ NETWORKS = {
         ),
         VALIDATORS_REGISTRY_GENESIS_BLOCK=BlockNumber(19469076),
         # TODO: replace with real values once contracts deployed
-        KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        ORACLES_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         GENESIS_VALIDATORS_ROOT=Bytes32(
             Web3.to_bytes(
                 hexstr=HexStr('0xf5dcb5564e829aab27264b9becd5dfaa017085611224cb3036f573368dbb9d47')
             )
         ),
         VAULT_GENESIS_BLOCK=BlockNumber(0),
-        DAO_ENS_ORACLES_KEY='gno_oracles_config',
         SECONDS_PER_BLOCK=Decimal('6.8'),
         CONFIRMATION_BLOCKS=24,
         GENESIS_FORK_VERSION=bytes.fromhex('00000064'),

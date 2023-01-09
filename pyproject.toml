@@ -9,14 +9,15 @@ python = "^3.10"
 python-decouple = "==3.6"
 backoff = "==2.2.1"
 sentry-sdk = "==1.12.1"
-web3 = "==6.0.0b8"
-multiproof = "==0.1.1"
+web3 = "==6.0.0b9"
 py-ecc = "==6.0.0"
-sw-utils = { git = "https://github.com/stakewise/sw-utils.git", rev = "v0.2.3" }
+multiproof = { git = "https://github.com/stakewise/multiproof.git", rev = "1b84917" }
+sw-utils = { git = "https://github.com/stakewise/sw-utils.git", rev = "9aaaaf0" }
 staking-deposit = { git = "https://github.com/ethereum/staking-deposit-cli.git", rev = "v2.3.0" }
 pycryptodomex = "==3.16.0"
 milagro-bls-binding = "==1.9.0"
 psycopg = { extras = ["binary"], version = "==3.1.6" }
+tqdm = "==4.64.1"
 
 [tool.poetry.group.dev.dependencies]
 pylint = "==2.15.9"

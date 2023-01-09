@@ -34,7 +34,7 @@ async def get_safe_block_number() -> BlockNumber:
 
 
 async def main() -> None:
-    validators_db_setup()
+    await validators_db_setup()
 
     # extract private keys from the keystores
     private_keys = load_private_keys()

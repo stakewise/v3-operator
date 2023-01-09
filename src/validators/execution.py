@@ -17,15 +17,14 @@ from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.types import EventData, Wei
 
-from src.common.clients import ens_client, execution_client, ipfs_fetch_client
+from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.contracts import (
-    keeper_contract,
+    oracles_contract,
     validators_registry_contract,
     vault_contract,
 )
 from src.config.networks import ETH_NETWORKS
 from src.config.settings import (
-    DAO_ENS_NAME,
     DEPOSIT_AMOUNT_GWEI,
     NETWORK,
     NETWORK_CONFIG,
@@ -44,6 +43,7 @@ from src.validators.ipfs import fetch_vault_deposit_data
 from src.validators.typings import (
     BLSPrivkey,
     DepositData,
+    KeeperApprovalParams,
     MultipleValidatorRegistration,
     NetworkValidator,
     Oracles,
@@ -60,6 +60,9 @@ logger = logging.getLogger(__name__)
 
 
 class NetworkValidatorsProcessor(EventProcessor):
+    contract = validators_registry_contract
+    contract_event = 'DepositEvent'
+
     @staticmethod
     async def get_from_block() -> BlockNumber:
         last_validator = get_last_network_validator()
@@ -75,6 +78,9 @@ class NetworkValidatorsProcessor(EventProcessor):
 
 
 class VaultValidatorsProcessor(EventProcessor):
+    contract = vault_contract
+    contract_event = 'ValidatorsRootUpdated'
+
     @staticmethod
     async def get_from_block() -> BlockNumber:
         last_root = get_last_validators_root()
@@ -94,6 +100,9 @@ class VaultValidatorsProcessor(EventProcessor):
             ipfs_hash=last_event['args']['validatorsIpfsHash'],
             block_number=BlockNumber(last_event['blockNumber'])
         )
+        if not new_root.ipfs_hash:
+            raise ValueError('Invalid validators root IPFS hash')
+
         deposit_data = await fetch_vault_deposit_data(new_root.ipfs_hash)
         save_deposit_data(deposit_data)
         save_validators_root(new_root)
@@ -143,8 +152,8 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
     else:
         from_block = VALIDATORS_REGISTRY_GENESIS_BLOCK
 
-    new_events = await validators_registry_contract.events.DepositEvent.getLogs(
-        fromBlock=from_block
+    new_events = await validators_registry_contract.events.DepositEvent.get_logs(
+        from_block=from_block
     )
     new_public_keys: Set[HexStr] = set()
     for event in new_events:
@@ -227,15 +236,19 @@ async def get_available_deposit_data(
 @backoff.on_exception(backoff.expo, Exception, max_time=300)
 async def get_oracles() -> Oracles:
     """Fetches oracles config from the DAO's ENS text record."""
-    ipfs_hash = await ens_client.get_text(name=DAO_ENS_NAME, key=NETWORK_CONFIG.DAO_ENS_ORACLES_KEY)
+    events = await oracles_contract.events.ConfigUpdated.get_logs(from_block=0)
+    if not events:
+        raise ValueError('Failed to fetch IPFS hash of oracles config')
 
     # fetch IPFS record
+    ipfs_hash = events[-1]['args']['configIpfsHash']
     config = await ipfs_fetch_client.fetch_json(ipfs_hash)
-    threshold = int(config['threshold'])
+    threshold = await oracles_contract.functions.requiredOracles().call()
+
     rsa_public_keys = []
     endpoints = []
     addresses = []
-    for oracle in config['oracles']:
+    for oracle in config:
         addresses.append(Web3.to_checksum_address(oracle['address']))
         rsa_public_keys.append(RSA.import_key(oracle['rsa_public_key']))
         endpoints.append(oracle['endpoint'])
@@ -265,14 +278,15 @@ async def register_single_validator(
     proof = deposit_data_tree.get_proof([validator, deposit_data.validator_index])  # type: ignore
 
     tx_data = SingleValidatorRegistration(
-        vault=VAULT_CONTRACT_ADDRESS,
-        validatorsRegistryRoot=approval.validators_registry_root,
-        validator=validator,
-        signatures=approval.signatures,
-        exitSignatureIpfsHash=approval.ipfs_hash,
+        keeperParams=KeeperApprovalParams(
+            validatorsRegistryRoot=approval.validators_registry_root,
+            validators=validator,
+            signatures=approval.signatures,
+            exitSignaturesIpfsHash=approval.ipfs_hash,
+        ),
         proof=proof
     )
-    tx = await keeper_contract.functions.registerValidator(
+    tx = await vault_contract.functions.registerValidator(
         dataclasses.asdict(tx_data)
     ).transact()  # type: ignore
     await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
@@ -300,16 +314,17 @@ async def register_multiple_validator(
     sorted_validators = [v[0] for v in multi_proof.leaves]
     indexes = [sorted_validators.index(v) for v in validators]
     tx_data = MultipleValidatorRegistration(
-        vault=VAULT_CONTRACT_ADDRESS,
-        validatorsRegistryRoot=approval.validators_registry_root,
-        validators=b''.join(validators),
-        signatures=approval.signatures,
-        exitSignatureIpfsHash=approval.ipfs_hash,
+        keeperParams=KeeperApprovalParams(
+            validatorsRegistryRoot=approval.validators_registry_root,
+            validators=b''.join(validators),
+            signatures=approval.signatures,
+            exitSignaturesIpfsHash=approval.ipfs_hash,
+        ),
         indexes=indexes,
         proofFlags=multi_proof.proof_flags,
         proof=multi_proof.proof
     )
-    tx = await keeper_contract.functions.registerValidators(
+    tx = await vault_contract.functions.registerValidators(
         dataclasses.asdict(tx_data)
     ).transact()  # type: ignore
     await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore

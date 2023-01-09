@@ -16,11 +16,14 @@ def _load_abi(abi_path: str) -> Dict:
 
 
 def get_vault_contract() -> AsyncContract:
-    """:returns instance of `BaseVault` contract."""
-    abi_path = 'abi/IBaseVault.json'
-    return execution_client.eth.contract(
-        address=VAULT_CONTRACT_ADDRESS, abi=_load_abi(abi_path)
-    )  # type: ignore
+    """:returns instance of `Vault` contract."""
+    if NETWORK in ETH_NETWORKS:
+        abi_path = 'abi/IEthVault.json'
+        return execution_client.eth.contract(
+            address=VAULT_CONTRACT_ADDRESS, abi=_load_abi(abi_path)
+        )  # type: ignore
+
+    raise NotImplementedError('networks other than Ethereum not supported')
 
 
 def get_validators_registry_contract() -> AsyncContract:
@@ -30,18 +33,14 @@ def get_validators_registry_contract() -> AsyncContract:
         address=NETWORK_CONFIG.VALIDATORS_REGISTRY_CONTRACT_ADDRESS, abi=_load_abi(abi_path)
     )  # type: ignore
 
-
-def get_keeper_contract() -> AsyncContract:
-    """:returns instance of `Keeper` contract."""
-    if NETWORK in ETH_NETWORKS:
-        abi_path = 'abi/IEthKeeper.json'
-        return execution_client.eth.contract(
-            address=NETWORK_CONFIG.KEEPER_CONTRACT_ADDRESS, abi=_load_abi(abi_path)
-        )  # type: ignore
-
-    raise NotImplementedError('networks other than Ethereum not supported')
+def get_oracles_contract() -> AsyncContract:
+    """:returns instance of `Oracles` contract."""
+    abi_path = 'abi/IOracles.json'
+    return execution_client.eth.contract(
+        address=NETWORK_CONFIG.ORACLES_CONTRACT_ADDRESS, abi=_load_abi(abi_path)
+    )  # type: ignore
 
 
 vault_contract = get_vault_contract()
 validators_registry_contract = get_validators_registry_contract()
-keeper_contract = get_keeper_contract()
+oracles_contract = get_oracles_contract()

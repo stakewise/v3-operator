@@ -1,14 +1,46 @@
+import logging
+
 from eth_typing import HexStr
 from psycopg.rows import class_row
 from psycopg.sql import SQL, Identifier
+from web3 import Web3
 
-from src.common.clients import db_client
-from src.config.settings import NETWORK
+from src.common.clients import db_client, ipfs_fetch_client
+from src.config.networks import GOERLI
+from src.config.settings import (
+    GOERLI_GENESIS_VALIDATORS_IPFS_HASH,
+    NETWORK,
+    NETWORK_CONFIG,
+)
 from src.validators.typings import DepositData, NetworkValidator, ValidatorsRoot
 
 NETWORK_VALIDATORS_TABLE = f'{NETWORK}_network_validators'
 DEPOSIT_DATA_TABLE = f'{NETWORK}_deposit_data'
 VALIDATORS_ROOT_TABLE = f'{NETWORK}_validators_root'
+
+logger = logging.getLogger(__name__)
+
+
+async def load_genesis_validators() -> None:
+    """
+    In some test networks (e.g. Goerli) genesis validators
+    are not registered through the registry contract.
+    """
+    if NETWORK != GOERLI or get_last_network_validator() is not None:
+        return
+
+    pub_keys = await ipfs_fetch_client.fetch_bytes(GOERLI_GENESIS_VALIDATORS_IPFS_HASH)
+    genesis_validators: list[NetworkValidator] = []
+    for i in range(0, len(pub_keys), 48):
+        genesis_validators.append(
+            NetworkValidator(
+                public_key=Web3.to_hex(pub_keys[i: i + 48]),
+                block_number=NETWORK_CONFIG.VALIDATORS_REGISTRY_GENESIS_BLOCK,
+            )
+        )
+
+    save_network_validators(genesis_validators)
+    logger.info('Loaded %d Goerli genesis validators', len(genesis_validators))
 
 
 def save_validators_root(root: ValidatorsRoot) -> None:
@@ -133,7 +165,7 @@ def get_next_validator_index(latest_public_keys: list[HexStr]) -> int:
     return index + len(latest_public_keys)
 
 
-def setup() -> None:
+async def setup() -> None:
     """Creates tables."""
     with db_client.get_db_connection() as conn:
         with conn.cursor() as cur:
@@ -169,3 +201,5 @@ def setup() -> None:
                     """
                 ).format(Identifier(VALIDATORS_ROOT_TABLE)),
             )
+
+    await load_genesis_validators()
