@@ -617,8 +617,8 @@ web3 = "^6.0.0b9"
 [package.source]
 type = "git"
 url = "https://github.com/stakewise/multiproof.git"
-reference = "1b84917"
-resolved_reference = "1b8491793e7990612f58370f98aaa1a772ada5ae"
+reference = "v0.1.2"
+resolved_reference = "e1f3633a10cb5929cc08d4f261effd170976e7b9"
 
 [[package]]
 name = "mypy"
@@ -1073,8 +1073,8 @@ web3 = "^6.0.0b9"
 [package.source]
 type = "git"
 url = "https://github.com/stakewise/sw-utils.git"
-reference = "9aaaaf0"
-resolved_reference = "9aaaaf0cd4c4b1128fdfb559b00335899bac1e8b"
+reference = "v0.2.7"
+resolved_reference = "75cf4e8a7abaa1a132b58153a60c1e1260205979"
 
 [[package]]
 name = "toml"
@@ -1241,7 +1241,7 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "fc3ab8dc127624fb5f5831bf2dfdb426b59f72d02d2c149ac857ae457cffabeb"
+content-hash = "cc8a177d8a9f6ef59160988246e3bd5ac8ac2c071dba8dda78e003b6e56eeb91"
 
 [metadata.files]
 aiohttp = [
