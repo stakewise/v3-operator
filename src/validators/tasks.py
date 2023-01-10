@@ -44,6 +44,7 @@ from src.validators.utils import send_approval_requests
 logger = logging.getLogger(__name__)
 
 
+@backoff.on_exception(backoff.expo, Exception, max_time=300)
 async def register_validators(private_keys: dict[HexStr, BLSPrivkey]) -> None:
     """Registers vault validators."""
     vault_balance = await get_available_assets()
@@ -126,7 +127,7 @@ async def get_oracles_approval(
         validators_registry_root=registry_root,
     )
 
-
+@backoff.on_exception(backoff.expo, Exception, max_time=300)
 async def load_genesis_validators() -> None:
     """
     In some test networks (e.g. Goerli) genesis validators

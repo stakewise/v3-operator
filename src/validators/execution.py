@@ -1,4 +1,3 @@
-import dataclasses
 import logging
 import struct
 from typing import Set
@@ -235,7 +234,7 @@ async def get_available_deposit_data(
 
 @backoff.on_exception(backoff.expo, Exception, max_time=300)
 async def get_oracles() -> Oracles:
-    """Fetches oracles config from the DAO's ENS text record."""
+    """Fetches oracles config."""
     events = await oracles_contract.events.ConfigUpdated.get_logs(from_block=0)
     if not events:
         raise ValueError('Failed to fetch IPFS hash of oracles config')
@@ -287,7 +286,12 @@ async def register_single_validator(
         proof=proof
     )
     tx = await vault_contract.functions.registerValidator(
-        dataclasses.asdict(tx_data)
+        (tx_data.keeperParams.validatorsRegistryRoot,
+         tx_data.keeperParams.validators,
+         tx_data.keeperParams.signatures,
+         tx_data.keeperParams.exitSignaturesIpfsHash
+         ),
+        tx_data.proof
     ).transact()  # type: ignore
     await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
 
@@ -325,7 +329,14 @@ async def register_multiple_validator(
         proof=multi_proof.proof
     )
     tx = await vault_contract.functions.registerValidators(
-        dataclasses.asdict(tx_data)
+        (tx_data.keeperParams.validatorsRegistryRoot,
+         tx_data.keeperParams.validators,
+         tx_data.keeperParams.signatures,
+         tx_data.keeperParams.exitSignaturesIpfsHash
+         ),
+        indexes,
+        multi_proof.proof_flags,
+        multi_proof.proof
     ).transact()  # type: ignore
     await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
 
