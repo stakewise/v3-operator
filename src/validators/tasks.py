@@ -127,6 +127,7 @@ async def get_oracles_approval(
         validators_registry_root=registry_root,
     )
 
+
 @backoff.on_exception(backoff.expo, Exception, max_time=300)
 async def load_genesis_validators() -> None:
     """
