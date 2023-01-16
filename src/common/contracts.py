@@ -33,6 +33,7 @@ def get_validators_registry_contract() -> AsyncContract:
         address=NETWORK_CONFIG.VALIDATORS_REGISTRY_CONTRACT_ADDRESS, abi=_load_abi(abi_path)
     )  # type: ignore
 
+
 def get_oracles_contract() -> AsyncContract:
     """:returns instance of `Oracles` contract."""
     abi_path = 'abi/IOracles.json'

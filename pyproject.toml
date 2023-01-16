@@ -45,8 +45,7 @@ good-names = ["db", "i", "el", "e", "w", "f", "w3"]
 ignored-modules=["milagro_bls_binding"]
 
 [tool.flake8]
-max-line-length = 88
-select = ["E121"]
+extend-ignore = ["E203", "E501"]  # line length will be checked by pylint
 
 [tool.mypy]
 ignore_missing_imports = true
