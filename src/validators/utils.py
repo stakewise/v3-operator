@@ -1,6 +1,7 @@
 import dataclasses
 import logging
 import random
+from multiprocessing import Pool
 from os import listdir
 from os.path import isfile, join
 
@@ -65,16 +66,34 @@ async def send_approval_request(
 
 def load_private_keys() -> dict[HexStr, BLSPrivkey]:
     """Extracts private keys from the keystores."""
-    private_keys: dict[HexStr, BLSPrivkey] = {}
-    for file_name in tqdm(listdir(KEYSTORES_PATH)):
-        file_path = join(KEYSTORES_PATH, file_name)
-        if not (isfile(file_path) and file_name.startswith('keystore')):
-            continue
+    files = listdir(KEYSTORES_PATH)
 
-        keystore = ScryptKeystore.from_file(file_path)
-        private_key = BLSPrivkey(keystore.decrypt(KEYSTORES_PASSWORD))
-        private_keys[Web3.to_hex(bls.SkToPk(private_key))] = private_key
+    with tqdm(total=len(files)) as pbar, Pool() as pool:
+        results = [
+            pool.apply_async(
+                _process_keystore_file,
+                [file],
+                callback=lambda x: pbar.update(1),
+            )
+            for file in files
+        ]
+
+        for result in results:
+            result.wait()
+
+        keys = [result.get() for result in results]
+        existing_keys: list[tuple[HexStr, BLSPrivkey]] = [key for key in keys if key]
+        private_keys = dict(existing_keys)
 
     logger.info('Loaded %d keystores', len(private_keys))
-
     return private_keys
+
+
+def _process_keystore_file(file_name: str) -> tuple[HexStr, BLSPrivkey] | None:
+    file_path = join(KEYSTORES_PATH, file_name)
+    if not (isfile(file_path) and file_name.startswith('keystore')):
+        return None
+    keystore = ScryptKeystore.from_file(file_path)
+    private_key = BLSPrivkey(keystore.decrypt(KEYSTORES_PASSWORD))
+    public_key = Web3.to_hex(bls.SkToPk(private_key))
+    return public_key, private_key
