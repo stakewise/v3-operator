@@ -13,7 +13,7 @@ from src.config.settings import (
     EXECUTION_ENDPOINT,
     IPFS_FETCH_ENDPOINTS,
     POSTGRES_DB,
-    POSTGRES_HOSTNAME,
+    POSTGRES_HOST,
     POSTGRES_PASSWORD,
     POSTGRES_PORT,
     POSTGRES_USER,
@@ -26,7 +26,7 @@ class Database:
             dbname=POSTGRES_DB,
             user=POSTGRES_USER,
             password=POSTGRES_PASSWORD,
-            host=POSTGRES_HOSTNAME,
+            host=POSTGRES_HOST,
             port=POSTGRES_PORT,
         )
 
