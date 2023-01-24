@@ -19,6 +19,10 @@ from src.validators.typings import ApprovalRequest, BLSPrivkey, OracleApproval, 
 logger = logging.getLogger(__name__)
 
 
+class KeystoreException(Exception):
+    ...
+
+
 async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> tuple[bytes, str]:
     """Requests approval from all oracles."""
     payload = dataclasses.asdict(request)
@@ -69,19 +73,29 @@ def load_private_keys() -> dict[HexStr, BLSPrivkey]:
     files = listdir(KEYSTORES_PATH)
 
     with tqdm(total=len(files)) as pbar, Pool() as pool:
+
+        # pylint: disable-next=unused-argument
+        def _stop_pool(*args, **kwargs):
+            pool.terminate()
+
         results = [
             pool.apply_async(
                 _process_keystore_file,
                 [file],
                 callback=lambda x: pbar.update(1),
+                error_callback=_stop_pool,
             )
             for file in files
         ]
-
+        keys = []
         for result in results:
             result.wait()
+            try:
+                keys.append(result.get())
+            except KeystoreException as e:
+                logger.error(e)
+                break
 
-        keys = [result.get() for result in results]
         existing_keys: list[tuple[HexStr, BLSPrivkey]] = [key for key in keys if key]
         private_keys = dict(existing_keys)
 
@@ -93,7 +107,15 @@ def _process_keystore_file(file_name: str) -> tuple[HexStr, BLSPrivkey] | None:
     file_path = join(KEYSTORES_PATH, file_name)
     if not (isfile(file_path) and file_name.startswith('keystore')):
         return None
-    keystore = ScryptKeystore.from_file(file_path)
-    private_key = BLSPrivkey(keystore.decrypt(KEYSTORES_PASSWORD))
+
+    try:
+        keystore = ScryptKeystore.from_file(file_path)
+    except BaseException as e:
+        raise KeystoreException(f'Invalid keystore format in file "{file_name}"') from e
+
+    try:
+        private_key = BLSPrivkey(keystore.decrypt(KEYSTORES_PASSWORD))
+    except BaseException as e:
+        raise KeystoreException(f'Invalid password for keystore "{file_name}"') from e
     public_key = Web3.to_hex(bls.SkToPk(private_key))
     return public_key, private_key
