@@ -23,11 +23,11 @@ from src.validators.database import (
     save_network_validators,
 )
 from src.validators.execution import (
-    get_available_assets,
     get_available_deposit_data,
     get_latest_network_validator_public_keys,
     get_oracles,
     get_validators_registry_root,
+    get_withdrawable_assets,
     register_multiple_validator,
     register_single_validator,
 )
@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
 @backoff.on_exception(backoff.expo, Exception, max_time=300)
 async def register_validators(private_keys: dict[HexStr, BLSPrivkey]) -> None:
     """Registers vault validators."""
-    vault_balance = await get_available_assets()
+    vault_balance = await get_withdrawable_assets()
     if NETWORK == GNOSIS:
         # apply GNO -> mGNO exchange rate
         vault_balance = Wei(int(vault_balance * MGNO_RATE // WAD))

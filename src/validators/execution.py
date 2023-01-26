@@ -8,7 +8,7 @@ from eth_typing import BlockNumber, HexStr
 from multiproof import StandardMerkleTree
 from sw_utils import (
     EventProcessor,
-    compute_deposit_message,
+    compute_deposit_data,
     get_eth1_withdrawal_credentials,
     is_valid_deposit_data_signature,
 )
@@ -164,9 +164,9 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
 
 
 @backoff.on_exception(backoff.expo, Exception, max_time=300)
-async def get_available_assets() -> Wei:
+async def get_withdrawable_assets() -> Wei:
     """Fetches vault's available assets for staking."""
-    return await vault_contract.functions.availableAssets().call()
+    return await vault_contract.functions.withdrawableAssets().call()
 
 
 @backoff.on_exception(backoff.expo, Exception, max_time=300)
@@ -347,9 +347,10 @@ def _encode_tx_validator(
 ) -> bytes:
     public_key = Web3.to_bytes(hexstr=deposit_data.public_key)
     signature = Web3.to_bytes(hexstr=deposit_data.signature)
-    deposit_root = compute_deposit_message(
+    deposit_root = compute_deposit_data(
         public_key=public_key,
         withdrawal_credentials=withdrawal_credentials,
-        amount_gwei=DEPOSIT_AMOUNT_GWEI
+        amount_gwei=DEPOSIT_AMOUNT_GWEI,
+        signature=signature
     ).hash_tree_root
     return public_key + signature + deposit_root
