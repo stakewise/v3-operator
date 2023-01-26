@@ -24,7 +24,7 @@ services:
     command: [ "./src/main.py" ]
     environment:
       KEYSTORES_PATH: /keystores
-      POSTGRES_HOSTNAME: operator_postgres
+      POSTGRES_HOST: operator_postgres
       POSTGRES_PORT: 5432
 
   postgres:
