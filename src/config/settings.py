@@ -13,7 +13,7 @@ CONSENSUS_ENDPOINT = config('CONSENSUS_ENDPOINT')
 POSTGRES_DB = config('POSTGRES_DB', default='operator')
 POSTGRES_PORT = config('POSTGRES_PORT', default=5432, cast=int)
 POSTGRES_USER = config('POSTGRES_USER', default='operator')
-POSTGRES_HOST = config('POSTGRES_HOST')
+POSTGRES_HOSTNAME = config('POSTGRES_HOSTNAME')
 POSTGRES_PASSWORD = config('POSTGRES_PASSWORD')
 
 # keystores
