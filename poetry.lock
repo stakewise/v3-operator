@@ -2152,8 +2152,8 @@ web3 = "^6.0.0b9"
 [package.source]
 type = "git"
 url = "https://github.com/stakewise/sw-utils.git"
-reference = "dd1659d"
-resolved_reference = "dd1659d2e7a110732120f2c6e9a193bb40402dbf"
+reference = "v0.2.13"
+resolved_reference = "91f19253fed83cc79089a93161a7aa6fd22047a5"
 
 [[package]]
 name = "toml"
@@ -2576,4 +2576,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "c9e7de3ffe223c76daf945c45c7893ec273b1b3ea79f632cba752035a9f20ea6"
+content-hash = "b6427f9e39923a830422120f0288368fa750806cf9dd0c5e333a0e1df230831b"
