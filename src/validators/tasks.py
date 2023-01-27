@@ -53,16 +53,15 @@ async def register_validators(private_keys: dict[HexStr, BLSPrivkey]) -> None:
         vault_balance = Wei(int(vault_balance * MGNO_RATE // WAD))
 
     # calculate number of validators that can be registered
-    validators_count: int = min(
-        APPROVAL_MAX_VALIDATORS, vault_balance // DEPOSIT_AMOUNT
-    )
+    validators_count: int = min(APPROVAL_MAX_VALIDATORS, vault_balance // DEPOSIT_AMOUNT)
     if not validators_count:
         # not enough balance to register validators
         return
 
+    logger.info('Started registration of %d validators', validators_count)
+
     deposit_data, deposit_data_tree = await get_available_deposit_data(
-        private_keys=private_keys,
-        validators_count=validators_count
+        private_keys=private_keys, validators_count=validators_count
     )
     if not (deposit_data and deposit_data_tree):
         return
@@ -77,8 +76,7 @@ async def register_validators(private_keys: dict[HexStr, BLSPrivkey]) -> None:
 
 @backoff.on_exception(backoff.expo, Exception, max_tries=10)
 async def get_oracles_approval(
-    private_keys: dict[HexStr, BLSPrivkey],
-    deposit_data: list[DepositData]
+    private_keys: dict[HexStr, BLSPrivkey], deposit_data: list[DepositData]
 ) -> OraclesApproval:
     """Updates vote for the new rewards."""
     # get latest oracles
@@ -102,14 +100,14 @@ async def get_oracles_approval(
         public_keys=[],
         deposit_signatures=[],
         public_key_shards=[],
-        exit_signature_shards=[]
+        exit_signature_shards=[],
     )
     for deposit in deposit_data:
         shards = get_exit_signature_shards(
             validator_index=validator_index,
             private_key=private_keys[deposit.public_key],
             oracles=oracles,
-            fork=fork
+            fork=fork,
         )
         if not shards:
             break
@@ -121,6 +119,11 @@ async def get_oracles_approval(
 
     # send approval request to oracles
     signatures, ipfs_hash = await send_approval_requests(oracles, request)
+    logger.info(
+        'Fetched oracles approval for validators: count=%d, start index=%d',
+        len(deposit_data),
+        validator_index,
+    )
     return OraclesApproval(
         signatures=signatures,
         ipfs_hash=ipfs_hash,
@@ -142,7 +145,7 @@ async def load_genesis_validators() -> None:
     for i in range(0, len(pub_keys), 48):
         genesis_validators.append(
             NetworkValidator(
-                public_key=Web3.to_hex(pub_keys[i: i + 48]),
+                public_key=Web3.to_hex(pub_keys[i : i + 48]),
                 block_number=NETWORK_CONFIG.VALIDATORS_REGISTRY_GENESIS_BLOCK,
             )
         )

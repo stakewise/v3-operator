@@ -274,6 +274,7 @@ async def register_single_validator(
     if NETWORK not in ETH_NETWORKS:
         raise NotImplementedError('networks other than Ethereum not supported')
 
+    logger.info('Submitting registration transaction')
     credentials = get_eth1_withdrawal_credentials(VAULT_CONTRACT_ADDRESS)
     validator = _encode_tx_validator(credentials, deposit_data)
     proof = deposit_data_tree.get_proof([validator, deposit_data.validator_index])  # type: ignore
@@ -295,6 +296,7 @@ async def register_single_validator(
          ),
         tx_data.proof
     ).transact()  # type: ignore
+    logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
     await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
 
 
