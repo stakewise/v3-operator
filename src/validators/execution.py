@@ -235,7 +235,9 @@ async def get_available_deposit_data(
 @backoff.on_exception(backoff.expo, Exception, max_time=300)
 async def get_oracles() -> Oracles:
     """Fetches oracles config."""
-    events = await oracles_contract.events.ConfigUpdated.get_logs(from_block=0)
+    events = await oracles_contract.events.ConfigUpdated.get_logs(
+        from_block=NETWORK_CONFIG.ORACLES_GENESIS_BLOCK
+    )
     if not events:
         raise ValueError('Failed to fetch IPFS hash of oracles config')
 
