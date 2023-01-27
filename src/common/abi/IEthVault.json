@@ -11,7 +11,7 @@
   },
   {
     "inputs": [],
-    "name": "InsufficientAvailableAssets",
+    "name": "InsufficientAssets",
     "type": "error"
   },
   {
@@ -52,6 +52,16 @@
   {
     "inputs": [],
     "name": "NotHarvested",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "PermitDeadlineExpired",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "PermitInvalidSigner",
     "type": "error"
   },
   {
@@ -190,6 +200,12 @@
       {
         "indexed": true,
         "internalType": "address",
+        "name": "caller",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
         "name": "feeRecipient",
         "type": "address"
       }
@@ -200,6 +216,12 @@
   {
     "anonymous": false,
     "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "caller",
+        "type": "address"
+      },
       {
         "indexed": false,
         "internalType": "string",
@@ -264,6 +286,12 @@
   {
     "anonymous": false,
     "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "caller",
+        "type": "address"
+      },
       {
         "indexed": true,
         "internalType": "bytes32",
@@ -389,19 +417,6 @@
       }
     ],
     "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "availableAssets",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -630,61 +645,14 @@
   {
     "inputs": [
       {
-        "components": [
-          {
-            "internalType": "uint256",
-            "name": "capacity",
-            "type": "uint256"
-          },
-          {
-            "internalType": "bytes32",
-            "name": "validatorsRoot",
-            "type": "bytes32"
-          },
-          {
-            "internalType": "address",
-            "name": "admin",
-            "type": "address"
-          },
-          {
-            "internalType": "address",
-            "name": "mevEscrow",
-            "type": "address"
-          },
-          {
-            "internalType": "uint16",
-            "name": "feePercent",
-            "type": "uint16"
-          },
-          {
-            "internalType": "string",
-            "name": "name",
-            "type": "string"
-          },
-          {
-            "internalType": "string",
-            "name": "symbol",
-            "type": "string"
-          },
-          {
-            "internalType": "string",
-            "name": "validatorsIpfsHash",
-            "type": "string"
-          },
-          {
-            "internalType": "string",
-            "name": "metadataIpfsHash",
-            "type": "string"
-          }
-        ],
-        "internalType": "struct IEthVault.EthVaultInitParams",
+        "internalType": "bytes",
         "name": "params",
-        "type": "tuple"
+        "type": "bytes"
       }
     ],
     "name": "initialize",
     "outputs": [],
-    "stateMutability": "nonpayable",
+    "stateMutability": "payable",
     "type": "function"
   },
   {
@@ -967,12 +935,12 @@
   },
   {
     "inputs": [],
-    "name": "registry",
+    "name": "securityDeposit",
     "outputs": [
       {
-        "internalType": "address",
+        "internalType": "uint256",
         "name": "",
-        "type": "address"
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -1239,6 +1207,32 @@
   },
   {
     "inputs": [],
+    "name": "vaultId",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "pure",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "vaultsRegistry",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "version",
     "outputs": [
       {
@@ -1277,6 +1271,19 @@
       }
     ],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "withdrawableAssets",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
