@@ -18,12 +18,14 @@ services:
     volumes:
       - ..:/app
       - $KEYSTORES_PATH:/keystores
+      - $KEYSTORES_PASSWORD_PATH:/keystores/password.txt
     env_file:
       - .env
     entrypoint: [ "python" ]
     command: [ "./src/main.py" ]
     environment:
       KEYSTORES_PATH: /keystores
+      KEYSTORES_PASSWORD_PATH: /keystores/password.txt
       POSTGRES_HOST: operator_postgres
       POSTGRES_PORT: 5432
 

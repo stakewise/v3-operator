@@ -13,7 +13,7 @@ from staking_deposit.key_handling.keystore import ScryptKeystore
 from tqdm import tqdm
 from web3 import Web3
 
-from src.config.settings import KEYSTORES_PASSWORD, KEYSTORES_PATH
+from src.config.settings import KEYSTORES_PASSWORD_PATH, KEYSTORES_PATH
 from src.validators.typings import ApprovalRequest, BLSPrivkey, OracleApproval, Oracles
 
 logger = logging.getLogger(__name__)
@@ -53,9 +53,7 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
 
 @backoff.on_exception(backoff.expo, Exception, max_time=60)
 async def send_approval_request(
-    session: aiohttp.ClientSession,
-    endpoint: str,
-    payload: dict
+    session: aiohttp.ClientSession, endpoint: str, payload: dict
 ) -> OracleApproval:
     """Requests approval from single oracle."""
     async with session.post(url=endpoint, json=payload) as response:
@@ -63,13 +61,14 @@ async def send_approval_request(
         data = await response.json()
 
     return OracleApproval(
-        ipfs_hash=data['ipfs_hash'],
-        signature=Web3.to_bytes(hexstr=data['signature'])
+        ipfs_hash=data['ipfs_hash'], signature=Web3.to_bytes(hexstr=data['signature'])
     )
 
 
 def load_private_keys() -> dict[HexStr, BLSPrivkey]:
     """Extracts private keys from the keystores."""
+
+    keystores_password = _load_keystores_password()
     files = listdir(KEYSTORES_PATH)
 
     with tqdm(total=len(files)) as pbar, Pool() as pool:
@@ -81,7 +80,7 @@ def load_private_keys() -> dict[HexStr, BLSPrivkey]:
         results = [
             pool.apply_async(
                 _process_keystore_file,
-                [file],
+                [file, keystores_password],
                 callback=lambda x: pbar.update(1),
                 error_callback=_stop_pool,
             )
@@ -103,7 +102,9 @@ def load_private_keys() -> dict[HexStr, BLSPrivkey]:
     return private_keys
 
 
-def _process_keystore_file(file_name: str) -> tuple[HexStr, BLSPrivkey] | None:
+def _process_keystore_file(
+    file_name: str, keystores_password: str
+) -> tuple[HexStr, BLSPrivkey] | None:
     file_path = join(KEYSTORES_PATH, file_name)
     if not (isfile(file_path) and file_name.startswith('keystore')):
         return None
@@ -114,8 +115,13 @@ def _process_keystore_file(file_name: str) -> tuple[HexStr, BLSPrivkey] | None:
         raise KeystoreException(f'Invalid keystore format in file "{file_name}"') from e
 
     try:
-        private_key = BLSPrivkey(keystore.decrypt(KEYSTORES_PASSWORD))
+        private_key = BLSPrivkey(keystore.decrypt(keystores_password))
     except BaseException as e:
         raise KeystoreException(f'Invalid password for keystore "{file_name}"') from e
     public_key = Web3.to_hex(bls.SkToPk(private_key))
     return public_key, private_key
+
+
+def _load_keystores_password() -> str:
+    with open(KEYSTORES_PASSWORD_PATH, 'r', encoding='utf-8') as f:
+        return f.read().strip()
