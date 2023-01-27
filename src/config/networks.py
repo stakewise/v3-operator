@@ -59,7 +59,7 @@ NETWORKS = {
                 hexstr=HexStr('0x043db0d9a83813551ee2f33450d23797757d430911a9320530ad8a0eabc43efb')
             )
         ),
-        VAULT_GENESIS_BLOCK=BlockNumber(8265639),
+        VAULT_GENESIS_BLOCK=BlockNumber(8368606),
         SECONDS_PER_BLOCK=Decimal(12),
         CONFIRMATION_BLOCKS=64,
         GENESIS_FORK_VERSION=bytes.fromhex('00001020'),
