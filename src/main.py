@@ -9,12 +9,9 @@ from src.common.accounts import operator_account
 from src.common.clients import execution_client
 from src.config.settings import LOG_LEVEL, NETWORK, NETWORK_CONFIG, SENTRY_DSN
 from src.validators.database import setup as validators_db_setup
-from src.validators.execution import (
-    NetworkValidatorsProcessor,
-    VaultValidatorsProcessor,
-)
+from src.validators.execution import NetworkValidatorsProcessor
 from src.validators.tasks import load_genesis_validators, register_validators
-from src.validators.utils import load_private_keys
+from src.validators.utils import load_deposit_data, load_keystores
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s %(message)s',
@@ -39,31 +36,24 @@ async def main() -> None:
     # load genesis validators for some networks
     await load_genesis_validators()
 
-    # extract private keys from the keystores
-    private_keys = load_private_keys()
+    # load keystores
+    keystores = load_keystores()
+
+    # load deposit data
+    deposit_data = await load_deposit_data()
 
     # start operator tasks
     interrupt_handler = InterruptHandler()
 
-    # periodically scan validators root updates
-    vault_validators_processor = VaultValidatorsProcessor()
-    vault_validators_scanner = EventScanner(
-        vault_validators_processor
-    )
-
     # periodically scan network validator updates
     network_validators_processor = NetworkValidatorsProcessor()
-    network_validators_scanner = EventScanner(
-        network_validators_processor
-    )
+    network_validators_scanner = EventScanner(network_validators_processor)
 
     while not interrupt_handler.exit:
         to_block = await get_safe_block_number()
         await asyncio.gather(
             # check and register new validators
-            register_validators(private_keys),
-            # process validators root updates
-            vault_validators_scanner.process_new_events(to_block),
+            register_validators(keystores, deposit_data),
             # process new network validators
             network_validators_scanner.process_new_events(to_block),
         )

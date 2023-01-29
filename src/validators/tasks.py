@@ -1,7 +1,6 @@
 import logging
 
 import backoff
-from eth_typing import HexStr
 from web3 import Web3
 from web3.types import Wei
 
@@ -23,7 +22,7 @@ from src.validators.database import (
     save_network_validators,
 )
 from src.validators.execution import (
-    get_available_deposit_data,
+    get_available_validators,
     get_latest_network_validator_public_keys,
     get_oracles,
     get_validators_registry_root,
@@ -34,10 +33,11 @@ from src.validators.execution import (
 from src.validators.signing import get_exit_signature_shards
 from src.validators.typings import (
     ApprovalRequest,
-    BLSPrivkey,
     DepositData,
+    Keystores,
     NetworkValidator,
     OraclesApproval,
+    Validator,
 )
 from src.validators.utils import send_approval_requests
 
@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 
 @backoff.on_exception(backoff.expo, Exception, max_time=300)
-async def register_validators(private_keys: dict[HexStr, BLSPrivkey]) -> None:
+async def register_validators(keystores: Keystores, deposit_data: DepositData) -> None:
     """Registers vault validators."""
     vault_balance = await get_withdrawable_assets()
     if NETWORK == GNOSIS:
@@ -53,34 +53,37 @@ async def register_validators(private_keys: dict[HexStr, BLSPrivkey]) -> None:
         vault_balance = Wei(int(vault_balance * MGNO_RATE // WAD))
 
     # calculate number of validators that can be registered
-    validators_count: int = min(
-        APPROVAL_MAX_VALIDATORS, vault_balance // DEPOSIT_AMOUNT
-    )
+    validators_count: int = min(APPROVAL_MAX_VALIDATORS, vault_balance // DEPOSIT_AMOUNT)
     if not validators_count:
         # not enough balance to register validators
         return
 
-    deposit_data, deposit_data_tree = await get_available_deposit_data(
-        private_keys=private_keys,
-        validators_count=validators_count
+    logger.info('Started registration of %d validators', validators_count)
+
+    validators: list[Validator] = await get_available_validators(
+        keystores, deposit_data, validators_count
     )
-    if not (deposit_data and deposit_data_tree):
+    if not validators:
+        logger.warning('Failed to find available validator. You must upload new deposit data.')
         return
 
-    oracles_approval = await get_oracles_approval(private_keys, deposit_data)
-    if len(deposit_data) == 1:
-        return await register_single_validator(deposit_data_tree, deposit_data[0], oracles_approval)
+    oracles_approval = await get_oracles_approval(keystores, validators)
+    if len(validators) == 1:
+        validator = validators[0]
+        await register_single_validator(deposit_data.tree, validator, oracles_approval)
+        logger.info('Successfully registered validator with public key %s', validator.public_key)
 
-    if len(deposit_data) > 1:
-        return await register_multiple_validator(deposit_data_tree, deposit_data, oracles_approval)
+    if len(validators) > 1:
+        await register_multiple_validator(deposit_data.tree, validators, oracles_approval)
+        pub_keys = ', '.join([val.public_key for val in validators])
+        logger.info('Successfully registered validators with public keys %s', pub_keys)
 
 
 @backoff.on_exception(backoff.expo, Exception, max_tries=10)
 async def get_oracles_approval(
-    private_keys: dict[HexStr, BLSPrivkey],
-    deposit_data: list[DepositData]
+    keystores: Keystores, validators: list[Validator]
 ) -> OraclesApproval:
-    """Updates vote for the new rewards."""
+    """Fetches approval from oracles."""
     # get latest oracles
     oracles = await get_oracles()
 
@@ -102,25 +105,30 @@ async def get_oracles_approval(
         public_keys=[],
         deposit_signatures=[],
         public_key_shards=[],
-        exit_signature_shards=[]
+        exit_signature_shards=[],
     )
-    for deposit in deposit_data:
+    for validator in validators:
         shards = get_exit_signature_shards(
             validator_index=validator_index,
-            private_key=private_keys[deposit.public_key],
+            private_key=keystores[validator.public_key],
             oracles=oracles,
-            fork=fork
+            fork=fork,
         )
         if not shards:
             break
 
-        request.public_keys.append(deposit.public_key)
-        request.deposit_signatures.append(deposit.signature)
+        request.public_keys.append(validator.public_key)
+        request.deposit_signatures.append(validator.signature)
         request.public_key_shards.append(shards.public_keys)
         request.exit_signature_shards.append(shards.exit_signatures)
 
     # send approval request to oracles
     signatures, ipfs_hash = await send_approval_requests(oracles, request)
+    logger.info(
+        'Fetched oracles approval for validators: count=%d, start index=%d',
+        len(validators),
+        validator_index,
+    )
     return OraclesApproval(
         signatures=signatures,
         ipfs_hash=ipfs_hash,
@@ -142,7 +150,7 @@ async def load_genesis_validators() -> None:
     for i in range(0, len(pub_keys), 48):
         genesis_validators.append(
             NetworkValidator(
-                public_key=Web3.to_hex(pub_keys[i: i + 48]),
+                public_key=Web3.to_hex(pub_keys[i : i + 48]),
                 block_number=NETWORK_CONFIG.VALIDATORS_REGISTRY_GENESIS_BLOCK,
             )
         )

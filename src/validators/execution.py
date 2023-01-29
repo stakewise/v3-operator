@@ -30,29 +30,23 @@ from src.config.settings import (
     VAULT_CONTRACT_ADDRESS,
 )
 from src.validators.database import (
-    get_deposit_data,
     get_last_network_validator,
-    get_last_validators_root,
     is_validator_registered,
-    save_deposit_data,
     save_network_validators,
-    save_validators_root,
 )
-from src.validators.ipfs import fetch_vault_deposit_data
 from src.validators.typings import (
-    BLSPrivkey,
     DepositData,
     KeeperApprovalParams,
+    Keystores,
     MultipleValidatorRegistration,
     NetworkValidator,
     Oracles,
     OraclesApproval,
     SingleValidatorRegistration,
-    ValidatorsRoot,
+    Validator,
 )
 
 VALIDATORS_REGISTRY_GENESIS_BLOCK: BlockNumber = NETWORK_CONFIG.VALIDATORS_REGISTRY_GENESIS_BLOCK
-VAULT_GENESIS_BLOCK: BlockNumber = NETWORK_CONFIG.VAULT_GENESIS_BLOCK
 GENESIS_FORK_VERSION: bytes = NETWORK_CONFIG.GENESIS_FORK_VERSION
 
 logger = logging.getLogger(__name__)
@@ -74,37 +68,6 @@ class NetworkValidatorsProcessor(EventProcessor):
     async def process_events(events: list[EventData]) -> None:
         validators = process_network_validator_events(events)
         save_network_validators(validators)
-
-
-class VaultValidatorsProcessor(EventProcessor):
-    contract = vault_contract
-    contract_event = 'ValidatorsRootUpdated'
-
-    @staticmethod
-    async def get_from_block() -> BlockNumber:
-        last_root = get_last_validators_root()
-        if not last_root:
-            return VAULT_GENESIS_BLOCK
-
-        return BlockNumber(last_root.block_number + 1)
-
-    @staticmethod
-    async def process_events(events: list[EventData]) -> None:
-        if not events:
-            return
-
-        last_event = events[-1]
-        new_root = ValidatorsRoot(
-            root=Web3.to_hex(last_event['args']['validatorsRoot']),
-            ipfs_hash=last_event['args']['validatorsIpfsHash'],
-            block_number=BlockNumber(last_event['blockNumber'])
-        )
-        if not new_root.ipfs_hash:
-            raise ValueError('Invalid validators root IPFS hash')
-
-        deposit_data = await fetch_vault_deposit_data(new_root.ipfs_hash)
-        save_deposit_data(deposit_data)
-        save_validators_root(new_root)
 
 
 def process_network_validator_events(events: list[EventData]) -> list[NetworkValidator]:
@@ -182,54 +145,45 @@ async def get_vault_validators_root() -> Bytes32:
 
 
 @backoff.on_exception(backoff.expo, Exception, max_time=300)
-async def get_available_deposit_data(
-    private_keys: dict[HexStr, BLSPrivkey],
-    validators_count: int
-) -> tuple[list[DepositData], StandardMerkleTree | None]:
-    """Fetches vault's available deposit data."""
-    if validators_count <= 0:
-        return [], None
+async def get_vault_validators_index() -> int:
+    """Fetches vault's current validators index."""
+    return await vault_contract.functions.validatorIndex().call()
 
-    credentials = get_eth1_withdrawal_credentials(VAULT_CONTRACT_ADDRESS)
-    current_index = await vault_contract.functions.validatorIndex().call()
-    deposit_data = get_deposit_data()
 
-    available_deposit_data = []
-    current_count = 0
-    leaves: list[tuple[bytes, int]] = []
-    for data in deposit_data:
-        leaves.append((_encode_tx_validator(credentials, data), data.validator_index))
-        if data.validator_index < current_index or validators_count <= current_count:
-            continue
+async def check_deposit_data_root(deposit_data_root: str) -> None:
+    """Checks whether deposit data root matches validators root in Vault."""
+    if deposit_data_root != Web3.to_hex(await get_vault_validators_root()):
+        raise RuntimeError("Deposit data tree root and vault's validators root don't match")
 
-        if data.public_key not in private_keys:
+
+async def get_available_validators(
+    keystores: Keystores, deposit_data: DepositData, count: int
+) -> list[Validator]:
+    """Fetches vault's available validators."""
+    await check_deposit_data_root(deposit_data.tree.root)
+
+    start_index = await get_vault_validators_index()
+    validators: list[Validator] = []
+    for i in range(start_index, start_index + count):
+        validator = deposit_data.validators[i]
+        if validator.public_key not in keystores:
             logger.warning(
                 'Cannot find validator with public key %s in imported keystores.',
-                data.public_key
+                validator.public_key,
             )
-            continue
+            break
 
-        if is_validator_registered(data.public_key):
+        if is_validator_registered(validator.public_key):
             logger.warning(
                 'Validator with public key %s is already registered.'
                 ' You must upload new deposit data.',
-                data.public_key
+                validator.public_key,
             )
-            continue
+            break
 
-        available_deposit_data.append(data)
-        current_count += 1
+        validators.append(validator)
 
-    if not available_deposit_data:
-        logger.warning(
-            'Failed to find available validator. You must upload new deposit data.'
-        )
-
-    tree = StandardMerkleTree.of(leaves, ['bytes', 'uint256'])
-    if tree.root != Web3.to_hex(await get_vault_validators_root()):
-        raise RuntimeError("Reconstructed tree root and vault's validators root don't match")
-
-    return available_deposit_data, tree
+    return validators
 
 
 @backoff.on_exception(backoff.expo, Exception, max_time=300)
@@ -261,98 +215,94 @@ async def get_oracles() -> Oracles:
         threshold=threshold,
         rsa_public_keys=rsa_public_keys,
         endpoints=endpoints,
-        addresses=addresses
+        addresses=addresses,
     )
 
 
 async def register_single_validator(
-    deposit_data_tree: StandardMerkleTree,
-    deposit_data: DepositData,
-    approval: OraclesApproval
+    tree: StandardMerkleTree, validator: Validator, approval: OraclesApproval
 ) -> None:
     """Registers single validator."""
     if NETWORK not in ETH_NETWORKS:
         raise NotImplementedError('networks other than Ethereum not supported')
 
     credentials = get_eth1_withdrawal_credentials(VAULT_CONTRACT_ADDRESS)
-    validator = _encode_tx_validator(credentials, deposit_data)
-    proof = deposit_data_tree.get_proof([validator, deposit_data.validator_index])  # type: ignore
+    tx_validator = _encode_tx_validator(credentials, validator)
+    proof = tree.get_proof([tx_validator, validator.index])  # type: ignore
 
     tx_data = SingleValidatorRegistration(
         keeperParams=KeeperApprovalParams(
             validatorsRegistryRoot=approval.validators_registry_root,
-            validators=validator,
+            validators=tx_validator,
             signatures=approval.signatures,
             exitSignaturesIpfsHash=approval.ipfs_hash,
         ),
-        proof=proof
+        proof=proof,
     )
     tx = await vault_contract.functions.registerValidator(
-        (tx_data.keeperParams.validatorsRegistryRoot,
-         tx_data.keeperParams.validators,
-         tx_data.keeperParams.signatures,
-         tx_data.keeperParams.exitSignaturesIpfsHash
-         ),
-        tx_data.proof
+        (
+            tx_data.keeperParams.validatorsRegistryRoot,
+            tx_data.keeperParams.validators,
+            tx_data.keeperParams.signatures,
+            tx_data.keeperParams.exitSignaturesIpfsHash,
+        ),
+        tx_data.proof,
     ).transact()  # type: ignore
     await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
 
 
 async def register_multiple_validator(
-    deposit_data_tree: StandardMerkleTree,
-    deposit_data: list[DepositData],
-    approval: OraclesApproval
+    tree: StandardMerkleTree,
+    validators: list[Validator],
+    approval: OraclesApproval,
 ) -> None:
     """Registers multiple validators."""
     if NETWORK not in ETH_NETWORKS:
         raise NotImplementedError('networks other than Ethereum not supported')
 
     credentials = get_eth1_withdrawal_credentials(VAULT_CONTRACT_ADDRESS)
-    deposit_data = sorted(deposit_data, key=lambda d: d.validator_index)
-    validators: list[bytes] = []
+    tx_validators: list[bytes] = []
     leaves: list[tuple[bytes, int]] = []
-    for deposit in deposit_data:
-        validator = _encode_tx_validator(credentials, deposit)
-        validators.append(validator)
-        leaves.append((validator, deposit.validator_index))
+    for validator in validators:
+        tx_validator = _encode_tx_validator(credentials, validator)
+        tx_validators.append(tx_validator)
+        leaves.append((tx_validator, validator.index))
 
-    multi_proof = deposit_data_tree.get_multi_proof(leaves)
-    sorted_validators = [v[0] for v in multi_proof.leaves]
-    indexes = [sorted_validators.index(v) for v in validators]
+    multi_proof = tree.get_multi_proof(leaves)
+    sorted_tx_validators: list[bytes] = [v[0] for v in multi_proof.leaves]
+    indexes = [sorted_tx_validators.index(v) for v in tx_validators]
     tx_data = MultipleValidatorRegistration(
         keeperParams=KeeperApprovalParams(
             validatorsRegistryRoot=approval.validators_registry_root,
-            validators=b''.join(validators),
+            validators=b''.join(tx_validators),
             signatures=approval.signatures,
             exitSignaturesIpfsHash=approval.ipfs_hash,
         ),
         indexes=indexes,
         proofFlags=multi_proof.proof_flags,
-        proof=multi_proof.proof
+        proof=multi_proof.proof,
     )
     tx = await vault_contract.functions.registerValidators(
-        (tx_data.keeperParams.validatorsRegistryRoot,
-         tx_data.keeperParams.validators,
-         tx_data.keeperParams.signatures,
-         tx_data.keeperParams.exitSignaturesIpfsHash
-         ),
+        (
+            tx_data.keeperParams.validatorsRegistryRoot,
+            tx_data.keeperParams.validators,
+            tx_data.keeperParams.signatures,
+            tx_data.keeperParams.exitSignaturesIpfsHash,
+        ),
         indexes,
         multi_proof.proof_flags,
-        multi_proof.proof
+        multi_proof.proof,
     ).transact()  # type: ignore
     await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
 
 
-def _encode_tx_validator(
-    withdrawal_credentials: bytes,
-    deposit_data: DepositData
-) -> bytes:
-    public_key = Web3.to_bytes(hexstr=deposit_data.public_key)
-    signature = Web3.to_bytes(hexstr=deposit_data.signature)
+def _encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) -> bytes:
+    public_key = Web3.to_bytes(hexstr=validator.public_key)
+    signature = Web3.to_bytes(hexstr=validator.signature)
     deposit_root = compute_deposit_data(
         public_key=public_key,
         withdrawal_credentials=withdrawal_credentials,
         amount_gwei=DEPOSIT_AMOUNT_GWEI,
-        signature=signature
+        signature=signature,
     ).hash_tree_root
     return public_key + signature + deposit_root

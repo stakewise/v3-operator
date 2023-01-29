@@ -3,9 +3,11 @@ from typing import NewType
 
 from Cryptodome.PublicKey import RSA
 from eth_typing import BlockNumber, ChecksumAddress, HexStr
+from multiproof import StandardMerkleTree
 from sw_utils.typings import Bytes32
 
 BLSPrivkey = NewType('BLSPrivkey', bytes)
+Keystores = NewType('Keystores', dict[HexStr, BLSPrivkey])
 
 
 @dataclass
@@ -15,17 +17,16 @@ class NetworkValidator:
 
 
 @dataclass
-class ValidatorsRoot:
-    root: HexStr
-    ipfs_hash: str
-    block_number: BlockNumber
+class Validator:
+    index: int
+    public_key: HexStr
+    signature: HexStr
 
 
 @dataclass
 class DepositData:
-    validator_index: int
-    public_key: HexStr
-    signature: HexStr
+    validators: list[Validator]
+    tree: StandardMerkleTree
 
 
 @dataclass
