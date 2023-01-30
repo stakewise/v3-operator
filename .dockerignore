@@ -9,6 +9,6 @@ Dockerfile
 .gitignore
 local.env
 __pycache__/
-/.postgres
 *.env
 /logfile
+/deploy

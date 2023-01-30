@@ -1,9 +1,5 @@
 version: "3.9"
 
-volumes:
-  operator_postgres:
-    driver: local
-
 services:
   # operator services
   operator:
@@ -13,12 +9,12 @@ services:
     image: operator
     container_name: operator
     restart: always
-    depends_on:
-      - postgres
     volumes:
       - ..:/app
       - $KEYSTORES_PATH:/keystores
       - $KEYSTORES_PASSWORD_PATH:/keystores/password.txt
+      - $DEPOSIT_DATA_PATH:/deposit_data.json
+      - ./database:/database
     env_file:
       - .env
     entrypoint: [ "python" ]
@@ -26,16 +22,4 @@ services:
     environment:
       KEYSTORES_PATH: /keystores
       KEYSTORES_PASSWORD_PATH: /keystores/password.txt
-      POSTGRES_HOST: operator_postgres
-      POSTGRES_PORT: 5432
-
-  postgres:
-    image: postgres:latest
-    container_name: operator_postgres
-    restart: always
-    ports:
-      - "5432:5432"
-    volumes:
-      - "operator_postgres:/var/lib/postgresql/data"
-    env_file:
-      - .env
+      DEPOSIT_DATA_PATH: /deposit_data.json
