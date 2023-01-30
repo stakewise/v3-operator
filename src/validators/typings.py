@@ -18,7 +18,7 @@ class NetworkValidator:
 
 @dataclass
 class Validator:
-    index: int
+    deposit_data_index: int
     public_key: HexStr
     signature: HexStr
 

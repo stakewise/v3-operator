@@ -130,7 +130,7 @@ async def load_deposit_data() -> DepositData:
     validators: list[Validator] = []
     for i, data in enumerate(deposit_data):
         validator = Validator(
-            index=i,
+            deposit_data_index=i,
             public_key=add_0x_prefix(data['pubkey']),
             signature=add_0x_prefix(data['signature']),
         )

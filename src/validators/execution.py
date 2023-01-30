@@ -228,7 +228,7 @@ async def register_single_validator(
 
     credentials = get_eth1_withdrawal_credentials(VAULT_CONTRACT_ADDRESS)
     tx_validator = _encode_tx_validator(credentials, validator)
-    proof = tree.get_proof([tx_validator, validator.index])  # type: ignore
+    proof = tree.get_proof([tx_validator, validator.deposit_data_index])  # type: ignore
 
     tx_data = SingleValidatorRegistration(
         keeperParams=KeeperApprovalParams(
@@ -268,7 +268,7 @@ async def register_multiple_validator(
     for validator in validators:
         tx_validator = _encode_tx_validator(credentials, validator)
         tx_validators.append(tx_validator)
-        leaves.append((tx_validator, validator.index))
+        leaves.append((tx_validator, validator.deposit_data_index))
 
     multi_proof = tree.get_multi_proof(leaves)
     sorted_tx_validators: list[bytes] = [v[0] for v in multi_proof.leaves]
