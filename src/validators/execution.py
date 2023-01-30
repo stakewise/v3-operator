@@ -239,6 +239,7 @@ async def register_single_validator(
         ),
         proof=proof,
     )
+    logger.info('Submitting registration transaction')
     tx = await vault_contract.functions.registerValidator(
         (
             tx_data.keeperParams.validatorsRegistryRoot,
@@ -248,6 +249,7 @@ async def register_single_validator(
         ),
         tx_data.proof,
     ).transact()  # type: ignore
+    logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
     await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
 
 
@@ -282,6 +284,7 @@ async def register_multiple_validator(
         proofFlags=multi_proof.proof_flags,
         proof=multi_proof.proof,
     )
+    logger.info('Submitting registration transaction')
     tx = await vault_contract.functions.registerValidators(
         (
             tx_data.keeperParams.validatorsRegistryRoot,
@@ -293,6 +296,7 @@ async def register_multiple_validator(
         multi_proof.proof_flags,
         multi_proof.proof,
     ).transact()  # type: ignore
+    logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
     await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
 
 
