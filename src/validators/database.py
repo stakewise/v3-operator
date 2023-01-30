@@ -6,75 +6,11 @@ from psycopg.sql import SQL, Identifier
 
 from src.common.clients import db_client
 from src.config.settings import NETWORK
-from src.validators.typings import DepositData, NetworkValidator, ValidatorsRoot
+from src.validators.typings import NetworkValidator
 
 NETWORK_VALIDATORS_TABLE = f'{NETWORK}_network_validators'
-DEPOSIT_DATA_TABLE = f'{NETWORK}_deposit_data'
-VALIDATORS_ROOT_TABLE = f'{NETWORK}_validators_root'
 
 logger = logging.getLogger(__name__)
-
-
-def save_validators_root(root: ValidatorsRoot) -> None:
-    """Cleans up previous validators root and saves the new one."""
-    with db_client.get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(SQL('DELETE FROM {}').format(Identifier(VALIDATORS_ROOT_TABLE)))
-            cur.execute(
-                SQL(
-                    'INSERT INTO {} (root, ipfs_hash, block_number) VALUES (%s, %s, %s)'
-                ).format(Identifier(VALIDATORS_ROOT_TABLE)),
-                (root.root, root.ipfs_hash, root.block_number),
-            )
-
-
-def get_last_validators_root() -> ValidatorsRoot | None:
-    """Fetches the last vault validators root."""
-    with db_client.get_db_connection() as conn:
-        with conn.cursor(row_factory=class_row(ValidatorsRoot)) as cur:
-            cur.execute(
-                SQL('SELECT * FROM {} ORDER BY block_number DESC LIMIT 1').format(
-                    Identifier(VALIDATORS_ROOT_TABLE)
-                ),
-            )
-            return cur.fetchone()
-
-
-def save_deposit_data(deposit_data: list[DepositData]) -> None:
-    """Cleans up previous deposit data and saves the new one."""
-    with db_client.get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(SQL('DELETE FROM {}').format(Identifier(DEPOSIT_DATA_TABLE)))
-            if not deposit_data:
-                return
-
-            cur.executemany(
-                SQL(
-                    'INSERT INTO {} (validator_index, public_key, signature) VALUES (%s, %s, %s)'
-                ).format(
-                    Identifier(DEPOSIT_DATA_TABLE),
-                ),
-                [
-                    (
-                        data.validator_index,
-                        data.public_key,
-                        data.signature
-                    )
-                    for data in deposit_data
-                ],
-            )
-
-
-def get_deposit_data() -> list[DepositData]:
-    """Fetches all the deposit data."""
-    with db_client.get_db_connection() as conn:
-        with conn.cursor(row_factory=class_row(DepositData)) as cur:
-            cur.execute(
-                SQL('SELECT * FROM {} ORDER BY validator_index ASC').format(
-                    Identifier(DEPOSIT_DATA_TABLE),
-                ),
-            )
-            return cur.fetchall()
 
 
 def save_network_validators(validators: list[NetworkValidator]) -> None:
@@ -150,26 +86,4 @@ def setup() -> None:
                     )
                     """
                 ).format(Identifier(NETWORK_VALIDATORS_TABLE)),
-            )
-            cur.execute(
-                SQL(
-                    """
-                    CREATE TABLE IF NOT EXISTS {} (
-                        validator_index INTEGER UNIQUE NOT NULL,
-                        public_key VARCHAR(98) UNIQUE NOT NULL,
-                        signature VARCHAR(194) UNIQUE NOT NULL
-                    )
-                    """
-                ).format(Identifier(DEPOSIT_DATA_TABLE)),
-            )
-            cur.execute(
-                SQL(
-                    """
-                    CREATE TABLE IF NOT EXISTS {} (
-                        root VARCHAR(66) NOT NULL,
-                        ipfs_hash VARCHAR(66) NOT NULL,
-                        block_number INTEGER NOT NULL
-                    )
-                    """
-                ).format(Identifier(VALIDATORS_ROOT_TABLE)),
             )

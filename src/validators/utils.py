@@ -1,4 +1,5 @@
 import dataclasses
+import json
 import logging
 import random
 from multiprocessing import Pool
@@ -9,12 +10,29 @@ import aiohttp
 import backoff
 import milagro_bls_binding as bls
 from eth_typing import ChecksumAddress, HexStr
+from eth_utils import add_0x_prefix
+from multiproof import StandardMerkleTree
 from staking_deposit.key_handling.keystore import ScryptKeystore
+from sw_utils import get_eth1_withdrawal_credentials
 from tqdm import tqdm
 from web3 import Web3
 
-from src.config.settings import KEYSTORES_PASSWORD_PATH, KEYSTORES_PATH
-from src.validators.typings import ApprovalRequest, BLSPrivkey, OracleApproval, Oracles
+from src.config.settings import (
+    DEPOSIT_DATA_PATH,
+    KEYSTORES_PASSWORD_PATH,
+    KEYSTORES_PATH,
+    VAULT_CONTRACT_ADDRESS,
+)
+from src.validators.execution import _encode_tx_validator, check_deposit_data_root
+from src.validators.typings import (
+    ApprovalRequest,
+    BLSPrivkey,
+    DepositData,
+    Keystores,
+    OracleApproval,
+    Oracles,
+    Validator,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +83,7 @@ async def send_approval_request(
     )
 
 
-def load_private_keys() -> dict[HexStr, BLSPrivkey]:
+def load_keystores() -> Keystores:
     """Extracts private keys from the keystores."""
 
     keystores_password = _load_keystores_password()
@@ -96,10 +114,34 @@ def load_private_keys() -> dict[HexStr, BLSPrivkey]:
                 break
 
         existing_keys: list[tuple[HexStr, BLSPrivkey]] = [key for key in keys if key]
-        private_keys = dict(existing_keys)
+        keystores = Keystores(dict(existing_keys))
 
-    logger.info('Loaded %d keystores', len(private_keys))
-    return private_keys
+    logger.info('Loaded %d keystores', len(keystores))
+    return keystores
+
+
+async def load_deposit_data() -> DepositData:
+    """Loads and verifies deposit data."""
+    with open(DEPOSIT_DATA_PATH, 'r', encoding='utf-8') as f:
+        deposit_data = json.load(f)
+
+    credentials = get_eth1_withdrawal_credentials(VAULT_CONTRACT_ADDRESS)
+    leaves: list[tuple[bytes, int]] = []
+    validators: list[Validator] = []
+    for i, data in enumerate(deposit_data):
+        validator = Validator(
+            deposit_data_index=i,
+            public_key=add_0x_prefix(data['pubkey']),
+            signature=add_0x_prefix(data['signature']),
+        )
+        leaves.append((_encode_tx_validator(credentials, validator), i))
+        validators.append(validator)
+
+    tree = StandardMerkleTree.of(leaves, ['bytes', 'uint256'])
+    await check_deposit_data_root(tree.root)
+
+    logger.info('Loaded deposit data file %s', DEPOSIT_DATA_PATH)
+    return DepositData(validators=validators, tree=tree)
 
 
 def _process_keystore_file(

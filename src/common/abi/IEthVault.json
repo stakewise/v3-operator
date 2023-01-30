@@ -297,12 +297,6 @@
         "internalType": "bytes32",
         "name": "validatorsRoot",
         "type": "bytes32"
-      },
-      {
-        "indexed": false,
-        "internalType": "string",
-        "name": "validatorsIpfsHash",
-        "type": "string"
       }
     ],
     "name": "ValidatorsRootUpdated",
@@ -978,11 +972,6 @@
         "internalType": "bytes32",
         "name": "_validatorsRoot",
         "type": "bytes32"
-      },
-      {
-        "internalType": "string",
-        "name": "validatorsIpfsHash",
-        "type": "string"
       }
     ],
     "name": "setValidatorsRoot",
