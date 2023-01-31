@@ -1,3 +1,5 @@
+import os
+
 from decouple import Choices, Csv, config
 from web3 import Web3
 
@@ -10,7 +12,7 @@ EXECUTION_ENDPOINT = config('EXECUTION_ENDPOINT')
 CONSENSUS_ENDPOINT = config('CONSENSUS_ENDPOINT')
 
 # database
-DATABASE = config('DATABASE')
+DATABASE = os.path.join(config('DATABASE_DIR'), 'operator.db')
 
 # keystores
 KEYSTORES_PASSWORD_PATH = config('KEYSTORES_PASSWORD_PATH')

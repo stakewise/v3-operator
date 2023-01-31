@@ -23,4 +23,4 @@ services:
       KEYSTORES_PATH: /keystores
       KEYSTORES_PASSWORD_PATH: /keystores/password.txt
       DEPOSIT_DATA_PATH: /deposit_data.json
-      DATABASE: /database/operator.db
+      DATABASE_DIR: /database
