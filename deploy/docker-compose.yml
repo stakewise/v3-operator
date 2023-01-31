@@ -11,7 +11,7 @@ services:
     restart: always
     volumes:
       - ..:/app
-      - ./database:/database
+      - $DATABASE_DIR:/database
       - $KEYSTORES_PATH:/keystores
       - $KEYSTORES_PASSWORD_PATH:/keystores/password.txt
       - $DEPOSIT_DATA_PATH:/deposit_data.json
