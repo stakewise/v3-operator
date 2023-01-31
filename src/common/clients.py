@@ -1,4 +1,5 @@
-import psycopg
+import sqlite3
+
 from sw_utils import (
     IpfsFetchClient,
     construct_async_sign_and_send_raw_middleware,
@@ -10,28 +11,15 @@ from web3 import Web3
 from src.common.accounts import operator_account
 from src.config.settings import (
     CONSENSUS_ENDPOINT,
+    DATABASE,
     EXECUTION_ENDPOINT,
     IPFS_FETCH_ENDPOINTS,
-    POSTGRES_DB,
-    POSTGRES_HOST,
-    POSTGRES_PASSWORD,
-    POSTGRES_PORT,
-    POSTGRES_USER,
 )
 
 
 class Database:
-    def __init__(self):
-        self.connection_args = dict(
-            dbname=POSTGRES_DB,
-            user=POSTGRES_USER,
-            password=POSTGRES_PASSWORD,
-            host=POSTGRES_HOST,
-            port=POSTGRES_PORT,
-        )
-
     def get_db_connection(self):
-        return psycopg.connect(**self.connection_args)
+        return sqlite3.connect(DATABASE)
 
 
 def build_execution_client() -> Web3:

@@ -1,3 +1,5 @@
+import os
+
 from decouple import Choices, Csv, config
 from web3 import Web3
 
@@ -9,12 +11,8 @@ VAULT_CONTRACT_ADDRESS = Web3.to_checksum_address(config('VAULT_CONTRACT_ADDRESS
 EXECUTION_ENDPOINT = config('EXECUTION_ENDPOINT')
 CONSENSUS_ENDPOINT = config('CONSENSUS_ENDPOINT')
 
-# postgres
-POSTGRES_DB = config('POSTGRES_DB', default='operator')
-POSTGRES_PORT = config('POSTGRES_PORT', default=5432, cast=int)
-POSTGRES_USER = config('POSTGRES_USER', default='operator')
-POSTGRES_HOST = config('POSTGRES_HOST')
-POSTGRES_PASSWORD = config('POSTGRES_PASSWORD')
+# database
+DATABASE = os.path.join(config('DATABASE_DIR'), 'operator.db')
 
 # keystores
 KEYSTORES_PASSWORD_PATH = config('KEYSTORES_PASSWORD_PATH')
