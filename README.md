@@ -16,9 +16,8 @@ The validator registration process consists of the following steps:
 2. Get the next free validator public key from the deposit data file attached to the operator. The validators are
    registered in the same order as specified in the deposit data file.
 3. Share the exit signature of the validator with StakeWise Oracles:
-    1. Using Shamir's secret sharing, generate shards for the validator's BLS private key. The number of shards is equal
-       to the
-       number of oracles.
+    1. Using [Shamir's secret sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing), generate shards for the
+       validator's BLS private key. The number of shards is equal to the number of oracles.
     2. Sign the exit message with every shard and encrypt exit signatures with corresponding oracles' RSA public keys.
     3. Send encrypted exit signatures to all the oracles and receive registration signatures from them.
 4. Send transaction Vault to register the validator.
