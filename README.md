@@ -2,31 +2,40 @@
 
 ## Introduction
 
-StakeWise Operator is a service that StakeWise Vault operators must run. It is responsible for peforming the following
+StakeWise Operator is a service that StakeWise Vault operators must run. It is responsible for performing the following
 tasks:
 
 ### Validator registration
 
-Operator periodically checks whether Vault has accumulated enough assets for registering new validator(s) and sends a
-registration transaction to the
-Vault.
+The operator periodically checks whether Vault has accumulated enough assets for registering new validator(s) and sends
+a registration transaction to the Vault.
 
 The validator registration process consists of the following steps:
 
-1. Check whether Vault has accumulated enough assets to register a validator (e.g. 32 ETH for Ethereum)
-2. Get the next free validator public key from the deposit data file attached to the operator. The validators
-   are registered in the same order as they are specified in the deposit data file.
-3. Share exit signature of the validator with [StakeWise Oracles](https://docs.stakewise.io/governance/oracles):
-    1. Generate shards for the validator's BLS private key
-       using [Shamir's secret sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing). The number of shards is
-       equal to the number of oracles.
-    2. Sign exit message with every shard and encrypt exit signatures with corresponding oracles' RSA public keys
-    3. Send encrypted exit signatures to all the oracles and receive registration signatures from them
-4. Send transaction Vault to register the validator
+1. Check whether Vault has accumulated enough assets to register a validator (e.g., 32 ETH for Ethereum)
+2. Get the next free validator public key from the deposit data file attached to the operator. The validators are
+   registered in the same order as specified in the deposit data file.
+3. Share the exit signature of the validator with StakeWise Oracles:
+    1. Using Shamir's secret sharing, generate shards for the validator's BLS private key. The number of shards is equal
+       to the
+       number of oracles.
+    2. Sign the exit message with every shard and encrypt exit signatures with corresponding oracles' RSA public keys.
+    3. Send encrypted exit signatures to all the oracles and receive registration signatures from them.
+4. Send transaction Vault to register the validator.
 
 ## Usage
 
-### Step 1. Install consensus node
+### Step 1. Install execution node
+
+The execution node is used to fetch data from the Vault contract and to submit transactions. Any execution client that
+supports [ETH Execution API specification](https://ethereum.github.io/execution-apis/api-documentation/) can be used:
+
+- [Nethermind](https://launchpad.ethereum.org/en/nethermind) (Ethereum, Gnosis)
+- [Besu](https://launchpad.ethereum.org/en/besu) (Ethereum)
+- [Erigon](https://launchpad.ethereum.org/en/erigon) (Ethereum)
+- [Geth](https://launchpad.ethereum.org/en/geth) (Ethereum)
+
+### Step 2. Install consensus node
 
 The consensus node is used to fetch consensus fork data required for generating exit signatures. Any consensus client
 that
@@ -37,25 +46,15 @@ supports [ETH Beacon Node API specification](https://ethereum.github.io/beacon-A
 - [Prysm](https://launchpad.ethereum.org/en/prysm) (Ethereum)
 - [Teku](https://launchpad.ethereum.org/en/teku) (Ethereum, Gnosis)
 
-### Step 2. Install execution node
-
-The execution node is used to fetch data from the Vault contract and to submit transactions. Any execution client that
-supports [ETH Execution API specification](https://ethereum.github.io/execution-apis/api-documentation/) can be used:
-
-- [Nethermind](https://launchpad.ethereum.org/en/nethermind) (Ethereum, Gnosis)
-- [Besu](https://launchpad.ethereum.org/en/besu) (Ethereum)
-- [Erigon](https://launchpad.ethereum.org/en/erigon) (Ethereum)
-- [Geth](https://launchpad.ethereum.org/en/geth) (Ethereum)
-
 ### Step 3. Generate keystores & deposit data
 
-The keystores are used to create exit signatures. The deposit data is used to register the validators.
+The keystores are used to create exit signatures, and the deposit data is used to register the validators.
 
 The deposit data must comply with the following rules:
 
 - The Vault address must be used as withdrawal credentials
-- The validator public keys must be new and never seen by beacon chain. This can be achieved by using higher mnemonic
-  index for every new deposit data. For example, if you've generated 4 keys before (keys #0, #1, #2, #3), then start
+- The validator public keys must be new and never seen by the beacon chain. This can be achieved using a higher mnemonic
+  index for every new deposit data. For example, if you've generated four keys before (keys #0, #1, #2, #3), then start
   with index 4.
 
 You can use any of the following tools to generate keystores and deposit data:
@@ -86,14 +85,15 @@ Copy `.env.example` file to `.env` file and fill it with correct values
 #### Option 1. Download binary executable file
 
 ##### Download binary
-See [releases page](https://github.com/stakewise/v3-operator/releases) to download and decompress the corresponding binary file.
+
+See [releases page](https://github.com/stakewise/v3-operator/releases) to download and decompress the corresponding
+binary file.
 
 ##### Start binary
+
 ```sh
 ./v3-operator
 ```
-
-
 
 #### Option 2. Use Docker image
 
