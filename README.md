@@ -97,7 +97,7 @@ binary file.
 
 #### Option 2. Use Docker image
 
-##### Build Docker image or use existing one [here](https://europe-west4-docker.pkg.dev/stakewiselabs/private/v3-operator)
+##### Build Docker image or pull existing one from [here](https://europe-west4-docker.pkg.dev/stakewiselabs/private/v3-operator)
 
 ```sh
 docker build --pull -t stakewiselabs/v3-operator .
@@ -123,7 +123,7 @@ in Kubernetes
 
 ```sh
 # install dependencies
-poetry install
+poetry install --no-dev
 # start operator
 python src/main.py
 ```
