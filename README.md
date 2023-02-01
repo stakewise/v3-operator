@@ -64,8 +64,9 @@ You can use any of the following tools to generate keystores and deposit data:
 
 ### Step 4. Generate hot wallet
 
-The hot wallet is used by the to submit validator registration transaction. You must send some ETH (DAI for Gnosis) to
-the wallet for the gas expenses. The validator registration costs around 0.01 ETH with 30 Gwei gas price.
+The hot wallet is used to submit validator registration transaction. You must send some ETH (DAI for Gnosis) to
+the wallet for the gas expenses. The validator registration costs around 0.01 ETH with 30 Gwei gas price. You must keep
+an eye on your wallet balance, otherwise validators will stop registering.
 
 You can use any of the tools available for generating the hot wallet. For example,
 
@@ -77,7 +78,7 @@ You can use any of the tools available for generating the hot wallet. For exampl
 
 ### Step 5. Prepare .env file
 
-Copy `.env.example` file to `.env` file and fill it with correct values
+Copy [.env.example](./.env.example) file to `.env` file and fill it with correct values
 
 ### Step 6. Deploy operator
 
