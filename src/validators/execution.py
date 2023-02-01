@@ -28,9 +28,9 @@ from src.config.settings import (
     DEPOSIT_AMOUNT_GWEI,
     NETWORK,
     NETWORK_CONFIG,
-    VAULT_CONTRACT_ADDRESS,
     OPERATOR_MIN_BALANCE,
     OPERATOR_MIN_BALANCE_ETH,
+    VAULT_CONTRACT_ADDRESS,
 )
 from src.validators.database import (
     get_last_network_validator,
@@ -131,7 +131,7 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
 
 @backoff.on_exception(backoff.expo, Exception, max_time=300)
 async def get_operator_balance() -> Wei:
-    return await execution_client.eth.get_balance(operator_account.address)
+    return await execution_client.eth.get_balance(operator_account.address)  # type: ignore
 
 
 async def check_operator_balance():
@@ -141,7 +141,10 @@ async def check_operator_balance():
     logger.info('Checking operator balance')
 
     if (await get_operator_balance()) < OPERATOR_MIN_BALANCE:
-        logger.warning('Operator balance is too low. At least %s ETH is recommended.', OPERATOR_MIN_BALANCE_ETH)
+        logger.warning(
+            'Operator balance is too low. At least %s ETH is recommended.',
+            OPERATOR_MIN_BALANCE_ETH
+        )
     else:
         logger.info('Operator balance is sufficient')
 
