@@ -16,6 +16,7 @@ from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.types import EventData, Wei
 
+from src.common.accounts import operator_account
 from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.contracts import (
     oracles_contract,
@@ -28,6 +29,8 @@ from src.config.settings import (
     NETWORK,
     NETWORK_CONFIG,
     VAULT_CONTRACT_ADDRESS,
+    OPERATOR_MIN_BALANCE,
+    OPERATOR_MIN_BALANCE_ETH,
 )
 from src.validators.database import (
     get_last_network_validator,
@@ -124,6 +127,23 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
             new_public_keys.add(public_key)
 
     return new_public_keys
+
+
+@backoff.on_exception(backoff.expo, Exception, max_time=300)
+async def get_operator_balance() -> Wei:
+    return await execution_client.eth.get_balance(operator_account.address)
+
+
+async def check_operator_balance():
+    if OPERATOR_MIN_BALANCE <= 0:
+        return
+
+    logger.info('Checking operator balance')
+
+    if (await get_operator_balance()) < OPERATOR_MIN_BALANCE:
+        logger.warning('Operator balance is too low. At least %s ETH is recommended.', OPERATOR_MIN_BALANCE_ETH)
+    else:
+        logger.info('Operator balance is sufficient')
 
 
 @backoff.on_exception(backoff.expo, Exception, max_time=300)
@@ -226,6 +246,8 @@ async def register_single_validator(
     if NETWORK not in ETH_NETWORKS:
         raise NotImplementedError('networks other than Ethereum not supported')
 
+    await check_operator_balance()
+
     credentials = get_eth1_withdrawal_credentials(VAULT_CONTRACT_ADDRESS)
     tx_validator = _encode_tx_validator(credentials, validator)
     proof = tree.get_proof([tx_validator, validator.deposit_data_index])  # type: ignore
@@ -261,6 +283,8 @@ async def register_multiple_validator(
     """Registers multiple validators."""
     if NETWORK not in ETH_NETWORKS:
         raise NotImplementedError('networks other than Ethereum not supported')
+
+    await check_operator_balance()
 
     credentials = get_eth1_withdrawal_credentials(VAULT_CONTRACT_ADDRESS)
     tx_validators: list[bytes] = []

@@ -9,7 +9,7 @@ from src.common.accounts import operator_account
 from src.common.clients import execution_client
 from src.config.settings import LOG_LEVEL, NETWORK, NETWORK_CONFIG, SENTRY_DSN
 from src.validators.database import setup as validators_db_setup
-from src.validators.execution import NetworkValidatorsProcessor
+from src.validators.execution import NetworkValidatorsProcessor, check_operator_balance
 from src.validators.tasks import load_genesis_validators, register_validators
 from src.validators.utils import load_deposit_data, load_keystores
 
@@ -41,6 +41,8 @@ async def main() -> None:
 
     # load deposit data
     deposit_data = await load_deposit_data()
+
+    await check_operator_balance()
 
     # start operator tasks
     interrupt_handler = InterruptHandler()
