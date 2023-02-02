@@ -16,11 +16,12 @@ The validator registration process consists of the following steps:
 2. Get the next free validator public key from the deposit data file attached to the operator. The validators are
    registered in the same order as specified in the deposit data file.
 3. Share the exit signature of the validator with StakeWise Oracles:
-    1. Using [Shamir's secret sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing), generate shards for the
-       validator's BLS private key. The number of shards is equal to the number of oracles.
-    2. Sign the exit message with every shard and encrypt exit signatures with corresponding oracles' RSA public keys.
+    1. Using [Shamir's secret sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing), generate shares for the
+       validator's BLS private key. The number of shares is equal to the number of oracles.
+    2. Sign the exit message with every private key share and encrypt exit signatures with corresponding oracles' RSA
+       public keys.
     3. Send encrypted exit signatures to all the oracles and receive registration signatures from them.
-4. Send transaction Vault to register the validator.
+4. Send transaction to Vault contract to register the validator.
 
 ## Usage
 
@@ -88,12 +89,8 @@ Copy [.env.example](./.env.example) file to `.env` file and fill it with correct
 
 #### Option 1. Download binary executable file
 
-##### Download binary
-
 See [releases page](https://github.com/stakewise/v3-operator/releases) to download and decompress the corresponding
-binary file.
-
-##### Start binary
+binary file. Start the binary with the following command:
 
 ```sh
 ./v3-operator
@@ -101,16 +98,17 @@ binary file.
 
 #### Option 2. Use Docker image
 
-##### Build Docker image or pull existing one from [here](https://europe-west4-docker.pkg.dev/stakewiselabs/private/v3-operator)
+Build Docker image or pull existing one
+from [here](https://europe-west4-docker.pkg.dev/stakewiselabs/private/v3-operator):
 
 ```sh
 docker build --pull -t stakewiselabs/v3-operator .
 ```
 
-##### Start Docker container
+Start the container with the following command:
 
 ```sh
-docker run --rm --env-file ./.env -v ./database:/database stakewiselabs/v3-operator
+docker run --rm --restart on-failure:10 --env-file ./.env -v ./database:/database stakewiselabs/v3-operator
 ```
 
 #### Option 3. Use Kubernetes helm chart
@@ -120,14 +118,13 @@ in Kubernetes
 
 #### Option 4. Build from source
 
-##### Build requirements
+Build requirements:
 
 - [Python 3.10+](https://www.python.org/downloads/)
 - [Poetry](https://python-poetry.org/docs/)
 
+Install dependencies and start operator:
 ```sh
-# install dependencies
 poetry install --no-dev
-# start operator
 python src/main.py
 ```
