@@ -17,6 +17,7 @@ GNO_NETWORKS = [GNOSIS]
 
 @dataclass
 class NetworkConfig:
+    SYMBOL: str
     VALIDATORS_REGISTRY_CONTRACT_ADDRESS: ChecksumAddress
     VALIDATORS_REGISTRY_GENESIS_BLOCK: BlockNumber
     ORACLES_CONTRACT_ADDRESS: ChecksumAddress
@@ -31,6 +32,7 @@ class NetworkConfig:
 
 NETWORKS = {
     MAINNET: NetworkConfig(
+        SYMBOL='ETH',
         VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x00000000219ab540356cBB839Cbe05303d7705Fa'
         ),
@@ -50,6 +52,7 @@ NETWORKS = {
         OPERATOR_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
     ),
     GOERLI: NetworkConfig(
+        SYMBOL='GoerliETH',
         VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xff50ed3d0ec03aC01D4C79aAd74928BFF48a7b2b'
         ),
@@ -70,6 +73,7 @@ NETWORKS = {
         OPERATOR_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
     ),
     GNOSIS: NetworkConfig(
+        SYMBOL='xDAI',
         VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0B98057eA310F4d31F2a452B414647007d1645d9'
         ),
