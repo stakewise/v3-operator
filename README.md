@@ -1,66 +1,130 @@
-# StakeWise Operator manager V3
+# StakeWise V3 Operator
 
-## Description
+## Introduction
 
-Operator service is responsible for saving exit signature shards of the new validators in the StakeWise network.
+StakeWise Operator is a service that StakeWise Vault operators must run. It is responsible for performing the following
+tasks:
 
+### Validator registration
 
-### Dependencies
+The operator periodically checks whether Vault has accumulated enough assets for registering new validator(s) and sends
+a registration transaction to the Vault.
 
-#### Graph Node
+The validator registration process consists of the following steps:
 
-The [Graph Node](https://github.com/graphprotocol/graph-node) from the Graph Protocol is used for syncing smart
-contracts data and allows oracle to perform complex queries using GraphQL. Either self-hosted (preferred)
-or `https://api.thegraph.com/subgraphs/name/stakewise/stakewise-<network>`
-endpoint can be used.
+1. Check whether Vault has accumulated enough assets to register a validator (e.g., 32 ETH for Ethereum)
+2. Get the next free validator public key from the deposit data file attached to the operator. The validators are
+   registered in the same order as specified in the deposit data file.
+3. Share the exit signature of the validator with StakeWise Oracles:
+    1. Using [Shamir's secret sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing), generate shares for the
+       validator's BLS private key. The number of shares is equal to the number of oracles.
+    2. Sign the exit message with every private key share and encrypt exit signatures with corresponding oracles' RSA
+       public keys.
+    3. Send encrypted exit signatures to all the oracles and receive registration signatures from them.
+4. Send transaction to Vault contract to register the validator.
 
-#### ETH2 Node
+## Usage
 
-The ETH2 node is used to fetch StakeWise validators data (statuses, balances). Any ETH2 client that
-supports [ETH2 Beacon Node API specification](https://ethereum.github.io/beacon-APIs/#/) can be used:
+### Step 1. Install execution node
 
-- [Lighthouse](https://launchpad.ethereum.org/en/lighthouse)
-- [Nimbus](https://launchpad.ethereum.org/en/nimbus)
-- [Prym](https://launchpad.ethereum.org/en/prysm). Make sure to provide `--slots-per-archive-point` flag. See [Archival Beacon Node](https://docs.prylabs.network/docs/advanced/beacon_node_api/)
-- [Teku](https://launchpad.ethereum.org/en/teku)
-- [Infura](https://infura.io/docs/eth2) (hosted)
+The execution node is used to fetch data from the Vault contract and to submit transactions. Any execution client that
+supports [ETH Execution API specification](https://ethereum.github.io/execution-apis/api-documentation/) can be used:
 
-### Operator Usage
+- [Nethermind](https://launchpad.ethereum.org/en/nethermind) (Ethereum, Gnosis)
+- [Besu](https://launchpad.ethereum.org/en/besu) (Ethereum)
+- [Erigon](https://launchpad.ethereum.org/en/erigon) (Ethereum)
+- [Geth](https://launchpad.ethereum.org/en/geth) (Ethereum)
 
-1. Move to `deploy/<network>` directory
+### Step 2. Install consensus node
 
-```shell script
-cd deploy/mainnet
+The consensus node is used to fetch consensus fork data required for generating exit signatures. Any consensus client
+that
+supports [ETH Beacon Node API specification](https://ethereum.github.io/beacon-APIs/#/) can be used:
+
+- [Lighthouse](https://launchpad.ethereum.org/en/lighthouse) (Ethereum, Gnosis)
+- [Nimbus](https://launchpad.ethereum.org/en/nimbus) (Ethereum)
+- [Prysm](https://launchpad.ethereum.org/en/prysm) (Ethereum)
+- [Teku](https://launchpad.ethereum.org/en/teku) (Ethereum, Gnosis)
+
+### Step 3. Generate keystores & deposit data
+
+The keystores are used to create exit signatures, and the deposit data is used to register the validators.
+
+The deposit data must comply with the following rules:
+
+- The Vault address must be used as withdrawal credentials. If you are creating a new Vault, go
+  to [StakeWise app](https://app.stakewise.io), connect the wallet you will create Vault from, click on "Create Vault"
+  and once you reach the "Setup Validator" step, you will see the address you must use for the withdrawals. If you
+  already have a Vault, you can see its address either in the URL bar or by scrolling to the "Details" at the bottom.
+- The validator public keys must be new and never seen by the beacon chain. This can be achieved using a higher mnemonic
+  index for every new deposit data. For example, if you've generated four keys before (keys #0, #1, #2, #3), then start
+  with index 4. [StakeWise key manager](https://github.com/stakewise/key-manager/) stores the index locally and updates
+  it every time you generate new validator keys.
+
+You can use any of the following tools to generate keystores and deposit data:
+
+- [StakeWise key manager](https://github.com/stakewise/key-manager/)
+- [Staking Deposit CLI](https://github.com/ethereum/staking-deposit-cli)
+- [Wagyu Key Gen](https://github.com/stake-house/wagyu-key-gen)
+
+### Step 4. Generate hot wallet
+
+The hot wallet is used to submit validator registration transaction. You must send some ETH (DAI for Gnosis) to
+the wallet for the gas expenses. The validator registration costs around 0.01 ETH with 30 Gwei gas price. You must keep
+an eye on your wallet balance, otherwise validators will stop registering.
+
+You can use any of the tools available for generating the hot wallet. For example,
+
+- [Metamask](https://metamask.io/)
+    1. [Generate wallet](https://metamask.zendesk.com/hc/en-us/articles/360015289452-How-to-create-an-additional-account-in-your-wallet)
+    2. [Export wallet](https://metamask.zendesk.com/hc/en-us/articles/360015289632-How-to-export-an-account-s-private-key)
+- [MyEtherWallet Offline](https://help.myetherwallet.com/en/articles/6512619-using-mew-offline-current-mew-version-6)
+- [Vanity ETH](https://github.com/bokub/vanity-eth)
+
+### Step 5. Prepare .env file
+
+Copy [.env.example](./.env.example) file to `.env` file and fill it with correct values
+
+### Step 6. Deploy operator
+
+#### Option 1. Download binary executable file
+
+See [releases page](https://github.com/stakewise/v3-operator/releases) to download and decompress the corresponding
+binary file. Start the binary with the following command:
+
+```sh
+./v3-operator
 ```
 
-2. Create an edit environment file
+#### Option 2. Use Docker image
 
-```shell script
-cp .env.example .env
+Build Docker image or pull existing one
+from [here](https://europe-west4-docker.pkg.dev/stakewiselabs/private/v3-operator):
+
+```sh
+docker build --pull -t stakewiselabs/v3-operator .
 ```
 
-3. Run with [docker-compose](https://docs.docker.com/compose/). The docker-compose version must be **v1.27.0+**.
+Start the container with the following command:
 
-```shell script
-docker-compose up -d
+```sh
+docker run --rm --restart on-failure:10 --env-file ./.env -v ./database:/database stakewiselabs/v3-operator
 ```
 
-# Local development
-### Mac OS
-- `brew install postgresql openssl`
-- `export LDFLAGS="-L/usr/local/opt/openssl@1.1/lib" export CPPFLAGS="-I/usr/local/opt/openssl@1.1/include"`
-### Setup
-- Install `poetry`
-- `poetry install`
-- `poetry shell`
+#### Option 3. Use Kubernetes helm chart
 
-### Run
-- `poetry shell`
-- `python src/main.py`
-### Test
-- `pipenv shell`
-- `pytest -s src/tests`
+You can use [Oracle V3 helm chart](https://github.com/stakewise/helm-charts/tree/main/charts/v3-oracle) to host operator
+in Kubernetes
 
-# Contacts
-- Alexander Sysoev - alexander@stakewise.io
-- Dmitri Tsumak - dmitri@stakewise.io
+#### Option 4. Build from source
+
+Build requirements:
+
+- [Python 3.10+](https://www.python.org/downloads/)
+- [Poetry](https://python-poetry.org/docs/)
+
+Install dependencies and start operator:
+```sh
+poetry install --no-dev
+python src/main.py
+```
