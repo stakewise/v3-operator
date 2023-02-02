@@ -28,8 +28,6 @@ from src.config.settings import (
     DEPOSIT_AMOUNT_GWEI,
     NETWORK,
     NETWORK_CONFIG,
-    OPERATOR_MIN_BALANCE,
-    OPERATOR_MIN_BALANCE_ETH,
     VAULT_CONTRACT_ADDRESS,
 )
 from src.validators.database import (
@@ -135,15 +133,17 @@ async def get_operator_balance() -> Wei:
 
 
 async def check_operator_balance() -> None:
-    if OPERATOR_MIN_BALANCE <= 0:
+    operator_min_balance = NETWORK_CONFIG.OPERATOR_MIN_BALANCE
+
+    if operator_min_balance <= 0:
         return
 
     logger.info('Checking operator balance')
 
-    if (await get_operator_balance()) < OPERATOR_MIN_BALANCE:
+    if (await get_operator_balance()) < operator_min_balance:
         logger.warning(
             'Operator balance is too low. At least %s ETH is recommended.',
-            OPERATOR_MIN_BALANCE_ETH
+            Web3.from_wei(operator_min_balance, 'ether')
         )
 
 

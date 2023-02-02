@@ -5,6 +5,7 @@ from ens.constants import EMPTY_ADDR_HEX
 from eth_typing import BlockNumber, ChecksumAddress, HexStr
 from sw_utils.typings import Bytes32
 from web3 import Web3
+from web3.types import Wei
 
 MAINNET = 'mainnet'
 GOERLI = 'goerli'
@@ -25,7 +26,7 @@ class NetworkConfig:
     CONFIRMATION_BLOCKS: int
     GENESIS_FORK_VERSION: bytes
     IS_POA: bool
-    OPERATOR_MIN_BALANCE_ETH: str | None = None
+    OPERATOR_MIN_BALANCE: Wei
 
 
 NETWORKS = {
@@ -46,6 +47,7 @@ NETWORKS = {
         CONFIRMATION_BLOCKS=64,
         GENESIS_FORK_VERSION=bytes.fromhex('00000000'),
         IS_POA=False,
+        OPERATOR_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
     ),
     GOERLI: NetworkConfig(
         VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
@@ -65,6 +67,7 @@ NETWORKS = {
         CONFIRMATION_BLOCKS=64,
         GENESIS_FORK_VERSION=bytes.fromhex('00001020'),
         IS_POA=True,
+        OPERATOR_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
     ),
     GNOSIS: NetworkConfig(
         VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
@@ -83,5 +86,6 @@ NETWORKS = {
         CONFIRMATION_BLOCKS=24,
         GENESIS_FORK_VERSION=bytes.fromhex('00000064'),
         IS_POA=False,
+        OPERATOR_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
     ),
 }
