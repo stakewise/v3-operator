@@ -134,7 +134,7 @@ async def get_operator_balance() -> Wei:
     return await execution_client.eth.get_balance(operator_account.address)  # type: ignore
 
 
-async def check_operator_balance():
+async def check_operator_balance() -> None:
     if OPERATOR_MIN_BALANCE <= 0:
         return
 
@@ -145,8 +145,6 @@ async def check_operator_balance():
             'Operator balance is too low. At least %s ETH is recommended.',
             OPERATOR_MIN_BALANCE_ETH
         )
-    else:
-        logger.info('Operator balance is sufficient')
 
 
 @backoff.on_exception(backoff.expo, Exception, max_time=300)
@@ -249,8 +247,6 @@ async def register_single_validator(
     if NETWORK not in ETH_NETWORKS:
         raise NotImplementedError('networks other than Ethereum not supported')
 
-    await check_operator_balance()
-
     credentials = get_eth1_withdrawal_credentials(VAULT_CONTRACT_ADDRESS)
     tx_validator = _encode_tx_validator(credentials, validator)
     proof = tree.get_proof([tx_validator, validator.deposit_data_index])  # type: ignore
@@ -286,8 +282,6 @@ async def register_multiple_validator(
     """Registers multiple validators."""
     if NETWORK not in ETH_NETWORKS:
         raise NotImplementedError('networks other than Ethereum not supported')
-
-    await check_operator_balance()
 
     credentials = get_eth1_withdrawal_credentials(VAULT_CONTRACT_ADDRESS)
     tx_validators: list[bytes] = []
