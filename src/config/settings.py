@@ -5,6 +5,10 @@ from web3 import Web3
 
 from src.config.networks import GOERLI, NETWORKS, NetworkConfig
 
+# network
+NETWORK = config('NETWORK', cast=Choices([GOERLI]))
+NETWORK_CONFIG: NetworkConfig = NETWORKS[NETWORK]
+
 VAULT_CONTRACT_ADDRESS = Web3.to_checksum_address(config('VAULT_CONTRACT_ADDRESS'))
 
 # connections
@@ -26,7 +30,7 @@ OPERATOR_PRIVATE_KEY = config('OPERATOR_PRIVATE_KEY', default=None)
 OPERATOR_KEYSTORE_PATH = config('OPERATOR_KEYSTORE_PATH', default=None)
 OPERATOR_KEYSTORE_PASSWORD_PATH = config('OPERATOR_KEYSTORE_PASSWORD_PATH', default=None)
 
-OPERATOR_MIN_BALANCE_ETH = config('OPERATOR_MIN_BALANCE_ETH', default=0)
+OPERATOR_MIN_BALANCE_ETH = NETWORK_CONFIG.OPERATOR_MIN_BALANCE_ETH or '0.01'
 OPERATOR_MIN_BALANCE = Web3.to_wei(
     OPERATOR_MIN_BALANCE_ETH,
     'ether'
@@ -46,10 +50,6 @@ GOERLI_GENESIS_VALIDATORS_IPFS_HASH = 'QmXSvJeUKXAtWtbH26gt5ruKUqxogUsjUs9rSYs3p
 LOG_LEVEL = config('LOG_LEVEL', default='INFO')
 DEPOSIT_AMOUNT = Web3.to_wei(32, 'ether')
 DEPOSIT_AMOUNT_GWEI = int(Web3.from_wei(DEPOSIT_AMOUNT, 'gwei'))
-
-# network
-NETWORK = config('NETWORK', cast=Choices([GOERLI]))
-NETWORK_CONFIG: NetworkConfig = NETWORKS[NETWORK]
 
 APPROVAL_MAX_VALIDATORS = config('APPROVAL_MAX_VALIDATORS', default=10, cast=int)
 

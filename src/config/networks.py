@@ -25,6 +25,7 @@ class NetworkConfig:
     CONFIRMATION_BLOCKS: int
     GENESIS_FORK_VERSION: bytes
     IS_POA: bool
+    OPERATOR_MIN_BALANCE_ETH: str | None = None
 
 
 NETWORKS = {
