@@ -25,6 +25,7 @@ from src.common.contracts import (
 )
 from src.config.networks import ETH_NETWORKS
 from src.config.settings import (
+    DEFAULT_RETRY_TIME,
     DEPOSIT_AMOUNT_GWEI,
     NETWORK,
     NETWORK_CONFIG,
@@ -106,7 +107,7 @@ def process_network_validator_event(event: EventData) -> HexStr | None:
     return None
 
 
-@backoff.on_exception(backoff.expo, Exception, max_time=300)
+@backoff.on_exception(backoff.expo, Exception, max_time=DEFAULT_RETRY_TIME)
 async def get_latest_network_validator_public_keys() -> Set[HexStr]:
     """Fetches the latest network validator public keys."""
     last_validator = get_last_network_validator()
@@ -153,19 +154,19 @@ async def get_withdrawable_assets() -> Wei:
     return await vault_contract.functions.withdrawableAssets().call()
 
 
-@backoff.on_exception(backoff.expo, Exception, max_time=300)
+@backoff.on_exception(backoff.expo, Exception, max_time=DEFAULT_RETRY_TIME)
 async def get_validators_registry_root() -> Bytes32:
     """Fetches the latest validators registry root."""
     return await validators_registry_contract.functions.get_deposit_root().call()
 
 
-@backoff.on_exception(backoff.expo, Exception, max_time=300)
+@backoff.on_exception(backoff.expo, Exception, max_time=DEFAULT_RETRY_TIME)
 async def get_vault_validators_root() -> Bytes32:
     """Fetches vault's validators root."""
     return await vault_contract.functions.validatorsRoot().call()
 
 
-@backoff.on_exception(backoff.expo, Exception, max_time=300)
+@backoff.on_exception(backoff.expo, Exception, max_time=DEFAULT_RETRY_TIME)
 async def get_vault_validators_index() -> int:
     """Fetches vault's current validators index."""
     return await vault_contract.functions.validatorIndex().call()
@@ -207,7 +208,7 @@ async def get_available_validators(
     return validators
 
 
-@backoff.on_exception(backoff.expo, Exception, max_time=300)
+@backoff.on_exception(backoff.expo, Exception, max_time=DEFAULT_RETRY_TIME)
 async def get_oracles() -> Oracles:
     """Fetches oracles config."""
     events = await oracles_contract.events.ConfigUpdated.get_logs(
