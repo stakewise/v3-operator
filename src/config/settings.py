@@ -47,5 +47,8 @@ DEPOSIT_AMOUNT_GWEI = int(Web3.from_wei(DEPOSIT_AMOUNT, 'gwei'))
 
 APPROVAL_MAX_VALIDATORS = config('APPROVAL_MAX_VALIDATORS', default=10, cast=int)
 
+# Backoff retries
+DEFAULT_RETRY_TIME = 60
+
 # sentry config
 SENTRY_DSN = config('SENTRY_DSN', default='')

@@ -9,6 +9,7 @@ from src.common.utils import MGNO_RATE, WAD
 from src.config.networks import GNOSIS, GOERLI
 from src.config.settings import (
     APPROVAL_MAX_VALIDATORS,
+    DEFAULT_RETRY_TIME,
     DEPOSIT_AMOUNT,
     GOERLI_GENESIS_VALIDATORS_IPFS_HASH,
     NETWORK,
@@ -45,7 +46,7 @@ from src.validators.utils import send_approval_requests
 logger = logging.getLogger(__name__)
 
 
-@backoff.on_exception(backoff.expo, Exception, max_time=300)
+@backoff.on_exception(backoff.expo, Exception, max_time=DEFAULT_RETRY_TIME)
 async def register_validators(keystores: Keystores, deposit_data: DepositData) -> None:
     """Registers vault validators."""
     vault_balance = await get_withdrawable_assets()
@@ -140,7 +141,7 @@ async def get_oracles_approval(
     )
 
 
-@backoff.on_exception(backoff.expo, Exception, max_time=300)
+@backoff.on_exception(backoff.expo, Exception, max_time=DEFAULT_RETRY_TIME)
 async def load_genesis_validators() -> None:
     """
     In some test networks (e.g. Goerli) genesis validators
