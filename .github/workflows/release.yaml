@@ -49,6 +49,10 @@ jobs:
               $CHECKSUM_FILE_NAME_PASH = "\tmp\artifacts\"  + $BUILD_FILE_NAME + ".sha256"
               certUtil -hashfile $ZIP_FILE_NAME SHA256 | findstr /i /v "SHA256" | findstr /i /v "CertUtil" > $CHECKSUM_FILE_NAME_PASH
 
+    defaults:
+      run:
+        shell:
+          bash
     steps:
       - uses: actions/checkout@v2
 
