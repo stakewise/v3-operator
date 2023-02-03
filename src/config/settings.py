@@ -5,6 +5,10 @@ from web3 import Web3
 
 from src.config.networks import GOERLI, NETWORKS, NetworkConfig
 
+# network
+NETWORK = config('NETWORK', cast=Choices([GOERLI]))
+NETWORK_CONFIG: NetworkConfig = NETWORKS[NETWORK]
+
 VAULT_CONTRACT_ADDRESS = Web3.to_checksum_address(config('VAULT_CONTRACT_ADDRESS'))
 
 # connections
@@ -40,10 +44,6 @@ GOERLI_GENESIS_VALIDATORS_IPFS_HASH = 'QmXSvJeUKXAtWtbH26gt5ruKUqxogUsjUs9rSYs3p
 LOG_LEVEL = config('LOG_LEVEL', default='INFO')
 DEPOSIT_AMOUNT = Web3.to_wei(32, 'ether')
 DEPOSIT_AMOUNT_GWEI = int(Web3.from_wei(DEPOSIT_AMOUNT, 'gwei'))
-
-# network
-NETWORK = config('NETWORK', cast=Choices([GOERLI]))
-NETWORK_CONFIG: NetworkConfig = NETWORKS[NETWORK]
 
 APPROVAL_MAX_VALIDATORS = config('APPROVAL_MAX_VALIDATORS', default=10, cast=int)
 

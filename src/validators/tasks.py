@@ -22,6 +22,7 @@ from src.validators.database import (
     save_network_validators,
 )
 from src.validators.execution import (
+    check_operator_balance,
     get_available_validators,
     get_latest_network_validator_public_keys,
     get_oracles,
@@ -77,6 +78,9 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
         await register_multiple_validator(deposit_data.tree, validators, oracles_approval)
         pub_keys = ', '.join([val.public_key for val in validators])
         logger.info('Successfully registered validators with public keys %s', pub_keys)
+
+    # check balance after transaction
+    await check_operator_balance()
 
 
 @backoff.on_exception(backoff.expo, Exception, max_tries=10)

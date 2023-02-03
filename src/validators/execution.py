@@ -16,6 +16,7 @@ from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.types import EventData, Wei
 
+from src.common.accounts import operator_account
 from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.contracts import (
     oracles_contract,
@@ -124,6 +125,26 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
             new_public_keys.add(public_key)
 
     return new_public_keys
+
+
+@backoff.on_exception(backoff.expo, Exception, max_time=300)
+async def get_operator_balance() -> Wei:
+    return await execution_client.eth.get_balance(operator_account.address)  # type: ignore
+
+
+async def check_operator_balance() -> None:
+    operator_min_balance = NETWORK_CONFIG.OPERATOR_MIN_BALANCE
+    symbol = NETWORK_CONFIG.SYMBOL
+
+    if operator_min_balance <= 0:
+        return
+
+    if (await get_operator_balance()) < operator_min_balance:
+        logger.warning(
+            'Operator balance is too low. At least %s %s is recommended.',
+            Web3.from_wei(operator_min_balance, 'ether'),
+            symbol
+        )
 
 
 @backoff.on_exception(backoff.expo, Exception, max_time=300)
