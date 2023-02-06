@@ -17,7 +17,7 @@ jobs:
               export PYTHONHASHSEED=42
               export BUILD_FILE_NAME=operator-${RELEASE_VERSION}-linux-amd64;
               mkdir ${BUILD_FILE_NAME};
-              git rev-parse --short HEAD > GITSHA
+              git rev-parse --short HEAD > GIT_SHA
               poetry run pyinstaller \
                 --onefile \
                 --hidden-import multiaddr.codecs.uint16be \
@@ -25,7 +25,7 @@ jobs:
                 --collect-data src \
                 --add-data ./src/common/abi:src/common/abi/ \
                 --add-data ./pyproject.toml:. \
-                --add-data ./GITSHA:. \
+                --add-data ./GIT_SHA:. \
                 --name operator \
                 --distpath ./${BUILD_FILE_NAME} \
                 ./src/main.py;
@@ -40,7 +40,7 @@ jobs:
               export PYTHONHASHSEED=42
               export BUILD_FILE_NAME=operator-${RELEASE_VERSION}-darwin-amd64;
               mkdir ${BUILD_FILE_NAME};
-              git rev-parse --short HEAD > GITSHA
+              git rev-parse --short HEAD > GIT_SHA
               poetry run pyinstaller \
                 --onefile \
                 --hidden-import multiaddr.codecs.uint16be \
@@ -48,7 +48,7 @@ jobs:
                 --collect-data src \
                 --add-data ./src/common/abi:src/common/abi/ \
                 --add-data ./pyproject.toml:. \
-                --add-data ./GITSHA:. \
+                --add-data ./GIT_SHA:. \
                 --name operator \
                 --distpath ./${BUILD_FILE_NAME} \
                 ./src/main.py;
@@ -63,7 +63,7 @@ jobs:
               $RELEASE_VERSION = $env:GITHUB_REF.replace('refs/tags/', '')
               $BUILD_FILE_NAME = "operator-" + $RELEASE_VERSION + "-windows-amd64"
               $BUILD_FILE_NAME_PATH = ".\" + $BUILD_FILE_NAME
-              git rev-parse --short HEAD > GITSHA
+              git rev-parse --short HEAD > GIT_SHA
               poetry run pyinstaller \
                 --onefile \
                 --hidden-import multiaddr.codecs.uint16be \
@@ -71,7 +71,7 @@ jobs:
                 --collect-data src \
                 --add-data "./src/common/abi;src/common/abi/" \
                 --add-data "./pyproject.toml;." \
-                --add-data "./GITSHA;." \
+                --add-data "./GIT_SHA;." \
                 --name operator \
                 --distpath ./${BUILD_FILE_NAME} \
                 ./src/main.py;

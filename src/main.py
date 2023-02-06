@@ -40,8 +40,18 @@ async def get_safe_block_number() -> BlockNumber:
     return BlockNumber(max(block_number - NETWORK_CONFIG.CONFIRMATION_BLOCKS, 0))
 
 
+def log_start() -> None:
+    build = get_build_version()
+    start_str = 'Starting operator service'
+
+    if build:
+        logger.info('%s, version %s, build %s', start_str, src.__version__, build)
+    else:
+        logger.info('%s, version %s', start_str, src.__version__)
+
+
 async def main() -> None:
-    logger.info('operator version %s, build %s', src.__version__, get_build_version())
+    log_start()
 
     await startup_checks()
 

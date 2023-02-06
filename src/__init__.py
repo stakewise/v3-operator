@@ -3,7 +3,7 @@ from pathlib import Path
 import tomli
 
 
-def _get_project_meta():
+def _get_project_meta() -> dict:
     toml_path = Path(__file__).parents[1].joinpath('pyproject.toml')
 
     with toml_path.open(mode='rb') as pyproject:
