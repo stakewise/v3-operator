@@ -6,6 +6,7 @@ import backoff
 from eth_typing import BlockNumber
 from sw_utils import EventScanner, InterruptHandler
 
+import src
 from src.common.accounts import operator_account
 from src.common.clients import execution_client
 from src.config.settings import (
@@ -39,6 +40,8 @@ async def get_safe_block_number() -> BlockNumber:
 
 
 async def main() -> None:
+    logger.info('Version %s', src.__version__)
+
     await startup_checks()
 
     validators_db_setup()
