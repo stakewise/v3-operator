@@ -17,6 +17,7 @@ from src.config.settings import (
     SENTRY_DSN,
 )
 from src.startup_check import startup_checks
+from src.utils import get_build_version
 from src.validators.database import setup as validators_db_setup
 from src.validators.execution import NetworkValidatorsProcessor
 from src.validators.tasks import load_genesis_validators, register_validators
@@ -40,7 +41,7 @@ async def get_safe_block_number() -> BlockNumber:
 
 
 async def main() -> None:
-    logger.info('Version %s', src.__version__)
+    logger.info('operator version %s, build %s', src.__version__, get_build_version())
 
     await startup_checks()
 
