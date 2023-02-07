@@ -108,7 +108,7 @@ docker build --pull -t stakewiselabs/v3-operator .
 Start the container with the following command:
 
 ```sh
-docker run --rm --restart on-failure:10 --env-file ./.env -v ./database:/database stakewiselabs/v3-operator
+docker run --restart on-failure:10 --env-file ./.env -v ./database:/database stakewiselabs/v3-operator
 ```
 
 #### Option 3. Use Kubernetes helm chart
