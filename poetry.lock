@@ -1112,7 +1112,7 @@ python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
 name = "tomli"
 version = "2.0.1"
 description = "A lil' TOML parser"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -1257,7 +1257,7 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "1.1"
 python-versions = "==3.10.9"
-content-hash = "83730660c6067c4d7cf5cc5eeed8ddea0c1cc75030e944735da90f46bb832db9"
+content-hash = "75039d5833bdec0b1fd2c65f6e928ce0114f6106a07347597459b66d36086e1e"
 
 [metadata.files]
 aiohttp = [

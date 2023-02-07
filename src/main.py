@@ -6,6 +6,7 @@ import backoff
 from eth_typing import BlockNumber
 from sw_utils import EventScanner, InterruptHandler
 
+import src
 from src.common.accounts import operator_account
 from src.common.clients import execution_client
 from src.config.settings import (
@@ -16,6 +17,7 @@ from src.config.settings import (
     SENTRY_DSN,
 )
 from src.startup_check import startup_checks
+from src.utils import get_build_version
 from src.validators.database import setup as validators_db_setup
 from src.validators.execution import NetworkValidatorsProcessor
 from src.validators.tasks import load_genesis_validators, register_validators
@@ -38,7 +40,19 @@ async def get_safe_block_number() -> BlockNumber:
     return BlockNumber(max(block_number - NETWORK_CONFIG.CONFIRMATION_BLOCKS, 0))
 
 
+def log_start() -> None:
+    build = get_build_version()
+    start_str = 'Starting operator service'
+
+    if build:
+        logger.info('%s, version %s, build %s', start_str, src.__version__, build)
+    else:
+        logger.info('%s, version %s', start_str, src.__version__)
+
+
 async def main() -> None:
+    log_start()
+
     await startup_checks()
 
     validators_db_setup()

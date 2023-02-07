@@ -3,6 +3,7 @@
 /.github
 /venv
 /dist
+build
 .mypy_cache
 Dockerfile
 .dockerignore
