@@ -34,11 +34,11 @@ OPERATOR_KEYSTORE_PASSWORD_PATH = config('OPERATOR_KEYSTORE_PASSWORD_PATH', defa
 IPFS_FETCH_ENDPOINTS = config(
     'IPFS_FETCH_ENDPOINTS',
     cast=Csv(),
-    default='https://stakewise.infura-ipfs.io/,'
+    default='https://stakewise-v3.infura-ipfs.io,'
     'http://cloudflare-ipfs.com,'
     'https://gateway.pinata.cloud,https://ipfs.io',
 )
-GOERLI_GENESIS_VALIDATORS_IPFS_HASH = 'QmXSvJeUKXAtWtbH26gt5ruKUqxogUsjUs9rSYs3pg37Fx'
+GOERLI_GENESIS_VALIDATORS_IPFS_HASH = 'bafybeiaaje4dyompaq2eztxt47damfxub37dvftnzvdcdxxk4kpb32bntu'
 
 # common
 LOG_LEVEL = config('LOG_LEVEL', default='INFO')
