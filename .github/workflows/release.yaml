@@ -64,16 +64,16 @@ jobs:
               $BUILD_FILE_NAME = "operator-" + $RELEASE_VERSION + "-windows-amd64"
               $BUILD_FILE_NAME_PATH = ".\" + $BUILD_FILE_NAME
               git rev-parse --short HEAD > GIT_SHA
-              poetry run pyinstaller \
-                --onefile \
-                --hidden-import multiaddr.codecs.uint16be \
-                --hidden-import multiaddr.codecs.idna \
-                --collect-data src \
-                --add-data "./src/common/abi;src/common/abi/" \
-                --add-data "./pyproject.toml;." \
-                --add-data "./GIT_SHA;." \
-                --name operator \
-                --distpath ./${BUILD_FILE_NAME} \
+              poetry run pyinstaller `
+                --onefile `
+                --hidden-import multiaddr.codecs.uint16be `
+                --hidden-import multiaddr.codecs.idna `
+                --collect-data src `
+                --add-data "./src/common/abi;src/common/abi/" `
+                --add-data "./pyproject.toml;." `
+                --add-data "./GIT_SHA;." `
+                --name operator `
+                --distpath ./${BUILD_FILE_NAME} `
                 ./src/main.py;
               $ZIP_FILE_NAME = $BUILD_FILE_NAME + ".zip"
               Compress-Archive -Path $BUILD_FILE_NAME_PATH -DestinationPath $ZIP_FILE_NAME
