@@ -2,7 +2,7 @@ import logging
 
 import backoff
 from web3 import Web3
-from web3.types import Wei
+from web3.types import BlockNumber, Wei
 
 from src.common.clients import ipfs_fetch_client
 from src.common.utils import MGNO_RATE, WAD
@@ -47,9 +47,13 @@ logger = logging.getLogger(__name__)
 
 
 @backoff.on_exception(backoff.expo, Exception, max_time=DEFAULT_RETRY_TIME)
-async def register_validators(keystores: Keystores, deposit_data: DepositData) -> None:
+async def register_validators(
+        block_number: BlockNumber,
+        keystores: Keystores,
+        deposit_data: DepositData
+) -> None:
     """Registers vault validators."""
-    vault_balance = await get_withdrawable_assets()
+    vault_balance = await get_withdrawable_assets(block_number)
     if NETWORK == GNOSIS:
         # apply GNO -> mGNO exchange rate
         vault_balance = Wei(int(vault_balance * MGNO_RATE // WAD))
@@ -63,13 +67,16 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
     logger.info('Started registration of %d validators', validators_count)
 
     validators: list[Validator] = await get_available_validators(
-        keystores, deposit_data, validators_count
+        block_number=block_number,
+        keystores=keystores,
+        deposit_data=deposit_data,
+        count=validators_count,
     )
     if not validators:
         logger.warning('Failed to find available validator. You must upload new deposit data.')
         return
 
-    oracles_approval = await get_oracles_approval(keystores, validators)
+    oracles_approval = await get_oracles_approval(block_number, keystores, validators)
     if len(validators) == 1:
         validator = validators[0]
         await register_single_validator(deposit_data.tree, validator, oracles_approval)
@@ -86,14 +93,14 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
 
 @backoff.on_exception(backoff.expo, Exception, max_tries=10)
 async def get_oracles_approval(
-    keystores: Keystores, validators: list[Validator]
+    block_number: BlockNumber, keystores: Keystores, validators: list[Validator]
 ) -> OraclesApproval:
     """Fetches approval from oracles."""
     # get latest oracles
     oracles = await get_oracles()
 
     # get latest registry root
-    registry_root = await get_validators_registry_root()
+    registry_root = await get_validators_registry_root(block_number)
 
     # get next validator index for exit signature
     latest_public_keys = await get_latest_network_validator_public_keys()

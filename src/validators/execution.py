@@ -149,15 +149,19 @@ async def check_operator_balance() -> None:
 
 
 @backoff.on_exception(backoff.expo, Exception, max_time=300)
-async def get_withdrawable_assets() -> Wei:
+async def get_withdrawable_assets(block_number: BlockNumber) -> Wei:
     """Fetches vault's available assets for staking."""
-    return await vault_contract.functions.withdrawableAssets().call()
+    return await vault_contract.functions.withdrawableAssets().call(
+        block_identifier=block_number
+    )
 
 
 @backoff.on_exception(backoff.expo, Exception, max_time=DEFAULT_RETRY_TIME)
-async def get_validators_registry_root() -> Bytes32:
+async def get_validators_registry_root(block_number: BlockNumber) -> Bytes32:
     """Fetches the latest validators registry root."""
-    return await validators_registry_contract.functions.get_deposit_root().call()
+    return await validators_registry_contract.functions.get_deposit_root().call(
+        block_identifier=block_number
+    )
 
 
 @backoff.on_exception(backoff.expo, Exception, max_time=DEFAULT_RETRY_TIME)
@@ -167,9 +171,11 @@ async def get_vault_validators_root() -> Bytes32:
 
 
 @backoff.on_exception(backoff.expo, Exception, max_time=DEFAULT_RETRY_TIME)
-async def get_vault_validators_index() -> int:
+async def get_vault_validators_index(block_number: BlockNumber) -> int:
     """Fetches vault's current validators index."""
-    return await vault_contract.functions.validatorIndex().call()
+    return await vault_contract.functions.validatorIndex().call(
+        block_identifier=block_number
+    )
 
 
 async def check_deposit_data_root(deposit_data_root: str) -> None:
@@ -179,12 +185,12 @@ async def check_deposit_data_root(deposit_data_root: str) -> None:
 
 
 async def get_available_validators(
-    keystores: Keystores, deposit_data: DepositData, count: int
+    block_number: BlockNumber, keystores: Keystores, deposit_data: DepositData, count: int
 ) -> list[Validator]:
     """Fetches vault's available validators."""
     await check_deposit_data_root(deposit_data.tree.root)
 
-    start_index = await get_vault_validators_index()
+    start_index = await get_vault_validators_index(block_number)
     validators: list[Validator] = []
     for i in range(start_index, start_index + count):
         validator = deposit_data.validators[i]
