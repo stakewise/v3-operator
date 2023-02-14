@@ -127,6 +127,8 @@ async def get_oracles_approval(
         request.public_key_shards.append(shards.public_keys)
         request.exit_signature_shards.append(shards.exit_signatures)
 
+        validator_index += 1
+
     # send approval request to oracles
     signatures, ipfs_hash = await send_approval_requests(oracles, request)
     logger.info(
