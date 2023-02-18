@@ -16,6 +16,11 @@
   },
   {
     "inputs": [],
+    "name": "InvalidCapacity",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "InvalidFeePercent",
     "type": "error"
   },
@@ -32,6 +37,11 @@
   {
     "inputs": [],
     "name": "InvalidSharesAmount",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidTokenMeta",
     "type": "error"
   },
   {
@@ -992,7 +1002,7 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "feeRecipient_",
+        "name": "_feeRecipient",
         "type": "address"
       }
     ],

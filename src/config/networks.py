@@ -58,9 +58,9 @@ NETWORKS = {
         ),
         VALIDATORS_REGISTRY_GENESIS_BLOCK=BlockNumber(4367321),
         ORACLES_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x4fA883CDB29c3D25A81e6290569eB449AaecAAE6'
+            '0xDF43F5dBB585C6b38AeC413685aa67CD1dD47091'
         ),
-        ORACLES_GENESIS_BLOCK=BlockNumber(8507956),
+        ORACLES_GENESIS_BLOCK=BlockNumber(8514406),
         GENESIS_VALIDATORS_ROOT=Bytes32(
             Web3.to_bytes(
                 hexstr=HexStr('0x043db0d9a83813551ee2f33450d23797757d430911a9320530ad8a0eabc43efb')
