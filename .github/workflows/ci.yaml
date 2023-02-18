@@ -13,7 +13,7 @@ jobs:
       - name: Set up python
         uses: actions/setup-python@v2
         with:
-          python-version: 3.10.9
+          python-version: 3.10.10
 
       # Install poetry
       - name: Load cached Poetry installation
