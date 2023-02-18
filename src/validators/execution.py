@@ -144,7 +144,7 @@ async def check_operator_balance() -> None:
         logger.warning(
             'Operator balance is too low. At least %s %s is recommended.',
             Web3.from_wei(operator_min_balance, 'ether'),
-            symbol
+            symbol,
         )
 
 
@@ -175,7 +175,10 @@ async def get_vault_validators_index() -> int:
 async def check_deposit_data_root(deposit_data_root: str) -> None:
     """Checks whether deposit data root matches validators root in Vault."""
     if deposit_data_root != Web3.to_hex(await get_vault_validators_root()):
-        raise RuntimeError("Deposit data tree root and vault's validators root don't match")
+        raise RuntimeError(
+            "Deposit data tree root and vault's validators root don't match."
+            ' Have you updated vault deposit data?'
+        )
 
 
 async def get_available_validators(

@@ -65,6 +65,11 @@
     "type": "error"
   },
   {
+    "inputs": [],
+    "name": "ZeroAddress",
+    "type": "error"
+  },
+  {
     "anonymous": false,
     "inputs": [
       {
@@ -115,6 +120,12 @@
         "internalType": "uint256",
         "name": "shares",
         "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "referrer",
+        "type": "address"
       }
     ],
     "name": "Deposit",
@@ -230,6 +241,25 @@
       }
     ],
     "name": "MetadataUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "caller",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "operator",
+        "type": "address"
+      }
+    ],
+    "name": "OperatorUpdated",
     "type": "event"
   },
   {
@@ -536,6 +566,11 @@
         "internalType": "address",
         "name": "receiver",
         "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "referrer",
+        "type": "address"
       }
     ],
     "name": "deposit",
@@ -721,6 +756,19 @@
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "operator",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
       }
     ],
     "stateMutability": "view",
@@ -944,7 +992,7 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "_feeRecipient",
+        "name": "feeRecipient_",
         "type": "address"
       }
     ],
@@ -962,6 +1010,19 @@
       }
     ],
     "name": "setMetadata",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_operator",
+        "type": "address"
+      }
+    ],
+    "name": "setOperator",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1119,6 +1180,11 @@
       {
         "internalType": "address",
         "name": "receiver",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "referrer",
         "type": "address"
       },
       {
