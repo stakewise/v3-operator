@@ -12,7 +12,7 @@ jobs:
       matrix:
         include:
           - OS: ubuntu-latest
-            PYTHON_VERSION: 3.10.9
+            PYTHON_VERSION: 3.10.10
             BUILD_CMD: |
               export PYTHONHASHSEED=42
               export BUILD_FILE_NAME=operator-${RELEASE_VERSION}-linux-amd64;
@@ -35,7 +35,7 @@ jobs:
               sha256sum ${BUILD_FILE_NAME}.tar.gz | head -c 64 > /tmp/artifacts/${BUILD_FILE_NAME}.sha256;
 
           - OS: macos-11
-            PYTHON_VERSION: 3.10.9
+            PYTHON_VERSION: 3.10.10
             BUILD_CMD: |
               export PYTHONHASHSEED=42
               export BUILD_FILE_NAME=operator-${RELEASE_VERSION}-darwin-amd64;
@@ -58,7 +58,7 @@ jobs:
               shasum -a 256 ${BUILD_FILE_NAME}.tar.gz | head -c 64 > /tmp/artifacts/${BUILD_FILE_NAME}.sha256
 
           - OS: windows-latest
-            PYTHON_VERSION: 3.10.9
+            PYTHON_VERSION: 3.10.10
             BUILD_CMD: |
               $RELEASE_VERSION = $env:GITHUB_REF.replace('refs/tags/', '')
               $BUILD_FILE_NAME = "operator-" + $RELEASE_VERSION + "-windows-amd64"
@@ -92,7 +92,7 @@ jobs:
       - name: Install Poetry
         uses: Gr1N/setup-poetry@v8
         with:
-          poetry-version: "1.2.2"
+          poetry-version: "1.3.2"
 
       - name: Install dependencies
         run: poetry install --no-interaction --no-root
