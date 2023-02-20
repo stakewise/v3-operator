@@ -25,6 +25,7 @@ from src.validators.database import (
 from src.validators.execution import (
     check_operator_balance,
     get_available_validators,
+    get_latest_block_number,
     get_latest_network_validator_public_keys,
     get_oracles,
     get_validators_registry_root,
@@ -92,11 +93,13 @@ async def get_oracles_approval(
     # get latest oracles
     oracles = await get_oracles()
 
+    block_number = await get_latest_block_number()
+
     # get latest registry root
-    registry_root = await get_validators_registry_root()
+    registry_root = await get_validators_registry_root(block_number)
 
     # get next validator index for exit signature
-    latest_public_keys = await get_latest_network_validator_public_keys()
+    latest_public_keys = await get_latest_network_validator_public_keys(block_number)
     validator_index = get_next_validator_index(list(latest_public_keys))
     start_validator_index = validator_index
 
