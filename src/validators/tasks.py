@@ -25,7 +25,6 @@ from src.validators.database import (
 from src.validators.execution import (
     check_operator_balance,
     get_available_validators,
-    get_latest_block_number,
     get_latest_network_validator_public_keys,
     get_oracles,
     get_validators_registry_root,
@@ -47,7 +46,6 @@ from src.validators.utils import send_approval_requests
 logger = logging.getLogger(__name__)
 
 
-@backoff.on_exception(backoff.expo, Exception, max_time=DEFAULT_RETRY_TIME)
 async def register_validators(keystores: Keystores, deposit_data: DepositData) -> None:
     """Registers vault validators."""
     vault_balance = await get_withdrawable_assets()
@@ -85,7 +83,6 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
     await check_operator_balance()
 
 
-@backoff.on_exception(backoff.expo, Exception, max_tries=10)
 async def get_oracles_approval(
     keystores: Keystores, validators: list[Validator]
 ) -> OraclesApproval:
@@ -93,13 +90,11 @@ async def get_oracles_approval(
     # get latest oracles
     oracles = await get_oracles()
 
-    block_number = await get_latest_block_number()
-
     # get latest registry root
-    registry_root = await get_validators_registry_root(block_number)
+    registry_root = await get_validators_registry_root()
 
     # get next validator index for exit signature
-    latest_public_keys = await get_latest_network_validator_public_keys(block_number)
+    latest_public_keys = await get_latest_network_validator_public_keys()
     validator_index = get_next_validator_index(list(latest_public_keys))
     start_validator_index = validator_index
 

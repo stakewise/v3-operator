@@ -77,11 +77,13 @@ async def main() -> None:
         start_time = time.time()
         to_block = await get_safe_block_number()
 
-        # process new network validators
-        await network_validators_scanner.process_new_events(to_block)
-
-        # check and register new validators
-        await register_validators(keystores, deposit_data)
+        try:
+            # process new network validators
+            await network_validators_scanner.process_new_events(to_block)
+            # check and register new validators
+            await register_validators(keystores, deposit_data)
+        except Exception as e:
+            logger.error(e)
 
         block_processing_time = time.time() - start_time
         sleep_time = max(int(NETWORK_CONFIG.SECONDS_PER_BLOCK) - int(block_processing_time), 0)
