@@ -9,6 +9,7 @@ from os.path import isfile, join
 import aiohttp
 import backoff
 import milagro_bls_binding as bls
+from aiohttp import ClientError
 from eth_typing import ChecksumAddress, HexStr
 from eth_utils import add_0x_prefix
 from multiproof import StandardMerkleTree
@@ -18,12 +19,19 @@ from tqdm import tqdm
 from web3 import Web3
 
 from src.config.settings import (
+    DEFAULT_RETRY_TIME,
     DEPOSIT_DATA_PATH,
     KEYSTORES_PASSWORD_PATH,
     KEYSTORES_PATH,
     VAULT_CONTRACT_ADDRESS,
 )
-from src.validators.execution import _encode_tx_validator, check_deposit_data_root
+from src.validators.database import get_next_validator_index
+from src.validators.execution import (
+    _encode_tx_validator,
+    check_deposit_data_root,
+    get_latest_network_validator_public_keys,
+    get_validators_registry_root,
+)
 from src.validators.typings import (
     ApprovalRequest,
     BLSPrivkey,
@@ -69,14 +77,26 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
     return signatures, ipfs_hash
 
 
-@backoff.on_exception(backoff.expo, Exception, max_time=60)
+@backoff.on_exception(backoff.expo, ClientError, max_time=DEFAULT_RETRY_TIME)
 async def send_approval_request(
     session: aiohttp.ClientSession, endpoint: str, payload: dict
 ) -> OracleApproval:
     """Requests approval from single oracle."""
-    async with session.post(url=endpoint, json=payload) as response:
-        response.raise_for_status()
-        data = await response.json()
+    try:
+        async with session.post(url=endpoint, json=payload) as response:
+            response.raise_for_status()
+            data = await response.json()
+    except ClientError as e:
+        registry_root = await get_validators_registry_root()
+        if Web3.to_hex(registry_root) != payload['validators_root']:
+            raise ValueError('Validators registry root has changed') from e
+
+        latest_public_keys = await get_latest_network_validator_public_keys()
+        validator_index = get_next_validator_index(list(latest_public_keys))
+        if validator_index != payload['validator_index']:
+            raise ValueError('Validator index has changed') from e
+
+        raise e
 
     return OracleApproval(
         ipfs_hash=data['ipfs_hash'], signature=Web3.to_bytes(hexstr=data['signature'])
@@ -90,7 +110,6 @@ def load_keystores() -> Keystores:
     files = listdir(KEYSTORES_PATH)
 
     with tqdm(total=len(files)) as pbar, Pool() as pool:
-
         # pylint: disable-next=unused-argument
         def _stop_pool(*args, **kwargs):
             pool.terminate()

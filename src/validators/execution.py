@@ -108,13 +108,7 @@ def process_network_validator_event(event: EventData) -> HexStr | None:
 
 
 @backoff.on_exception(backoff.expo, Exception, max_time=DEFAULT_RETRY_TIME)
-async def get_latest_block_number() -> BlockNumber:
-    """Fetches the latest block."""
-    return await execution_client.eth.block_number  # type: ignore
-
-
-@backoff.on_exception(backoff.expo, Exception, max_time=DEFAULT_RETRY_TIME)
-async def get_latest_network_validator_public_keys(block_number: BlockNumber) -> Set[HexStr]:
+async def get_latest_network_validator_public_keys() -> Set[HexStr]:
     """Fetches the latest network validator public keys."""
     last_validator = get_last_network_validator()
     if last_validator:
@@ -123,8 +117,7 @@ async def get_latest_network_validator_public_keys(block_number: BlockNumber) ->
         from_block = VALIDATORS_REGISTRY_GENESIS_BLOCK
 
     new_events = await validators_registry_contract.events.DepositEvent.get_logs(
-        from_block=from_block,
-        to_block=block_number,
+        from_block=from_block
     )
     new_public_keys: Set[HexStr] = set()
     for event in new_events:
@@ -162,11 +155,9 @@ async def get_withdrawable_assets() -> Wei:
 
 
 @backoff.on_exception(backoff.expo, Exception, max_time=DEFAULT_RETRY_TIME)
-async def get_validators_registry_root(block_number: BlockNumber) -> Bytes32:
+async def get_validators_registry_root() -> Bytes32:
     """Fetches the latest validators registry root."""
-    return await validators_registry_contract.functions.get_deposit_root().call(
-        block_identifier=block_number
-    )
+    return await validators_registry_contract.functions.get_deposit_root().call()
 
 
 @backoff.on_exception(backoff.expo, Exception, max_time=DEFAULT_RETRY_TIME)
