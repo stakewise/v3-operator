@@ -1,4 +1,5 @@
 import sqlite3
+from pathlib import Path
 
 from sw_utils import (
     IpfsFetchClient,
@@ -20,6 +21,9 @@ from src.config.settings import (
 class Database:
     def get_db_connection(self):
         return sqlite3.connect(DATABASE)
+
+    def create_db_dir(self):
+        Path(DATABASE).parent.mkdir(parents=True, exist_ok=True)
 
 
 def build_execution_client() -> Web3:

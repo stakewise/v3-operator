@@ -25,6 +25,7 @@ async def startup_checks():
     await check_operator_balance()
 
     logger.info('Checking connection to database...')
+    db_client.create_db_dir()
     with db_client.get_db_connection() as conn:
         conn.cursor()
     logger.info('Connected to database %s.', DATABASE)
