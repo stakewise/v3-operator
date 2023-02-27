@@ -44,6 +44,8 @@ from src.validators.typings import (
 
 logger = logging.getLogger(__name__)
 
+REGISTRY_ROOT_CHANGED_ERROR = 'Validators registry root has changed'
+
 
 class KeystoreException(Exception):
     ...
@@ -89,7 +91,7 @@ async def send_approval_request(
     except ClientError as e:
         registry_root = await get_validators_registry_root()
         if Web3.to_hex(registry_root) != payload['validators_root']:
-            raise ValueError('Validators registry root has changed') from e
+            raise ValueError(REGISTRY_ROOT_CHANGED_ERROR) from e
 
         latest_public_keys = await get_latest_network_validator_public_keys()
         validator_index = get_next_validator_index(list(latest_public_keys))
