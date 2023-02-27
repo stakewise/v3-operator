@@ -21,7 +21,7 @@ from src.utils import get_build_version
 from src.validators.database import setup as validators_db_setup
 from src.validators.execution import NetworkValidatorsProcessor
 from src.validators.tasks import load_genesis_validators, register_validators
-from src.validators.utils import load_deposit_data, load_keystores
+from src.validators.utils import load_deposit_data, load_keystores, REGISTRY_ROOT_CHANGED_ERROR
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s %(message)s',
@@ -83,7 +83,14 @@ async def main() -> None:
             # check and register new validators
             await register_validators(keystores, deposit_data)
         except Exception as e:
-            logger.exception(e)
+            if (
+                isinstance(e, ValueError)
+                and len(e.args)
+                and e.args[0] == REGISTRY_ROOT_CHANGED_ERROR
+            ):
+                logger.warning(REGISTRY_ROOT_CHANGED_ERROR)
+            else:
+                logger.exception(e)
 
         block_processing_time = time.time() - start_time
         sleep_time = max(int(NETWORK_CONFIG.SECONDS_PER_BLOCK) - int(block_processing_time), 0)
