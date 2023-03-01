@@ -98,17 +98,10 @@ binary file. Start the binary with the following command:
 
 #### Option 2. Use Docker image
 
-Build Docker image or pull existing one
-from [here](https://europe-west4-docker.pkg.dev/stakewiselabs/private/v3-operator):
+Pull Docker image from [here](https://europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator) and start the container with the following command:
 
 ```sh
-docker build --pull -t stakewiselabs/v3-operator .
-```
-
-Start the container with the following command:
-
-```sh
-docker run --restart on-failure:10 --env-file ./.env -v ./database:/database stakewiselabs/v3-operator
+docker run --restart on-failure:10 --env-file ./.env -v ./database:/database europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator
 ```
 
 #### Option 3. Use Kubernetes helm chart
@@ -128,3 +121,8 @@ Install dependencies and start operator:
 poetry install --no-dev
 python src/main.py
 ```
+
+# Contacts
+- Dmitri Tsumak - dmitri@stakewise.io
+- Alexander Sysoev - alexander@stakewise.io
+- Evgeny Gusarov - evgeny@stakewise.io
