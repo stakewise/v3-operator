@@ -16,7 +16,6 @@ sw-utils = { git = "https://github.com/stakewise/sw-utils.git", rev = "v0.2.15" 
 staking-deposit = { git = "https://github.com/ethereum/staking-deposit-cli.git", rev = "v2.4.0" }
 pycryptodomex = "==3.17.0"
 milagro-bls-binding = "==1.9.0"
-tqdm = "==4.64.1"
 tomli = "~2"
 
 [tool.poetry.group.dev.dependencies]
