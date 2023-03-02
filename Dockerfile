@@ -67,3 +67,4 @@ ENV PYTHONPATH="${PYTHONPATH}:/app"
 
 # Start application
 ENTRYPOINT ["python"]
+CMD ["src/main.py"]
