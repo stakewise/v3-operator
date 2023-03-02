@@ -26,6 +26,11 @@ from src.config.settings import (
     VAULT_CONTRACT_ADDRESS,
 )
 from src.validators.database import get_next_validator_index
+from src.validators.exceptions import (
+    KeystoreException,
+    RegistryRootChangedError,
+    ValidatorIndexChangedError,
+)
 from src.validators.execution import (
     _encode_tx_validator,
     check_deposit_data_root,
@@ -43,12 +48,6 @@ from src.validators.typings import (
 )
 
 logger = logging.getLogger(__name__)
-
-REGISTRY_ROOT_CHANGED_ERROR = 'Validators registry root has changed'
-
-
-class KeystoreException(Exception):
-    ...
 
 
 async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> tuple[bytes, str]:
@@ -91,12 +90,12 @@ async def send_approval_request(
     except ClientError as e:
         registry_root = await get_validators_registry_root()
         if Web3.to_hex(registry_root) != payload['validators_root']:
-            raise ValueError(REGISTRY_ROOT_CHANGED_ERROR) from e
+            raise RegistryRootChangedError from e
 
         latest_public_keys = await get_latest_network_validator_public_keys()
         validator_index = get_next_validator_index(list(latest_public_keys))
         if validator_index != payload['validator_index']:
-            raise ValueError('Validator index has changed') from e
+            raise ValidatorIndexChangedError from e
 
         raise e
 

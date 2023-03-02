@@ -15,13 +15,14 @@ from src.config.settings import (
     NETWORK,
     NETWORK_CONFIG,
     SENTRY_DSN,
+    VERBOSE,
 )
 from src.startup_check import startup_checks
 from src.utils import get_build_version
 from src.validators.database import setup as validators_db_setup
 from src.validators.execution import NetworkValidatorsProcessor
 from src.validators.tasks import load_genesis_validators, register_validators
-from src.validators.utils import load_deposit_data, load_keystores, REGISTRY_ROOT_CHANGED_ERROR
+from src.validators.utils import load_deposit_data, load_keystores
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s %(message)s',
@@ -67,12 +68,16 @@ async def main() -> None:
     deposit_data = await load_deposit_data()
 
     # start operator tasks
-    interrupt_handler = InterruptHandler()
 
     # periodically scan network validator updates
     network_validators_processor = NetworkValidatorsProcessor()
     network_validators_scanner = EventScanner(network_validators_processor)
 
+    logger.info('Syncing network validator events...')
+    await network_validators_scanner.process_new_events(await get_safe_block_number())
+
+    logger.info('Started operator service')
+    interrupt_handler = InterruptHandler()
     while not interrupt_handler.exit:
         start_time = time.time()
         to_block = await get_safe_block_number()
@@ -83,14 +88,10 @@ async def main() -> None:
             # check and register new validators
             await register_validators(keystores, deposit_data)
         except Exception as e:
-            if (
-                isinstance(e, ValueError)
-                and len(e.args)
-                and e.args[0] == REGISTRY_ROOT_CHANGED_ERROR
-            ):
-                logger.warning(REGISTRY_ROOT_CHANGED_ERROR)
-            else:
+            if VERBOSE:
                 logger.exception(e)
+            else:
+                logger.error(e)
 
         block_processing_time = time.time() - start_time
         sleep_time = max(int(NETWORK_CONFIG.SECONDS_PER_BLOCK) - int(block_processing_time), 0)

@@ -1,9 +1,13 @@
 import os
+import sys
 
 from decouple import Choices, Csv, config
 from web3 import Web3
 
 from src.config.networks import GOERLI, NETWORKS, NetworkConfig
+
+# debug
+VERBOSE = '-v' in sys.argv
 
 # network
 NETWORK = config('NETWORK', cast=Choices([GOERLI]))
