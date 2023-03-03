@@ -1,6 +1,10 @@
 import asyncio
 import logging
+import os
+import ssl
+import sys
 import time
+from multiprocessing import freeze_support
 
 import backoff
 from eth_typing import BlockNumber
@@ -99,6 +103,13 @@ async def main() -> None:
 
 
 if __name__ == '__main__':
+    # Pyinstaller hacks
+    freeze_support()
+    # Use certificate from certifi only if cafile could not find by ssl.
+    if ssl.get_default_verify_paths().cafile is None and hasattr(sys, '_MEIPASS'):
+        # pylint: disable-next=protected-access
+        os.environ['SSL_CERT_FILE'] = os.path.join(sys._MEIPASS, 'certifi', 'cacert.pem')
+
     if SENTRY_DSN:
         import sentry_sdk
         from sentry_sdk.integrations.logging import ignore_logger

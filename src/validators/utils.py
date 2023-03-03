@@ -15,7 +15,6 @@ from eth_utils import add_0x_prefix
 from multiproof import StandardMerkleTree
 from staking_deposit.key_handling.keystore import ScryptKeystore
 from sw_utils import get_eth1_withdrawal_credentials
-from tqdm import tqdm
 from web3 import Web3
 
 from src.config.settings import (
@@ -109,8 +108,8 @@ def load_keystores() -> Keystores:
 
     keystores_password = _load_keystores_password()
     files = listdir(KEYSTORES_PATH)
-
-    with tqdm(total=len(files)) as pbar, Pool() as pool:
+    logger.info('Loading keystores from %s...', KEYSTORES_PATH)
+    with Pool() as pool:
         # pylint: disable-next=unused-argument
         def _stop_pool(*args, **kwargs):
             pool.terminate()
@@ -119,7 +118,6 @@ def load_keystores() -> Keystores:
             pool.apply_async(
                 _process_keystore_file,
                 [file, keystores_password],
-                callback=lambda x: pbar.update(1),
                 error_callback=_stop_pool,
             )
             for file in files
