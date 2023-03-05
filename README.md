@@ -98,10 +98,21 @@ binary file. Start the binary with the following command:
 
 #### Option 2. Use Docker image
 
-Pull Docker image from [here](https://europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator) and start the container with the following command:
+Build Docker image:
 
 ```sh
-docker run --restart on-failure:10 --env-file ./.env -v ./database:/database europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator
+docker build --pull -t stakewiselabs/v3-operator .
+```
+
+or pull existing one:
+```sh
+docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:latest
+```
+
+Start the container with the following command:
+
+```sh
+docker run --restart on-failure:10 --env-file ./.env -v ./database:/database europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:latest
 ```
 
 #### Option 3. Use Kubernetes helm chart
