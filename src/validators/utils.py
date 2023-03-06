@@ -77,7 +77,14 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
     return signatures, ipfs_hash
 
 
-@backoff.on_exception(backoff.expo, ClientError, max_time=DEFAULT_RETRY_TIME)
+connection_errors = (
+    aiohttp.ClientConnectionError,
+    aiohttp.ClientConnectorError,
+    aiohttp.ServerConnectionError,
+)
+
+
+@backoff.on_exception(backoff.expo, connection_errors, max_time=DEFAULT_RETRY_TIME)
 async def send_approval_request(
     session: aiohttp.ClientSession, endpoint: str, payload: dict
 ) -> OracleApproval:
