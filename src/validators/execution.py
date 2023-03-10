@@ -11,7 +11,7 @@ from sw_utils import (
     get_eth1_withdrawal_credentials,
     is_valid_deposit_data_signature,
 )
-from sw_utils.decorators import backoff_aiohttp_connection_errors
+from sw_utils.decorators import backoff_aiohttp_errors
 from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.types import EventData, Wei
@@ -107,7 +107,7 @@ def process_network_validator_event(event: EventData) -> HexStr | None:
     return None
 
 
-@backoff_aiohttp_connection_errors(max_time=DEFAULT_RETRY_TIME)
+@backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
 async def get_latest_network_validator_public_keys() -> Set[HexStr]:
     """Fetches the latest network validator public keys."""
     last_validator = get_last_network_validator()
@@ -128,7 +128,7 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
     return new_public_keys
 
 
-@backoff_aiohttp_connection_errors(max_time=300)
+@backoff_aiohttp_errors(max_time=300)
 async def get_operator_balance() -> Wei:
     return await execution_client.eth.get_balance(operator_account.address)  # type: ignore
 
@@ -148,25 +148,25 @@ async def check_operator_balance() -> None:
         )
 
 
-@backoff_aiohttp_connection_errors(max_time=300)
+@backoff_aiohttp_errors(max_time=300)
 async def get_withdrawable_assets() -> Wei:
     """Fetches vault's available assets for staking."""
     return await vault_contract.functions.withdrawableAssets().call()
 
 
-@backoff_aiohttp_connection_errors(max_time=DEFAULT_RETRY_TIME)
+@backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
 async def get_validators_registry_root() -> Bytes32:
     """Fetches the latest validators registry root."""
     return await validators_registry_contract.functions.get_deposit_root().call()
 
 
-@backoff_aiohttp_connection_errors(max_time=DEFAULT_RETRY_TIME)
+@backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
 async def get_vault_validators_root() -> Bytes32:
     """Fetches vault's validators root."""
     return await vault_contract.functions.validatorsRoot().call()
 
 
-@backoff_aiohttp_connection_errors(max_time=DEFAULT_RETRY_TIME)
+@backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
 async def get_vault_validators_index() -> int:
     """Fetches vault's current validators index."""
     return await vault_contract.functions.validatorIndex().call()
@@ -211,7 +211,7 @@ async def get_available_validators(
     return validators
 
 
-@backoff_aiohttp_connection_errors(max_time=DEFAULT_RETRY_TIME)
+@backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
 async def get_oracles() -> Oracles:
     """Fetches oracles config."""
     events = await oracles_contract.events.ConfigUpdated.get_logs(

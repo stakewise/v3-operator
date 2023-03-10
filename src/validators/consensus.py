@@ -1,4 +1,4 @@
-from sw_utils.decorators import backoff_aiohttp_connection_errors
+from sw_utils.decorators import backoff_aiohttp_errors
 from sw_utils.typings import ConsensusFork
 from web3 import Web3
 
@@ -6,7 +6,7 @@ from src.common.clients import consensus_client
 from src.config.settings import DEFAULT_RETRY_TIME
 
 
-@backoff_aiohttp_connection_errors(max_time=DEFAULT_RETRY_TIME)
+@backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
 async def get_consensus_fork(
 ) -> ConsensusFork:
     """Fetches current fork data."""
