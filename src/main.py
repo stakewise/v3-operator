@@ -6,9 +6,9 @@ import sys
 import time
 from multiprocessing import freeze_support
 
-import backoff
 from eth_typing import BlockNumber
 from sw_utils import EventScanner, InterruptHandler
+from sw_utils.decorators import backoff_aiohttp_errors
 
 import src
 from src.common.accounts import operator_account
@@ -38,7 +38,7 @@ logging.getLogger('backoff').addHandler(logging.StreamHandler())
 logger = logging.getLogger(__name__)
 
 
-@backoff.on_exception(backoff.expo, Exception, max_time=DEFAULT_RETRY_TIME)
+@backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
 async def get_safe_block_number() -> BlockNumber:
     """Fetches the fork safe block number."""
     block_number = await execution_client.eth.block_number  # type: ignore

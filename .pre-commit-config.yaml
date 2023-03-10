@@ -47,6 +47,7 @@ repos:
             "-rn", # Only display messages
             "-sn", # Don't display the score
           ]
+        require_serial: true
 
   - repo: local
     hooks:

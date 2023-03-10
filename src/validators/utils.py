@@ -7,7 +7,6 @@ from os import listdir
 from os.path import isfile, join
 
 import aiohttp
-import backoff
 import milagro_bls_binding as bls
 from aiohttp import ClientError
 from eth_typing import ChecksumAddress, HexStr
@@ -15,6 +14,7 @@ from eth_utils import add_0x_prefix
 from multiproof import StandardMerkleTree
 from staking_deposit.key_handling.keystore import ScryptKeystore
 from sw_utils import get_eth1_withdrawal_credentials
+from sw_utils.decorators import backoff_aiohttp_errors
 from web3 import Web3
 
 from src.config.settings import (
@@ -77,7 +77,7 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
     return signatures, ipfs_hash
 
 
-@backoff.on_exception(backoff.expo, ClientError, max_time=DEFAULT_RETRY_TIME)
+@backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
 async def send_approval_request(
     session: aiohttp.ClientSession, endpoint: str, payload: dict
 ) -> OracleApproval:
