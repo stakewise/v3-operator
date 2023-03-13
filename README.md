@@ -53,7 +53,7 @@ The keystores are used to create exit signatures, and the deposit data is used t
 The deposit data must comply with the following rules:
 
 - The Vault address must be used as withdrawal credentials. If you are creating a new Vault, go
-  to [StakeWise app](https://app.stakewise.io), connect the wallet you will create Vault from, click on "Create Vault"
+  to [StakeWise testnet app](https://testnet.stakewise.io), connect the wallet you will create Vault from, click on "Create Vault"
   and once you reach the "Setup Validator" step, you will see the address you must use for the withdrawals. If you
   already have a Vault, you can see its address either in the URL bar or by scrolling to the "Details" at the bottom.
 - The validator public keys must be new and never seen by the beacon chain. This can be achieved using a higher mnemonic
