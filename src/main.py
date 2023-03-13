@@ -12,17 +12,10 @@ from sw_utils.decorators import backoff_aiohttp_errors
 
 import src
 from src.common.accounts import operator_account
-from src.common.clients import execution_client
-from src.config.settings import (
-    DEFAULT_RETRY_TIME,
-    LOG_LEVEL,
-    NETWORK,
-    NETWORK_CONFIG,
-    SENTRY_DSN,
-    VERBOSE,
-)
+from src.config.settings import LOG_LEVEL, NETWORK, NETWORK_CONFIG, SENTRY_DSN, VERBOSE
 from src.startup_check import startup_checks
 from src.utils import get_build_version
+from src.validators.consensus import get_chain_finalized_head
 from src.validators.database import setup as validators_db_setup
 from src.validators.execution import NetworkValidatorsProcessor
 from src.validators.tasks import load_genesis_validators, register_validators
@@ -38,11 +31,9 @@ logging.getLogger('backoff').addHandler(logging.StreamHandler())
 logger = logging.getLogger(__name__)
 
 
-@backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
 async def get_safe_block_number() -> BlockNumber:
-    """Fetches the fork safe block number."""
-    block_number = await execution_client.eth.block_number  # type: ignore
-    return BlockNumber(max(block_number - NETWORK_CONFIG.CONFIRMATION_BLOCKS, 0))
+    chain_state = await get_chain_finalized_head()
+    return chain_state.execution_block
 
 
 def log_start() -> None:
