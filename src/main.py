@@ -6,7 +6,6 @@ import sys
 import time
 from multiprocessing import freeze_support
 
-from eth_typing import BlockNumber
 from sw_utils import EventScanner, InterruptHandler
 
 import src
@@ -28,11 +27,6 @@ logging.basicConfig(
 logging.getLogger('backoff').addHandler(logging.StreamHandler())
 
 logger = logging.getLogger(__name__)
-
-
-async def get_safe_block_number() -> BlockNumber:
-    chain_state = await get_chain_finalized_head()
-    return chain_state.execution_block
 
 
 def log_start() -> None:
@@ -68,13 +62,17 @@ async def main() -> None:
     network_validators_scanner = EventScanner(network_validators_processor)
 
     logger.info('Syncing network validator events...')
-    await network_validators_scanner.process_new_events(await get_safe_block_number())
+    chain_state = await get_chain_finalized_head()
+    to_block = chain_state.execution_block
+    await network_validators_scanner.process_new_events(to_block)
 
     logger.info('Started operator service')
     interrupt_handler = InterruptHandler()
     while not interrupt_handler.exit:
         start_time = time.time()
-        to_block = await get_safe_block_number()
+
+        chain_state = await get_chain_finalized_head()
+        to_block = chain_state.execution_block
 
         try:
             # process new network validators
