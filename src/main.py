@@ -8,7 +8,6 @@ from multiprocessing import freeze_support
 
 from eth_typing import BlockNumber
 from sw_utils import EventScanner, InterruptHandler
-from sw_utils.decorators import backoff_aiohttp_errors
 
 import src
 from src.common.accounts import operator_account

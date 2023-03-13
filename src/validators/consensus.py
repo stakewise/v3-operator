@@ -1,9 +1,8 @@
-from sw_utils.decorators import backoff_aiohttp_errors
 from dataclasses import dataclass
 
-import backoff
 from aiohttp import ClientResponseError
 from eth_typing import BlockNumber
+from sw_utils.decorators import backoff_aiohttp_errors
 from sw_utils.typings import ConsensusFork
 from web3 import Web3
 from web3.types import Timestamp
