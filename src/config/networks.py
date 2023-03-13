@@ -23,8 +23,8 @@ class NetworkConfig:
     ORACLES_CONTRACT_ADDRESS: ChecksumAddress
     ORACLES_GENESIS_BLOCK: BlockNumber
     GENESIS_VALIDATORS_ROOT: Bytes32
+    SLOTS_PER_EPOCH: int
     SECONDS_PER_BLOCK: Decimal
-    CONFIRMATION_BLOCKS: int
     GENESIS_FORK_VERSION: bytes
     IS_POA: bool
     OPERATOR_MIN_BALANCE: Wei
@@ -45,8 +45,8 @@ NETWORKS = {
                 hexstr=HexStr('0x4b363db94e286120d76eb905340fdd4e54bfe9f06bf33ff6cf5ad27f511bfe95')
             )
         ),
+        SLOTS_PER_EPOCH=32,
         SECONDS_PER_BLOCK=Decimal(12),
-        CONFIRMATION_BLOCKS=64,
         GENESIS_FORK_VERSION=bytes.fromhex('00000000'),
         IS_POA=False,
         OPERATOR_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
@@ -66,8 +66,8 @@ NETWORKS = {
                 hexstr=HexStr('0x043db0d9a83813551ee2f33450d23797757d430911a9320530ad8a0eabc43efb')
             )
         ),
+        SLOTS_PER_EPOCH=32,
         SECONDS_PER_BLOCK=Decimal(12),
-        CONFIRMATION_BLOCKS=64,
         GENESIS_FORK_VERSION=bytes.fromhex('00001020'),
         IS_POA=True,
         OPERATOR_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
@@ -86,8 +86,8 @@ NETWORKS = {
                 hexstr=HexStr('0xf5dcb5564e829aab27264b9becd5dfaa017085611224cb3036f573368dbb9d47')
             )
         ),
+        SLOTS_PER_EPOCH=32,
         SECONDS_PER_BLOCK=Decimal('6.8'),
-        CONFIRMATION_BLOCKS=24,
         GENESIS_FORK_VERSION=bytes.fromhex('00000064'),
         IS_POA=False,
         OPERATOR_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
