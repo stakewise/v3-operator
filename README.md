@@ -93,7 +93,7 @@ See [releases page](https://github.com/stakewise/v3-operator/releases) to downlo
 binary file. Start the binary with the following command:
 
 ```sh
-./v3-operator
+./operator
 ```
 
 #### Option 2. Use Docker image
