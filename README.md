@@ -52,17 +52,17 @@ The keystores are used to create exit signatures, and the deposit data is used t
 
 The deposit data must comply with the following rules:
 
-- The Vault address must be used as withdrawal address. 
-- The validator public keys must be new and never seen by the beacon chain. 
+- The Vault address must be used as withdrawal address.
+- The validator public keys must be new and never seen by the beacon chain.
 
 #### How can I find the Vault address?
 
 If you are creating a new Vault:
-1. go to [StakeWise testnet app](https://testnet.stakewise.io), 
-2. connect the wallet you will create Vault from, 
+1. go to [StakeWise testnet app](https://testnet.stakewise.io),
+2. connect the wallet you will create Vault from,
 3. click on "Create Vault"
 4. reach the "Setup Validator" step
-5. now you see the Vault address 
+5. now you see the Vault address
 
 If you already have a Vault, you can see its address either in the URL bar or by scrolling to the "Details" at the bottom.
 
@@ -116,11 +116,29 @@ or pull existing one:
 docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:latest
 ```
 
+Make sure that file paths in .env file represent container paths. For example:
+```
+DATABASE_DIR=/database
+KEYSTORES_PASSWORD_PATH=/data/keystores/password.txt
+KEYSTORES_PATH=/data/keystores
+DEPOSIT_DATA_PATH=/data/deposit_data.json
+```
+
+You have to mount keystores and deposit data folders into docker container.
+Assume that:
+* your keystores and deposit data are located in `/home/user/data` folder on a host,
+* you use `/home/user/database` folder on host for database
+
 Start the container with the following command:
 
 ```sh
-docker run --restart on-failure:10 --env-file ./.env -v ./database:/database europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:latest
+docker run --restart on-failure:10 \
+  --env-file .env \
+  -v /home/user/database:/database \
+  -v /home/user/data:/data \
+  europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:latest
 ```
+
 
 #### Option 3. Use Kubernetes helm chart
 
