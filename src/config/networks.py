@@ -25,7 +25,6 @@ class NetworkConfig:
     GENESIS_VALIDATORS_ROOT: Bytes32
     SLOTS_PER_EPOCH: int
     SECONDS_PER_BLOCK: Decimal
-    CONFIRMATION_BLOCKS: int
     GENESIS_FORK_VERSION: bytes
     IS_POA: bool
     OPERATOR_MIN_BALANCE: Wei
@@ -48,7 +47,6 @@ NETWORKS = {
         ),
         SLOTS_PER_EPOCH=32,
         SECONDS_PER_BLOCK=Decimal(12),
-        CONFIRMATION_BLOCKS=64,
         GENESIS_FORK_VERSION=bytes.fromhex('00000000'),
         IS_POA=False,
         OPERATOR_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
@@ -70,7 +68,6 @@ NETWORKS = {
         ),
         SLOTS_PER_EPOCH=32,
         SECONDS_PER_BLOCK=Decimal(12),
-        CONFIRMATION_BLOCKS=64,
         GENESIS_FORK_VERSION=bytes.fromhex('00001020'),
         IS_POA=True,
         OPERATOR_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
@@ -91,7 +88,6 @@ NETWORKS = {
         ),
         SLOTS_PER_EPOCH=32,
         SECONDS_PER_BLOCK=Decimal('6.8'),
-        CONFIRMATION_BLOCKS=24,
         GENESIS_FORK_VERSION=bytes.fromhex('00000064'),
         IS_POA=False,
         OPERATOR_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
