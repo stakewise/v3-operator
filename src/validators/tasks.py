@@ -1,6 +1,5 @@
 import logging
 
-import backoff
 from web3 import Web3
 from web3.types import Wei
 
@@ -9,7 +8,6 @@ from src.common.utils import MGNO_RATE, WAD
 from src.config.networks import GNOSIS, GOERLI
 from src.config.settings import (
     APPROVAL_MAX_VALIDATORS,
-    DEFAULT_RETRY_TIME,
     DEPOSIT_AMOUNT,
     GOERLI_GENESIS_VALIDATORS_IPFS_HASH,
     NETWORK,
@@ -142,7 +140,6 @@ async def get_oracles_approval(
     )
 
 
-@backoff.on_exception(backoff.expo, Exception, max_time=DEFAULT_RETRY_TIME)
 async def load_genesis_validators() -> None:
     """
     In some test networks (e.g. Goerli) genesis validators
