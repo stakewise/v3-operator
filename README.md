@@ -52,20 +52,34 @@ The keystores are used to create exit signatures, and the deposit data is used t
 
 The deposit data must comply with the following rules:
 
-- The Vault address must be used as withdrawal credentials. If you are creating a new Vault, go
-  to [StakeWise app](https://app.stakewise.io), connect the wallet you will create Vault from, click on "Create Vault"
-  and once you reach the "Setup Validator" step, you will see the address you must use for the withdrawals. If you
-  already have a Vault, you can see its address either in the URL bar or by scrolling to the "Details" at the bottom.
-- The validator public keys must be new and never seen by the beacon chain. This can be achieved using a higher mnemonic
-  index for every new deposit data. For example, if you've generated four keys before (keys #0, #1, #2, #3), then start
-  with index 4. [StakeWise key manager](https://github.com/stakewise/key-manager/) stores the index locally and updates
-  it every time you generate new validator keys.
+- The Vault address must be used as withdrawal address.
+- The validator public keys must be new and never seen by the beacon chain.
 
-You can use any of the following tools to generate keystores and deposit data:
+#### How can I find the Vault address?
+
+If you are creating a new Vault:
+1. go to [StakeWise testnet app](https://testnet.stakewise.io)
+2. connect the wallet you will create Vault from
+3. click on "Create Vault"
+4. reach the "Setup Validator" step
+5. the Vault address is specified in the withdrawal address field
+
+If you already have a Vault, you can see its address either in the URL bar or by scrolling to the "Details" at the bottom.
+
+#### Tools to generate keystores and deposit data
+
+You can use any of the following tools:
 
 - [StakeWise key manager](https://github.com/stakewise/key-manager/)
 - [Staking Deposit CLI](https://github.com/ethereum/staking-deposit-cli)
 - [Wagyu Key Gen](https://github.com/stake-house/wagyu-key-gen)
+
+#### Generating new keystores upon existing ones
+
+The validator public keys must be new and never seen by the beacon chain. This can be achieved using a higher mnemonic
+index for every new deposit data. For example, if you've generated four keys before (keys #0, #1, #2, #3), then start
+with index 4. [StakeWise key manager](https://github.com/stakewise/key-manager/) stores the index locally and updates
+it every time you generate new validator keys.
 
 ### Step 4. Generate hot wallet
 
@@ -109,11 +123,27 @@ or pull existing one:
 docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:latest
 ```
 
+Make sure that file paths in .env file represent container paths. For example:
+```
+DATABASE_DIR=/database
+KEYSTORES_PASSWORD_PATH=/data/keystores/password.txt
+KEYSTORES_PATH=/data/keystores
+DEPOSIT_DATA_PATH=/data/deposit_data.json
+```
+
+You have to mount keystores and deposit data folders into docker container.
+For example, if your keystores and deposit data file are located in `/home/user/data` folder on a host and you use `/home/user/database` folder on host for the database
+
 Start the container with the following command:
 
 ```sh
-docker run --restart on-failure:10 --env-file ./.env -v ./database:/database europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:latest
+docker run --restart on-failure:10 \
+  --env-file .env \
+  -v /home/user/database:/database \
+  -v /home/user/data:/data \
+  europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:latest
 ```
+
 
 #### Option 3. Use Kubernetes helm chart
 
