@@ -58,7 +58,7 @@ The deposit data must comply with the following rules:
 #### How can I find the Vault address?
 
 If you are creating a new Vault:
-1. go to [StakeWise testnet app](https://testnet.stakewise.io),
+1. go to [StakeWise testnet app](https://testnet.stakewise.io)
 2. connect the wallet you will create Vault from,
 3. click on "Create Vault"
 4. reach the "Setup Validator" step
