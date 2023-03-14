@@ -74,6 +74,13 @@ You can use any of the following tools:
 - [Staking Deposit CLI](https://github.com/ethereum/staking-deposit-cli)
 - [Wagyu Key Gen](https://github.com/stake-house/wagyu-key-gen)
 
+#### Generating new keystores upon existing ones
+
+The validator public keys must be new and never seen by the beacon chain. This can be achieved using a higher mnemonic
+index for every new deposit data. For example, if you've generated four keys before (keys #0, #1, #2, #3), then start
+with index 4. [StakeWise key manager](https://github.com/stakewise/key-manager/) stores the index locally and updates
+it every time you generate new validator keys.
+
 ### Step 4. Generate hot wallet
 
 The hot wallet is used to submit validator registration transaction. You must send some ETH (DAI for Gnosis) to
