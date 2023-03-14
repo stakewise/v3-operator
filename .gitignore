@@ -9,3 +9,5 @@ local.env
 /logfile
 GIT_SHA
 build
+database
+*.db
