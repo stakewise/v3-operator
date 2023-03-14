@@ -62,7 +62,7 @@ If you are creating a new Vault:
 2. connect the wallet you will create Vault from
 3. click on "Create Vault"
 4. reach the "Setup Validator" step
-5. now you see the Vault address
+5. the Vault address is specified in the withdrawal address field
 
 If you already have a Vault, you can see its address either in the URL bar or by scrolling to the "Details" at the bottom.
 
