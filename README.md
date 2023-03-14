@@ -125,9 +125,7 @@ DEPOSIT_DATA_PATH=/data/deposit_data.json
 ```
 
 You have to mount keystores and deposit data folders into docker container.
-Assume that:
-* your keystores and deposit data are located in `/home/user/data` folder on a host,
-* you use `/home/user/database` folder on host for database
+For example, if your keystores and deposit data file are located in `/home/user/data` folder on a host and you use `/home/user/database` folder on host for the database
 
 Start the container with the following command:
 
