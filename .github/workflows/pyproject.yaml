@@ -1,0 +1,22 @@
+name: pyproject
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  pyproject:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: 'master'
+      - name: Update pyproject.toml version
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          export CURRENT_TAG=$(echo ${GITHUB_REF#refs/*/} | sed 's/v//g')
+          sed -i "s/^version = \".*\"/version = \"$CURRENT_TAG\"/g" pyproject.toml
+          git commit -am "Release v${CURRENT_TAG}"
+          git push
