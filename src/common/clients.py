@@ -3,8 +3,8 @@ from pathlib import Path
 
 import backoff
 from sw_utils import (
-    IpfsFetchClient,
     IpfsException,
+    IpfsFetchClient,
     construct_async_sign_and_send_raw_middleware,
     get_consensus_client,
     get_execution_client,
