@@ -1,13 +1,14 @@
 import sqlite3
 from pathlib import Path
 
+import backoff
 from sw_utils import (
+    IpfsException,
     IpfsFetchClient,
     construct_async_sign_and_send_raw_middleware,
     get_consensus_client,
     get_execution_client,
 )
-from sw_utils.decorators import backoff_requests_errors
 from web3 import Web3
 
 from src.common.accounts import operator_account
@@ -36,11 +37,11 @@ def build_execution_client() -> Web3:
 
 
 class IpfsFetchRetryClient(IpfsFetchClient):
-    @backoff_requests_errors(max_time=DEFAULT_RETRY_TIME)
+    @backoff.on_exception(backoff.expo, IpfsException, max_time=DEFAULT_RETRY_TIME)
     async def fetch_bytes(self, ipfs_hash: str) -> bytes:
         return await super().fetch_bytes(ipfs_hash)
 
-    @backoff_requests_errors(max_time=DEFAULT_RETRY_TIME)
+    @backoff.on_exception(backoff.expo, IpfsException, max_time=DEFAULT_RETRY_TIME)
     async def fetch_json(self, ipfs_hash: str) -> dict | list:
         return await super().fetch_json(ipfs_hash)
 
