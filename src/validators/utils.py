@@ -2,6 +2,7 @@ import dataclasses
 import json
 import logging
 import random
+import sys
 from multiprocessing import Pool
 from os import listdir
 from os.path import isfile, join
@@ -112,7 +113,7 @@ def load_keystores() -> Keystores:
     with Pool() as pool:
         # pylint: disable-next=unused-argument
         def _stop_pool(*args, **kwargs):
-            pool.terminate()
+            pool.close()
 
         results = [
             pool.apply_async(
@@ -129,7 +130,7 @@ def load_keystores() -> Keystores:
                 keys.append(result.get())
             except KeystoreException as e:
                 logger.error(e)
-                break
+                sys.exit(1)
 
         existing_keys: list[tuple[HexStr, BLSPrivkey]] = [key for key in keys if key]
         keystores = Keystores(dict(existing_keys))
