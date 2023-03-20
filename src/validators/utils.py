@@ -2,7 +2,6 @@ import dataclasses
 import json
 import logging
 import random
-import sys
 from multiprocessing import Pool
 from os import listdir
 from os.path import isfile, join
@@ -104,7 +103,7 @@ async def send_approval_request(
     )
 
 
-def load_keystores() -> Keystores:
+def load_keystores() -> Keystores | None:
     """Extracts private keys from the keystores."""
 
     keystores_password = _load_keystores_password()
@@ -130,7 +129,7 @@ def load_keystores() -> Keystores:
                 keys.append(result.get())
             except KeystoreException as e:
                 logger.error(e)
-                sys.exit(1)
+                return None
 
         existing_keys: list[tuple[HexStr, BLSPrivkey]] = [key for key in keys if key]
         keystores = Keystores(dict(existing_keys))
