@@ -103,7 +103,7 @@ async def send_approval_request(
     )
 
 
-def load_keystores() -> Keystores:
+def load_keystores() -> Keystores | None:
     """Extracts private keys from the keystores."""
 
     keystores_password = _load_keystores_password()
@@ -112,7 +112,7 @@ def load_keystores() -> Keystores:
     with Pool() as pool:
         # pylint: disable-next=unused-argument
         def _stop_pool(*args, **kwargs):
-            pool.terminate()
+            pool.close()
 
         results = [
             pool.apply_async(
@@ -129,7 +129,7 @@ def load_keystores() -> Keystores:
                 keys.append(result.get())
             except KeystoreException as e:
                 logger.error(e)
-                break
+                return None
 
         existing_keys: list[tuple[HexStr, BLSPrivkey]] = [key for key in keys if key]
         keystores = Keystores(dict(existing_keys))

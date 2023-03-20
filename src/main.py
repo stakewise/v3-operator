@@ -51,6 +51,8 @@ async def main() -> None:
 
     # load keystores
     keystores = load_keystores()
+    if not keystores:
+        return
 
     # load deposit data
     deposit_data = await load_deposit_data()
