@@ -19,9 +19,7 @@ jobs:
               mkdir ${BUILD_FILE_NAME};
               git rev-parse --short HEAD > GIT_SHA
               poetry run pyinstaller \
-                --onefile \
                 --distpath ./${BUILD_FILE_NAME} \
-                --add-data /usr/lib/x86_64-linux-gnu/libssl.so.1.1;. \
                 ./operator.spec;
               tar -zcvf ${BUILD_FILE_NAME}.tar.gz ./${BUILD_FILE_NAME};
               mkdir /tmp/artifacts;
