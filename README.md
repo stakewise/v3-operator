@@ -147,7 +147,7 @@ docker run --restart on-failure:10 \
 
 #### Option 3. Use Kubernetes helm chart
 
-You can use [Oracle V3 helm chart](https://github.com/stakewise/helm-charts/tree/main/charts/v3-oracle) to host operator
+You can use [Operator V3 helm chart](https://github.com/stakewise/helm-charts/tree/main/charts/v3-operator) to host operator
 in Kubernetes
 
 #### Option 4. Build from source
