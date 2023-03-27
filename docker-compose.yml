@@ -4,12 +4,11 @@ services:
   operator:
     build:
       context: .
-      dockerfile: ./Dockerfile
+      dockerfile: europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:latest
     image: v3-operator
     container_name: v3-operator
     volumes:
-      - .:/app
-      - ../key-manager/data/:/key-manager/data
+      - ./key-manager/data/:/key-manager/data
       - ./database:/database
     env_file:
       - .env

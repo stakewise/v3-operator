@@ -144,6 +144,13 @@ docker run --restart on-failure:10 \
   europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:latest
 ```
 
+If you prefer declarative style instead of long one-liners, then docker-compose is an option for you.
+Example `docker-compose.yml` included. Adjust it for yourself and run:
+
+```sh
+docker-compose up
+```
+
 
 #### Option 3. Use Kubernetes helm chart
 
