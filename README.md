@@ -159,7 +159,7 @@ Build requirements:
 
 Install dependencies and start operator:
 ```sh
-poetry install --no-dev
+poetry install --only main
 PYTHONPATH=. poetry run python src/main.py
 ```
 
