@@ -8,12 +8,12 @@ services:
     image: v3-operator
     container_name: v3-operator
     volumes:
-      - ./key-manager/data/:/key-manager/data
-      - ./database:/database
+      - /home/user/data/:/data
+      - /home/user/database:/database
     env_file:
       - .env
     environment:
       DATABASE_DIR: /database
-      KEYSTORES_PATH: /key-manager/data/keystores
-      KEYSTORES_PASSWORD_PATH: /key-manager/data/keystores/password.txt
-      DEPOSIT_DATA_PATH: /key-manager/data/deposit_data.json
+      KEYSTORES_PATH: /data/keystores
+      KEYSTORES_PASSWORD_PATH: /data/keystores/password.txt
+      DEPOSIT_DATA_PATH: /data/deposit_data.json
