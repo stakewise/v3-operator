@@ -160,8 +160,7 @@ Build requirements:
 Install dependencies and start operator:
 ```sh
 poetry install --no-dev
-poetry shell
-PYTHONPATH=. python src/main.py
+PYTHONPATH=. poetry run python src/main.py
 ```
 
 # Contacts
