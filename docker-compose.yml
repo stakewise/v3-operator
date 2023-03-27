@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  operator:
+    build:
+      context: .
+      dockerfile: europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:latest
+    image: v3-operator
+    container_name: v3-operator
+    volumes:
+      - /home/user/data/:/data
+      - /home/user/database:/database
+    env_file:
+      - .env
+    environment:
+      DATABASE_DIR: /database
+      KEYSTORES_PATH: /data/keystores
+      KEYSTORES_PASSWORD_PATH: /data/keystores/password.txt
+      DEPOSIT_DATA_PATH: /data/deposit_data.json

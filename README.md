@@ -58,7 +58,7 @@ The deposit data must comply with the following rules:
 #### How can I find the Vault address?
 
 If you are creating a new Vault:
-1. go to [StakeWise testnet app](https://testnet.stakewise.io)
+1. go to [StakeWise testnet app](https://atlantic.stakewise.io)
 2. connect the wallet you will create Vault from
 3. click on "Create Vault"
 4. reach the "Setup Validator" step
@@ -142,6 +142,13 @@ docker run --restart on-failure:10 \
   -v /home/user/database:/database \
   -v /home/user/data:/data \
   europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:latest
+```
+
+If you prefer declarative style instead of long one-liners, then docker-compose is an option for you.
+Example `docker-compose.yml` included. Adjust it for yourself and run:
+
+```sh
+docker-compose up
 ```
 
 
