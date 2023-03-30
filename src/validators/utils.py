@@ -185,3 +185,9 @@ def _process_keystore_file(
 def _load_keystores_password() -> str:
     with open(KEYSTORES_PASSWORD_PATH, 'r', encoding='utf-8') as f:
         return f.read().strip()
+
+
+def count_deposit_keys(file_path):
+    with open(file_path, 'r') as f:
+        deposit_data = json.load(f)
+        return len(deposit_data)
