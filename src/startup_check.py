@@ -19,7 +19,7 @@ from src.config.settings import (
     KEYSTORES_PATH,
 )
 from src.validators.execution import check_operator_balance, get_oracles
-from src.validators.utils import count_deposit_keys
+from src.validators.utils import count_deposit_data_non_exited_keys
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +87,7 @@ async def startup_checks():
     logger.info('Checking deposit data file exists...')
     while not path.exists(DEPOSIT_DATA_PATH):
         logger.warning("Can't find deposit data file (%s)", DEPOSIT_DATA_PATH)
-        time.sleep(5)
+        time.sleep(15)
     logger.info('Found deposit data file at %s', DEPOSIT_DATA_PATH)
 
     logger.info('Checking keystores exists...')
@@ -97,18 +97,20 @@ async def startup_checks():
             KEYSTORES_PATH,
             KEYSTORES_PASSWORD_PATH
         )
-        time.sleep(5)
+        time.sleep(15)
     logger.info('Found keystores and password file...')
 
     logger.info('Checking that amount of keystores in directory and deposit data is equal...')
-    while count_deposit_keys(DEPOSIT_DATA_PATH) != count_files_in_folder(KEYSTORES_PATH, '.json'):
+    while (
+        await count_deposit_data_non_exited_keys() >= count_files_in_folder(KEYSTORES_PATH, '.json')
+    ):
         logger.warning(
             '''The number of validators in deposit data
             (%s) and keystores directory (%s) is different.''',
             DEPOSIT_DATA_PATH,
             KEYSTORES_PATH
         )
-        time.sleep(5)
+        time.sleep(15)
     logger.info('Amount of keystores in directory and deposit data file is equal...')
 
 

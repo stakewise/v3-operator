@@ -17,6 +17,7 @@ from sw_utils import get_eth1_withdrawal_credentials
 from sw_utils.decorators import backoff_aiohttp_errors
 from web3 import Web3
 
+from src.common.clients import consensus_client
 from src.config.settings import (
     DEFAULT_RETRY_TIME,
     DEPOSIT_DATA_PATH,
@@ -187,7 +188,12 @@ def _load_keystores_password() -> str:
         return f.read().strip()
 
 
-def count_deposit_keys(file_path):
-    with open(file_path, 'r') as f:
-        deposit_data = json.load(f)
-        return len(deposit_data)
+async def count_deposit_data_non_exited_keys() -> int:
+    deposit_data = await load_deposit_data()
+    validator_ids = [v.public_key for v in deposit_data.validators]
+    validator_statuses = await consensus_client.get_validators_by_ids(validator_ids)
+    count = 0
+    for validator in validator_statuses['data']:
+        if validator['status'] != 'exited':
+            count += 1
+    return count
