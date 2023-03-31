@@ -101,7 +101,7 @@ async def startup_checks():
     logger.info('Found keystores and password file...')
 
     logger.info('Checking that amount of keystores in directory and deposit data is equal...')
-    while count_deposit_keys(DEPOSIT_DATA_PATH) != count_files_in_folder(KEYSTORES_PATH):
+    while count_deposit_keys(DEPOSIT_DATA_PATH) != count_files_in_folder(KEYSTORES_PATH, '.json'):
         logger.warning(
             '''The number of validators in deposit data
             (%s) and keystores directory (%s) is different.''',
@@ -109,7 +109,7 @@ async def startup_checks():
             KEYSTORES_PATH
         )
         time.sleep(5)
-    logger.info('Amount of keystores in directoy and deposit data file is equal...')
+    logger.info('Amount of keystores in directory and deposit data file is equal...')
 
 
 async def _aiohttp_fetch(session, url) -> str:

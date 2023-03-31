@@ -1,3 +1,4 @@
+import fnmatch
 import os
 
 from web3 import Web3
@@ -12,8 +13,6 @@ def convert_to_gno(mgno_amount: Wei) -> Wei:
     return Wei(mgno_amount * WAD // MGNO_RATE)
 
 
-def count_files_in_folder(path):
-    count = 0
-    for _, _, files in os.walk(path):
-        count += len(files)
-    return count
+def count_files_in_folder(path, extension):
+    files = [f for f in os.listdir(path) if fnmatch.fnmatch(f, f'*{extension}')]
+    return len(files)
