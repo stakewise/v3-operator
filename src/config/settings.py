@@ -56,3 +56,6 @@ DEFAULT_RETRY_TIME = 60
 
 # sentry config
 SENTRY_DSN = config('SENTRY_DSN', default='')
+
+# validators
+VALIDATORS_FETCH_CHUNK_SIZE = config('VALIDATORS_FETCH_CHUNK_SIZE', default=100, cast=int)
