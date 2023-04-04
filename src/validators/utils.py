@@ -14,14 +14,17 @@ from eth_utils import add_0x_prefix
 from multiproof import StandardMerkleTree
 from staking_deposit.key_handling.keystore import ScryptKeystore
 from sw_utils import get_eth1_withdrawal_credentials
+from sw_utils.consensus import EXITED_STATUSES
 from sw_utils.decorators import backoff_aiohttp_errors
 from web3 import Web3
 
+from src.common.clients import consensus_client
 from src.config.settings import (
     DEFAULT_RETRY_TIME,
     DEPOSIT_DATA_PATH,
     KEYSTORES_PASSWORD_PATH,
     KEYSTORES_PATH,
+    VALIDATORS_FETCH_CHUNK_SIZE,
     VAULT_CONTRACT_ADDRESS,
 )
 from src.validators.database import get_next_validator_index
@@ -185,3 +188,21 @@ def _process_keystore_file(
 def _load_keystores_password() -> str:
     with open(KEYSTORES_PASSWORD_PATH, 'r', encoding='utf-8') as f:
         return f.read().strip()
+
+
+async def count_deposit_data_non_exited_keys() -> int:
+    deposit_data = await load_deposit_data()
+    validator_ids = [v.public_key for v in deposit_data.validators]
+    validator_statuses = []
+
+    for i in range(0, len(validator_ids), VALIDATORS_FETCH_CHUNK_SIZE):
+        validators = await consensus_client.get_validators_by_ids(
+            validator_ids[i: i + VALIDATORS_FETCH_CHUNK_SIZE]
+        )
+        validator_statuses.extend(validators['data'])
+
+    count = 0
+    for validator in validator_statuses:
+        if validator['status'] not in EXITED_STATUSES:
+            count += 1
+    return count
