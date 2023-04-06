@@ -59,13 +59,10 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
 
     logger.info('Started registration of %d validators', validators_count)
 
-    try:
-        validators: list[Validator] = await get_available_validators(
-            keystores, deposit_data, validators_count
-        )
-        if not validators:
-            raise IndexError
-    except IndexError:
+    validators: list[Validator] = await get_available_validators(
+        keystores, deposit_data, validators_count
+    )
+    if not validators:
         logger.warning('There are not enough available validators in the current deposit data '
                        'to proceed with registration. '
                        'To register additional validators, you must upload new deposit data.')
