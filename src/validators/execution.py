@@ -189,7 +189,7 @@ async def get_available_validators(
 
     start_index = await get_vault_validators_index()
     validators: list[Validator] = []
-    if len(deposit_data.validators) < start_index + count:
+    if len(deposit_data.validators) < count:
         return []
 
     for i in range(start_index, start_index + count):
