@@ -59,14 +59,20 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
 
     logger.info('Started registration of %d validators', validators_count)
 
-    validators: list[Validator] = await get_available_validators(
-        keystores, deposit_data, validators_count
-    )
-    if not validators:
-        logger.warning('Failed to find available validator. You must upload new deposit data.')
+    try:
+        validators: list[Validator] = await get_available_validators(
+            keystores, deposit_data, validators_count
+        )
+        if not validators:
+            raise IndexError
+    except IndexError:
+        logger.warning('There are not enough available validators in the current deposit data '
+                       'to proceed with registration. '
+                       'To register additional validators, you must upload new deposit data.')
         return
 
     oracles_approval = await get_oracles_approval(keystores, validators)
+
     if len(validators) == 1:
         validator = validators[0]
         await register_single_validator(deposit_data.tree, validator, oracles_approval)
