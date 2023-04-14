@@ -2,11 +2,11 @@ import argparse
 import os
 import sys
 
-from decouple import Csv
+from decouple import Choices, Csv
 from decouple import config as decouple_config
 from web3 import Web3
 
-from src.config.networks import NETWORKS, NetworkConfig
+from src.config.networks import GOERLI, NETWORKS, NetworkConfig
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--network', type=str,
@@ -34,15 +34,15 @@ parser.add_argument('--operator-keystore-password-path', type=str,
 args = parser.parse_args()
 
 
-def config(name: str) -> str:
-    return getattr(args, name.lower(), None) or decouple_config(name, default=None)
+def config(name: str, **kwargs) -> str:
+    return getattr(args, name.lower(), None) or decouple_config(name, **kwargs)
 
 
 # debug
 VERBOSE = '-v' in sys.argv
 
 # network
-NETWORK = config('NETWORK')
+NETWORK = config('NETWORK', cast=Choices([GOERLI]))
 NETWORK_CONFIG: NetworkConfig = NETWORKS[NETWORK]
 
 VAULT_CONTRACT_ADDRESS = Web3.to_checksum_address(
@@ -63,12 +63,13 @@ KEYSTORES_PATH = config('KEYSTORES_PATH')
 DEPOSIT_DATA_PATH = config('DEPOSIT_DATA_PATH')
 
 # operator private key
-OPERATOR_PRIVATE_KEY = config('OPERATOR_PRIVATE_KEY')
-OPERATOR_KEYSTORE_PATH = config('OPERATOR_KEYSTORE_PATH')
-OPERATOR_KEYSTORE_PASSWORD_PATH = config('OPERATOR_KEYSTORE_PASSWORD_PATH')
+OPERATOR_PRIVATE_KEY = config('OPERATOR_PRIVATE_KEY', default=None)
+OPERATOR_KEYSTORE_PATH = config('OPERATOR_KEYSTORE_PATH', default=None)
+OPERATOR_KEYSTORE_PASSWORD_PATH = config(
+    'OPERATOR_KEYSTORE_PASSWORD_PATH', default=None)
 
 # remote IPFS
-IPFS_FETCH_ENDPOINTS = decouple_config(
+IPFS_FETCH_ENDPOINTS = config(
     'IPFS_FETCH_ENDPOINTS',
     cast=Csv(),
     default='https://stakewise-v3.infura-ipfs.io,'
@@ -78,19 +79,19 @@ IPFS_FETCH_ENDPOINTS = decouple_config(
 GOERLI_GENESIS_VALIDATORS_IPFS_HASH = 'bafybeiaaje4dyompaq2eztxt47damfxub37dvftnzvdcdxxk4kpb32bntu'
 
 # common
-LOG_LEVEL = decouple_config('LOG_LEVEL', default='INFO')
+LOG_LEVEL = config('LOG_LEVEL', default='INFO')
 DEPOSIT_AMOUNT = Web3.to_wei(32, 'ether')
 DEPOSIT_AMOUNT_GWEI = int(Web3.from_wei(DEPOSIT_AMOUNT, 'gwei'))
 
-APPROVAL_MAX_VALIDATORS = decouple_config(
+APPROVAL_MAX_VALIDATORS = config(
     'APPROVAL_MAX_VALIDATORS', default=10, cast=int)
 
 # Backoff retries
 DEFAULT_RETRY_TIME = 60
 
 # sentry config
-SENTRY_DSN = decouple_config('SENTRY_DSN', default='')
+SENTRY_DSN = config('SENTRY_DSN', default='')
 
 # validators
-VALIDATORS_FETCH_CHUNK_SIZE = decouple_config(
+VALIDATORS_FETCH_CHUNK_SIZE = config(
     'VALIDATORS_FETCH_CHUNK_SIZE', default=100, cast=int)
