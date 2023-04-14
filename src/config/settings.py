@@ -34,7 +34,7 @@ parser.add_argument('--operator-keystore-password-path', type=str,
 args = parser.parse_args()
 
 
-def config(name: str, **kwargs) -> str:
+def config(name: str, **kwargs):
     return getattr(args, name.lower(), None) or decouple_config(name, **kwargs)
 
 
