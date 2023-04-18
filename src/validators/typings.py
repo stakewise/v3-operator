@@ -65,6 +65,7 @@ class ApprovalRequest:
     deposit_signatures: list[HexStr]
     public_key_shards: list[list[HexStr]]
     exit_signature_shards: list[list[HexStr]]
+    fork_version: bytes
 
 
 @dataclass

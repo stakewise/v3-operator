@@ -108,6 +108,7 @@ async def get_oracles_approval(
         deposit_signatures=[],
         public_key_shards=[],
         exit_signature_shards=[],
+        fork_version=fork.version,
     )
     for validator in validators:
         shards = get_exit_signature_shards(
