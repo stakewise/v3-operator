@@ -1,6 +1,5 @@
 import argparse
 import os
-import sys
 
 from decouple import Choices, Csv
 from decouple import config as decouple_config
@@ -31,6 +30,8 @@ parser.add_argument('--operator-keystore-path', type=str,
                     help='Absolute path to the directory with all the encrypted keystores')
 parser.add_argument('--operator-keystore-password-path', type=str,
                     help='Absolute path to the password file for decrypting keystores')
+parser.add_argument('-v', '--verbose', help='Enable debug mode',
+                    action='store_true')
 args = parser.parse_args()
 
 
@@ -39,7 +40,7 @@ def config(name: str, **kwargs):
 
 
 # debug
-VERBOSE = '-v' in sys.argv
+VERBOSE = getattr(args, 'verbose', False)
 
 # network
 NETWORK = config('NETWORK', cast=Choices([GOERLI]))
