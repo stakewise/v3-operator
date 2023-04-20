@@ -18,7 +18,7 @@ parser.add_argument('--execution-endpoint', type=str,
                     help='API endpoint for the execution node')
 parser.add_argument('--consensus-endpoint', type=str,
                     help='API endpoint for the consensus node')
-parser.add_argument('--max-transaction-gwei', type=int,
+parser.add_argument('--max-gas-price-gwei', type=int,
                     help='Maximum gas limit per transaction')
 parser.add_argument('--keystores-password-path', type=str,
                     help='Absolute path to the password file for decrypting keystores')
@@ -85,7 +85,7 @@ GOERLI_GENESIS_VALIDATORS_IPFS_HASH = 'bafybeiaaje4dyompaq2eztxt47damfxub37dvftn
 LOG_LEVEL = config('LOG_LEVEL', default='INFO')
 DEPOSIT_AMOUNT = Web3.to_wei(32, 'ether')
 DEPOSIT_AMOUNT_GWEI = int(Web3.from_wei(DEPOSIT_AMOUNT, 'gwei'))
-MAX_TRANSACTION_GWEI = config('MAX_TRANSACTION_GWEI', default=20, cast=int)
+MAX_GAS_PRICE_GWEI = config('MAX_GAS_PRICE_GWEI', default=70, cast=int)
 
 APPROVAL_MAX_VALIDATORS = config(
     'APPROVAL_MAX_VALIDATORS', default=10, cast=int)

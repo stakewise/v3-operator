@@ -27,7 +27,7 @@ from src.config.networks import ETH_NETWORKS
 from src.config.settings import (
     DEFAULT_RETRY_TIME,
     DEPOSIT_AMOUNT_GWEI,
-    MAX_TRANSACTION_GWEI,
+    MAX_GAS_PRICE_GWEI,
     NETWORK,
     NETWORK_CONFIG,
     VAULT_CONTRACT_ADDRESS,
@@ -255,6 +255,8 @@ async def register_single_validator(
     if NETWORK not in ETH_NETWORKS:
         raise NotImplementedError('networks other than Ethereum not supported')
 
+    await check_for_acceptable_gas_price(execution_client, MAX_GAS_PRICE_GWEI)
+
     credentials = get_eth1_withdrawal_credentials(VAULT_CONTRACT_ADDRESS)
     tx_validator = _encode_tx_validator(credentials, validator)
     proof = tree.get_proof([tx_validator, validator.deposit_data_index])  # type: ignore
@@ -268,8 +270,6 @@ async def register_single_validator(
         ),
         proof=proof,
     )
-
-    await check_for_acceptable_gas_price(execution_client, MAX_TRANSACTION_GWEI)
 
     logger.info('Submitting registration transaction')
     tx = await vault_contract.functions.registerValidator(
@@ -294,6 +294,8 @@ async def register_multiple_validator(
     if NETWORK not in ETH_NETWORKS:
         raise NotImplementedError('networks other than Ethereum not supported')
 
+    await check_for_acceptable_gas_price(execution_client, MAX_GAS_PRICE_GWEI)
+
     credentials = get_eth1_withdrawal_credentials(VAULT_CONTRACT_ADDRESS)
     tx_validators: list[bytes] = []
     leaves: list[tuple[bytes, int]] = []
@@ -316,8 +318,6 @@ async def register_multiple_validator(
         proofFlags=multi_proof.proof_flags,
         proof=multi_proof.proof,
     )
-
-    await check_for_acceptable_gas_price(execution_client, MAX_TRANSACTION_GWEI)
 
     logger.info('Submitting registration transaction')
     tx = await vault_contract.functions.registerValidators(
@@ -351,7 +351,7 @@ class GasPriceTooHigh(Exception):
     pass
 
 
-async def check_for_acceptable_gas_price(client: Web3, max_transaction_gwei: int) -> None:
+async def check_for_acceptable_gas_price(client: Web3, max_gas_price_gwei: int) -> None:
     current_gas_price = await client.eth.gas_price  # type: ignore
-    if current_gas_price <= Web3.to_wei(max_transaction_gwei, 'gwei'):
-        raise GasPriceTooHigh
+    if current_gas_price <= Web3.to_wei(max_gas_price_gwei, 'gwei'):
+        raise GasPriceTooHigh()
