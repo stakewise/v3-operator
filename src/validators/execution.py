@@ -27,7 +27,8 @@ from src.config.networks import ETH_NETWORKS
 from src.config.settings import (
     DEFAULT_RETRY_TIME,
     DEPOSIT_AMOUNT_GWEI,
-    MAX_GAS_PRICE_GWEI,
+    MAX_FEE_PER_GAS_GWEI,
+    MAX_PRIORITY_FEE_PER_GAS_GWEI,
     NETWORK,
     NETWORK_CONFIG,
     VAULT_CONTRACT_ADDRESS,
@@ -255,8 +256,6 @@ async def register_single_validator(
     if NETWORK not in ETH_NETWORKS:
         raise NotImplementedError('networks other than Ethereum not supported')
 
-    await check_for_acceptable_gas_price(execution_client, MAX_GAS_PRICE_GWEI)
-
     credentials = get_eth1_withdrawal_credentials(VAULT_CONTRACT_ADDRESS)
     tx_validator = _encode_tx_validator(credentials, validator)
     proof = tree.get_proof([tx_validator, validator.deposit_data_index])  # type: ignore
@@ -272,6 +271,7 @@ async def register_single_validator(
     )
 
     logger.info('Submitting registration transaction')
+    max_fee_per_gas, max_priority_fee_per_gas = await get_gas_prices_with_limits()
     tx = await vault_contract.functions.registerValidator(
         (
             tx_data.keeperParams.validatorsRegistryRoot,
@@ -280,7 +280,9 @@ async def register_single_validator(
             tx_data.keeperParams.exitSignaturesIpfsHash,
         ),
         tx_data.proof,
-    ).transact()  # type: ignore
+    ).transact(
+        {'maxFeePerGas': max_fee_per_gas, 'maxPriorityFeePerGas': max_priority_fee_per_gas}
+    )  # type: ignore
     logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
     await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
 
@@ -293,8 +295,6 @@ async def register_multiple_validator(
     """Registers multiple validators."""
     if NETWORK not in ETH_NETWORKS:
         raise NotImplementedError('networks other than Ethereum not supported')
-
-    await check_for_acceptable_gas_price(execution_client, MAX_GAS_PRICE_GWEI)
 
     credentials = get_eth1_withdrawal_credentials(VAULT_CONTRACT_ADDRESS)
     tx_validators: list[bytes] = []
@@ -320,6 +320,7 @@ async def register_multiple_validator(
     )
 
     logger.info('Submitting registration transaction')
+    max_fee_per_gas, max_priority_fee_per_gas = await get_gas_prices_with_limits()
     tx = await vault_contract.functions.registerValidators(
         (
             tx_data.keeperParams.validatorsRegistryRoot,
@@ -330,7 +331,9 @@ async def register_multiple_validator(
         indexes,
         multi_proof.proof_flags,
         multi_proof.proof,
-    ).transact()  # type: ignore
+    ).transact(
+        {'maxFeePerGas': max_fee_per_gas, 'maxPriorityFeePerGas': max_priority_fee_per_gas}
+    )  # type: ignore
     logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
     await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
 
@@ -347,11 +350,13 @@ def _encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) ->
     return public_key + signature + deposit_root
 
 
-class GasPriceTooHigh(Exception):
-    pass
+async def get_gas_prices_with_limits():
+    max_fee_per_gas_wei = Web3.to_wei(MAX_FEE_PER_GAS_GWEI, 'gwei')
+    max_priority_fee_per_gas_wei = Web3.to_wei(MAX_PRIORITY_FEE_PER_GAS_GWEI, 'gwei')
 
+    current_gas_price = await execution_client.eth.gas_price  # type: ignore
 
-async def check_for_acceptable_gas_price(client: Web3, max_gas_price_gwei: int) -> None:
-    current_gas_price = await client.eth.gas_price  # type: ignore
-    if current_gas_price <= Web3.to_wei(max_gas_price_gwei, 'gwei'):
-        raise GasPriceTooHigh()
+    max_fee_per_gas = min(current_gas_price, max_fee_per_gas_wei)
+    max_priority_fee_per_gas = min(current_gas_price, max_priority_fee_per_gas_wei)
+
+    return max_fee_per_gas, max_priority_fee_per_gas
