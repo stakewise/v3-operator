@@ -85,7 +85,7 @@ GOERLI_GENESIS_VALIDATORS_IPFS_HASH = 'bafybeiaaje4dyompaq2eztxt47damfxub37dvftn
 LOG_LEVEL = config('LOG_LEVEL', default='INFO')
 DEPOSIT_AMOUNT = Web3.to_wei(32, 'ether')
 DEPOSIT_AMOUNT_GWEI = int(Web3.from_wei(DEPOSIT_AMOUNT, 'gwei'))
-MAX_TRANSACTION_GWEI = config('MAX_TRANSCATION_GWEI', default=20, cast=int)
+MAX_TRANSACTION_GWEI = config('MAX_TRANSACTION_GWEI', default=20, cast=int)
 
 APPROVAL_MAX_VALIDATORS = config(
     'APPROVAL_MAX_VALIDATORS', default=10, cast=int)
