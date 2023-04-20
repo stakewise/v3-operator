@@ -88,7 +88,7 @@ LOG_LEVEL = config('LOG_LEVEL', default='INFO')
 DEPOSIT_AMOUNT = Web3.to_wei(32, 'ether')
 DEPOSIT_AMOUNT_GWEI = int(Web3.from_wei(DEPOSIT_AMOUNT, 'gwei'))
 MAX_FEE_PER_GAS_GWEI = config('MAX_FEE_PER_GAS_GWEI', default=70, cast=int)
-MAX_PRIORITY_FEE_PER_GAS_GWEI = config('MAX_PRIORITY_FEE_PER_GAS_GWEI', default=70, cast=int)
+MAX_PRIORITY_FEE_PER_GAS_GWEI = config('MAX_PRIORITY_FEE_PER_GAS_GWEI', default=2, cast=int)
 
 APPROVAL_MAX_VALIDATORS = config(
     'APPROVAL_MAX_VALIDATORS', default=10, cast=int)
