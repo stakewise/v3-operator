@@ -269,11 +269,7 @@ async def register_single_validator(
         proof=proof,
     )
 
-    try:
-        await check_for_acceptable_gas_price(execution_client, MAX_TRANSACTION_GWEI)
-    except Exception as exc:
-        logger.info('Gas price too high.')
-        raise GasPriceTooHigh from exc
+    await check_for_acceptable_gas_price(execution_client, MAX_TRANSACTION_GWEI)
 
     logger.info('Submitting registration transaction')
     tx = await vault_contract.functions.registerValidator(
@@ -321,11 +317,7 @@ async def register_multiple_validator(
         proof=multi_proof.proof,
     )
 
-    try:
-        await check_for_acceptable_gas_price(execution_client, MAX_TRANSACTION_GWEI)
-    except Exception as exc:
-        logger.info('Gas price too high.')
-        raise GasPriceTooHigh from exc
+    await check_for_acceptable_gas_price(execution_client, MAX_TRANSACTION_GWEI)
 
     logger.info('Submitting registration transaction')
     tx = await vault_contract.functions.registerValidators(
