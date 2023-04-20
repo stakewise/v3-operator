@@ -1,4 +1,5 @@
 import logging
+import asyncio
 import struct
 from typing import Set
 
@@ -27,6 +28,7 @@ from src.config.networks import ETH_NETWORKS
 from src.config.settings import (
     DEFAULT_RETRY_TIME,
     DEPOSIT_AMOUNT_GWEI,
+    MAX_TRANSACTION_GWEI,
     NETWORK,
     NETWORK_CONFIG,
     VAULT_CONTRACT_ADDRESS,
@@ -267,6 +269,9 @@ async def register_single_validator(
         ),
         proof=proof,
     )
+
+    await wait_for_acceptable_gas_price(execution_client, MAX_TRANSACTION_GWEI)
+
     logger.info('Submitting registration transaction')
     tx = await vault_contract.functions.registerValidator(
         (
@@ -312,6 +317,9 @@ async def register_multiple_validator(
         proofFlags=multi_proof.proof_flags,
         proof=multi_proof.proof,
     )
+
+    await wait_for_acceptable_gas_price(execution_client, MAX_TRANSACTION_GWEI)
+
     logger.info('Submitting registration transaction')
     tx = await vault_contract.functions.registerValidators(
         (
@@ -338,3 +346,15 @@ def _encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) ->
         signature=signature,
     ).hash_tree_root
     return public_key + signature + deposit_root
+
+
+async def wait_for_acceptable_gas_price(client: Web3, max_transaction_gwei: int) -> None:
+    while True:
+        current_gas_price = await client.eth.gas_price  # type: ignore
+        if current_gas_price <= Web3.to_wei(max_transaction_gwei, 'gwei'):
+            break
+
+        logger.info("Gas price too high. Waiting for the next block.")
+        current_block_number = await client.eth.block_number  # type: ignore
+        while await client.eth.block_number == current_block_number:  # type: ignore
+            await asyncio.sleep(10)
