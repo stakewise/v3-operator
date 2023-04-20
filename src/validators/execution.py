@@ -270,7 +270,11 @@ async def register_single_validator(
         proof=proof,
     )
 
-    await wait_for_acceptable_gas_price(execution_client, MAX_TRANSACTION_GWEI)
+    try:
+        await check_for_acceptable_gas_price(execution_client, MAX_TRANSACTION_GWEI)
+    except Exception as exc:
+        logger.info('Gas price too high.')
+        raise GasPriceTooHigh from exc
 
     logger.info('Submitting registration transaction')
     tx = await vault_contract.functions.registerValidator(
@@ -318,7 +322,11 @@ async def register_multiple_validator(
         proof=multi_proof.proof,
     )
 
-    await wait_for_acceptable_gas_price(execution_client, MAX_TRANSACTION_GWEI)
+    try:
+        await check_for_acceptable_gas_price(execution_client, MAX_TRANSACTION_GWEI)
+    except Exception as exc:
+        logger.info('Gas price too high.')
+        raise GasPriceTooHigh from exc
 
     logger.info('Submitting registration transaction')
     tx = await vault_contract.functions.registerValidators(
@@ -348,13 +356,11 @@ def _encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) ->
     return public_key + signature + deposit_root
 
 
-async def wait_for_acceptable_gas_price(client: Web3, max_transaction_gwei: int) -> None:
-    while True:
-        current_gas_price = await client.eth.gas_price  # type: ignore
-        if current_gas_price <= Web3.to_wei(max_transaction_gwei, 'gwei'):
-            break
+class GasPriceTooHigh(Exception):
+    pass
 
-        logger.info('Gas price too high. Waiting for the next block.')
-        current_block_number = await client.eth.block_number  # type: ignore
-        while await client.eth.block_number == current_block_number:  # type: ignore
-            await asyncio.sleep(10)
+
+async def check_for_acceptable_gas_price(client: Web3, max_transaction_gwei: int) -> None:
+    current_gas_price = await client.eth.gas_price  # type: ignore
+    if current_gas_price <= Web3.to_wei(max_transaction_gwei, 'gwei'):
+        raise GasPriceTooHigh
