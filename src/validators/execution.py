@@ -1,5 +1,5 @@
-import logging
 import asyncio
+import logging
 import struct
 from typing import Set
 
@@ -354,7 +354,7 @@ async def wait_for_acceptable_gas_price(client: Web3, max_transaction_gwei: int)
         if current_gas_price <= Web3.to_wei(max_transaction_gwei, 'gwei'):
             break
 
-        logger.info("Gas price too high. Waiting for the next block.")
+        logger.info('Gas price too high. Waiting for the next block.')
         current_block_number = await client.eth.block_number  # type: ignore
         while await client.eth.block_number == current_block_number:  # type: ignore
             await asyncio.sleep(10)
