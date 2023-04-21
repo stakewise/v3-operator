@@ -27,8 +27,6 @@ from src.config.networks import ETH_NETWORKS
 from src.config.settings import (
     DEFAULT_RETRY_TIME,
     DEPOSIT_AMOUNT_GWEI,
-    MAX_FEE_PER_GAS_GWEI,
-    MAX_PRIORITY_FEE_PER_GAS_GWEI,
     NETWORK,
     NETWORK_CONFIG,
     VAULT_CONTRACT_ADDRESS,
@@ -271,7 +269,6 @@ async def register_single_validator(
     )
 
     logger.info('Submitting registration transaction')
-    max_fee_per_gas, max_priority_fee_per_gas = await get_gas_prices_with_limits()
     tx = await vault_contract.functions.registerValidator(
         (
             tx_data.keeperParams.validatorsRegistryRoot,
@@ -280,9 +277,7 @@ async def register_single_validator(
             tx_data.keeperParams.exitSignaturesIpfsHash,
         ),
         tx_data.proof,
-    ).transact(
-        {'maxFeePerGas': max_fee_per_gas, 'maxPriorityFeePerGas': max_priority_fee_per_gas}
-    )  # type: ignore
+    ).transact()  # type: ignore
     logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
     await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
 
@@ -320,7 +315,6 @@ async def register_multiple_validator(
     )
 
     logger.info('Submitting registration transaction')
-    max_fee_per_gas, max_priority_fee_per_gas = await get_gas_prices_with_limits()
     tx = await vault_contract.functions.registerValidators(
         (
             tx_data.keeperParams.validatorsRegistryRoot,
@@ -331,9 +325,7 @@ async def register_multiple_validator(
         indexes,
         multi_proof.proof_flags,
         multi_proof.proof,
-    ).transact(
-        {'maxFeePerGas': max_fee_per_gas, 'maxPriorityFeePerGas': max_priority_fee_per_gas}
-    )  # type: ignore
+    ).transact()  # type: ignore
     logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
     await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
 
@@ -348,15 +340,3 @@ def _encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) ->
         signature=signature,
     ).hash_tree_root
     return public_key + signature + deposit_root
-
-
-async def get_gas_prices_with_limits():
-    max_fee_per_gas_wei = Web3.to_wei(MAX_FEE_PER_GAS_GWEI, 'gwei')
-    max_priority_fee_per_gas_wei = Web3.to_wei(MAX_PRIORITY_FEE_PER_GAS_GWEI, 'gwei')
-
-    current_gas_price = await execution_client.eth.gas_price  # type: ignore
-
-    max_fee_per_gas = min(current_gas_price, max_fee_per_gas_wei)
-    max_priority_fee_per_gas = min(current_gas_price, max_priority_fee_per_gas_wei)
-
-    return max_fee_per_gas, max_priority_fee_per_gas

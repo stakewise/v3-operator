@@ -3,13 +3,14 @@ import logging
 from web3 import Web3
 from web3.types import Wei
 
-from src.common.clients import ipfs_fetch_client
+from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.utils import MGNO_RATE, WAD
 from src.config.networks import GNOSIS, GOERLI
 from src.config.settings import (
     APPROVAL_MAX_VALIDATORS,
     DEPOSIT_AMOUNT,
     GOERLI_GENESIS_VALIDATORS_IPFS_HASH,
+    MAX_FEE_PER_GAS_GWEI,
     NETWORK,
     NETWORK_CONFIG,
     VAULT_CONTRACT_ADDRESS,
@@ -55,6 +56,10 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
     validators_count: int = min(APPROVAL_MAX_VALIDATORS, vault_balance // DEPOSIT_AMOUNT)
     if not validators_count:
         # not enough balance to register validators
+        return
+
+    gas_price = execution_client.eth.generate_gas_price()
+    if gas_price is None or gas_price >= Web3.to_wei(MAX_FEE_PER_GAS_GWEI, 'gwei'):
         return
 
     logger.info('Started registration of %d validators', validators_count)
