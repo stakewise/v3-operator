@@ -9,8 +9,7 @@ from sw_utils import (
     get_consensus_client,
     get_execution_client,
 )
-from web3 import Web3, middleware
-from web3.gas_strategies.time_based import medium_gas_price_strategy
+from web3 import Web3
 
 from src.common.accounts import operator_account
 from src.config.settings import (
@@ -34,10 +33,6 @@ def build_execution_client() -> Web3:
     w3 = get_execution_client(EXECUTION_ENDPOINT)
     w3.middleware_onion.add(construct_async_sign_and_send_raw_middleware(operator_account))
     w3.eth.default_account = operator_account.address
-    w3.eth.set_gas_price_strategy(medium_gas_price_strategy)
-    w3.middleware_onion.add(middleware.time_based_cache_middleware)
-    w3.middleware_onion.add(middleware.latest_block_based_cache_middleware)
-    w3.middleware_onion.add(middleware.simple_cache_middleware)
     return w3
 
 

@@ -3,7 +3,7 @@ import logging
 from web3 import Web3
 from web3.types import Wei
 
-from src.common.clients import execution_client, ipfs_fetch_client
+from src.common.clients import ipfs_fetch_client
 from src.common.utils import MGNO_RATE, WAD
 from src.config.networks import GNOSIS, GOERLI
 from src.config.settings import (
@@ -25,6 +25,7 @@ from src.validators.execution import (
     check_operator_balance,
     get_available_validators,
     get_latest_network_validator_public_keys,
+    get_max_fee_per_gas,
     get_oracles,
     get_validators_registry_root,
     get_withdrawable_assets,
@@ -58,8 +59,8 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
         # not enough balance to register validators
         return
 
-    gas_price = execution_client.eth.generate_gas_price()
-    if gas_price is None or gas_price >= Web3.to_wei(MAX_FEE_PER_GAS_GWEI, 'gwei'):
+    max_fee_per_gas = await get_max_fee_per_gas()
+    if max_fee_per_gas >= Web3.to_wei(MAX_FEE_PER_GAS_GWEI, 'gwei'):
         return
 
     logger.info('Started registration of %d validators', validators_count)
