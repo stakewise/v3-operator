@@ -347,4 +347,4 @@ async def get_max_fee_per_gas():
     latest_block = await execution_client.eth.get_block('latest')
     base_fee = latest_block['baseFeePerGas']
     max_fee_per_gas = priority_fee + 2 * base_fee
-    return Wei(max_fee_per_gas)
+    return max_fee_per_gas
