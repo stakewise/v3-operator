@@ -10,6 +10,7 @@ from src.config.settings import (
     APPROVAL_MAX_VALIDATORS,
     DEPOSIT_AMOUNT,
     GOERLI_GENESIS_VALIDATORS_IPFS_HASH,
+    MAX_FEE_PER_GAS_GWEI,
     NETWORK,
     NETWORK_CONFIG,
     VAULT_CONTRACT_ADDRESS,
@@ -24,6 +25,7 @@ from src.validators.execution import (
     check_operator_balance,
     get_available_validators,
     get_latest_network_validator_public_keys,
+    get_max_fee_per_gas,
     get_oracles,
     get_validators_registry_root,
     get_withdrawable_assets,
@@ -55,6 +57,13 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
     validators_count: int = min(APPROVAL_MAX_VALIDATORS, vault_balance // DEPOSIT_AMOUNT)
     if not validators_count:
         # not enough balance to register validators
+        return
+
+    max_fee_per_gas = await get_max_fee_per_gas()
+    if max_fee_per_gas >= Web3.to_wei(MAX_FEE_PER_GAS_GWEI, 'gwei'):
+        logging.warning('Current gas price (%s gwei) is too high. '
+                        'Will try to register validator on the next block if the gas '
+                        'price is acceptable.', Web3.from_wei(max_fee_per_gas, 'gwei'))
         return
 
     logger.info('Started registration of %d validators', validators_count)

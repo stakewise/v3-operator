@@ -267,6 +267,7 @@ async def register_single_validator(
         ),
         proof=proof,
     )
+
     logger.info('Submitting registration transaction')
     tx = await vault_contract.functions.registerValidator(
         (
@@ -312,6 +313,7 @@ async def register_multiple_validator(
         proofFlags=multi_proof.proof_flags,
         proof=multi_proof.proof,
     )
+
     logger.info('Submitting registration transaction')
     tx = await vault_contract.functions.registerValidators(
         (
@@ -338,3 +340,11 @@ def _encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) ->
         signature=signature,
     ).hash_tree_root
     return public_key + signature + deposit_root
+
+
+async def get_max_fee_per_gas() -> Wei:
+    priority_fee = await execution_client.eth.max_priority_fee  # type: ignore
+    latest_block = await execution_client.eth.get_block('latest')  # type: ignore
+    base_fee = latest_block['baseFeePerGas']
+    max_fee_per_gas = priority_fee + 2 * base_fee
+    return Wei(max_fee_per_gas)
