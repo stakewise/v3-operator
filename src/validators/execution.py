@@ -342,9 +342,9 @@ def _encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) ->
     return public_key + signature + deposit_root
 
 
-async def get_max_fee_per_gas():
+async def get_max_fee_per_gas() -> Wei:
     priority_fee = await execution_client.eth.max_priority_fee
     latest_block = await execution_client.eth.get_block('latest')
     base_fee = latest_block['baseFeePerGas']
     max_fee_per_gas = priority_fee + 2 * base_fee
-    return max_fee_per_gas
+    return Wei(max_fee_per_gas)
