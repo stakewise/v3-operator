@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 async def register_validators(keystores: Keystores, deposit_data: DepositData) -> None:
     """Registers vault validators."""
-    vault_balance = await get_withdrawable_assets()
+    vault_balance = await get_withdrawable_assets(VAULT_CONTRACT_ADDRESS)
     if NETWORK == GNOSIS:
         # apply GNO -> mGNO exchange rate
         vault_balance = Wei(int(vault_balance * MGNO_RATE // WAD))

@@ -14,11 +14,12 @@ from sw_utils import (
 from sw_utils.decorators import backoff_aiohttp_errors
 from sw_utils.typings import Bytes32
 from web3 import Web3
-from web3.types import EventData, Wei
+from web3.types import ChecksumAddress, EventData, Wei
 
 from src.common.accounts import operator_account
 from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.contracts import (
+    keeper_contract,
     oracles_contract,
     validators_registry_contract,
     vault_contract,
@@ -36,6 +37,7 @@ from src.validators.database import (
     is_validator_registered,
     save_network_validators,
 )
+from src.validators.ipfs import fetch_harvest_params
 from src.validators.typings import (
     DepositData,
     KeeperApprovalParams,
@@ -44,12 +46,15 @@ from src.validators.typings import (
     NetworkValidator,
     Oracles,
     OraclesApproval,
+    RewardVoteInfo,
     SingleValidatorRegistration,
     Validator,
 )
 
 VALIDATORS_REGISTRY_GENESIS_BLOCK: BlockNumber = NETWORK_CONFIG.VALIDATORS_REGISTRY_GENESIS_BLOCK
 GENESIS_FORK_VERSION: bytes = NETWORK_CONFIG.GENESIS_FORK_VERSION
+SECONDS_PER_MONTH: int = 2628000
+APPROX_BLOCKS_PER_MONTH: int = int(SECONDS_PER_MONTH // NETWORK_CONFIG.SECONDS_PER_BLOCK)
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +138,11 @@ async def get_operator_balance() -> Wei:
     return await execution_client.eth.get_balance(operator_account.address)  # type: ignore
 
 
+@backoff_aiohttp_errors(max_time=300)
+async def can_harvest(vault_address: ChecksumAddress) -> bool:
+    return await keeper_contract.functions.canHarvest(vault_address).call()
+
+
 async def check_operator_balance() -> None:
     operator_min_balance = NETWORK_CONFIG.OPERATOR_MIN_BALANCE
     symbol = NETWORK_CONFIG.SYMBOL
@@ -149,9 +159,32 @@ async def check_operator_balance() -> None:
 
 
 @backoff_aiohttp_errors(max_time=300)
-async def get_withdrawable_assets() -> Wei:
+async def get_withdrawable_assets(vault_address: ChecksumAddress) -> Wei:
     """Fetches vault's available assets for staking."""
-    return await vault_contract.functions.withdrawableAssets().call()
+    if not await can_harvest(vault_address):
+        return await vault_contract.functions.withdrawableAssets().call()
+
+    last_rewards = await get_last_rewards_update()
+    harvest_params = await fetch_harvest_params(
+        vault_address=VAULT_CONTRACT_ADDRESS,
+        ipfs_hash=last_rewards.ipfs_hash,
+        rewards_root=last_rewards.rewards_root,
+    )
+
+    calls = []
+    update_state_call = vault_contract.encodeABI(
+        fn_name='updateState',
+        args=[(harvest_params.rewards_root, harvest_params.reward, harvest_params.proof)]
+    )
+    calls.append(update_state_call)
+
+    withdrawable_assets_call = vault_contract.encodeABI(fn_name='withdrawableAssets', args=[])
+    calls.append(withdrawable_assets_call)
+
+    multicall = await vault_contract.functions.multicall(calls).call()
+    withdrawable_assets = Web3.to_int(multicall[1])
+
+    return Wei(withdrawable_assets)
 
 
 @backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
@@ -328,6 +361,30 @@ async def register_multiple_validator(
     ).transact()  # type: ignore
     logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
     await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
+
+
+@backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
+async def get_last_rewards_update() -> RewardVoteInfo | None:
+    """Fetches the last rewards update."""
+    block_number = await execution_client.eth.get_block_number()  # type: ignore
+    events = await keeper_contract.events.RewardsRootUpdated.get_logs(
+        from_block=max(
+            int(NETWORK_CONFIG.KEEPER_GENESIS_BLOCK),
+            block_number - APPROX_BLOCKS_PER_MONTH,
+            0
+        ),
+        to_block=block_number,
+    )
+    if not events:
+        return None
+
+    last_event: EventData = events[-1]
+
+    voting_info = RewardVoteInfo(
+        ipfs_hash=last_event['args']['rewardsIpfsHash'],
+        rewards_root=last_event['args']['rewardsRoot'],
+    )
+    return voting_info
 
 
 def _encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) -> bytes:
