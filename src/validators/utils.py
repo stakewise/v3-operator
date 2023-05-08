@@ -62,19 +62,16 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
     responses: dict[ChecksumAddress, bytes] = {}
     async with aiohttp.ClientSession() as session:
         for address, endpoint in endpoints:
-            try:
-                response = await send_approval_request(session, endpoint, payload)
-                logger.debug('Received response from oracle %s: %s', address, response)
+            response = await send_approval_request(session, endpoint, payload)
+            logger.debug('Received response from oracle %s: %s', address, response)
 
-                if ipfs_hash is None:
-                    ipfs_hash = response.ipfs_hash
-                elif ipfs_hash != response.ipfs_hash:
-                    logger.error('Different oracles IPFS hashes for approval request')
-                    raise ValueError('Different oracles IPFS hashes for approval request')
+            if ipfs_hash is None:
+                ipfs_hash = response.ipfs_hash
+            elif ipfs_hash != response.ipfs_hash:
+                logger.error('Different oracles IPFS hashes for approval request')
+                raise ValueError('Different oracles IPFS hashes for approval request')
 
-                responses[address] = response.signature
-            except Exception as e:
-                logger.error('Failed to send approval request to oracle %s: %s', address, e)
+            responses[address] = response.signature
 
     if ipfs_hash is None:
         logger.error('No oracles to get approval from')
