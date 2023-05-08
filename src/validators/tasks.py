@@ -99,17 +99,21 @@ async def get_oracles_approval(
     """Fetches approval from oracles."""
     # get latest oracles
     oracles = await get_oracles()
+    logger.debug('Fetched latest oracles: %s', oracles)
 
     # get latest registry root
     registry_root = await get_validators_registry_root()
+    logger.debug('Fetched latest validators registry root: %s', registry_root)
 
     # get next validator index for exit signature
     latest_public_keys = await get_latest_network_validator_public_keys()
     validator_index = get_next_validator_index(list(latest_public_keys))
     start_validator_index = validator_index
+    logger.debug('Next validator index for exit signature: %d', validator_index)
 
     # fetch current fork data
     fork = await get_consensus_fork()
+    logger.debug('Fetched current fork data: %s', fork)
 
     # get exit signature shards
     request = ApprovalRequest(
@@ -129,6 +133,9 @@ async def get_oracles_approval(
             fork=fork,
         )
         if not shards:
+            logger.warning(
+                'Failed to get exit signature shards for validator %s', validator.public_key
+            )
             break
 
         request.public_keys.append(validator.public_key)
