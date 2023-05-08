@@ -63,10 +63,12 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
     async with aiohttp.ClientSession() as session:
         for address, endpoint in endpoints:
             response = await send_approval_request(session, endpoint, payload)
+            logger.debug('Received response from oracle %s: %s', address, response)
+
             if ipfs_hash is None:
                 ipfs_hash = response.ipfs_hash
             elif ipfs_hash != response.ipfs_hash:
-                raise ValueError('Different oracles ipfs hashes for approval request')
+                raise ValueError('Different oracles IPFS hashes for approval request')
 
             responses[address] = response.signature
 
