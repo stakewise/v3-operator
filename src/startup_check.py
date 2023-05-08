@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 IPFS_HASH_EXAMPLE = 'QmawUdo17Fvo7xa6ARCUSMV1eoVwPtVuzx8L8Crj2xozWm'
 
 
+# pylint: disable-next=R0912,R0915
 async def startup_checks():
     logger.info('Checking operator account %s...', operator_account.address)
 
@@ -38,20 +39,32 @@ async def startup_checks():
     logger.info('Connected to database %s.', DATABASE)
 
     logger.info('Checking connection to consensus node...')
-    data = await consensus_client.get_finality_checkpoint()
-    logger.info(
-        'Connected to consensus node at %s. Finalized epoch: %s',
-        CONSENSUS_ENDPOINT,
-        data['data']['finalized']['epoch'],
-    )
+    while True:
+        try:
+            data = await consensus_client.get_finality_checkpoint()
+            logger.info(
+                'Connected to consensus node at %s. Finalized epoch: %s',
+                CONSENSUS_ENDPOINT,
+                data['data']['finalized']['epoch'],
+            )
+            break
+        except Exception as e:
+            logger.warning('Failed to connect to consensus node. Retrying in 10 seconds: %s', e)
+            await asyncio.sleep(10)
 
     logger.info('Checking connection to execution node...')
-    block_number = await execution_client.eth.block_number
-    logger.info(
-        'Connected to execution node at %s. Current block number: %s',
-        EXECUTION_ENDPOINT,
-        block_number,
-    )
+    while True:
+        try:
+            block_number = await execution_client.eth.block_number
+            logger.info(
+                'Connected to execution node at %s. Current block number: %s',
+                EXECUTION_ENDPOINT,
+                block_number,
+            )
+            break
+        except Exception as e:
+            logger.warning('Failed to connect to execution node. Retrying in 10 seconds: %s', e)
+            await asyncio.sleep(10)
 
     logger.info('Checking connection to ipfs nodes...')
     healthy_ipfs_endpoint = []
