@@ -68,13 +68,11 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
             if ipfs_hash is None:
                 ipfs_hash = response.ipfs_hash
             elif ipfs_hash != response.ipfs_hash:
-                logger.error('Different oracles IPFS hashes for approval request')
                 raise ValueError('Different oracles IPFS hashes for approval request')
 
             responses[address] = response.signature
 
     if ipfs_hash is None:
-        logger.error('No oracles to get approval from')
         raise RuntimeError('No oracles to get approval from')
 
     signatures = b''
