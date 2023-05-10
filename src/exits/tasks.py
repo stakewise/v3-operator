@@ -1,16 +1,15 @@
 import logging
-import posixpath
 import random
 from urllib.parse import urljoin
 
 import aiohttp
 from web3.types import HexStr
 
-from src.config.settings import SIGNATURES_URL_PATH, VAULT_CONTRACT_ADDRESS
+from src.config.settings import OUTDATED_SIGNATURES_URL_PATH, VAULT_CONTRACT_ADDRESS
 from src.exits.consensus import get_validator_public_keys
 from src.exits.execution import register_exit_signatures
 from src.exits.typings import OraclesApproval, SignatureRotationRequest
-from src.exits.utils import send_approval_requests
+from src.exits.utils import send_signature_rotation_requests
 from src.validators.consensus import get_consensus_fork
 from src.validators.execution import check_operator_balance, get_oracles
 from src.validators.signing import get_exit_signature_shards
@@ -48,7 +47,7 @@ async def update_exit_signatures(keystores: Keystores) -> None:
 
 
 async def _fetch_outdated_indexes(oracle_endpoint: str) -> list[int]:
-    path = posixpath.join(SIGNATURES_URL_PATH, VAULT_CONTRACT_ADDRESS)
+    path = OUTDATED_SIGNATURES_URL_PATH.format(vault=VAULT_CONTRACT_ADDRESS)
     url = urljoin(oracle_endpoint, path)
 
     async with aiohttp.ClientSession() as session:
@@ -89,9 +88,9 @@ async def get_oracles_approval(
         request.exit_signature_shards.append(shards.exit_signatures)
 
     # send approval request to oracles
-    signatures, ipfs_hash = await send_approval_requests(oracles, request)
+    signatures, ipfs_hash = await send_signature_rotation_requests(oracles, request)
     logger.info(
-        'Fetched ... for validators: count=%d',
+        'Fetched updated signature for validators: count=%d',
         len(validators)
     )
     return OraclesApproval(
