@@ -7,7 +7,7 @@ from web3.types import HexStr
 
 from src.config.settings import OUTDATED_SIGNATURES_URL_PATH, VAULT_CONTRACT_ADDRESS
 from src.exits.consensus import get_validator_public_keys
-from src.exits.execution import register_exit_signatures
+from src.exits.execution import submit_exit_signatures
 from src.exits.typings import OraclesApproval, SignatureRotationRequest
 from src.exits.utils import send_signature_rotation_requests
 from src.validators.consensus import get_consensus_fork
@@ -23,23 +23,23 @@ async def update_exit_signatures(keystores: Keystores) -> None:
     oracles = await get_oracles()
 
     random_oracle = random.choice(oracles.endpoints)  # nosec
-    rotated_indexes = await _fetch_outdated_indexes(random_oracle)
-    if not rotated_indexes:
+    outdated_indexes = await _fetch_outdated_indexes(random_oracle)
+    if not outdated_indexes:
         return
 
-    logger.info('Started exit signature rotation for %d validators', len(rotated_indexes))
+    logger.info('Started exit signature rotation for %d validators', len(outdated_indexes))
 
-    validators = await get_validator_public_keys(rotated_indexes)
+    validators = await get_validator_public_keys(outdated_indexes)
     oracles_approval = await get_oracles_approval(
         oracles=oracles,
         keystores=keystores,
         validators=validators,
     )
 
-    await register_exit_signatures(oracles_approval)
+    await submit_exit_signatures(oracles_approval)
     logger.info(
-        'Successfully managed exit signature rotation for validators with indexes %s',
-        ', '.join([str(index) for index in rotated_indexes])
+        'Successfully rotated exit signatures for validators with indexes %s',
+        ', '.join([str(index) for index in outdated_indexes])
     )
 
     # check balance after transaction

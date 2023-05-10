@@ -11,7 +11,7 @@ from src.exits.typings import OraclesApproval, UpdateExitSignaturesParams
 logger = logging.getLogger(__name__)
 
 
-async def register_exit_signatures(
+async def submit_exit_signatures(
     approval: OraclesApproval,
 ) -> None:
     """Sends updateExitSignatures transaction to keeper contract"""
