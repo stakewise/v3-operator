@@ -22,6 +22,7 @@ from src.common.clients import consensus_client
 from src.config.settings import (
     DEFAULT_RETRY_TIME,
     DEPOSIT_DATA_PATH,
+    KEYSTORES_PASSWORD_DIR,
     KEYSTORES_PASSWORD_FILE,
     KEYSTORES_PATH,
     VALIDATORS_FETCH_CHUNK_SIZE,
@@ -43,6 +44,7 @@ from src.validators.typings import (
     ApprovalRequest,
     BLSPrivkey,
     DepositData,
+    KeystoreFile,
     Keystores,
     OracleApproval,
     Oracles,
@@ -108,11 +110,35 @@ async def send_approval_request(
     )
 
 
+def list_keystore_files() -> list[KeystoreFile]:
+    key_files = [
+        f for f in listdir(KEYSTORES_PATH)
+        if isfile(join(KEYSTORES_PATH, f)) and f.startswith('keystore') and f.endswith('.json')
+    ]
+
+    if KEYSTORES_PASSWORD_DIR:
+        # Each key file has its own password
+        res: list[KeystoreFile] = []
+
+        for key_file in key_files:
+            password_file = key_file.replace('.json', '.txt')
+            password = _load_keystores_password(join(KEYSTORES_PASSWORD_DIR, password_file))
+            res.append(KeystoreFile(name=key_file, password=password))
+
+        return res
+
+    if KEYSTORES_PASSWORD_FILE:
+        # Common password for all key files
+        password = _load_keystores_password()
+        return [KeystoreFile(name=name, password=password) for name in key_files]
+
+    return []
+
+
 def load_keystores() -> Keystores | None:
     """Extracts private keys from the keystores."""
 
-    keystores_password = _load_keystores_password()
-    files = listdir(KEYSTORES_PATH)
+    keystore_files = list_keystore_files()
     logger.info('Loading keystores from %s...', KEYSTORES_PATH)
     with Pool() as pool:
         # pylint: disable-next=unused-argument
@@ -122,10 +148,10 @@ def load_keystores() -> Keystores | None:
         results = [
             pool.apply_async(
                 _process_keystore_file,
-                [file, keystores_password],
+                (keystore_file, ),
                 error_callback=_stop_pool,
             )
-            for file in files
+            for keystore_file in keystore_files
         ]
         keys = []
         for result in results:
@@ -168,11 +194,11 @@ async def load_deposit_data() -> DepositData:
 
 
 def _process_keystore_file(
-    file_name: str, keystores_password: str
+    keystore_file: KeystoreFile
 ) -> tuple[HexStr, BLSPrivkey] | None:
+    file_name = keystore_file.name
+    keystores_password = keystore_file.password
     file_path = join(KEYSTORES_PATH, file_name)
-    if not (isfile(file_path) and file_name.startswith('keystore')):
-        return None
 
     try:
         keystore = ScryptKeystore.from_file(file_path)
@@ -187,8 +213,10 @@ def _process_keystore_file(
     return public_key, private_key
 
 
-def _load_keystores_password() -> str:
-    with open(KEYSTORES_PASSWORD_FILE, 'r', encoding='utf-8') as f:
+def _load_keystores_password(password_path: str | None = None) -> str:
+    password_path = password_path or KEYSTORES_PASSWORD_FILE
+
+    with open(password_path, 'r', encoding='utf-8') as f:
         return f.read().strip()
 
 

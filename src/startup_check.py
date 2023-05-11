@@ -15,6 +15,7 @@ from src.config.settings import (
     DEPOSIT_DATA_PATH,
     EXECUTION_ENDPOINT,
     IPFS_FETCH_ENDPOINTS,
+    KEYSTORES_PASSWORD_DIR,
     KEYSTORES_PASSWORD_FILE,
     KEYSTORES_PATH,
 )
@@ -103,15 +104,34 @@ async def startup_checks():
         time.sleep(15)
     logger.info('Found deposit data file at %s', DEPOSIT_DATA_PATH)
 
-    logger.info('Checking keystores exists...')
-    while not path.exists(KEYSTORES_PATH) or not path.exists(KEYSTORES_PASSWORD_FILE):
-        logger.warning(
-            "Can't find keystores directory (%s) or password file (%s)",
-            KEYSTORES_PATH,
-            KEYSTORES_PASSWORD_FILE
+    if not KEYSTORES_PASSWORD_FILE and not KEYSTORES_PASSWORD_DIR:
+        raise ValueError('KEYSTORES_PASSWORD_FILE or KEYSTORES_PASSWORD_DIR must be set')
+
+    if KEYSTORES_PASSWORD_FILE and KEYSTORES_PASSWORD_DIR:
+        raise ValueError(
+            'Only one of KEYSTORES_PASSWORD_FILE or KEYSTORES_PASSWORD_DIR must be set'
         )
-        time.sleep(15)
-    logger.info('Found keystores and password file...')
+
+    logger.info('Checking keystores exists...')
+    if KEYSTORES_PASSWORD_FILE:
+        while not path.exists(KEYSTORES_PATH) or not path.exists(KEYSTORES_PASSWORD_FILE):
+            logger.warning(
+                "Can't find keystores directory (%s) or password file (%s)",
+                KEYSTORES_PATH,
+                KEYSTORES_PASSWORD_FILE
+            )
+            time.sleep(15)
+        logger.info('Found keystores and password file')
+
+    if KEYSTORES_PASSWORD_DIR:
+        while not path.exists(KEYSTORES_PATH) or not path.exists(KEYSTORES_PASSWORD_DIR):
+            logger.warning(
+                "Can't find keystores directory (%s) or password dir (%s)",
+                KEYSTORES_PATH,
+                KEYSTORES_PASSWORD_DIR
+            )
+            time.sleep(15)
+        logger.info('Found keystores and password dir')
 
     logger.info('Checking that amount of keystores in directory and deposit data is equal...')
     while (
