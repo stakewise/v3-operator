@@ -15,7 +15,7 @@ from src.config.settings import (
     DEPOSIT_DATA_PATH,
     EXECUTION_ENDPOINT,
     IPFS_FETCH_ENDPOINTS,
-    KEYSTORES_PASSWORD_PATH,
+    KEYSTORES_PASSWORD_FILE,
     KEYSTORES_PATH,
 )
 from src.validators.execution import check_operator_balance, get_oracles
@@ -104,11 +104,11 @@ async def startup_checks():
     logger.info('Found deposit data file at %s', DEPOSIT_DATA_PATH)
 
     logger.info('Checking keystores exists...')
-    while not path.exists(KEYSTORES_PATH) or not path.exists(KEYSTORES_PASSWORD_PATH):
+    while not path.exists(KEYSTORES_PATH) or not path.exists(KEYSTORES_PASSWORD_FILE):
         logger.warning(
             "Can't find keystores directory (%s) or password file (%s)",
             KEYSTORES_PATH,
-            KEYSTORES_PASSWORD_PATH
+            KEYSTORES_PASSWORD_FILE
         )
         time.sleep(15)
     logger.info('Found keystores and password file...')

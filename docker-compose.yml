@@ -15,5 +15,5 @@ services:
     environment:
       DATABASE_DIR: /database
       KEYSTORES_PATH: /data/keystores
-      KEYSTORES_PASSWORD_PATH: /data/keystores/password.txt
+      KEYSTORES_PASSWORD_FILE: /data/keystores/password.txt
       DEPOSIT_DATA_PATH: /data/deposit_data.json

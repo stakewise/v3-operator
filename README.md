@@ -126,7 +126,7 @@ docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:latest
 Make sure that file paths in .env file represent container paths. For example:
 ```
 DATABASE_DIR=/database
-KEYSTORES_PASSWORD_PATH=/data/keystores/password.txt
+KEYSTORES_PASSWORD_FILE=/data/keystores/password.txt
 KEYSTORES_PATH=/data/keystores
 DEPOSIT_DATA_PATH=/data/deposit_data.json
 ```

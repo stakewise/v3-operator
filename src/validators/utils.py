@@ -22,7 +22,7 @@ from src.common.clients import consensus_client
 from src.config.settings import (
     DEFAULT_RETRY_TIME,
     DEPOSIT_DATA_PATH,
-    KEYSTORES_PASSWORD_PATH,
+    KEYSTORES_PASSWORD_FILE,
     KEYSTORES_PATH,
     VALIDATORS_FETCH_CHUNK_SIZE,
     VAULT_CONTRACT_ADDRESS,
@@ -188,7 +188,7 @@ def _process_keystore_file(
 
 
 def _load_keystores_password() -> str:
-    with open(KEYSTORES_PASSWORD_PATH, 'r', encoding='utf-8') as f:
+    with open(KEYSTORES_PASSWORD_FILE, 'r', encoding='utf-8') as f:
         return f.read().strip()
 
 
