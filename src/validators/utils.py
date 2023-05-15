@@ -129,7 +129,7 @@ def list_keystore_files() -> list[KeystoreFile]:
 
     if KEYSTORES_PASSWORD_FILE:
         # Common password for all key files
-        password = _load_keystores_password()
+        password = _load_keystores_password(KEYSTORES_PASSWORD_FILE)
         return [KeystoreFile(name=name, password=password) for name in key_files]
 
     return []
@@ -213,9 +213,7 @@ def _process_keystore_file(
     return public_key, private_key
 
 
-def _load_keystores_password(password_path: str | None = None) -> str:
-    password_path = password_path or KEYSTORES_PASSWORD_FILE
-
+def _load_keystores_password(password_path: str) -> str:
     with open(password_path, 'r', encoding='utf-8') as f:
         return f.read().strip()
 
