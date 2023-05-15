@@ -15,7 +15,8 @@ from src.config.settings import (
     DEPOSIT_DATA_PATH,
     EXECUTION_ENDPOINT,
     IPFS_FETCH_ENDPOINTS,
-    KEYSTORES_PASSWORD_PATH,
+    KEYSTORES_PASSWORD_DIR,
+    KEYSTORES_PASSWORD_FILE,
     KEYSTORES_PATH,
 )
 from src.validators.execution import check_operator_balance, get_oracles
@@ -26,19 +27,7 @@ logger = logging.getLogger(__name__)
 IPFS_HASH_EXAMPLE = 'QmawUdo17Fvo7xa6ARCUSMV1eoVwPtVuzx8L8Crj2xozWm'
 
 
-# pylint: disable-next=R0912,R0915
-async def startup_checks():
-    logger.info('Checking operator account %s...', operator_account.address)
-
-    await check_operator_balance()
-
-    logger.info('Checking connection to database...')
-    db_client.create_db_dir()
-    with db_client.get_db_connection() as conn:
-        conn.cursor()
-    logger.info('Connected to database %s.', DATABASE)
-
-    logger.info('Checking connection to consensus node...')
+async def wait_for_consensus_node() -> None:
     while True:
         try:
             data = await consensus_client.get_finality_checkpoint()
@@ -52,10 +41,11 @@ async def startup_checks():
             logger.warning('Failed to connect to consensus node. Retrying in 10 seconds: %s', e)
             await asyncio.sleep(10)
 
-    logger.info('Checking connection to execution node...')
+
+async def wait_for_execution_node() -> None:
     while True:
         try:
-            block_number = await execution_client.eth.block_number
+            block_number = await execution_client.eth.block_number  # type: ignore
             logger.info(
                 'Connected to execution node at %s. Current block number: %s',
                 EXECUTION_ENDPOINT,
@@ -66,19 +56,8 @@ async def startup_checks():
             logger.warning('Failed to connect to execution node. Retrying in 10 seconds: %s', e)
             await asyncio.sleep(10)
 
-    logger.info('Checking connection to ipfs nodes...')
-    healthy_ipfs_endpoint = []
-    for endpoint in IPFS_FETCH_ENDPOINTS:
-        client = IpfsFetchClient([endpoint])
-        try:
-            await client.fetch_json(IPFS_HASH_EXAMPLE)
-        except Exception as e:
-            logger.warning("Can't connect to ipfs node %s: %s", endpoint, e)
-        else:
-            healthy_ipfs_endpoint.append(endpoint)
-    logger.info('Connected to ipfs nodes at %s.', ', '.join(healthy_ipfs_endpoint))
 
-    logger.info('Checking connection to oracles set...')
+async def collect_healthy_oracles() -> list:
     oracles = (await get_oracles()).endpoints
 
     async with ClientSession(timeout=ClientTimeout(60)) as session:
@@ -95,25 +74,38 @@ async def startup_checks():
 
         if result:
             healthy_oracles.append(result)
-    logger.info('Connected to oracles at %s', ', '.join(healthy_oracles))
 
-    logger.info('Checking deposit data file exists...')
-    while not path.exists(DEPOSIT_DATA_PATH):
-        logger.warning("Can't find deposit data file (%s)", DEPOSIT_DATA_PATH)
-        time.sleep(15)
-    logger.info('Found deposit data file at %s', DEPOSIT_DATA_PATH)
+    return healthy_oracles
 
-    logger.info('Checking keystores exists...')
-    while not path.exists(KEYSTORES_PATH) or not path.exists(KEYSTORES_PASSWORD_PATH):
+
+def wait_for_keystores_path() -> None:
+    while not path.exists(KEYSTORES_PATH):
         logger.warning(
-            "Can't find keystores directory (%s) or password file (%s)",
+            "Can't find keystores directory (%s)",
             KEYSTORES_PATH,
-            KEYSTORES_PASSWORD_PATH
         )
         time.sleep(15)
-    logger.info('Found keystores and password file...')
 
-    logger.info('Checking that amount of keystores in directory and deposit data is equal...')
+
+def wait_for_keystores_password_file() -> None:
+    while not path.exists(KEYSTORES_PASSWORD_FILE):
+        logger.warning(
+            "Can't find password file (%s)",
+            KEYSTORES_PASSWORD_FILE
+        )
+        time.sleep(15)
+
+
+def wait_for_keystores_password_dir() -> None:
+    while not path.exists(KEYSTORES_PASSWORD_DIR):
+        logger.warning(
+            "Can't find password dir (%s)",
+            KEYSTORES_PASSWORD_DIR
+        )
+        time.sleep(15)
+
+
+async def wait_for_keystore_files() -> None:
     while (
         await count_deposit_data_non_exited_keys() >= count_files_in_folder(KEYSTORES_PATH, '.json')
     ):
@@ -124,7 +116,72 @@ async def startup_checks():
             KEYSTORES_PATH
         )
         time.sleep(15)
-    logger.info('Amount of keystores in directory and deposit data file is equal...')
+
+
+async def startup_checks():
+    logger.info('Checking operator account %s...', operator_account.address)
+
+    await check_operator_balance()
+
+    logger.info('Checking connection to database...')
+    db_client.create_db_dir()
+    with db_client.get_db_connection() as conn:
+        conn.cursor()
+    logger.info('Connected to database %s.', DATABASE)
+
+    logger.info('Checking connection to consensus node...')
+    await wait_for_consensus_node()
+
+    logger.info('Checking connection to execution node...')
+    await wait_for_execution_node()
+
+    logger.info('Checking connection to ipfs nodes...')
+    healthy_ipfs_endpoint = []
+    for endpoint in IPFS_FETCH_ENDPOINTS:
+        client = IpfsFetchClient([endpoint])
+        try:
+            await client.fetch_json(IPFS_HASH_EXAMPLE)
+        except Exception as e:
+            logger.warning("Can't connect to ipfs node %s: %s", endpoint, e)
+        else:
+            healthy_ipfs_endpoint.append(endpoint)
+    logger.info('Connected to ipfs nodes at %s.', ', '.join(healthy_ipfs_endpoint))
+
+    logger.info('Checking connection to oracles set...')
+    healthy_oracles = await collect_healthy_oracles()
+    logger.info('Connected to oracles at %s', ', '.join(healthy_oracles))
+
+    logger.info('Checking deposit data file exists...')
+    while not path.exists(DEPOSIT_DATA_PATH):
+        logger.warning("Can't find deposit data file (%s)", DEPOSIT_DATA_PATH)
+        time.sleep(15)
+    logger.info('Found deposit data file at %s', DEPOSIT_DATA_PATH)
+
+    if not KEYSTORES_PASSWORD_FILE and not KEYSTORES_PASSWORD_DIR:
+        raise ValueError('KEYSTORES_PASSWORD_FILE or KEYSTORES_PASSWORD_DIR must be set')
+
+    if KEYSTORES_PASSWORD_FILE and KEYSTORES_PASSWORD_DIR:
+        raise ValueError(
+            'Only one of KEYSTORES_PASSWORD_FILE or KEYSTORES_PASSWORD_DIR must be set'
+        )
+
+    logger.info('Checking keystores dir...')
+    wait_for_keystores_path()
+    logger.info('Found keystores dir')
+
+    if KEYSTORES_PASSWORD_FILE:
+        logger.info('Checking keystore password file...')
+        wait_for_keystores_password_file()
+        logger.info('Found keystores password file')
+
+    if KEYSTORES_PASSWORD_DIR:
+        logger.info('Checking keystore password dir...')
+        wait_for_keystores_password_dir()
+        logger.info('Found keystores password dir')
+
+    logger.info('Checking keystore files...')
+    await wait_for_keystore_files()
+    logger.info('Found keystore files')
 
 
 async def _aiohttp_fetch(session, url) -> str:

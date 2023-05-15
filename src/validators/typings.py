@@ -87,3 +87,9 @@ class MultipleValidatorRegistration:
     indexes: list[int]
     proofFlags: list[bool]
     proof: list[str | HexStr | bytes]
+
+
+@dataclass
+class KeystoreFile:
+    name: str
+    password: str

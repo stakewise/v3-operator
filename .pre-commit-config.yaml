@@ -56,3 +56,4 @@ repos:
         entry: mypy
         language: system
         types: [ python ]
+        require_serial: true
