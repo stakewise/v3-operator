@@ -9,8 +9,9 @@ from sw_utils.signing import get_exit_message_signing_root
 from sw_utils.typings import ConsensusFork
 from web3 import Web3
 
+from src.common.typings import Oracles
 from src.config.settings import NETWORK_CONFIG
-from src.validators.typings import BLSPrivkey, ExitSignatureShards, Oracles
+from src.validators.typings import BLSPrivkey, ExitSignatureShards
 
 
 def get_polynomial_points(coefficients: list[int], num_points: int) -> list[bytes]:

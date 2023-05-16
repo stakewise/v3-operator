@@ -10,7 +10,15 @@ from sw_utils import EventScanner, InterruptHandler
 
 import src
 from src.common.accounts import operator_account
-from src.config.settings import LOG_LEVEL, NETWORK, NETWORK_CONFIG, SENTRY_DSN, VERBOSE
+from src.config.settings import (
+    LOG_LEVEL,
+    NETWORK,
+    NETWORK_CONFIG,
+    SENTRY_DSN,
+    UPDATE_VAULT_STATE,
+    VERBOSE,
+)
+from src.harvest.tasks import harvest_vault
 from src.startup_check import startup_checks
 from src.utils import get_build_version
 from src.validators.consensus import get_chain_finalized_head
@@ -81,6 +89,10 @@ async def main() -> None:
             await network_validators_scanner.process_new_events(to_block)
             # check and register new validators
             await register_validators(keystores, deposit_data)
+
+            # update vault state
+            if UPDATE_VAULT_STATE:
+                await harvest_vault()
         except Exception as e:
             if VERBOSE:
                 logger.exception(e)

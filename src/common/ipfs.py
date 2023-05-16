@@ -5,7 +5,7 @@ from web3 import Web3
 from web3.types import Wei
 
 from src.common.clients import ipfs_fetch_client
-from src.validators.typings import HarvestParams
+from src.common.typings import HarvestParams
 
 logger = logging.getLogger(__name__)
 

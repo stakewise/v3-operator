@@ -4,6 +4,11 @@ from web3 import Web3
 from web3.types import Wei
 
 from src.common.clients import ipfs_fetch_client
+from src.common.execution import (
+    check_operator_balance,
+    get_max_fee_per_gas,
+    get_oracles,
+)
 from src.common.utils import MGNO_RATE, WAD
 from src.config.networks import GNOSIS, GOERLI
 from src.config.settings import (
@@ -22,11 +27,8 @@ from src.validators.database import (
     save_network_validators,
 )
 from src.validators.execution import (
-    check_operator_balance,
     get_available_validators,
     get_latest_network_validator_public_keys,
-    get_max_fee_per_gas,
-    get_oracles,
     get_validators_registry_root,
     get_withdrawable_assets,
     register_multiple_validator,

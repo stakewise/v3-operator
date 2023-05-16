@@ -32,6 +32,8 @@ parser.add_argument('--operator-keystore-path', type=str,
                     help='Absolute path to the directory with all the encrypted keystores')
 parser.add_argument('--operator-keystore-password-path', type=str,
                     help='Absolute path to the password file for decrypting keystores')
+parser.add_argument('--update-vault-state',  action=argparse.BooleanOptionalAction,
+                    help='Periodically submit vault update state transaction(spending gas)')
 parser.add_argument('-v', '--verbose', help='Enable debug mode',
                     action='store_true')
 args = parser.parse_args()
@@ -43,6 +45,9 @@ def config(name: str, **kwargs):
 
 # debug
 VERBOSE = getattr(args, 'verbose', False)
+
+# behavior
+UPDATE_VAULT_STATE = config('UPDATE_VAULT_STATE', default=False, cast=bool)
 
 # network
 NETWORK = config('NETWORK', cast=Choices([GOERLI]))
