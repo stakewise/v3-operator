@@ -5,11 +5,6 @@ repos:
       - id: end-of-file-fixer
       - id: trailing-whitespace
 
-  - repo: https://github.com/myint/unify
-    rev: v0.5
-    hooks:
-      - id: unify
-
   - repo: local
     hooks:
       - id: bandit

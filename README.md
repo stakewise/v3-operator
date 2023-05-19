@@ -161,7 +161,7 @@ in Kubernetes
 
 Build requirements:
 
-- [Python 3.10+](https://www.python.org/downloads/)
+- [Python 3.11+](https://www.python.org/downloads/)
 - [Poetry](https://python-poetry.org/docs/)
 
 Install dependencies and start operator:
