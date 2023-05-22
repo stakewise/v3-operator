@@ -4,7 +4,7 @@ from sw_utils.decorators import backoff_aiohttp_errors
 from web3 import Web3
 
 from src.common.clients import execution_client
-from src.common.contracts import keeper_contract
+from src.common.contracts import vault_contract
 from src.common.typings import HarvestParams
 from src.config.networks import ETH_NETWORKS
 from src.config.settings import DEFAULT_RETRY_TIME, NETWORK
@@ -18,7 +18,7 @@ async def submit_harvest_transaction(harvest_params: HarvestParams) -> None:
         raise NotImplementedError('networks other than Ethereum not supported')
 
     logger.info('Submitting harvest transaction...')
-    tx = await keeper_contract.functions.harvest(
+    tx = await vault_contract.functions.updateState(
         (
             harvest_params.rewards_root,
             harvest_params.reward,
