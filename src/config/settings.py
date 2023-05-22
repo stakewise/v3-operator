@@ -83,6 +83,10 @@ IPFS_FETCH_ENDPOINTS = config(
 )
 GOERLI_GENESIS_VALIDATORS_IPFS_HASH = 'bafybeiaaje4dyompaq2eztxt47damfxub37dvftnzvdcdxxk4kpb32bntu'
 
+# oracles
+UPDATE_SIGNATURES_URL_PATH = '/signatures'
+OUTDATED_SIGNATURES_URL_PATH = '/signatures/{vault}'
+
 # common
 LOG_LEVEL = config('LOG_LEVEL', default='INFO')
 DEPOSIT_AMOUNT = Web3.to_wei(32, 'ether')

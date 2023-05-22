@@ -11,6 +11,7 @@ from sw_utils import EventScanner, InterruptHandler
 import src
 from src.common.accounts import operator_account
 from src.config.settings import LOG_LEVEL, NETWORK, NETWORK_CONFIG, SENTRY_DSN, VERBOSE
+from src.exits.tasks import update_exit_signatures
 from src.startup_check import startup_checks
 from src.utils import get_build_version
 from src.validators.consensus import get_chain_finalized_head
@@ -81,6 +82,9 @@ async def main() -> None:
             await network_validators_scanner.process_new_events(to_block)
             # check and register new validators
             await register_validators(keystores, deposit_data)
+
+            # process outdated exit signatures
+            await update_exit_signatures(keystores)
         except Exception as e:
             if VERBOSE:
                 logger.exception(e)
