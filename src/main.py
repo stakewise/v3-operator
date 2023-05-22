@@ -18,6 +18,7 @@ from src.config.settings import (
     UPDATE_VAULT_STATE,
     VERBOSE,
 )
+from src.exits.tasks import update_exit_signatures
 from src.harvest.tasks import harvest_vault
 from src.startup_check import startup_checks
 from src.utils import get_build_version
@@ -90,9 +91,13 @@ async def main() -> None:
             # check and register new validators
             await register_validators(keystores, deposit_data)
 
+            # process outdated exit signatures
+            await update_exit_signatures(keystores)
+
             # update vault state
             if UPDATE_VAULT_STATE:
                 await harvest_vault()
+
         except Exception as e:
             if VERBOSE:
                 logger.exception(e)

@@ -71,10 +71,12 @@ KEYSTORES_PATH = config('KEYSTORES_PATH')
 DEPOSIT_DATA_PATH = config('DEPOSIT_DATA_PATH')
 
 # operator private key
-OPERATOR_PRIVATE_KEY = config('OPERATOR_PRIVATE_KEY', default=None)
-OPERATOR_KEYSTORE_PATH = config('OPERATOR_KEYSTORE_PATH', default=None)
-OPERATOR_KEYSTORE_PASSWORD_PATH = config(
-    'OPERATOR_KEYSTORE_PASSWORD_PATH', default=None)
+HOT_WALLET_PRIVATE_KEY = config('HOT_WALLET_PRIVATE_KEY', default=None)
+HOT_WALLET_KEYSTORE_PATH = config('HOT_WALLET_KEYSTORE_PATH', default=None)
+HOT_WALLET_KEYSTORE_PASSWORD_PATH = config(
+    'HOT_WALLET_KEYSTORE_PASSWORD_PATH',
+    default=None
+)
 
 # remote IPFS
 IPFS_FETCH_ENDPOINTS = config(
@@ -85,6 +87,10 @@ IPFS_FETCH_ENDPOINTS = config(
     'https://gateway.pinata.cloud,https://ipfs.io',
 )
 GOERLI_GENESIS_VALIDATORS_IPFS_HASH = 'bafybeiaaje4dyompaq2eztxt47damfxub37dvftnzvdcdxxk4kpb32bntu'
+
+# oracles
+UPDATE_SIGNATURES_URL_PATH = '/signatures'
+OUTDATED_SIGNATURES_URL_PATH = '/signatures/{vault}'
 
 # common
 LOG_LEVEL = config('LOG_LEVEL', default='INFO')
