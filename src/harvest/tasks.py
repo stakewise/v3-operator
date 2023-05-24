@@ -39,7 +39,7 @@ async def harvest_vault() -> None:
     )
 
     await submit_harvest_transaction(harvest_params)
-    logger.info('Successfully vault harvest')
+    logger.info('Successfully harvested vault')
 
     # check balance after transaction
     await check_operator_balance()
