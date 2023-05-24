@@ -23,4 +23,5 @@ class RewardVoteInfo:
 class HarvestParams:
     rewards_root: bytes
     reward: Wei
+    unlocked_mev_reward: Wei
     proof: list[bytes]

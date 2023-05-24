@@ -19,6 +19,7 @@ async def fetch_harvest_params(
             return HarvestParams(
                 rewards_root=rewards_root,
                 reward=Wei(vault_data['reward']),
+                unlocked_mev_reward=Wei(vault_data['unlocked_mev_reward']),
                 proof=[Web3.to_bytes(hexstr=x) for x in vault_data['proof']]
             )
     raise ValueError(f"Can't find vault {vault_address} in reward file {ipfs_hash}")

@@ -25,7 +25,7 @@ async def harvest_vault() -> None:
     max_fee_per_gas = await get_max_fee_per_gas()
     if max_fee_per_gas >= Web3.to_wei(MAX_FEE_PER_GAS_GWEI, 'gwei'):
         logging.warning('Current gas price (%s gwei) is too high. '
-                        'Will try to register validator on the next block if the gas '
+                        'Will try to harvest on the next block if the gas '
                         'price is acceptable.', Web3.from_wei(max_fee_per_gas, 'gwei'))
         return
 

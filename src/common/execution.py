@@ -79,7 +79,7 @@ async def get_oracles() -> Oracles:
 async def get_last_rewards_update() -> RewardVoteInfo | None:
     """Fetches the last rewards update."""
     block_number = await execution_client.eth.get_block_number()  # type: ignore
-    events = await keeper_contract.events.RewardsRootUpdated.get_logs(
+    events = await keeper_contract.events.RewardsUpdated.get_logs(
         from_block=max(
             int(NETWORK_CONFIG.KEEPER_GENESIS_BLOCK),
             block_number - APPROX_BLOCKS_PER_MONTH,
