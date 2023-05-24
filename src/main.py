@@ -11,11 +11,11 @@ from sw_utils import EventScanner, InterruptHandler
 import src
 from src.common.accounts import operator_account
 from src.config.settings import (
+    HARVEST_VAULT,
     LOG_LEVEL,
     NETWORK,
     NETWORK_CONFIG,
     SENTRY_DSN,
-    UPDATE_VAULT_STATE,
 )
 from src.exits.tasks import update_exit_signatures
 from src.harvest.tasks import harvest_vault
@@ -91,8 +91,8 @@ async def main() -> None:
             # process outdated exit signatures
             await update_exit_signatures(keystores)
 
-            # update vault state
-            if UPDATE_VAULT_STATE:
+            # submit harvest vault transaction
+            if HARVEST_VAULT:
                 await harvest_vault()
 
         except Exception as exc:
