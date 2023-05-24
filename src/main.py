@@ -16,12 +16,11 @@ from src.config.settings import (
     NETWORK_CONFIG,
     SENTRY_DSN,
     UPDATE_VAULT_STATE,
-    VERBOSE,
 )
 from src.exits.tasks import update_exit_signatures
 from src.harvest.tasks import harvest_vault
 from src.startup_check import startup_checks
-from src.utils import get_build_version
+from src.utils import get_build_version, log_verbose
 from src.validators.consensus import get_chain_finalized_head
 from src.validators.database import setup as validators_db_setup
 from src.validators.execution import NetworkValidatorsProcessor
@@ -81,11 +80,9 @@ async def main() -> None:
     interrupt_handler = InterruptHandler()
     while not interrupt_handler.exit:
         start_time = time.time()
-
-        chain_state = await get_chain_finalized_head()
-        to_block = chain_state.execution_block
-
         try:
+            chain_state = await get_chain_finalized_head()
+            to_block = chain_state.execution_block
             # process new network validators
             await network_validators_scanner.process_new_events(to_block)
             # check and register new validators
@@ -98,11 +95,8 @@ async def main() -> None:
             if UPDATE_VAULT_STATE:
                 await harvest_vault()
 
-        except Exception as e:
-            if VERBOSE:
-                logger.exception(e)
-            else:
-                logger.error(e)
+        except Exception as exc:
+            log_verbose(exc)
 
         block_processing_time = time.time() - start_time
         sleep_time = max(int(NETWORK_CONFIG.SECONDS_PER_BLOCK) - int(block_processing_time), 0)
@@ -126,4 +120,7 @@ if __name__ == '__main__':
         sentry_sdk.set_tag('operator', operator_account.address)
         ignore_logger('backoff')
 
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except Exception as e:
+        log_verbose(e)
