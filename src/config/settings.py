@@ -32,6 +32,8 @@ parser.add_argument('--operator-keystore-path', type=str,
                     help='Absolute path to the directory with all the encrypted keystores')
 parser.add_argument('--operator-keystore-password-path', type=str,
                     help='Absolute path to the password file for decrypting keystores')
+parser.add_argument('--harvest-vault',  action=argparse.BooleanOptionalAction,
+                    help='Periodically submit vault harvest transaction')
 parser.add_argument('-v', '--verbose', help='Enable debug mode',
                     action='store_true')
 args = parser.parse_args()
@@ -43,6 +45,9 @@ def config(name: str, **kwargs):
 
 # debug
 VERBOSE = getattr(args, 'verbose', False)
+
+# behavior
+HARVEST_VAULT = config('HARVEST_VAULT', default=False, cast=bool)
 
 # network
 NETWORK = config('NETWORK', cast=Choices([GOERLI]))
@@ -67,10 +72,12 @@ KEYSTORES_PASSWORD_DIR = config('KEYSTORES_PASSWORD_DIR', default='')
 DEPOSIT_DATA_PATH = config('DEPOSIT_DATA_PATH')
 
 # operator private key
-OPERATOR_PRIVATE_KEY = config('OPERATOR_PRIVATE_KEY', default=None)
-OPERATOR_KEYSTORE_PATH = config('OPERATOR_KEYSTORE_PATH', default=None)
-OPERATOR_KEYSTORE_PASSWORD_PATH = config(
-    'OPERATOR_KEYSTORE_PASSWORD_PATH', default=None)
+HOT_WALLET_PRIVATE_KEY = config('HOT_WALLET_PRIVATE_KEY', default=None)
+HOT_WALLET_KEYSTORE_PATH = config('HOT_WALLET_KEYSTORE_PATH', default=None)
+HOT_WALLET_KEYSTORE_PASSWORD_PATH = config(
+    'HOT_WALLET_KEYSTORE_PASSWORD_PATH',
+    default=None
+)
 
 # remote IPFS
 IPFS_FETCH_ENDPOINTS = config(
@@ -81,6 +88,10 @@ IPFS_FETCH_ENDPOINTS = config(
     'https://gateway.pinata.cloud,https://ipfs.io',
 )
 GOERLI_GENESIS_VALIDATORS_IPFS_HASH = 'bafybeiaaje4dyompaq2eztxt47damfxub37dvftnzvdcdxxk4kpb32bntu'
+
+# oracles
+UPDATE_SIGNATURES_URL_PATH = '/signatures'
+OUTDATED_SIGNATURES_URL_PATH = '/signatures/{vault}'
 
 # common
 LOG_LEVEL = config('LOG_LEVEL', default='INFO')

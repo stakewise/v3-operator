@@ -42,6 +42,15 @@ def get_oracles_contract() -> AsyncContract:
     )  # type: ignore
 
 
+def get_keeper_contract() -> AsyncContract:
+    """:returns instance of `Keeper` contract."""
+    abi_path = 'abi/IKeeper.json'
+    return execution_client.eth.contract(
+        address=NETWORK_CONFIG.KEEPER_CONTRACT_ADDRESS, abi=_load_abi(abi_path)
+    )  # type: ignore
+
+
 vault_contract = get_vault_contract()
 validators_registry_contract = get_validators_registry_contract()
 oracles_contract = get_oracles_contract()
+keeper_contract = get_keeper_contract()

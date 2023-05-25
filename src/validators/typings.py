@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import NewType
 
-from Cryptodome.PublicKey import RSA
 from eth_typing import BlockNumber, ChecksumAddress, HexStr
 from multiproof import StandardMerkleTree
 from sw_utils.typings import Bytes32
@@ -27,14 +26,6 @@ class Validator:
 class DepositData:
     validators: list[Validator]
     tree: StandardMerkleTree
-
-
-@dataclass
-class Oracles:
-    threshold: int
-    addresses: list[ChecksumAddress]
-    rsa_public_keys: list[RSA.RsaKey]
-    endpoints: list[str]
 
 
 @dataclass

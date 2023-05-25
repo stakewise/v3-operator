@@ -2,7 +2,6 @@ import logging
 import struct
 from typing import Set
 
-from Cryptodome.PublicKey import RSA
 from eth_typing import BlockNumber, HexStr
 from multiproof import StandardMerkleTree
 from sw_utils import (
@@ -14,15 +13,12 @@ from sw_utils import (
 from sw_utils.decorators import backoff_aiohttp_errors
 from sw_utils.typings import Bytes32
 from web3 import Web3
-from web3.types import EventData, Wei
+from web3.types import ChecksumAddress, EventData, Wei
 
-from src.common.accounts import operator_account
-from src.common.clients import execution_client, ipfs_fetch_client
-from src.common.contracts import (
-    oracles_contract,
-    validators_registry_contract,
-    vault_contract,
-)
+from src.common.clients import execution_client
+from src.common.contracts import validators_registry_contract, vault_contract
+from src.common.execution import can_harvest, get_last_rewards_update
+from src.common.ipfs import fetch_harvest_params
 from src.config.networks import ETH_NETWORKS
 from src.config.settings import (
     DEFAULT_RETRY_TIME,
@@ -42,7 +38,6 @@ from src.validators.typings import (
     Keystores,
     MultipleValidatorRegistration,
     NetworkValidator,
-    Oracles,
     OraclesApproval,
     SingleValidatorRegistration,
     Validator,
@@ -129,29 +124,32 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
 
 
 @backoff_aiohttp_errors(max_time=300)
-async def get_operator_balance() -> Wei:
-    return await execution_client.eth.get_balance(operator_account.address)  # type: ignore
-
-
-async def check_operator_balance() -> None:
-    operator_min_balance = NETWORK_CONFIG.OPERATOR_MIN_BALANCE
-    symbol = NETWORK_CONFIG.SYMBOL
-
-    if operator_min_balance <= 0:
-        return
-
-    if (await get_operator_balance()) < operator_min_balance:
-        logger.warning(
-            'Operator balance is too low. At least %s %s is recommended.',
-            Web3.from_wei(operator_min_balance, 'ether'),
-            symbol,
-        )
-
-
-@backoff_aiohttp_errors(max_time=300)
-async def get_withdrawable_assets() -> Wei:
+async def get_withdrawable_assets(vault_address: ChecksumAddress) -> Wei:
     """Fetches vault's available assets for staking."""
-    return await vault_contract.functions.withdrawableAssets().call()
+    if not await can_harvest(vault_address):
+        return await vault_contract.functions.withdrawableAssets().call()
+
+    last_rewards = await get_last_rewards_update()
+    harvest_params = await fetch_harvest_params(
+        vault_address=VAULT_CONTRACT_ADDRESS,
+        ipfs_hash=last_rewards.ipfs_hash,
+        rewards_root=last_rewards.rewards_root,
+    )
+
+    calls = []
+    update_state_call = vault_contract.encodeABI(
+        fn_name='updateState',
+        args=[(harvest_params.rewards_root, harvest_params.reward, harvest_params.proof)]
+    )
+    calls.append(update_state_call)
+
+    withdrawable_assets_call = vault_contract.encodeABI(fn_name='withdrawableAssets', args=[])
+    calls.append(withdrawable_assets_call)
+
+    multicall = await vault_contract.functions.multicall(calls).call()
+    withdrawable_assets = Web3.to_int(multicall[1])
+
+    return Wei(withdrawable_assets)
 
 
 @backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
@@ -212,39 +210,6 @@ async def get_available_validators(
         validators.append(validator)
 
     return validators
-
-
-@backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
-async def get_oracles() -> Oracles:
-    """Fetches oracles config."""
-    events = await oracles_contract.events.ConfigUpdated.get_logs(
-        from_block=NETWORK_CONFIG.ORACLES_GENESIS_BLOCK
-    )
-    if not events:
-        raise ValueError('Failed to fetch IPFS hash of oracles config')
-
-    # fetch IPFS record
-    ipfs_hash = events[-1]['args']['configIpfsHash']
-    config = await ipfs_fetch_client.fetch_json(ipfs_hash)
-    threshold = await oracles_contract.functions.requiredOracles().call()
-
-    rsa_public_keys = []
-    endpoints = []
-    addresses = []
-    for oracle in config:
-        addresses.append(Web3.to_checksum_address(oracle['address']))
-        rsa_public_keys.append(RSA.import_key(oracle['rsa_public_key']))
-        endpoints.append(oracle['endpoint'])
-
-    if not 1 <= threshold <= len(rsa_public_keys):
-        raise ValueError('Invalid threshold in oracles config')
-
-    return Oracles(
-        threshold=threshold,
-        rsa_public_keys=rsa_public_keys,
-        endpoints=endpoints,
-        addresses=addresses,
-    )
 
 
 async def register_single_validator(
@@ -340,11 +305,3 @@ def _encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) ->
         signature=signature,
     ).hash_tree_root
     return public_key + signature + deposit_root
-
-
-async def get_max_fee_per_gas() -> Wei:
-    priority_fee = await execution_client.eth.max_priority_fee  # type: ignore
-    latest_block = await execution_client.eth.get_block('latest')  # type: ignore
-    base_fee = latest_block['baseFeePerGas']
-    max_fee_per_gas = priority_fee + 2 * base_fee
-    return Wei(max_fee_per_gas)

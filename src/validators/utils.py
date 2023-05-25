@@ -19,6 +19,7 @@ from sw_utils.decorators import backoff_aiohttp_errors
 from web3 import Web3
 
 from src.common.clients import consensus_client
+from src.common.typings import Oracles
 from src.config.settings import (
     DEFAULT_RETRY_TIME,
     DEPOSIT_DATA_PATH,
@@ -47,7 +48,6 @@ from src.validators.typings import (
     KeystoreFile,
     Keystores,
     OracleApproval,
-    Oracles,
     Validator,
 )
 

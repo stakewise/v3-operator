@@ -18,10 +18,12 @@ GNO_NETWORKS = [GNOSIS]
 @dataclass
 class NetworkConfig:
     SYMBOL: str
-    VALIDATORS_REGISTRY_CONTRACT_ADDRESS: ChecksumAddress
-    VALIDATORS_REGISTRY_GENESIS_BLOCK: BlockNumber
+    VALIDATORS_REGISTRY_CONTRACT_ADDRESS: ChecksumAddress  # eth2 deposit contract
+    VALIDATORS_REGISTRY_GENESIS_BLOCK: BlockNumber  # eth2 deposit contract genesis
     ORACLES_CONTRACT_ADDRESS: ChecksumAddress
     ORACLES_GENESIS_BLOCK: BlockNumber
+    KEEPER_CONTRACT_ADDRESS: ChecksumAddress
+    KEEPER_GENESIS_BLOCK: BlockNumber
     GENESIS_VALIDATORS_ROOT: Bytes32
     SLOTS_PER_EPOCH: int
     SECONDS_PER_BLOCK: Decimal
@@ -40,6 +42,8 @@ NETWORKS = {
         # TODO: replace with real values once contracts deployed
         ORACLES_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         ORACLES_GENESIS_BLOCK=BlockNumber(0),
+        KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        KEEPER_GENESIS_BLOCK=BlockNumber(0),
         GENESIS_VALIDATORS_ROOT=Bytes32(
             Web3.to_bytes(
                 hexstr=HexStr('0x4b363db94e286120d76eb905340fdd4e54bfe9f06bf33ff6cf5ad27f511bfe95')
@@ -58,9 +62,13 @@ NETWORKS = {
         ),
         VALIDATORS_REGISTRY_GENESIS_BLOCK=BlockNumber(4367321),
         ORACLES_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xDF43F5dBB585C6b38AeC413685aa67CD1dD47091'
+            '0x747653E25bF69D9D3AA95F2B9597D8cf080d9813'
         ),
-        ORACLES_GENESIS_BLOCK=BlockNumber(8514406),
+        ORACLES_GENESIS_BLOCK=BlockNumber(8982223),
+        KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x996461A815191bDE7FAdb7ABAbA9053cd6969CAA'
+        ),
+        KEEPER_GENESIS_BLOCK=BlockNumber(8982227),
         GENESIS_VALIDATORS_ROOT=Bytes32(
             Web3.to_bytes(
                 hexstr=HexStr('0x043db0d9a83813551ee2f33450d23797757d430911a9320530ad8a0eabc43efb')
@@ -81,6 +89,8 @@ NETWORKS = {
         # TODO: replace with real values once contracts deployed
         ORACLES_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         ORACLES_GENESIS_BLOCK=BlockNumber(0),
+        KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        KEEPER_GENESIS_BLOCK=BlockNumber(0),
         GENESIS_VALIDATORS_ROOT=Bytes32(
             Web3.to_bytes(
                 hexstr=HexStr('0xf5dcb5564e829aab27264b9becd5dfaa017085611224cb3036f573368dbb9d47')
