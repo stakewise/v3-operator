@@ -8,9 +8,9 @@ from eth_typing import ChecksumAddress
 from sw_utils.decorators import backoff_aiohttp_errors
 from web3 import Web3
 
+from src.common.typings import Oracles
 from src.config.settings import DEFAULT_RETRY_TIME, UPDATE_SIGNATURES_URL_PATH
 from src.exits.typings import OracleApproval, SignatureRotationRequest
-from src.validators.typings import Oracles
 
 logger = logging.getLogger(__name__)
 

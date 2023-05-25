@@ -1,11 +1,9 @@
 from dataclasses import dataclass
 from typing import NewType
 
-from Cryptodome.PublicKey import RSA
 from eth_typing import BlockNumber, ChecksumAddress, HexStr
 from multiproof import StandardMerkleTree
 from sw_utils.typings import Bytes32
-from web3.types import Wei
 
 BLSPrivkey = NewType('BLSPrivkey', bytes)
 Keystores = NewType('Keystores', dict[HexStr, BLSPrivkey])
@@ -28,14 +26,6 @@ class Validator:
 class DepositData:
     validators: list[Validator]
     tree: StandardMerkleTree
-
-
-@dataclass
-class Oracles:
-    threshold: int
-    addresses: list[ChecksumAddress]
-    rsa_public_keys: list[RSA.RsaKey]
-    endpoints: list[str]
 
 
 @dataclass
@@ -88,16 +78,3 @@ class MultipleValidatorRegistration:
     indexes: list[int]
     proofFlags: list[bool]
     proof: list[str | HexStr | bytes]
-
-
-@dataclass
-class RewardVoteInfo:
-    rewards_root: bytes
-    ipfs_hash: str
-
-
-@dataclass
-class HarvestParams:
-    rewards_root: bytes
-    reward: Wei
-    proof: list[bytes]

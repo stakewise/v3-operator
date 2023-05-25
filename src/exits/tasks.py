@@ -5,13 +5,13 @@ from urllib.parse import urljoin
 import aiohttp
 from web3.types import HexStr
 
+from src.common.execution import check_operator_balance, get_oracles
 from src.config.settings import OUTDATED_SIGNATURES_URL_PATH, VAULT_CONTRACT_ADDRESS
 from src.exits.consensus import get_validator_public_keys
 from src.exits.execution import submit_exit_signatures
 from src.exits.typings import OraclesApproval, SignatureRotationRequest
 from src.exits.utils import send_signature_rotation_requests
 from src.validators.consensus import get_consensus_fork
-from src.validators.execution import check_operator_balance, get_oracles
 from src.validators.signing import get_exit_signature_shards
 from src.validators.typings import Keystores
 

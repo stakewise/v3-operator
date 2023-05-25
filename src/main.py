@@ -10,8 +10,15 @@ from sw_utils import EventScanner, InterruptHandler
 
 import src
 from src.common.accounts import operator_account
-from src.config.settings import LOG_LEVEL, NETWORK, NETWORK_CONFIG, SENTRY_DSN
+from src.config.settings import (
+    HARVEST_VAULT,
+    LOG_LEVEL,
+    NETWORK,
+    NETWORK_CONFIG,
+    SENTRY_DSN,
+)
 from src.exits.tasks import update_exit_signatures
+from src.harvest.tasks import harvest_vault
 from src.startup_check import startup_checks
 from src.utils import get_build_version, log_verbose
 from src.validators.consensus import get_chain_finalized_head
@@ -83,6 +90,11 @@ async def main() -> None:
 
             # process outdated exit signatures
             await update_exit_signatures(keystores)
+
+            # submit harvest vault transaction
+            if HARVEST_VAULT:
+                await harvest_vault()
+
         except Exception as exc:
             log_verbose(exc)
 

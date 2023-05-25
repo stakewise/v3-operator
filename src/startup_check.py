@@ -8,6 +8,7 @@ from sw_utils import IpfsFetchClient
 
 from src.common.accounts import operator_account
 from src.common.clients import consensus_client, db_client, execution_client
+from src.common.execution import check_operator_balance, get_oracles
 from src.common.utils import count_files_in_folder
 from src.config.settings import (
     CONSENSUS_ENDPOINT,
@@ -18,7 +19,6 @@ from src.config.settings import (
     KEYSTORES_PASSWORD_PATH,
     KEYSTORES_PATH,
 )
-from src.validators.execution import check_operator_balance, get_oracles
 from src.validators.utils import count_deposit_data_non_exited_keys
 
 logger = logging.getLogger(__name__)
