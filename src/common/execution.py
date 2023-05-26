@@ -53,7 +53,7 @@ async def get_oracles() -> Oracles:
 
     # fetch IPFS record
     ipfs_hash = events[-1]['args']['configIpfsHash']
-    config = await ipfs_fetch_client.fetch_json(ipfs_hash)
+    config: dict = await ipfs_fetch_client.fetch_json(ipfs_hash)  # type: ignore
     threshold = await oracles_contract.functions.requiredOracles().call()
 
     rsa_public_keys = []
