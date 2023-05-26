@@ -59,7 +59,7 @@ async def get_oracles() -> Oracles:
     rsa_public_keys = []
     endpoints = []
     addresses = []
-    for oracle in config:
+    for oracle in config['oracles']:
         addresses.append(Web3.to_checksum_address(oracle['address']))
         rsa_public_keys.append(RSA.import_key(oracle['rsa_public_key']))
         endpoints.append(oracle['endpoint'])
