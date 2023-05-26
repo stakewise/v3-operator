@@ -114,6 +114,7 @@ binary file. Start the binary with the following command:
 
 Build Docker image:
 
+##### Debian based image
 ```sh
 docker build --pull -t stakewiselabs/v3-operator .
 ```
@@ -123,6 +124,16 @@ or pull existing one:
 docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:latest
 ```
 
+##### Alpine based image
+
+```sh
+docker build -f Dockerfile.alpine --pull -t stakewiselabs/v3-operator .
+```
+
+or pull existing one:
+```sh
+docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:<release>-alpine
+```
 Make sure that file paths in .env file represent container paths. For example:
 ```
 DATABASE_DIR=/database
