@@ -18,13 +18,14 @@ GNO_NETWORKS = [GNOSIS]
 @dataclass
 class NetworkConfig:
     SYMBOL: str
-    VALIDATORS_REGISTRY_CONTRACT_ADDRESS: ChecksumAddress  # eth2 deposit contract
-    VALIDATORS_REGISTRY_GENESIS_BLOCK: BlockNumber  # eth2 deposit contract genesis
+    VALIDATORS_REGISTRY_CONTRACT_ADDRESS: ChecksumAddress  # consensus deposit contract
+    VALIDATORS_REGISTRY_GENESIS_BLOCK: BlockNumber  # consensus deposit contract genesis
     ORACLES_CONTRACT_ADDRESS: ChecksumAddress
     ORACLES_GENESIS_BLOCK: BlockNumber
     KEEPER_CONTRACT_ADDRESS: ChecksumAddress
     KEEPER_GENESIS_BLOCK: BlockNumber
     GENESIS_VALIDATORS_ROOT: Bytes32
+    GENESIS_NETWORK_VALIDATORS_HASH: str
     SLOTS_PER_EPOCH: int
     SECONDS_PER_BLOCK: Decimal
     GENESIS_FORK_VERSION: bytes
@@ -49,6 +50,7 @@ NETWORKS = {
                 hexstr=HexStr('0x4b363db94e286120d76eb905340fdd4e54bfe9f06bf33ff6cf5ad27f511bfe95')
             )
         ),
+        GENESIS_NETWORK_VALIDATORS_HASH='',
         SLOTS_PER_EPOCH=32,
         SECONDS_PER_BLOCK=Decimal(12),
         GENESIS_FORK_VERSION=bytes.fromhex('00000000'),
@@ -74,6 +76,9 @@ NETWORKS = {
                 hexstr=HexStr('0x043db0d9a83813551ee2f33450d23797757d430911a9320530ad8a0eabc43efb')
             )
         ),
+        GENESIS_NETWORK_VALIDATORS_HASH=(
+            'bafybeih5le7ilw6miw5cr45xz655bzxkkqivq3t2lfkkty7adzlvwcqqxq'
+        ),
         SLOTS_PER_EPOCH=32,
         SECONDS_PER_BLOCK=Decimal(12),
         GENESIS_FORK_VERSION=bytes.fromhex('00001020'),
@@ -96,6 +101,7 @@ NETWORKS = {
                 hexstr=HexStr('0xf5dcb5564e829aab27264b9becd5dfaa017085611224cb3036f573368dbb9d47')
             )
         ),
+        GENESIS_NETWORK_VALIDATORS_HASH='',
         SLOTS_PER_EPOCH=32,
         SECONDS_PER_BLOCK=Decimal('6.8'),
         GENESIS_FORK_VERSION=bytes.fromhex('00000064'),

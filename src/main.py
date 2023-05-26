@@ -54,7 +54,7 @@ async def main() -> None:
 
     validators_db_setup()
 
-    # load genesis validators for some networks
+    # load network validators from ipfs dump
     await load_genesis_validators()
 
     # load keystores

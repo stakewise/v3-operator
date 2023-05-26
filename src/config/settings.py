@@ -87,7 +87,6 @@ IPFS_FETCH_ENDPOINTS = config(
     'http://cloudflare-ipfs.com,'
     'https://gateway.pinata.cloud,https://ipfs.io',
 )
-GOERLI_GENESIS_VALIDATORS_IPFS_HASH = 'bafybeiaaje4dyompaq2eztxt47damfxub37dvftnzvdcdxxk4kpb32bntu'
 
 # oracles
 UPDATE_SIGNATURES_URL_PATH = '/signatures'
