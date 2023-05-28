@@ -166,7 +166,7 @@ async def load_genesis_validators() -> None:
     Used to speed up service startup
     """
 
-    ipfs_hash = NETWORK_CONFIG.GENESIS_NETWORK_VALIDATORS_HASH
+    ipfs_hash = NETWORK_CONFIG.NETWORK_VALIDATORS_IPFS_HASH
     if not ipfs_hash or get_last_network_validator() is not None:
         return
 
