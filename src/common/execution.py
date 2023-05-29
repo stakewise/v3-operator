@@ -53,13 +53,13 @@ async def get_oracles() -> Oracles:
 
     # fetch IPFS record
     ipfs_hash = events[-1]['args']['configIpfsHash']
-    config = await ipfs_fetch_client.fetch_json(ipfs_hash)
+    config: dict = await ipfs_fetch_client.fetch_json(ipfs_hash)  # type: ignore
     threshold = await oracles_contract.functions.requiredOracles().call()
 
     rsa_public_keys = []
     endpoints = []
     addresses = []
-    for oracle in config:
+    for oracle in config['oracles']:
         addresses.append(Web3.to_checksum_address(oracle['address']))
         rsa_public_keys.append(RSA.import_key(oracle['rsa_public_key']))
         endpoints.append(oracle['endpoint'])
