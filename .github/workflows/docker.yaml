@@ -9,6 +9,14 @@ jobs:
   docker:
     name: Build Docker Image
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - dockerfile: ./Dockerfile
+            set_latest: true
+          - dockerfile: ./Dockerfile.alpine
+            suffix: "-alpine"
+            set_latest: false
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -16,12 +24,14 @@ jobs:
         id: meta
         uses: docker/metadata-action@v3
         with:
+          flavor: |
+            latest=${{ matrix.set_latest }}
           images: |
             europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator
           tags: |
-            type=ref,event=branch
-            type=ref,event=tag
-            type=sha
+            type=ref,event=branch,suffix=${{ matrix.suffix }}
+            type=ref,event=tag,suffix=${{ matrix.suffix }}
+            type=sha,suffix=${{ matrix.suffix }}
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
       - name: Login to GAR
@@ -34,6 +44,7 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: .
+          file: ${{ matrix.dockerfile }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
