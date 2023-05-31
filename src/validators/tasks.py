@@ -1,7 +1,7 @@
 import logging
 
 from web3 import Web3
-from web3.types import Wei
+from web3.types import BlockNumber, Wei
 
 from src.common.clients import ipfs_fetch_client
 from src.common.execution import (
@@ -10,11 +10,10 @@ from src.common.execution import (
     get_oracles,
 )
 from src.common.utils import MGNO_RATE, WAD
-from src.config.networks import GNOSIS, GOERLI
+from src.config.networks import GNOSIS
 from src.config.settings import (
     APPROVAL_MAX_VALIDATORS,
     DEPOSIT_AMOUNT,
-    GOERLI_GENESIS_VALIDATORS_IPFS_HASH,
     MAX_FEE_PER_GAS_GWEI,
     NETWORK,
     NETWORK_CONFIG,
@@ -163,21 +162,26 @@ async def get_oracles_approval(
 
 async def load_genesis_validators() -> None:
     """
-    In some test networks (e.g. Goerli) genesis validators
-    are not registered through the registry contract.
+    Load consensus network validators from the ipfs dump.
+    Used to speed up service startup
     """
-    if NETWORK != GOERLI or get_last_network_validator() is not None:
+
+    ipfs_hash = NETWORK_CONFIG.NETWORK_VALIDATORS_IPFS_HASH
+    if not ipfs_hash or get_last_network_validator() is not None:
         return
 
-    pub_keys = await ipfs_fetch_client.fetch_bytes(GOERLI_GENESIS_VALIDATORS_IPFS_HASH)
+    logger.info('Loading network validators from dump...')
+    ipfs_data = await ipfs_fetch_client.fetch_bytes(ipfs_hash)
+    block_number = BlockNumber(int.from_bytes(ipfs_data[:4], byteorder='big'))
     genesis_validators: list[NetworkValidator] = []
+    pub_keys = ipfs_data[4:]
     for i in range(0, len(pub_keys), 48):
         genesis_validators.append(
             NetworkValidator(
                 public_key=Web3.to_hex(pub_keys[i : i + 48]),
-                block_number=NETWORK_CONFIG.VALIDATORS_REGISTRY_GENESIS_BLOCK,
+                block_number=block_number,
             )
         )
 
     save_network_validators(genesis_validators)
-    logger.info('Loaded %d Goerli genesis validators', len(genesis_validators))
+    logger.info('Loaded %d network validators', len(genesis_validators))
