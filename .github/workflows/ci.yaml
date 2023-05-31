@@ -37,3 +37,39 @@ jobs:
       # Run precommit
       - name: Run precommit
         run: poetry run pre-commit run --all-files
+
+  security:
+    name: pip-audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.10.10
+
+      # Install poetry
+      - name: Load cached Poetry installation
+        uses: actions/cache@v2
+        with:
+          path: ~/.local
+          key: poetry-0
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
+
+      - name: Install dependencies
+        run: poetry install --no-interaction --no-root
+
+      - name: Export requirements
+        run: poetry export -f requirements.txt --without-hashes > audit_requirements.txt
+
+      # Run audit
+      - uses: pypa/gh-action-pip-audit@v1.0.7
+        with:
+          inputs: audit_requirements.txt
