@@ -1,5 +1,5 @@
 # `python-base` sets up all our shared environment variables
-FROM python:3.10.10-slim as python-base
+FROM python:3.10-alpine as python-base
 
     # python
 ENV PYTHONUNBUFFERED=1 \
@@ -28,18 +28,17 @@ ENV PYTHONUNBUFFERED=1 \
     VENV_PATH="/opt/pysetup/.venv"
 
 # prepend poetry and venv to path
-ENV PATH="$POETRY_HOME/bin:$VENV_PATH/bin:$PATH"
+ENV PATH="$POETRY_HOME/bin:$VENV_PATH/bin:/root/.cargo/bin:$PATH"
 
 
 # `builder-base` stage is used to build deps + create our virtual environment
 FROM python-base as builder-base
 
-RUN apt-get update \
-    && apt-get install --no-install-recommends -y \
-        # deps for installing poetry
-        curl \
-        # deps for building python deps
-        build-essential
+RUN apk upgrade --no-cache
+RUN apk add --no-cache gcc musl-dev python3-dev libffi-dev openssl-dev curl libgcc libstdc++
+RUN curl https://sh.rustup.rs -sSf | \
+    sh -s -- --default-toolchain stable -y
+RUN rm -rf /var/cache/apt/*
 
 # install poetry - respects $POETRY_VERSION & $POETRY_HOME
 RUN curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/install-poetry.py | python -
@@ -58,6 +57,7 @@ FROM python-base as production
 # Copy dependencies from build container
 WORKDIR /app
 COPY --from=builder-base $PYSETUP_PATH $PYSETUP_PATH
+COPY --from=builder-base /usr/lib/ /usr/lib/
 
 # Copy source code
 COPY . ./

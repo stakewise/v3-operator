@@ -1,22 +1,11 @@
 name: Docker
 
-on:
-  push:
-    tags:
-      - "v*.*.*"
+on: [ pull_request, push ]
 
 jobs:
   docker:
     name: Build Docker Image
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - dockerfile: ./Dockerfile
-            set_latest: true
-          - dockerfile: ./Dockerfile.alpine
-            suffix: "-alpine"
-            set_latest: false
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -25,13 +14,13 @@ jobs:
         uses: docker/metadata-action@v3
         with:
           flavor: |
-            latest=${{ matrix.set_latest }}
+            latest=true
           images: |
             europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator
           tags: |
-            type=ref,event=branch,suffix=${{ matrix.suffix }}
-            type=ref,event=tag,suffix=${{ matrix.suffix }}
-            type=sha,suffix=${{ matrix.suffix }}
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
       - name: Login to GAR
@@ -48,3 +37,20 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+  scanner:
+    name: Trivy scanner
+    runs-on: ubuntu-latest
+    needs: docker
+    steps:
+      - id: commit-hash
+        uses: pr-mpt/actions-commit-hash@v2
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:sha-${{ steps.commit-hash.outputs.short }}'
+          format: 'table'
+          exit-code: '1'
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
