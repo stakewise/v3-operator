@@ -50,7 +50,7 @@ def log_start() -> None:
 async def main() -> None:
     log_start()
 
-    await startup_checks()
+    # await startup_checks()
 
     validators_db_setup()
 

@@ -1,16 +1,25 @@
 from dataclasses import dataclass
+from functools import cached_property
 
-from Cryptodome.PublicKey import RSA
-from eth_typing import ChecksumAddress
+from eth_keys.datatypes import PublicKey
+from eth_typing import ChecksumAddress, HexStr
+from web3 import Web3
 from web3.types import Wei
 
 
 @dataclass
 class Oracles:
     threshold: int
-    addresses: list[ChecksumAddress]
-    rsa_public_keys: list[RSA.RsaKey]
+    public_keys: list[HexStr]
     endpoints: list[str]
+
+    @cached_property
+    def addresses(self) -> list[ChecksumAddress]:
+        res = []
+        for public_key in self.public_keys:
+            public_key_obj = PublicKey(Web3.to_bytes(hexstr=public_key))
+            res.append(public_key_obj.to_checksum_address())
+        return res
 
 
 @dataclass

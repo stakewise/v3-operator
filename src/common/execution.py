@@ -1,6 +1,5 @@
 import logging
 
-from Cryptodome.PublicKey import RSA
 from sw_utils.decorators import backoff_aiohttp_errors
 from web3 import Web3
 from web3.types import ChecksumAddress, EventData, Wei
@@ -56,22 +55,20 @@ async def get_oracles() -> Oracles:
     config: dict = await ipfs_fetch_client.fetch_json(ipfs_hash)  # type: ignore
     threshold = await oracles_contract.functions.requiredOracles().call()
 
-    rsa_public_keys = []
     endpoints = []
-    addresses = []
-    for oracle in config['oracles']:
-        addresses.append(Web3.to_checksum_address(oracle['address']))
-        rsa_public_keys.append(RSA.import_key(oracle['rsa_public_key']))
-        endpoints.append(oracle['endpoint'])
+    public_keys = []
 
-    if not 1 <= threshold <= len(rsa_public_keys):
+    for oracle in config['oracles']:
+        endpoints.append(oracle['endpoint'])
+        public_keys.append(oracle['public_key'])
+
+    if not 1 <= threshold <= len(config['oracles']):
         raise ValueError('Invalid threshold in oracles config')
 
     return Oracles(
         threshold=threshold,
-        rsa_public_keys=rsa_public_keys,
+        public_keys=public_keys,
         endpoints=endpoints,
-        addresses=addresses,
     )
 
 

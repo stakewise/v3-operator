@@ -1,7 +1,5 @@
+import ecies
 import milagro_bls_binding as bls
-from Cryptodome.Cipher import AES, PKCS1_OAEP
-from Cryptodome.PublicKey import RSA
-from Cryptodome.Random import get_random_bytes
 from Cryptodome.Random.random import randint
 from eth_typing import HexStr
 from py_ecc.optimized_bls12_381.optimized_curve import curve_order
@@ -30,18 +28,8 @@ def get_polynomial_points(coefficients: list[int], num_points: int) -> list[byte
     return points
 
 
-def encrypt_oracle_data(public_key: RSA.RsaKey, data: bytes) -> bytes:
-    """Encrypts data with oracle's public key."""
-    session_key = get_random_bytes(32)
-
-    # Encrypt the session key with the public RSA key
-    cipher_rsa = PKCS1_OAEP.new(public_key)
-    enc_session_key = cipher_rsa.encrypt(session_key)
-
-    # Encrypt the data with the AES session key
-    cipher_aes = AES.new(session_key, AES.MODE_EAX)
-    ciphertext, tag = cipher_aes.encrypt_and_digest(data)  # type: ignore
-    return enc_session_key + cipher_aes.nonce + tag + ciphertext  # type: ignore
+def encrypt_oracle_data(public_key: str | bytes, data: bytes) -> bytes:
+    return ecies.encrypt(public_key, data)
 
 
 def get_exit_signature_shards(
@@ -57,9 +45,9 @@ def get_exit_signature_shards(
         fork=fork
     )
 
-    if len(oracles.rsa_public_keys) == 1:
-        rsa_pub_key = oracles.rsa_public_keys[0]
-        shard = encrypt_oracle_data(rsa_pub_key, bls.Sign(private_key, message))
+    if len(oracles.public_keys) == 1:
+        pub_key = oracles.public_keys[0]
+        shard = encrypt_oracle_data(pub_key, bls.Sign(private_key, message))
         return ExitSignatureShards(
             public_keys=[Web3.to_hex(bls.SkToPk(private_key))],
             exit_signatures=[Web3.to_hex(shard)]
@@ -69,11 +57,11 @@ def get_exit_signature_shards(
     for _ in range(oracles.threshold - 1):
         coefficients.append(randint(0, curve_order - 1))
 
-    private_keys = get_polynomial_points(coefficients, len(oracles.rsa_public_keys))
+    private_keys = get_polynomial_points(coefficients, len(oracles.public_keys))
     exit_signature_shards: list[HexStr] = []
-    for bls_priv_key, rsa_pub_key in zip(private_keys, oracles.rsa_public_keys):
+    for bls_priv_key, pub_key in zip(private_keys, oracles.public_keys):
         shard = encrypt_oracle_data(
-            public_key=rsa_pub_key,
+            public_key=pub_key,
             data=bls.Sign(bls_priv_key, message)
         )
         exit_signature_shards.append(Web3.to_hex(shard))
