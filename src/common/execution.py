@@ -65,6 +65,9 @@ async def get_oracles() -> Oracles:
     if not 1 <= threshold <= len(config['oracles']):
         raise ValueError('Invalid threshold in oracles config')
 
+    if len(public_keys) != len(set(public_keys)):
+        raise ValueError('Duplicate public keys in oracles config')
+
     return Oracles(
         threshold=threshold,
         public_keys=public_keys,
