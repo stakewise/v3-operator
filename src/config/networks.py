@@ -25,7 +25,7 @@ class NetworkConfig:
     KEEPER_CONTRACT_ADDRESS: ChecksumAddress
     KEEPER_GENESIS_BLOCK: BlockNumber
     GENESIS_VALIDATORS_ROOT: Bytes32
-    NETWORK_VALIDATORS_IPFS_HASH: str
+    GENESIS_VALIDATORS_IPFS_HASH: str
     SLOTS_PER_EPOCH: int
     SECONDS_PER_BLOCK: Decimal
     GENESIS_FORK_VERSION: bytes
@@ -50,7 +50,7 @@ NETWORKS = {
                 hexstr=HexStr('0x4b363db94e286120d76eb905340fdd4e54bfe9f06bf33ff6cf5ad27f511bfe95')
             )
         ),
-        NETWORK_VALIDATORS_IPFS_HASH='',
+        GENESIS_VALIDATORS_IPFS_HASH='',
         SLOTS_PER_EPOCH=32,
         SECONDS_PER_BLOCK=Decimal(12),
         GENESIS_FORK_VERSION=bytes.fromhex('00000000'),
@@ -64,21 +64,19 @@ NETWORKS = {
         ),
         VALIDATORS_REGISTRY_GENESIS_BLOCK=BlockNumber(4367321),
         ORACLES_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x747653E25bF69D9D3AA95F2B9597D8cf080d9813'
+            '0x95a4ECB8879B526534e8dB48A75F8EF7E521d8fE'
         ),
-        ORACLES_GENESIS_BLOCK=BlockNumber(8982223),
+        ORACLES_GENESIS_BLOCK=BlockNumber(9116861),
         KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x996461A815191bDE7FAdb7ABAbA9053cd6969CAA'
+            '0xfdBDd455dE0D0AB2B24f4A3B450A2a0e82F7a666'
         ),
-        KEEPER_GENESIS_BLOCK=BlockNumber(8982227),
+        KEEPER_GENESIS_BLOCK=BlockNumber(9116864),
         GENESIS_VALIDATORS_ROOT=Bytes32(
             Web3.to_bytes(
                 hexstr=HexStr('0x043db0d9a83813551ee2f33450d23797757d430911a9320530ad8a0eabc43efb')
             )
         ),
-        NETWORK_VALIDATORS_IPFS_HASH=(
-            'bafybeih5le7ilw6miw5cr45xz655bzxkkqivq3t2lfkkty7adzlvwcqqxq'
-        ),
+        GENESIS_VALIDATORS_IPFS_HASH='QmQo3oLYxqWm75fbgJJkCaUttZoYVqZhZj9r99r1UsZVpu',
         SLOTS_PER_EPOCH=32,
         SECONDS_PER_BLOCK=Decimal(12),
         GENESIS_FORK_VERSION=bytes.fromhex('00001020'),
@@ -101,7 +99,7 @@ NETWORKS = {
                 hexstr=HexStr('0xf5dcb5564e829aab27264b9becd5dfaa017085611224cb3036f573368dbb9d47')
             )
         ),
-        NETWORK_VALIDATORS_IPFS_HASH='',
+        GENESIS_VALIDATORS_IPFS_HASH='',
         SLOTS_PER_EPOCH=32,
         SECONDS_PER_BLOCK=Decimal('6.8'),
         GENESIS_FORK_VERSION=bytes.fromhex('00000064'),

@@ -13,15 +13,16 @@ from sw_utils import (
 from sw_utils.decorators import backoff_aiohttp_errors
 from sw_utils.typings import Bytes32
 from web3 import Web3
-from web3.types import ChecksumAddress, EventData, Wei
+from web3.types import EventData, Wei
 
 from src.common.clients import execution_client
 from src.common.contracts import validators_registry_contract, vault_contract
-from src.common.execution import can_harvest, get_last_rewards_update
+from src.common.execution import get_last_rewards_update
 from src.common.ipfs import fetch_harvest_params
 from src.config.networks import ETH_NETWORKS
 from src.config.settings import (
     DEFAULT_RETRY_TIME,
+    DEPOSIT_AMOUNT,
     DEPOSIT_AMOUNT_GWEI,
     NETWORK,
     NETWORK_CONFIG,
@@ -34,12 +35,9 @@ from src.validators.database import (
 )
 from src.validators.typings import (
     DepositData,
-    KeeperApprovalParams,
     Keystores,
-    MultipleValidatorRegistration,
     NetworkValidator,
     OraclesApproval,
-    SingleValidatorRegistration,
     Validator,
 )
 
@@ -124,32 +122,44 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
 
 
 @backoff_aiohttp_errors(max_time=300)
-async def get_withdrawable_assets(vault_address: ChecksumAddress) -> Wei:
+async def get_withdrawable_assets() -> tuple[Wei, HexStr | None]:
     """Fetches vault's available assets for staking."""
-    if not await can_harvest(vault_address):
-        return await vault_contract.functions.withdrawableAssets().call()
+    before_update_assets = await vault_contract.functions.withdrawableAssets().call()
+    before_update_vals = before_update_assets // DEPOSIT_AMOUNT
 
     last_rewards = await get_last_rewards_update()
+    if last_rewards is None:
+        return before_update_assets, None
+
     harvest_params = await fetch_harvest_params(
         vault_address=VAULT_CONTRACT_ADDRESS,
         ipfs_hash=last_rewards.ipfs_hash,
         rewards_root=last_rewards.rewards_root,
     )
 
-    calls = []
     update_state_call = vault_contract.encodeABI(
         fn_name='updateState',
-        args=[(harvest_params.rewards_root, harvest_params.reward, harvest_params.proof)]
+        args=[
+            (
+                harvest_params.rewards_root,
+                harvest_params.reward,
+                harvest_params.unlocked_mev_reward,
+                harvest_params.proof,
+            )
+        ],
     )
-    calls.append(update_state_call)
-
     withdrawable_assets_call = vault_contract.encodeABI(fn_name='withdrawableAssets', args=[])
-    calls.append(withdrawable_assets_call)
 
-    multicall = await vault_contract.functions.multicall(calls).call()
-    withdrawable_assets = Web3.to_int(multicall[1])
+    multicall = await vault_contract.functions.multicall(
+        [update_state_call, withdrawable_assets_call]
+    ).call()
+    after_update_assets = Web3.to_int(multicall[1])
+    after_update_vals = after_update_assets // DEPOSIT_AMOUNT
 
-    return Wei(withdrawable_assets)
+    if before_update_vals != after_update_vals:
+        return Wei(after_update_assets), update_state_call
+
+    return Wei(before_update_assets), None
 
 
 @backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
@@ -213,7 +223,10 @@ async def get_available_validators(
 
 
 async def register_single_validator(
-    tree: StandardMerkleTree, validator: Validator, approval: OraclesApproval
+    tree: StandardMerkleTree,
+    validator: Validator,
+    approval: OraclesApproval,
+    update_state_call: HexStr | None,
 ) -> None:
     """Registers single validator."""
     if NETWORK not in ETH_NETWORKS:
@@ -223,26 +236,29 @@ async def register_single_validator(
     tx_validator = _encode_tx_validator(credentials, validator)
     proof = tree.get_proof([tx_validator, validator.deposit_data_index])  # type: ignore
 
-    tx_data = SingleValidatorRegistration(
-        keeperParams=KeeperApprovalParams(
-            validatorsRegistryRoot=approval.validators_registry_root,
-            validators=tx_validator,
-            signatures=approval.signatures,
-            exitSignaturesIpfsHash=approval.ipfs_hash,
-        ),
-        proof=proof,
-    )
-
     logger.info('Submitting registration transaction')
-    tx = await vault_contract.functions.registerValidator(
+    register_call_args = [
         (
-            tx_data.keeperParams.validatorsRegistryRoot,
-            tx_data.keeperParams.validators,
-            tx_data.keeperParams.signatures,
-            tx_data.keeperParams.exitSignaturesIpfsHash,
+            approval.validators_registry_root,
+            tx_validator,
+            approval.signatures,
+            approval.ipfs_hash,
         ),
-        tx_data.proof,
-    ).transact()  # type: ignore
+        proof,
+    ]
+    if update_state_call is not None:
+        register_call = vault_contract.encodeABI(
+            fn_name='registerValidator',
+            args=register_call_args,
+        )
+        tx = await vault_contract.functions.multicall(
+            [update_state_call, register_call]
+        ).transact()  # type: ignore
+    else:
+        tx = await vault_contract.functions.registerValidator(
+            *register_call_args
+        ).transact()  # type: ignore
+
     logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
     await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
 
@@ -251,6 +267,7 @@ async def register_multiple_validator(
     tree: StandardMerkleTree,
     validators: list[Validator],
     approval: OraclesApproval,
+    update_call: HexStr | None,
 ) -> None:
     """Registers multiple validators."""
     if NETWORK not in ETH_NETWORKS:
@@ -267,30 +284,32 @@ async def register_multiple_validator(
     multi_proof = tree.get_multi_proof(leaves)
     sorted_tx_validators: list[bytes] = [v[0] for v in multi_proof.leaves]
     indexes = [sorted_tx_validators.index(v) for v in tx_validators]
-    tx_data = MultipleValidatorRegistration(
-        keeperParams=KeeperApprovalParams(
-            validatorsRegistryRoot=approval.validators_registry_root,
-            validators=b''.join(tx_validators),
-            signatures=approval.signatures,
-            exitSignaturesIpfsHash=approval.ipfs_hash,
-        ),
-        indexes=indexes,
-        proofFlags=multi_proof.proof_flags,
-        proof=multi_proof.proof,
-    )
 
     logger.info('Submitting registration transaction')
-    tx = await vault_contract.functions.registerValidators(
+    register_call_args = [
         (
-            tx_data.keeperParams.validatorsRegistryRoot,
-            tx_data.keeperParams.validators,
-            tx_data.keeperParams.signatures,
-            tx_data.keeperParams.exitSignaturesIpfsHash,
+            approval.validators_registry_root,
+            b''.join(tx_validators),
+            approval.signatures,
+            approval.ipfs_hash,
         ),
         indexes,
         multi_proof.proof_flags,
         multi_proof.proof,
-    ).transact()  # type: ignore
+    ]
+    if update_call is not None:
+        register_call = vault_contract.encodeABI(
+            fn_name='registerValidators',
+            args=register_call_args,
+        )
+        tx = await vault_contract.functions.multicall(
+            [update_call, register_call]
+        ).transact()  # type: ignore
+    else:
+        tx = await vault_contract.functions.registerValidators(
+            *register_call_args
+        ).transact()  # type: ignore
+
     logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
     await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
 
