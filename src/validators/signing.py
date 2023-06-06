@@ -28,10 +28,6 @@ def get_polynomial_points(coefficients: list[int], num_points: int) -> list[byte
     return points
 
 
-def encrypt_oracle_data(public_key: str | bytes, data: bytes) -> bytes:
-    return ecies.encrypt(public_key, data)
-
-
 def get_exit_signature_shards(
     validator_index: int,
     private_key: BLSPrivkey,
@@ -47,7 +43,7 @@ def get_exit_signature_shards(
 
     if len(oracles.public_keys) == 1:
         pub_key = oracles.public_keys[0]
-        shard = encrypt_oracle_data(pub_key, bls.Sign(private_key, message))
+        shard = ecies.encrypt(pub_key, bls.Sign(private_key, message))
         return ExitSignatureShards(
             public_keys=[Web3.to_hex(bls.SkToPk(private_key))],
             exit_signatures=[Web3.to_hex(shard)]
@@ -60,10 +56,7 @@ def get_exit_signature_shards(
     private_keys = get_polynomial_points(coefficients, len(oracles.public_keys))
     exit_signature_shards: list[HexStr] = []
     for bls_priv_key, pub_key in zip(private_keys, oracles.public_keys):
-        shard = encrypt_oracle_data(
-            public_key=pub_key,
-            data=bls.Sign(bls_priv_key, message)
-        )
+        shard = ecies.encrypt(pub_key, bls.Sign(bls_priv_key, message))
         exit_signature_shards.append(Web3.to_hex(shard))
 
     return ExitSignatureShards(

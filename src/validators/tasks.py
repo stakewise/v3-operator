@@ -122,7 +122,6 @@ async def get_oracles_approval(
     # fetch current fork data
     fork = await get_consensus_fork()
     logger.debug('Fetched current fork data: %s', fork)
-    logger.debug('validator_index %s', validator_index)
 
     # get exit signature shards
     request = ApprovalRequest(
