@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 async def fetch_harvest_params(
     vault_address: ChecksumAddress, ipfs_hash: str, rewards_root: bytes
-) -> HarvestParams:
+) -> HarvestParams | None:
     ipfs_data = await ipfs_fetch_client.fetch_json(ipfs_hash)
     for vault_data in ipfs_data:
         if vault_address == Web3.to_checksum_address(vault_data['vault']):
@@ -28,4 +28,5 @@ async def fetch_harvest_params(
                 unlocked_mev_reward=unlocked_mev_reward,
                 proof=[Web3.to_bytes(hexstr=x) for x in vault_data['proof']],
             )
-    raise ValueError(f"Can't find vault {vault_address} in reward file {ipfs_hash}")
+
+    return None

@@ -29,15 +29,16 @@ async def harvest_vault() -> None:
                         'price is acceptable.', Web3.from_wei(max_fee_per_gas, 'gwei'))
         return
 
-    logger.info('Starting vault harvest')
-
     last_rewards = await get_last_rewards_update()
     harvest_params = await fetch_harvest_params(
         vault_address=VAULT_CONTRACT_ADDRESS,
         ipfs_hash=last_rewards.ipfs_hash,
         rewards_root=last_rewards.rewards_root,
     )
+    if not harvest_params:
+        return
 
+    logger.info('Starting vault harvest')
     await submit_harvest_transaction(harvest_params)
     logger.info('Successfully harvested vault')
 

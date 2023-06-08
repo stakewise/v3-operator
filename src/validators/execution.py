@@ -136,6 +136,8 @@ async def get_withdrawable_assets() -> tuple[Wei, HexStr | None]:
         ipfs_hash=last_rewards.ipfs_hash,
         rewards_root=last_rewards.rewards_root,
     )
+    if harvest_params is None:
+        return before_update_assets, None
 
     update_state_call = vault_contract.encodeABI(
         fn_name='updateState',
