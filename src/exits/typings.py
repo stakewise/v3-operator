@@ -25,10 +25,3 @@ class SignatureRotationRequest:
     public_keys: list[HexStr]
     public_key_shards: list[list[HexStr]]
     exit_signature_shards: list[list[HexStr]]
-
-
-@dataclass
-class UpdateExitSignaturesParams:
-    vault: ChecksumAddress
-    exitSignaturesIpfsHash: str
-    oraclesSignatures: HexStr | bytes

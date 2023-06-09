@@ -17,6 +17,7 @@ staking-deposit = { git = "https://github.com/ethereum/staking-deposit-cli.git",
 pycryptodomex = "==3.17.0"
 milagro-bls-binding = "==1.9.0"
 tomli = "~2"
+eciespy = "==0.3.13"
 
 [tool.poetry.group.dev.dependencies]
 pylint = "==2.16.2"
