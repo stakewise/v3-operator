@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 
 async def register_validators(keystores: Keystores, deposit_data: DepositData) -> None:
     """Registers vault validators."""
-    vault_balance, update_call = await get_withdrawable_assets()
+    vault_balance, update_state_call = await get_withdrawable_assets()
     if NETWORK == GNOSIS:
         # apply GNO -> mGNO exchange rate
         vault_balance = Wei(int(vault_balance * MGNO_RATE // WAD))
@@ -82,12 +82,17 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
 
     if len(validators) == 1:
         validator = validators[0]
-        await register_single_validator(deposit_data.tree, validator, oracles_approval, update_call)
+        await register_single_validator(
+            tree=deposit_data.tree,
+            validator=validator,
+            approval=oracles_approval,
+            update_state_call=update_state_call
+        )
         logger.info('Successfully registered validator with public key %s', validator.public_key)
 
     if len(validators) > 1:
         await register_multiple_validator(
-            deposit_data.tree, validators, oracles_approval, update_call
+            deposit_data.tree, validators, oracles_approval, update_state_call
         )
         pub_keys = ', '.join([val.public_key for val in validators])
         logger.info('Successfully registered validators with public keys %s', pub_keys)
