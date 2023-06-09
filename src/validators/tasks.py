@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 
 async def register_validators(keystores: Keystores, deposit_data: DepositData) -> None:
     """Registers vault validators."""
-    vault_balance = await get_withdrawable_assets(VAULT_CONTRACT_ADDRESS)
+    vault_balance, update_state_call = await get_withdrawable_assets()
     if NETWORK == GNOSIS:
         # apply GNO -> mGNO exchange rate
         vault_balance = Wei(int(vault_balance * MGNO_RATE // WAD))
@@ -67,7 +67,7 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
                         'price is acceptable.', Web3.from_wei(max_fee_per_gas, 'gwei'))
         return
 
-    logger.info('Started registration of %d validators', validators_count)
+    logger.info('Started registration of %d validator(s)', validators_count)
 
     validators: list[Validator] = await get_available_validators(
         keystores, deposit_data, validators_count
@@ -82,11 +82,18 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
 
     if len(validators) == 1:
         validator = validators[0]
-        await register_single_validator(deposit_data.tree, validator, oracles_approval)
+        await register_single_validator(
+            tree=deposit_data.tree,
+            validator=validator,
+            approval=oracles_approval,
+            update_state_call=update_state_call
+        )
         logger.info('Successfully registered validator with public key %s', validator.public_key)
 
     if len(validators) > 1:
-        await register_multiple_validator(deposit_data.tree, validators, oracles_approval)
+        await register_multiple_validator(
+            deposit_data.tree, validators, oracles_approval, update_state_call
+        )
         pub_keys = ', '.join([val.public_key for val in validators])
         logger.info('Successfully registered validators with public keys %s', pub_keys)
 
@@ -166,22 +173,19 @@ async def load_genesis_validators() -> None:
     Used to speed up service startup
     """
 
-    ipfs_hash = NETWORK_CONFIG.NETWORK_VALIDATORS_IPFS_HASH
-    if not ipfs_hash or get_last_network_validator() is not None:
+    if not (get_last_network_validator() is None and NETWORK_CONFIG.GENESIS_VALIDATORS_IPFS_HASH):
         return
 
-    logger.info('Loading network validators from dump...')
-    ipfs_data = await ipfs_fetch_client.fetch_bytes(ipfs_hash)
-    block_number = BlockNumber(int.from_bytes(ipfs_data[:4], byteorder='big'))
+    data = await ipfs_fetch_client.fetch_bytes(NETWORK_CONFIG.GENESIS_VALIDATORS_IPFS_HASH)
     genesis_validators: list[NetworkValidator] = []
-    pub_keys = ipfs_data[4:]
-    for i in range(0, len(pub_keys), 48):
+    logger.info('Loading genesis validators...')
+    for i in range(0, len(data), 52):
         genesis_validators.append(
             NetworkValidator(
-                public_key=Web3.to_hex(pub_keys[i : i + 48]),
-                block_number=block_number,
+                public_key=Web3.to_hex(data[i + 4 : i + 52]),
+                block_number=BlockNumber(int.from_bytes(data[i : i + 4], 'big')),
             )
         )
 
     save_network_validators(genesis_validators)
-    logger.info('Loaded %d network validators', len(genesis_validators))
+    logger.info('Loaded %d genesis validators', len(genesis_validators))

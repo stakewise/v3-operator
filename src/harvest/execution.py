@@ -22,6 +22,7 @@ async def submit_harvest_transaction(harvest_params: HarvestParams) -> None:
         (
             harvest_params.rewards_root,
             harvest_params.reward,
+            harvest_params.unlocked_mev_reward,
             harvest_params.proof,
         )
     ).transact()  # type: ignore

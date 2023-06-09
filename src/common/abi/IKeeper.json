@@ -6,6 +6,11 @@
   },
   {
     "inputs": [],
+    "name": "InvalidAvgRewardPerSecond",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "InvalidProof",
     "type": "error"
   },
@@ -101,25 +106,6 @@
         "type": "address"
       },
       {
-        "indexed": false,
-        "internalType": "uint64",
-        "name": "rewardsDelay",
-        "type": "uint64"
-      }
-    ],
-    "name": "RewardsDelayUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "caller",
-        "type": "address"
-      },
-      {
         "indexed": true,
         "internalType": "bytes32",
         "name": "rewardsRoot",
@@ -127,9 +113,9 @@
       },
       {
         "indexed": false,
-        "internalType": "uint128",
+        "internalType": "uint256",
         "name": "avgRewardPerSecond",
-        "type": "uint128"
+        "type": "uint256"
       },
       {
         "indexed": false,
@@ -217,19 +203,6 @@
     "name": "approveValidators",
     "outputs": [],
     "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "avgRewardPerSecond",
-    "outputs": [
-      {
-        "internalType": "uint128",
-        "name": "",
-        "type": "uint128"
-      }
-    ],
-    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -330,37 +303,6 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "implementation",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_owner",
-        "type": "address"
-      },
-      {
-        "internalType": "uint64",
-        "name": "_rewardsDelay",
-        "type": "uint64"
-      }
-    ],
-    "name": "initialize",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
         "internalType": "address",
@@ -414,19 +356,6 @@
   {
     "inputs": [],
     "name": "prevRewardsRoot",
-    "outputs": [
-      {
-        "internalType": "bytes32",
-        "name": "",
-        "type": "bytes32"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "proxiableUUID",
     "outputs": [
       {
         "internalType": "bytes32",
@@ -503,19 +432,6 @@
   {
     "inputs": [
       {
-        "internalType": "uint64",
-        "name": "_rewardsDelay",
-        "type": "uint64"
-      }
-    ],
-    "name": "setRewardsDelay",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
         "internalType": "address",
         "name": "vault",
         "type": "address"
@@ -570,9 +486,9 @@
             "type": "bytes32"
           },
           {
-            "internalType": "uint128",
+            "internalType": "uint256",
             "name": "avgRewardPerSecond",
-            "type": "uint128"
+            "type": "uint256"
           },
           {
             "internalType": "uint64",
@@ -598,19 +514,6 @@
     "name": "updateRewards",
     "outputs": [],
     "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "version",
-    "outputs": [
-      {
-        "internalType": "uint8",
-        "name": "",
-        "type": "uint8"
-      }
-    ],
-    "stateMutability": "view",
     "type": "function"
   }
 ]

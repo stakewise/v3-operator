@@ -67,20 +67,6 @@ class KeeperApprovalParams:
 
 
 @dataclass
-class SingleValidatorRegistration:
-    keeperParams: KeeperApprovalParams
-    proof: list[str | HexStr | bytes]
-
-
-@dataclass
-class MultipleValidatorRegistration:
-    keeperParams: KeeperApprovalParams
-    indexes: list[int]
-    proofFlags: list[bool]
-    proof: list[str | HexStr | bytes]
-
-
-@dataclass
 class KeystoreFile:
     name: str
     password: str
