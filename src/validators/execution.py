@@ -156,9 +156,9 @@ async def get_withdrawable_assets() -> tuple[Wei, HexStr | None]:
     ).call()
     after_update_assets = Web3.to_int(multicall[1])
 
-    before_update_vals = before_update_assets // DEPOSIT_AMOUNT
-    after_update_vals = after_update_assets // DEPOSIT_AMOUNT
-    if before_update_vals != after_update_vals:
+    before_update_validators = before_update_assets // DEPOSIT_AMOUNT
+    after_update_validators = after_update_assets // DEPOSIT_AMOUNT
+    if before_update_validators != after_update_validators:
         return Wei(after_update_assets), update_state_call
 
     return Wei(before_update_assets), None

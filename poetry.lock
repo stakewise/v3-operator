@@ -2319,7 +2319,7 @@ pbr = ">=2.0.0,<2.1.0 || >2.1.0"
 
 [[package]]
 name = "sw-utils"
-version = "0.3.3"
+version = "0.3.5"
 description = "StakeWise Python utils"
 category = "main"
 optional = false
@@ -2338,8 +2338,8 @@ web3 = "==6.0.0b9"
 [package.source]
 type = "git"
 url = "https://github.com/stakewise/sw-utils.git"
-reference = "v0.3.3"
-resolved_reference = "42ea734ef117319b228f765340e7dd8deb095170"
+reference = "v0.3.5"
+resolved_reference = "345f29ebd4569470887102da9c322ea0ab520d9e"
 
 [[package]]
 name = "toml"
@@ -2769,4 +2769,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.11"
-content-hash = "bcab0c0dff63650d2820b7c9d08fc77f240547cf0a6386aea848cb65a7a3b6ee"
+content-hash = "36f56e5de727da8383f8d77e9ba9aae0338f96ae3849c8bf3b5047131d0270ae"
