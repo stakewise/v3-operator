@@ -125,7 +125,6 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
 async def get_withdrawable_assets() -> tuple[Wei, HexStr | None]:
     """Fetches vault's available assets for staking."""
     before_update_assets = await vault_contract.functions.withdrawableAssets().call()
-    before_update_vals = before_update_assets // DEPOSIT_AMOUNT
 
     last_rewards = await get_last_rewards_update()
     if last_rewards is None:
@@ -156,8 +155,9 @@ async def get_withdrawable_assets() -> tuple[Wei, HexStr | None]:
         [update_state_call, withdrawable_assets_call]
     ).call()
     after_update_assets = Web3.to_int(multicall[1])
-    after_update_vals = after_update_assets // DEPOSIT_AMOUNT
 
+    before_update_vals = before_update_assets // DEPOSIT_AMOUNT
+    after_update_vals = after_update_assets // DEPOSIT_AMOUNT
     if before_update_vals != after_update_vals:
         return Wei(after_update_assets), update_state_call
 
