@@ -4,31 +4,32 @@ from sw_utils.decorators import backoff_aiohttp_errors
 from web3 import Web3
 from web3.types import ChecksumAddress, EventData, Wei
 
-from src.common.accounts import operator_account
-from src.common.clients import execution_client, ipfs_fetch_client
-from src.common.contracts import keeper_contract, oracles_contract
+from src.common.accounts import OperatorAccount
+from src.common.clients import ExecutionClient, IpfsFetchRetryClient
+from src.common.contracts import KeeperContract, OraclesContract
 from src.common.typings import Oracles, RewardVoteInfo
-from src.config.settings import DEFAULT_RETRY_TIME, NETWORK_CONFIG
+from src.config.settings import DEFAULT_RETRY_TIME, SettingsStore
 
 SECONDS_PER_MONTH: int = 2628000
-APPROX_BLOCKS_PER_MONTH: int = int(SECONDS_PER_MONTH // NETWORK_CONFIG.SECONDS_PER_BLOCK)
 
 logger = logging.getLogger(__name__)
 
 
 @backoff_aiohttp_errors(max_time=300)
 async def get_operator_balance() -> Wei:
+    execution_client = ExecutionClient().client
+    operator_account = OperatorAccount().operator_account
     return await execution_client.eth.get_balance(operator_account.address)  # type: ignore
 
 
 @backoff_aiohttp_errors(max_time=300)
 async def can_harvest(vault_address: ChecksumAddress) -> bool:
-    return await keeper_contract.functions.canHarvest(vault_address).call()
+    return await KeeperContract().contract.functions.canHarvest(vault_address).call()
 
 
 async def check_operator_balance() -> None:
-    operator_min_balance = NETWORK_CONFIG.OPERATOR_MIN_BALANCE
-    symbol = NETWORK_CONFIG.SYMBOL
+    operator_min_balance = SettingsStore().NETWORK_CONFIG.OPERATOR_MIN_BALANCE
+    symbol = SettingsStore().NETWORK_CONFIG.SYMBOL
 
     if operator_min_balance <= 0:
         return
@@ -44,16 +45,16 @@ async def check_operator_balance() -> None:
 @backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
 async def get_oracles() -> Oracles:
     """Fetches oracles config."""
-    events = await oracles_contract.events.ConfigUpdated.get_logs(
-        from_block=NETWORK_CONFIG.ORACLES_GENESIS_BLOCK
+    events = await OraclesContract().contract.events.ConfigUpdated.get_logs(
+        from_block=SettingsStore().NETWORK_CONFIG.ORACLES_GENESIS_BLOCK
     )
     if not events:
         raise ValueError('Failed to fetch IPFS hash of oracles config')
 
     # fetch IPFS record
     ipfs_hash = events[-1]['args']['configIpfsHash']
-    config: dict = await ipfs_fetch_client.fetch_json(ipfs_hash)  # type: ignore
-    threshold = await oracles_contract.functions.requiredOracles().call()
+    config: dict = await IpfsFetchRetryClient().fetch_json(ipfs_hash)  # type: ignore
+    threshold = await OraclesContract().contract.functions.requiredOracles().call()
 
     endpoints = []
     public_keys = []
@@ -78,11 +79,14 @@ async def get_oracles() -> Oracles:
 @backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
 async def get_last_rewards_update() -> RewardVoteInfo | None:
     """Fetches the last rewards update."""
-    block_number = await execution_client.eth.get_block_number()  # type: ignore
-    events = await keeper_contract.events.RewardsUpdated.get_logs(
+    approx_blocks_per_month: int = int(
+        SECONDS_PER_MONTH // SettingsStore().NETWORK_CONFIG.SECONDS_PER_BLOCK
+    )
+    block_number = await ExecutionClient().client.eth.get_block_number()  # type: ignore
+    events = await KeeperContract().contract.events.RewardsUpdated.get_logs(
         from_block=max(
-            int(NETWORK_CONFIG.KEEPER_GENESIS_BLOCK),
-            block_number - APPROX_BLOCKS_PER_MONTH,
+            int(SettingsStore().NETWORK_CONFIG.KEEPER_GENESIS_BLOCK),
+            block_number - approx_blocks_per_month,
             0
         ),
         to_block=block_number,
@@ -100,6 +104,7 @@ async def get_last_rewards_update() -> RewardVoteInfo | None:
 
 
 async def get_max_fee_per_gas() -> Wei:
+    execution_client = ExecutionClient().client
     priority_fee = await execution_client.eth.max_priority_fee  # type: ignore
     latest_block = await execution_client.eth.get_block('latest')  # type: ignore
     base_fee = latest_block['baseFeePerGas']

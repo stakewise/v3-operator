@@ -3,6 +3,7 @@ from pathlib import Path
 
 import backoff
 from sw_utils import (
+    ExtendedAsyncBeacon,
     IpfsException,
     IpfsFetchClient,
     construct_async_sign_and_send_raw_middleware,
@@ -11,32 +12,40 @@ from sw_utils import (
 )
 from web3 import Web3
 
-from src.common.accounts import operator_account
-from src.config.settings import (
-    CONSENSUS_ENDPOINT,
-    DATABASE,
-    DEFAULT_RETRY_TIME,
-    EXECUTION_ENDPOINT,
-    IPFS_FETCH_ENDPOINTS,
-)
+from src.common.accounts import OperatorAccount
+from src.config.settings import DEFAULT_RETRY_TIME, SettingsStore
 
 
 class Database:
     def get_db_connection(self):
-        return sqlite3.connect(DATABASE)
+        return sqlite3.connect(SettingsStore().DATABASE)
 
     def create_db_dir(self):
-        Path(DATABASE).parent.mkdir(parents=True, exist_ok=True)
+        Path(SettingsStore().DATABASE).parent.mkdir(parents=True, exist_ok=True)
 
 
-def build_execution_client() -> Web3:
-    w3 = get_execution_client(EXECUTION_ENDPOINT)
-    w3.middleware_onion.add(construct_async_sign_and_send_raw_middleware(operator_account))
-    w3.eth.default_account = operator_account.address
-    return w3
+class ExecutionClient:
+    # @cache
+    @property
+    def client(self) -> Web3:
+        operator_account = OperatorAccount().operator_account
+        w3 = get_execution_client(SettingsStore().EXECUTION_ENDPOINT)
+        w3.middleware_onion.add(construct_async_sign_and_send_raw_middleware(operator_account))
+        w3.eth.default_account = operator_account.address
+        return w3
+
+
+class ConsensusClient:
+    # @cache
+    @property
+    def client(self) -> ExtendedAsyncBeacon:
+        return get_consensus_client(SettingsStore().CONSENSUS_ENDPOINT)
 
 
 class IpfsFetchRetryClient(IpfsFetchClient):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs, endpoints=SettingsStore().IPFS_FETCH_ENDPOINTS)
+
     @backoff.on_exception(backoff.expo, IpfsException, max_time=DEFAULT_RETRY_TIME)
     async def fetch_bytes(self, ipfs_hash: str) -> bytes:
         return await super().fetch_bytes(ipfs_hash)
@@ -46,7 +55,4 @@ class IpfsFetchRetryClient(IpfsFetchClient):
         return await super().fetch_json(ipfs_hash)
 
 
-execution_client = build_execution_client()
-consensus_client = get_consensus_client(CONSENSUS_ENDPOINT)
 db_client = Database()
-ipfs_fetch_client = IpfsFetchRetryClient(IPFS_FETCH_ENDPOINTS)

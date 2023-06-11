@@ -4,7 +4,7 @@ from eth_typing import ChecksumAddress
 from web3 import Web3
 from web3.types import Wei
 
-from src.common.clients import ipfs_fetch_client
+from src.common.clients import IpfsFetchRetryClient
 from src.common.typings import HarvestParams
 
 logger = logging.getLogger(__name__)
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 async def fetch_harvest_params(
     vault_address: ChecksumAddress, ipfs_hash: str, rewards_root: bytes
 ) -> HarvestParams | None:
-    ipfs_data = await ipfs_fetch_client.fetch_json(ipfs_hash)
+    ipfs_data = await IpfsFetchRetryClient().fetch_json(ipfs_hash)
     for vault_data in ipfs_data['vaults']:  # type: ignore
         if vault_address == Web3.to_checksum_address(vault_data['vault']):
             unlocked_mev_reward = Wei(vault_data['unlocked_mev_reward'])

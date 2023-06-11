@@ -15,8 +15,8 @@ from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.types import EventData, Wei
 
-from src.common.clients import execution_client
-from src.common.contracts import validators_registry_contract, vault_contract
+from src.common.clients import ExecutionClient
+from src.common.contracts import ValidatorsRegistryContract, VaultContract
 from src.common.execution import get_last_rewards_update
 from src.common.ipfs import fetch_harvest_params
 from src.config.networks import ETH_NETWORKS
@@ -24,9 +24,7 @@ from src.config.settings import (
     DEFAULT_RETRY_TIME,
     DEPOSIT_AMOUNT,
     DEPOSIT_AMOUNT_GWEI,
-    NETWORK,
-    NETWORK_CONFIG,
-    VAULT_CONTRACT_ADDRESS,
+    SettingsStore,
 )
 from src.validators.database import (
     get_last_network_validator,
@@ -41,21 +39,24 @@ from src.validators.typings import (
     Validator,
 )
 
-VALIDATORS_REGISTRY_GENESIS_BLOCK: BlockNumber = NETWORK_CONFIG.VALIDATORS_REGISTRY_GENESIS_BLOCK
-GENESIS_FORK_VERSION: bytes = NETWORK_CONFIG.GENESIS_FORK_VERSION
+# VALIDATORS_REGISTRY_GENESIS_BLOCK: BlockNumber = NETWORK_CONFIG.VALIDATORS_REGISTRY_GENESIS_BLOCK
+# GENESIS_FORK_VERSION: bytes = NETWORK_CONFIG.GENESIS_FORK_VERSION
 
 logger = logging.getLogger(__name__)
 
 
 class NetworkValidatorsProcessor(EventProcessor):
-    contract = validators_registry_contract
     contract_event = 'DepositEvent'
+
+    @property
+    def contract(self):
+        return ValidatorsRegistryContract().contract
 
     @staticmethod
     async def get_from_block() -> BlockNumber:
         last_validator = get_last_network_validator()
         if not last_validator:
-            return VALIDATORS_REGISTRY_GENESIS_BLOCK
+            return SettingsStore().NETWORK_CONFIG.VALIDATORS_REGISTRY_GENESIS_BLOCK
 
         return BlockNumber(last_validator.block_number + 1)
 
@@ -92,8 +93,9 @@ def process_network_validator_event(event: EventData) -> HexStr | None:
     withdrawal_creds = event['args']['withdrawal_credentials']
     amount_gwei = struct.unpack('<Q', event['args']['amount'])[0]
     signature = event['args']['signature']
+    fork_version = SettingsStore().NETWORK_CONFIG.GENESIS_FORK_VERSION
     if is_valid_deposit_data_signature(
-        public_key, withdrawal_creds, signature, amount_gwei, GENESIS_FORK_VERSION
+        public_key, withdrawal_creds, signature, amount_gwei, fork_version
     ):
         return Web3.to_hex(public_key)
 
@@ -107,9 +109,9 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
     if last_validator:
         from_block = BlockNumber(last_validator.block_number + 1)
     else:
-        from_block = VALIDATORS_REGISTRY_GENESIS_BLOCK
+        from_block = SettingsStore().NETWORK_CONFIG.VALIDATORS_REGISTRY_GENESIS_BLOCK
 
-    new_events = await validators_registry_contract.events.DepositEvent.get_logs(
+    new_events = await ValidatorsRegistryContract().contract.events.DepositEvent.get_logs(
         from_block=from_block
     )
     new_public_keys: Set[HexStr] = set()
@@ -124,6 +126,7 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
 @backoff_aiohttp_errors(max_time=300)
 async def get_withdrawable_assets() -> tuple[Wei, HexStr | None]:
     """Fetches vault's available assets for staking."""
+    vault_contract = VaultContract().contract
     before_update_assets = await vault_contract.functions.withdrawableAssets().call()
 
     last_rewards = await get_last_rewards_update()
@@ -131,7 +134,7 @@ async def get_withdrawable_assets() -> tuple[Wei, HexStr | None]:
         return before_update_assets, None
 
     harvest_params = await fetch_harvest_params(
-        vault_address=VAULT_CONTRACT_ADDRESS,
+        vault_address=SettingsStore().VAULT_CONTRACT_ADDRESS,
         ipfs_hash=last_rewards.ipfs_hash,
         rewards_root=last_rewards.rewards_root,
     )
@@ -167,19 +170,19 @@ async def get_withdrawable_assets() -> tuple[Wei, HexStr | None]:
 @backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
 async def get_validators_registry_root() -> Bytes32:
     """Fetches the latest validators registry root."""
-    return await validators_registry_contract.functions.get_deposit_root().call()
+    return await ValidatorsRegistryContract().contract.functions.get_deposit_root().call()
 
 
 @backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
 async def get_vault_validators_root() -> Bytes32:
     """Fetches vault's validators root."""
-    return await vault_contract.functions.validatorsRoot().call()
+    return await VaultContract().contract.functions.validatorsRoot().call()
 
 
 @backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
 async def get_vault_validators_index() -> int:
     """Fetches vault's current validators index."""
-    return await vault_contract.functions.validatorIndex().call()
+    return await VaultContract().contract.functions.validatorIndex().call()
 
 
 async def check_deposit_data_root(deposit_data_root: str) -> None:
@@ -231,10 +234,10 @@ async def register_single_validator(
     update_state_call: HexStr | None,
 ) -> None:
     """Registers single validator."""
-    if NETWORK not in ETH_NETWORKS:
+    if SettingsStore().NETWORK not in ETH_NETWORKS:
         raise NotImplementedError('networks other than Ethereum not supported')
 
-    credentials = get_eth1_withdrawal_credentials(VAULT_CONTRACT_ADDRESS)
+    credentials = get_eth1_withdrawal_credentials(SettingsStore().VAULT_CONTRACT_ADDRESS)
     tx_validator = _encode_tx_validator(credentials, validator)
     proof = tree.get_proof([tx_validator, validator.deposit_data_index])  # type: ignore
 
@@ -248,6 +251,7 @@ async def register_single_validator(
         ),
         proof,
     ]
+    vault_contract = VaultContract().contract
     if update_state_call is not None:
         register_call = vault_contract.encodeABI(
             fn_name='registerValidator',
@@ -262,9 +266,10 @@ async def register_single_validator(
         ).transact()  # type: ignore
 
     logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
-    await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
+    await ExecutionClient().client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
 
 
+# pylint: disable-next=too-many-locals
 async def register_multiple_validator(
     tree: StandardMerkleTree,
     validators: list[Validator],
@@ -272,10 +277,10 @@ async def register_multiple_validator(
     update_call: HexStr | None,
 ) -> None:
     """Registers multiple validators."""
-    if NETWORK not in ETH_NETWORKS:
+    if SettingsStore().NETWORK not in ETH_NETWORKS:
         raise NotImplementedError('networks other than Ethereum not supported')
 
-    credentials = get_eth1_withdrawal_credentials(VAULT_CONTRACT_ADDRESS)
+    credentials = get_eth1_withdrawal_credentials(SettingsStore().VAULT_CONTRACT_ADDRESS)
     tx_validators: list[bytes] = []
     leaves: list[tuple[bytes, int]] = []
     for validator in validators:
@@ -299,6 +304,7 @@ async def register_multiple_validator(
         multi_proof.proof_flags,
         multi_proof.proof,
     ]
+    vault_contract = VaultContract().contract
     if update_call is not None:
         register_call = vault_contract.encodeABI(
             fn_name='registerValidators',
@@ -313,7 +319,7 @@ async def register_multiple_validator(
         ).transact()  # type: ignore
 
     logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
-    await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
+    await ExecutionClient().client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
 
 
 def _encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) -> bytes:
