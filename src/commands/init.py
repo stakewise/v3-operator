@@ -39,20 +39,29 @@ from src.config.settings import AVAILABLE_NETWORKS, GOERLI
     is_flag=True,
     help='Skips mnemonic verification when provided.',
 )
+@click.option(
+    '--data-dir',
+    required=False,
+    help='Path where the vault data will be places. '
+    'Defaults to ~/.stakewise/<vault>',
+    type=click.Path(exists=False, file_okay=False, dir_okay=True),
+)
 @click.command(help='Creates the mnemonic used to derive validator keys.')
 def init(
     language: str,
     no_verify: bool,
     vault: HexAddress,
     network: str,
+    data_dir: str,
 ) -> None:
     config = Config(
+        data_dir=data_dir,
         vault=vault,
         network=network,
         mnemonic_next_index=0,
     )
-    if config.vault_dir.exists():
-        raise click.ClickException(f'Vault directory {config.vault_dir} already exists.')
+    if config.data_dir.exists():
+        raise click.ClickException(f'Vault directory {config.data_dir} already exists.')
 
     if not language:
         language = click.prompt(
@@ -66,6 +75,12 @@ def init(
 
     config.first_public_key = first_public_key
     config.create()
+    if not no_verify:
+        click.secho(
+            f'Successfully initialized configuration for vault {vault}',
+            bold=True,
+            fg='green'
+        )
 
 
 def _get_first_public_key(network: str, vault: HexAddress, mnemonic: str) -> str:

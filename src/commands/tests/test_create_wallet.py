@@ -7,7 +7,7 @@ from staking_deposit.key_handling.key_derivation.mnemonic import get_mnemonic
 
 from src.commands.create_wallet import create_wallet
 from src.common.language import WORD_LISTS_PATH
-from src.config.settings import CONFIG_DIR
+from src.config.settings import DATA_DIR
 
 from .factories import faker
 
@@ -15,7 +15,7 @@ from .factories import faker
 class TestCreateWallet(unittest.TestCase):
     def test_basic(self):
         vault = faker.eth_address()
-        vault_dir = f'{CONFIG_DIR}/{vault}'
+        vault_dir = f'{DATA_DIR}/{vault}'
         runner = CliRunner()
         Account.enable_unaudited_hdwallet_features()
         mnemonic = get_mnemonic(language='english', words_path=WORD_LISTS_PATH)

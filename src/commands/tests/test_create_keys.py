@@ -9,7 +9,7 @@ import src
 from src.commands.create_keys import create_keys
 from src.commands.init import init
 from src.common.language import WORD_LISTS_PATH
-from src.config.settings import CONFIG_DIR
+from src.config.settings import DATA_DIR
 
 from .factories import faker
 
@@ -43,13 +43,12 @@ class TestCreateKeys(unittest.TestCase):
             result = runner.invoke(create_keys, args)
             assert result.exit_code == 0
 
-            vault_dir = f'{CONFIG_DIR}/{vault}'
+            vault_dir = f'{DATA_DIR}/{vault}'
 
             output = (
                 'Creating validator keys:\t\t\n'
                 'Generating deposit data JSON\t\t\n'
                 'Exporting validator keystores\t\t\n'
-                f'Successfully updated configuration for vault {vault}\n'
                 f'Done. Generated 5 keys for {vault} vault.\n'
                 f'Keystores saved to {vault_dir}/keystores file\n'
                 f'Deposit data saved to {vault_dir}/deposit_data.json file'

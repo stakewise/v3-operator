@@ -9,16 +9,22 @@ from src.config.settings import AVAILABLE_NETWORKS
 
 
 class Config:
+    # pylint: disable-next=too-many-arguments
     def __init__(
         self,
+        data_dir: str,
         vault: HexAddress,
         network: str = '',
         mnemonic_next_index: int = 0,
         first_public_key: str | None = None
     ):
         self.vault = vault
-        self.vault_dir = Path(f'~/.stakewise/{vault}').expanduser()
-        self.config_path = self.vault_dir / 'config.json'
+        if data_dir:
+            self.data_dir = Path(data_dir)
+        else:
+            self.data_dir = Path(f'~/.stakewise/{vault}').expanduser()
+
+        self.config_path = self.data_dir / 'config.json'
         self.network = network
         self.mnemonic_next_index = mnemonic_next_index
         self.first_public_key = first_public_key
@@ -42,15 +48,9 @@ class Config:
         }
 
         self._validate()
-        self.vault_dir.mkdir(parents=True, exist_ok=True)
+        self.data_dir.mkdir(parents=True, exist_ok=True)
         with self.config_path.open('w') as f:
             json.dump(config, f)
-
-        click.secho(
-            f'Successfully initialized configuration for vault {self.vault}',
-            bold=True,
-            fg='green'
-        )
 
     def update(self, network=None, mnemonic_next_index=None, first_public_key=None):
         self.load()
@@ -68,12 +68,6 @@ class Config:
         }
         with self.config_path.open('w') as f:
             json.dump(config, f)
-
-        click.secho(
-            f'Successfully updated configuration for vault {self.vault}',
-            bold=True,
-            fg='green'
-        )
 
     def _validate(self):
         """Validates the loaded configuration data."""

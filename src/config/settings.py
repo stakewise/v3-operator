@@ -9,7 +9,7 @@ from web3.types import ChecksumAddress
 
 from src.config.networks import GOERLI, NETWORKS, NetworkConfig
 
-CONFIG_DIR = Path.home() / '.stakewise'
+DATA_DIR = Path.home() / '.stakewise'
 
 
 class Singleton(type):
@@ -132,7 +132,7 @@ class Settings(metaclass=Singleton):
 
     @property
     def VAULT_DIR(self) -> Path:
-        return Path(CONFIG_DIR) / str(self.VAULT_CONTRACT_ADDRESS)
+        return Path(DATA_DIR) / str(self.VAULT_CONTRACT_ADDRESS)
 
     @property
     def DATABASE(self) -> str:

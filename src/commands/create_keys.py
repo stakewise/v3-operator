@@ -1,7 +1,6 @@
 import json
 from multiprocessing import Pool
 from os import makedirs, path
-from pathlib import Path
 
 import click
 from eth_typing import HexAddress
@@ -11,7 +10,6 @@ from src.common.contrib import async_command, greenify
 from src.common.credentials import Credential, CredentialManager
 from src.common.password import get_or_create_password_file
 from src.common.validators import validate_eth_address, validate_mnemonic
-from src.config.settings import CONFIG_DIR
 
 
 @click.option(
@@ -35,20 +33,27 @@ from src.config.settings import CONFIG_DIR
     type=str,
     callback=validate_eth_address,
 )
+@click.option(
+    '--data-dir',
+    required=False,
+    help='Path where the vault data will be places. '
+    'Defaults to ~/.stakewise/<vault>',
+    type=click.Path(exists=False, file_okay=False, dir_okay=True),
+)
 @click.command(help='Creates the validator keys from the mnemonic.')
 @async_command
 async def create_keys(
     mnemonic: str,
     count: int,
     vault: HexAddress,
+    data_dir: str,
 ) -> None:
-    vault_dir = Path(CONFIG_DIR) / str(vault)
-    deposit_data_file = vault_dir / 'deposit_data.json'
-    keystores_dir = vault_dir / 'keystores'
-    password_file = keystores_dir / 'password.txt'
-
-    config = Config(vault=vault)
+    config = Config(vault=vault, data_dir=data_dir)
     config.load()
+
+    deposit_data_file = config.data_dir / 'deposit_data.json'
+    keystores_dir = config.data_dir / 'keystores'
+    password_file = keystores_dir / 'password.txt'
 
     credentials = CredentialManager.generate_credentials(
         network=config.network,

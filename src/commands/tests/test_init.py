@@ -61,7 +61,7 @@ class TestCreateMnemonic(unittest.TestCase):
         result = runner.invoke(init, args)
         assert result.exit_code == 0
         mnemonic_mock.assert_called_once()
-        assert mnemonic in result.output.strip()
+        assert mnemonic == result.output.strip()
 
     def test_bad_language(self, *args):
         runner = CliRunner()

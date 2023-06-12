@@ -9,7 +9,7 @@ from eth_typing import HexAddress
 from src.common.contrib import greenify
 from src.common.password import get_or_create_password_file
 from src.common.validators import validate_eth_address, validate_mnemonic
-from src.config.settings import CONFIG_DIR
+from src.config.settings import DATA_DIR
 
 
 @click.option(
@@ -27,9 +27,20 @@ from src.config.settings import CONFIG_DIR
     type=str,
     callback=validate_eth_address,
 )
+@click.option(
+    '--data-dir',
+    required=False,
+    help='Path where the vault data will be places. '
+    'Defaults to ~/.stakewise/<vault>',
+    type=click.Path(exists=False, file_okay=False, dir_okay=True),
+)
 @click.command(help='Creates the encrypted hot wallet from the mnemonic.')
-def create_wallet(mnemonic: str, vault: HexAddress,) -> None:
-    wallet_dir = Path(f'{CONFIG_DIR}/{vault}/wallet')
+def create_wallet(mnemonic: str, vault: HexAddress, data_dir: str) -> None:
+    if data_dir:
+        wallet_dir = Path(f'{data_dir}/wallet')
+    else:
+        wallet_dir = Path(f'{DATA_DIR}/{vault}/wallet')
+
     wallet_dir.mkdir(parents=True, exist_ok=True)
     wallet = _generate_encrypted_wallet(mnemonic, str(wallet_dir))
     click.echo(f'Done. Wallet {greenify(wallet)} saved to {greenify(wallet_dir)} directory')
