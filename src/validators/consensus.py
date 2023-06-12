@@ -8,7 +8,8 @@ from web3 import Web3
 from web3.types import Timestamp
 
 from src.common.clients import consensus_client
-from src.config.settings import DEFAULT_RETRY_TIME, settings
+from src.common.metrics import SLOT_NUMBER
+from src.config.settings import DEFAULT_RETRY_TIME, NETWORK_CONFIG
 
 
 @backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
@@ -34,9 +35,11 @@ async def get_chain_finalized_head() -> ChainHead:
     """Fetches the fork safe chain head."""
     checkpoints = await consensus_client.get_finality_checkpoint()
     epoch: int = int(checkpoints['data']['finalized']['epoch'])
-    slots_per_epoch = settings.NETWORK_CONFIG.SLOTS_PER_EPOCH
-    last_slot_id: int = (epoch * slots_per_epoch) + slots_per_epoch - 1
-    for i in range(slots_per_epoch):
+    last_slot_id: int = (
+        (epoch * NETWORK_CONFIG.SLOTS_PER_EPOCH) + NETWORK_CONFIG.SLOTS_PER_EPOCH - 1
+    )
+    SLOT_NUMBER.set(last_slot_id)
+    for i in range(NETWORK_CONFIG.SLOTS_PER_EPOCH):
         try:
             slot = await consensus_client.get_block(last_slot_id - i)
         except ClientResponseError as e:

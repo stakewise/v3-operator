@@ -6,6 +6,7 @@ from web3.types import ChecksumAddress, EventData, Wei
 
 from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.contracts import keeper_contract, oracles_contract
+from src.common.metrics import VAULT_BALANCE
 from src.common.typings import Oracles, RewardVoteInfo
 from src.common.wallet import hot_wallet
 from src.config.settings import DEFAULT_RETRY_TIME, settings
@@ -32,7 +33,11 @@ async def check_hot_wallet_balance() -> None:
     if hot_wallet_min_balance <= 0:
         return
 
-    if (await get_hot_wallet_balance()) < hot_wallet_min_balance:
+    operator_balance = await get_operator_balance()
+
+    VAULT_BALANCE.set(operator_balance)
+
+    if (operator_balance) < operator_min_balance:
         logger.warning(
             'Wallet balance is too low. At least %s %s is recommended.',
             Web3.from_wei(hot_wallet_min_balance, 'ether'),
