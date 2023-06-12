@@ -220,28 +220,26 @@ async def get_available_validators(
     return validators
 
 
-async def get_unregistered_validators_count(
+async def update_unused_validator_keys_metric(
     keystores: Keystores, deposit_data: DepositData
 ) -> int:
-    await check_deposit_data_root(deposit_data.tree.root)
+    try:
+        await check_deposit_data_root(deposit_data.tree.root)
+    except RuntimeError:
+        metrics.available_validators.set(0)
+        return 0
 
-    validators: list[Validator] = []
+    validators: int = 0
     for validator in deposit_data.validators:
         if validator.public_key not in keystores:
-            logger.warning(
-                'Cannot find validator with public key %s in imported keystores.',
-                validator.public_key,
-            )
-            break
-
+            continue
         if is_validator_registered(validator.public_key):
             continue
+        validators += 1
 
-        validators.append(validator)
+    metrics.available_validators.set(validators)
 
-    metrics.available_validators.set(len(validators))
-
-    return len(validators)
+    return validators
 
 
 async def register_single_validator(

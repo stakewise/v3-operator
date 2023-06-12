@@ -23,7 +23,7 @@ from src.validators.consensus import get_chain_finalized_head
 from src.validators.database import setup as validators_db_setup
 from src.validators.execution import (
     NetworkValidatorsProcessor,
-    get_unregistered_validators_count,
+    update_unused_validator_keys_metric,
 )
 from src.validators.tasks import load_genesis_validators, register_validators
 from src.validators.utils import load_deposit_data, load_keystores
@@ -84,7 +84,7 @@ async def main() -> None:
             # process new network validators
             await network_validators_scanner.process_new_events(to_block)
             # check and register new validators
-            await get_unregistered_validators_count(keystores, deposit_data)
+            await update_unused_validator_keys_metric(keystores, deposit_data)
             await register_validators(keystores, deposit_data)
             # process outdated exit signatures
             await update_exit_signatures(keystores)

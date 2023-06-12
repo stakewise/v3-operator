@@ -33,11 +33,11 @@ async def check_hot_wallet_balance() -> None:
     if hot_wallet_min_balance <= 0:
         return
 
-    operator_balance = await get_operator_balance()
+    wallet_balance = await get_operator_balance()
 
-    metrics.operator_balance.set(operator_balance)
+    metrics.wallet_balance.set(wallet_balance)
 
-    if (operator_balance) < operator_min_balance:
+    if (wallet_balance) < operator_min_balance:
         logger.warning(
             'Wallet balance is too low. At least %s %s is recommended.',
             Web3.from_wei(hot_wallet_min_balance, 'ether'),
@@ -98,10 +98,6 @@ async def get_last_rewards_update() -> RewardVoteInfo | None:
         return None
 
     last_event: EventData = events[-1]
-
-    block = execution_client.eth.get_block(last_event['blockNumber'])
-    timestamp = block['timestamp']
-    metrics.last_votes_time.set(timestamp)
 
     voting_info = RewardVoteInfo(
         ipfs_hash=last_event['args']['rewardsIpfsHash'],

@@ -38,7 +38,7 @@ parser.add_argument('--harvest-vault',  action=argparse.BooleanOptionalAction,
 parser.add_argument('--metrics-host', type=str,
                     help='Prometheus metrics host, defaults to 127.0.0.1')
 parser.add_argument('--metrics-port', type=int,
-                    help='Prometheus metrics port, default to 9100')
+                    help='Prometheus metrics port, defaults to 9100')
 parser.add_argument('-v', '--verbose', help='Enable debug mode',
                     action='store_true')
 args = parser.parse_args()
@@ -280,4 +280,4 @@ VALIDATORS_FETCH_CHUNK_SIZE = config(
 
 # Prometheus metrics
 METRICS_HOST = config('METRICS_HOST', default='127.0.0.1')
-METRICS_PORT = config('METRICS_PORT', default=9100)
+METRICS_PORT = config('METRICS_PORT', default=9100, cast=int)
