@@ -99,6 +99,8 @@ async def get_last_rewards_update() -> RewardVoteInfo | None:
 
     last_event: EventData = events[-1]
 
+    metrics.block_number.set(block_number)
+
     voting_info = RewardVoteInfo(
         ipfs_hash=last_event['args']['rewardsIpfsHash'],
         rewards_root=last_event['args']['rewardsRoot'],

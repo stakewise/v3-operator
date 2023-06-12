@@ -226,7 +226,7 @@ async def update_unused_validator_keys_metric(
     try:
         await check_deposit_data_root(deposit_data.tree.root)
     except RuntimeError:
-        metrics.available_validators.set(0)
+        metrics.unused_validator_keys.set(0)
         return 0
 
     validators: int = 0
@@ -237,7 +237,7 @@ async def update_unused_validator_keys_metric(
             continue
         validators += 1
 
-    metrics.available_validators.set(validators)
+    metrics.unused_validator_keys.set(validators)
 
     return validators
 

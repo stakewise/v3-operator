@@ -5,8 +5,9 @@ from urllib.parse import urljoin
 import aiohttp
 from web3.types import HexStr
 
-from src.common.execution import check_hot_wallet_balance, get_oracles
-from src.config.settings import OUTDATED_SIGNATURES_URL_PATH, settings
+from src.common.execution import check_operator_balance, get_oracles
+from src.common.metrics import metrics
+from src.config.settings import OUTDATED_SIGNATURES_URL_PATH, VAULT_CONTRACT_ADDRESS
 from src.exits.consensus import get_validator_public_keys
 from src.exits.execution import submit_exit_signatures
 from src.exits.typings import OraclesApproval, SignatureRotationRequest
@@ -25,7 +26,9 @@ async def update_exit_signatures(keystores: Keystores) -> None:
     random_oracle = random.choice(oracles.endpoints)  # nosec
     outdated_indexes = await _fetch_outdated_indexes(random_oracle)
     if not outdated_indexes:
+        metrics.outdated_signatures.set(0)
         return
+    metrics.outdated_signatures.set(len(outdated_indexes))
 
     logger.info('Started exit signature rotation for %d validators', len(outdated_indexes))
 

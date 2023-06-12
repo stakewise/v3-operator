@@ -9,6 +9,7 @@ from src.common.execution import (
     get_max_fee_per_gas,
     get_oracles,
 )
+from src.common.metrics import metrics
 from src.common.utils import MGNO_RATE, WAD
 from src.config.networks import GNOSIS
 from src.config.settings import DEPOSIT_AMOUNT, settings
@@ -42,6 +43,8 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
     if settings.NETWORK == GNOSIS:
         # apply GNO -> mGNO exchange rate
         vault_balance = Wei(int(vault_balance * MGNO_RATE // WAD))
+
+    metrics.stakeable_assets.set(int(vault_balance))
 
     # calculate number of validators that can be registered
     validators_count: int = min(
