@@ -24,7 +24,7 @@ async def wait_for_consensus_node() -> None:
             data = await ConsensusClient().client.get_finality_checkpoint()
             logger.info(
                 'Connected to consensus node at %s. Finalized epoch: %s',
-                SettingsStore.CONSENSUS_ENDPOINT,
+                SettingsStore().CONSENSUS_ENDPOINT,
                 data['data']['finalized']['epoch'],
             )
             break
@@ -39,7 +39,7 @@ async def wait_for_execution_node() -> None:
             block_number = await ExecutionClient().client.eth.block_number  # type: ignore
             logger.info(
                 'Connected to execution node at %s. Current block number: %s',
-                SettingsStore.EXECUTION_ENDPOINT,
+                SettingsStore().EXECUTION_ENDPOINT,
                 block_number,
             )
             break

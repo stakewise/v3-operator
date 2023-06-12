@@ -43,7 +43,6 @@ async def create_keys(
     vault: HexAddress,
 ) -> None:
     vault_dir = Path(CONFIG_DIR) / str(vault)
-    config_path = vault_dir / 'config'
     deposit_data_file = vault_dir / 'deposit_data.json'
     keystores_dir = vault_dir / 'keystores'
     password_file = keystores_dir / 'password.txt'
@@ -74,8 +73,7 @@ async def create_keys(
     click.echo(
         f'Done. Generated {greenify(count)} keys for {greenify(vault)} vault.\n'
         f'Keystores saved to {greenify(keystores_dir)} file\n'
-        f'Deposit data saved to {greenify(deposit_data)} file\n'
-        f'Next mnemonic start index saved to {config_path} file',
+        f'Deposit data saved to {greenify(deposit_data)} file'
     )
 
 

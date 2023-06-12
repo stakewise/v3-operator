@@ -145,7 +145,7 @@ def load_keystores() -> Keystores | None:
         results = [
             pool.apply_async(
                 _process_keystore_file,
-                (keystore_file, ),
+                (keystore_file, SettingsStore().KEYSTORES_PATH),
                 error_callback=_stop_pool,
             )
             for keystore_file in keystore_files
@@ -191,11 +191,12 @@ async def load_deposit_data() -> DepositData:
 
 
 def _process_keystore_file(
-    keystore_file: KeystoreFile
+    keystore_file: KeystoreFile,
+    keystore_path: Path
 ) -> tuple[HexStr, BLSPrivkey] | None:
     file_name = keystore_file.name
     keystores_password = keystore_file.password
-    file_path = join(SettingsStore().KEYSTORES_PATH, file_name)
+    file_path = join(keystore_path, file_name)
 
     try:
         keystore = ScryptKeystore.from_file(file_path)

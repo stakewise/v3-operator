@@ -35,8 +35,6 @@ class Config:
         self._validate()
 
     def create(self):
-        if self.vault_dir.exists():
-            raise click.ClickException(f'Vault directory {self.vault_dir} already exists.')
         config = {
             'network': self.network,
             'mnemonic_next_index': self.mnemonic_next_index,
@@ -48,7 +46,11 @@ class Config:
         with self.config_path.open('w') as f:
             json.dump(config, f)
 
-        click.secho(f'Configuration create in {self.vault_dir}/config.json', bold=True, fg='green')
+        click.secho(
+            f'Successfully initialized configuration for vault {self.vault}',
+            bold=True,
+            fg='green'
+        )
 
     def update(self, network=None, mnemonic_next_index=None, first_public_key=None):
         self.load()
@@ -67,7 +69,11 @@ class Config:
         with self.config_path.open('w') as f:
             json.dump(config, f)
 
-        click.secho(f'Configuration updated in {self.vault_dir}/config.json', bold=True, fg='green')
+        click.secho(
+            f'Successfully updated configuration for vault {self.vault}',
+            bold=True,
+            fg='green'
+        )
 
     def _validate(self):
         """Validates the loaded configuration data."""

@@ -180,7 +180,7 @@ UPDATE_SIGNATURES_URL_PATH = '/signatures'
 OUTDATED_SIGNATURES_URL_PATH = '/signatures/{vault}'
 
 # common
-DEPOSIT_AMOUNT = Web3.to_wei(32, 'ether')  # todo
+DEPOSIT_AMOUNT = Web3.to_wei(32, 'ether')
 DEPOSIT_AMOUNT_GWEI = int(Web3.from_wei(DEPOSIT_AMOUNT, 'gwei'))
 
 # Backoff retries

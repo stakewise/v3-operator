@@ -29,7 +29,8 @@ from web3._utils import request
 
 import src
 from src.common.contrib import chunkify
-from src.config.settings import DEPOSIT_AMOUNT_GWEI, SettingsStore
+from src.config.networks import NETWORKS
+from src.config.settings import DEPOSIT_AMOUNT_GWEI
 
 # Set path as EIP-2334 format
 # https://eips.ethereum.org/EIPS/eip-2334
@@ -85,7 +86,7 @@ class Credential:
 
     @property
     def signed_deposit(self) -> DepositData:
-        fork_version = SettingsStore().NETWORK_CONFIG.GENESIS_FORK_VERSION
+        fork_version = NETWORKS[self.network].GENESIS_FORK_VERSION
         domain = compute_deposit_domain(fork_version)
         signing_root = compute_signing_root(self.deposit_message, domain)
         signed_deposit = DepositData(
@@ -98,7 +99,7 @@ class Credential:
     def deposit_datum_dict(self) -> dict[str, bytes]:
         deposit_cli_version = src.__version__
         signed_deposit_datum = self.signed_deposit
-        fork_version = SettingsStore().NETWORK_CONFIG.GENESIS_FORK_VERSION
+        fork_version = NETWORKS[self.network].GENESIS_FORK_VERSION
         datum_dict = signed_deposit_datum.as_dict()
         datum_dict.update({'deposit_message_root': self.deposit_message.hash_tree_root})
         datum_dict.update({'deposit_data_root': signed_deposit_datum.hash_tree_root})
@@ -161,12 +162,12 @@ class CredentialManager:
 
         credentials: list[Credential] = []
         for index in indexes:
-            credential = CredentialManager._generate_credential(network, vault, mnemonic, index)
+            credential = CredentialManager.generate_credential(network, vault, mnemonic, index)
             credentials.append(credential)
         return credentials
 
     @staticmethod
-    def _generate_credential(
+    def generate_credential(
         network: str, vault: HexAddress, mnemonic: str, index: int
     ) -> Credential:
         """Returns the signing key of the mnemonic at a specific index."""

@@ -58,9 +58,10 @@ logger = logging.getLogger(__name__)
               help='Absolute path to the password file for decrypting keystores')
 @click.option('--harvest-vault', type=bool,
               help='Periodically submit vault harvest transaction')
-@click.option('-v', '--verbose', help='Enable debug mode')
+@click.option('-v', '--verbose', help='Enable debug mode', is_flag=True)
 @click.command(help='Start operator service')
 def worker(*args, **kwargs) -> None:
+    # setup config
     SettingsStore(*args, **kwargs)
     try:
         asyncio.run(main())

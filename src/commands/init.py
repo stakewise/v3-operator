@@ -46,6 +46,14 @@ def init(
     vault: HexAddress,
     network: str,
 ) -> None:
+    config = Config(
+        vault=vault,
+        network=network,
+        mnemonic_next_index=0,
+    )
+    if config.vault_dir.exists():
+        raise click.ClickException(f'Vault directory {config.vault_dir} already exists.')
+
     if not language:
         language = click.prompt(
             'Choose your mnemonic language',
@@ -56,22 +64,16 @@ def init(
 
     first_public_key = _get_first_public_key(network, vault, str(mnemonic))
 
-    config = Config(
-        vault=vault,
-        network=network,
-        mnemonic_next_index=0,
-        first_public_key=first_public_key
-    )
+    config.first_public_key = first_public_key
     config.create()
 
 
 def _get_first_public_key(network: str, vault: HexAddress, mnemonic: str) -> str:
-    credentials = CredentialManager.generate_credentials(
+    credential = CredentialManager.generate_credential(
         network=network,
         vault=vault,
         mnemonic=mnemonic,
-        count=1,
-        start_index=0,
+        index=0,
     )
 
-    return credentials[0].public_key
+    return credential.public_key
