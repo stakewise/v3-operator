@@ -21,9 +21,9 @@ class Singleton(type):
         return cls._instances[cls]
 
 
-@dataclass(frozen=True)
+@dataclass
 # pylint: disable-next=too-many-public-methods
-class SettingsStore(metaclass=Singleton):
+class Settings(metaclass=Singleton):
     verbose: bool | None = None
     log_level: str | None = None
     network: str | None = None
@@ -44,6 +44,51 @@ class SettingsStore(metaclass=Singleton):
     approval_max_validators: int | None = None
     validators_fetch_chunk_size: int | None = None
     sentry_dsn: str | None = None
+
+    # pylint: disable-next=too-many-arguments,too-many-locals
+    def set(
+        self,
+        verbose:  bool | None = None,
+        log_level:  str | None = None,
+        network:  str | None = None,
+        execution_endpoint:  str | None = None,
+        consensus_endpoint:  str | None = None,
+        ipfs_fetch_endpoints:  list[str] | None = None,
+        vault:  str | None = None,
+        database_dir: str | None = None,
+        keystores_path: Path | None = None,
+        keystores_password_file: Path | None = None,
+        keystores_password_dir: Path | None = None,
+        deposit_data_path: Path | None = None,
+        hot_wallet_private_key: str | None = None,
+        hot_wallet_keystore_path: Path | None = None,
+        hot_wallet_keystore_password_path: Path | None = None,
+        harvest_vault: bool | None = None,
+        max_fee_per_gas_gwei: int | None = None,
+        approval_max_validators: int | None = None,
+        validators_fetch_chunk_size: int | None = None,
+        sentry_dsn: str | None = None,
+    ):
+        self.verbose = verbose
+        self.log_level = log_level
+        self.network = network
+        self.execution_endpoint = execution_endpoint
+        self.consensus_endpoint = consensus_endpoint
+        self.ipfs_fetch_endpoints = ipfs_fetch_endpoints
+        self.vault = vault
+        self.database_dir = database_dir
+        self.keystores_path = keystores_path
+        self.keystores_password_file = keystores_password_file
+        self.keystores_password_dir = keystores_password_dir
+        self.deposit_data_path = deposit_data_path
+        self.hot_wallet_private_key = hot_wallet_private_key
+        self.hot_wallet_keystore_path = hot_wallet_keystore_path
+        self.hot_wallet_keystore_password_path = hot_wallet_keystore_password_path
+        self.harvest_vault = harvest_vault
+        self.max_fee_per_gas_gwei = max_fee_per_gas_gwei
+        self.approval_max_validators = approval_max_validators
+        self.validators_fetch_chunk_size = validators_fetch_chunk_size
+        self.sentry_dsn = sentry_dsn
 
     @property
     def VERBOSE(self) -> bool:
@@ -171,6 +216,9 @@ class SettingsStore(metaclass=Singleton):
     @property
     def NETWORK_VALIDATORS_TABLE(self) -> str:
         return f'{self.NETWORK}_network_validators'
+
+
+settings = Settings()
 
 
 AVAILABLE_NETWORKS = [GOERLI]

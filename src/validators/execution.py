@@ -24,7 +24,7 @@ from src.config.settings import (
     DEFAULT_RETRY_TIME,
     DEPOSIT_AMOUNT,
     DEPOSIT_AMOUNT_GWEI,
-    SettingsStore,
+    settings,
 )
 from src.validators.database import (
     get_last_network_validator,
@@ -56,7 +56,7 @@ class NetworkValidatorsProcessor(EventProcessor):
     async def get_from_block() -> BlockNumber:
         last_validator = get_last_network_validator()
         if not last_validator:
-            return SettingsStore().NETWORK_CONFIG.VALIDATORS_REGISTRY_GENESIS_BLOCK
+            return settings.NETWORK_CONFIG.VALIDATORS_REGISTRY_GENESIS_BLOCK
 
         return BlockNumber(last_validator.block_number + 1)
 
@@ -93,7 +93,7 @@ def process_network_validator_event(event: EventData) -> HexStr | None:
     withdrawal_creds = event['args']['withdrawal_credentials']
     amount_gwei = struct.unpack('<Q', event['args']['amount'])[0]
     signature = event['args']['signature']
-    fork_version = SettingsStore().NETWORK_CONFIG.GENESIS_FORK_VERSION
+    fork_version = settings.NETWORK_CONFIG.GENESIS_FORK_VERSION
     if is_valid_deposit_data_signature(
         public_key, withdrawal_creds, signature, amount_gwei, fork_version
     ):
@@ -109,7 +109,7 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
     if last_validator:
         from_block = BlockNumber(last_validator.block_number + 1)
     else:
-        from_block = SettingsStore().NETWORK_CONFIG.VALIDATORS_REGISTRY_GENESIS_BLOCK
+        from_block = settings.NETWORK_CONFIG.VALIDATORS_REGISTRY_GENESIS_BLOCK
 
     new_events = await ValidatorsRegistryContract().contract.events.DepositEvent.get_logs(
         from_block=from_block
@@ -134,7 +134,7 @@ async def get_withdrawable_assets() -> tuple[Wei, HexStr | None]:
         return before_update_assets, None
 
     harvest_params = await fetch_harvest_params(
-        vault_address=SettingsStore().VAULT_CONTRACT_ADDRESS,
+        vault_address=settings.VAULT_CONTRACT_ADDRESS,
         ipfs_hash=last_rewards.ipfs_hash,
         rewards_root=last_rewards.rewards_root,
     )
@@ -234,10 +234,10 @@ async def register_single_validator(
     update_state_call: HexStr | None,
 ) -> None:
     """Registers single validator."""
-    if SettingsStore().NETWORK not in ETH_NETWORKS:
+    if settings.NETWORK not in ETH_NETWORKS:
         raise NotImplementedError('networks other than Ethereum not supported')
 
-    credentials = get_eth1_withdrawal_credentials(SettingsStore().VAULT_CONTRACT_ADDRESS)
+    credentials = get_eth1_withdrawal_credentials(settings.VAULT_CONTRACT_ADDRESS)
     tx_validator = _encode_tx_validator(credentials, validator)
     proof = tree.get_proof([tx_validator, validator.deposit_data_index])  # type: ignore
 
@@ -277,10 +277,10 @@ async def register_multiple_validator(
     update_call: HexStr | None,
 ) -> None:
     """Registers multiple validators."""
-    if SettingsStore().NETWORK not in ETH_NETWORKS:
+    if settings.NETWORK not in ETH_NETWORKS:
         raise NotImplementedError('networks other than Ethereum not supported')
 
-    credentials = get_eth1_withdrawal_credentials(SettingsStore().VAULT_CONTRACT_ADDRESS)
+    credentials = get_eth1_withdrawal_credentials(settings.VAULT_CONTRACT_ADDRESS)
     tx_validators: list[bytes] = []
     leaves: list[tuple[bytes, int]] = []
     for validator in validators:

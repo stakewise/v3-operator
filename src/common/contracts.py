@@ -5,7 +5,7 @@ from web3.contract import AsyncContract
 from web3.types import ChecksumAddress
 
 from src.common.clients import ExecutionClient
-from src.config.settings import SettingsStore
+from src.config.settings import settings
 
 
 class ContractWrapper:
@@ -14,7 +14,7 @@ class ContractWrapper:
 
     @property
     def contract_address(self) -> ChecksumAddress:
-        return getattr(SettingsStore().NETWORK_CONFIG, self.settings_key)
+        return getattr(settings.NETWORK_CONFIG, self.settings_key)
 
     @property
     def contract(self) -> AsyncContract:
@@ -31,7 +31,7 @@ class VaultContract(ContractWrapper):
     abi_path = 'abi/IEthVault.json'
 
     def __init__(self):
-        self.address = SettingsStore().VAULT_CONTRACT_ADDRESS
+        self.address = settings.VAULT_CONTRACT_ADDRESS
 
     @property
     def contract_address(self) -> ChecksumAddress:

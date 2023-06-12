@@ -4,16 +4,16 @@ import os.path
 from eth_account import Account
 from eth_account.account import LocalAccount
 
-from src.config.settings import SettingsStore
+from src.config.settings import settings
 
 
 class OperatorAccount:
 
     @property
     def operator_account(self) -> LocalAccount:
-        HOT_WALLET_PRIVATE_KEY = SettingsStore().HOT_WALLET_PRIVATE_KEY
-        HOT_WALLET_KEYSTORE_PATH = SettingsStore().HOT_WALLET_KEYSTORE_PATH
-        HOT_WALLET_KEYSTORE_PASSWORD_PATH = SettingsStore().HOT_WALLET_KEYSTORE_PASSWORD_PATH
+        HOT_WALLET_PRIVATE_KEY = settings.HOT_WALLET_PRIVATE_KEY
+        HOT_WALLET_KEYSTORE_PATH = settings.HOT_WALLET_KEYSTORE_PATH
+        HOT_WALLET_KEYSTORE_PASSWORD_PATH = settings.HOT_WALLET_KEYSTORE_PASSWORD_PATH
 
         if HOT_WALLET_PRIVATE_KEY:
             return Account().from_key(HOT_WALLET_PRIVATE_KEY)

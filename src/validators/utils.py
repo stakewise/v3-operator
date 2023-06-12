@@ -21,7 +21,7 @@ from web3 import Web3
 
 from src.common.clients import ConsensusClient
 from src.common.typings import Oracles
-from src.config.settings import DEFAULT_RETRY_TIME, SettingsStore
+from src.config.settings import DEFAULT_RETRY_TIME, settings
 from src.validators.database import get_next_validator_index
 from src.validators.exceptions import (
     KeystoreException,
@@ -104,9 +104,9 @@ async def send_approval_request(
 
 
 def list_keystore_files() -> list[KeystoreFile]:
-    KEYSTORES_PATH = SettingsStore().KEYSTORES_PATH
-    KEYSTORES_PASSWORD_FILE = SettingsStore().KEYSTORES_PASSWORD_FILE
-    KEYSTORES_PASSWORD_DIR = SettingsStore().KEYSTORES_PASSWORD_DIR
+    KEYSTORES_PATH = settings.KEYSTORES_PATH
+    KEYSTORES_PASSWORD_FILE = settings.KEYSTORES_PASSWORD_FILE
+    KEYSTORES_PASSWORD_DIR = settings.KEYSTORES_PASSWORD_DIR
     key_files = [
         f for f in listdir(KEYSTORES_PATH)
         if isfile(join(KEYSTORES_PATH, f)) and f.startswith('keystore') and f.endswith('.json')
@@ -136,7 +136,7 @@ def load_keystores() -> Keystores | None:
     """Extracts private keys from the keystores."""
 
     keystore_files = list_keystore_files()
-    logger.info('Loading keystores from %s...', SettingsStore().KEYSTORES_PATH)
+    logger.info('Loading keystores from %s...', settings.KEYSTORES_PATH)
     with Pool() as pool:
         # pylint: disable-next=unused-argument
         def _stop_pool(*args, **kwargs):
@@ -145,7 +145,7 @@ def load_keystores() -> Keystores | None:
         results = [
             pool.apply_async(
                 _process_keystore_file,
-                (keystore_file, SettingsStore().KEYSTORES_PATH),
+                (keystore_file, settings.KEYSTORES_PATH),
                 error_callback=_stop_pool,
             )
             for keystore_file in keystore_files
@@ -168,10 +168,10 @@ def load_keystores() -> Keystores | None:
 
 async def load_deposit_data() -> DepositData:
     """Loads and verifies deposit data."""
-    with open(SettingsStore().DEPOSIT_DATA_PATH, 'r', encoding='utf-8') as f:
+    with open(settings.DEPOSIT_DATA_PATH, 'r', encoding='utf-8') as f:
         deposit_data = json.load(f)
 
-    credentials = get_eth1_withdrawal_credentials(SettingsStore().VAULT_CONTRACT_ADDRESS)
+    credentials = get_eth1_withdrawal_credentials(settings.VAULT_CONTRACT_ADDRESS)
     leaves: list[tuple[bytes, int]] = []
     validators: list[Validator] = []
     for i, data in enumerate(deposit_data):
@@ -186,7 +186,7 @@ async def load_deposit_data() -> DepositData:
     tree = StandardMerkleTree.of(leaves, ['bytes', 'uint256'])
     await check_deposit_data_root(tree.root)
 
-    logger.info('Loaded deposit data file %s', SettingsStore(). DEPOSIT_DATA_PATH)
+    logger.info('Loaded deposit data file %s', settings. DEPOSIT_DATA_PATH)
     return DepositData(validators=validators, tree=tree)
 
 
@@ -221,9 +221,9 @@ async def count_deposit_data_non_exited_keys() -> int:
     validator_ids = [v.public_key for v in deposit_data.validators]
     validator_statuses = []
 
-    for i in range(0, len(validator_ids), SettingsStore().VALIDATORS_FETCH_CHUNK_SIZE):
+    for i in range(0, len(validator_ids), settings.VALIDATORS_FETCH_CHUNK_SIZE):
         validators = await ConsensusClient().client.get_validators_by_ids(
-            validator_ids[i: i + SettingsStore().VALIDATORS_FETCH_CHUNK_SIZE]
+            validator_ids[i: i + settings.VALIDATORS_FETCH_CHUNK_SIZE]
         )
         validator_statuses.extend(validators['data'])
 

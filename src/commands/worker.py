@@ -8,7 +8,7 @@ from sw_utils import EventScanner, InterruptHandler
 import src
 from src.common.accounts import OperatorAccount
 from src.common.validators import validate_eth_address
-from src.config.settings import AVAILABLE_NETWORKS, GOERLI, SettingsStore
+from src.config.settings import AVAILABLE_NETWORKS, GOERLI, settings
 from src.exits.tasks import update_exit_signatures
 from src.harvest.tasks import harvest_vault
 from src.startup_check import startup_checks
@@ -62,7 +62,7 @@ logger = logging.getLogger(__name__)
 @click.command(help='Start operator service')
 def worker(*args, **kwargs) -> None:
     # setup config
-    SettingsStore(*args, **kwargs)
+    settings.set(*args, **kwargs)
     try:
         asyncio.run(main())
     except Exception as e:
@@ -116,7 +116,7 @@ async def main() -> None:
             await update_exit_signatures(keystores)
 
             # submit harvest vault transaction
-            if SettingsStore().HARVEST_VAULT:
+            if settings.HARVEST_VAULT:
                 await harvest_vault()
 
         except Exception as exc:
@@ -124,7 +124,7 @@ async def main() -> None:
 
         block_processing_time = time.time() - start_time
         sleep_time = max(
-            int(SettingsStore().NETWORK_CONFIG.SECONDS_PER_BLOCK) - int(block_processing_time),
+            int(settings.NETWORK_CONFIG.SECONDS_PER_BLOCK) - int(block_processing_time),
             0
         )
         await asyncio.sleep(sleep_time)
@@ -144,20 +144,20 @@ def setup_logging() -> None:
     logging.basicConfig(
         format='%(asctime)s %(levelname)-8s %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S',
-        level=SettingsStore().LOG_LEVEL,
+        level=settings.LOG_LEVEL,
     )
     logging.getLogger('backoff').addHandler(logging.StreamHandler())
 
 
 def setup_sentry():
-    if SettingsStore().SENTRY_DSN:
+    if settings.SENTRY_DSN:
         # pylint: disable-next=import-outside-toplevel
         import sentry_sdk
 
         # pylint: disable-next=import-outside-toplevel
         from sentry_sdk.integrations.logging import ignore_logger
 
-        sentry_sdk.init(SettingsStore().SENTRY_DSN, traces_sample_rate=0.1)
-        sentry_sdk.set_tag('network', SettingsStore().NETWORK)
+        sentry_sdk.init(settings.SENTRY_DSN, traces_sample_rate=0.1)
+        sentry_sdk.set_tag('network', settings.NETWORK)
         sentry_sdk.set_tag('operator', OperatorAccount().operator_account.address)
         ignore_logger('backoff')

@@ -11,7 +11,7 @@ from src.common.execution import (
 )
 from src.common.utils import MGNO_RATE, WAD
 from src.config.networks import GNOSIS
-from src.config.settings import DEPOSIT_AMOUNT, SettingsStore
+from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.validators.consensus import get_consensus_fork
 from src.validators.database import (
     get_last_network_validator,
@@ -43,20 +43,20 @@ logger = logging.getLogger(__name__)
 async def register_validators(keystores: Keystores, deposit_data: DepositData) -> None:
     """Registers vault validators."""
     vault_balance, update_state_call = await get_withdrawable_assets()
-    if SettingsStore().NETWORK == GNOSIS:
+    if settings.NETWORK == GNOSIS:
         # apply GNO -> mGNO exchange rate
         vault_balance = Wei(int(vault_balance * MGNO_RATE // WAD))
 
     # calculate number of validators that can be registered
     validators_count: int = min(
-        SettingsStore().APPROVAL_MAX_VALIDATORS, vault_balance // DEPOSIT_AMOUNT
+        settings.APPROVAL_MAX_VALIDATORS, vault_balance // DEPOSIT_AMOUNT
     )
     if not validators_count:
         # not enough balance to register validators
         return
 
     max_fee_per_gas = await get_max_fee_per_gas()
-    if max_fee_per_gas >= Web3.to_wei(SettingsStore().MAX_FEE_PER_GAS_GWEI, 'gwei'):
+    if max_fee_per_gas >= Web3.to_wei(settings.MAX_FEE_PER_GAS_GWEI, 'gwei'):
         logging.warning('Current gas price (%s gwei) is too high. '
                         'Will try to register validator on the next block if the gas '
                         'price is acceptable.', Web3.from_wei(max_fee_per_gas, 'gwei'))
@@ -121,7 +121,7 @@ async def get_oracles_approval(
     # get exit signature shards
     request = ApprovalRequest(
         validator_index=validator_index,
-        vault_address=SettingsStore().VAULT_CONTRACT_ADDRESS,
+        vault_address=settings.VAULT_CONTRACT_ADDRESS,
         validators_root=Web3.to_hex(registry_root),
         public_keys=[],
         deposit_signatures=[],
@@ -167,7 +167,7 @@ async def load_genesis_validators() -> None:
     Load consensus network validators from the ipfs dump.
     Used to speed up service startup
     """
-    ipfs_hash = SettingsStore().NETWORK_CONFIG.GENESIS_VALIDATORS_IPFS_HASH
+    ipfs_hash = settings.NETWORK_CONFIG.GENESIS_VALIDATORS_IPFS_HASH
     if not (get_last_network_validator() is None and ipfs_hash):
         return
 

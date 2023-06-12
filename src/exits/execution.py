@@ -5,7 +5,7 @@ from web3 import Web3
 from src.common.clients import ExecutionClient
 from src.common.contracts import KeeperContract
 from src.config.networks import ETH_NETWORKS
-from src.config.settings import SettingsStore
+from src.config.settings import settings
 from src.exits.typings import OraclesApproval
 
 logger = logging.getLogger(__name__)
@@ -15,12 +15,12 @@ async def submit_exit_signatures(
     approval: OraclesApproval,
 ) -> None:
     """Sends updateExitSignatures transaction to keeper contract"""
-    if SettingsStore().NETWORK not in ETH_NETWORKS:
+    if settings.NETWORK not in ETH_NETWORKS:
         raise NotImplementedError('networks other than Ethereum not supported')
 
     logger.info('Submitting UpdateExitSignatures transaction')
     tx = await KeeperContract().contract.functions.updateExitSignatures(
-        SettingsStore().VAULT_CONTRACT_ADDRESS,
+        settings.VAULT_CONTRACT_ADDRESS,
         approval.ipfs_hash,
         approval.signatures,
     ).transact()  # type: ignore
