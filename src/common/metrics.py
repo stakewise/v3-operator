@@ -1,18 +1,28 @@
-import toml
-from prometheus_client import start_http_server, Gauge, Info
+import toml  # type: ignore
+from prometheus_client import Gauge, Info, start_http_server
+
 from src.config.settings import METRICS_HOST, METRICS_PORT
 
 
-app_version = toml.load("pyproject.toml")["tool"]["poetry"]["version"]
+class Metrics:
+    def __init__(self):
+        self.app_version = Info('app_version', 'V3 Operator version')
+        self.block_number = Gauge('block_number', 'Current block number')
+        self.slot_number = Gauge('slot_number', 'Current slot number')
+        self.last_votes_time = Gauge('last_votes_time', 'Last votes time')
+        self.operator_balance = Gauge('operator_balance', 'Current operator balance')
+        self.available_validators = Gauge(
+            'available_validators', 'Amount of validators available for registration'
+        )
 
-APP_VERSION: Info = Info('app_version', 'V3 Operator version')
-APP_VERSION.info({'version': app_version})
-BLOCK_NUMBER: Gauge = Gauge('block_number', 'Current block number')
-SLOT_NUMBER: Gauge = Gauge('slot_number', 'Current slot number')
-WALLET_INFO: Gauge = Gauge('wallet_info', 'Wallet info', labelnames=['balance','min_balance'])
-NETWORK_VALIDATORS_COUNT: Gauge = Gauge('network_validators_count', 'Current amount of validators in network')
-LAST_VOTES_TIME: Gauge = Gauge('last_votes_time', 'Last votes time')
-VAULT_BALANCE: Gauge = Gauge('vault_balance', 'Current vault balance')
+    def set_app_version(self):
+        app_version = toml.load('pyproject.toml')['tool']['poetry']['version']
+        self.app_version.info({'version': app_version})
+
+
+metrics = Metrics()
+metrics.set_app_version()
+
 
 async def metrics_server() -> None:
     start_http_server(METRICS_PORT, METRICS_HOST)

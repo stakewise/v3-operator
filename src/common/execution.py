@@ -6,7 +6,7 @@ from web3.types import ChecksumAddress, EventData, Wei
 
 from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.contracts import keeper_contract, oracles_contract
-from src.common.metrics import VAULT_BALANCE
+from src.common.metrics import metrics
 from src.common.typings import Oracles, RewardVoteInfo
 from src.common.wallet import hot_wallet
 from src.config.settings import DEFAULT_RETRY_TIME, settings
@@ -35,7 +35,7 @@ async def check_hot_wallet_balance() -> None:
 
     operator_balance = await get_operator_balance()
 
-    VAULT_BALANCE.set(operator_balance)
+    metrics.operator_balance.set(operator_balance)
 
     if (operator_balance) < operator_min_balance:
         logger.warning(
@@ -98,6 +98,10 @@ async def get_last_rewards_update() -> RewardVoteInfo | None:
         return None
 
     last_event: EventData = events[-1]
+
+    block = execution_client.eth.get_block(last_event['blockNumber'])
+    timestamp = block['timestamp']
+    metrics.last_votes_time.set(timestamp)
 
     voting_info = RewardVoteInfo(
         ipfs_hash=last_event['args']['rewardsIpfsHash'],

@@ -7,7 +7,7 @@ import click
 
 import src
 from src.common.accounts import operator_account
-from src.common.metrics import NETWORK_VALIDATORS_COUNT, metrics_server
+from src.common.metrics import metrics_server
 from src.config.settings import (
     HARVEST_VAULT,
     LOG_LEVEL,
@@ -20,9 +20,11 @@ from src.harvest.tasks import harvest_vault
 from src.startup_check import startup_checks
 from src.utils import get_build_version, log_verbose
 from src.validators.consensus import get_chain_finalized_head
-from src.validators.database import get_validators_count
 from src.validators.database import setup as validators_db_setup
-from src.validators.execution import NetworkValidatorsProcessor
+from src.validators.execution import (
+    NetworkValidatorsProcessor,
+    get_unregistered_validators_count,
+)
 from src.validators.tasks import load_genesis_validators, register_validators
 from src.validators.utils import load_deposit_data, load_keystores
 
@@ -81,11 +83,9 @@ async def main() -> None:
             to_block = chain_state.execution_block
             # process new network validators
             await network_validators_scanner.process_new_events(to_block)
-            # update network validators count
-            NETWORK_VALIDATORS_COUNT.set(get_validators_count())
             # check and register new validators
+            await get_unregistered_validators_count(keystores, deposit_data)
             await register_validators(keystores, deposit_data)
-
             # process outdated exit signatures
             await update_exit_signatures(keystores)
 
