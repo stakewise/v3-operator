@@ -25,7 +25,6 @@ class Database:
 
 
 class ExecutionClient:
-    # @cache
     @property
     def client(self) -> Web3:
         operator_account = OperatorAccount().operator_account
@@ -36,7 +35,6 @@ class ExecutionClient:
 
 
 class ConsensusClient:
-    # @cache
     @property
     def client(self) -> ExtendedAsyncBeacon:
         return get_consensus_client(SettingsStore().CONSENSUS_ENDPOINT)

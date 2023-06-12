@@ -51,7 +51,3 @@ class OraclesContract(ContractWrapper):
 class KeeperContract(ContractWrapper):
     abi_path = 'abi/IKeeper.json'
     settings_key = 'KEEPER_CONTRACT_ADDRESS'
-    #
-    # @backoff_aiohttp_errors(max_time=300)
-    # async def can_harvest(self, vault_address: ChecksumAddress) -> bool:
-    #     return await self.contract.functions.canHarvest(vault_address).call()
