@@ -9,7 +9,7 @@ from src.commands.create_keys import create_keys
 from src.commands.create_wallet import create_wallet
 from src.commands.init import init
 from src.commands.merge_deposit_data import merge_deposit_data
-from src.commands.worker import worker
+from src.commands.worker import start
 
 
 @click.group()
@@ -21,7 +21,7 @@ cli.add_command(init)
 cli.add_command(create_keys)
 cli.add_command(create_wallet)
 cli.add_command(merge_deposit_data)
-cli.add_command(worker)
+cli.add_command(start)
 
 
 if __name__ == '__main__':

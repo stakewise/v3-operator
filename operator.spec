@@ -3,9 +3,22 @@ from PyInstaller.utils.hooks import collect_data_files
 from sys import platform
 
 if platform == "linux" or platform == "linux2":
-    datas = [('src/common/abi/*', 'src/common/abi/'), ('./pyproject.toml', '.'), ('./GIT_SHA', '.'), ('/usr/lib/x86_64-linux-gnu/libssl.so.1.1', '.'), ('/usr/lib/x86_64-linux-gnu/libcrypto.so.1.1', '.'), ('/usr/lib/x86_64-linux-gnu/libffi.so.7', '.')]
+    datas = [
+        ('src/common/abi/*', 'src/common/abi/'),
+        ('src/common/word_lists/*', 'src/common/word_lists/'),
+        ('./pyproject.toml', '.'),
+        ('./GIT_SHA', '.'),
+        ('/usr/lib/x86_64-linux-gnu/libssl.so.1.1', '.'),
+        ('/usr/lib/x86_64-linux-gnu/libcrypto.so.1.1', '.'),
+        ('/usr/lib/x86_64-linux-gnu/libffi.so.7', '.')
+    ]
 else:
-    datas = [('src/common/abi/*', 'src/common/abi/'), ('./pyproject.toml', '.'), ('./GIT_SHA', '.')]
+    datas = [
+      ('src/common/abi/*', 'src/common/abi/'),
+      ('src/common/word_lists/*', 'src/common/word_lists/'),
+      ('./pyproject.toml', '.'),
+      ('./GIT_SHA', '.')
+     ]
 
 datas += collect_data_files('certifi')
 

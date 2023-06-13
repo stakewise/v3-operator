@@ -39,9 +39,6 @@ from src.validators.typings import (
     Validator,
 )
 
-# VALIDATORS_REGISTRY_GENESIS_BLOCK: BlockNumber = NETWORK_CONFIG.VALIDATORS_REGISTRY_GENESIS_BLOCK
-# GENESIS_FORK_VERSION: bytes = NETWORK_CONFIG.GENESIS_FORK_VERSION
-
 logger = logging.getLogger(__name__)
 
 
