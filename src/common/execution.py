@@ -5,7 +5,7 @@ from web3 import Web3
 from web3.types import ChecksumAddress, EventData, Wei
 
 from src.common.accounts import operator_account
-from src.common.clients import IpfsFetchRetryClient, execution_client
+from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.contracts import keeper_contract, oracles_contract
 from src.common.typings import Oracles, RewardVoteInfo
 from src.config.settings import DEFAULT_RETRY_TIME, settings
@@ -51,7 +51,7 @@ async def get_oracles() -> Oracles:
 
     # fetch IPFS record
     ipfs_hash = events[-1]['args']['configIpfsHash']
-    config: dict = await IpfsFetchRetryClient().fetch_json(ipfs_hash)  # type: ignore
+    config: dict = await ipfs_fetch_client.fetch_json(ipfs_hash)  # type: ignore
     threshold = await oracles_contract.functions.requiredOracles().call()
 
     endpoints = []

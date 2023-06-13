@@ -48,19 +48,21 @@ class ConsensusClient:
         return getattr(self.client, item)
 
 
-class IpfsFetchRetryClient(IpfsFetchClient):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs, endpoints=settings.IPFS_FETCH_ENDPOINTS)
+class IpfsFetchRetryClient:
+    @cached_property
+    def client(self) -> IpfsFetchClient:
+        return IpfsFetchClient(endpoints=settings.IPFS_FETCH_ENDPOINTS)
 
     @backoff.on_exception(backoff.expo, IpfsException, max_time=DEFAULT_RETRY_TIME)
     async def fetch_bytes(self, ipfs_hash: str) -> bytes:
-        return await super().fetch_bytes(ipfs_hash)
+        return await self.client.fetch_bytes(ipfs_hash)
 
     @backoff.on_exception(backoff.expo, IpfsException, max_time=DEFAULT_RETRY_TIME)
     async def fetch_json(self, ipfs_hash: str) -> dict | list:
-        return await super().fetch_json(ipfs_hash)
+        return await self.client.fetch_json(ipfs_hash)
 
 
 db_client = Database()
 execution_client = ExecutionClient()
 consensus_client = ConsensusClient()
+ipfs_fetch_client = IpfsFetchRetryClient()

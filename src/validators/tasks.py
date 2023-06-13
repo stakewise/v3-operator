@@ -3,7 +3,7 @@ import logging
 from web3 import Web3
 from web3.types import BlockNumber, Wei
 
-from src.common.clients import IpfsFetchRetryClient
+from src.common.clients import ipfs_fetch_client
 from src.common.execution import (
     check_operator_balance,
     get_max_fee_per_gas,
@@ -167,7 +167,7 @@ async def load_genesis_validators() -> None:
     if not (NetworkValidatorCrud().get_last_network_validator() is None and ipfs_hash):
         return
 
-    data = await IpfsFetchRetryClient().fetch_bytes(ipfs_hash)
+    data = await ipfs_fetch_client.fetch_bytes(ipfs_hash)
     genesis_validators: list[NetworkValidator] = []
     logger.info('Loading genesis validators...')
     for i in range(0, len(data), 52):
