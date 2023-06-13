@@ -4,7 +4,7 @@ from sw_utils.decorators import backoff_aiohttp_errors
 from web3 import Web3
 from web3.types import ChecksumAddress, EventData, Wei
 
-from src.common.accounts import OperatorAccount
+from src.common.accounts import operator_account
 from src.common.clients import IpfsFetchRetryClient, execution_client
 from src.common.contracts import keeper_contract, oracles_contract
 from src.common.typings import Oracles, RewardVoteInfo
@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 @backoff_aiohttp_errors(max_time=300)
 async def get_operator_balance() -> Wei:
-    operator_account = OperatorAccount().operator_account
     return await execution_client.eth.get_balance(operator_account.address)  # type: ignore
 
 

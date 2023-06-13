@@ -1,5 +1,6 @@
 import json
 import os.path
+from functools import cached_property
 
 from eth_account import Account
 from eth_account.account import LocalAccount
@@ -9,8 +10,8 @@ from src.config.settings import settings
 
 class OperatorAccount:
 
-    @property
-    def operator_account(self) -> LocalAccount:
+    @cached_property
+    def account(self) -> LocalAccount:
         HOT_WALLET_PRIVATE_KEY = settings.HOT_WALLET_PRIVATE_KEY
         HOT_WALLET_KEYSTORE_PATH = settings.HOT_WALLET_KEYSTORE_PATH
         HOT_WALLET_KEYSTORE_PASSWORD_PATH = settings.HOT_WALLET_KEYSTORE_PASSWORD_PATH
@@ -35,3 +36,9 @@ class OperatorAccount:
 
         raise ValueError('Provide HOT_WALLET_PRIVATE_KEY setting or combination of '
                          'HOT_WALLET_KEYSTORE_PATH and HOT_WALLET_KEYSTORE_PASSWORD_PATH settings')
+
+    def __getattr__(self, item):
+        return getattr(self.account, item)
+
+
+operator_account = OperatorAccount()

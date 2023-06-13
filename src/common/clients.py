@@ -13,7 +13,7 @@ from sw_utils import (
 )
 from web3 import Web3
 
-from src.common.accounts import OperatorAccount
+from src.common.accounts import operator_account
 from src.config.settings import DEFAULT_RETRY_TIME, settings
 
 
@@ -28,9 +28,10 @@ class Database:
 class ExecutionClient:
     @cached_property
     def client(self) -> Web3:
-        operator_account = OperatorAccount().operator_account
         w3 = get_execution_client(settings.EXECUTION_ENDPOINT)
-        w3.middleware_onion.add(construct_async_sign_and_send_raw_middleware(operator_account))
+        w3.middleware_onion.add(
+            construct_async_sign_and_send_raw_middleware(operator_account.account)
+        )
         w3.eth.default_account = operator_account.address
         return w3
 

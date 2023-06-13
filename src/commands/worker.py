@@ -6,7 +6,7 @@ import click
 from sw_utils import EventScanner, InterruptHandler
 
 import src
-from src.common.accounts import OperatorAccount
+from src.common.accounts import operator_account
 from src.common.validators import validate_eth_address
 from src.config.settings import AVAILABLE_NETWORKS, settings
 from src.exits.tasks import update_exit_signatures
@@ -165,5 +165,5 @@ def setup_sentry():
 
         sentry_sdk.init(settings.SENTRY_DSN, traces_sample_rate=0.1)
         sentry_sdk.set_tag('network', settings.NETWORK)
-        sentry_sdk.set_tag('operator', OperatorAccount().operator_account.address)
+        sentry_sdk.set_tag('operator', operator_account.address)
         ignore_logger('backoff')

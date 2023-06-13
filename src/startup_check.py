@@ -6,7 +6,7 @@ from os import path
 from aiohttp import ClientSession, ClientTimeout
 from sw_utils import IpfsFetchClient
 
-from src.common.accounts import OperatorAccount
+from src.common.accounts import operator_account
 from src.common.clients import consensus_client, db_client, execution_client
 from src.common.execution import check_operator_balance, get_oracles
 from src.common.utils import count_files_in_folder
@@ -111,7 +111,7 @@ async def wait_for_keystore_files() -> None:
 
 
 async def startup_checks():
-    logger.info('Checking operator account %s...', OperatorAccount().operator_account.address)
+    logger.info('Checking operator account %s...', operator_account.address)
 
     await check_operator_balance()
 
