@@ -36,7 +36,7 @@ from src.common.validators import validate_eth_address, validate_mnemonic
 @click.option(
     '--data-dir',
     required=False,
-    help='Path where the vault data will be places. '
+    help='Path where the vault data will be placed. '
     'Defaults to ~/.stakewise/<vault>',
     type=click.Path(exists=False, file_okay=False, dir_okay=True),
 )
@@ -56,7 +56,7 @@ async def create_keys(
     )
     if first_public_key != config.first_public_key:
         raise click.ClickException(
-            'Invalid mnemonic. Another mnemonic was already used for keys generation'
+            'Invalid mnemonic. Please use mnemonic provided at init command.'
         )
 
     deposit_data_file = config.data_dir / 'deposit_data.json'

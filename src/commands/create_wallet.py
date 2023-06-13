@@ -30,7 +30,7 @@ from src.config.settings import DATA_DIR
 @click.option(
     '--data-dir',
     required=False,
-    help='Path where the vault data will be places. '
+    help='Path where the vault data will be placed. '
     'Defaults to ~/.stakewise/<vault>',
     type=click.Path(exists=False, file_okay=False, dir_okay=True),
 )

@@ -19,7 +19,7 @@ async def submit_exit_signatures(
         raise NotImplementedError('networks other than Ethereum not supported')
 
     logger.info('Submitting UpdateExitSignatures transaction')
-    tx = await keeper_contract.contract.functions.updateExitSignatures(
+    tx = await keeper_contract.functions.updateExitSignatures(
         settings.VAULT_CONTRACT_ADDRESS,
         approval.ipfs_hash,
         approval.signatures,

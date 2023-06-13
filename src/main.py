@@ -9,7 +9,7 @@ from src.commands.create_keys import create_keys
 from src.commands.create_wallet import create_wallet
 from src.commands.init import init
 from src.commands.merge_deposit_data import merge_deposit_data
-from src.commands.worker import start
+from src.commands.start import start
 
 
 @click.group()

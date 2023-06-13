@@ -23,11 +23,12 @@ class TestCreateMnemonic(unittest.TestCase):
             '--network',
             'goerli'
         ]
-        result = runner.invoke(init, args, input=f'a\n{mnemonic}\n')
-        assert result.exit_code == 0
-        mnemonic_mock.assert_called_once()
-        assert mnemonic in result.output.strip()
-        assert 'Successfully initialized configuration' in result.output.strip()
+        with runner.isolated_filesystem():
+            result = runner.invoke(init, args, input=f'a\n{mnemonic}\n')
+            assert result.exit_code == 0
+            mnemonic_mock.assert_called_once()
+            assert mnemonic in result.output.strip()
+            assert 'Successfully initialized configuration' in result.output.strip()
 
     def test_bad_verify(self, mnemonic_mock):
         vault = faker.eth_address()
@@ -40,11 +41,12 @@ class TestCreateMnemonic(unittest.TestCase):
             '--network',
             'goerli'
         ]
-        result = runner.invoke(init, args, input=f'a\n{mnemonic} bad\na\n{mnemonic}\n')
-        assert result.exit_code == 0
-        mnemonic_mock.assert_called_once()
-        assert mnemonic in result.output.strip()
-        assert 'Successfully initialized configuration' in result.output.strip()
+        with runner.isolated_filesystem():
+            result = runner.invoke(init, args, input=f'a\n{mnemonic} bad\na\n{mnemonic}\n')
+            assert result.exit_code == 0
+            mnemonic_mock.assert_called_once()
+            assert mnemonic in result.output.strip()
+            assert 'Successfully initialized configuration' in result.output.strip()
 
     def test_no_verify(self, mnemonic_mock):
         vault = faker.eth_address()
@@ -58,14 +60,16 @@ class TestCreateMnemonic(unittest.TestCase):
             '--network',
             'goerli'
         ]
-        result = runner.invoke(init, args)
-        assert result.exit_code == 0
-        mnemonic_mock.assert_called_once()
-        assert mnemonic == result.output.strip()
+        with runner.isolated_filesystem():
+            result = runner.invoke(init, args)
+            assert result.exit_code == 0
+            mnemonic_mock.assert_called_once()
+            assert mnemonic == result.output.strip()
 
     def test_bad_language(self, *args):
         runner = CliRunner()
         args = ['--language', 'bad', '--no-verify']
-        result = runner.invoke(init, args)
-        assert result.exit_code == 2
-        assert "Invalid value for '--language': 'bad' is not one of" in result.output.strip()
+        with runner.isolated_filesystem():
+            result = runner.invoke(init, args)
+            assert result.exit_code == 2
+            assert "Invalid value for '--language': 'bad' is not one of" in result.output.strip()

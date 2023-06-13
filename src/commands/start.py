@@ -53,17 +53,17 @@ logger = logging.getLogger(__name__)
 @click.option('--keystores-password-file', type=str,
               help='Absolute path to the password file for decrypting keystores')
 @click.option('--keystores-password-dir', type=str,
-              help='Absolute path to the password file for decrypting keystores')
+              help='Absolute path to the password directory for decrypting keystores')
 @click.option('--keystores-path', type=str,
               help='Absolute path to the directory with all the encrypted keystores')
 @click.option('--deposit-data-path', type=str,
               help='Path to the deposit_data.json file')
 @click.option('--hot-wallet-private-key', type=str,
-              help='Private key of the hot wallet with ETH for submitting transactions')
+              help='Private key of the hot wallet for submitting transactions')
 @click.option('--hot-wallet-keystore-path', type=str,
-              help='Absolute path to the directory with all the encrypted keystores')
+              help='Absolute path to the hot wallet')
 @click.option('--hot-wallet-keystore-password-path', type=str,
-              help='Absolute path to the password file for decrypting keystores')
+              help='Absolute path to the password file for hot wallet')
 @click.option('-v', '--verbose', help='Enable debug mode', is_flag=True)
 @click.command(help='Start operator service')
 def start(*args, **kwargs) -> None:
