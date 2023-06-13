@@ -3,17 +3,13 @@ import os
 import unittest
 
 from click.testing import CliRunner
-from staking_deposit.key_handling.key_derivation.mnemonic import get_mnemonic
 
 import src
 from src.commands.create_keys import create_keys
 from src.commands.init import init
-from src.common.language import WORD_LISTS_PATH
 from src.config.settings import DATA_DIR
 
 from .factories import faker
-
-mnemonic = get_mnemonic(language='english', words_path=WORD_LISTS_PATH)
 
 
 class TestCreateKeys(unittest.TestCase):
@@ -21,25 +17,27 @@ class TestCreateKeys(unittest.TestCase):
         vault = faker.eth_address()
         count = 5
         runner = CliRunner()
-        args = [
-            '--mnemonic',
-            f'"{mnemonic}"',
-            '--count',
-            count,
-            '--vault',
-            vault
-        ]
-        args_init = [
-            '--language',
-            'english',
-            '--no-verify',
-            '--vault',
-            vault,
-            '--network',
-            'goerli'
-        ]
+
         with runner.isolated_filesystem():
-            runner.invoke(init, args_init)
+            args_init = [
+                '--language',
+                'english',
+                '--no-verify',
+                '--vault',
+                vault,
+                '--network',
+                'goerli'
+            ]
+            init_result = runner.invoke(init, args_init)
+            mnemonic = init_result.output.strip()
+            args = [
+                '--mnemonic',
+                f'"{mnemonic}"',
+                '--count',
+                count,
+                '--vault',
+                vault
+            ]
             result = runner.invoke(create_keys, args)
             assert result.exit_code == 0
 

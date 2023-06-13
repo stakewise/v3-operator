@@ -30,7 +30,7 @@ class TestCreateWallet(unittest.TestCase):
             result = runner.invoke(create_wallet, args)
             assert result.exit_code == 0
             filename = 'wallet.json'
-            output = f'Done. Wallet {filename} saved to\n'
+            output = 'Done. The wallet and password saved to'
             assert output.strip() in result.output.strip()
             with open(f'{vault_dir}/wallet/{filename}', encoding='utf-8') as f:
                 data = json.load(f)
