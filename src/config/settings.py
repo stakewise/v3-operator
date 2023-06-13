@@ -222,10 +222,6 @@ class Settings(metaclass=Singleton):
         return self.sentry_dsn
 
     @property
-    def NETWORK_VALIDATORS_TABLE(self) -> str:
-        return f'{self.NETWORK}_network_validators'
-
-    @property
     def VAULT_CONFIG(self) -> str:
         return f'{self.NETWORK}_network_validators'
 

@@ -22,7 +22,7 @@ from web3 import Web3
 from src.common.clients import ConsensusClient
 from src.common.typings import Oracles
 from src.config.settings import DEFAULT_RETRY_TIME, settings
-from src.validators.database import get_next_validator_index
+from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import (
     KeystoreException,
     RegistryRootChangedError,
@@ -92,7 +92,7 @@ async def send_approval_request(
             raise RegistryRootChangedError from e
 
         latest_public_keys = await get_latest_network_validator_public_keys()
-        validator_index = get_next_validator_index(list(latest_public_keys))
+        validator_index = NetworkValidatorCrud().get_next_validator_index(list(latest_public_keys))
         if validator_index != payload['validator_index']:
             raise ValidatorIndexChangedError from e
 

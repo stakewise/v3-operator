@@ -26,11 +26,7 @@ from src.config.settings import (
     DEPOSIT_AMOUNT_GWEI,
     settings,
 )
-from src.validators.database import (
-    get_last_network_validator,
-    is_validator_registered,
-    save_network_validators,
-)
+from src.validators.database import NetworkValidatorCrud
 from src.validators.typings import (
     DepositData,
     Keystores,
@@ -51,7 +47,7 @@ class NetworkValidatorsProcessor(EventProcessor):
 
     @staticmethod
     async def get_from_block() -> BlockNumber:
-        last_validator = get_last_network_validator()
+        last_validator = NetworkValidatorCrud().get_last_network_validator()
         if not last_validator:
             return settings.NETWORK_CONFIG.VALIDATORS_REGISTRY_GENESIS_BLOCK
 
@@ -60,7 +56,7 @@ class NetworkValidatorsProcessor(EventProcessor):
     @staticmethod
     async def process_events(events: list[EventData]) -> None:
         validators = process_network_validator_events(events)
-        save_network_validators(validators)
+        NetworkValidatorCrud().save_network_validators(validators)
 
 
 def process_network_validator_events(events: list[EventData]) -> list[NetworkValidator]:
@@ -102,7 +98,7 @@ def process_network_validator_event(event: EventData) -> HexStr | None:
 @backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
 async def get_latest_network_validator_public_keys() -> Set[HexStr]:
     """Fetches the latest network validator public keys."""
-    last_validator = get_last_network_validator()
+    last_validator = NetworkValidatorCrud().get_last_network_validator()
     if last_validator:
         from_block = BlockNumber(last_validator.block_number + 1)
     else:
@@ -211,7 +207,7 @@ async def get_available_validators(
             )
             break
 
-        if is_validator_registered(validator.public_key):
+        if NetworkValidatorCrud().is_validator_registered(validator.public_key):
             logger.warning(
                 'Validator with public key %s is already registered.'
                 ' You must upload new deposit data.',

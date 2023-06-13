@@ -13,11 +13,7 @@ from src.common.utils import MGNO_RATE, WAD
 from src.config.networks import GNOSIS
 from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.validators.consensus import get_consensus_fork
-from src.validators.database import (
-    get_last_network_validator,
-    get_next_validator_index,
-    save_network_validators,
-)
+from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import (
     get_available_validators,
     get_latest_network_validator_public_keys,
@@ -110,7 +106,7 @@ async def get_oracles_approval(
 
     # get next validator index for exit signature
     latest_public_keys = await get_latest_network_validator_public_keys()
-    validator_index = get_next_validator_index(list(latest_public_keys))
+    validator_index = NetworkValidatorCrud().get_next_validator_index(list(latest_public_keys))
     start_validator_index = validator_index
     logger.debug('Next validator index for exit signature: %d', validator_index)
 
@@ -168,7 +164,7 @@ async def load_genesis_validators() -> None:
     Used to speed up service startup
     """
     ipfs_hash = settings.NETWORK_CONFIG.GENESIS_VALIDATORS_IPFS_HASH
-    if not (get_last_network_validator() is None and ipfs_hash):
+    if not (NetworkValidatorCrud().get_last_network_validator() is None and ipfs_hash):
         return
 
     data = await IpfsFetchRetryClient().fetch_bytes(ipfs_hash)
@@ -182,5 +178,5 @@ async def load_genesis_validators() -> None:
             )
         )
 
-    save_network_validators(genesis_validators)
+    NetworkValidatorCrud().save_network_validators(genesis_validators)
     logger.info('Loaded %d genesis validators', len(genesis_validators))
