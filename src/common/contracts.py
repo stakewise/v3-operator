@@ -1,5 +1,6 @@
 import json
 import os
+from functools import cached_property
 
 from web3.contract import AsyncContract
 from web3.types import ChecksumAddress
@@ -16,7 +17,7 @@ class ContractWrapper:
     def contract_address(self) -> ChecksumAddress:
         return getattr(settings.NETWORK_CONFIG, self.settings_key)
 
-    @property
+    @cached_property
     def contract(self) -> AsyncContract:
         current_dir = os.path.dirname(__file__)
         with open(os.path.join(current_dir, self.abi_path), encoding='utf-8') as f:
@@ -25,16 +26,16 @@ class ContractWrapper:
             abi=abi, address=self.contract_address
         )  # type: ignore
 
+    def __getattr__(self, item):
+        return getattr(self.contract, item)
+
 
 class VaultContract(ContractWrapper):
     abi_path = 'abi/IEthVault.json'
 
-    def __init__(self):
-        self.address = settings.VAULT_CONTRACT_ADDRESS
-
     @property
     def contract_address(self) -> ChecksumAddress:
-        return self.address
+        return settings.VAULT_CONTRACT_ADDRESS
 
 
 class ValidatorsRegistryContract(ContractWrapper):
@@ -50,3 +51,9 @@ class OraclesContract(ContractWrapper):
 class KeeperContract(ContractWrapper):
     abi_path = 'abi/IKeeper.json'
     settings_key = 'KEEPER_CONTRACT_ADDRESS'
+
+
+vault_contract = VaultContract()
+validators_registry_contract = ValidatorsRegistryContract()
+oracles_contract = OraclesContract()
+keeper_contract = KeeperContract()

@@ -16,7 +16,7 @@ from web3 import Web3
 from web3.types import EventData, Wei
 
 from src.common.clients import execution_client
-from src.common.contracts import ValidatorsRegistryContract, VaultContract
+from src.common.contracts import validators_registry_contract, vault_contract
 from src.common.execution import get_last_rewards_update
 from src.common.ipfs import fetch_harvest_params
 from src.config.networks import ETH_NETWORKS
@@ -43,7 +43,7 @@ class NetworkValidatorsProcessor(EventProcessor):
 
     @property
     def contract(self):
-        return ValidatorsRegistryContract().contract
+        return validators_registry_contract
 
     @staticmethod
     async def get_from_block() -> BlockNumber:
@@ -104,7 +104,7 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
     else:
         from_block = settings.NETWORK_CONFIG.VALIDATORS_REGISTRY_GENESIS_BLOCK
 
-    new_events = await ValidatorsRegistryContract().contract.events.DepositEvent.get_logs(
+    new_events = await validators_registry_contract.events.DepositEvent.get_logs(
         from_block=from_block
     )
     new_public_keys: Set[HexStr] = set()
@@ -119,7 +119,6 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
 @backoff_aiohttp_errors(max_time=300)
 async def get_withdrawable_assets() -> tuple[Wei, HexStr | None]:
     """Fetches vault's available assets for staking."""
-    vault_contract = VaultContract().contract
     before_update_assets = await vault_contract.functions.withdrawableAssets().call()
 
     last_rewards = await get_last_rewards_update()
@@ -163,19 +162,19 @@ async def get_withdrawable_assets() -> tuple[Wei, HexStr | None]:
 @backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
 async def get_validators_registry_root() -> Bytes32:
     """Fetches the latest validators registry root."""
-    return await ValidatorsRegistryContract().contract.functions.get_deposit_root().call()
+    return await validators_registry_contract.functions.get_deposit_root().call()
 
 
 @backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
 async def get_vault_validators_root() -> Bytes32:
     """Fetches vault's validators root."""
-    return await VaultContract().contract.functions.validatorsRoot().call()
+    return await vault_contract.functions.validatorsRoot().call()
 
 
 @backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
 async def get_vault_validators_index() -> int:
     """Fetches vault's current validators index."""
-    return await VaultContract().contract.functions.validatorIndex().call()
+    return await vault_contract.functions.validatorIndex().call()
 
 
 async def check_deposit_data_root(deposit_data_root: str) -> None:
@@ -244,7 +243,6 @@ async def register_single_validator(
         ),
         proof,
     ]
-    vault_contract = VaultContract().contract
     if update_state_call is not None:
         register_call = vault_contract.encodeABI(
             fn_name='registerValidator',
@@ -297,7 +295,6 @@ async def register_multiple_validator(
         multi_proof.proof_flags,
         multi_proof.proof,
     ]
-    vault_contract = VaultContract().contract
     if update_call is not None:
         register_call = vault_contract.encodeABI(
             fn_name='registerValidators',

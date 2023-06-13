@@ -3,7 +3,7 @@ import logging
 from web3 import Web3
 
 from src.common.clients import execution_client
-from src.common.contracts import KeeperContract
+from src.common.contracts import keeper_contract
 from src.config.networks import ETH_NETWORKS
 from src.config.settings import settings
 from src.exits.typings import OraclesApproval
@@ -19,7 +19,7 @@ async def submit_exit_signatures(
         raise NotImplementedError('networks other than Ethereum not supported')
 
     logger.info('Submitting UpdateExitSignatures transaction')
-    tx = await KeeperContract().contract.functions.updateExitSignatures(
+    tx = await keeper_contract.contract.functions.updateExitSignatures(
         settings.VAULT_CONTRACT_ADDRESS,
         approval.ipfs_hash,
         approval.signatures,

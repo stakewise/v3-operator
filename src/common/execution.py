@@ -6,7 +6,7 @@ from web3.types import ChecksumAddress, EventData, Wei
 
 from src.common.accounts import OperatorAccount
 from src.common.clients import IpfsFetchRetryClient, execution_client
-from src.common.contracts import KeeperContract, OraclesContract
+from src.common.contracts import keeper_contract, oracles_contract
 from src.common.typings import Oracles, RewardVoteInfo
 from src.config.settings import DEFAULT_RETRY_TIME, settings
 
@@ -23,7 +23,7 @@ async def get_operator_balance() -> Wei:
 
 @backoff_aiohttp_errors(max_time=300)
 async def can_harvest(vault_address: ChecksumAddress) -> bool:
-    return await KeeperContract().contract.functions.canHarvest(vault_address).call()
+    return await keeper_contract.functions.canHarvest(vault_address).call()
 
 
 async def check_operator_balance() -> None:
@@ -44,7 +44,7 @@ async def check_operator_balance() -> None:
 @backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
 async def get_oracles() -> Oracles:
     """Fetches oracles config."""
-    events = await OraclesContract().contract.events.ConfigUpdated.get_logs(
+    events = await oracles_contract.events.ConfigUpdated.get_logs(
         from_block=settings.NETWORK_CONFIG.ORACLES_GENESIS_BLOCK
     )
     if not events:
@@ -53,7 +53,7 @@ async def get_oracles() -> Oracles:
     # fetch IPFS record
     ipfs_hash = events[-1]['args']['configIpfsHash']
     config: dict = await IpfsFetchRetryClient().fetch_json(ipfs_hash)  # type: ignore
-    threshold = await OraclesContract().contract.functions.requiredOracles().call()
+    threshold = await oracles_contract.functions.requiredOracles().call()
 
     endpoints = []
     public_keys = []
@@ -82,7 +82,7 @@ async def get_last_rewards_update() -> RewardVoteInfo | None:
         SECONDS_PER_MONTH // settings.NETWORK_CONFIG.SECONDS_PER_BLOCK
     )
     block_number = await execution_client.eth.get_block_number()  # type: ignore
-    events = await KeeperContract().contract.events.RewardsUpdated.get_logs(
+    events = await keeper_contract.events.RewardsUpdated.get_logs(
         from_block=max(
             int(settings.NETWORK_CONFIG.KEEPER_GENESIS_BLOCK),
             block_number - approx_blocks_per_month,
