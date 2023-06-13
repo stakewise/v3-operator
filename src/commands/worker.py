@@ -8,7 +8,7 @@ from sw_utils import EventScanner, InterruptHandler
 import src
 from src.common.accounts import OperatorAccount
 from src.common.validators import validate_eth_address
-from src.config.settings import AVAILABLE_NETWORKS, GOERLI, settings
+from src.config.settings import AVAILABLE_NETWORKS, settings
 from src.exits.tasks import update_exit_signatures
 from src.harvest.tasks import harvest_vault
 from src.startup_check import startup_checks
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 @click.option(
     '--network',
-    default=GOERLI,
+    required=False,
     help='The network of the Vault',
     prompt='Enter the network name',
     type=click.Choice(
@@ -34,6 +34,12 @@ logger = logging.getLogger(__name__)
 )
 @click.option('--vault', type=str,
               help='Address of the Vault to register validators for', callback=validate_eth_address)
+@click.option(
+    '--data-dir',
+    required=False,
+    help='Path where the vault data is placed. Defaults to ~/.stakewise/<vault>',
+    type=click.Path(exists=False, file_okay=False, dir_okay=True),
+)
 @click.option('--database-dir', type=str,
               help='The directory where the database will be created or read from')
 @click.option('--execution-endpoint', type=str,
@@ -42,6 +48,8 @@ logger = logging.getLogger(__name__)
               help='API endpoint for the consensus node')
 @click.option('--max-fee-per-gas-gwei', type=int,
               help='Maximum fee per gas limit')
+@click.option('--harvest-vault', type=bool,
+              help='Periodically submit vault harvest transaction')
 @click.option('--keystores-password-file', type=str,
               help='Absolute path to the password file for decrypting keystores')
 @click.option('--keystores-password-dir', type=str,
@@ -56,11 +64,9 @@ logger = logging.getLogger(__name__)
               help='Absolute path to the directory with all the encrypted keystores')
 @click.option('--hot-wallet-keystore-password-path', type=str,
               help='Absolute path to the password file for decrypting keystores')
-@click.option('--harvest-vault', type=bool,
-              help='Periodically submit vault harvest transaction')
 @click.option('-v', '--verbose', help='Enable debug mode', is_flag=True)
 @click.command(help='Start operator service')
-def worker(*args, **kwargs) -> None:
+def start(*args, **kwargs) -> None:
     # setup config
     settings.set(*args, **kwargs)
     try:

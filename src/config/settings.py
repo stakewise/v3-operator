@@ -1,5 +1,4 @@
 import os
-from dataclasses import dataclass
 from pathlib import Path
 
 from decouple import Choices, Csv
@@ -21,40 +20,41 @@ class Singleton(type):
         return cls._instances[cls]
 
 
-@dataclass
 # pylint: disable-next=too-many-public-methods
 class Settings(metaclass=Singleton):
-    verbose: bool | None = None
-    log_level: str | None = None
-    network: str | None = None
-    execution_endpoint: str | None = None
-    consensus_endpoint: str | None = None
-    ipfs_fetch_endpoints: list[str] | None = None
-    vault: str | None = None
-    database_dir: str | None = None
-    keystores_path: Path | None = None
-    keystores_password_file: Path | None = None
-    keystores_password_dir: Path | None = None
-    deposit_data_path: Path | None = None
-    hot_wallet_private_key: str | None = None
-    hot_wallet_keystore_path: Path | None = None
-    hot_wallet_keystore_password_path: Path | None = None
-    harvest_vault: bool | None = None
-    max_fee_per_gas_gwei: int | None = None
-    approval_max_validators: int | None = None
-    validators_fetch_chunk_size: int | None = None
-    sentry_dsn: str | None = None
+    verbose: bool
+    log_level: str
+    network: str
+    data_dir: Path
+    execution_endpoint: str
+    consensus_endpoint: str
+    ipfs_fetch_endpoints: list[str]
+    vault: str
+    database_dir: str
+    keystores_path: Path
+    keystores_password_file: Path
+    keystores_password_dir: Path
+    deposit_data_path: Path
+    hot_wallet_private_key: str
+    hot_wallet_keystore_path: Path
+    hot_wallet_keystore_password_path: Path
+    harvest_vault: bool
+    max_fee_per_gas_gwei: int
+    approval_max_validators: int
+    validators_fetch_chunk_size: int
+    sentry_dsn: str
 
     # pylint: disable-next=too-many-arguments,too-many-locals
     def set(
         self,
-        verbose:  bool | None = None,
-        log_level:  str | None = None,
-        network:  str | None = None,
-        execution_endpoint:  str | None = None,
-        consensus_endpoint:  str | None = None,
-        ipfs_fetch_endpoints:  list[str] | None = None,
-        vault:  str | None = None,
+        data_dir: Path | None = None,
+        network: str | None = None,
+        vault: str | None = None,
+        verbose: bool | None = None,
+        log_level: str | None = None,
+        execution_endpoint: str | None = None,
+        consensus_endpoint: str | None = None,
+        ipfs_fetch_endpoints: list[str] | None = None,
         database_dir: str | None = None,
         keystores_path: Path | None = None,
         keystores_password_file: Path | None = None,
@@ -69,38 +69,65 @@ class Settings(metaclass=Singleton):
         validators_fetch_chunk_size: int | None = None,
         sentry_dsn: str | None = None,
     ):
-        self.verbose = verbose
-        self.log_level = log_level
-        self.network = network
-        self.execution_endpoint = execution_endpoint
-        self.consensus_endpoint = consensus_endpoint
-        self.ipfs_fetch_endpoints = ipfs_fetch_endpoints
-        self.vault = vault
-        self.database_dir = database_dir
-        self.keystores_path = keystores_path
-        self.keystores_password_file = keystores_password_file
-        self.keystores_password_dir = keystores_password_dir
-        self.deposit_data_path = deposit_data_path
-        self.hot_wallet_private_key = hot_wallet_private_key
-        self.hot_wallet_keystore_path = hot_wallet_keystore_path
-        self.hot_wallet_keystore_password_path = hot_wallet_keystore_password_path
-        self.harvest_vault = harvest_vault
-        self.max_fee_per_gas_gwei = max_fee_per_gas_gwei
-        self.approval_max_validators = approval_max_validators
-        self.validators_fetch_chunk_size = validators_fetch_chunk_size
-        self.sentry_dsn = sentry_dsn
+        self.network = network or decouple_config('NETWORK', cast=Choices([GOERLI]))
+        self.verbose = verbose or decouple_config('VERBOSE', default=False)
+        self.log_level = log_level or decouple_config('LOG_LEVEL', default='INFO')
+        self.execution_endpoint = execution_endpoint or decouple_config('EXECUTION_ENDPOINT')
+        self.consensus_endpoint = consensus_endpoint or decouple_config('CONSENSUS_ENDPOINT')
+        self.ipfs_fetch_endpoints = ipfs_fetch_endpoints or decouple_config(
+            'IPFS_FETCH_ENDPOINTS',
+            cast=Csv(),
+            default='https://stakewise-v3.infura-ipfs.io,'
+            'http://cloudflare-ipfs.com,'
+            'https://gateway.pinata.cloud,https://ipfs.io',
+        )
+        self.vault = vault or decouple_config('VAULT_CONTRACT_ADDRESS')
+        self.data_dir = data_dir or Path(DATA_DIR) / str(self.vault)
+        self.database_dir = database_dir or decouple_config('DATABASE_DIR', default=None)
+        self.keystores_path = keystores_path or decouple_config('KEYSTORES_PATH', default=None)
+        self.keystores_password_file = keystores_password_file or decouple_config(
+            'KEYSTORES_PASSWORD_FILE', default=None
+        )
+        self.keystores_password_dir = keystores_password_dir or decouple_config(
+            'KEYSTORES_PASSWORD_DIR', default=None
+        )
+        self.deposit_data_path = deposit_data_path or decouple_config(
+            'DEPOSIT_DATA_PATH', default=None
+        )
+        self.hot_wallet_private_key = hot_wallet_private_key or decouple_config(
+            'DEPOSIT_DATA_PATH', default=None
+        )
+        self.hot_wallet_keystore_path = hot_wallet_keystore_path or decouple_config(
+            'DEPOSIT_DATA_PATH', default=None
+        )
+        self.hot_wallet_keystore_password_path = (
+            hot_wallet_keystore_password_path or decouple_config('DEPOSIT_DATA_PATH', default=None)
+        )
+        self.harvest_vault = harvest_vault or decouple_config(
+            'HARVEST_VAULT', default=False, cast=bool
+        )
+        self.max_fee_per_gas_gwei = max_fee_per_gas_gwei or decouple_config(
+            'MAX_FEE_PER_GAS_GWEI', default=70, cast=int
+        )
+        self.approval_max_validators = approval_max_validators or decouple_config(
+            'APPROVAL_MAX_VALIDATORS', default=10, cast=int
+        )
+        self.validators_fetch_chunk_size = validators_fetch_chunk_size or decouple_config(
+            'VALIDATORS_FETCH_CHUNK_SIZE', default=100, cast=int
+        )
+        self.sentry_dsn = sentry_dsn or decouple_config('SENTRY_DSN', default='')
 
     @property
     def VERBOSE(self) -> bool:
-        return self.verbose or decouple_config('VERBOSE', default=False)
+        return self.verbose
 
     @property
     def LOG_LEVEL(self) -> str:
-        return self.log_level or decouple_config('LOG_LEVEL', default='INFO')
+        return self.log_level
 
     @property
     def NETWORK(self) -> str:
-        return self.network or decouple_config('NETWORK', cast=Choices([GOERLI]))
+        return self.network
 
     @property
     def NETWORK_CONFIG(self) -> NetworkConfig:
@@ -108,50 +135,38 @@ class Settings(metaclass=Singleton):
 
     @property
     def EXECUTION_ENDPOINT(self) -> str:
-        return self.execution_endpoint or decouple_config('EXECUTION_ENDPOINT')
+        return self.execution_endpoint
 
     @property
     def CONSENSUS_ENDPOINT(self) -> str:
-        return self.consensus_endpoint or decouple_config('CONSENSUS_ENDPOINT')
+        return self.consensus_endpoint
 
     @property
     def IPFS_FETCH_ENDPOINTS(self) -> list[str]:
-        return self.ipfs_fetch_endpoints or decouple_config(
-            'IPFS_FETCH_ENDPOINTS',
-            cast=Csv(),
-            default='https://stakewise-v3.infura-ipfs.io,'
-            'http://cloudflare-ipfs.com,'
-            'https://gateway.pinata.cloud,https://ipfs.io',
-        )
+        return self.ipfs_fetch_endpoints
 
     @property
     def VAULT_CONTRACT_ADDRESS(self) -> ChecksumAddress:
-        if self.vault:
-            return Web3.to_checksum_address(self.vault)
-        return Web3.to_checksum_address(decouple_config('VAULT_CONTRACT_ADDRESS'))
-
-    @property
-    def VAULT_DIR(self) -> Path:
-        return Path(DATA_DIR) / str(self.VAULT_CONTRACT_ADDRESS)
+        return Web3.to_checksum_address(self.vault)
 
     @property
     def DATABASE(self) -> str:
         if self.database_dir:
             return os.path.join(self.database_dir, 'operator.db')
-        return os.path.join(self.VAULT_DIR, 'operator.db')
+        return os.path.join(self.data_dir, 'operator.db')
 
     @property
     def KEYSTORES_PATH(self) -> Path:
         if self.keystores_path:
             return self.keystores_path
-        return self.VAULT_DIR / 'keystores'
+        return self.data_dir / 'keystores'
 
     @property
     def KEYSTORES_PASSWORD_FILE(self) -> Path | None:
         if self.keystores_password_file:
             return self.keystores_password_file
         if not self.KEYSTORES_PASSWORD_DIR:
-            return self.VAULT_DIR / 'keystores' / 'password.txt'
+            return self.data_dir / 'keystores' / 'password.txt'
         return None
 
     @property
@@ -160,7 +175,7 @@ class Settings(metaclass=Singleton):
 
     @property
     def DEPOSIT_DATA_PATH(self) -> Path:
-        return self.deposit_data_path or self.VAULT_DIR / 'deposit_data.json'
+        return self.deposit_data_path or self.data_dir / 'deposit_data.json'
 
     @property
     def HOT_WALLET_PRIVATE_KEY(self) -> str | None:
@@ -174,7 +189,7 @@ class Settings(metaclass=Singleton):
             return self.hot_wallet_keystore_path
 
         if not self.HOT_WALLET_PRIVATE_KEY:
-            return self.VAULT_DIR / 'wallet' / 'wallet.json'
+            return self.data_dir / 'wallet' / 'wallet.json'
         return None
 
     @property
@@ -183,31 +198,24 @@ class Settings(metaclass=Singleton):
             return self.hot_wallet_keystore_password_path
 
         if not self.HOT_WALLET_PRIVATE_KEY:
-            return self.VAULT_DIR / 'wallet' / 'password.txt'
+            return self.data_dir / 'wallet' / 'password.txt'
         return None
 
     @property
     def HARVEST_VAULT(self) -> bool:
-        return self.harvest_vault or decouple_config('HARVEST_VAULT', default=False, cast=bool)
+        return bool(self.harvest_vault)
 
     @property
     def MAX_FEE_PER_GAS_GWEI(self) -> int:
-        return (
-                self.max_fee_per_gas_gwei
-                or
-                decouple_config('MAX_FEE_PER_GAS_GWEI', default=70, cast=int)
-        )
+        return int(self.max_fee_per_gas_gwei)
 
     @property
     def APPROVAL_MAX_VALIDATORS(self) -> int:
-        return self.approval_max_validators or decouple_config(
-         'APPROVAL_MAX_VALIDATORS', default=10, cast=int)
+        return self.approval_max_validators
 
     @property
     def VALIDATORS_FETCH_CHUNK_SIZE(self) -> int:
-        return self.validators_fetch_chunk_size or decouple_config(
-            'VALIDATORS_FETCH_CHUNK_SIZE', default=100, cast=int
-        )
+        return self.validators_fetch_chunk_size
 
     @property
     def SENTRY_DSN(self) -> str | None:
@@ -215,6 +223,10 @@ class Settings(metaclass=Singleton):
 
     @property
     def NETWORK_VALIDATORS_TABLE(self) -> str:
+        return f'{self.NETWORK}_network_validators'
+
+    @property
+    def VAULT_CONFIG(self) -> str:
         return f'{self.NETWORK}_network_validators'
 
 
