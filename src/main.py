@@ -2,7 +2,6 @@ import multiprocessing
 import os
 import ssl
 import sys
-from multiprocessing import freeze_support
 
 import click
 
@@ -29,8 +28,6 @@ if __name__ == '__main__':
     # Pyinstaller hacks
     multiprocessing.set_start_method('spawn')
     multiprocessing.freeze_support()
-    # Pyinstaller hacks
-    freeze_support()
     # Use certificate from certifi only if cafile could not find by ssl.
     if ssl.get_default_verify_paths().cafile is None and hasattr(sys, '_MEIPASS'):
         # pylint: disable-next=protected-access

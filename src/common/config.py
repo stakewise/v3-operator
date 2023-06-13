@@ -100,5 +100,5 @@ class Config:
 
         if not re.match('^0x[0-9a-fA-F]{96}$', self.first_public_key):
             raise click.ClickException(
-                "Invalid 'first_public_key'. Expected a 96-character hexadecimal string."
+                "Invalid 'first_public_key'. Expected a 98-character hexadecimal string."
             )

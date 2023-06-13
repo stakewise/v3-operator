@@ -42,20 +42,17 @@ def create_wallet(mnemonic: str, vault: HexAddress, data_dir: str) -> None:
         wallet_dir = Path(f'{DATA_DIR}/{vault}/wallet')
 
     wallet_dir.mkdir(parents=True, exist_ok=True)
-    wallet = _generate_encrypted_wallet(mnemonic, str(wallet_dir))
-    click.echo(f'Done. Wallet {greenify(wallet)} saved to {greenify(wallet_dir)} directory')
+    _generate_encrypted_wallet(mnemonic, str(wallet_dir))
+    click.echo(f'Done. The wallet and password saved to {greenify(wallet_dir)} directory.')
 
 
-def _generate_encrypted_wallet(mnemonic: str, wallet_dir: str) -> str:
+def _generate_encrypted_wallet(mnemonic: str, wallet_dir: str) -> None:
     Account.enable_unaudited_hdwallet_features()
 
     account = Account().from_mnemonic(mnemonic=mnemonic)
     password = get_or_create_password_file(path.join(wallet_dir, 'password.txt'))
     encrypted_data = Account.encrypt(account.key, password=password)
 
-    # wallet_name = f'{account.address}-{int(time.time())}.json'
     wallet_name = 'wallet.json'
     with open(path.join(wallet_dir, wallet_name), 'w', encoding='utf-8') as f:
         json.dump(encrypted_data, f, default=lambda x: x.hex())
-
-    return wallet_name

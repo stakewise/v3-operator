@@ -15,23 +15,26 @@ import click
     type=click.Path(exists=True, file_okay=True, dir_okay=False),
 )
 @click.option(
-    '--merged-file-path',
+    '--output-file',
     '-m',
     required=True,
-    help='Path where the merged deposit file will be created. '
+    help='Path where the merged deposit data file will be created. '
     'Specify the full path including the filename. Example: -m /path/to/merged_file.json',
     type=click.Path(exists=False, file_okay=True, dir_okay=False),
 )
-@click.command(help='Merges multiple deposit data files into one. '
-               'The merge process will take JSON elements from each input '
-               'file in a round-robin manner. It starts by taking the first '
-               'JSON element from each file, then the second, and so on. '
-               'The merged JSON elements are written to the specified output file. '
-               'If a file has fewer elements than others, the process continues with '
-               'the remaining files until all elements are merged.')
-def merge_deposit_data(deposit_data: tuple, merged_file_path: str) -> None:
+@click.command(
+    help='Merges multiple deposit data files into one. The first validator in '
+         'the merged file will be the validator from the first deposit data file, '
+         'then the first validator key from the second file, etc., until all the first keys '
+         'from all the deposit data files are processed. '
+         'Then it continues with the second key from each file the same way.'
+)
+def merge_deposit_data(deposit_data: tuple, output_file: str) -> None:
     if len(deposit_data) <= 1:
         raise click.BadParameter('You must provide at least 2 deposit data files')
+
+    if os.path.exists(output_file):
+        raise click.BadParameter(f'{output_file} already exists.')
 
     json_data_list = []
 
@@ -46,8 +49,5 @@ def merge_deposit_data(deposit_data: tuple, merged_file_path: str) -> None:
             if element is not None:
                 merged_json.append(element)
 
-    if os.path.exists(merged_file_path):
-        raise click.BadParameter(f'{merged_file_path} already exists.')
-
-    with open(merged_file_path, 'w', encoding='utf-8') as merged_file:
+    with open(output_file, 'w', encoding='utf-8') as merged_file:
         json.dump(merged_json, merged_file)

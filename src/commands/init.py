@@ -46,7 +46,7 @@ from src.config.settings import AVAILABLE_NETWORKS, GOERLI
     'Defaults to ~/.stakewise/<vault>',
     type=click.Path(exists=False, file_okay=False, dir_okay=True),
 )
-@click.command(help='Creates the mnemonic used to derive validator keys.')
+@click.command(help='Initializes vault data directory and generates mnemonic.')
 def init(
     language: str,
     no_verify: bool,
