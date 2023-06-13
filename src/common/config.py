@@ -22,8 +22,7 @@ class Config:
         if data_dir:
             self.data_dir = Path(data_dir)
         else:
-            self.data_dir = Path(f'~/.stakewise/{vault}').expanduser()
-
+            self.data_dir = Path.home() / '.stakewise' / vault
         self.config_path = self.data_dir / 'config.json'
         self.network = network
         self.mnemonic_next_index = mnemonic_next_index

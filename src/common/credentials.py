@@ -182,3 +182,14 @@ class CredentialManager:
         return Credential(
             private_key=private_key, path=signing_key_path, network=network, vault=vault
         )
+
+    @staticmethod
+    def generate_credential_first_public_key(
+        network: str, vault: HexAddress, mnemonic: str
+    ) -> str:
+        return CredentialManager.generate_credential(
+            network=network,
+            vault=vault,
+            mnemonic=mnemonic,
+            index=0,
+        ).public_key

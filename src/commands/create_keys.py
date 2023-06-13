@@ -51,6 +51,14 @@ async def create_keys(
     config = Config(vault=vault, data_dir=data_dir)
     config.load()
 
+    first_public_key = CredentialManager.generate_credential_first_public_key(
+        config.network, vault, str(mnemonic)
+    )
+    if first_public_key != config.first_public_key:
+        raise click.ClickException(
+            'Invalid mnemonic. Another mnemonic was already used for keys generation'
+        )
+
     deposit_data_file = config.data_dir / 'deposit_data.json'
     keystores_dir = config.data_dir / 'keystores'
     password_file = keystores_dir / 'password.txt'

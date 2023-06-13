@@ -71,7 +71,9 @@ def init(
         )
     mnemonic = create_new_mnemonic(language, skip_test=no_verify)
 
-    first_public_key = _get_first_public_key(network, vault, str(mnemonic))
+    first_public_key = CredentialManager.generate_credential_first_public_key(
+        network, vault, str(mnemonic)
+    )
 
     config.first_public_key = first_public_key
     config.create()
@@ -81,14 +83,3 @@ def init(
             bold=True,
             fg='green'
         )
-
-
-def _get_first_public_key(network: str, vault: HexAddress, mnemonic: str) -> str:
-    credential = CredentialManager.generate_credential(
-        network=network,
-        vault=vault,
-        mnemonic=mnemonic,
-        index=0,
-    )
-
-    return credential.public_key
