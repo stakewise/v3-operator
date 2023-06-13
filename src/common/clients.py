@@ -1,4 +1,5 @@
 import sqlite3
+from functools import cached_property
 from pathlib import Path
 
 import backoff
@@ -25,7 +26,7 @@ class Database:
 
 
 class ExecutionClient:
-    @property
+    @cached_property
     def client(self) -> Web3:
         operator_account = OperatorAccount().operator_account
         w3 = get_execution_client(settings.EXECUTION_ENDPOINT)
@@ -33,11 +34,17 @@ class ExecutionClient:
         w3.eth.default_account = operator_account.address
         return w3
 
+    def __getattr__(self, item):
+        return getattr(self.client, item)
+
 
 class ConsensusClient:
-    @property
+    @cached_property
     def client(self) -> ExtendedAsyncBeacon:
         return get_consensus_client(settings.CONSENSUS_ENDPOINT)
+
+    def __getattr__(self, item):
+        return getattr(self.client, item)
 
 
 class IpfsFetchRetryClient(IpfsFetchClient):
@@ -54,3 +61,5 @@ class IpfsFetchRetryClient(IpfsFetchClient):
 
 
 db_client = Database()
+execution_client = ExecutionClient()
+consensus_client = ConsensusClient()

@@ -15,7 +15,7 @@ from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.types import EventData, Wei
 
-from src.common.clients import ExecutionClient
+from src.common.clients import execution_client
 from src.common.contracts import ValidatorsRegistryContract, VaultContract
 from src.common.execution import get_last_rewards_update
 from src.common.ipfs import fetch_harvest_params
@@ -259,7 +259,7 @@ async def register_single_validator(
         ).transact()  # type: ignore
 
     logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
-    await ExecutionClient().client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
+    await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
 
 
 # pylint: disable-next=too-many-locals
@@ -312,7 +312,7 @@ async def register_multiple_validator(
         ).transact()  # type: ignore
 
     logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
-    await ExecutionClient().client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
+    await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
 
 
 def _encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) -> bytes:

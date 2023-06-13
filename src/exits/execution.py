@@ -2,7 +2,7 @@ import logging
 
 from web3 import Web3
 
-from src.common.clients import ExecutionClient
+from src.common.clients import execution_client
 from src.common.contracts import KeeperContract
 from src.config.networks import ETH_NETWORKS
 from src.config.settings import settings
@@ -25,4 +25,4 @@ async def submit_exit_signatures(
         approval.signatures,
     ).transact()  # type: ignore
     logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
-    await ExecutionClient().client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
+    await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore

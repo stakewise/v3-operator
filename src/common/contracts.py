@@ -4,7 +4,7 @@ import os
 from web3.contract import AsyncContract
 from web3.types import ChecksumAddress
 
-from src.common.clients import ExecutionClient
+from src.common.clients import execution_client
 from src.config.settings import settings
 
 
@@ -21,7 +21,6 @@ class ContractWrapper:
         current_dir = os.path.dirname(__file__)
         with open(os.path.join(current_dir, self.abi_path), encoding='utf-8') as f:
             abi = json.load(f)
-        execution_client = ExecutionClient().client
         return execution_client.eth.contract(
             abi=abi, address=self.contract_address
         )  # type: ignore

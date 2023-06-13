@@ -5,7 +5,7 @@ from web3 import Web3
 from web3.types import ChecksumAddress, EventData, Wei
 
 from src.common.accounts import OperatorAccount
-from src.common.clients import ExecutionClient, IpfsFetchRetryClient
+from src.common.clients import IpfsFetchRetryClient, execution_client
 from src.common.contracts import KeeperContract, OraclesContract
 from src.common.typings import Oracles, RewardVoteInfo
 from src.config.settings import DEFAULT_RETRY_TIME, settings
@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 @backoff_aiohttp_errors(max_time=300)
 async def get_operator_balance() -> Wei:
-    execution_client = ExecutionClient().client
     operator_account = OperatorAccount().operator_account
     return await execution_client.eth.get_balance(operator_account.address)  # type: ignore
 
@@ -82,7 +81,7 @@ async def get_last_rewards_update() -> RewardVoteInfo | None:
     approx_blocks_per_month: int = int(
         SECONDS_PER_MONTH // settings.NETWORK_CONFIG.SECONDS_PER_BLOCK
     )
-    block_number = await ExecutionClient().client.eth.get_block_number()  # type: ignore
+    block_number = await execution_client.eth.get_block_number()  # type: ignore
     events = await KeeperContract().contract.events.RewardsUpdated.get_logs(
         from_block=max(
             int(settings.NETWORK_CONFIG.KEEPER_GENESIS_BLOCK),
@@ -104,7 +103,6 @@ async def get_last_rewards_update() -> RewardVoteInfo | None:
 
 
 async def get_max_fee_per_gas() -> Wei:
-    execution_client = ExecutionClient().client
     priority_fee = await execution_client.eth.max_priority_fee  # type: ignore
     latest_block = await execution_client.eth.get_block('latest')  # type: ignore
     base_fee = latest_block['baseFeePerGas']

@@ -7,7 +7,7 @@ from aiohttp import ClientSession, ClientTimeout
 from sw_utils import IpfsFetchClient
 
 from src.common.accounts import OperatorAccount
-from src.common.clients import ConsensusClient, ExecutionClient, db_client
+from src.common.clients import consensus_client, db_client, execution_client
 from src.common.execution import check_operator_balance, get_oracles
 from src.common.utils import count_files_in_folder
 from src.config.settings import settings
@@ -21,7 +21,7 @@ IPFS_HASH_EXAMPLE = 'QmawUdo17Fvo7xa6ARCUSMV1eoVwPtVuzx8L8Crj2xozWm'
 async def wait_for_consensus_node() -> None:
     while True:
         try:
-            data = await ConsensusClient().client.get_finality_checkpoint()
+            data = await consensus_client.get_finality_checkpoint()
             logger.info(
                 'Connected to consensus node at %s. Finalized epoch: %s',
                 settings.CONSENSUS_ENDPOINT,
@@ -36,7 +36,7 @@ async def wait_for_consensus_node() -> None:
 async def wait_for_execution_node() -> None:
     while True:
         try:
-            block_number = await ExecutionClient().client.eth.block_number  # type: ignore
+            block_number = await execution_client.eth.block_number  # type: ignore
             logger.info(
                 'Connected to execution node at %s. Current block number: %s',
                 settings.EXECUTION_ENDPOINT,

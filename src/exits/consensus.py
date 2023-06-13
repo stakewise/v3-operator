@@ -1,7 +1,7 @@
 from sw_utils.decorators import backoff_aiohttp_errors
 from web3.types import HexStr
 
-from src.common.clients import ConsensusClient
+from src.common.clients import consensus_client
 from src.config.settings import DEFAULT_RETRY_TIME, settings
 
 
@@ -11,7 +11,7 @@ async def get_validator_public_keys(validator_indexes: list[int]) -> dict[int, H
     indexes = [str(index) for index in validator_indexes]
     result = {}
     for i in range(0, len(indexes), settings.VALIDATORS_FETCH_CHUNK_SIZE):
-        validators = await ConsensusClient().client.get_validators_by_ids(
+        validators = await consensus_client.get_validators_by_ids(
             indexes[i: i + settings.VALIDATORS_FETCH_CHUNK_SIZE]
         )
         for beacon_validator in validators['data']:

@@ -19,7 +19,7 @@ from sw_utils.consensus import EXITED_STATUSES
 from sw_utils.decorators import backoff_aiohttp_errors
 from web3 import Web3
 
-from src.common.clients import ConsensusClient
+from src.common.clients import consensus_client
 from src.common.typings import Oracles
 from src.config.settings import DEFAULT_RETRY_TIME, settings
 from src.validators.database import NetworkValidatorCrud
@@ -222,7 +222,7 @@ async def count_deposit_data_non_exited_keys() -> int:
     validator_statuses = []
 
     for i in range(0, len(validator_ids), settings.VALIDATORS_FETCH_CHUNK_SIZE):
-        validators = await ConsensusClient().client.get_validators_by_ids(
+        validators = await consensus_client.get_validators_by_ids(
             validator_ids[i: i + settings.VALIDATORS_FETCH_CHUNK_SIZE]
         )
         validator_statuses.extend(validators['data'])
