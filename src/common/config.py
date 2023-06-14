@@ -15,18 +15,20 @@ class VaultConfig:
 
     def __init__(
         self,
-        data_dir: str,
-        vault: HexAddress,
+        data_dir: str = '',
+        vault: HexAddress | None = None,
     ):
         self.vault = vault
         if data_dir:
             self.data_dir = Path(data_dir)
-        else:
+        elif vault:
             self.data_dir = Path.home() / '.stakewise' / vault
+        else:
+            raise click.ClickException('Invalid vault config. Provide vault or data_dir')
         self.config_path = self.data_dir / 'config.json'
 
     @property
-    def is_exist(self) -> bool:
+    def exist(self) -> bool:
         return self.config_path.is_file()
 
     def load(self):

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import time
+from pathlib import Path
 
 import click
 from decouple import config as decouple_config
@@ -68,28 +69,7 @@ logger = logging.getLogger(__name__)
 @click.option('-v', '--verbose', help='Enable debug mode', is_flag=True)
 @click.command(help='Start operator service')
 def start(*args, **kwargs) -> None:
-    # validate vault config
-    vault = kwargs.pop('vault', decouple_config('VAULT_CONTRACT_ADDRESS', default=''))
-    network = kwargs.pop('network', decouple_config('NETWORK', default=''))
-    config = VaultConfig(vault=vault, data_dir=kwargs.get('data_dir', ''))
-    if config.is_exist:
-        config.load()
-
-        if vault and vault != config.vault:
-            raise click.ClickException(
-                f'Invalid vault address. Please use data-dir provided for {vault} init command.'
-            )
-        if not vault:
-            vault = config.vault
-
-        if network and network != config.network:
-            raise click.ClickException(
-                f'Invalid vault network. Please use data-dir provided for {vault} init command.'
-            )
-        if not network:
-            network = config.network
-
-    settings.set(vault=vault, network=network, *args, **kwargs)  # type: ignore
+    setup_config(*args, **kwargs)
 
     try:
         asyncio.run(main())
@@ -156,6 +136,37 @@ async def main() -> None:
             0
         )
         await asyncio.sleep(sleep_time)
+
+
+def setup_config(*args, **kwargs) -> None:
+    vault = kwargs.pop('vault') or decouple_config('VAULT_CONTRACT_ADDRESS', default='')
+    network = kwargs.pop('network') or decouple_config('NETWORK', default='')
+    data_dir = kwargs.pop('data_dir') or decouple_config('DATA_DIR', default='')
+    config = VaultConfig(vault=vault, data_dir=data_dir)
+    if config.exist:
+        config.load()
+
+        if vault and vault != config.vault:
+            raise click.ClickException(
+                f'Invalid vault address. Please use data-dir provided for {vault} init command.'
+            )
+        if not vault:
+            vault = config.vault
+
+        if network and network != config.network:
+            raise click.ClickException(
+                f'Invalid vault network. Please use data-dir provided for {vault} init command.'
+            )
+        if not network:
+            network = config.network
+    if data_dir:
+        data_dir = Path(data_dir)
+    settings.set(
+        vault=vault,
+        network=network,
+        data_dir=data_dir,
+        *args, **kwargs
+    )  # type: ignore
 
 
 def log_start() -> None:
