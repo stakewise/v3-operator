@@ -28,7 +28,6 @@ logger = logging.getLogger(__name__)
     '--network',
     required=False,
     help='The network of the Vault',
-    prompt='Enter the network name',
     type=click.Choice(
         AVAILABLE_NETWORKS,
         case_sensitive=False,

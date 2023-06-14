@@ -4,7 +4,6 @@ from pathlib import Path
 
 import click
 from eth_typing import HexAddress
-from web3 import Web3
 
 from src.config.settings import AVAILABLE_NETWORKS
 
@@ -48,14 +47,17 @@ class VaultConfig:
         mnemonic_next_index: int = 0,
         first_public_key: str | None = None
      ):
-        config = {
-            'vault': self.vault,
-            'network': network,
-            'mnemonic_next_index': mnemonic_next_index,
-            'first_public_key': first_public_key,
-        }
+        self.network = network
+        self.mnemonic_next_index = mnemonic_next_index
+        self.first_public_key = first_public_key
 
         self._validate()
+        config = {
+            'vault': self.vault,
+            'network': self.network,
+            'mnemonic_next_index': self.mnemonic_next_index,
+            'first_public_key': self.first_public_key,
+        }
         self.data_dir.mkdir(parents=True, exist_ok=True)
         with self.config_path.open('w') as f:
             json.dump(config, f)
@@ -69,6 +71,7 @@ class VaultConfig:
             self.first_public_key = first_public_key
         self._validate()
         config = {
+            'vault': self.vault,
             'network': self.network,
             'mnemonic_next_index': self.mnemonic_next_index,
             'first_public_key': self.first_public_key,
@@ -80,9 +83,6 @@ class VaultConfig:
         """Validates the loaded configuration data."""
         if not self.vault:
             raise click.ClickException('Vault is not set in the configuration.')
-
-        if Web3.is_checksum_address(self.vault):
-            raise click.ClickException('Invalid vault address.')
 
         if not self.network:
             raise click.ClickException('Network is not set in the configuration.')
