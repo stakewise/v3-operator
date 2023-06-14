@@ -2,10 +2,9 @@ import unittest
 from unittest.mock import patch
 
 from click.testing import CliRunner
+from sw_utils.tests.factories import faker
 
 from src.commands.init import init
-
-from .factories import faker
 
 mnemonic = ' '.join([faker.word() for x in range(24)])
 

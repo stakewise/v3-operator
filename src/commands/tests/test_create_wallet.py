@@ -4,12 +4,11 @@ import unittest
 from click.testing import CliRunner
 from eth_account import Account
 from staking_deposit.key_handling.key_derivation.mnemonic import get_mnemonic
+from sw_utils.tests.factories import faker
 
 from src.commands.create_wallet import create_wallet
 from src.common.language import WORD_LISTS_PATH
 from src.config.settings import DATA_DIR
-
-from .factories import faker
 
 
 class TestCreateWallet(unittest.TestCase):

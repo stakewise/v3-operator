@@ -3,13 +3,12 @@ import os
 import unittest
 
 from click.testing import CliRunner
+from sw_utils.tests.factories import faker
 
 import src
 from src.commands.create_keys import create_keys
 from src.commands.init import init
 from src.config.settings import DATA_DIR
-
-from .factories import faker
 
 
 class TestCreateKeys(unittest.TestCase):
