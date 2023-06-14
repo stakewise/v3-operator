@@ -8,10 +8,9 @@ from src.common.accounts import operator_account
 from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.contracts import keeper_contract, oracles_contract
 from src.common.typings import Oracles, RewardVoteInfo
-from src.config.settings import DEFAULT_RETRY_TIME, NETWORK_CONFIG
+from src.config.settings import DEFAULT_RETRY_TIME, settings
 
 SECONDS_PER_MONTH: int = 2628000
-APPROX_BLOCKS_PER_MONTH: int = int(SECONDS_PER_MONTH // NETWORK_CONFIG.SECONDS_PER_BLOCK)
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +26,8 @@ async def can_harvest(vault_address: ChecksumAddress) -> bool:
 
 
 async def check_operator_balance() -> None:
-    operator_min_balance = NETWORK_CONFIG.OPERATOR_MIN_BALANCE
-    symbol = NETWORK_CONFIG.SYMBOL
+    operator_min_balance = settings.NETWORK_CONFIG.OPERATOR_MIN_BALANCE
+    symbol = settings.NETWORK_CONFIG.SYMBOL
 
     if operator_min_balance <= 0:
         return
@@ -45,7 +44,7 @@ async def check_operator_balance() -> None:
 async def get_oracles() -> Oracles:
     """Fetches oracles config."""
     events = await oracles_contract.events.ConfigUpdated.get_logs(
-        from_block=NETWORK_CONFIG.ORACLES_GENESIS_BLOCK
+        from_block=settings.NETWORK_CONFIG.ORACLES_GENESIS_BLOCK
     )
     if not events:
         raise ValueError('Failed to fetch IPFS hash of oracles config')
@@ -78,11 +77,14 @@ async def get_oracles() -> Oracles:
 @backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
 async def get_last_rewards_update() -> RewardVoteInfo | None:
     """Fetches the last rewards update."""
+    approx_blocks_per_month: int = int(
+        SECONDS_PER_MONTH // settings.NETWORK_CONFIG.SECONDS_PER_BLOCK
+    )
     block_number = await execution_client.eth.get_block_number()  # type: ignore
     events = await keeper_contract.events.RewardsUpdated.get_logs(
         from_block=max(
-            int(NETWORK_CONFIG.KEEPER_GENESIS_BLOCK),
-            block_number - APPROX_BLOCKS_PER_MONTH,
+            int(settings.NETWORK_CONFIG.KEEPER_GENESIS_BLOCK),
+            block_number - approx_blocks_per_month,
             0
         ),
         to_block=block_number,

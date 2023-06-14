@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 
-from src.config.settings import VERBOSE
+from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ def get_build_version() -> str | None:
 
 
 def log_verbose(e: Exception):
-    if VERBOSE:
+    if settings.VERBOSE:
         logger.exception(e)
     else:
         logger.error(e)

@@ -7,14 +7,14 @@ from src.common.clients import execution_client
 from src.common.contracts import vault_contract
 from src.common.typings import HarvestParams
 from src.config.networks import ETH_NETWORKS
-from src.config.settings import DEFAULT_RETRY_TIME, NETWORK
+from src.config.settings import DEFAULT_RETRY_TIME, settings
 
 logger = logging.getLogger(__name__)
 
 
 @backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
 async def submit_harvest_transaction(harvest_params: HarvestParams) -> None:
-    if NETWORK not in ETH_NETWORKS:
+    if settings.NETWORK not in ETH_NETWORKS:
         raise NotImplementedError('networks other than Ethereum not supported')
 
     logger.info('Submitting harvest transaction...')

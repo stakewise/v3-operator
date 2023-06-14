@@ -5,6 +5,7 @@ import random
 from multiprocessing import Pool
 from os import listdir
 from os.path import isfile, join
+from pathlib import Path
 
 import aiohttp
 import milagro_bls_binding as bls
@@ -20,16 +21,8 @@ from web3 import Web3
 
 from src.common.clients import consensus_client
 from src.common.typings import Oracles
-from src.config.settings import (
-    DEFAULT_RETRY_TIME,
-    DEPOSIT_DATA_PATH,
-    KEYSTORES_PASSWORD_DIR,
-    KEYSTORES_PASSWORD_FILE,
-    KEYSTORES_PATH,
-    VALIDATORS_FETCH_CHUNK_SIZE,
-    VAULT_CONTRACT_ADDRESS,
-)
-from src.validators.database import get_next_validator_index
+from src.config.settings import DEFAULT_RETRY_TIME, settings
+from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import (
     KeystoreException,
     RegistryRootChangedError,
@@ -99,7 +92,7 @@ async def send_approval_request(
             raise RegistryRootChangedError from e
 
         latest_public_keys = await get_latest_network_validator_public_keys()
-        validator_index = get_next_validator_index(list(latest_public_keys))
+        validator_index = NetworkValidatorCrud().get_next_validator_index(list(latest_public_keys))
         if validator_index != payload['validator_index']:
             raise ValidatorIndexChangedError from e
 
@@ -111,6 +104,9 @@ async def send_approval_request(
 
 
 def list_keystore_files() -> list[KeystoreFile]:
+    KEYSTORES_PATH = settings.KEYSTORES_PATH
+    KEYSTORES_PASSWORD_FILE = settings.KEYSTORES_PASSWORD_FILE
+    KEYSTORES_PASSWORD_DIR = settings.KEYSTORES_PASSWORD_DIR
     key_files = [
         f for f in listdir(KEYSTORES_PATH)
         if isfile(join(KEYSTORES_PATH, f)) and f.startswith('keystore') and f.endswith('.json')
@@ -122,7 +118,8 @@ def list_keystore_files() -> list[KeystoreFile]:
 
         for key_file in key_files:
             password_file = key_file.replace('.json', '.txt')
-            password = _load_keystores_password(join(KEYSTORES_PASSWORD_DIR, password_file))
+            path = Path(KEYSTORES_PASSWORD_DIR) / password_file
+            password = _load_keystores_password(path)
             res.append(KeystoreFile(name=key_file, password=password))
 
         return res
@@ -139,7 +136,7 @@ def load_keystores() -> Keystores | None:
     """Extracts private keys from the keystores."""
 
     keystore_files = list_keystore_files()
-    logger.info('Loading keystores from %s...', KEYSTORES_PATH)
+    logger.info('Loading keystores from %s...', settings.KEYSTORES_PATH)
     with Pool() as pool:
         # pylint: disable-next=unused-argument
         def _stop_pool(*args, **kwargs):
@@ -148,7 +145,7 @@ def load_keystores() -> Keystores | None:
         results = [
             pool.apply_async(
                 _process_keystore_file,
-                (keystore_file, ),
+                (keystore_file, settings.KEYSTORES_PATH),
                 error_callback=_stop_pool,
             )
             for keystore_file in keystore_files
@@ -171,10 +168,10 @@ def load_keystores() -> Keystores | None:
 
 async def load_deposit_data() -> DepositData:
     """Loads and verifies deposit data."""
-    with open(DEPOSIT_DATA_PATH, 'r', encoding='utf-8') as f:
+    with open(settings.DEPOSIT_DATA_PATH, 'r', encoding='utf-8') as f:
         deposit_data = json.load(f)
 
-    credentials = get_eth1_withdrawal_credentials(VAULT_CONTRACT_ADDRESS)
+    credentials = get_eth1_withdrawal_credentials(settings.VAULT_CONTRACT_ADDRESS)
     leaves: list[tuple[bytes, int]] = []
     validators: list[Validator] = []
     for i, data in enumerate(deposit_data):
@@ -189,16 +186,17 @@ async def load_deposit_data() -> DepositData:
     tree = StandardMerkleTree.of(leaves, ['bytes', 'uint256'])
     await check_deposit_data_root(tree.root)
 
-    logger.info('Loaded deposit data file %s', DEPOSIT_DATA_PATH)
+    logger.info('Loaded deposit data file %s', settings. DEPOSIT_DATA_PATH)
     return DepositData(validators=validators, tree=tree)
 
 
 def _process_keystore_file(
-    keystore_file: KeystoreFile
+    keystore_file: KeystoreFile,
+    keystore_path: Path
 ) -> tuple[HexStr, BLSPrivkey] | None:
     file_name = keystore_file.name
     keystores_password = keystore_file.password
-    file_path = join(KEYSTORES_PATH, file_name)
+    file_path = join(keystore_path, file_name)
 
     try:
         keystore = ScryptKeystore.from_file(file_path)
@@ -213,7 +211,7 @@ def _process_keystore_file(
     return public_key, private_key
 
 
-def _load_keystores_password(password_path: str) -> str:
+def _load_keystores_password(password_path: Path) -> str:
     with open(password_path, 'r', encoding='utf-8') as f:
         return f.read().strip()
 
@@ -223,9 +221,9 @@ async def count_deposit_data_non_exited_keys() -> int:
     validator_ids = [v.public_key for v in deposit_data.validators]
     validator_statuses = []
 
-    for i in range(0, len(validator_ids), VALIDATORS_FETCH_CHUNK_SIZE):
+    for i in range(0, len(validator_ids), settings.VALIDATORS_FETCH_CHUNK_SIZE):
         validators = await consensus_client.get_validators_by_ids(
-            validator_ids[i: i + VALIDATORS_FETCH_CHUNK_SIZE]
+            validator_ids[i: i + settings.VALIDATORS_FETCH_CHUNK_SIZE]
         )
         validator_statuses.extend(validators['data'])
 

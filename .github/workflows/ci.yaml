@@ -37,7 +37,41 @@ jobs:
       # Run precommit
       - name: Run precommit
         run: poetry run pre-commit run --all-files
+  test:
+    name: Testing
+    runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
 
+      - name: Set up python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.10.10
+
+      # Install poetry
+      - name: Load cached Poetry installation
+        uses: actions/cache@v2
+        with:
+          path: ~/.local
+          key: poetry-0
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.3.2
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
+
+      # Install dependencies
+      - name: Install dependencies
+        run: poetry install --no-interaction --no-root
+
+      # Run tests
+      - name: Run tests
+        run: poetry run pytest src
   security:
     name: pip-audit
     runs-on: ubuntu-latest

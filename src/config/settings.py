@@ -1,112 +1,239 @@
-import argparse
 import os
+from pathlib import Path
 
 from decouple import Choices, Csv
 from decouple import config as decouple_config
 from web3 import Web3
+from web3.types import ChecksumAddress
 
 from src.config.networks import GOERLI, NETWORKS, NetworkConfig
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--network', type=str,
-                    help='The network of the Vault. Choices are: mainnet, gnosis, goerli')
-parser.add_argument('--vault-contract-address', type=str,
-                    help='Address of the Vault to register validators for')
-parser.add_argument('--database-dir', type=str,
-                    help='The directory where the database will be created or read from')
-parser.add_argument('--execution-endpoint', type=str,
-                    help='API endpoint for the execution node')
-parser.add_argument('--consensus-endpoint', type=str,
-                    help='API endpoint for the consensus node')
-parser.add_argument('--max-fee-per-gas-gwei', type=int,
-                    help='Maximum fee per gas limit')
-parser.add_argument('--keystores-password-path', type=str,
-                    help='Absolute path to the password file for decrypting keystores')
-parser.add_argument('--keystores-path', type=str,
-                    help='Absolute path to the directory with all the encrypted keystores')
-parser.add_argument('--deposit-data-path', type=str,
-                    help='Path to the deposit_data.json file')
-parser.add_argument('--operator-private-key', type=str,
-                    help='Private key of the hot wallet with ETH for submitting transactions')
-parser.add_argument('--operator-keystore-path', type=str,
-                    help='Absolute path to the directory with all the encrypted keystores')
-parser.add_argument('--operator-keystore-password-path', type=str,
-                    help='Absolute path to the password file for decrypting keystores')
-parser.add_argument('--harvest-vault',  action=argparse.BooleanOptionalAction,
-                    help='Periodically submit vault harvest transaction')
-parser.add_argument('-v', '--verbose', help='Enable debug mode',
-                    action='store_true')
-args = parser.parse_args()
+DATA_DIR = Path.home() / '.stakewise'
 
 
-def config(name: str, **kwargs):
-    return getattr(args, name.lower(), None) or decouple_config(name, **kwargs)
+class Singleton(type):
+    _instances: dict = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
+        return cls._instances[cls]
 
 
-# debug
-VERBOSE = getattr(args, 'verbose', False)
+# pylint: disable-next=too-many-public-methods
+class Settings(metaclass=Singleton):
+    verbose: bool
+    log_level: str
+    network: str
+    data_dir: Path
+    execution_endpoint: str
+    consensus_endpoint: str
+    ipfs_fetch_endpoints: list[str]
+    vault: str
+    database_dir: str
+    keystores_path: Path
+    keystores_password_file: Path
+    keystores_password_dir: Path
+    deposit_data_path: Path
+    hot_wallet_private_key: str
+    hot_wallet_keystore_path: Path
+    hot_wallet_keystore_password_path: Path
+    harvest_vault: bool
+    max_fee_per_gas_gwei: int
+    approval_max_validators: int
+    validators_fetch_chunk_size: int
+    sentry_dsn: str
 
-# behavior
-HARVEST_VAULT = config('HARVEST_VAULT', default=False, cast=bool)
+    # pylint: disable-next=too-many-arguments,too-many-locals
+    def set(
+        self,
+        vault: str | None = None,
+        network: str | None = None,
+        data_dir: Path | None = None,
+        verbose: bool | None = None,
+        log_level: str | None = None,
+        execution_endpoint: str | None = None,
+        consensus_endpoint: str | None = None,
+        ipfs_fetch_endpoints: list[str] | None = None,
+        database_dir: str | None = None,
+        keystores_path: Path | None = None,
+        keystores_password_file: Path | None = None,
+        keystores_password_dir: Path | None = None,
+        deposit_data_path: Path | None = None,
+        hot_wallet_private_key: str | None = None,
+        hot_wallet_keystore_path: Path | None = None,
+        hot_wallet_keystore_password_path: Path | None = None,
+        harvest_vault: bool | None = None,
+        max_fee_per_gas_gwei: int | None = None,
+        approval_max_validators: int | None = None,
+        validators_fetch_chunk_size: int | None = None,
+        sentry_dsn: str | None = None,
+    ):
+        self.vault = vault or decouple_config('VAULT_CONTRACT_ADDRESS')
+        self.network = network or decouple_config('NETWORK', cast=Choices([GOERLI]))
+        self.verbose = verbose or decouple_config('VERBOSE', default=False)
+        self.log_level = log_level or decouple_config('LOG_LEVEL', default='INFO')
+        self.execution_endpoint = execution_endpoint or decouple_config('EXECUTION_ENDPOINT')
+        self.consensus_endpoint = consensus_endpoint or decouple_config('CONSENSUS_ENDPOINT')
+        self.ipfs_fetch_endpoints = ipfs_fetch_endpoints or decouple_config(
+            'IPFS_FETCH_ENDPOINTS',
+            cast=Csv(),
+            default='https://stakewise-v3.infura-ipfs.io,'
+            'http://cloudflare-ipfs.com,'
+            'https://gateway.pinata.cloud,https://ipfs.io',
+        )
+        self.data_dir = data_dir or Path(DATA_DIR) / str(self.vault)
+        self.database_dir = database_dir or decouple_config('DATABASE_DIR', default=None)
+        self.keystores_path = keystores_path or decouple_config('KEYSTORES_PATH', default=None)
+        self.keystores_password_file = keystores_password_file or decouple_config(
+            'KEYSTORES_PASSWORD_FILE', default=None
+        )
+        self.keystores_password_dir = keystores_password_dir or decouple_config(
+            'KEYSTORES_PASSWORD_DIR', default=None
+        )
+        self.deposit_data_path = deposit_data_path or decouple_config(
+            'DEPOSIT_DATA_PATH', default=None
+        )
+        self.hot_wallet_private_key = hot_wallet_private_key or decouple_config(
+            'DEPOSIT_DATA_PATH', default=None
+        )
+        self.hot_wallet_keystore_path = hot_wallet_keystore_path or decouple_config(
+            'DEPOSIT_DATA_PATH', default=None
+        )
+        self.hot_wallet_keystore_password_path = (
+            hot_wallet_keystore_password_path or decouple_config('DEPOSIT_DATA_PATH', default=None)
+        )
+        self.harvest_vault = harvest_vault or decouple_config(
+            'HARVEST_VAULT', default=False, cast=bool
+        )
+        self.max_fee_per_gas_gwei = max_fee_per_gas_gwei or decouple_config(
+            'MAX_FEE_PER_GAS_GWEI', default=70, cast=int
+        )
+        self.approval_max_validators = approval_max_validators or decouple_config(
+            'APPROVAL_MAX_VALIDATORS', default=10, cast=int
+        )
+        self.validators_fetch_chunk_size = validators_fetch_chunk_size or decouple_config(
+            'VALIDATORS_FETCH_CHUNK_SIZE', default=100, cast=int
+        )
+        self.sentry_dsn = sentry_dsn or decouple_config('SENTRY_DSN', default='')
 
-# network
-NETWORK = config('NETWORK', cast=Choices([GOERLI]))
-NETWORK_CONFIG: NetworkConfig = NETWORKS[NETWORK]
+    @property
+    def VERBOSE(self) -> bool:
+        return self.verbose
 
-VAULT_CONTRACT_ADDRESS = Web3.to_checksum_address(
-    config('VAULT_CONTRACT_ADDRESS'))
+    @property
+    def LOG_LEVEL(self) -> str:
+        return self.log_level
 
-# connections
-EXECUTION_ENDPOINT = config('EXECUTION_ENDPOINT')
-CONSENSUS_ENDPOINT = config('CONSENSUS_ENDPOINT')
+    @property
+    def NETWORK(self) -> str:
+        return self.network
 
-# database
-DATABASE = os.path.join(config('DATABASE_DIR'), 'operator.db')
+    @property
+    def NETWORK_CONFIG(self) -> NetworkConfig:
+        return NETWORKS[self.NETWORK]
 
-# keystores
-KEYSTORES_PASSWORD_FILE = config('KEYSTORES_PASSWORD_FILE', default='')
-KEYSTORES_PATH = config('KEYSTORES_PATH')
-KEYSTORES_PASSWORD_DIR = config('KEYSTORES_PASSWORD_DIR', default='')
+    @property
+    def EXECUTION_ENDPOINT(self) -> str:
+        return self.execution_endpoint
 
-# deposit data
-DEPOSIT_DATA_PATH = config('DEPOSIT_DATA_PATH')
+    @property
+    def CONSENSUS_ENDPOINT(self) -> str:
+        return self.consensus_endpoint
 
-# operator private key
-HOT_WALLET_PRIVATE_KEY = config('HOT_WALLET_PRIVATE_KEY', default=None)
-HOT_WALLET_KEYSTORE_PATH = config('HOT_WALLET_KEYSTORE_PATH', default=None)
-HOT_WALLET_KEYSTORE_PASSWORD_PATH = config(
-    'HOT_WALLET_KEYSTORE_PASSWORD_PATH',
-    default=None
-)
+    @property
+    def IPFS_FETCH_ENDPOINTS(self) -> list[str]:
+        return self.ipfs_fetch_endpoints
 
-# remote IPFS
-IPFS_FETCH_ENDPOINTS = config(
-    'IPFS_FETCH_ENDPOINTS',
-    cast=Csv(),
-    default='https://stakewise-v3.infura-ipfs.io,'
-    'http://cloudflare-ipfs.com,'
-    'https://gateway.pinata.cloud,https://ipfs.io',
-)
+    @property
+    def VAULT_CONTRACT_ADDRESS(self) -> ChecksumAddress:
+        return Web3.to_checksum_address(self.vault)
+
+    @property
+    def DATABASE(self) -> str:
+        if self.database_dir:
+            return os.path.join(self.database_dir, 'operator.db')
+        return os.path.join(self.data_dir, 'operator.db')
+
+    @property
+    def KEYSTORES_PATH(self) -> Path:
+        if self.keystores_path:
+            return self.keystores_path
+        return self.data_dir / 'keystores'
+
+    @property
+    def KEYSTORES_PASSWORD_FILE(self) -> Path | None:
+        if self.keystores_password_file:
+            return self.keystores_password_file
+        if not self.KEYSTORES_PASSWORD_DIR:
+            return self.data_dir / 'keystores' / 'password.txt'
+        return None
+
+    @property
+    def KEYSTORES_PASSWORD_DIR(self) -> Path | None:
+        return self.keystores_password_dir
+
+    @property
+    def DEPOSIT_DATA_PATH(self) -> Path:
+        return self.deposit_data_path or self.data_dir / 'deposit_data.json'
+
+    @property
+    def HOT_WALLET_PRIVATE_KEY(self) -> str | None:
+        if self.hot_wallet_private_key:
+            return self.hot_wallet_private_key
+        return None
+
+    @property
+    def HOT_WALLET_KEYSTORE_PATH(self) -> Path | None:
+        if self.hot_wallet_keystore_path:
+            return self.hot_wallet_keystore_path
+
+        if not self.HOT_WALLET_PRIVATE_KEY:
+            return self.data_dir / 'wallet' / 'wallet.json'
+        return None
+
+    @property
+    def HOT_WALLET_KEYSTORE_PASSWORD_PATH(self) -> Path | None:
+        if self.hot_wallet_keystore_password_path:
+            return self.hot_wallet_keystore_password_path
+
+        if not self.HOT_WALLET_PRIVATE_KEY:
+            return self.data_dir / 'wallet' / 'password.txt'
+        return None
+
+    @property
+    def HARVEST_VAULT(self) -> bool:
+        return self.harvest_vault
+
+    @property
+    def MAX_FEE_PER_GAS_GWEI(self) -> int:
+        return self.max_fee_per_gas_gwei
+
+    @property
+    def APPROVAL_MAX_VALIDATORS(self) -> int:
+        return self.approval_max_validators
+
+    @property
+    def VALIDATORS_FETCH_CHUNK_SIZE(self) -> int:
+        return self.validators_fetch_chunk_size
+
+    @property
+    def SENTRY_DSN(self) -> str | None:
+        return self.sentry_dsn
+
+
+settings = Settings()
+
+
+AVAILABLE_NETWORKS = [GOERLI]
 
 # oracles
 UPDATE_SIGNATURES_URL_PATH = '/signatures'
 OUTDATED_SIGNATURES_URL_PATH = '/signatures/{vault}'
 
 # common
-LOG_LEVEL = config('LOG_LEVEL', default='INFO')
 DEPOSIT_AMOUNT = Web3.to_wei(32, 'ether')
 DEPOSIT_AMOUNT_GWEI = int(Web3.from_wei(DEPOSIT_AMOUNT, 'gwei'))
-MAX_FEE_PER_GAS_GWEI = config('MAX_FEE_PER_GAS_GWEI', default=70, cast=int)
-
-APPROVAL_MAX_VALIDATORS = config(
-    'APPROVAL_MAX_VALIDATORS', default=10, cast=int)
 
 # Backoff retries
 DEFAULT_RETRY_TIME = 60
-
-# sentry config
-SENTRY_DSN = config('SENTRY_DSN', default='')
-
-# validators
-VALIDATORS_FETCH_CHUNK_SIZE = config(
-    'VALIDATORS_FETCH_CHUNK_SIZE', default=100, cast=int)

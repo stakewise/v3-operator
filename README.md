@@ -24,6 +24,91 @@ The validator registration process consists of the following steps:
 4. Send transaction to Vault contract to register the validator.
 
 ## Usage
+# Stakewise V3 key manager
+
+Key manager generates validators keys and deposit data for the validators, generates mnemonic and hot wallet. Also it helps to manage validators keys in web3signer infrastructure.
+
+See [releases page](https://github.com/stakewise/key-manager/releases) to download and decompress the corresponding binary files.
+
+## Key management commands
+
+### 1. Create mnemonic
+Create the mnemonic used to derive validator keys.
+```bash
+./key-manager create-mnemonic --language english
+```
+```
+This is your seed phrase. Write it down and store it safely, it is the ONLY way to recover your validator keys.
+
+pumpkin anxiety private salon inquiry ....
+
+
+Press any key when you have written down your mnemonic.
+
+Please type your mnemonic (separated by spaces) to confirm you have written it down
+
+: pumpkin anxiety private salon inquiry ....
+
+done.
+```
+#### Options:
+- `--language` - Choose your mnemonic language
+- `--no-verify` - Skips mnemonic verification when provided.
+
+**NB! You must store the generated mnemonic in a secure cold storage.
+It will allow you to restore the keys in case the Vault will get corrupted or lost.**
+
+### 2. Create keys
+Creates deposit data and validator keystores files for operator service:
+
+```bash
+./key-manager create-keys
+```
+```
+Enter the number of the validator keys to generate: 10
+Enter the mnemonic for generating the validator keys: pumpkin anxiety private salon inquiry ....
+Enter the network name (goerli) [goerli]:
+Enter the vault address for which the validator keys are generated: 0x56FED...07E7
+Enter the mnemonic start index for generating validator keys [0]:
+Creating validator keys:		  [####################################]  10/10
+Generating deposit data JSON		  [####################################]  10/10
+Exporting validator keystores		  [####################################]  10/10
+
+Done. Generated 10 keys for 0x56FED...07E7 vault.
+Keystores saved to ./data/keystores file
+Deposit data saved to ./data/deposit_data.json file
+Next mnemonic start index saved to ./mnemonic_next_index.txt file
+```
+#### Options:
+- `--network` - The network to generate the deposit data for.
+- `--mnemonic` - The mnemonic for generating the validator keys.
+- `--count` - The number of the validator keys to generate.
+- `--vault` or `--withdrawal-address` -The withdrawal address where the funds will be sent after validators’ withdrawals.
+- `--admin` - The vault admin address.
+- `--vault-type` - The vault type.
+- `--execution-endpoint` - The endpoint of the execution node used for computing the with.
+- `--deposit-data-file` - The path to store the deposit data file. Defaults to ./data/deposit_data.json.
+- `--keystores` - The directory to store the validator keys in the EIP-2335 standard. Defaults to ./data/keystores.
+- `--password-file` - The path to store randomly generated password for encrypting the keystores. Defaults to ./data/keystores/password.txt.
+- `--mnemonic-start-index` - The index of the first validator keys you wish to generate. If this is your first time generating keys with this mnemonic, use 0. If you have generated keys using this mnemonic before, add --mnemonic-next-index-file flag or specify the next index from which you want to start generating keys from (eg, if you've generated 4 keys before (keys #0, #1, #2, #3) then enter 4 here.
+- `--mnemonic-next-index-file` - The path where to store the mnemonic index to use for generating next validator keys. Used to always generate unique validator keys. Defaults to ./mnemonic_next_index.txt.
+
+
+### 3. Create wallets
+
+Creates the encrypted hot wallet from the mnemonic.
+
+```bash
+./key-manager create-wallet
+```
+```
+Enter the mnemonic for generating the wallet: pumpkin anxiety private salon inquiry ...
+Done. Wallet 0xf5fF7...B914a-1677838759.json saved to ./wallet directory
+```
+#### Options:
+- `--mnemonic` - The mnemonic for generating the validator keys.
+- `--wallet-dir` - The directory to save encrypted wallet and password files. Defaults to ./wallet.
+
 
 ### Step 1. Install execution node
 

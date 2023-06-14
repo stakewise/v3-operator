@@ -8,7 +8,7 @@ from sw_utils.typings import ConsensusFork
 from web3 import Web3
 
 from src.common.typings import Oracles
-from src.config.settings import NETWORK_CONFIG
+from src.config.settings import settings
 from src.validators.typings import BLSPrivkey, ExitSignatureShards
 
 
@@ -37,7 +37,7 @@ def get_exit_signature_shards(
     """Generates exit signature shards and encrypts them with oracles' RSA keys."""
     message = get_exit_message_signing_root(
         validator_index=validator_index,
-        genesis_validators_root=NETWORK_CONFIG.GENESIS_VALIDATORS_ROOT,
+        genesis_validators_root=settings.NETWORK_CONFIG.GENESIS_VALIDATORS_ROOT,
         fork=fork
     )
 

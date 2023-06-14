@@ -10,16 +10,7 @@ from src.common.accounts import operator_account
 from src.common.clients import consensus_client, db_client, execution_client
 from src.common.execution import check_operator_balance, get_oracles
 from src.common.utils import count_files_in_folder
-from src.config.settings import (
-    CONSENSUS_ENDPOINT,
-    DATABASE,
-    DEPOSIT_DATA_PATH,
-    EXECUTION_ENDPOINT,
-    IPFS_FETCH_ENDPOINTS,
-    KEYSTORES_PASSWORD_DIR,
-    KEYSTORES_PASSWORD_FILE,
-    KEYSTORES_PATH,
-)
+from src.config.settings import settings
 from src.validators.utils import count_deposit_data_non_exited_keys
 
 logger = logging.getLogger(__name__)
@@ -33,7 +24,7 @@ async def wait_for_consensus_node() -> None:
             data = await consensus_client.get_finality_checkpoint()
             logger.info(
                 'Connected to consensus node at %s. Finalized epoch: %s',
-                CONSENSUS_ENDPOINT,
+                settings.CONSENSUS_ENDPOINT,
                 data['data']['finalized']['epoch'],
             )
             break
@@ -48,7 +39,7 @@ async def wait_for_execution_node() -> None:
             block_number = await execution_client.eth.block_number  # type: ignore
             logger.info(
                 'Connected to execution node at %s. Current block number: %s',
-                EXECUTION_ENDPOINT,
+                settings.EXECUTION_ENDPOINT,
                 block_number,
             )
             break
@@ -79,41 +70,42 @@ async def collect_healthy_oracles() -> list:
 
 
 def wait_for_keystores_path() -> None:
-    while not path.exists(KEYSTORES_PATH):
+    while not path.exists(settings.KEYSTORES_PATH):
         logger.warning(
             "Can't find keystores directory (%s)",
-            KEYSTORES_PATH,
+            settings.KEYSTORES_PATH,
         )
         time.sleep(15)
 
 
 def wait_for_keystores_password_file() -> None:
-    while not path.exists(KEYSTORES_PASSWORD_FILE):
+    while not path.exists(settings.KEYSTORES_PASSWORD_FILE):  # type: ignore
         logger.warning(
             "Can't find password file (%s)",
-            KEYSTORES_PASSWORD_FILE
+            settings.KEYSTORES_PASSWORD_FILE
         )
         time.sleep(15)
 
 
 def wait_for_keystores_password_dir() -> None:
-    while not path.exists(KEYSTORES_PASSWORD_DIR):
+    while not path.exists(settings.KEYSTORES_PASSWORD_DIR):  # type: ignore
         logger.warning(
             "Can't find password dir (%s)",
-            KEYSTORES_PASSWORD_DIR
+            settings.KEYSTORES_PASSWORD_DIR
         )
         time.sleep(15)
 
 
 async def wait_for_keystore_files() -> None:
+    keystores_count = count_files_in_folder(settings.KEYSTORES_PATH, '.json')
     while (
-        await count_deposit_data_non_exited_keys() >= count_files_in_folder(KEYSTORES_PATH, '.json')
+        await count_deposit_data_non_exited_keys() >= keystores_count
     ):
         logger.warning(
             '''The number of validators in deposit data
             (%s) and keystores directory (%s) is different.''',
-            DEPOSIT_DATA_PATH,
-            KEYSTORES_PATH
+            settings.DEPOSIT_DATA_PATH,
+            settings.KEYSTORES_PATH
         )
         time.sleep(15)
 
@@ -127,7 +119,7 @@ async def startup_checks():
     db_client.create_db_dir()
     with db_client.get_db_connection() as conn:
         conn.cursor()
-    logger.info('Connected to database %s.', DATABASE)
+    logger.info('Connected to database %s.', settings.DATABASE)
 
     logger.info('Checking connection to consensus node...')
     await wait_for_consensus_node()
@@ -137,7 +129,7 @@ async def startup_checks():
 
     logger.info('Checking connection to ipfs nodes...')
     healthy_ipfs_endpoint = []
-    for endpoint in IPFS_FETCH_ENDPOINTS:
+    for endpoint in settings.IPFS_FETCH_ENDPOINTS:
         client = IpfsFetchClient([endpoint])
         try:
             await client.fetch_json(IPFS_HASH_EXAMPLE)
@@ -152,15 +144,15 @@ async def startup_checks():
     logger.info('Connected to oracles at %s', ', '.join(healthy_oracles))
 
     logger.info('Checking deposit data file exists...')
-    while not path.exists(DEPOSIT_DATA_PATH):
-        logger.warning("Can't find deposit data file (%s)", DEPOSIT_DATA_PATH)
+    while not path.exists(settings.DEPOSIT_DATA_PATH):
+        logger.warning("Can't find deposit data file (%s)", settings.DEPOSIT_DATA_PATH)
         time.sleep(15)
-    logger.info('Found deposit data file at %s', DEPOSIT_DATA_PATH)
+    logger.info('Found deposit data file at %s', settings.DEPOSIT_DATA_PATH)
 
-    if not KEYSTORES_PASSWORD_FILE and not KEYSTORES_PASSWORD_DIR:
+    if not settings.KEYSTORES_PASSWORD_FILE and not settings.KEYSTORES_PASSWORD_DIR:
         raise ValueError('KEYSTORES_PASSWORD_FILE or KEYSTORES_PASSWORD_DIR must be set')
 
-    if KEYSTORES_PASSWORD_FILE and KEYSTORES_PASSWORD_DIR:
+    if settings.KEYSTORES_PASSWORD_FILE and settings.KEYSTORES_PASSWORD_DIR:
         raise ValueError(
             'Only one of KEYSTORES_PASSWORD_FILE or KEYSTORES_PASSWORD_DIR must be set'
         )
@@ -169,12 +161,12 @@ async def startup_checks():
     wait_for_keystores_path()
     logger.info('Found keystores dir')
 
-    if KEYSTORES_PASSWORD_FILE:
+    if settings.KEYSTORES_PASSWORD_FILE:
         logger.info('Checking keystore password file...')
         wait_for_keystores_password_file()
         logger.info('Found keystores password file')
 
-    if KEYSTORES_PASSWORD_DIR:
+    if settings.KEYSTORES_PASSWORD_DIR:
         logger.info('Checking keystore password dir...')
         wait_for_keystores_password_dir()
         logger.info('Found keystores password dir')
