@@ -28,7 +28,7 @@ class VaultConfig:
         self.config_path = self.data_dir / 'config.json'
 
     @property
-    def exist(self) -> bool:
+    def exists(self) -> bool:
         return self.config_path.is_file()
 
     def load(self):

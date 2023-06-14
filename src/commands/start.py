@@ -143,7 +143,7 @@ def setup_config(*args, **kwargs) -> None:
     network = kwargs.pop('network') or decouple_config('NETWORK', default='')
     data_dir = kwargs.pop('data_dir') or decouple_config('DATA_DIR', default='')
     config = VaultConfig(vault=vault, data_dir=data_dir)
-    if config.exist:
+    if config.exists:
         config.load()
 
         if vault and vault != config.vault:
