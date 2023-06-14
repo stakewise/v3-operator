@@ -203,11 +203,11 @@ class Settings(metaclass=Singleton):
 
     @property
     def HARVEST_VAULT(self) -> bool:
-        return bool(self.harvest_vault)
+        return self.harvest_vault
 
     @property
     def MAX_FEE_PER_GAS_GWEI(self) -> int:
-        return int(self.max_fee_per_gas_gwei)
+        return self.max_fee_per_gas_gwei
 
     @property
     def APPROVAL_MAX_VALIDATORS(self) -> int:
@@ -220,10 +220,6 @@ class Settings(metaclass=Singleton):
     @property
     def SENTRY_DSN(self) -> str | None:
         return self.sentry_dsn
-
-    @property
-    def VAULT_CONFIG(self) -> str:
-        return f'{self.NETWORK}_network_validators'
 
 
 settings = Settings()
