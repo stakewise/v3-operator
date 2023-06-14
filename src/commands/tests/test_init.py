@@ -24,7 +24,7 @@ class TestCreateMnemonic(unittest.TestCase):
             'goerli'
         ]
         with runner.isolated_filesystem():
-            result = runner.invoke(init, args, input=f'a\n{mnemonic}\n')
+            result = runner.invoke(init, args, input=f'a\n\n{mnemonic}\n')
             assert result.exit_code == 0
             mnemonic_mock.assert_called_once()
             assert mnemonic in result.output.strip()
@@ -42,7 +42,7 @@ class TestCreateMnemonic(unittest.TestCase):
             'goerli'
         ]
         with runner.isolated_filesystem():
-            result = runner.invoke(init, args, input=f'a\n{mnemonic} bad\na\n{mnemonic}\n')
+            result = runner.invoke(init, args, input=f'a\n\n{mnemonic} bad\n\na\n\n{mnemonic}\n')
             assert result.exit_code == 0
             mnemonic_mock.assert_called_once()
             assert mnemonic in result.output.strip()
