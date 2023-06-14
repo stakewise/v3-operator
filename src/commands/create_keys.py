@@ -5,7 +5,7 @@ from os import makedirs, path
 import click
 from eth_typing import HexAddress
 
-from src.common.config import Config
+from src.common.config import VaultConfig
 from src.common.contrib import async_command, greenify
 from src.common.credentials import Credential, CredentialManager
 from src.common.password import get_or_create_password_file
@@ -48,8 +48,12 @@ async def create_keys(
     vault: HexAddress,
     data_dir: str,
 ) -> None:
-    config = Config(vault=vault, data_dir=data_dir)
+    config = VaultConfig(vault=vault, data_dir=data_dir)
     config.load()
+    if vault != config.vault:
+        raise click.ClickException(
+            f'Invalid vault. Please use data-dir provided for {vault} init command.'
+        )
 
     first_public_key = CredentialManager.generate_credential_first_public_key(
         config.network, vault, str(mnemonic)

@@ -47,9 +47,9 @@ class Settings(metaclass=Singleton):
     # pylint: disable-next=too-many-arguments,too-many-locals
     def set(
         self,
-        data_dir: Path | None = None,
-        network: str | None = None,
         vault: str | None = None,
+        network: str | None = None,
+        data_dir: Path | None = None,
         verbose: bool | None = None,
         log_level: str | None = None,
         execution_endpoint: str | None = None,
@@ -69,6 +69,7 @@ class Settings(metaclass=Singleton):
         validators_fetch_chunk_size: int | None = None,
         sentry_dsn: str | None = None,
     ):
+        self.vault = vault or decouple_config('VAULT_CONTRACT_ADDRESS')
         self.network = network or decouple_config('NETWORK', cast=Choices([GOERLI]))
         self.verbose = verbose or decouple_config('VERBOSE', default=False)
         self.log_level = log_level or decouple_config('LOG_LEVEL', default='INFO')
@@ -81,7 +82,6 @@ class Settings(metaclass=Singleton):
             'http://cloudflare-ipfs.com,'
             'https://gateway.pinata.cloud,https://ipfs.io',
         )
-        self.vault = vault or decouple_config('VAULT_CONTRACT_ADDRESS')
         self.data_dir = data_dir or Path(DATA_DIR) / str(self.vault)
         self.database_dir = database_dir or decouple_config('DATABASE_DIR', default=None)
         self.keystores_path = keystores_path or decouple_config('KEYSTORES_PATH', default=None)

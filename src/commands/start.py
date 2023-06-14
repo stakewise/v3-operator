@@ -3,10 +3,12 @@ import logging
 import time
 
 import click
+from decouple import config as decouple_config
 from sw_utils import EventScanner, InterruptHandler
 
 import src
 from src.common.accounts import operator_account
+from src.common.config import VaultConfig
 from src.common.validators import validate_eth_address
 from src.config.settings import AVAILABLE_NETWORKS, settings
 from src.exits.tasks import update_exit_signatures
@@ -67,8 +69,29 @@ logger = logging.getLogger(__name__)
 @click.option('-v', '--verbose', help='Enable debug mode', is_flag=True)
 @click.command(help='Start operator service')
 def start(*args, **kwargs) -> None:
-    # setup config
-    settings.set(*args, **kwargs)
+    # validate vault config
+    vault = kwargs.pop('vault', decouple_config('VAULT_CONTRACT_ADDRESS', default=''))
+    network = kwargs.pop('network', decouple_config('NETWORK', default=''))
+    config = VaultConfig(vault=vault, data_dir=kwargs.get('data_dir', ''))
+    if config.is_exist:
+        config.load()
+
+        if vault and vault != config.vault:
+            raise click.ClickException(
+                f'Invalid vault address. Please use data-dir provided for {vault} init command.'
+            )
+        if not vault:
+            vault = config.vault
+
+        if network and network != config.network:
+            raise click.ClickException(
+                f'Invalid vault network. Please use data-dir provided for {vault} init command.'
+            )
+        if not network:
+            network = config.network
+
+    settings.set(vault=vault, network=network, *args, **kwargs)  # type: ignore
+
     try:
         asyncio.run(main())
     except Exception as e:

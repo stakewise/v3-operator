@@ -1,7 +1,7 @@
 import click
 from eth_typing import HexAddress
 
-from src.common.config import Config
+from src.common.config import VaultConfig
 from src.common.credentials import CredentialManager
 from src.common.language import LANGUAGES, create_new_mnemonic
 from src.common.validators import validate_eth_address
@@ -54,11 +54,9 @@ def init(
     network: str,
     data_dir: str,
 ) -> None:
-    config = Config(
+    config = VaultConfig(
         data_dir=data_dir,
         vault=vault,
-        network=network,
-        mnemonic_next_index=0,
     )
     if config.data_dir.exists():
         raise click.ClickException(f'Vault directory {config.data_dir} already exists.')
@@ -75,8 +73,11 @@ def init(
         network, vault, str(mnemonic)
     )
 
-    config.first_public_key = first_public_key
-    config.create()
+    config.save(
+        network=network,
+        mnemonic_next_index=0,
+        first_public_key=first_public_key,
+    )
     if not no_verify:
         click.secho(
             f'Successfully initialized configuration for vault {vault}',

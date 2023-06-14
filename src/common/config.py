@@ -4,19 +4,20 @@ from pathlib import Path
 
 import click
 from eth_typing import HexAddress
+from web3 import Web3
 
 from src.config.settings import AVAILABLE_NETWORKS
 
 
-class Config:
-    # pylint: disable-next=too-many-arguments
+class VaultConfig:
+    network: str = ''
+    mnemonic_next_index: int = 0
+    first_public_key: str | None = None
+
     def __init__(
         self,
         data_dir: str,
         vault: HexAddress,
-        network: str = '',
-        mnemonic_next_index: int = 0,
-        first_public_key: str | None = None
     ):
         self.vault = vault
         if data_dir:
@@ -24,14 +25,16 @@ class Config:
         else:
             self.data_dir = Path.home() / '.stakewise' / vault
         self.config_path = self.data_dir / 'config.json'
-        self.network = network
-        self.mnemonic_next_index = mnemonic_next_index
-        self.first_public_key = first_public_key
+
+    @property
+    def is_exist(self) -> bool:
+        return self.config_path.is_file()
 
     def load(self):
         if self.config_path.is_file():
             with self.config_path.open('r') as f:
                 config = json.load(f)
+            self.vault = config.get('vault')
             self.network = config.get('network')
             self.mnemonic_next_index = config.get('mnemonic_next_index')
             self.first_public_key = config.get('first_public_key')
@@ -39,11 +42,17 @@ class Config:
             raise click.ClickException(f'{self.config_path} is not a file')
         self._validate()
 
-    def create(self):
+    def save(
+        self,
+        network: str = '',
+        mnemonic_next_index: int = 0,
+        first_public_key: str | None = None
+     ):
         config = {
-            'network': self.network,
-            'mnemonic_next_index': self.mnemonic_next_index,
-            'first_public_key': self.first_public_key,
+            'vault': self.vault,
+            'network': network,
+            'mnemonic_next_index': mnemonic_next_index,
+            'first_public_key': first_public_key,
         }
 
         self._validate()
@@ -52,7 +61,6 @@ class Config:
             json.dump(config, f)
 
     def update(self, network=None, mnemonic_next_index=None, first_public_key=None):
-        self.load()
         if network is not None:
             self.network = network
         if mnemonic_next_index is not None:
@@ -70,6 +78,12 @@ class Config:
 
     def _validate(self):
         """Validates the loaded configuration data."""
+        if not self.vault:
+            raise click.ClickException('Vault is not set in the configuration.')
+
+        if Web3.is_checksum_address(self.vault):
+            raise click.ClickException('Invalid vault address.')
+
         if not self.network:
             raise click.ClickException('Network is not set in the configuration.')
 
