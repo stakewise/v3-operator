@@ -24,10 +24,10 @@ import click
 )
 @click.command(
     help='Merges multiple deposit data files into one. The first validator in '
-         'the merged file will be the validator from the first deposit data file, '
-         'then the first validator key from the second file, etc., until all the first keys '
-         'from all the deposit data files are processed. '
-         'Then it continues with the second key from each file the same way.'
+    'the merged file will be the validator from the first deposit data file, '
+    'then the first validator key from the second file, etc., until all the first keys '
+    'from all the deposit data files are processed. '
+    'Then it continues with the second key from each file the same way.'
 )
 def merge_deposit_data(deposit_data: tuple, output_file: str) -> None:
     if len(deposit_data) <= 1:

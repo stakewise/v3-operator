@@ -14,14 +14,7 @@ class TestCreateMnemonic(unittest.TestCase):
     def test_basic(self, mnemonic_mock):
         vault = faker.eth_address()
         runner = CliRunner()
-        args = [
-            '--language',
-            'english',
-            '--vault',
-            vault,
-            '--network',
-            'goerli'
-        ]
+        args = ['--language', 'english', '--vault', vault, '--network', 'goerli']
         with runner.isolated_filesystem():
             result = runner.invoke(init, args, input=f'a\n\n{mnemonic}\n')
             assert result.exit_code == 0
@@ -32,14 +25,7 @@ class TestCreateMnemonic(unittest.TestCase):
     def test_bad_verify(self, mnemonic_mock):
         vault = faker.eth_address()
         runner = CliRunner()
-        args = [
-            '--language',
-            'english',
-            '--vault',
-            vault,
-            '--network',
-            'goerli'
-        ]
+        args = ['--language', 'english', '--vault', vault, '--network', 'goerli']
         with runner.isolated_filesystem():
             result = runner.invoke(init, args, input=f'a\n\n{mnemonic} bad\n\na\n\n{mnemonic}\n')
             assert result.exit_code == 0
@@ -50,15 +36,7 @@ class TestCreateMnemonic(unittest.TestCase):
     def test_no_verify(self, mnemonic_mock):
         vault = faker.eth_address()
         runner = CliRunner()
-        args = [
-            '--language',
-            'english',
-            '--no-verify',
-            '--vault',
-            vault,
-            '--network',
-            'goerli'
-        ]
+        args = ['--language', 'english', '--no-verify', '--vault', vault, '--network', 'goerli']
         with runner.isolated_filesystem():
             result = runner.invoke(init, args)
             assert result.exit_code == 0

@@ -108,7 +108,8 @@ def list_keystore_files() -> list[KeystoreFile]:
     KEYSTORES_PASSWORD_FILE = settings.KEYSTORES_PASSWORD_FILE
     KEYSTORES_PASSWORD_DIR = settings.KEYSTORES_PASSWORD_DIR
     key_files = [
-        f for f in listdir(KEYSTORES_PATH)
+        f
+        for f in listdir(KEYSTORES_PATH)
         if isfile(join(KEYSTORES_PATH, f)) and f.startswith('keystore') and f.endswith('.json')
     ]
 
@@ -186,13 +187,12 @@ async def load_deposit_data() -> DepositData:
     tree = StandardMerkleTree.of(leaves, ['bytes', 'uint256'])
     await check_deposit_data_root(tree.root)
 
-    logger.info('Loaded deposit data file %s', settings. DEPOSIT_DATA_PATH)
+    logger.info('Loaded deposit data file %s', settings.DEPOSIT_DATA_PATH)
     return DepositData(validators=validators, tree=tree)
 
 
 def _process_keystore_file(
-    keystore_file: KeystoreFile,
-    keystore_path: Path
+    keystore_file: KeystoreFile, keystore_path: Path
 ) -> tuple[HexStr, BLSPrivkey] | None:
     file_name = keystore_file.name
     keystores_password = keystore_file.password
@@ -223,7 +223,7 @@ async def count_deposit_data_non_exited_keys() -> int:
 
     for i in range(0, len(validator_ids), settings.VALIDATORS_FETCH_CHUNK_SIZE):
         validators = await consensus_client.get_validators_by_ids(
-            validator_ids[i: i + settings.VALIDATORS_FETCH_CHUNK_SIZE]
+            validator_ids[i : i + settings.VALIDATORS_FETCH_CHUNK_SIZE]
         )
         validator_statuses.extend(validators['data'])
 

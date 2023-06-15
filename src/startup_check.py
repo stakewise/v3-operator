@@ -80,32 +80,24 @@ def wait_for_keystores_path() -> None:
 
 def wait_for_keystores_password_file() -> None:
     while not path.exists(settings.KEYSTORES_PASSWORD_FILE):  # type: ignore
-        logger.warning(
-            "Can't find password file (%s)",
-            settings.KEYSTORES_PASSWORD_FILE
-        )
+        logger.warning("Can't find password file (%s)", settings.KEYSTORES_PASSWORD_FILE)
         time.sleep(15)
 
 
 def wait_for_keystores_password_dir() -> None:
     while not path.exists(settings.KEYSTORES_PASSWORD_DIR):  # type: ignore
-        logger.warning(
-            "Can't find password dir (%s)",
-            settings.KEYSTORES_PASSWORD_DIR
-        )
+        logger.warning("Can't find password dir (%s)", settings.KEYSTORES_PASSWORD_DIR)
         time.sleep(15)
 
 
 async def wait_for_keystore_files() -> None:
     keystores_count = count_files_in_folder(settings.KEYSTORES_PATH, '.json')
-    while (
-        await count_deposit_data_non_exited_keys() >= keystores_count
-    ):
+    while await count_deposit_data_non_exited_keys() >= keystores_count:
         logger.warning(
             '''The number of validators in deposit data
             (%s) and keystores directory (%s) is different.''',
             settings.DEPOSIT_DATA_PATH,
-            settings.KEYSTORES_PATH
+            settings.KEYSTORES_PATH,
         )
         time.sleep(15)
 

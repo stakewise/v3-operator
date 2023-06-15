@@ -42,8 +42,7 @@ from src.config.settings import AVAILABLE_NETWORKS, GOERLI
 @click.option(
     '--data-dir',
     required=False,
-    help='Path where the vault data will be placed. '
-    'Defaults to ~/.stakewise/<vault>',
+    help='Path where the vault data will be placed. ' 'Defaults to ~/.stakewise/<vault>',
     type=click.Path(exists=False, file_okay=False, dir_okay=True),
 )
 @click.command(help='Initializes vault data directory and generates mnemonic.')
@@ -80,7 +79,5 @@ def init(
     )
     if not no_verify:
         click.secho(
-            f'Successfully initialized configuration for vault {vault}',
-            bold=True,
-            fg='green'
+            f'Successfully initialized configuration for vault {vault}', bold=True, fg='green'
         )

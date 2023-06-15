@@ -12,7 +12,7 @@ async def get_validator_public_keys(validator_indexes: list[int]) -> dict[int, H
     result = {}
     for i in range(0, len(indexes), settings.VALIDATORS_FETCH_CHUNK_SIZE):
         validators = await consensus_client.get_validators_by_ids(
-            indexes[i: i + settings.VALIDATORS_FETCH_CHUNK_SIZE]
+            indexes[i : i + settings.VALIDATORS_FETCH_CHUNK_SIZE]
         )
         for beacon_validator in validators['data']:
             result[int(beacon_validator['index'])] = beacon_validator['validator']['pubkey']

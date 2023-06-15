@@ -44,11 +44,8 @@ class VaultConfig:
         self._validate()
 
     def save(
-        self,
-        network: str = '',
-        mnemonic_next_index: int = 0,
-        first_public_key: str | None = None
-     ):
+        self, network: str = '', mnemonic_next_index: int = 0, first_public_key: str | None = None
+    ):
         self.network = network
         self.mnemonic_next_index = mnemonic_next_index
         self.first_public_key = first_public_key

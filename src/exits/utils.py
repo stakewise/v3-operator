@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 async def send_signature_rotation_requests(
-        oracles: Oracles, request: SignatureRotationRequest
+    oracles: Oracles, request: SignatureRotationRequest
 ) -> tuple[bytes, str]:
     """Requests exit signature rotation from all oracles."""
     payload = dataclasses.asdict(request)
