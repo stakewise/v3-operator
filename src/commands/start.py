@@ -9,8 +9,8 @@ from sw_utils import EventScanner, InterruptHandler
 
 import src
 from src.common.config import VaultConfig
-from src.common.validators import validate_eth_address
 from src.common.metrics import metrics_server
+from src.common.validators import validate_eth_address
 from src.config.settings import AVAILABLE_NETWORKS, settings
 from src.exits.tasks import update_exit_signatures
 from src.harvest.tasks import harvest_vault
@@ -18,7 +18,10 @@ from src.startup_check import startup_checks
 from src.utils import get_build_version, log_verbose
 from src.validators.consensus import get_chain_finalized_head
 from src.validators.database import NetworkValidatorCrud
-from src.validators.execution import NetworkValidatorsProcessor, update_unused_validator_keys_metric
+from src.validators.execution import (
+    NetworkValidatorsProcessor,
+    update_unused_validator_keys_metric,
+)
 from src.validators.tasks import load_genesis_validators, register_validators
 from src.validators.utils import load_deposit_data, load_keystores
 

@@ -1,7 +1,7 @@
 import toml  # type: ignore
 from prometheus_client import Gauge, Info, start_http_server
 
-from src.config.settings import METRICS_HOST, METRICS_PORT
+from src.config.settings import settings
 
 
 class Metrics:
@@ -26,4 +26,4 @@ metrics.set_app_version()
 
 
 async def metrics_server() -> None:
-    start_http_server(METRICS_PORT, METRICS_HOST)
+    start_http_server(int(settings.METRICS_PORT), str(settings.METRICS_HOST))

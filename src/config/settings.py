@@ -228,11 +228,11 @@ class Settings(metaclass=Singleton):
         return self.sentry_dsn
 
     @property
-    def METRICS_HOST(self) -> str | None:
+    def METRICS_HOST(self) -> str:
         return self.metrics_host
 
     @property
-    def METRICS_PORT(self) -> str | None:
+    def METRICS_PORT(self) -> int:
         return self.metrics_port
 
 
