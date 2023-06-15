@@ -5,7 +5,7 @@ from urllib.parse import urljoin
 import aiohttp
 from web3.types import HexStr
 
-from src.common.execution import check_wallet_balance, get_oracles
+from src.common.execution import check_hot_wallet_balance, get_oracles
 from src.config.settings import OUTDATED_SIGNATURES_URL_PATH, settings
 from src.exits.consensus import get_validator_public_keys
 from src.exits.execution import submit_exit_signatures
@@ -43,7 +43,7 @@ async def update_exit_signatures(keystores: Keystores) -> None:
     )
 
     # check balance after transaction
-    await check_wallet_balance()
+    await check_hot_wallet_balance()
 
 
 async def _fetch_outdated_indexes(oracle_endpoint: str) -> list[int]:

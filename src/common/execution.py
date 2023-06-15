@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 @backoff_aiohttp_errors(max_time=300)
-async def get_wallet_balance() -> Wei:
+async def get_hot_wallet_balance() -> Wei:
     return await execution_client.eth.get_balance(hot_wallet.address)  # type: ignore
 
 
@@ -25,17 +25,17 @@ async def can_harvest(vault_address: ChecksumAddress) -> bool:
     return await keeper_contract.functions.canHarvest(vault_address).call()
 
 
-async def check_wallet_balance() -> None:
-    wallet_min_balance = settings.NETWORK_CONFIG.WALLET_MIN_BALANCE
+async def check_hot_wallet_balance() -> None:
+    hot_wallet_min_balance = settings.NETWORK_CONFIG.HOT_WALLET_MIN_BALANCE
     symbol = settings.NETWORK_CONFIG.SYMBOL
 
-    if wallet_min_balance <= 0:
+    if hot_wallet_min_balance <= 0:
         return
 
-    if (await get_wallet_balance()) < wallet_min_balance:
+    if (await get_hot_wallet_balance()) < hot_wallet_min_balance:
         logger.warning(
             'Wallet balance is too low. At least %s %s is recommended.',
-            Web3.from_wei(wallet_min_balance, 'ether'),
+            Web3.from_wei(hot_wallet_min_balance, 'ether'),
             symbol,
         )
 

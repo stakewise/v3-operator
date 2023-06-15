@@ -7,7 +7,7 @@ from aiohttp import ClientSession, ClientTimeout
 from sw_utils import IpfsFetchClient
 
 from src.common.clients import consensus_client, db_client, execution_client
-from src.common.execution import check_wallet_balance, get_oracles
+from src.common.execution import check_hot_wallet_balance, get_oracles
 from src.common.utils import count_files_in_folder
 from src.common.wallet import hot_wallet
 from src.config.settings import settings
@@ -111,9 +111,9 @@ async def wait_for_keystore_files() -> None:
 
 
 async def startup_checks():
-    logger.info('Checking wallet balance %s...', hot_wallet.address)
+    logger.info('Checking hot wallet balance %s...', hot_wallet.address)
 
-    await check_wallet_balance()
+    await check_hot_wallet_balance()
 
     logger.info('Checking connection to database...')
     db_client.create_db_dir()

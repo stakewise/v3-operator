@@ -4,7 +4,11 @@ from web3 import Web3
 from web3.types import BlockNumber, Wei
 
 from src.common.clients import ipfs_fetch_client
-from src.common.execution import check_wallet_balance, get_max_fee_per_gas, get_oracles
+from src.common.execution import (
+    check_hot_wallet_balance,
+    get_max_fee_per_gas,
+    get_oracles,
+)
 from src.common.utils import MGNO_RATE, WAD
 from src.config.networks import GNOSIS
 from src.config.settings import DEPOSIT_AMOUNT, settings
@@ -85,7 +89,7 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
         logger.info('Successfully registered validators with public keys %s', pub_keys)
 
     # check balance after transaction
-    await check_wallet_balance()
+    await check_hot_wallet_balance()
 
 
 async def get_oracles_approval(
