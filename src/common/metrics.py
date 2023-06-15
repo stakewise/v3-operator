@@ -26,4 +26,4 @@ metrics.set_app_version()
 
 
 async def metrics_server() -> None:
-    start_http_server(int(settings.METRICS_PORT), str(settings.METRICS_HOST))
+    start_http_server(settings.METRICS_PORT, settings.METRICS_HOST)
