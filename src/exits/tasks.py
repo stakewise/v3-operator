@@ -7,7 +7,7 @@ from web3.types import HexStr
 
 from src.common.execution import check_hot_wallet_balance, get_oracles
 from src.common.metrics import metrics
-from src.config.settings import OUTDATED_SIGNATURES_URL_PATH, VAULT_CONTRACT_ADDRESS
+from src.config.settings import OUTDATED_SIGNATURES_URL_PATH, settings
 from src.exits.consensus import get_validator_public_keys
 from src.exits.execution import submit_exit_signatures
 from src.exits.typings import OraclesApproval, SignatureRotationRequest
@@ -50,7 +50,7 @@ async def update_exit_signatures(keystores: Keystores) -> None:
 
 
 async def _fetch_outdated_indexes(oracle_endpoint: str) -> list[int]:
-    path = OUTDATED_SIGNATURES_URL_PATH.format(vault=VAULT_CONTRACT_ADDRESS)
+    path = OUTDATED_SIGNATURES_URL_PATH.format(vault=settings.VAULT_CONTRACT_ADDRESS)
     url = urljoin(oracle_endpoint, path)
 
     async with aiohttp.ClientSession() as session:
@@ -71,7 +71,7 @@ async def get_oracles_approval(
 
     # get exit signature shards
     request = SignatureRotationRequest(
-        vault_address=VAULT_CONTRACT_ADDRESS,
+        vault_address=settings.VAULT_CONTRACT_ADDRESS,
         public_keys=[],
         public_key_shards=[],
         exit_signature_shards=[],
