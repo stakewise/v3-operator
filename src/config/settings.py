@@ -8,40 +8,7 @@ from web3.types import ChecksumAddress
 
 from src.config.networks import GOERLI, NETWORKS, NetworkConfig
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--network', type=str,
-                    help='The network of the Vault. Choices are: mainnet, gnosis, goerli')
-parser.add_argument('--vault-contract-address', type=str,
-                    help='Address of the Vault to register validators for')
-parser.add_argument('--database-dir', type=str,
-                    help='The directory where the database will be created or read from')
-parser.add_argument('--execution-endpoint', type=str,
-                    help='API endpoint for the execution node')
-parser.add_argument('--consensus-endpoint', type=str,
-                    help='API endpoint for the consensus node')
-parser.add_argument('--max-fee-per-gas-gwei', type=int,
-                    help='Maximum fee per gas limit')
-parser.add_argument('--keystores-password-path', type=str,
-                    help='Absolute path to the password file for decrypting keystores')
-parser.add_argument('--keystores-path', type=str,
-                    help='Absolute path to the directory with all the encrypted keystores')
-parser.add_argument('--deposit-data-path', type=str,
-                    help='Path to the deposit_data.json file')
-parser.add_argument('--operator-private-key', type=str,
-                    help='Private key of the hot wallet with ETH for submitting transactions')
-parser.add_argument('--operator-keystore-path', type=str,
-                    help='Absolute path to the directory with all the encrypted keystores')
-parser.add_argument('--operator-keystore-password-path', type=str,
-                    help='Absolute path to the password file for decrypting keystores')
-parser.add_argument('--harvest-vault',  action=argparse.BooleanOptionalAction,
-                    help='Periodically submit vault harvest transaction')
-parser.add_argument('--metrics-host', type=str,
-                    help='Prometheus metrics host, defaults to 127.0.0.1')
-parser.add_argument('--metrics-port', type=int,
-                    help='Prometheus metrics port, defaults to 9100')
-parser.add_argument('-v', '--verbose', help='Enable debug mode',
-                    action='store_true')
-args = parser.parse_args()
+DATA_DIR = Path.home() / '.stakewise'
 
 
 class Singleton(type):
@@ -76,6 +43,8 @@ class Settings(metaclass=Singleton):
     approval_max_validators: int
     validators_fetch_chunk_size: int
     sentry_dsn: str
+    metrics_host: str
+    metrics_port: int
 
     # pylint: disable-next=too-many-arguments,too-many-locals
     def set(
@@ -101,6 +70,8 @@ class Settings(metaclass=Singleton):
         approval_max_validators: int | None = None,
         validators_fetch_chunk_size: int | None = None,
         sentry_dsn: str | None = None,
+        metrics_host: str | None = None,
+        metrics_port: int | None = None,
     ):
         self.vault = vault or decouple_config('VAULT_CONTRACT_ADDRESS')
         self.network = network or decouple_config('NETWORK', cast=Choices([GOERLI]))
@@ -149,6 +120,8 @@ class Settings(metaclass=Singleton):
             'VALIDATORS_FETCH_CHUNK_SIZE', default=100, cast=int
         )
         self.sentry_dsn = sentry_dsn or decouple_config('SENTRY_DSN', default='')
+        self.metrics_host = metrics_host or decouple_config('METRICS_HOST', default='127.0.0.1')
+        self.metrics_port = metrics_port or decouple_config('METRICS_PORT', default=9100)
 
     @property
     def VERBOSE(self) -> bool:
@@ -254,6 +227,14 @@ class Settings(metaclass=Singleton):
     def SENTRY_DSN(self) -> str | None:
         return self.sentry_dsn
 
+    @property
+    def METRICS_HOST(self) -> str | None:
+        return self.metrics_host
+
+    @property
+    def METRICS_PORT(self) -> str | None:
+        return self.metrics_port
+
 
 settings = Settings()
 
@@ -270,14 +251,3 @@ DEPOSIT_AMOUNT_GWEI = int(Web3.from_wei(DEPOSIT_AMOUNT, 'gwei'))
 
 # Backoff retries
 DEFAULT_RETRY_TIME = 60
-
-# sentry config
-SENTRY_DSN = config('SENTRY_DSN', default='')
-
-# validators
-VALIDATORS_FETCH_CHUNK_SIZE = config(
-    'VALIDATORS_FETCH_CHUNK_SIZE', default=100, cast=int)
-
-# Prometheus metrics
-METRICS_HOST = config('METRICS_HOST', default='127.0.0.1')
-METRICS_PORT = config('METRICS_PORT', default=9100, cast=int)

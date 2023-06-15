@@ -33,11 +33,11 @@ async def check_hot_wallet_balance() -> None:
     if hot_wallet_min_balance <= 0:
         return
 
-    wallet_balance = await get_operator_balance()
+    hot_wallet_balance = await get_hot_wallet_balance()
 
-    metrics.wallet_balance.set(wallet_balance)
+    metrics.wallet_balance.set(hot_wallet_balance)
 
-    if (wallet_balance) < operator_min_balance:
+    if hot_wallet_balance < hot_wallet_min_balance:
         logger.warning(
             'Wallet balance is too low. At least %s %s is recommended.',
             Web3.from_wei(hot_wallet_min_balance, 'ether'),
