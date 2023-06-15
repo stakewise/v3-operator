@@ -233,7 +233,7 @@ async def update_unused_validator_keys_metric(
     for validator in deposit_data.validators:
         if validator.public_key not in keystores:
             continue
-        if is_validator_registered(validator.public_key):
+        if NetworkValidatorCrud().is_validator_registered(validator.public_key):
             continue
         validators += 1
 

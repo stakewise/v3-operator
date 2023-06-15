@@ -62,15 +62,14 @@ class NetworkValidatorCrud:
 
         return index + len(latest_public_keys)
 
-
-def setup() -> None:
-    """Creates tables."""
-    with db_client.get_db_connection() as conn:
-        conn.execute(
-            f"""
-                    CREATE TABLE IF NOT EXISTS {NETWORK_VALIDATORS_TABLE} (
-                        public_key VARCHAR(98) UNIQUE NOT NULL,
-                        block_number INTEGER NOT NULL
-                    )
-                    """
-        )
+    def setup(self) -> None:
+        """Creates tables."""
+        with db_client.get_db_connection() as conn:
+            conn.execute(
+                f"""
+                        CREATE TABLE IF NOT EXISTS {self.NETWORK_VALIDATORS_TABLE} (
+                            public_key VARCHAR(98) UNIQUE NOT NULL,
+                            block_number INTEGER NOT NULL
+                        )
+                        """
+            )

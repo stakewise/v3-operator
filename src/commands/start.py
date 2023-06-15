@@ -10,6 +10,7 @@ from sw_utils import EventScanner, InterruptHandler
 import src
 from src.common.config import VaultConfig
 from src.common.validators import validate_eth_address
+from src.common.metrics import metrics_server
 from src.config.settings import AVAILABLE_NETWORKS, settings
 from src.exits.tasks import update_exit_signatures
 from src.harvest.tasks import harvest_vault
@@ -17,7 +18,7 @@ from src.startup_check import startup_checks
 from src.utils import get_build_version, log_verbose
 from src.validators.consensus import get_chain_finalized_head
 from src.validators.database import NetworkValidatorCrud
-from src.validators.execution import NetworkValidatorsProcessor
+from src.validators.execution import NetworkValidatorsProcessor, update_unused_validator_keys_metric
 from src.validators.tasks import load_genesis_validators, register_validators
 from src.validators.utils import load_deposit_data, load_keystores
 
@@ -106,6 +107,7 @@ async def main() -> None:
     chain_state = await get_chain_finalized_head()
     to_block = chain_state.execution_block
     await network_validators_scanner.process_new_events(to_block)
+    await metrics_server()
 
     logger.info('Started operator service')
     interrupt_handler = InterruptHandler()
@@ -117,6 +119,7 @@ async def main() -> None:
             # process new network validators
             await network_validators_scanner.process_new_events(to_block)
             # check and register new validators
+            await update_unused_validator_keys_metric(keystores, deposit_data)
             await register_validators(keystores, deposit_data)
 
             # process outdated exit signatures
