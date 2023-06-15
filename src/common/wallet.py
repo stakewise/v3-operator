@@ -8,7 +8,7 @@ from eth_account.account import LocalAccount
 from src.config.settings import settings
 
 
-class OperatorAccount:
+class HotWallet:
 
     @cached_property
     def account(self) -> LocalAccount:
@@ -41,4 +41,4 @@ class OperatorAccount:
         return getattr(self.account, item)
 
 
-operator_account = OperatorAccount()
+hot_wallet = HotWallet()

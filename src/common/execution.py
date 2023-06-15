@@ -4,10 +4,10 @@ from sw_utils.decorators import backoff_aiohttp_errors
 from web3 import Web3
 from web3.types import ChecksumAddress, EventData, Wei
 
-from src.common.accounts import operator_account
 from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.contracts import keeper_contract, oracles_contract
 from src.common.typings import Oracles, RewardVoteInfo
+from src.common.wallet import hot_wallet
 from src.config.settings import DEFAULT_RETRY_TIME, settings
 
 SECONDS_PER_MONTH: int = 2628000
@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 
 
 @backoff_aiohttp_errors(max_time=300)
-async def get_operator_balance() -> Wei:
-    return await execution_client.eth.get_balance(operator_account.address)  # type: ignore
+async def get_hot_wallet_balance() -> Wei:
+    return await execution_client.eth.get_balance(hot_wallet.address)  # type: ignore
 
 
 @backoff_aiohttp_errors(max_time=300)
@@ -25,17 +25,17 @@ async def can_harvest(vault_address: ChecksumAddress) -> bool:
     return await keeper_contract.functions.canHarvest(vault_address).call()
 
 
-async def check_operator_balance() -> None:
-    operator_min_balance = settings.NETWORK_CONFIG.OPERATOR_MIN_BALANCE
+async def check_hot_wallet_balance() -> None:
+    hot_wallet_min_balance = settings.NETWORK_CONFIG.HOT_WALLET_MIN_BALANCE
     symbol = settings.NETWORK_CONFIG.SYMBOL
 
-    if operator_min_balance <= 0:
+    if hot_wallet_min_balance <= 0:
         return
 
-    if (await get_operator_balance()) < operator_min_balance:
+    if (await get_hot_wallet_balance()) < hot_wallet_min_balance:
         logger.warning(
-            'Operator balance is too low. At least %s %s is recommended.',
-            Web3.from_wei(operator_min_balance, 'ether'),
+            'Wallet balance is too low. At least %s %s is recommended.',
+            Web3.from_wei(hot_wallet_min_balance, 'ether'),
             symbol,
         )
 

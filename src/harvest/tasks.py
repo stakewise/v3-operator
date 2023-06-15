@@ -4,7 +4,7 @@ from web3 import Web3
 
 from src.common.execution import (
     can_harvest,
-    check_operator_balance,
+    check_hot_wallet_balance,
     get_last_rewards_update,
     get_max_fee_per_gas,
 )
@@ -43,4 +43,4 @@ async def harvest_vault() -> None:
     logger.info('Successfully harvested vault')
 
     # check balance after transaction
-    await check_operator_balance()
+    await check_hot_wallet_balance()
