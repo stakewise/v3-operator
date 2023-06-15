@@ -30,7 +30,7 @@ class NetworkConfig:
     SECONDS_PER_BLOCK: Decimal
     GENESIS_FORK_VERSION: bytes
     IS_POA: bool
-    OPERATOR_MIN_BALANCE: Wei
+    WALLET_MIN_BALANCE: Wei
 
 
 NETWORKS = {
@@ -55,7 +55,7 @@ NETWORKS = {
         SECONDS_PER_BLOCK=Decimal(12),
         GENESIS_FORK_VERSION=bytes.fromhex('00000000'),
         IS_POA=False,
-        OPERATOR_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
+        WALLET_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
     ),
     GOERLI: NetworkConfig(
         SYMBOL='GoerliETH',
@@ -81,7 +81,7 @@ NETWORKS = {
         SECONDS_PER_BLOCK=Decimal(12),
         GENESIS_FORK_VERSION=bytes.fromhex('00001020'),
         IS_POA=True,
-        OPERATOR_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
+        WALLET_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
     ),
     GNOSIS: NetworkConfig(
         SYMBOL='xDAI',
@@ -104,6 +104,6 @@ NETWORKS = {
         SECONDS_PER_BLOCK=Decimal('6.8'),
         GENESIS_FORK_VERSION=bytes.fromhex('00000064'),
         IS_POA=False,
-        OPERATOR_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
+        WALLET_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
     ),
 }

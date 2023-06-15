@@ -13,7 +13,7 @@ from sw_utils import (
 )
 from web3 import Web3
 
-from src.common.accounts import operator_account
+from src.common.wallet import hot_wallet
 from src.config.settings import DEFAULT_RETRY_TIME, settings
 
 
@@ -30,9 +30,9 @@ class ExecutionClient:
     def client(self) -> Web3:
         w3 = get_execution_client(settings.EXECUTION_ENDPOINT)
         w3.middleware_onion.add(
-            construct_async_sign_and_send_raw_middleware(operator_account.account)
+            construct_async_sign_and_send_raw_middleware(hot_wallet.account)
         )
-        w3.eth.default_account = operator_account.address
+        w3.eth.default_account = hot_wallet.address
         return w3
 
     def __getattr__(self, item):
