@@ -6,7 +6,7 @@ from sw_utils.tests.factories import faker
 
 from src.commands.init import init
 
-mnemonic = ' '.join([faker.word() for x in range(24)])
+mnemonic = ' '.join([faker.word().lower() for x in range(24)])
 
 
 @patch('src.common.language.get_mnemonic', return_value=mnemonic)
@@ -16,7 +16,7 @@ class TestCreateMnemonic(unittest.TestCase):
         runner = CliRunner()
         args = ['--language', 'english', '--vault', vault, '--network', 'goerli']
         with runner.isolated_filesystem():
-            result = runner.invoke(init, args, input=f'a\n\n{mnemonic}\n')
+            result = runner.invoke(init, args, input=f'\n{mnemonic}\n')
             assert result.exit_code == 0
             mnemonic_mock.assert_called_once()
             assert mnemonic in result.output.strip()
@@ -27,7 +27,7 @@ class TestCreateMnemonic(unittest.TestCase):
         runner = CliRunner()
         args = ['--language', 'english', '--vault', vault, '--network', 'goerli']
         with runner.isolated_filesystem():
-            result = runner.invoke(init, args, input=f'a\n\n{mnemonic} bad\n\na\n\n{mnemonic}\n')
+            result = runner.invoke(init, args, input=f'\n{mnemonic} bad\n\n{mnemonic}\n')
             assert result.exit_code == 0
             mnemonic_mock.assert_called_once()
             assert mnemonic in result.output.strip()
