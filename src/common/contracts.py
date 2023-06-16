@@ -22,9 +22,7 @@ class ContractWrapper:
         current_dir = os.path.dirname(__file__)
         with open(os.path.join(current_dir, self.abi_path), encoding='utf-8') as f:
             abi = json.load(f)
-        return execution_client.eth.contract(
-            abi=abi, address=self.contract_address
-        )  # type: ignore
+        return execution_client.eth.contract(abi=abi, address=self.contract_address)  # type: ignore
 
     def __getattr__(self, item):
         return getattr(self.contract, item)

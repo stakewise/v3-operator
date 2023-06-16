@@ -110,7 +110,6 @@ class Credential:
 
 
 class CredentialManager:
-
     @staticmethod
     def generate_credentials(
         network: str, vault: HexAddress, mnemonic: str, count: int, start_index: int
@@ -184,9 +183,7 @@ class CredentialManager:
         )
 
     @staticmethod
-    def generate_credential_first_public_key(
-        network: str, vault: HexAddress, mnemonic: str
-    ) -> str:
+    def generate_credential_first_public_key(network: str, vault: HexAddress, mnemonic: str) -> str:
         return CredentialManager.generate_credential(
             network=network,
             vault=vault,

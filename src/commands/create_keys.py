@@ -36,8 +36,7 @@ from src.common.validators import validate_eth_address, validate_mnemonic
 @click.option(
     '--data-dir',
     required=False,
-    help='Path where the vault data will be placed. '
-    'Defaults to ~/.stakewise/<vault>',
+    help='Path where the vault data will be placed. ' 'Defaults to ~/.stakewise/<vault>',
     type=click.Path(exists=False, file_okay=False, dir_okay=True),
 )
 @click.command(help='Creates the validator keys from the mnemonic.')
@@ -75,17 +74,14 @@ async def create_keys(
         start_index=config.mnemonic_next_index,
     )
     deposit_data = _export_deposit_data_json(
-        credentials=credentials,
-        filename=str(deposit_data_file)
+        credentials=credentials, filename=str(deposit_data_file)
     )
 
     _export_keystores(
-        credentials=credentials,
-        keystores_dir=str(keystores_dir),
-        password_file=str(password_file)
+        credentials=credentials, keystores_dir=str(keystores_dir), password_file=str(password_file)
     )
 
-    config.update(mnemonic_next_index=config.mnemonic_next_index+count)
+    config.update(mnemonic_next_index=config.mnemonic_next_index + count)
 
     click.echo(
         f'Done. Generated {greenify(count)} keys for {greenify(vault)} vault.\n'

@@ -29,9 +29,7 @@ class ExecutionClient:
     @cached_property
     def client(self) -> Web3:
         w3 = get_execution_client(settings.EXECUTION_ENDPOINT)
-        w3.middleware_onion.add(
-            construct_async_sign_and_send_raw_middleware(hot_wallet.account)
-        )
+        w3.middleware_onion.add(construct_async_sign_and_send_raw_middleware(hot_wallet.account))
         w3.eth.default_account = hot_wallet.address
         return w3
 
