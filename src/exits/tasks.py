@@ -42,7 +42,7 @@ async def update_exit_signatures(keystores: Keystores) -> None:
     await submit_exit_signatures(oracles_approval)
     logger.info(
         'Successfully rotated exit signatures for validators with indexes %s',
-        ', '.join([str(index) for index in outdated_indexes])
+        ', '.join([str(index) for index in outdated_indexes]),
     )
 
     # check balance after transaction
@@ -61,9 +61,7 @@ async def _fetch_outdated_indexes(oracle_endpoint: str) -> list[int]:
 
 
 async def get_oracles_approval(
-    oracles,
-    keystores: Keystores,
-    validators: dict[int, HexStr]
+    oracles, keystores: Keystores, validators: dict[int, HexStr]
 ) -> OraclesApproval:
     """Fetches approval from oracles."""
     # get latest oracles
@@ -92,10 +90,7 @@ async def get_oracles_approval(
 
     # send approval request to oracles
     signatures, ipfs_hash = await send_signature_rotation_requests(oracles, request)
-    logger.info(
-        'Fetched updated signature for validators: count=%d',
-        len(validators)
-    )
+    logger.info('Fetched updated signature for validators: count=%d', len(validators))
     return OraclesApproval(
         signatures=signatures,
         ipfs_hash=ipfs_hash,

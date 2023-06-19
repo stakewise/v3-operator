@@ -13,8 +13,7 @@ from src.config.settings import DEFAULT_RETRY_TIME, settings
 
 
 @backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
-async def get_consensus_fork(
-) -> ConsensusFork:
+async def get_consensus_fork() -> ConsensusFork:
     """Fetches current fork data."""
     fork_data = (await consensus_client.get_fork_data())['data']
     return ConsensusFork(

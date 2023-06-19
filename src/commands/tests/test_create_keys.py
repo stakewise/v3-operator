@@ -25,18 +25,11 @@ class TestCreateKeys(unittest.TestCase):
                 '--vault',
                 vault,
                 '--network',
-                'goerli'
+                'goerli',
             ]
             init_result = runner.invoke(init, args_init)
             mnemonic = init_result.output.strip()
-            args = [
-                '--mnemonic',
-                f'"{mnemonic}"',
-                '--count',
-                count,
-                '--vault',
-                vault
-            ]
+            args = ['--mnemonic', f'"{mnemonic}"', '--count', count, '--vault', vault]
             result = runner.invoke(create_keys, args)
             assert result.exit_code == 0
 

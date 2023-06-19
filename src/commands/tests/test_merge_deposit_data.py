@@ -17,8 +17,9 @@ def test_merge_deposit_files():
         {'id': 4, 'pubkey': '0x4'},
     ]
 
-    with tempfile.NamedTemporaryFile('w', delete=False) as file1, \
-            tempfile.NamedTemporaryFile('w', delete=False) as file2:
+    with tempfile.NamedTemporaryFile('w', delete=False) as file1, tempfile.NamedTemporaryFile(
+        'w', delete=False
+    ) as file2:
         json.dump(file1_content, file1)
         json.dump(file2_content, file2)
 
@@ -28,11 +29,17 @@ def test_merge_deposit_files():
         merged_file = _generate_temp_filepath()
 
         runner = click.testing.CliRunner()
-        result = runner.invoke(merge_deposit_data, [
-            '-d', file1.name,
-            '-d', file2.name,
-            '-m', merged_file,
-        ])
+        result = runner.invoke(
+            merge_deposit_data,
+            [
+                '-d',
+                file1.name,
+                '-d',
+                file2.name,
+                '-m',
+                merged_file,
+            ],
+        )
 
         assert result.exit_code == 0
 

@@ -19,12 +19,7 @@ class TestCreateWallet(unittest.TestCase):
         Account.enable_unaudited_hdwallet_features()
         mnemonic = get_mnemonic(language='english', words_path=WORD_LISTS_PATH)
         account = Account().from_mnemonic(mnemonic=mnemonic)
-        args = [
-            '--mnemonic',
-            f'"{mnemonic}"',
-            '--vault',
-            vault
-        ]
+        args = ['--mnemonic', f'"{mnemonic}"', '--vault', vault]
         with runner.isolated_filesystem():
             result = runner.invoke(create_wallet, args)
             assert result.exit_code == 0

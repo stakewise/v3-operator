@@ -90,7 +90,7 @@ async def get_last_rewards_update() -> RewardVoteInfo | None:
         from_block=max(
             int(settings.NETWORK_CONFIG.KEEPER_GENESIS_BLOCK),
             block_number - approx_blocks_per_month,
-            0
+            0,
         ),
         to_block=block_number,
     )

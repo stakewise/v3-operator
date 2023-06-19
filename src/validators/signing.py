@@ -20,7 +20,7 @@ def get_polynomial_points(coefficients: list[int], num_points: int) -> list[byte
         y = coefficients[0]
         # calculate each term and add it to y, using modular math
         for i in range(1, len(coefficients)):
-            exponentiation = (x ** i) % curve_order
+            exponentiation = (x**i) % curve_order
             term = (coefficients[i] * exponentiation) % curve_order
             y = (y + term) % curve_order
         # add the point to the list of points
@@ -29,24 +29,20 @@ def get_polynomial_points(coefficients: list[int], num_points: int) -> list[byte
 
 
 def get_exit_signature_shards(
-    validator_index: int,
-    private_key: BLSPrivkey,
-    oracles: Oracles,
-    fork: ConsensusFork
+    validator_index: int, private_key: BLSPrivkey, oracles: Oracles, fork: ConsensusFork
 ) -> ExitSignatureShards:
     """Generates exit signature shards and encrypts them with oracles' RSA keys."""
     message = get_exit_message_signing_root(
         validator_index=validator_index,
         genesis_validators_root=settings.NETWORK_CONFIG.GENESIS_VALIDATORS_ROOT,
-        fork=fork
+        fork=fork,
     )
 
     if len(oracles.public_keys) == 1:
         pub_key = oracles.public_keys[0]
         shard = ecies.encrypt(pub_key, bls.Sign(private_key, message))
         return ExitSignatureShards(
-            public_keys=[Web3.to_hex(bls.SkToPk(private_key))],
-            exit_signatures=[Web3.to_hex(shard)]
+            public_keys=[Web3.to_hex(bls.SkToPk(private_key))], exit_signatures=[Web3.to_hex(shard)]
         )
 
     coefficients: list[int] = [int.from_bytes(private_key, 'big')]
@@ -61,5 +57,5 @@ def get_exit_signature_shards(
 
     return ExitSignatureShards(
         public_keys=[Web3.to_hex(bls.SkToPk(priv_key)) for priv_key in private_keys],
-        exit_signatures=exit_signature_shards
+        exit_signatures=exit_signature_shards,
     )
