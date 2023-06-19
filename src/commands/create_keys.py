@@ -8,7 +8,7 @@ from eth_typing import HexAddress
 from src.common.config import VaultConfig
 from src.common.contrib import async_command, greenify
 from src.common.credentials import Credential, CredentialManager
-from src.common.password import get_or_create_password_file
+from src.common.password import generate_password, get_or_create_password_file
 from src.common.validators import validate_eth_address, validate_mnemonic
 
 
@@ -39,6 +39,12 @@ from src.common.validators import validate_eth_address, validate_mnemonic
     help='Path where the vault data will be placed. ' 'Defaults to ~/.stakewise/<vault>',
     type=click.Path(exists=False, file_okay=False, dir_okay=True),
 )
+@click.option(
+    '--per-keystore-password',
+    is_flag=True,
+    default=False,
+    help='Creates separate password file for each keystore',
+)
 @click.command(help='Creates the validator keys from the mnemonic.')
 @async_command
 async def create_keys(
@@ -46,6 +52,7 @@ async def create_keys(
     count: int,
     vault: HexAddress,
     data_dir: str,
+    per_keystore_password: bool,
 ) -> None:
     config = VaultConfig(vault=vault, data_dir=data_dir)
     config.load()
@@ -78,7 +85,10 @@ async def create_keys(
     )
 
     _export_keystores(
-        credentials=credentials, keystores_dir=str(keystores_dir), password_file=str(password_file)
+        credentials=credentials,
+        keystores_dir=str(keystores_dir),
+        password_file=str(password_file),
+        per_keystore_password=per_keystore_password,
     )
 
     config.update(mnemonic_next_index=config.mnemonic_next_index + count)
@@ -115,10 +125,14 @@ def _export_deposit_data_json(credentials: list[Credential], filename: str) -> s
 
 
 def _export_keystores(
-    credentials: list[Credential], keystores_dir: str, password_file: str
+    credentials: list[Credential],
+    keystores_dir: str,
+    password_file: str,
+    per_keystore_password: bool,
 ) -> None:
     makedirs(path.abspath(keystores_dir), exist_ok=True)
-    password = get_or_create_password_file(password_file)
+    if not per_keystore_password:
+        password = get_or_create_password_file(password_file)
     with click.progressbar(
         credentials,
         label='Exporting validator keystores\t\t',
@@ -128,7 +142,11 @@ def _export_keystores(
         results = [
             pool.apply_async(
                 cred.save_signing_keystore,
-                kwds={'password': password, 'folder': keystores_dir},
+                kwds={
+                    'password': generate_password() if per_keystore_password else password,
+                    'folder': keystores_dir,
+                    'per_keystore_password': per_keystore_password,
+                },
                 callback=lambda x: bar.update(1),
             )
             for cred in credentials
