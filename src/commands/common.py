@@ -9,8 +9,10 @@ from src.config.settings import settings
 
 
 def setup_config(*args, **kwargs) -> None:
-    vault = kwargs.pop('vault') or decouple_config('VAULT_CONTRACT_ADDRESS', default='')
-    network = kwargs.pop('network') or decouple_config('NETWORK', default='')
+    # Vault and network will be loaded from vault config if not passed another way.
+    vault = kwargs.pop('vault', None) or decouple_config('VAULT_CONTRACT_ADDRESS', default='')
+    network = kwargs.pop('network', None) or decouple_config('NETWORK', default='')
+
     data_dir = kwargs.pop('data_dir') or decouple_config('DATA_DIR', default='')
     config = VaultConfig(vault=vault, data_dir=data_dir)
     if config.exists:
