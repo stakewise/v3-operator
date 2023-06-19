@@ -3,9 +3,9 @@ import os
 import unittest
 
 from click.testing import CliRunner
+from staking_deposit.settings import DEPOSIT_CLI_VERSION
 from sw_utils.tests.factories import faker
 
-import src
 from src.commands.create_keys import create_keys
 from src.commands.init import init
 from src.config.settings import DATA_DIR
@@ -49,7 +49,7 @@ class TestCreateKeys(unittest.TestCase):
                 assert count == len(data)
                 assert data[0].get('network_name') == 'goerli'
                 assert data[0].get('fork_version') == '00001020'
-                assert data[0].get('deposit_cli_version') == src.__version__
+                assert data[0].get('deposit_cli_version') == DEPOSIT_CLI_VERSION
             with open(f'{vault_dir}/keystores/password.txt', encoding='utf-8') as f:
                 assert len(f.readline()) == 20
 

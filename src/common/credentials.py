@@ -16,6 +16,7 @@ from staking_deposit.key_handling.key_derivation.tree import (
     derive_master_SK,
 )
 from staking_deposit.key_handling.keystore import Keystore, ScryptKeystore
+from staking_deposit.settings import DEPOSIT_CLI_VERSION
 from sw_utils import get_eth1_withdrawal_credentials
 from sw_utils.signing import (
     DepositData,
@@ -27,7 +28,6 @@ from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3._utils import request
 
-import src
 from src.common.contrib import chunkify
 from src.config.networks import NETWORKS
 from src.config.settings import DEPOSIT_AMOUNT_GWEI
@@ -97,7 +97,6 @@ class Credential:
         return signed_deposit
 
     def deposit_datum_dict(self) -> dict[str, bytes]:
-        deposit_cli_version = src.__version__
         signed_deposit_datum = self.signed_deposit
         fork_version = NETWORKS[self.network].GENESIS_FORK_VERSION
         datum_dict = signed_deposit_datum.as_dict()
@@ -105,7 +104,7 @@ class Credential:
         datum_dict.update({'deposit_data_root': signed_deposit_datum.hash_tree_root})
         datum_dict.update({'fork_version': fork_version})
         datum_dict.update({'network_name': self.network})
-        datum_dict.update({'deposit_cli_version': deposit_cli_version})
+        datum_dict.update({'deposit_cli_version': DEPOSIT_CLI_VERSION})
         return datum_dict
 
 
