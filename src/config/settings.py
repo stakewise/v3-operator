@@ -99,13 +99,14 @@ class Settings(metaclass=Singleton):
             'DEPOSIT_DATA_PATH', default=None
         )
         self.hot_wallet_private_key = hot_wallet_private_key or decouple_config(
-            'DEPOSIT_DATA_PATH', default=None
+            'HOT_WALLET_PRIVATE_KEY', default=None
         )
         self.hot_wallet_keystore_path = hot_wallet_keystore_path or decouple_config(
-            'DEPOSIT_DATA_PATH', default=None
+            'HOT_WALLET_KEYSTORE_PATH', default=None
         )
         self.hot_wallet_keystore_password_path = (
-            hot_wallet_keystore_password_path or decouple_config('DEPOSIT_DATA_PATH', default=None)
+            hot_wallet_keystore_password_path
+            or decouple_config('HOT_WALLET_KEYSTORE_PASSWORD_PATH', default=None)
         )
         self.harvest_vault = harvest_vault or decouple_config(
             'HARVEST_VAULT', default=False, cast=bool
