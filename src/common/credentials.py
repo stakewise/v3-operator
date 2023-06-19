@@ -68,13 +68,20 @@ class Credential:
             secret=self.private_key_bytes, password=password, path=self.path
         )
 
-    def save_signing_keystore(self, password: str, folder: str) -> str:
+    def save_signing_keystore(
+        self, password: str, folder: str, per_keystore_password: bool = False
+    ) -> str:
         keystore = self.encrypt_signing_keystore(password)
-        filefolder = path.join(
-            folder, f'keystore-{keystore.path.replace("/", "_")}-{int(time.time())}.json'
-        )
-        keystore.save(filefolder)
-        return filefolder
+        file_name = f'keystore-{keystore.path.replace("/", "_")}-{int(time.time())}'
+        file_path = path.join(folder, f'{file_name}.json')
+
+        if per_keystore_password:
+            password_file_path = path.join(folder, f'{file_name}.txt')
+            with open(password_file_path, 'w') as password_file:
+                password_file.write(password)
+
+        keystore.save(file_path)
+        return file_path
 
     @property
     def deposit_message(self) -> DepositMessage:
