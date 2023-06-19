@@ -8,6 +8,7 @@ from web3 import Web3
 from web3.types import Timestamp
 
 from src.common.clients import consensus_client
+from src.common.metrics import metrics
 from src.config.settings import DEFAULT_RETRY_TIME, settings
 
 
@@ -35,6 +36,7 @@ async def get_chain_finalized_head() -> ChainHead:
     epoch: int = int(checkpoints['data']['finalized']['epoch'])
     slots_per_epoch = settings.NETWORK_CONFIG.SLOTS_PER_EPOCH
     last_slot_id: int = (epoch * slots_per_epoch) + slots_per_epoch - 1
+    metrics.slot_number.set(last_slot_id)
     for i in range(slots_per_epoch):
         try:
             slot = await consensus_client.get_block(last_slot_id - i)

@@ -19,6 +19,7 @@ from src.common.clients import execution_client
 from src.common.contracts import validators_registry_contract, vault_contract
 from src.common.execution import get_last_rewards_update
 from src.common.ipfs import fetch_harvest_params
+from src.common.metrics import metrics
 from src.config.networks import ETH_NETWORKS
 from src.config.settings import (
     DEFAULT_RETRY_TIME,
@@ -215,6 +216,28 @@ async def get_available_validators(
             break
 
         validators.append(validator)
+
+    return validators
+
+
+async def update_unused_validator_keys_metric(
+    keystores: Keystores, deposit_data: DepositData
+) -> int:
+    try:
+        await check_deposit_data_root(deposit_data.tree.root)
+    except RuntimeError:
+        metrics.unused_validator_keys.set(0)
+        return 0
+
+    validators: int = 0
+    for validator in deposit_data.validators:
+        if validator.public_key not in keystores:
+            continue
+        if NetworkValidatorCrud().is_validator_registered(validator.public_key):
+            continue
+        validators += 1
+
+    metrics.unused_validator_keys.set(validators)
 
     return validators
 

@@ -43,6 +43,8 @@ class Settings(metaclass=Singleton):
     approval_max_validators: int
     validators_fetch_chunk_size: int
     sentry_dsn: str
+    metrics_host: str
+    metrics_port: int
 
     # pylint: disable-next=too-many-arguments,too-many-locals
     def set(
@@ -68,6 +70,8 @@ class Settings(metaclass=Singleton):
         approval_max_validators: int | None = None,
         validators_fetch_chunk_size: int | None = None,
         sentry_dsn: str | None = None,
+        metrics_host: str | None = None,
+        metrics_port: int | None = None,
     ):
         self.vault = vault or decouple_config('VAULT_CONTRACT_ADDRESS')
         self.network = network or decouple_config('NETWORK', cast=Choices([GOERLI]))
@@ -116,6 +120,8 @@ class Settings(metaclass=Singleton):
             'VALIDATORS_FETCH_CHUNK_SIZE', default=100, cast=int
         )
         self.sentry_dsn = sentry_dsn or decouple_config('SENTRY_DSN', default='')
+        self.metrics_host = metrics_host or decouple_config('METRICS_HOST', default='127.0.0.1')
+        self.metrics_port = metrics_port or decouple_config('METRICS_PORT', default=9100)
 
     @property
     def VERBOSE(self) -> bool:
@@ -220,6 +226,14 @@ class Settings(metaclass=Singleton):
     @property
     def SENTRY_DSN(self) -> str | None:
         return self.sentry_dsn
+
+    @property
+    def METRICS_HOST(self) -> str:
+        return self.metrics_host
+
+    @property
+    def METRICS_PORT(self) -> int:
+        return self.metrics_port
 
 
 settings = Settings()
