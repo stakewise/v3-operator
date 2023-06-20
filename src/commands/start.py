@@ -6,12 +6,13 @@ import click
 from sw_utils import EventScanner, InterruptHandler
 
 import src
-from src.commands.common import setup_config, setup_logging
 from src.common.metrics import metrics_server
 from src.common.validators import validate_eth_address
 from src.config.settings import AVAILABLE_NETWORKS, settings
 from src.exits.tasks import update_exit_signatures
 from src.harvest.tasks import harvest_vault
+from src.setup_config import setup_config
+from src.setup_logging import setup_logging
 from src.startup_check import startup_checks
 from src.utils import get_build_version, log_verbose
 from src.validators.consensus import get_chain_finalized_head

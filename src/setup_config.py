@@ -1,4 +1,3 @@
-import logging
 from pathlib import Path
 
 import click
@@ -34,12 +33,3 @@ def setup_config(*args, **kwargs) -> None:
     if data_dir:
         data_dir = Path(data_dir)
     settings.set(vault=vault, network=network, data_dir=data_dir, *args, **kwargs)  # type: ignore
-
-
-def setup_logging() -> None:
-    logging.basicConfig(
-        format='%(asctime)s %(levelname)-8s %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S',
-        level=settings.LOG_LEVEL,
-    )
-    logging.getLogger('backoff').addHandler(logging.StreamHandler())

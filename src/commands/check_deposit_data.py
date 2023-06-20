@@ -4,8 +4,9 @@ import sys
 
 import click
 
-from src.commands.common import setup_config, setup_logging
 from src.common.validators import validate_eth_address
+from src.setup_config import setup_config
+from src.setup_logging import setup_logging
 from src.validators.execution import check_deposit_data_root
 from src.validators.utils import load_deposit_data
 
