@@ -31,7 +31,7 @@ class ExecutionClient:
         w3 = get_execution_client(settings.EXECUTION_ENDPOINT)
         # Account is required when emitting transactions.
         # For read-only queries account may be omitted.
-        if settings.HOT_WALLET_PRIVATE_KEY:
+        if hot_wallet.can_load():
             w3.middleware_onion.add(
                 construct_async_sign_and_send_raw_middleware(hot_wallet.account)
             )
