@@ -101,7 +101,7 @@ class TestCreateKeys(unittest.TestCase):
                 assert count == len(data)
                 assert data[0].get('network_name') == 'goerli'
                 assert data[0].get('fork_version') == '00001020'
-                assert data[0].get('deposit_cli_version') == src.__version__
+                assert data[0].get('deposit_cli_version') == DEPOSIT_CLI_VERSION
             password_files = glob.glob(os.path.join(vault_dir, '/keystores/*.txt'))
             for password_file in password_files:
                 with open(password_file, 'r', encoding='utf-8') as f:
