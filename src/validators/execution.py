@@ -167,12 +167,6 @@ async def get_validators_registry_root() -> Bytes32:
 
 
 @backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
-async def get_vault_validators_root() -> Bytes32:
-    """Fetches vault's validators root."""
-    return await vault_contract.functions.validatorsRoot().call()
-
-
-@backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
 async def get_vault_validators_index() -> int:
     """Fetches vault's current validators index."""
     return await vault_contract.functions.validatorIndex().call()
@@ -180,7 +174,7 @@ async def get_vault_validators_index() -> int:
 
 async def check_deposit_data_root(deposit_data_root: str) -> None:
     """Checks whether deposit data root matches validators root in Vault."""
-    if deposit_data_root != Web3.to_hex(await get_vault_validators_root()):
+    if deposit_data_root != Web3.to_hex(await vault_contract.get_validators_root()):
         raise RuntimeError(
             "Deposit data tree root and vault's validators root don't match."
             ' Have you updated vault deposit data?'
