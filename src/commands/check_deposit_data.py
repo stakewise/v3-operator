@@ -20,11 +20,6 @@ logger = logging.getLogger(__name__)
 DEPOSIT_DATA_ROOT_ERROR = 2
 
 
-async def check_deposit_data() -> None:
-    deposit_data = await load_deposit_data()
-    await check_deposit_data_root(deposit_data.tree.root)
-
-
 @click.option(
     '--vault',
     type=str,
@@ -43,7 +38,12 @@ def check_deposit_data_cmd(*args, **kwargs) -> None:
     setup_config(*args, consensus_endpoint='fake-endpoint', **kwargs)
     setup_logging()
     try:
-        asyncio.run(check_deposit_data())
+        asyncio.run(_check_deposit_data())
     except RuntimeError as e:
         logger.error(repr(e))
         sys.exit(DEPOSIT_DATA_ROOT_ERROR)
+
+
+async def _check_deposit_data() -> None:
+    deposit_data = await load_deposit_data()
+    await check_deposit_data_root(deposit_data.tree.root)
