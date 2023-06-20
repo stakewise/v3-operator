@@ -31,18 +31,11 @@ class ExecutionClient:
         w3 = get_execution_client(settings.EXECUTION_ENDPOINT)
         # Account is required when emitting transactions.
         # For read-only queries account may be omitted.
-        w3.middleware_onion.add(construct_async_sign_and_send_raw_middleware(hot_wallet.account))
-        w3.eth.default_account = hot_wallet.address
-        return w3
-
-    def __getattr__(self, item):
-        return getattr(self.client, item)
-
-
-class ReadOnlyExecutionClient:
-    @cached_property
-    def client(self) -> Web3:
-        w3 = get_execution_client(settings.EXECUTION_ENDPOINT)
+        if settings.HOT_WALLET_PRIVATE_KEY:
+            w3.middleware_onion.add(
+                construct_async_sign_and_send_raw_middleware(hot_wallet.account)
+            )
+            w3.eth.default_account = hot_wallet.address
         return w3
 
     def __getattr__(self, item):
@@ -74,6 +67,5 @@ class IpfsFetchRetryClient:
 
 db_client = Database()
 execution_client = ExecutionClient()
-read_only_execution_client = ReadOnlyExecutionClient()
 consensus_client = ConsensusClient()
 ipfs_fetch_client = IpfsFetchRetryClient()
