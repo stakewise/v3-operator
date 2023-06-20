@@ -19,28 +19,27 @@ class HotWallet:
             return Account().from_key(HOT_WALLET_PRIVATE_KEY)
 
         if HOT_WALLET_KEYSTORE_PATH and HOT_WALLET_KEYSTORE_PASSWORD_PATH:
-            if not os.path.isfile(HOT_WALLET_KEYSTORE_PATH):
-                raise ValueError(
-                    f"Can't open HOT_WALLET_KEYSTORE_PATH file. "
-                    f' Path: {HOT_WALLET_KEYSTORE_PATH}'
-                )
-            if not os.path.isfile(HOT_WALLET_KEYSTORE_PASSWORD_PATH):
-                raise ValueError(
-                    f"Can't open HOT_WALLET_KEYSTORE_PASSWORD_PATH file. "
-                    f'Path: {HOT_WALLET_KEYSTORE_PASSWORD_PATH}'
-                )
-
-            with open(HOT_WALLET_KEYSTORE_PATH, 'r', encoding='utf-8') as f:
-                keyfile_json = json.load(f)
-            with open(HOT_WALLET_KEYSTORE_PASSWORD_PATH, 'r', encoding='utf-8') as f:
-                password = f.read().strip()
-            key = Account().decrypt(keyfile_json, password)
-            return Account().from_key(key)
+            return self.load_password_protected_account(
+                HOT_WALLET_KEYSTORE_PATH, HOT_WALLET_KEYSTORE_PASSWORD_PATH
+            )
 
         raise ValueError(
             'Provide HOT_WALLET_PRIVATE_KEY setting or combination of '
             'HOT_WALLET_KEYSTORE_PATH and HOT_WALLET_KEYSTORE_PASSWORD_PATH settings'
         )
+
+    def load_password_protected_account(self, keystore_path, password_path) -> LocalAccount:
+        if not os.path.isfile(keystore_path):
+            raise ValueError(f"Can't open key file. Path: {keystore_path}")
+        if not os.path.isfile(password_path):
+            raise ValueError(f"Can't open password file. Path: {password_path}")
+
+        with open(keystore_path, 'r', encoding='utf-8') as f:
+            keyfile_json = json.load(f)
+        with open(password_path, 'r', encoding='utf-8') as f:
+            password = f.read().strip()
+        key = Account.decrypt(keyfile_json, password)
+        return Account().from_key(key)
 
     def __getattr__(self, item):
         return getattr(self.account, item)
