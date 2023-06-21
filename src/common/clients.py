@@ -1,3 +1,4 @@
+import logging
 import sqlite3
 from functools import cached_property
 from pathlib import Path
@@ -15,6 +16,8 @@ from web3 import Web3
 
 from src.common.wallet import hot_wallet
 from src.config.settings import DEFAULT_RETRY_TIME, settings
+
+logger = logging.getLogger(__name__)
 
 
 class Database:
@@ -36,6 +39,9 @@ class ExecutionClient:
                 construct_async_sign_and_send_raw_middleware(hot_wallet.account)
             )
             w3.eth.default_account = hot_wallet.address
+        else:
+            logger.warning('Unable to load hot wallet')
+
         return w3
 
     def __getattr__(self, item):
