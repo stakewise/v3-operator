@@ -1,3 +1,4 @@
+import logging
 import sqlite3
 from functools import cached_property
 from pathlib import Path
@@ -16,6 +17,8 @@ from web3 import Web3
 from src.common.wallet import hot_wallet
 from src.config.settings import DEFAULT_RETRY_TIME, settings
 
+logger = logging.getLogger(__name__)
+
 
 class Database:
     def get_db_connection(self):
@@ -29,8 +32,16 @@ class ExecutionClient:
     @cached_property
     def client(self) -> Web3:
         w3 = get_execution_client(settings.EXECUTION_ENDPOINT)
-        w3.middleware_onion.add(construct_async_sign_and_send_raw_middleware(hot_wallet.account))
-        w3.eth.default_account = hot_wallet.address
+        # Account is required when emitting transactions.
+        # For read-only queries account may be omitted.
+        if hot_wallet.can_load():
+            w3.middleware_onion.add(
+                construct_async_sign_and_send_raw_middleware(hot_wallet.account)
+            )
+            w3.eth.default_account = hot_wallet.address
+        else:
+            logger.warning('Unable to load hot wallet')
+
         return w3
 
     def __getattr__(self, item):

@@ -77,8 +77,12 @@ class Settings(metaclass=Singleton):
         self.network = network or decouple_config('NETWORK', cast=Choices([GOERLI]))
         self.verbose = verbose or decouple_config('VERBOSE', default=False)
         self.log_level = log_level or decouple_config('LOG_LEVEL', default='INFO')
-        self.execution_endpoint = execution_endpoint or decouple_config('EXECUTION_ENDPOINT')
-        self.consensus_endpoint = consensus_endpoint or decouple_config('CONSENSUS_ENDPOINT')
+        self.execution_endpoint = execution_endpoint or decouple_config(
+            'EXECUTION_ENDPOINT', default=''
+        )
+        self.consensus_endpoint = consensus_endpoint or decouple_config(
+            'CONSENSUS_ENDPOINT', default=''
+        )
         self.ipfs_fetch_endpoints = ipfs_fetch_endpoints or decouple_config(
             'IPFS_FETCH_ENDPOINTS',
             cast=Csv(),
@@ -99,13 +103,14 @@ class Settings(metaclass=Singleton):
             'DEPOSIT_DATA_PATH', default=None
         )
         self.hot_wallet_private_key = hot_wallet_private_key or decouple_config(
-            'DEPOSIT_DATA_PATH', default=None
+            'HOT_WALLET_PRIVATE_KEY', default=None
         )
         self.hot_wallet_keystore_path = hot_wallet_keystore_path or decouple_config(
-            'DEPOSIT_DATA_PATH', default=None
+            'HOT_WALLET_KEYSTORE_PATH', default=None
         )
         self.hot_wallet_keystore_password_path = (
-            hot_wallet_keystore_password_path or decouple_config('DEPOSIT_DATA_PATH', default=None)
+            hot_wallet_keystore_password_path
+            or decouple_config('HOT_WALLET_KEYSTORE_PASSWORD_PATH', default=None)
         )
         self.harvest_vault = harvest_vault or decouple_config(
             'HARVEST_VAULT', default=False, cast=bool

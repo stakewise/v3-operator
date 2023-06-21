@@ -9,6 +9,13 @@ from src.config.settings import settings
 
 
 class HotWallet:
+    def can_load(self) -> bool:
+        try:
+            self.account
+        except ValueError:
+            return False
+        return True
+
     @cached_property
     def account(self) -> LocalAccount:
         HOT_WALLET_PRIVATE_KEY = settings.HOT_WALLET_PRIVATE_KEY

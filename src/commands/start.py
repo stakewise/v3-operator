@@ -1,19 +1,18 @@
 import asyncio
 import logging
 import time
-from pathlib import Path
 
 import click
-from decouple import config as decouple_config
 from sw_utils import EventScanner, InterruptHandler
 
 import src
-from src.common.config import VaultConfig
 from src.common.metrics import metrics_server
 from src.common.validators import validate_eth_address
 from src.config.settings import AVAILABLE_NETWORKS, settings
 from src.exits.tasks import update_exit_signatures
 from src.harvest.tasks import harvest_vault
+from src.setup_config import setup_config
+from src.setup_logging import setup_logging
 from src.startup_check import startup_checks
 from src.utils import get_build_version, log_verbose
 from src.validators.consensus import get_chain_finalized_head
@@ -156,32 +155,6 @@ async def main() -> None:
         await asyncio.sleep(sleep_time)
 
 
-def setup_config(*args, **kwargs) -> None:
-    vault = kwargs.pop('vault') or decouple_config('VAULT_CONTRACT_ADDRESS', default='')
-    network = kwargs.pop('network') or decouple_config('NETWORK', default='')
-    data_dir = kwargs.pop('data_dir') or decouple_config('DATA_DIR', default='')
-    config = VaultConfig(vault=vault, data_dir=data_dir)
-    if config.exists:
-        config.load()
-
-        if vault and vault != config.vault:
-            raise click.ClickException(
-                f'Invalid vault address. Please use data-dir provided for {vault} init command.'
-            )
-        if not vault:
-            vault = config.vault
-
-        if network and network != config.network:
-            raise click.ClickException(
-                f'Invalid vault network. Please use data-dir provided for {vault} init command.'
-            )
-        if not network:
-            network = config.network
-    if data_dir:
-        data_dir = Path(data_dir)
-    settings.set(vault=vault, network=network, data_dir=data_dir, *args, **kwargs)  # type: ignore
-
-
 def log_start() -> None:
     build = get_build_version()
     start_str = 'Starting operator service'
@@ -190,15 +163,6 @@ def log_start() -> None:
         logger.info('%s, version %s, build %s', start_str, src.__version__, build)
     else:
         logger.info('%s, version %s', start_str, src.__version__)
-
-
-def setup_logging() -> None:
-    logging.basicConfig(
-        format='%(asctime)s %(levelname)-8s %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S',
-        level=settings.LOG_LEVEL,
-    )
-    logging.getLogger('backoff').addHandler(logging.StreamHandler())
 
 
 def setup_sentry():

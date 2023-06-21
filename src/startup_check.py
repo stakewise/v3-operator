@@ -18,6 +18,14 @@ logger = logging.getLogger(__name__)
 IPFS_HASH_EXAMPLE = 'QmawUdo17Fvo7xa6ARCUSMV1eoVwPtVuzx8L8Crj2xozWm'
 
 
+def validate_settings():
+    if not settings.EXECUTION_ENDPOINT:
+        raise ValueError('EXECUTION_ENDPOINT is missing')
+
+    if not settings.CONSENSUS_ENDPOINT:
+        raise ValueError('CONSENSUS_ENDPOINT is missing')
+
+
 async def wait_for_consensus_node() -> None:
     while True:
         try:
@@ -103,6 +111,8 @@ async def wait_for_keystore_files() -> None:
 
 
 async def startup_checks():
+    validate_settings()
+
     logger.info('Checking hot wallet balance %s...', hot_wallet.address)
 
     await check_hot_wallet_balance()

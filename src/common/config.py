@@ -81,10 +81,10 @@ class VaultConfig:
     def _validate(self):
         """Validates the loaded configuration data."""
         if not self.vault:
-            raise click.ClickException('Vault is not set in the configuration.')
+            raise click.ClickException('Vault is not set in vault configuration.')
 
         if not self.network:
-            raise click.ClickException('Network is not set in the configuration.')
+            raise click.ClickException('Network is not set in vault configuration.')
 
         if self.network not in AVAILABLE_NETWORKS:
             raise click.ClickException(
@@ -93,7 +93,7 @@ class VaultConfig:
             )
 
         if self.mnemonic_next_index is None:
-            raise click.ClickException('mnemonic_next_index is not set in the configuration.')
+            raise click.ClickException('mnemonic_next_index is not set in vault configuration.')
 
         if not isinstance(self.mnemonic_next_index, int):
             raise click.ClickException(
@@ -102,7 +102,7 @@ class VaultConfig:
             )
 
         if not self.first_public_key:
-            raise click.ClickException('first_public_key is not set in the configuration.')
+            raise click.ClickException('first_public_key is not set in vault configuration.')
 
         if not isinstance(self.first_public_key, str):
             raise click.ClickException(
