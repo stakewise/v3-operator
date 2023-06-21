@@ -11,7 +11,7 @@ from src.common.execution import check_hot_wallet_balance, get_oracles
 from src.common.utils import count_files_in_folder
 from src.common.wallet import hot_wallet
 from src.config.settings import settings
-from src.validators.utils import count_deposit_data_non_exited_keys
+from src.validators.utils import count_deposit_data_non_exited_keys, load_deposit_data
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +90,20 @@ def wait_for_keystores_password_dir() -> None:
         time.sleep(15)
 
 
+async def wait_for_deposit_data_file() -> None:
+    while not path.exists(settings.DEPOSIT_DATA_PATH):
+        logger.warning("Can't find deposit data file (%s)", settings.DEPOSIT_DATA_PATH)
+        time.sleep(15)
+
+    while True:
+        try:
+            await load_deposit_data()
+            break
+        except RuntimeError as e:
+            logger.warning(e)
+            time.sleep(15)
+
+
 async def wait_for_keystore_files() -> None:
     keystores_count = count_files_in_folder(settings.KEYSTORES_PATH, '.json')
     while await count_deposit_data_non_exited_keys() >= keystores_count:
@@ -135,11 +149,8 @@ async def startup_checks():
     healthy_oracles = await collect_healthy_oracles()
     logger.info('Connected to oracles at %s', ', '.join(healthy_oracles))
 
-    logger.info('Checking deposit data file exists...')
-    while not path.exists(settings.DEPOSIT_DATA_PATH):
-        logger.warning("Can't find deposit data file (%s)", settings.DEPOSIT_DATA_PATH)
-        time.sleep(15)
-    logger.info('Found deposit data file at %s', settings.DEPOSIT_DATA_PATH)
+    logger.info('Checking deposit data file...')
+    await wait_for_deposit_data_file()
 
     if not settings.KEYSTORES_PASSWORD_FILE and not settings.KEYSTORES_PASSWORD_DIR:
         raise ValueError('KEYSTORES_PASSWORD_FILE or KEYSTORES_PASSWORD_DIR must be set')
