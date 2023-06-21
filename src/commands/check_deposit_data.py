@@ -36,7 +36,7 @@ DEPOSIT_DATA_ROOT_ERROR = 2
 @click.option('--execution-endpoint', type=str, help='API endpoint for the execution node')
 @click.command(name='check_deposit_data', help='check deposit data')
 def check_deposit_data_cmd(*args, **kwargs) -> None:
-    setup_config(*args, consensus_endpoint='fake-endpoint', **kwargs)
+    setup_config(*args, **kwargs)
     setup_logging()
     try:
         asyncio.run(_check_deposit_data())
