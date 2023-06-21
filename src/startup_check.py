@@ -104,7 +104,7 @@ async def wait_for_deposit_data_file() -> None:
         except RuntimeError as e:
             logger.warning(e)
             time.sleep(15)
-    logger.info('Founded deposit data file %s', settings.DEPOSIT_DATA_PATH)
+    logger.info('Found deposit data file %s', settings.DEPOSIT_DATA_PATH)
 
 
 async def wait_for_keystore_files() -> None:
