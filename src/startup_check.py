@@ -11,6 +11,7 @@ from src.common.execution import check_hot_wallet_balance, get_oracles
 from src.common.utils import count_files_in_folder
 from src.common.wallet import hot_wallet
 from src.config.settings import settings
+from src.validators.execution import check_deposit_data_root
 from src.validators.utils import count_deposit_data_non_exited_keys, load_deposit_data
 
 logger = logging.getLogger(__name__)
@@ -94,14 +95,16 @@ async def wait_for_deposit_data_file() -> None:
     while not path.exists(settings.DEPOSIT_DATA_PATH):
         logger.warning("Can't find deposit data file (%s)", settings.DEPOSIT_DATA_PATH)
         time.sleep(15)
+    deposit_data = await load_deposit_data()
 
     while True:
         try:
-            await load_deposit_data()
+            await check_deposit_data_root(deposit_data.tree.root)
             break
         except RuntimeError as e:
             logger.warning(e)
             time.sleep(15)
+    logger.info('Founded deposit data file %s', settings.DEPOSIT_DATA_PATH)
 
 
 async def wait_for_keystore_files() -> None:
