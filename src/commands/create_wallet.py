@@ -35,11 +35,7 @@ from src.config.settings import DATA_DIR
 )
 @click.command(help='Creates the encrypted hot wallet from the mnemonic.')
 def create_wallet(mnemonic: str, vault: HexAddress, data_dir: str) -> None:
-    if data_dir:
-        wallet_dir = Path(f'{data_dir}/wallet')
-    else:
-        wallet_dir = Path(f'{DATA_DIR}/{vault}/wallet')
-
+    wallet_dir = Path(f'{data_dir or DATA_DIR}/{vault}/wallet')
     wallet_dir.mkdir(parents=True, exist_ok=True)
     _generate_encrypted_wallet(mnemonic, str(wallet_dir))
     click.echo(f'Done. The wallet and password saved to {greenify(wallet_dir)} directory.')

@@ -56,10 +56,6 @@ async def create_keys(
 ) -> None:
     config = VaultConfig(vault=vault, data_dir=data_dir)
     config.load()
-    if vault != config.vault:
-        raise click.ClickException(
-            f'Invalid vault. Please use data-dir provided for {vault} init command.'
-        )
 
     first_public_key = CredentialManager.generate_credential_first_public_key(
         config.network, vault, str(mnemonic)

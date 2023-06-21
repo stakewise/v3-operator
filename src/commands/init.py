@@ -54,8 +54,8 @@ def init(
     data_dir: str,
 ) -> None:
     config = VaultConfig(
-        data_dir=data_dir,
         vault=vault,
+        data_dir=data_dir,
     )
     if config.data_dir.exists():
         raise click.ClickException(f'Vault directory {config.data_dir} already exists.')

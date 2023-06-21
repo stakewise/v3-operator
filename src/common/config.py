@@ -15,16 +15,14 @@ class VaultConfig:
 
     def __init__(
         self,
+        vault: HexAddress,
         data_dir: str = '',
-        vault: HexAddress | None = None,
     ):
         self.vault = vault
         if data_dir:
-            self.data_dir = Path(data_dir)
-        elif vault:
-            self.data_dir = Path.home() / '.stakewise' / vault
+            self.data_dir = Path(data_dir) / vault
         else:
-            raise click.ClickException('Invalid vault config. Provide vault or data_dir')
+            self.data_dir = Path.home() / '.stakewise' / vault
         self.config_path = self.data_dir / 'config.json'
 
     @property
@@ -35,7 +33,6 @@ class VaultConfig:
         if self.config_path.is_file():
             with self.config_path.open('r') as f:
                 config = json.load(f)
-            self.vault = config.get('vault')
             self.network = config.get('network')
             self.mnemonic_next_index = config.get('mnemonic_next_index')
             self.first_public_key = config.get('first_public_key')
@@ -52,7 +49,6 @@ class VaultConfig:
 
         self._validate()
         config = {
-            'vault': self.vault,
             'network': self.network,
             'mnemonic_next_index': self.mnemonic_next_index,
             'first_public_key': self.first_public_key,
@@ -70,7 +66,6 @@ class VaultConfig:
             self.first_public_key = first_public_key
         self._validate()
         config = {
-            'vault': self.vault,
             'network': self.network,
             'mnemonic_next_index': self.mnemonic_next_index,
             'first_public_key': self.first_public_key,
@@ -80,9 +75,6 @@ class VaultConfig:
 
     def _validate(self):
         """Validates the loaded configuration data."""
-        if not self.vault:
-            raise click.ClickException('Vault is not set in vault configuration.')
-
         if not self.network:
             raise click.ClickException('Network is not set in vault configuration.')
 
