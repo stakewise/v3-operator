@@ -62,15 +62,15 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
             ],
         )
 
-        for address, result in zip(oracles.addresses, results):
-            ipfs_hashes.append(result.ipfs_hash)
-            responses[address] = result.signature
+    for address, result in zip(oracles.addresses, results):
+        ipfs_hashes.append(result.ipfs_hash)
+        responses[address] = result.signature
 
-        if not ipfs_hashes:
-            raise RuntimeError('No oracles to get approval from')
+    if not ipfs_hashes:
+        raise RuntimeError('No oracles to get approval from')
 
-        if ipfs_hashes.count(ipfs_hashes[0]) != len(ipfs_hashes):
-            raise ValueError('Different oracles IPFS hashes for approval request')
+    if ipfs_hashes.count(ipfs_hashes[0]) != len(ipfs_hashes):
+        raise ValueError('Different oracles IPFS hashes for approval request')
     signatures = b''
     for address in sorted(responses.keys()):
         signatures += responses[address]
