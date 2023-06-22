@@ -26,6 +26,7 @@ class Settings(metaclass=Singleton):
     log_level: str
     network: str
     data_dir: Path
+    vault_dir: Path
     execution_endpoint: str
     consensus_endpoint: str
     ipfs_fetch_endpoints: list[str]
@@ -91,7 +92,7 @@ class Settings(metaclass=Singleton):
             'https://gateway.pinata.cloud,https://ipfs.io',
         )
         data_dir = data_dir or DATA_DIR
-        self.data_dir = Path(data_dir) / str(self.vault)
+        self.vault_dir = Path(data_dir) / str(self.vault)
         self.database_dir = database_dir or decouple_config('DATABASE_DIR', default=None)
         self.keystores_path = keystores_path or decouple_config('KEYSTORES_PATH', default=None)
         self.keystores_password_file = keystores_password_file or decouple_config(
@@ -165,20 +166,20 @@ class Settings(metaclass=Singleton):
     def DATABASE(self) -> str:
         if self.database_dir:
             return os.path.join(self.database_dir, 'operator.db')
-        return os.path.join(self.data_dir, 'operator.db')
+        return os.path.join(self.vault_dir, 'operator.db')
 
     @property
     def KEYSTORES_PATH(self) -> Path:
         if self.keystores_path:
             return self.keystores_path
-        return self.data_dir / 'keystores'
+        return self.vault_dir / 'keystores'
 
     @property
     def KEYSTORES_PASSWORD_FILE(self) -> Path | None:
         if self.keystores_password_file:
             return self.keystores_password_file
         if not self.KEYSTORES_PASSWORD_DIR:
-            return self.data_dir / 'keystores' / 'password.txt'
+            return self.vault_dir / 'keystores' / 'password.txt'
         return None
 
     @property
@@ -187,7 +188,7 @@ class Settings(metaclass=Singleton):
 
     @property
     def DEPOSIT_DATA_PATH(self) -> Path:
-        return self.deposit_data_path or self.data_dir / 'deposit_data.json'
+        return self.deposit_data_path or self.vault_dir / 'deposit_data.json'
 
     @property
     def HOT_WALLET_PRIVATE_KEY(self) -> str | None:
@@ -201,7 +202,7 @@ class Settings(metaclass=Singleton):
             return self.hot_wallet_keystore_path
 
         if not self.HOT_WALLET_PRIVATE_KEY:
-            return self.data_dir / 'wallet' / 'wallet.json'
+            return self.vault_dir / 'wallet' / 'wallet.json'
         return None
 
     @property
@@ -210,7 +211,7 @@ class Settings(metaclass=Singleton):
             return self.hot_wallet_keystore_password_path
 
         if not self.HOT_WALLET_PRIVATE_KEY:
-            return self.data_dir / 'wallet' / 'password.txt'
+            return self.vault_dir / 'wallet' / 'password.txt'
         return None
 
     @property
