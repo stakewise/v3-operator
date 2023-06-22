@@ -43,6 +43,7 @@ class OraclesApproval:
 
 @dataclass
 class OracleApproval:
+    address: ChecksumAddress
     signature: bytes
     ipfs_hash: str
 
