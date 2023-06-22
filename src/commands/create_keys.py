@@ -65,8 +65,8 @@ async def create_keys(
             'Invalid mnemonic. Please use mnemonic provided at init command.'
         )
 
-    deposit_data_file = config.data_dir / 'deposit_data.json'
-    keystores_dir = config.data_dir / 'keystores'
+    deposit_data_file = config.vault_dir / 'deposit_data.json'
+    keystores_dir = config.vault_dir / 'keystores'
     password_file = keystores_dir / 'password.txt'
 
     credentials = CredentialManager.generate_credentials(

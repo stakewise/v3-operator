@@ -20,10 +20,10 @@ class VaultConfig:
     ):
         self.vault = vault
         if data_dir:
-            self.data_dir = Path(data_dir) / vault
+            self.vault_dir = Path(data_dir) / vault
         else:
-            self.data_dir = Path.home() / '.stakewise' / vault
-        self.config_path = self.data_dir / 'config.json'
+            self.vault_dir = Path.home() / '.stakewise' / vault
+        self.config_path = self.vault_dir / 'config.json'
 
     @property
     def exists(self) -> bool:
@@ -53,7 +53,7 @@ class VaultConfig:
             'mnemonic_next_index': self.mnemonic_next_index,
             'first_public_key': self.first_public_key,
         }
-        self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.vault_dir.mkdir(parents=True, exist_ok=True)
         with self.config_path.open('w') as f:
             json.dump(config, f)
 
