@@ -57,16 +57,14 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
     async with aiohttp.ClientSession() as session:
         results = await asyncio.gather(
             *[
-                send_approval_request(
-                    session=session, address=address, endpoint=endpoint, payload=payload
-                )
+                send_approval_request(session=session, endpoint=endpoint, payload=payload)
                 for address, endpoint in endpoints
             ],
         )
 
-        for result in results:
+        for address, result in zip(oracles.addresses, results):
             ipfs_hashes.append(result.ipfs_hash)
-            responses[result.address] = result.signature
+            responses[address] = result.signature
 
         if not ipfs_hashes:
             raise RuntimeError('No oracles to get approval from')
@@ -81,7 +79,7 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
 
 @backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
 async def send_approval_request(
-    session: aiohttp.ClientSession, address: ChecksumAddress, endpoint: str, payload: dict
+    session: aiohttp.ClientSession, endpoint: str, payload: dict
 ) -> OracleApproval:
     """Requests approval from single oracle."""
     try:
@@ -101,7 +99,6 @@ async def send_approval_request(
         raise e
     logger.debug('Received response from oracle %s: %s', endpoint, response)
     return OracleApproval(
-        address=address,
         ipfs_hash=data['ipfs_hash'],
         signature=Web3.to_bytes(hexstr=data['signature']),
     )
