@@ -9,4 +9,3 @@ def setup_logging() -> None:
         datefmt='%Y-%m-%d %H:%M:%S',
         level=settings.LOG_LEVEL,
     )
-    logging.getLogger('backoff').addHandler(logging.StreamHandler())
