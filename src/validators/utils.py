@@ -30,7 +30,6 @@ from src.validators.exceptions import (
 )
 from src.validators.execution import (
     _encode_tx_validator,
-    check_deposit_data_root,
     get_latest_network_validator_public_keys,
     get_validators_registry_root,
 )
@@ -186,9 +185,7 @@ async def load_deposit_data() -> DepositData:
         validators.append(validator)
 
     tree = StandardMerkleTree.of(leaves, ['bytes', 'uint256'])
-    await check_deposit_data_root(tree.root)
 
-    logger.info('Loaded deposit data file %s', settings.DEPOSIT_DATA_PATH)
     return DepositData(validators=validators, tree=tree)
 
 
