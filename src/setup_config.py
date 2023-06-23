@@ -8,7 +8,6 @@ from src.config.settings import settings
 
 
 def setup_config(*args, **kwargs) -> None:
-    # Vault and network will be loaded from vault config if not passed another way.
     vault = kwargs.pop('vault', None) or decouple_config('VAULT_CONTRACT_ADDRESS', default='')
     network = kwargs.pop('network', None) or decouple_config('NETWORK', default='')
 
@@ -16,13 +15,6 @@ def setup_config(*args, **kwargs) -> None:
     config = VaultConfig(vault=vault, data_dir=data_dir)
     if config.exists:
         config.load()
-
-        if vault and vault != config.vault:
-            raise click.ClickException(
-                f'Invalid vault address. Please use data-dir provided for {vault} init command.'
-            )
-        if not vault:
-            vault = config.vault
 
         if network and network != config.network:
             raise click.ClickException(
