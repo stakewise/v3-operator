@@ -1,7 +1,7 @@
+import asyncio
 import dataclasses
 import json
 import logging
-import random
 from multiprocessing import Pool
 from os import listdir
 from os.path import isfile, join
@@ -51,30 +51,30 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
     """Requests approval from all oracles."""
     payload = dataclasses.asdict(request)
     endpoints = list(zip(oracles.addresses, oracles.endpoints))
-    random.shuffle(endpoints)
 
-    ipfs_hash = None
+    ipfs_hashes = []
     responses: dict[ChecksumAddress, bytes] = {}
     async with aiohttp.ClientSession() as session:
-        for address, endpoint in endpoints:
-            response = await send_approval_request(session, endpoint, payload)
-            logger.debug('Received response from oracle %s: %s', address, response)
+        results = await asyncio.gather(
+            *[
+                send_approval_request(session=session, endpoint=endpoint, payload=payload)
+                for address, endpoint in endpoints
+            ],
+        )
 
-            if ipfs_hash is None:
-                ipfs_hash = response.ipfs_hash
-            elif ipfs_hash != response.ipfs_hash:
-                raise ValueError('Different oracles IPFS hashes for approval request')
+    for address, result in zip(oracles.addresses, results):
+        ipfs_hashes.append(result.ipfs_hash)
+        responses[address] = result.signature
 
-            responses[address] = response.signature
-
-    if ipfs_hash is None:
+    if not ipfs_hashes:
         raise RuntimeError('No oracles to get approval from')
 
+    if len(set(ipfs_hashes)) != 1:
+        raise ValueError('Different oracles IPFS hashes for approval request')
     signatures = b''
     for address in sorted(responses.keys()):
         signatures += responses[address]
-
-    return signatures, ipfs_hash
+    return signatures, ipfs_hashes[0]
 
 
 @backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
@@ -97,9 +97,10 @@ async def send_approval_request(
             raise ValidatorIndexChangedError from e
 
         raise e
-
+    logger.debug('Received response from oracle %s: %s', endpoint, response)
     return OracleApproval(
-        ipfs_hash=data['ipfs_hash'], signature=Web3.to_bytes(hexstr=data['signature'])
+        ipfs_hash=data['ipfs_hash'],
+        signature=Web3.to_bytes(hexstr=data['signature']),
     )
 
 
