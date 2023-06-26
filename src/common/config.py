@@ -19,10 +19,12 @@ class VaultConfig:
         data_dir: str = '',
     ):
         self.vault = vault
+
+        vault_lower = vault.lower()
         if data_dir:
-            self.vault_dir = Path(data_dir) / vault
+            self.vault_dir = Path(data_dir) / vault_lower
         else:
-            self.vault_dir = Path.home() / '.stakewise' / vault
+            self.vault_dir = Path.home() / '.stakewise' / vault_lower
         self.config_path = self.vault_dir / 'config.json'
 
     @property
