@@ -21,6 +21,7 @@ else:
      ]
 
 datas += collect_data_files('certifi')
+datas += collect_data_files('eth_account')
 
 
 block_cipher = None
