@@ -5,7 +5,7 @@ import sys
 
 import click
 
-from src.commands.check_deposit_data import check_deposit_data_cmd
+from src.commands.check_deposit_data import check_deposit_data
 from src.commands.create_keys import create_keys
 from src.commands.create_wallet import create_wallet
 from src.commands.init import init
@@ -23,7 +23,7 @@ cli.add_command(create_keys)
 cli.add_command(create_wallet)
 cli.add_command(merge_deposit_data)
 cli.add_command(start)
-cli.add_command(check_deposit_data_cmd)
+cli.add_command(check_deposit_data)
 
 
 if __name__ == '__main__':

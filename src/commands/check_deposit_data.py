@@ -24,7 +24,7 @@ DEPOSIT_DATA_ROOT_ERROR = 2
 @click.option(
     '--vault',
     type=str,
-    help='Address of the Vault to register validators for',
+    help='Address of the Vault to check deposit data for',
     callback=validate_eth_address,
 )
 @click.option(
@@ -34,8 +34,8 @@ DEPOSIT_DATA_ROOT_ERROR = 2
     type=click.Path(exists=False, file_okay=False, dir_okay=True),
 )
 @click.option('--execution-endpoint', type=str, help='API endpoint for the execution node')
-@click.command(name='check_deposit_data', help='check deposit data')
-def check_deposit_data_cmd(*args, **kwargs) -> None:
+@click.command(help='Compares deposit data in the vault contract and the vault data directory')
+def check_deposit_data(*args, **kwargs) -> None:
     setup_config(*args, **kwargs)
     setup_logging()
     try:
