@@ -275,6 +275,7 @@ Operator supports monitoring using Prometheus by providing a `/metrics` endpoint
 1. Operator application running and accessible.
 1. Prometheus server installed and running.
 1. Basic knowledge of how to configure Prometheus targets.
+1. [Grafana Dashboard](https://grafana.com/grafana/dashboards/19060-v3-operator/) for `v3-operator` installed
 
 Setup Operator for Monitoring:
 
