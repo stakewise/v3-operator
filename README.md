@@ -74,9 +74,6 @@ It will allow you to restore the keys in case the Vault will get corrupted or lo
 
 ### 2. Create keys
 Creates deposit data and validator keystores files for operator service:
-The validator public keys must be new and never seen by the beacon chain. This can be achieved using a higher mnemonic
-index for every new deposit data. For example, if you've generated four keys before (keys #0, #1, #2, #3), then start
-with index 4. Operator stores the index locally and updates it every time you generate new validator keys.
 ```bash
 ./operator create-keys
 ```
