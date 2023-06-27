@@ -25,15 +25,15 @@ The validator registration process consists of the following steps:
 
 
 ### Exit signatures rotation
-Exit signatures from the previous section are valid only for current and next forks.
-The operator periodically checks active validators for Vault and if some signatures become outdated after new fork released the operator will send
+Exit signatures from the previous section are valid only for current and next consensus client forks.
+The operator periodically checks active validators for Vault and if some signatures become outdated after new fork released the operator will submit
 a signature update transaction to the Vault.
 
 
-### Vault harvesting
+### Vault state update (optional)
 
-The operator periodically checks whether Vault state should be harvested
-To enable vault harvesting add `--harvest-vault` flag to `start` command:
+The oracles periodically submit consensus rewards of all the vaults to the Keeper contract.
+By default, every vault pulls these updates on the user interaction with the vault (deposit, withdraw, etc.), but it also can be done by the vault operator by passing the `--harvest-vault` flag to the `start` command.
 
 ## Usage
 
@@ -53,7 +53,7 @@ If you are creating a new Vault:
 
 If you already have a Vault, you can see its address either in the URL bar or in the "Contract address" field by scrolling to the "Details" at the bottom.
 
-### 1. Vault init command
+### 1. Init vault config
 Create the vault config and mnemonic used to derive validator keys.
 ```bash
 ./operator init
