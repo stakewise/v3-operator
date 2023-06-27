@@ -23,7 +23,6 @@ class Metrics:
 
 metrics = Metrics()
 metrics.set_app_version()
-metrics.set_build_version()
 
 
 async def metrics_server() -> None:
