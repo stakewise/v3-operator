@@ -26,7 +26,7 @@ The validator registration process consists of the following steps:
 
 ### Exit signatures rotation
 Exit signatures from the previous section are valid only for current and next consensus client forks.
-The operator periodically checks active validators for Vault and if some signatures become outdated after new fork released the operator will submit
+The operator periodically checks active validators for Vault and if some signatures become outdated after new fork release the operator will submit
 a signature update transaction to the Vault.
 
 
