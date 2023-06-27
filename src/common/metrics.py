@@ -2,7 +2,6 @@ from prometheus_client import Gauge, Info, start_http_server
 
 import src
 from src.config.settings import settings
-from src.utils import get_build_version
 
 
 class Metrics:
