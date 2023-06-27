@@ -45,13 +45,13 @@ Operator generates mnemonic, keystores, deposit data for the validators. It also
 #### How can I find the Vault address?
 
 If you are creating a new Vault:
-1. go to [StakeWise testnet app](https://testnet.stakewise.io)
-2. connect the wallet you will create Vault from
-3. click on "Create Vault"
-4. process vault setup step by step
-5. Click on the "Configure" the Vault address is specified in the withdrawal address field
+1. Go to [StakeWise testnet app](https://testnet.stakewise.io)
+2. Connect with your wallet
+3. Click on "Create Vault"
+4. Process vault setup step by step
+5. Once vault is deployed go to its page
 
-If you already have a Vault, you can see its address either in the URL bar or in the "Contract address" field by scrolling to the "Details" at the bottom.
+You can find the vault address either in the URL bar or in the "Contract address" field by scrolling to the "Details" at the bottom.
 
 ### 1. Init vault config
 Create the vault config and mnemonic used to derive validator keys.
