@@ -5,7 +5,7 @@ from web3 import Web3
 from web3.types import ChecksumAddress, EventData, Wei
 
 from src.common.clients import execution_client, ipfs_fetch_client
-from src.common.contracts import keeper_contract, oracles_contract
+from src.common.contracts import keeper_contract
 from src.common.metrics import metrics
 from src.common.typings import Oracles, RewardVoteInfo
 from src.common.wallet import hot_wallet
@@ -48,8 +48,8 @@ async def check_hot_wallet_balance() -> None:
 @backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
 async def get_oracles() -> Oracles:
     """Fetches oracles config."""
-    events = await oracles_contract.events.ConfigUpdated.get_logs(
-        from_block=settings.NETWORK_CONFIG.ORACLES_GENESIS_BLOCK
+    events = await keeper_contract.events.ConfigUpdated.get_logs(
+        from_block=settings.NETWORK_CONFIG.KEEPER_GENESIS_BLOCK
     )
     if not events:
         raise ValueError('Failed to fetch IPFS hash of oracles config')
@@ -57,7 +57,7 @@ async def get_oracles() -> Oracles:
     # fetch IPFS record
     ipfs_hash = events[-1]['args']['configIpfsHash']
     config: dict = await ipfs_fetch_client.fetch_json(ipfs_hash)  # type: ignore
-    threshold = await oracles_contract.functions.requiredOracles().call()
+    threshold = await keeper_contract.functions.requiredOracles().call()
 
     endpoints = []
     public_keys = []
