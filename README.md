@@ -23,31 +23,46 @@ The validator registration process consists of the following steps:
     3. Send encrypted exit signatures to all the oracles and receive registration signatures from them.
 4. Send transaction to Vault contract to register the validator.
 
+
+### Exit signatures rotation
+Exit signatures from the previous section are valid only for current and next forks.
+The operator periodically checks active validators for Vault and if some signatures become outdated after new fork released the operator will send
+a signature update transaction to the Vault.
+
+
+### Vault harvesting
+
+The operator periodically checks whether Vault state should be harvested
+To enable vault harvesting add `--harvest-vault` flag to `start` command:
+
 ## Usage
 
 ## Step 0. Download operator binary
-Download and decompress the corresponding binary files binary from [releases page](https://github.com/stakewise/v3-operator/releases).
+Download and decompress the binary file from [releases page](https://github.com/stakewise/v3-operator/releases).
 
 ## Step 1. Generate keystores & deposit data
-Operator generates validators keys and deposit data for the validators, generates mnemonic and hot wallet
-
+Operator generates mnemonic, keystores, deposit data for the validators. It also generates hot wallet used to submit validator registration transactions.
 #### How can I find the Vault address?
 
 If you are creating a new Vault:
 1. go to [StakeWise testnet app](https://testnet.stakewise.io)
 2. connect the wallet you will create Vault from
 3. click on "Create Vault"
-4. reach the "Setup Validator" step
-5. the Vault address is specified in the withdrawal address field
+4. process vault setup step by step
+5. Click on the "Configure" the Vault address is specified in the withdrawal address field
 
-If you already have a Vault, you can see its address either in the URL bar or by scrolling to the "Details" at the bottom.
+If you already have a Vault, you can see its address either in the URL bar or in the "Contract address" field by scrolling to the "Details" at the bottom.
 
 ### 1. Vault init command
 Create the vault config and mnemonic used to derive validator keys.
 ```bash
-./operator init --network goerli --vault 0x0000000000000000000000000000000000000000 --language english
+./operator init
 ```
 ```
+Enter your vault address: 0x3320ad928c20187602a2b2c04eeaa813fa899468
+Choose your mnemonic language. (chinese_simplified, chinese_traditional, czech, english, italian, korean, portuguese, spanish) [english]: english
+Enter the network name (goerli) [goerli]: goerli
+
 This is your seed phrase. Write it down and store it safely, it is the ONLY way to recover your validator keys.
 
 pumpkin anxiety private salon inquiry ....
@@ -60,7 +75,7 @@ Please type your mnemonic (separated by spaces) to confirm you have written it d
 : pumpkin anxiety private salon inquiry ....
 
 done.
-Successfully initialized configuration for vault 0x0000000000000000000000000000000000000000
+Successfully initialized configuration for vault 0x3320ad928c20187602a2b2c04eeaa813fa899468
 ```
 #### Options:
 - `--network` - The network to generate the vault config for.
@@ -78,16 +93,16 @@ Creates deposit data and validator keystores files for operator service:
 ./operator create-keys
 ```
 ```
-Enter the vault address for which the validator keys are generated: 0x00000...000
+Enter the vault address for which the validator keys are generated: 0x3320a...68
 Enter the number of the validator keys to generate: 10
 Enter the mnemonic for generating the validator keys: pumpkin anxiety private salon inquiry ....
 Creating validator keys:		  [####################################]  10/10
 Generating deposit data JSON		  [####################################]  10/10
 Exporting validator keystores		  [####################################]  10/10
 
-Done. Generated 10 keys for 0x00000...000 vault.
-Keystores saved to /home/user/.stakewise/0x0000000000000000000000000000000000000000/keystores file
-Deposit data saved to /home/user/.stakewise/0x0000000000000000000000000000000000000000/keystores/deposit_data.json file
+Done. Generated 10 keys for 0x3320a...68 vault.
+Keystores saved to /home/user/.stakewise/0x3320ad928c20187602a2b2c04eeaa813fa899468/keystores file
+Deposit data saved to /home/user/.stakewise/0x3320ad928c20187602a2b2c04eeaa813fa899468/keystores/deposit_data.json file
 ```
 #### Options:
 - `--mnemonic` - The mnemonic for generating the validator keys.
@@ -105,9 +120,9 @@ The hot wallet is used to submit validator registration transaction. You must se
 ./operator create-wallet
 ```
 ```
-Enter the vault address: 0x00000...000
+Enter the vault address: 0x3320a...68
 Enter the mnemonic for generating the wallet: pumpkin anxiety private salon inquiry ...
-Done. The wallet and password saved to /home/user/.stakewise/0x0000000000000000000000000000000000000000/wallet directory.
+Done. The wallet and password saved to /home/user/.stakewise/0x3320ad928c20187602a2b2c04eeaa813fa899468/wallet directory.
 ```
 #### Options:
 - `--vault` - The vault to generate the wallet for.
@@ -121,9 +136,8 @@ Or you can use any of the tools available for generating the hot wallet. For exa
     1. [Generate wallet](https://metamask.zendesk.com/hc/en-us/articles/360015289452-How-to-create-an-additional-account-in-your-wallet)
     2. [Export wallet](https://metamask.zendesk.com/hc/en-us/articles/360015289632-How-to-export-an-account-s-private-key)
 - [MyEtherWallet Offline](https://help.myetherwallet.com/en/articles/6512619-using-mew-offline-current-mew-version-6)
-- [Vanity ETH](https://github.com/bokub/vanity-eth)
 
-### Step 2. Install execution node
+## Step 2. Install execution node
 
 The execution node is used to fetch data from the Vault contract and to submit transactions. Any execution client that
 supports [ETH Execution API specification](https://ethereum.github.io/execution-apis/api-documentation/) can be used:
@@ -133,7 +147,7 @@ supports [ETH Execution API specification](https://ethereum.github.io/execution-
 - [Erigon](https://launchpad.ethereum.org/en/erigon) (Ethereum)
 - [Geth](https://launchpad.ethereum.org/en/geth) (Ethereum)
 
-### Step 3. Install consensus node
+## Step 3. Install consensus node
 
 The consensus node is used to fetch consensus fork data required for generating exit signatures. Any consensus client
 that
@@ -144,7 +158,7 @@ supports [ETH Beacon Node API specification](https://ethereum.github.io/beacon-A
 - [Prysm](https://launchpad.ethereum.org/en/prysm) (Ethereum)
 - [Teku](https://launchpad.ethereum.org/en/teku) (Ethereum, Gnosis)
 
-### Step 4. Run operator service
+## Step 4. Run operator service
 
 #### Option 1. From binary executable file
 
@@ -152,7 +166,7 @@ See [releases page](https://github.com/stakewise/v3-operator/releases) to downlo
 binary file. Start the binary with the following command:
 
 ```sh
-./operator start --vault=0x0000000000000000000000000000000000000000  --consensus-endpoint=https://example.com --execution-endpoint=https://example.com
+./operator start --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468  --consensus-endpoint=https://example.com --execution-endpoint=https://example.com
 ```
 Or you can use environment variables. Check .env.example file for details
 #### Option 2. Use Docker image
@@ -168,21 +182,20 @@ or pull existing one:
 docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:latest
 ```
 
-Copy [.env.example](./.env.example) file to `.env` file and fill it with correct values
-
-Make sure that file paths in .env file represent vault data and client endpoints
-
 You have to mount keystores and deposit data folders into docker container.
 
 Start the container with the following command:
 
 ```sh
-docker run env-file .env  -v ~/.stakewise/:/data  europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:latest
 docker run --restart on-failure:10 \
   --env-file .env \
   -v ~/.stakewise/:/data \
   europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:latest \
-  src/main.py start
+  src/main.py start \
+  --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
+  --data-dir=/data \
+  --consensus-endpoint=https://example.com \
+  --execution-endpoint=https://example.com
 ```
 
 If you prefer declarative style instead of long one-liners, then docker-compose is an option for you.
@@ -208,8 +221,18 @@ Build requirements:
 Install dependencies and start operator:
 ```sh
 poetry install --only main
-PYTHONPATH=. poetry run python src/main.py start
+PYTHONPATH=. poetry run python src/main.py start \
+--vault=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
+--data-dir=/data \
+--consensus-endpoint=https://example.com \
+--execution-endpoint=https://example.com
 ```
+
+### Environment variables
+Operator service also can be configured via environment variables instead of cli flags.
+Copy [.env.example](./.env.example) file to `.env` file and fill it with correct values.
+Make sure that file paths in .env file represent vault data and client endpoints
+
 
 # Contacts
 - Dmitri Tsumak - dmitri@stakewise.io
