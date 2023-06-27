@@ -8,7 +8,6 @@ from src.utils import get_build_version
 class Metrics:
     def __init__(self):
         self.app_version = Info('app_version', 'V3 Operator version')
-        self.build_version = Info('build_version', 'V3 Operator version')
         self.block_number = Gauge('block_number', 'Current block number')
         self.slot_number = Gauge('slot_number', 'Current slot number')
         self.wallet_balance = Gauge('wallet_balance', 'Current wallet balance')
@@ -20,9 +19,6 @@ class Metrics:
 
     def set_app_version(self):
         self.app_version.info({'version': src.__version__})
-
-    def set_build_version(self):
-        self.build_version.info({'version': get_build_version()})
 
 
 metrics = Metrics()
