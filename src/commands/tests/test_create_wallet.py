@@ -14,7 +14,7 @@ from src.config.settings import DATA_DIR
 class TestCreateWallet(unittest.TestCase):
     def test_basic(self):
         vault = faker.eth_address()
-        vault_dir = f'{DATA_DIR}/{vault}'
+        vault_dir = f'{DATA_DIR}/{vault.lower()}'
         runner = CliRunner()
         Account.enable_unaudited_hdwallet_features()
         mnemonic = get_mnemonic(language='english', words_path=WORD_LISTS_PATH)

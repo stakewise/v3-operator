@@ -34,7 +34,7 @@ class TestCreateKeys(unittest.TestCase):
             result = runner.invoke(create_keys, args)
             assert result.exit_code == 0
 
-            vault_dir = f'{DATA_DIR}/{vault}'
+            vault_dir = f'{DATA_DIR}/{vault.lower()}'
 
             output = (
                 'Creating validator keys:\t\t\n'
@@ -85,7 +85,7 @@ class TestCreateKeys(unittest.TestCase):
             result = runner.invoke(create_keys, args)
             assert result.exit_code == 0
 
-            vault_dir = f'{DATA_DIR}/{vault}'
+            vault_dir = f'{DATA_DIR}/{vault.lower()}'
 
             output = (
                 'Creating validator keys:\t\t\n'

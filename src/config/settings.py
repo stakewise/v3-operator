@@ -92,7 +92,7 @@ class Settings(metaclass=Singleton):
             'https://gateway.pinata.cloud,https://ipfs.io',
         )
         data_dir = data_dir or DATA_DIR
-        self.vault_dir = Path(data_dir) / str(self.vault)
+        self.vault_dir = Path(data_dir) / str(self.vault).lower()
         self.database_dir = database_dir or decouple_config('DATABASE_DIR', default=None)
         self.keystores_path = keystores_path or decouple_config('KEYSTORES_PATH', default=None)
         self.keystores_password_file = keystores_password_file or decouple_config(
