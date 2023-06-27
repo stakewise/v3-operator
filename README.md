@@ -23,21 +23,46 @@ The validator registration process consists of the following steps:
     3. Send encrypted exit signatures to all the oracles and receive registration signatures from them.
 4. Send transaction to Vault contract to register the validator.
 
+
+### Exit signatures rotation
+Exit signatures from the previous section are valid only for current and next consensus client forks.
+The operator periodically checks active validators for Vault and if some signatures become outdated after new fork release the operator will submit
+a signature update transaction to the Vault.
+
+
+### Vault state update (optional)
+
+The oracles periodically submit consensus rewards of all the vaults to the Keeper contract.
+By default, every vault pulls these updates on the user interaction with the vault (deposit, withdraw, etc.), but it also can be done by the vault operator by passing the `--harvest-vault` flag to the `start` command.
+
 ## Usage
-# Stakewise V3 key manager
 
-Key manager generates validators keys and deposit data for the validators, generates mnemonic and hot wallet. Also it helps to manage validators keys in web3signer infrastructure.
+## Step 0. Download operator binary
+Download and decompress the binary file from [releases page](https://github.com/stakewise/v3-operator/releases).
 
-See [releases page](https://github.com/stakewise/key-manager/releases) to download and decompress the corresponding binary files.
+## Step 1. Generate keystores & deposit data
+Operator generates mnemonic, keystores, deposit data for the validators. It also generates hot wallet used to submit validator registration transactions.
+#### How can I find the Vault address?
 
-## Key management commands
+If you are creating a new Vault:
+1. Go to [StakeWise testnet app](https://testnet.stakewise.io)
+2. Connect with your wallet
+3. Click on "Create Vault"
+4. Process vault setup step by step
+5. Once vault is deployed go to its page
 
-### 1. Create mnemonic
-Create the mnemonic used to derive validator keys.
+You can find the vault address either in the URL bar or in the "Contract address" field by scrolling to the "Details" at the bottom.
+
+### 1. Init vault config
+Create the vault config and mnemonic used to derive validator keys.
 ```bash
-./key-manager create-mnemonic --language english
+./operator init
 ```
 ```
+Enter your vault address: 0x3320ad928c20187602a2b2c04eeaa813fa899468
+Choose your mnemonic language. (chinese_simplified, chinese_traditional, czech, english, italian, korean, portuguese, spanish) [english]: english
+Enter the network name (goerli) [goerli]: goerli
+
 This is your seed phrase. Write it down and store it safely, it is the ONLY way to recover your validator keys.
 
 pumpkin anxiety private salon inquiry ....
@@ -50,67 +75,69 @@ Please type your mnemonic (separated by spaces) to confirm you have written it d
 : pumpkin anxiety private salon inquiry ....
 
 done.
+Successfully initialized configuration for vault 0x3320ad928c20187602a2b2c04eeaa813fa899468
 ```
 #### Options:
+- `--network` - The network to generate the vault config for.
+- `--vault` - The vault to generate the vault config for.
 - `--language` - Choose your mnemonic language
 - `--no-verify` - Skips mnemonic verification when provided.
+- `--data-dir` - Path where the vault data will be placed. Defaults to ~/.stakewise/<vault>.
 
 **NB! You must store the generated mnemonic in a secure cold storage.
 It will allow you to restore the keys in case the Vault will get corrupted or lost.**
 
 ### 2. Create keys
 Creates deposit data and validator keystores files for operator service:
-
 ```bash
-./key-manager create-keys
+./operator create-keys
 ```
 ```
+Enter the vault address for which the validator keys are generated: 0x3320a...68
 Enter the number of the validator keys to generate: 10
 Enter the mnemonic for generating the validator keys: pumpkin anxiety private salon inquiry ....
-Enter the network name (goerli) [goerli]:
-Enter the vault address for which the validator keys are generated: 0x56FED...07E7
-Enter the mnemonic start index for generating validator keys [0]:
 Creating validator keys:		  [####################################]  10/10
 Generating deposit data JSON		  [####################################]  10/10
 Exporting validator keystores		  [####################################]  10/10
 
-Done. Generated 10 keys for 0x56FED...07E7 vault.
-Keystores saved to ./data/keystores file
-Deposit data saved to ./data/deposit_data.json file
-Next mnemonic start index saved to ./mnemonic_next_index.txt file
+Done. Generated 10 keys for 0x3320a...68 vault.
+Keystores saved to /home/user/.stakewise/0x3320ad928c20187602a2b2c04eeaa813fa899468/keystores file
+Deposit data saved to /home/user/.stakewise/0x3320ad928c20187602a2b2c04eeaa813fa899468/keystores/deposit_data.json file
 ```
 #### Options:
-- `--network` - The network to generate the deposit data for.
 - `--mnemonic` - The mnemonic for generating the validator keys.
 - `--count` - The number of the validator keys to generate.
-- `--vault` or `--withdrawal-address` -The withdrawal address where the funds will be sent after validators’ withdrawals.
-- `--admin` - The vault admin address.
-- `--vault-type` - The vault type.
-- `--execution-endpoint` - The endpoint of the execution node used for computing the with.
-- `--deposit-data-file` - The path to store the deposit data file. Defaults to ./data/deposit_data.json.
-- `--keystores` - The directory to store the validator keys in the EIP-2335 standard. Defaults to ./data/keystores.
-- `--password-file` - The path to store randomly generated password for encrypting the keystores. Defaults to ./data/keystores/password.txt.
-- `--mnemonic-start-index` - The index of the first validator keys you wish to generate. If this is your first time generating keys with this mnemonic, use 0. If you have generated keys using this mnemonic before, add --mnemonic-next-index-file flag or specify the next index from which you want to start generating keys from (eg, if you've generated 4 keys before (keys #0, #1, #2, #3) then enter 4 here.
-- `--mnemonic-next-index-file` - The path where to store the mnemonic index to use for generating next validator keys. Used to always generate unique validator keys. Defaults to ./mnemonic_next_index.txt.
+- `--vault` - The vault to generate the keystores and deposit data for.
+- `--per-keystore-password` - Creates separate password file for each keystore.
+- `--data-dir` - Path where the vault data will be placed. Defaults to ~/.stakewise/<vault>.
 
 
-### 3. Create wallets
-
+### 3. Create wallet
 Creates the encrypted hot wallet from the mnemonic.
+The hot wallet is used to submit validator registration transaction. You must send some ETH (DAI for Gnosis) to the wallet for the gas expenses. The validator registration costs around 0.01 ETH with 30 Gwei gas price. You must keep an eye on your wallet balance, otherwise validators will stop registering.
 
 ```bash
-./key-manager create-wallet
+./operator create-wallet
 ```
 ```
+Enter the vault address: 0x3320a...68
 Enter the mnemonic for generating the wallet: pumpkin anxiety private salon inquiry ...
-Done. Wallet 0xf5fF7...B914a-1677838759.json saved to ./wallet directory
+Done. The wallet and password saved to /home/user/.stakewise/0x3320ad928c20187602a2b2c04eeaa813fa899468/wallet directory.
 ```
 #### Options:
-- `--mnemonic` - The mnemonic for generating the validator keys.
-- `--wallet-dir` - The directory to save encrypted wallet and password files. Defaults to ./wallet.
+- `--vault` - The vault to generate the wallet for.
+- `--mnemonic` - The mnemonic for generating the wallet.
+- `--data-dir` - Path where the vault data will be placed. Defaults to ~/.stakewise/<vault>.
 
 
-### Step 1. Install execution node
+Or you can use any of the tools available for generating the hot wallet. For example,
+
+- [Metamask](https://metamask.io/)
+    1. [Generate wallet](https://metamask.zendesk.com/hc/en-us/articles/360015289452-How-to-create-an-additional-account-in-your-wallet)
+    2. [Export wallet](https://metamask.zendesk.com/hc/en-us/articles/360015289632-How-to-export-an-account-s-private-key)
+- [MyEtherWallet Offline](https://help.myetherwallet.com/en/articles/6512619-using-mew-offline-current-mew-version-6)
+
+## Step 2. Install execution node
 
 The execution node is used to fetch data from the Vault contract and to submit transactions. Any execution client that
 supports [ETH Execution API specification](https://ethereum.github.io/execution-apis/api-documentation/) can be used:
@@ -120,7 +147,7 @@ supports [ETH Execution API specification](https://ethereum.github.io/execution-
 - [Erigon](https://launchpad.ethereum.org/en/erigon) (Ethereum)
 - [Geth](https://launchpad.ethereum.org/en/geth) (Ethereum)
 
-### Step 2. Install consensus node
+## Step 3. Install consensus node
 
 The consensus node is used to fetch consensus fork data required for generating exit signatures. Any consensus client
 that
@@ -131,75 +158,21 @@ supports [ETH Beacon Node API specification](https://ethereum.github.io/beacon-A
 - [Prysm](https://launchpad.ethereum.org/en/prysm) (Ethereum)
 - [Teku](https://launchpad.ethereum.org/en/teku) (Ethereum, Gnosis)
 
-### Step 3. Generate keystores & deposit data
+## Step 4. Run operator service
 
-The keystores are used to create exit signatures, and the deposit data is used to register the validators.
-
-The deposit data must comply with the following rules:
-
-- The Vault address must be used as withdrawal address.
-- The validator public keys must be new and never seen by the beacon chain.
-
-#### How can I find the Vault address?
-
-If you are creating a new Vault:
-1. go to [StakeWise testnet app](https://atlantic.stakewise.io)
-2. connect the wallet you will create Vault from
-3. click on "Create Vault"
-4. reach the "Setup Validator" step
-5. the Vault address is specified in the withdrawal address field
-
-If you already have a Vault, you can see its address either in the URL bar or by scrolling to the "Details" at the bottom.
-
-#### Tools to generate keystores and deposit data
-
-You can use any of the following tools:
-
-- [StakeWise key manager](https://github.com/stakewise/key-manager/)
-- [Staking Deposit CLI](https://github.com/ethereum/staking-deposit-cli)
-- [Wagyu Key Gen](https://github.com/stake-house/wagyu-key-gen)
-
-#### Generating new keystores upon existing ones
-
-The validator public keys must be new and never seen by the beacon chain. This can be achieved using a higher mnemonic
-index for every new deposit data. For example, if you've generated four keys before (keys #0, #1, #2, #3), then start
-with index 4. [StakeWise key manager](https://github.com/stakewise/key-manager/) stores the index locally and updates
-it every time you generate new validator keys.
-
-### Step 4. Generate hot wallet
-
-The hot wallet is used to submit validator registration transaction. You must send some ETH (DAI for Gnosis) to
-the wallet for the gas expenses. The validator registration costs around 0.01 ETH with 30 Gwei gas price. You must keep
-an eye on your wallet balance, otherwise validators will stop registering.
-
-You can use any of the tools available for generating the hot wallet. For example,
-
-- [Metamask](https://metamask.io/)
-    1. [Generate wallet](https://metamask.zendesk.com/hc/en-us/articles/360015289452-How-to-create-an-additional-account-in-your-wallet)
-    2. [Export wallet](https://metamask.zendesk.com/hc/en-us/articles/360015289632-How-to-export-an-account-s-private-key)
-- [MyEtherWallet Offline](https://help.myetherwallet.com/en/articles/6512619-using-mew-offline-current-mew-version-6)
-- [Vanity ETH](https://github.com/bokub/vanity-eth)
-
-### Step 5. Prepare .env file
-
-Copy [.env.example](./.env.example) file to `.env` file and fill it with correct values
-
-### Step 6. Deploy operator
-
-#### Option 1. Download binary executable file
+#### Option 1. From binary executable file
 
 See [releases page](https://github.com/stakewise/v3-operator/releases) to download and decompress the corresponding
 binary file. Start the binary with the following command:
 
 ```sh
-./operator
+./operator start --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468  --consensus-endpoint=https://example.com --execution-endpoint=https://example.com
 ```
-
+Or you can use environment variables. Check .env.example file for details
 #### Option 2. Use Docker image
 
 Build Docker image:
 
-##### Debian based image
 ```sh
 docker build --pull -t stakewiselabs/v3-operator .
 ```
@@ -209,35 +182,20 @@ or pull existing one:
 docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:latest
 ```
 
-##### Alpine based image
-
-```sh
-docker build -f Dockerfile.alpine --pull -t stakewiselabs/v3-operator .
-```
-
-or pull existing one:
-```sh
-docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:<release>-alpine
-```
-Make sure that file paths in .env file represent container paths. For example:
-```
-DATABASE_DIR=/database
-KEYSTORES_PASSWORD_FILE=/data/keystores/password.txt
-KEYSTORES_PATH=/data/keystores
-DEPOSIT_DATA_PATH=/data/deposit_data.json
-```
-
 You have to mount keystores and deposit data folders into docker container.
-For example, if your keystores and deposit data file are located in `/home/user/data` folder on a host and you use `/home/user/database` folder on host for the database
 
 Start the container with the following command:
 
 ```sh
 docker run --restart on-failure:10 \
   --env-file .env \
-  -v /home/user/database:/database \
-  -v /home/user/data:/data \
-  europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:latest
+  -v ~/.stakewise/:/data \
+  europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:latest \
+  src/main.py start \
+  --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
+  --data-dir=/data \
+  --consensus-endpoint=https://example.com \
+  --execution-endpoint=https://example.com
 ```
 
 If you prefer declarative style instead of long one-liners, then docker-compose is an option for you.
@@ -263,8 +221,18 @@ Build requirements:
 Install dependencies and start operator:
 ```sh
 poetry install --only main
-PYTHONPATH=. poetry run python src/main.py
+PYTHONPATH=. poetry run python src/main.py start \
+--vault=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
+--data-dir=/data \
+--consensus-endpoint=https://example.com \
+--execution-endpoint=https://example.com
 ```
+
+### Environment variables
+Operator service also can be configured via environment variables instead of cli flags.
+Copy [.env.example](./.env.example) file to `.env` file and fill it with correct values.
+Make sure that file paths in .env file represent vault data and client endpoints
+
 
 # Contacts
 - Dmitri Tsumak - dmitri@stakewise.io
