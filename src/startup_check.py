@@ -32,7 +32,7 @@ async def wait_for_consensus_node() -> None:
         try:
             syncing = await consensus_client.get_syncing()
             if syncing['data']['is_syncing'] is True:
-                logger.info(
+                logger.warning(
                     'The consensus node located at %s has not completed synchronization yet. '
                     'The remaining synchronization distance is %s.',
                     settings.CONSENSUS_ENDPOINT,
@@ -57,7 +57,7 @@ async def wait_for_execution_node() -> None:
         try:
             syncing = await execution_client.eth.syncing
             if syncing is True:
-                logger.info(
+                logger.warning(
                     'The execution node located at %s has not completed synchronization yet.',
                     settings.EXECUTION_ENDPOINT,
                 )
