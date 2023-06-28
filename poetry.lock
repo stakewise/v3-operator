@@ -2060,14 +2060,14 @@ hook-testing = ["execnet (>=1.5.0)", "psutil", "pytest (>=2.7.3)"]
 
 [[package]]
 name = "pyinstaller-hooks-contrib"
-version = "2023.3"
+version = "2023.4"
 description = "Community maintained hooks for PyInstaller"
 category = "dev"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pyinstaller-hooks-contrib-2023.3.tar.gz", hash = "sha256:bb39e1038e3e0972420455e0b39cd9dce73f3d80acaf4bf2b3615fea766ff370"},
-    {file = "pyinstaller_hooks_contrib-2023.3-py2.py3-none-any.whl", hash = "sha256:062ad7a1746e1cfc24d3a8c4be4e606fced3b123bda7d419f14fcf7507804b07"},
+    {file = "pyinstaller-hooks-contrib-2023.4.tar.gz", hash = "sha256:9c11197653de9605a81975325a60b9369e9cdc37c009b6aeb0221a57211f9388"},
+    {file = "pyinstaller_hooks_contrib-2023.4-py2.py3-none-any.whl", hash = "sha256:fc9892e46fa19d05725205413fb21a764f2f6ff1e70ba95322fb02420a665a45"},
 ]
 
 [[package]]
@@ -2545,7 +2545,7 @@ pbr = ">=2.0.0,<2.1.0 || >2.1.0"
 
 [[package]]
 name = "sw-utils"
-version = "0.3.7"
+version = "0.3.9"
 description = "StakeWise Python utils"
 category = "main"
 optional = false
@@ -2559,13 +2559,13 @@ ipfshttpclient = "^0.8.0a2"
 milagro-bls-binding = "==1.9.0"
 py-ecc = "^6.0.0"
 types-requests = "^2.28.11.15"
-web3 = "==6.0.0b9"
+web3 = "==6.5.0"
 
 [package.source]
 type = "git"
 url = "https://github.com/stakewise/sw-utils.git"
-reference = "v0.3.7"
-resolved_reference = "7fbb341f6b272c2c9a793ca1130b4c8ddce9a880"
+reference = "v0.3.9"
+resolved_reference = "76f083f553b903daf9d82424549797571f73d62e"
 
 [[package]]
 name = "toml"
@@ -2706,19 +2706,19 @@ test = ["covdefaults (>=2.3)", "coverage (>=7.2.7)", "coverage-enable-subprocess
 
 [[package]]
 name = "web3"
-version = "6.0.0b9"
-description = "Web3.py"
+version = "6.5.0"
+description = "web3.py"
 category = "main"
 optional = false
 python-versions = ">=3.7.2"
 files = [
-    {file = "web3-6.0.0b9-py3-none-any.whl", hash = "sha256:2b70afe31d38813804aa5ee3503c72e9e41cb2cf7e720627ccbc0a85791f97ca"},
-    {file = "web3-6.0.0b9.tar.gz", hash = "sha256:f90e55cddf6cde97552ff241d55903a5ef2a5fec192f2cad540e8effe555c494"},
+    {file = "web3-6.5.0-py3-none-any.whl", hash = "sha256:a6e9f6e4e13d75a5a3726d10b1be91cde5951446e8a6f0efdaee1695b5011472"},
+    {file = "web3-6.5.0.tar.gz", hash = "sha256:ebbce3caa0b50015d15a07f17d2a280abbb94a52c6994babb90f3a5482c97712"},
 ]
 
 [package.dependencies]
 aiohttp = ">=3.7.4.post0"
-eth-abi = ">=4.0.0-b.2"
+eth-abi = ">=4.0.0"
 eth-account = ">=0.8.0"
 eth-hash = {version = ">=0.5.1", extras = ["pycryptodome"]}
 eth-typing = ">=3.0.0"
@@ -2726,18 +2726,17 @@ eth-utils = ">=2.1.0"
 hexbytes = ">=0.1.0"
 jsonschema = ">=4.0.0"
 lru-dict = ">=1.1.6"
-parsimonious = "0.9.0"
 protobuf = ">=4.21.6"
 pywin32 = {version = ">=223", markers = "platform_system == \"Windows\""}
 requests = ">=2.16.0"
 websockets = ">=10.0.0"
 
 [package.extras]
-dev = ["black (>=22.1.0)", "bumpversion", "click (>=5.1)", "configparser (==3.5.0)", "contextlib2 (>=0.5.4)", "eth-tester[py-evm] (==v0.8.0-b.3)", "flake8 (==3.8.3)", "flaky (>=3.7.0)", "hypothesis (>=3.31.2)", "importlib-metadata (<5.0)", "ipfshttpclient (==0.8.0a2)", "isort (>=4.2.15,<4.3.5)", "mock", "mypy (==0.910)", "pluggy (==0.13.1)", "py-geth (>=3.10.0)", "py-geth (>=3.9.1)", "py-solc (>=0.4.0)", "pytest (>=6.2.5)", "pytest-asyncio (>=0.18.1)", "pytest-mock (>=1.10)", "pytest-pythonpath (>=0.3)", "pytest-watch (>=4.2)", "pytest-xdist (>=1.29)", "setuptools (>=38.6.0)", "sphinx (>=4.2.0)", "sphinx-rtd-theme (>=0.5.2)", "toposort (>=1.4)", "towncrier (==18.5.0)", "tox (>=3.18.0)", "tqdm (>4.32)", "twine (>=1.13)", "types-protobuf (==3.19.13)", "types-requests (>=2.26.1)", "types-setuptools (>=57.4.4)", "urllib3", "wheel", "when-changed (>=0.3.0)"]
-docs = ["click (>=5.1)", "configparser (==3.5.0)", "contextlib2 (>=0.5.4)", "mock", "py-geth (>=3.9.1)", "py-solc (>=0.4.0)", "pytest (>=6.2.5)", "sphinx (>=4.2.0)", "sphinx-rtd-theme (>=0.5.2)", "toposort (>=1.4)", "towncrier (==18.5.0)", "urllib3", "wheel"]
+dev = ["black (>=22.1.0)", "build (>=0.9.0)", "bumpversion", "eth-tester[py-evm] (==v0.9.0-b.1)", "flake8 (==3.8.3)", "flaky (>=3.7.0)", "hypothesis (>=3.31.2)", "importlib-metadata (<5.0)", "ipfshttpclient (==0.8.0a2)", "isort (>=5.11.0)", "mypy (==0.910)", "py-geth (>=3.11.0)", "pytest (>=7.0.0)", "pytest-asyncio (>=0.18.1)", "pytest-mock (>=1.10)", "pytest-watch (>=4.2)", "pytest-xdist (>=1.29)", "setuptools (>=38.6.0)", "sphinx (>=5.3.0)", "sphinx-rtd-theme (>=1.0.0)", "towncrier (>=21,<22)", "tox (>=3.18.0)", "tqdm (>4.32)", "twine (>=1.13)", "types-protobuf (==3.19.13)", "types-requests (>=2.26.1)", "types-setuptools (>=57.4.4)", "when-changed (>=0.3.0)"]
+docs = ["sphinx (>=5.3.0)", "sphinx-rtd-theme (>=1.0.0)", "towncrier (>=21,<22)"]
 ipfs = ["ipfshttpclient (==0.8.0a2)"]
-linter = ["black (>=22.1.0)", "flake8 (==3.8.3)", "isort (>=4.2.15,<4.3.5)", "mypy (==0.910)", "types-protobuf (==3.19.13)", "types-requests (>=2.26.1)", "types-setuptools (>=57.4.4)"]
-tester = ["eth-tester[py-evm] (==v0.8.0-b.3)", "py-geth (>=3.10.0)"]
+linter = ["black (>=22.1.0)", "flake8 (==3.8.3)", "isort (>=5.11.0)", "mypy (==0.910)", "types-protobuf (==3.19.13)", "types-requests (>=2.26.1)", "types-setuptools (>=57.4.4)"]
+tester = ["eth-tester[py-evm] (==v0.9.0-b.1)", "py-geth (>=3.11.0)"]
 
 [[package]]
 name = "websockets"
@@ -2995,4 +2994,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.11"
-content-hash = "5154c3326c0908b2d1674971e6504a437520a415b55bf6dd51c0d5f68db4bf53"
+content-hash = "1c0f67a158a234cb994bec61d3e182d8b6a999526f29c08ced053e16432774be"

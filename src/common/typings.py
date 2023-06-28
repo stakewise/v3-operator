@@ -9,7 +9,8 @@ from web3.types import Wei
 
 @dataclass
 class Oracles:
-    threshold: int
+    rewards_threshold: int
+    validators_threshold: int
     public_keys: list[HexStr]
     endpoints: list[str]
 

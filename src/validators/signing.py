@@ -46,7 +46,7 @@ def get_exit_signature_shards(
         )
 
     coefficients: list[int] = [int.from_bytes(private_key, 'big')]
-    for _ in range(oracles.threshold - 1):
+    for _ in range(oracles.validators_threshold - 1):
         coefficients.append(randint(0, curve_order - 1))
 
     private_keys = get_polynomial_points(coefficients, len(oracles.public_keys))
