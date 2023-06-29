@@ -66,10 +66,10 @@ async def get_oracles() -> Oracles:
         public_keys.append(oracle['public_key'])
 
     if not 1 <= rewards_threshold <= len(config['oracles']):
-        raise ValueError('Invalid rewards threshold in oracles config')
+        raise ValueError('Invalid rewards threshold')
 
     if not 1 <= validators_threshold <= len(config['oracles']):
-        raise ValueError('Invalid validators threshold in oracles config')
+        raise ValueError('Invalid validators threshold')
 
     if len(public_keys) != len(set(public_keys)):
         raise ValueError('Duplicate public keys in oracles config')
