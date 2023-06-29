@@ -30,6 +30,16 @@ def validate_settings():
 async def wait_for_consensus_node() -> None:
     while True:
         try:
+            syncing = await consensus_client.get_syncing()
+            if syncing['data']['is_syncing'] is True:
+                logger.warning(
+                    'The consensus node located at %s has not completed synchronization yet. '
+                    'The remaining synchronization distance is %s.',
+                    settings.CONSENSUS_ENDPOINT,
+                    syncing['data']['sync_distance'],
+                )
+                await asyncio.sleep(10)
+                continue
             data = await consensus_client.get_finality_checkpoint()
             logger.info(
                 'Connected to consensus node at %s. Finalized epoch: %s',
@@ -45,6 +55,14 @@ async def wait_for_consensus_node() -> None:
 async def wait_for_execution_node() -> None:
     while True:
         try:
+            syncing = await execution_client.eth.syncing
+            if syncing is True:
+                logger.warning(
+                    'The execution node located at %s has not completed synchronization yet.',
+                    settings.EXECUTION_ENDPOINT,
+                )
+                await asyncio.sleep(10)
+                continue
             block_number = await execution_client.eth.block_number  # type: ignore
             logger.info(
                 'Connected to execution node at %s. Current block number: %s',
