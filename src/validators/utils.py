@@ -172,7 +172,7 @@ async def load_deposit_data() -> DepositData:
     with open(settings.DEPOSIT_DATA_PATH, 'r', encoding='utf-8') as f:
         deposit_data = json.load(f)
 
-    credentials = get_eth1_withdrawal_credentials(settings.VAULT_CONTRACT_ADDRESS)
+    credentials = get_eth1_withdrawal_credentials(settings.VAULT)
     leaves: list[tuple[bytes, int]] = []
     validators: list[Validator] = []
     for i, data in enumerate(deposit_data):

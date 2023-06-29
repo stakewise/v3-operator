@@ -20,7 +20,7 @@ async def submit_exit_signatures(
 
     logger.info('Submitting UpdateExitSignatures transaction')
     tx = await keeper_contract.functions.updateExitSignatures(
-        settings.VAULT_CONTRACT_ADDRESS,
+        settings.VAULT,
         approval.ipfs_hash,
         approval.signatures,
     ).transact()  # type: ignore

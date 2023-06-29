@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 async def harvest_vault() -> None:
     """Check vault state and send harvest transaction if needed."""
 
-    if not await can_harvest(settings.VAULT_CONTRACT_ADDRESS):
+    if not await can_harvest(settings.VAULT):
         return
 
     # check current gas prices
@@ -34,7 +34,7 @@ async def harvest_vault() -> None:
 
     last_rewards = await get_last_rewards_update()
     harvest_params = await fetch_harvest_params(
-        vault_address=settings.VAULT_CONTRACT_ADDRESS,
+        vault_address=settings.VAULT,
         ipfs_hash=last_rewards.ipfs_hash,
         rewards_root=last_rewards.rewards_root,
     )
