@@ -121,7 +121,7 @@ async def wait_for_deposit_data_file() -> None:
     while not path.exists(settings.DEPOSIT_DATA_PATH):
         logger.warning("Can't find deposit data file (%s)", settings.DEPOSIT_DATA_PATH)
         time.sleep(15)
-    deposit_data = await load_deposit_data()
+    deposit_data = load_deposit_data()
 
     while True:
         try:

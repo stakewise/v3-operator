@@ -111,7 +111,7 @@ async def main() -> None:
         return
 
     # load deposit data
-    deposit_data = await load_deposit_data()
+    deposit_data = load_deposit_data()
     logger.info('Loaded deposit data file %s', settings.DEPOSIT_DATA_PATH)
     # start operator tasks
 

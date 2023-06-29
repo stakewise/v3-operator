@@ -167,7 +167,7 @@ def load_keystores() -> Keystores | None:
     return keystores
 
 
-async def load_deposit_data() -> DepositData:
+def load_deposit_data() -> DepositData:
     """Loads and verifies deposit data."""
     with open(settings.DEPOSIT_DATA_PATH, 'r', encoding='utf-8') as f:
         deposit_data = json.load(f)
@@ -215,7 +215,7 @@ def _load_keystores_password(password_path: Path) -> str:
 
 
 async def count_deposit_data_non_exited_keys() -> int:
-    deposit_data = await load_deposit_data()
+    deposit_data = load_deposit_data()
     validator_ids = [v.public_key for v in deposit_data.validators]
     validator_statuses = []
 
