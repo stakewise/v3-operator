@@ -59,19 +59,28 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
                 send_approval_request(session=session, endpoint=endpoint, payload=payload)
                 for address, endpoint in endpoints
             ],
+            return_exceptions=True,
         )
 
     for address, result in zip(oracles.addresses, results):
+        if isinstance(result, BaseException):
+            logger.error(result)
+            continue
+
         ipfs_hashes.append(result.ipfs_hash)
         responses[address] = result.signature
 
     if not ipfs_hashes:
         raise RuntimeError('No oracles to get approval from')
 
+    if len(ipfs_hashes) < oracles.validators_threshold:
+        raise RuntimeError('Not enough oracles to get approval from')
+
     if len(set(ipfs_hashes)) != 1:
         raise ValueError('Different oracles IPFS hashes for approval request')
+
     signatures = b''
-    for address in sorted(responses.keys()):
+    for address in sorted(responses.keys())[: oracles.validators_threshold]:
         signatures += responses[address]
     return signatures, ipfs_hashes[0]
 
