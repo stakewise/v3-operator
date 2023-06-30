@@ -123,7 +123,7 @@ async def get_oracles_approval(
     # get exit signature shards
     request = ApprovalRequest(
         validator_index=validator_index,
-        vault_address=settings.VAULT_CONTRACT_ADDRESS,
+        vault_address=settings.VAULT,
         validators_root=Web3.to_hex(registry_root),
         public_keys=[],
         deposit_signatures=[],

@@ -127,7 +127,7 @@ async def get_withdrawable_assets() -> tuple[Wei, HexStr | None]:
         return before_update_assets, None
 
     harvest_params = await fetch_harvest_params(
-        vault_address=settings.VAULT_CONTRACT_ADDRESS,
+        vault_address=settings.VAULT,
         ipfs_hash=last_rewards.ipfs_hash,
         rewards_root=last_rewards.rewards_root,
     )
@@ -252,7 +252,7 @@ async def register_single_validator(
     if settings.NETWORK not in ETH_NETWORKS:
         raise NotImplementedError('networks other than Ethereum not supported')
 
-    credentials = get_eth1_withdrawal_credentials(settings.VAULT_CONTRACT_ADDRESS)
+    credentials = get_eth1_withdrawal_credentials(settings.VAULT)
     tx_validator = _encode_tx_validator(credentials, validator)
     proof = tree.get_proof([tx_validator, validator.deposit_data_index])  # type: ignore
 
@@ -294,7 +294,7 @@ async def register_multiple_validator(
     if settings.NETWORK not in ETH_NETWORKS:
         raise NotImplementedError('networks other than Ethereum not supported')
 
-    credentials = get_eth1_withdrawal_credentials(settings.VAULT_CONTRACT_ADDRESS)
+    credentials = get_eth1_withdrawal_credentials(settings.VAULT)
     tx_validators: list[bytes] = []
     leaves: list[tuple[bytes, int]] = []
     for validator in validators:

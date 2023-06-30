@@ -159,7 +159,7 @@ class Settings(metaclass=Singleton):
         return self.ipfs_fetch_endpoints
 
     @property
-    def VAULT_CONTRACT_ADDRESS(self) -> ChecksumAddress:
+    def VAULT(self) -> ChecksumAddress:
         return Web3.to_checksum_address(self.vault)
 
     @property

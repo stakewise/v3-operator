@@ -175,5 +175,5 @@ def setup_sentry():
 
         sentry_sdk.init(settings.SENTRY_DSN, traces_sample_rate=0.1)
         sentry_sdk.set_tag('network', settings.NETWORK)
-        sentry_sdk.set_tag('vault', settings.VAULT_CONTRACT_ADDRESS)
+        sentry_sdk.set_tag('vault', settings.VAULT)
         ignore_logger('backoff')

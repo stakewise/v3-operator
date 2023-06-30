@@ -33,7 +33,7 @@ class VaultContract(ContractWrapper):
 
     @property
     def contract_address(self) -> ChecksumAddress:
-        return settings.VAULT_CONTRACT_ADDRESS
+        return settings.VAULT
 
 
 class ValidatorsRegistryContract(ContractWrapper):
