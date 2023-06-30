@@ -51,4 +51,3 @@ jobs:
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: true
-        continue-on-error: true
