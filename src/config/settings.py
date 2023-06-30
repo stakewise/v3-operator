@@ -169,6 +169,10 @@ class Settings(metaclass=Singleton):
         return os.path.join(self.vault_dir, 'operator.db')
 
     @property
+    def VAULT_DIR(self) -> Path:
+        return self.vault_dir
+
+    @property
     def KEYSTORES_PATH(self) -> Path:
         if self.keystores_path:
             return self.keystores_path
@@ -200,18 +204,12 @@ class Settings(metaclass=Singleton):
     def HOT_WALLET_KEYSTORE_PATH(self) -> Path | None:
         if self.hot_wallet_keystore_path:
             return self.hot_wallet_keystore_path
-
-        if not self.HOT_WALLET_PRIVATE_KEY:
-            return self.vault_dir / 'wallet' / 'wallet.json'
         return None
 
     @property
     def HOT_WALLET_KEYSTORE_PASSWORD_PATH(self) -> Path | None:
         if self.hot_wallet_keystore_password_path:
             return self.hot_wallet_keystore_password_path
-
-        if not self.HOT_WALLET_PRIVATE_KEY:
-            return self.vault_dir / 'wallet' / 'password.txt'
         return None
 
     @property
