@@ -106,7 +106,7 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
         from_block = settings.NETWORK_CONFIG.VALIDATORS_REGISTRY_GENESIS_BLOCK
 
     new_events = await validators_registry_contract.events.DepositEvent.get_logs(
-        from_block=from_block
+        fromBlock=from_block
     )
     new_public_keys: Set[HexStr] = set()
     for event in new_events:

@@ -1,38 +1,22 @@
 [
   {
-    "inputs": [],
-    "name": "AccessDenied",
-    "type": "error"
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "configIpfsHash",
+        "type": "string"
+      }
+    ],
+    "name": "ConfigUpdated",
+    "type": "event"
   },
   {
+    "anonymous": false,
     "inputs": [],
-    "name": "InvalidAvgRewardPerSecond",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "InvalidProof",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "InvalidRewardsRoot",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "InvalidValidatorsRegistryRoot",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "InvalidVault",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "TooEarlyUpdate",
-    "type": "error"
+    "name": "EIP712DomainChanged",
+    "type": "event"
   },
   {
     "anonymous": false,
@@ -94,6 +78,45 @@
       }
     ],
     "name": "Harvested",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "oracle",
+        "type": "address"
+      }
+    ],
+    "name": "OracleAdded",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "oracle",
+        "type": "address"
+      }
+    ],
+    "name": "OracleRemoved",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "oracles",
+        "type": "uint256"
+      }
+    ],
+    "name": "RewardsMinOraclesUpdated",
     "type": "event"
   },
   {
@@ -171,6 +194,32 @@
     "type": "event"
   },
   {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "oracles",
+        "type": "uint256"
+      }
+    ],
+    "name": "ValidatorsMinOraclesUpdated",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "oracle",
+        "type": "address"
+      }
+    ],
+    "name": "addOracle",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "components": [
@@ -232,6 +281,49 @@
         "internalType": "bool",
         "name": "",
         "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "eip712Domain",
+    "outputs": [
+      {
+        "internalType": "bytes1",
+        "name": "fields",
+        "type": "bytes1"
+      },
+      {
+        "internalType": "string",
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "version",
+        "type": "string"
+      },
+      {
+        "internalType": "uint256",
+        "name": "chainId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "verifyingContract",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "salt",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "extensions",
+        "type": "uint256[]"
       }
     ],
     "stateMutability": "view",
@@ -341,6 +433,25 @@
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "oracle",
+        "type": "address"
+      }
+    ],
+    "name": "isOracle",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "lastRewardsTimestamp",
     "outputs": [
@@ -364,6 +475,19 @@
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "oracle",
+        "type": "address"
+      }
+    ],
+    "name": "removeOracle",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -405,6 +529,19 @@
   },
   {
     "inputs": [],
+    "name": "rewardsMinOracles",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "rewardsNonce",
     "outputs": [
       {
@@ -432,6 +569,45 @@
   {
     "inputs": [
       {
+        "internalType": "uint256",
+        "name": "_rewardsMinOracles",
+        "type": "uint256"
+      }
+    ],
+    "name": "setRewardsMinOracles",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_validatorsMinOracles",
+        "type": "uint256"
+      }
+    ],
+    "name": "setValidatorsMinOracles",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "totalOracles",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "address",
         "name": "vault",
         "type": "address"
@@ -451,6 +627,19 @@
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "configIpfsHash",
+        "type": "string"
+      }
+    ],
+    "name": "updateConfig",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -514,6 +703,19 @@
     "name": "updateRewards",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "validatorsMinOracles",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   }
 ]

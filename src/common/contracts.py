@@ -41,11 +41,6 @@ class ValidatorsRegistryContract(ContractWrapper):
     settings_key = 'VALIDATORS_REGISTRY_CONTRACT_ADDRESS'
 
 
-class OraclesContract(ContractWrapper):
-    abi_path = 'abi/IOracles.json'
-    settings_key = 'ORACLES_CONTRACT_ADDRESS'
-
-
 class KeeperContract(ContractWrapper):
     abi_path = 'abi/IKeeper.json'
     settings_key = 'KEEPER_CONTRACT_ADDRESS'
@@ -53,5 +48,4 @@ class KeeperContract(ContractWrapper):
 
 vault_contract = VaultContract()
 validators_registry_contract = ValidatorsRegistryContract()
-oracles_contract = OraclesContract()
 keeper_contract = KeeperContract()

@@ -20,8 +20,6 @@ class NetworkConfig:
     SYMBOL: str
     VALIDATORS_REGISTRY_CONTRACT_ADDRESS: ChecksumAddress  # consensus deposit contract
     VALIDATORS_REGISTRY_GENESIS_BLOCK: BlockNumber  # consensus deposit contract genesis
-    ORACLES_CONTRACT_ADDRESS: ChecksumAddress
-    ORACLES_GENESIS_BLOCK: BlockNumber
     KEEPER_CONTRACT_ADDRESS: ChecksumAddress
     KEEPER_GENESIS_BLOCK: BlockNumber
     GENESIS_VALIDATORS_ROOT: Bytes32
@@ -41,8 +39,6 @@ NETWORKS = {
         ),
         VALIDATORS_REGISTRY_GENESIS_BLOCK=BlockNumber(11052983),
         # TODO: replace with real values once contracts deployed
-        ORACLES_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
-        ORACLES_GENESIS_BLOCK=BlockNumber(0),
         KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         KEEPER_GENESIS_BLOCK=BlockNumber(0),
         GENESIS_VALIDATORS_ROOT=Bytes32(
@@ -63,14 +59,10 @@ NETWORKS = {
             '0xff50ed3d0ec03aC01D4C79aAd74928BFF48a7b2b'
         ),
         VALIDATORS_REGISTRY_GENESIS_BLOCK=BlockNumber(4367321),
-        ORACLES_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x95a4ECB8879B526534e8dB48A75F8EF7E521d8fE'
-        ),
-        ORACLES_GENESIS_BLOCK=BlockNumber(9116861),
         KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xfdBDd455dE0D0AB2B24f4A3B450A2a0e82F7a666'
+            '0xDbb29280c1561F44C02a9cB91AC3B8B5B3b45752'
         ),
-        KEEPER_GENESIS_BLOCK=BlockNumber(9116864),
+        KEEPER_GENESIS_BLOCK=BlockNumber(9234813),
         GENESIS_VALIDATORS_ROOT=Bytes32(
             Web3.to_bytes(
                 hexstr=HexStr('0x043db0d9a83813551ee2f33450d23797757d430911a9320530ad8a0eabc43efb')
@@ -90,8 +82,6 @@ NETWORKS = {
         ),
         VALIDATORS_REGISTRY_GENESIS_BLOCK=BlockNumber(19469076),
         # TODO: replace with real values once contracts deployed
-        ORACLES_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
-        ORACLES_GENESIS_BLOCK=BlockNumber(0),
         KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         KEEPER_GENESIS_BLOCK=BlockNumber(0),
         GENESIS_VALIDATORS_ROOT=Bytes32(

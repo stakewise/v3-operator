@@ -126,33 +126,33 @@ async def main() -> None:
     await metrics_server()
 
     logger.info('Started operator service')
-    interrupt_handler = InterruptHandler()
-    while not interrupt_handler.exit:
-        start_time = time.time()
-        try:
-            chain_state = await get_chain_finalized_head()
-            to_block = chain_state.execution_block
-            # process new network validators
-            await network_validators_scanner.process_new_events(to_block)
-            # check and register new validators
-            await update_unused_validator_keys_metric(keystores, deposit_data)
-            await register_validators(keystores, deposit_data)
+    with InterruptHandler() as interrupt_handler:
+        while not interrupt_handler.exit:
+            start_time = time.time()
+            try:
+                chain_state = await get_chain_finalized_head()
+                to_block = chain_state.execution_block
+                # process new network validators
+                await network_validators_scanner.process_new_events(to_block)
+                # check and register new validators
+                await update_unused_validator_keys_metric(keystores, deposit_data)
+                await register_validators(keystores, deposit_data)
 
-            # process outdated exit signatures
-            await update_exit_signatures(keystores)
+                # process outdated exit signatures
+                await update_exit_signatures(keystores)
 
-            # submit harvest vault transaction
-            if settings.HARVEST_VAULT:
-                await harvest_vault()
+                # submit harvest vault transaction
+                if settings.HARVEST_VAULT:
+                    await harvest_vault()
 
-        except Exception as exc:
-            log_verbose(exc)
+            except Exception as exc:
+                log_verbose(exc)
 
-        block_processing_time = time.time() - start_time
-        sleep_time = max(
-            int(settings.NETWORK_CONFIG.SECONDS_PER_BLOCK) - int(block_processing_time), 0
-        )
-        await asyncio.sleep(sleep_time)
+            block_processing_time = time.time() - start_time
+            sleep_time = max(
+                int(settings.NETWORK_CONFIG.SECONDS_PER_BLOCK) - int(block_processing_time), 0
+            )
+            await asyncio.sleep(sleep_time)
 
 
 def log_start() -> None:

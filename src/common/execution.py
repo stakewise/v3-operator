@@ -5,7 +5,7 @@ from web3 import Web3
 from web3.types import ChecksumAddress, EventData, Wei
 
 from src.common.clients import execution_client, ipfs_fetch_client
-from src.common.contracts import keeper_contract, oracles_contract
+from src.common.contracts import keeper_contract
 from src.common.metrics import metrics
 from src.common.typings import Oracles, RewardVoteInfo
 from src.common.wallet import hot_wallet
@@ -48,8 +48,8 @@ async def check_hot_wallet_balance() -> None:
 @backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
 async def get_oracles() -> Oracles:
     """Fetches oracles config."""
-    events = await oracles_contract.events.ConfigUpdated.get_logs(
-        from_block=settings.NETWORK_CONFIG.ORACLES_GENESIS_BLOCK
+    events = await keeper_contract.events.ConfigUpdated.get_logs(
+        fromBlock=settings.NETWORK_CONFIG.KEEPER_GENESIS_BLOCK
     )
     if not events:
         raise ValueError('Failed to fetch IPFS hash of oracles config')
@@ -57,23 +57,26 @@ async def get_oracles() -> Oracles:
     # fetch IPFS record
     ipfs_hash = events[-1]['args']['configIpfsHash']
     config: dict = await ipfs_fetch_client.fetch_json(ipfs_hash)  # type: ignore
-    threshold = await oracles_contract.functions.requiredOracles().call()
-
+    rewards_threshold = await keeper_contract.functions.rewardsMinOracles().call()
+    validators_threshold = await keeper_contract.functions.validatorsMinOracles().call()
     endpoints = []
     public_keys = []
-
     for oracle in config['oracles']:
         endpoints.append(oracle['endpoint'])
         public_keys.append(oracle['public_key'])
 
-    if not 1 <= threshold <= len(config['oracles']):
-        raise ValueError('Invalid threshold in oracles config')
+    if not 1 <= rewards_threshold <= len(config['oracles']):
+        raise ValueError('Invalid rewards threshold')
+
+    if not 1 <= validators_threshold <= len(config['oracles']):
+        raise ValueError('Invalid validators threshold')
 
     if len(public_keys) != len(set(public_keys)):
         raise ValueError('Duplicate public keys in oracles config')
 
     return Oracles(
-        threshold=threshold,
+        rewards_threshold=rewards_threshold,
+        validators_threshold=validators_threshold,
         public_keys=public_keys,
         endpoints=endpoints,
     )
@@ -87,12 +90,12 @@ async def get_last_rewards_update() -> RewardVoteInfo | None:
     )
     block_number = await execution_client.eth.get_block_number()  # type: ignore
     events = await keeper_contract.events.RewardsUpdated.get_logs(
-        from_block=max(
+        fromBlock=max(
             int(settings.NETWORK_CONFIG.KEEPER_GENESIS_BLOCK),
             block_number - approx_blocks_per_month,
             0,
         ),
-        to_block=block_number,
+        toBlock=block_number,
     )
     if not events:
         return None
