@@ -58,7 +58,7 @@ class ConsensusClient:
         return getattr(self.client, item)
 
 
-def retry_ipfs_exception(delay: int = 60):
+def retry_ipfs_exception(delay: int = DEFAULT_RETRY_TIME):
     return retry(
         retry=retry_if_exception_type(IpfsException),
         wait=wait_exponential(multiplier=1, min=1, max=delay // 2),
