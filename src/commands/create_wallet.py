@@ -4,7 +4,7 @@ from pathlib import Path
 
 import click
 from eth_account import Account
-from eth_typing import HexAddress
+from eth_typing import ChecksumAddress, HexAddress
 
 from src.common.contrib import greenify
 from src.common.password import get_or_create_password_file
@@ -37,11 +37,15 @@ from src.config.settings import DATA_DIR
 def create_wallet(mnemonic: str, vault: HexAddress, data_dir: str) -> None:
     wallet_dir = Path(f'{data_dir or DATA_DIR}/{vault.lower()}/wallet')
     wallet_dir.mkdir(parents=True, exist_ok=True)
-    _generate_encrypted_wallet(mnemonic, str(wallet_dir))
-    click.echo(f'Done. The wallet and password saved to {greenify(wallet_dir)} directory.')
+    address = _generate_encrypted_wallet(mnemonic, str(wallet_dir))
+    click.echo(
+        f'Done. '
+        f'The wallet and password saved to {greenify(wallet_dir)} directory. '
+        f'The Wallet address is: {greenify(address)}'
+    )
 
 
-def _generate_encrypted_wallet(mnemonic: str, wallet_dir: str) -> None:
+def _generate_encrypted_wallet(mnemonic: str, wallet_dir: str) -> ChecksumAddress:
     Account.enable_unaudited_hdwallet_features()
 
     account = Account().from_mnemonic(mnemonic=mnemonic)
@@ -51,3 +55,4 @@ def _generate_encrypted_wallet(mnemonic: str, wallet_dir: str) -> None:
     wallet_name = 'wallet.json'
     with open(path.join(wallet_dir, wallet_name), 'w', encoding='utf-8') as f:
         json.dump(encrypted_data, f, default=lambda x: x.hex())
+    return account.address
