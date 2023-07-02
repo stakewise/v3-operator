@@ -17,7 +17,7 @@ from web3.types import EventData, Wei
 
 from src.common.clients import execution_client
 from src.common.contracts import validators_registry_contract, vault_contract
-from src.common.execution import get_last_rewards_update
+from src.common.execution import can_harvest, get_last_rewards_update
 from src.common.ipfs import fetch_harvest_params
 from src.common.metrics import metrics
 from src.config.networks import ETH_NETWORKS
@@ -154,7 +154,9 @@ async def get_withdrawable_assets() -> tuple[Wei, HexStr | None]:
 
     before_update_validators = before_update_assets // DEPOSIT_AMOUNT
     after_update_validators = after_update_assets // DEPOSIT_AMOUNT
-    if before_update_validators != after_update_validators:
+    if before_update_validators != after_update_validators or await can_harvest(
+        vault_contract.contract_address
+    ):
         return Wei(after_update_assets), update_state_call
 
     return Wei(before_update_assets), None
