@@ -63,7 +63,7 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
         )
 
     for address, result in zip(oracles.addresses, results):
-        if isinstance(result, BaseException):
+        if isinstance(result, Exception):
             logger.error(result)
             continue
 
