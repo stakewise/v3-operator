@@ -51,12 +51,12 @@ class HotWallet:
     def load_password_protected_account(self) -> LocalAccount:
         if not os.path.isfile(self.keystore_path):
             raise ValueError(f"Can't open key file. Path: {self.keystore_path}")
-        if not os.path.isfile(self.password_path):
-            raise ValueError(f"Can't open password file. Path: {self.password_path}")
+        if not os.path.isfile(self.keystore_password_path):
+            raise ValueError(f"Can't open password file. Path: {self.keystore_password_path}")
 
         with open(self.keystore_path, 'r', encoding='utf-8') as f:
             keyfile_json = json.load(f)
-        with open(self.password_path, 'r', encoding='utf-8') as f:
+        with open(self.keystore_password_path, 'r', encoding='utf-8') as f:
             password = f.read().strip()
         key = Account.decrypt(keyfile_json, password)
         return Account().from_key(key)
