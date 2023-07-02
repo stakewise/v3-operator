@@ -1,6 +1,6 @@
 import logging
 
-from sw_utils.decorators import backoff_aiohttp_errors
+from sw_utils.tenacity_decorators import retry_aiohttp_errors
 from web3 import Web3
 from web3.types import ChecksumAddress, EventData, Wei
 
@@ -16,12 +16,12 @@ SECONDS_PER_MONTH: int = 2628000
 logger = logging.getLogger(__name__)
 
 
-@backoff_aiohttp_errors(max_time=300)
+@retry_aiohttp_errors(delay=300)
 async def get_hot_wallet_balance() -> Wei:
     return await execution_client.eth.get_balance(hot_wallet.address)  # type: ignore
 
 
-@backoff_aiohttp_errors(max_time=300)
+@retry_aiohttp_errors(delay=300)
 async def can_harvest(vault_address: ChecksumAddress) -> bool:
     return await keeper_contract.functions.canHarvest(vault_address).call()
 
@@ -45,7 +45,7 @@ async def check_hot_wallet_balance() -> None:
         )
 
 
-@backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
+@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def get_oracles() -> Oracles:
     """Fetches oracles config."""
     events = await keeper_contract.events.ConfigUpdated.get_logs(
@@ -57,6 +57,7 @@ async def get_oracles() -> Oracles:
     # fetch IPFS record
     ipfs_hash = events[-1]['args']['configIpfsHash']
     config: dict = await ipfs_fetch_client.fetch_json(ipfs_hash)  # type: ignore
+    logger.info('config %s', config)
     rewards_threshold = await keeper_contract.functions.rewardsMinOracles().call()
     validators_threshold = await keeper_contract.functions.validatorsMinOracles().call()
     endpoints = []
@@ -82,7 +83,7 @@ async def get_oracles() -> Oracles:
     )
 
 
-@backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
+@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def get_last_rewards_update() -> RewardVoteInfo | None:
     """Fetches the last rewards update."""
     approx_blocks_per_month: int = int(

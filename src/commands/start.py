@@ -170,10 +170,6 @@ def setup_sentry():
         # pylint: disable-next=import-outside-toplevel
         import sentry_sdk
 
-        # pylint: disable-next=import-outside-toplevel
-        from sentry_sdk.integrations.logging import ignore_logger
-
         sentry_sdk.init(settings.SENTRY_DSN, traces_sample_rate=0.1)
         sentry_sdk.set_tag('network', settings.NETWORK)
         sentry_sdk.set_tag('vault', settings.VAULT)
-        ignore_logger('backoff')

@@ -3,7 +3,6 @@ import sqlite3
 from functools import cached_property
 from pathlib import Path
 
-import backoff
 from sw_utils import (
     ExtendedAsyncBeacon,
     IpfsException,
@@ -12,6 +11,8 @@ from sw_utils import (
     get_consensus_client,
     get_execution_client,
 )
+from sw_utils.tenacity_decorators import custom_before_log
+from tenacity import retry, retry_if_exception_type, stop_after_delay, wait_exponential
 from web3 import Web3
 
 from src.common.wallet import hot_wallet
@@ -57,16 +58,25 @@ class ConsensusClient:
         return getattr(self.client, item)
 
 
+def retry_ipfs_exception(delay: int = 60):
+    return retry(
+        retry=retry_if_exception_type(IpfsException),
+        wait=wait_exponential(multiplier=1, min=1, max=delay // 2),
+        stop=stop_after_delay(delay),
+        before=custom_before_log(logger, logging.INFO),
+    )
+
+
 class IpfsFetchRetryClient:
     @cached_property
     def client(self) -> IpfsFetchClient:
         return IpfsFetchClient(endpoints=settings.IPFS_FETCH_ENDPOINTS)
 
-    @backoff.on_exception(backoff.expo, IpfsException, max_time=DEFAULT_RETRY_TIME)
+    @retry_ipfs_exception(delay=DEFAULT_RETRY_TIME)
     async def fetch_bytes(self, ipfs_hash: str) -> bytes:
         return await self.client.fetch_bytes(ipfs_hash)
 
-    @backoff.on_exception(backoff.expo, IpfsException, max_time=DEFAULT_RETRY_TIME)
+    @retry_ipfs_exception(delay=DEFAULT_RETRY_TIME)
     async def fetch_json(self, ipfs_hash: str) -> dict | list:
         return await self.client.fetch_json(ipfs_hash)
 
