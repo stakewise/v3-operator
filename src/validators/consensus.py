@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from aiohttp import ClientResponseError
 from eth_typing import BlockNumber
-from sw_utils.decorators import backoff_aiohttp_errors
+from sw_utils.tenacity_decorators import retry_aiohttp_errors
 from sw_utils.typings import ConsensusFork
 from web3 import Web3
 from web3.types import Timestamp
@@ -12,7 +12,7 @@ from src.common.metrics import metrics
 from src.config.settings import DEFAULT_RETRY_TIME, settings
 
 
-@backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
+@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def get_consensus_fork() -> ConsensusFork:
     """Fetches current fork data."""
     fork_data = (await consensus_client.get_fork_data())['data']
@@ -29,7 +29,7 @@ class ChainHead:
     execution_ts: Timestamp
 
 
-@backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
+@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def get_chain_finalized_head() -> ChainHead:
     """Fetches the fork safe chain head."""
     checkpoints = await consensus_client.get_finality_checkpoint()

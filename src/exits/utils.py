@@ -5,7 +5,7 @@ from urllib.parse import urljoin
 
 import aiohttp
 from eth_typing import ChecksumAddress
-from sw_utils.decorators import backoff_aiohttp_errors
+from sw_utils.tenacity_decorators import retry_aiohttp_errors
 from web3 import Web3
 
 from src.common.typings import Oracles
@@ -46,7 +46,7 @@ async def send_signature_rotation_requests(
     return signatures, ipfs_hash
 
 
-@backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
+@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def send_signature_rotation_request(
     session: aiohttp.ClientSession, endpoint: str, payload: dict
 ) -> OracleApproval:

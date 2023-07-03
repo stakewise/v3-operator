@@ -16,7 +16,7 @@ from multiproof import StandardMerkleTree
 from staking_deposit.key_handling.keystore import ScryptKeystore
 from sw_utils import get_eth1_withdrawal_credentials
 from sw_utils.consensus import EXITED_STATUSES
-from sw_utils.decorators import backoff_aiohttp_errors
+from sw_utils.tenacity_decorators import retry_aiohttp_errors
 from web3 import Web3
 
 from src.common.clients import consensus_client
@@ -76,7 +76,7 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
     return signatures, ipfs_hashes[0]
 
 
-@backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
+@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def send_approval_request(
     session: aiohttp.ClientSession, endpoint: str, payload: dict
 ) -> OracleApproval:

@@ -1,11 +1,11 @@
-from sw_utils.decorators import backoff_aiohttp_errors
+from sw_utils.tenacity_decorators import retry_aiohttp_errors
 from web3.types import HexStr
 
 from src.common.clients import consensus_client
 from src.config.settings import DEFAULT_RETRY_TIME, settings
 
 
-@backoff_aiohttp_errors(max_time=DEFAULT_RETRY_TIME)
+@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def get_validator_public_keys(validator_indexes: list[int]) -> dict[int, HexStr]:
     """Fetches validators public keys."""
     indexes = [str(index) for index in validator_indexes]
