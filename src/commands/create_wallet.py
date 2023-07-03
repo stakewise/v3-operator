@@ -41,7 +41,7 @@ def create_wallet(mnemonic: str, vault: HexAddress, data_dir: str) -> None:
     click.echo(
         f'Done. '
         f'The wallet and password saved to {greenify(wallet_dir)} directory. '
-        f'The Wallet address is: {greenify(address)}'
+        f'The wallet address is: {greenify(address)}'
     )
 
 
