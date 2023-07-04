@@ -61,7 +61,7 @@ async def wait_for_consensus_node() -> None:
         await asyncio.sleep(10)
 
 
-async def wait_for_execution_nodes() -> None:
+async def wait_for_execution_node() -> None:
     done = False
     while True:
         for execution_endpoint in settings.EXECUTION_ENDPOINTS:
@@ -181,7 +181,7 @@ async def startup_checks():
     await wait_for_consensus_node()
 
     logger.info('Checking connection to execution nodes...')
-    await wait_for_execution_nodes()
+    await wait_for_execution_node()
 
     logger.info('Checking connection to ipfs nodes...')
     healthy_ipfs_endpoint = []

@@ -148,11 +148,11 @@ class Settings(metaclass=Singleton):
 
     @property
     def EXECUTION_ENDPOINTS(self) -> list[str]:
-        return self.execution_endpoints.strip().split(',')
+        return [node.strip() for node in self.execution_endpoints.split(',')]
 
     @property
     def CONSENSUS_ENDPOINTS(self) -> list[str]:
-        return self.consensus_endpoints.strip().split(',')
+        return [node.strip() for node in self.consensus_endpoints.split(',')]
 
     @property
     def IPFS_FETCH_ENDPOINTS(self) -> list[str]:
