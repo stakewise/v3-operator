@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
     help='Path where the vault data is placed. Defaults to ~/.stakewise/<vault>',
     type=click.Path(exists=False, file_okay=False, dir_okay=True),
 )
-@click.option('--execution-endpoint', type=str, help='API endpoint for the execution node')
+@click.option('--execution-endpoints', type=str, help='API endpoint for the execution nodes')
 @click.command(help='Compares deposit data in the vault contract and the vault data directory')
 def get_validators_root(*args, **kwargs) -> None:
     setup_config(*args, **kwargs)

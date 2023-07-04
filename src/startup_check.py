@@ -4,9 +4,9 @@ import time
 from os import path
 
 from aiohttp import ClientSession, ClientTimeout
-from sw_utils import IpfsFetchClient
+from sw_utils import IpfsFetchClient, get_consensus_client, get_execution_client
 
-from src.common.clients import consensus_client, db_client, execution_client
+from src.common.clients import db_client
 from src.common.execution import check_hot_wallet_balance, get_oracles
 from src.common.utils import count_files_in_folder
 from src.common.wallet import hot_wallet
@@ -20,22 +20,23 @@ IPFS_HASH_EXAMPLE = 'QmawUdo17Fvo7xa6ARCUSMV1eoVwPtVuzx8L8Crj2xozWm'
 
 
 def validate_settings():
-    if not settings.EXECUTION_ENDPOINT:
-        raise ValueError('EXECUTION_ENDPOINT is missing')
+    if not settings.EXECUTION_ENDPOINTS:
+        raise ValueError('EXECUTION_ENDPOINTS is missing')
 
-    if not settings.CONSENSUS_ENDPOINT:
-        raise ValueError('CONSENSUS_ENDPOINT is missing')
+    if not settings.CONSENSUS_ENDPOINTS:
+        raise ValueError('CONSENSUS_ENDPOINTS is missing')
 
 
-async def wait_for_consensus_node() -> None:
+async def wait_for_consensus_node(consensus_endpoint: str) -> None:
     while True:
         try:
+            consensus_client = get_consensus_client([consensus_endpoint])
             syncing = await consensus_client.get_syncing()
             if syncing['data']['is_syncing'] is True:
                 logger.warning(
                     'The consensus node located at %s has not completed synchronization yet. '
                     'The remaining synchronization distance is %s.',
-                    settings.CONSENSUS_ENDPOINT,
+                    consensus_endpoint,
                     syncing['data']['sync_distance'],
                 )
                 await asyncio.sleep(10)
@@ -43,35 +44,45 @@ async def wait_for_consensus_node() -> None:
             data = await consensus_client.get_finality_checkpoint()
             logger.info(
                 'Connected to consensus node at %s. Finalized epoch: %s',
-                settings.CONSENSUS_ENDPOINT,
+                consensus_endpoint,
                 data['data']['finalized']['epoch'],
             )
             break
         except Exception as e:
-            logger.warning('Failed to connect to consensus node. Retrying in 10 seconds: %s', e)
+            logger.warning(
+                'Failed to connect to consensus node at %s. Retrying in 10 seconds: %s',
+                consensus_endpoint,
+                e,
+            )
             await asyncio.sleep(10)
 
 
-async def wait_for_execution_node() -> None:
+async def wait_for_execution_nodes(execution_endpoint: str) -> None:
     while True:
         try:
+            execution_client = get_execution_client([execution_endpoint])
+
             syncing = await execution_client.eth.syncing
             if syncing is True:
                 logger.warning(
                     'The execution node located at %s has not completed synchronization yet.',
-                    settings.EXECUTION_ENDPOINT,
+                    execution_endpoint,
                 )
                 await asyncio.sleep(10)
                 continue
             block_number = await execution_client.eth.block_number  # type: ignore
             logger.info(
                 'Connected to execution node at %s. Current block number: %s',
-                settings.EXECUTION_ENDPOINT,
+                execution_endpoint,
                 block_number,
             )
             break
         except Exception as e:
-            logger.warning('Failed to connect to execution node. Retrying in 10 seconds: %s', e)
+            logger.warning(
+                'Failed to connect to execution node at %s. Retrying in 10 seconds: %s',
+                execution_endpoint,
+                e,
+            )
             await asyncio.sleep(10)
 
 
@@ -158,11 +169,13 @@ async def startup_checks():
         conn.cursor()
     logger.info('Connected to database %s.', settings.DATABASE)
 
-    logger.info('Checking connection to consensus node...')
-    await wait_for_consensus_node()
+    logger.info('Checking connection to consensus nodes...')
+    for consensus_endpoint in settings.CONSENSUS_ENDPOINTS:
+        await wait_for_consensus_node(consensus_endpoint)
 
-    logger.info('Checking connection to execution node...')
-    await wait_for_execution_node()
+    logger.info('Checking connection to execution nodes...')
+    for execution_endpoint in settings.EXECUTION_ENDPOINTS:
+        await wait_for_execution_nodes(execution_endpoint)
 
     logger.info('Checking connection to ipfs nodes...')
     healthy_ipfs_endpoint = []
