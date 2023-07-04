@@ -27,63 +27,71 @@ def validate_settings():
         raise ValueError('CONSENSUS_ENDPOINTS is missing')
 
 
-async def wait_for_consensus_node(consensus_endpoint: str) -> None:
+async def wait_for_consensus_node() -> None:
+    done = False
     while True:
-        try:
-            consensus_client = get_consensus_client([consensus_endpoint])
-            syncing = await consensus_client.get_syncing()
-            if syncing['data']['is_syncing'] is True:
-                logger.warning(
-                    'The consensus node located at %s has not completed synchronization yet. '
-                    'The remaining synchronization distance is %s.',
+        for consensus_endpoint in settings.CONSENSUS_ENDPOINTS:
+            try:
+                consensus_client = get_consensus_client([consensus_endpoint])
+                syncing = await consensus_client.get_syncing()
+                if syncing['data']['is_syncing'] is True:
+                    logger.warning(
+                        'The consensus node located at %s has not completed synchronization yet. '
+                        'The remaining synchronization distance is %s.',
+                        consensus_endpoint,
+                        syncing['data']['sync_distance'],
+                    )
+                    continue
+                data = await consensus_client.get_finality_checkpoint()
+                logger.info(
+                    'Connected to consensus node at %s. Finalized epoch: %s',
                     consensus_endpoint,
-                    syncing['data']['sync_distance'],
+                    data['data']['finalized']['epoch'],
                 )
-                await asyncio.sleep(10)
-                continue
-            data = await consensus_client.get_finality_checkpoint()
-            logger.info(
-                'Connected to consensus node at %s. Finalized epoch: %s',
-                consensus_endpoint,
-                data['data']['finalized']['epoch'],
-            )
-            break
-        except Exception as e:
-            logger.warning(
-                'Failed to connect to consensus node at %s. Retrying in 10 seconds: %s',
-                consensus_endpoint,
-                e,
-            )
-            await asyncio.sleep(10)
-
-
-async def wait_for_execution_nodes(execution_endpoint: str) -> None:
-    while True:
-        try:
-            execution_client = get_execution_client([execution_endpoint])
-
-            syncing = await execution_client.eth.syncing
-            if syncing is True:
+                done = True
+            except Exception as e:
                 logger.warning(
-                    'The execution node located at %s has not completed synchronization yet.',
-                    execution_endpoint,
+                    'Failed to connect to consensus node at %s. %s',
+                    consensus_endpoint,
+                    e,
                 )
-                await asyncio.sleep(10)
-                continue
-            block_number = await execution_client.eth.block_number  # type: ignore
-            logger.info(
-                'Connected to execution node at %s. Current block number: %s',
-                execution_endpoint,
-                block_number,
-            )
-            break
-        except Exception as e:
-            logger.warning(
-                'Failed to connect to execution node at %s. Retrying in 10 seconds: %s',
-                execution_endpoint,
-                e,
-            )
-            await asyncio.sleep(10)
+        if done:
+            return
+        logger.warning('Failed to connect to consensus nodes. Retrying in 10 seconds...')
+        await asyncio.sleep(10)
+
+
+async def wait_for_execution_nodes() -> None:
+    done = False
+    while True:
+        for execution_endpoint in settings.EXECUTION_ENDPOINTS:
+            try:
+                execution_client = get_execution_client([execution_endpoint])
+
+                syncing = await execution_client.eth.syncing
+                if syncing is True:
+                    logger.warning(
+                        'The execution node located at %s has not completed synchronization yet.',
+                        execution_endpoint,
+                    )
+                    continue
+                block_number = await execution_client.eth.block_number  # type: ignore
+                logger.info(
+                    'Connected to execution node at %s. Current block number: %s',
+                    execution_endpoint,
+                    block_number,
+                )
+                done = True
+            except Exception as e:
+                logger.warning(
+                    'Failed to connect to execution node at %s. %s',
+                    execution_endpoint,
+                    e,
+                )
+        if done:
+            return
+        logger.warning('Failed to connect to consensus nodes. Retrying in 10 seconds...')
+        await asyncio.sleep(10)
 
 
 async def collect_healthy_oracles() -> list:
@@ -170,12 +178,10 @@ async def startup_checks():
     logger.info('Connected to database %s.', settings.DATABASE)
 
     logger.info('Checking connection to consensus nodes...')
-    for consensus_endpoint in settings.CONSENSUS_ENDPOINTS:
-        await wait_for_consensus_node(consensus_endpoint)
+    await wait_for_consensus_node()
 
     logger.info('Checking connection to execution nodes...')
-    for execution_endpoint in settings.EXECUTION_ENDPOINTS:
-        await wait_for_execution_nodes(execution_endpoint)
+    await wait_for_execution_nodes()
 
     logger.info('Checking connection to ipfs nodes...')
     healthy_ipfs_endpoint = []

@@ -51,8 +51,16 @@ logger = logging.getLogger(__name__)
 @click.option(
     '--database-dir', type=str, help='The directory where the database will be created or read from'
 )
-@click.option('--execution-endpoints', type=str, help='API endpoint for the execution nodes')
-@click.option('--consensus-endpoints', type=str, help='API endpoint for the consensus nodes')
+@click.option(
+    '--execution-endpoints',
+    type=str,
+    help='Comma separated list of API endpoints for execution nodes',
+)
+@click.option(
+    '--consensus-endpoints',
+    type=str,
+    help='Comma separated list of API endpoints for consensus nodes',
+)
 @click.option('--max-fee-per-gas-gwei', type=int, help='Maximum fee per gas limit')
 @click.option('--harvest-vault', type=bool, help='Periodically submit vault harvest transaction')
 @click.option(
