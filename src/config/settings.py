@@ -27,8 +27,8 @@ class Settings(metaclass=Singleton):
     network: str
     data_dir: Path
     vault_dir: Path
-    execution_endpoint: str
-    consensus_endpoint: str
+    execution_endpoints: str
+    consensus_endpoints: str
     ipfs_fetch_endpoints: list[str]
     vault: str
     database_dir: str
@@ -55,8 +55,8 @@ class Settings(metaclass=Singleton):
         data_dir: Path | None = None,
         verbose: bool | None = None,
         log_level: str | None = None,
-        execution_endpoint: str | None = None,
-        consensus_endpoint: str | None = None,
+        execution_endpoints: str | None = None,
+        consensus_endpoints: str | None = None,
         ipfs_fetch_endpoints: list[str] | None = None,
         database_dir: str | None = None,
         keystores_path: Path | None = None,
@@ -78,11 +78,11 @@ class Settings(metaclass=Singleton):
         self.network = network or decouple_config('NETWORK', cast=Choices([GOERLI]))
         self.verbose = verbose or decouple_config('VERBOSE', default=False)
         self.log_level = log_level or decouple_config('LOG_LEVEL', default='INFO')
-        self.execution_endpoint = execution_endpoint or decouple_config(
-            'EXECUTION_ENDPOINT', default=''
+        self.execution_endpoints = execution_endpoints or decouple_config(
+            'EXECUTION_ENDPOINTS', default=''
         )
-        self.consensus_endpoint = consensus_endpoint or decouple_config(
-            'CONSENSUS_ENDPOINT', default=''
+        self.consensus_endpoints = consensus_endpoints or decouple_config(
+            'CONSENSUS_ENDPOINTS', default=''
         )
         self.ipfs_fetch_endpoints = ipfs_fetch_endpoints or decouple_config(
             'IPFS_FETCH_ENDPOINTS',
@@ -147,12 +147,12 @@ class Settings(metaclass=Singleton):
         return NETWORKS[self.NETWORK]
 
     @property
-    def EXECUTION_ENDPOINT(self) -> str:
-        return self.execution_endpoint
+    def EXECUTION_ENDPOINTS(self) -> list[str]:
+        return [node.strip() for node in self.execution_endpoints.split(',')]
 
     @property
-    def CONSENSUS_ENDPOINT(self) -> str:
-        return self.consensus_endpoint
+    def CONSENSUS_ENDPOINTS(self) -> list[str]:
+        return [node.strip() for node in self.consensus_endpoints.split(',')]
 
     @property
     def IPFS_FETCH_ENDPOINTS(self) -> list[str]:

@@ -166,7 +166,7 @@ See [releases page](https://github.com/stakewise/v3-operator/releases) to downlo
 binary file. Start the binary with the following command:
 
 ```sh
-./operator start --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468  --consensus-endpoint=https://example.com --execution-endpoint=https://example.com
+./operator start --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468  --consensus-endpoints=https://example.com --execution-endpoints=https://example.com
 ```
 Or you can use environment variables. Check .env.example file for details
 #### Option 2. Use Docker image
@@ -194,8 +194,8 @@ docker run --restart on-failure:10 \
   src/main.py start \
   --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
   --data-dir=/data \
-  --consensus-endpoint=https://example.com \
-  --execution-endpoint=https://example.com
+  --consensus-endpoints=https://example.com \
+  --execution-endpoints=https://example.com
 ```
 
 If you prefer declarative style instead of long one-liners, then docker-compose is an option for you.
@@ -224,8 +224,8 @@ poetry install --only main
 PYTHONPATH=. poetry run python src/main.py start \
 --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
 --data-dir=/data \
---consensus-endpoint=https://example.com \
---execution-endpoint=https://example.com
+--consensus-endpoints=https://example.com \
+--execution-endpoints=https://example.com
 ```
 ### Environment variables
 Operator service also can be configured via environment variables instead of cli flags.

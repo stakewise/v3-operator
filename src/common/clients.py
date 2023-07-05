@@ -32,7 +32,7 @@ class Database:
 class ExecutionClient:
     @cached_property
     def client(self) -> Web3:
-        w3 = get_execution_client(settings.EXECUTION_ENDPOINT)
+        w3 = get_execution_client(settings.EXECUTION_ENDPOINTS)
         # Account is required when emitting transactions.
         # For read-only queries account may be omitted.
         if hot_wallet.can_load():
@@ -52,7 +52,7 @@ class ExecutionClient:
 class ConsensusClient:
     @cached_property
     def client(self) -> ExtendedAsyncBeacon:
-        return get_consensus_client(settings.CONSENSUS_ENDPOINT)
+        return get_consensus_client(settings.CONSENSUS_ENDPOINTS)
 
     def __getattr__(self, item):
         return getattr(self.client, item)

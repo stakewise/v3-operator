@@ -996,13 +996,13 @@ test = ["hypothesis (>=4.43.0)", "mypy (==0.971)", "pytest (>=7.0.0)", "pytest-x
 
 [[package]]
 name = "exceptiongroup"
-version = "1.1.1"
+version = "1.1.2"
 description = "Backport of PEP 654 (exception groups)"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "exceptiongroup-1.1.1-py3-none-any.whl", hash = "sha256:232c37c63e4f682982c8b6459f33a8981039e5fb8756b2074364e5055c498c9e"},
-    {file = "exceptiongroup-1.1.1.tar.gz", hash = "sha256:d484c3090ba2889ae2928419117447a14daf3c1231d5e30d0aae34f354f01785"},
+    {file = "exceptiongroup-1.1.2-py3-none-any.whl", hash = "sha256:e346e69d186172ca7cf029c8c1d16235aa0e04035e5750b4b95039e65204328f"},
+    {file = "exceptiongroup-1.1.2.tar.gz", hash = "sha256:12c3e887d6485d16943a309616de20ae5582633e0a2eda17f4e10fd61c1e8af5"},
 ]
 
 [package.extras]
@@ -1849,7 +1849,7 @@ name = "pycparser"
 version = "2.21"
 description = "C parser in Python"
 optional = false
-python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
+python-versions = "*"
 files = [
     {file = "pycparser-2.21-py2.py3-none-any.whl", hash = "sha256:8ee45429555515e1f6b185e78100aea234072576aa43ab53aefcae078162fca9"},
     {file = "pycparser-2.21.tar.gz", hash = "sha256:e644fdec12f7872f86c58ff790da456218b10f863970249516d60a5eaca77206"},
@@ -2450,7 +2450,7 @@ pbr = ">=2.0.0,<2.1.0 || >2.1.0"
 
 [[package]]
 name = "sw-utils"
-version = "0.3.10"
+version = "0.3.11"
 description = "StakeWise Python utils"
 optional = false
 python-versions = "^3.10"
@@ -2469,8 +2469,8 @@ web3 = "==6.5.0"
 [package.source]
 type = "git"
 url = "https://github.com/stakewise/sw-utils.git"
-reference = "v0.3.10"
-resolved_reference = "b7ae8214fc9314f2a1c51c80a6cf93b846fdade7"
+reference = "v0.3.11"
+resolved_reference = "da1a32c58a624b2139a2e5b46122fe7baaccb362"
 
 [[package]]
 name = "tenacity"
@@ -2557,13 +2557,13 @@ files = [
 
 [[package]]
 name = "typing-extensions"
-version = "4.7.0"
+version = "4.7.1"
 description = "Backported and Experimental Type Hints for Python 3.7+"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "typing_extensions-4.7.0-py3-none-any.whl", hash = "sha256:5d8c9dac95c27d20df12fb1d97b9793ab8b2af8a3a525e68c80e21060c161771"},
-    {file = "typing_extensions-4.7.0.tar.gz", hash = "sha256:935ccf31549830cda708b42289d44b6f74084d616a00be651601a4f968e77c82"},
+    {file = "typing_extensions-4.7.1-py3-none-any.whl", hash = "sha256:440d5dd3af93b060174bf433bccd69b0babc3b15b1a8dca43789fd7f61514b36"},
+    {file = "typing_extensions-4.7.1.tar.gz", hash = "sha256:b75ddc264f0ba5615db7ba217daeb99701ad295353c45f9e95963337ceeeffb2"},
 ]
 
 [[package]]
@@ -2899,4 +2899,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.11"
-content-hash = "f29956354c3bae281ce0e588a1255998487c9a0ce5d3fed46c48d9acad29c300"
+content-hash = "abf9383f7536621efb1f3e4846b500aa2b964abb429d970f89da663ee6485988"
