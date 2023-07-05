@@ -60,9 +60,9 @@ NETWORKS = {
         ),
         VALIDATORS_REGISTRY_GENESIS_BLOCK=BlockNumber(4367321),
         KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xDbb29280c1561F44C02a9cB91AC3B8B5B3b45752'
+            '0xb39CEBd50642389ceE6C058C2134e53417ce053a'
         ),
-        KEEPER_GENESIS_BLOCK=BlockNumber(9234813),
+        KEEPER_GENESIS_BLOCK=BlockNumber(9290253),
         GENESIS_VALIDATORS_ROOT=Bytes32(
             Web3.to_bytes(
                 hexstr=HexStr('0x043db0d9a83813551ee2f33450d23797757d430911a9320530ad8a0eabc43efb')
