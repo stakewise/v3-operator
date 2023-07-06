@@ -11,7 +11,7 @@ from src.validators.utils import load_deposit_data
 @click.option(
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
-    envvar='SW_DATA_DIR',
+    envvar='DATA_DIR',
     help='Path where the vault data will be placed. Default is ~/.stakewise.',
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
 )

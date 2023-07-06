@@ -1,18 +1,19 @@
 import asyncio
 import logging
 import time
+from pathlib import Path
 
 import click
+from eth_typing import ChecksumAddress
 from sw_utils import EventScanner, InterruptHandler
 
 import src
+from src.common.config import VaultConfig
 from src.common.metrics import metrics_server
 from src.common.validators import validate_eth_address
 from src.config.settings import AVAILABLE_NETWORKS, settings
 from src.exits.tasks import update_exit_signatures
-from src.harvest.tasks import harvest_vault
-from src.setup_config import setup_config
-from src.setup_logging import setup_logging
+from src.harvest.tasks import harvest_vault as harvest_vault_task
 from src.startup_check import startup_checks
 from src.utils import get_build_version, log_verbose
 from src.validators.consensus import get_chain_finalized_head
@@ -28,72 +29,162 @@ logger = logging.getLogger(__name__)
 
 
 @click.option(
+    '--data-dir',
+    default=str(Path.home() / '.stakewise'),
+    envvar='DATA_DIR',
+    help='Path where the vault data will be placed. Default is ~/.stakewise.',
+    type=click.Path(exists=True, file_okay=False, dir_okay=True),
+)
+@click.option(
+    '--database-dir',
+    type=click.Path(exists=True, file_okay=False, dir_okay=True),
+    envvar='DATABASE_DIR',
+    help='The directory where the database will be created or read from. '
+    'Default is ~/.stakewise/<vault>.',
+)
+@click.option(
+    '--max-fee-per-gas-gwei',
+    type=int,
+    envvar='MAX_FEE_PER_GAS_GWEI',
+    default=70,
+    help='Maximum fee per gas limit. Default is 70 Gwei.',
+)
+@click.option(
+    '--hot-wallet-password-file',
+    type=click.Path(exists=True, file_okay=True, dir_okay=False),
+    envvar='HOT_WALLET_PASSWORD_FILE',
+    help='Absolute path to the hot wallet password file. '
+    'Default is the file generated with "create-wallet" command.',
+)
+@click.option(
+    '--hot-wallet-file',
+    type=click.Path(exists=True, file_okay=True, dir_okay=False),
+    envvar='HOT_WALLET_FILE',
+    help='Absolute path to the hot wallet. '
+    'Default is the file generated with "create-wallet" command.',
+)
+@click.option(
+    '--keystores-password-file',
+    type=click.Path(exists=True, file_okay=True, dir_okay=False),
+    envvar='KEYSTORES_PASSWORD_FILE',
+    help='Absolute path to the password file for decrypting keystores. '
+    'Default is the file generated with "create-keys" command.',
+)
+@click.option(
+    '--keystores-dir',
+    type=click.Path(exists=True, file_okay=False, dir_okay=True),
+    envvar='KEYSTORES_DIR',
+    help='Absolute path to the directory with all the encrypted keystores. '
+    'Default is the directory generated with "create-keys" command.',
+)
+@click.option(
+    '--deposit-data-file',
+    type=click.Path(exists=True, file_okay=True, dir_okay=False),
+    envvar='DEPOSIT_DATA_FILE',
+    help='Path to the deposit_data.json file. '
+    'Default is the file generated with "create-keys" command.',
+)
+@click.option(
     '--network',
-    required=False,
-    help='The network of the Vault',
     type=click.Choice(
         AVAILABLE_NETWORKS,
         case_sensitive=False,
     ),
+    envvar='NETWORK',
+    help='The network of the vault. Defaults is the network specified at "init" command.',
 )
 @click.option(
-    '--vault',
+    '--metrics-host',
     type=str,
-    help='Address of the Vault to register validators for',
-    callback=validate_eth_address,
+    help='The prometheus metrics host. Default is 127.0.0.1.',
+    envvar='METRICS_HOST',
+    default='127.0.0.1',
 )
 @click.option(
-    '--data-dir',
-    required=False,
-    help='Path where the vault data is placed. Defaults to ~/.stakewise/<vault>',
-    type=click.Path(exists=False, file_okay=False, dir_okay=True),
+    '--metrics-port',
+    type=int,
+    help='The prometheus metrics port. Default is 9100.',
+    envvar='METRICS_PORT',
+    default=9100,
 )
 @click.option(
-    '--database-dir', type=str, help='The directory where the database will be created or read from'
+    '-v',
+    '--verbose',
+    help='Enable debug mode. Default is false.',
+    envvar='VERBOSE',
+    is_flag=True,
+)
+@click.option(
+    '--harvest-vault',
+    is_flag=True,
+    envvar='HARVEST_VAULT',
+    help='Whether to submit vault harvest transaction. Default is false.',
 )
 @click.option(
     '--execution-endpoints',
     type=str,
-    help='Comma separated list of API endpoints for execution nodes',
+    envvar='EXECUTION_ENDPOINTS',
+    prompt='Enter comma separated list of API endpoints for execution nodes',
+    help='Comma separated list of API endpoints for execution nodes.',
 )
 @click.option(
     '--consensus-endpoints',
     type=str,
-    help='Comma separated list of API endpoints for consensus nodes',
-)
-@click.option('--max-fee-per-gas-gwei', type=int, help='Maximum fee per gas limit')
-@click.option('--harvest-vault', type=bool, help='Periodically submit vault harvest transaction')
-@click.option(
-    '--keystores-password-file',
-    type=str,
-    help='Absolute path to the password file for decrypting keystores',
+    envvar='CONSENSUS_ENDPOINTS',
+    prompt='Enter comma separated list of API endpoints for consensus nodes',
+    help='Comma separated list of API endpoints for consensus nodes.',
 )
 @click.option(
-    '--keystores-password-dir',
-    type=str,
-    help='Absolute path to the password directory for decrypting keystores',
+    '--vault',
+    type=ChecksumAddress,
+    callback=validate_eth_address,
+    envvar='VAULT',
+    prompt='Enter the vault address',
+    help='Address of the vault to register validators for.',
 )
-@click.option(
-    '--keystores-path',
-    type=str,
-    help='Absolute path to the directory with all the encrypted keystores',
-)
-@click.option('--deposit-data-path', type=str, help='Path to the deposit_data.json file')
-@click.option(
-    '--hot-wallet-private-key',
-    type=str,
-    help='Private key of the hot wallet for submitting transactions',
-)
-@click.option('--hot-wallet-keystore-path', type=str, help='Absolute path to the hot wallet')
-@click.option(
-    '--hot-wallet-keystore-password-path',
-    type=str,
-    help='Absolute path to the password file for hot wallet',
-)
-@click.option('-v', '--verbose', help='Enable debug mode', is_flag=True)
 @click.command(help='Start operator service')
-def start(*args, **kwargs) -> None:
-    setup_config(*args, **kwargs)
+# pylint: disable-next=too-many-arguments,too-many-locals
+def start(
+    vault: ChecksumAddress,
+    consensus_endpoints: str,
+    execution_endpoints: str,
+    harvest_vault: bool,
+    verbose: bool,
+    metrics_host: str,
+    metrics_port: int,
+    data_dir: str,
+    network: str | None,
+    deposit_data_file: str | None,
+    keystores_dir: str | None,
+    keystores_password_file: str | None,
+    hot_wallet_file: str | None,
+    hot_wallet_password_file: str | None,
+    max_fee_per_gas_gwei: int,
+    database_dir: str | None,
+) -> None:
+    vault_config = VaultConfig(vault, Path(data_dir))
+    if network is None:
+        vault_config.load()
+        network = vault_config.network
+
+    settings.set(
+        vault=vault,
+        vault_dir=vault_config.vault_dir,
+        consensus_endpoints=consensus_endpoints,
+        execution_endpoints=execution_endpoints,
+        harvest_vault=harvest_vault,
+        verbose=verbose,
+        metrics_host=metrics_host,
+        metrics_port=metrics_port,
+        network=network,
+        deposit_data_file=deposit_data_file,
+        keystores_dir=keystores_dir,
+        keystores_password_file=keystores_password_file,
+        hot_wallet_file=hot_wallet_file,
+        hot_wallet_password_file=hot_wallet_password_file,
+        max_fee_per_gas_gwei=max_fee_per_gas_gwei,
+        database_dir=database_dir,
+    )
 
     try:
         asyncio.run(main())
@@ -119,8 +210,8 @@ async def main() -> None:
         return
 
     # load deposit data
-    deposit_data = load_deposit_data()
-    logger.info('Loaded deposit data file %s', settings.DEPOSIT_DATA_PATH)
+    deposit_data = load_deposit_data(settings.VAULT, settings.DEPOSIT_DATA_FILE)
+    logger.info('Loaded deposit data file %s', settings.DEPOSIT_DATA_FILE)
     # start operator tasks
 
     # periodically scan network validator updates
@@ -151,7 +242,7 @@ async def main() -> None:
 
                 # submit harvest vault transaction
                 if settings.HARVEST_VAULT:
-                    await harvest_vault()
+                    await harvest_vault_task()
 
             except Exception as exc:
                 log_verbose(exc)
@@ -181,3 +272,11 @@ def setup_sentry():
         sentry_sdk.init(settings.SENTRY_DSN, traces_sample_rate=0.1)
         sentry_sdk.set_tag('network', settings.NETWORK)
         sentry_sdk.set_tag('vault', settings.VAULT)
+
+
+def setup_logging():
+    logging.basicConfig(
+        format='%(asctime)s %(levelname)-8s %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
+        level=settings.LOG_LEVEL,
+    )

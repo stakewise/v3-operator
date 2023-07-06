@@ -1,7 +1,6 @@
 import logging
 import sqlite3
 from functools import cached_property
-from pathlib import Path
 
 from sw_utils import (
     ExtendedAsyncBeacon,
@@ -26,7 +25,7 @@ class Database:
         return sqlite3.connect(settings.DATABASE)
 
     def create_db_dir(self):
-        Path(settings.DATABASE).parent.mkdir(parents=True, exist_ok=True)
+        settings.DATABASE.parent.mkdir(parents=True, exist_ok=True)
 
 
 class ExecutionClient:

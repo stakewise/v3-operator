@@ -10,16 +10,14 @@ from pathlib import Path
 import aiohttp
 import milagro_bls_binding as bls
 from aiohttp import ClientError
-from eth_typing import ChecksumAddress, HexStr
+from eth_typing import ChecksumAddress, HexAddress, HexStr
 from eth_utils import add_0x_prefix
 from multiproof import StandardMerkleTree
 from staking_deposit.key_handling.keystore import ScryptKeystore
 from sw_utils import get_eth1_withdrawal_credentials
-from sw_utils.consensus import EXITED_STATUSES
 from sw_utils.tenacity_decorators import retry_aiohttp_errors
 from web3 import Web3
 
-from src.common.clients import consensus_client
 from src.common.typings import Oracles
 from src.config.settings import DEFAULT_RETRY_TIME, settings
 from src.validators.database import NetworkValidatorCrud
@@ -113,40 +111,30 @@ async def send_approval_request(
 
 
 def list_keystore_files() -> list[KeystoreFile]:
-    KEYSTORES_PATH = settings.KEYSTORES_PATH
-    KEYSTORES_PASSWORD_FILE = settings.KEYSTORES_PASSWORD_FILE
-    KEYSTORES_PASSWORD_DIR = settings.KEYSTORES_PASSWORD_DIR
-    key_files = [
-        f
-        for f in listdir(KEYSTORES_PATH)
-        if isfile(join(KEYSTORES_PATH, f)) and f.startswith('keystore') and f.endswith('.json')
-    ]
+    keystores_dir = settings.KEYSTORES_DIR
+    keystores_password_dir = settings.KEYSTORES_PASSWORD_DIR
+    keystores_password_file = settings.KEYSTORES_PASSWORD_FILE
 
-    if KEYSTORES_PASSWORD_DIR:
-        # Each key file has its own password
-        res: list[KeystoreFile] = []
+    res: list[KeystoreFile] = []
+    for f in listdir(keystores_dir):
+        if not (isfile(keystores_dir / f) and f.startswith('keystore') and f.endswith('.json')):
+            continue
 
-        for key_file in key_files:
-            password_file = key_file.replace('.json', '.txt')
-            path = Path(KEYSTORES_PASSWORD_DIR) / password_file
-            password = _load_keystores_password(path)
-            res.append(KeystoreFile(name=key_file, password=password))
+        password_file = keystores_password_dir / f.replace('.json', '.txt')
+        if not isfile(password_file):
+            password_file = keystores_password_file
 
-        return res
+        password = _load_keystores_password(password_file)
+        res.append(KeystoreFile(name=f, password=password))
 
-    if KEYSTORES_PASSWORD_FILE:
-        # Common password for all key files
-        password = _load_keystores_password(KEYSTORES_PASSWORD_FILE)
-        return [KeystoreFile(name=name, password=password) for name in key_files]
-
-    return []
+    return res
 
 
 def load_keystores() -> Keystores | None:
     """Extracts private keys from the keystores."""
 
     keystore_files = list_keystore_files()
-    logger.info('Loading keystores from %s...', settings.KEYSTORES_PATH)
+    logger.info('Loading keystores from %s...', settings.KEYSTORES_DIR)
     with Pool() as pool:
         # pylint: disable-next=unused-argument
         def _stop_pool(*args, **kwargs):
@@ -155,7 +143,7 @@ def load_keystores() -> Keystores | None:
         results = [
             pool.apply_async(
                 _process_keystore_file,
-                (keystore_file, settings.KEYSTORES_PATH),
+                (keystore_file, settings.KEYSTORES_DIR),
                 error_callback=_stop_pool,
             )
             for keystore_file in keystore_files
@@ -176,12 +164,12 @@ def load_keystores() -> Keystores | None:
     return keystores
 
 
-def load_deposit_data() -> DepositData:
+def load_deposit_data(vault: HexAddress, deposit_data_file: Path) -> DepositData:
     """Loads and verifies deposit data."""
-    with open(settings.DEPOSIT_DATA_PATH, 'r', encoding='utf-8') as f:
+    with open(deposit_data_file, 'r', encoding='utf-8') as f:
         deposit_data = json.load(f)
 
-    credentials = get_eth1_withdrawal_credentials(settings.VAULT)
+    credentials = get_eth1_withdrawal_credentials(vault)
     leaves: list[tuple[bytes, int]] = []
     validators: list[Validator] = []
     for i, data in enumerate(deposit_data):
@@ -221,21 +209,3 @@ def _process_keystore_file(
 def _load_keystores_password(password_path: Path) -> str:
     with open(password_path, 'r', encoding='utf-8') as f:
         return f.read().strip()
-
-
-async def count_deposit_data_non_exited_keys() -> int:
-    deposit_data = load_deposit_data()
-    validator_ids = [v.public_key for v in deposit_data.validators]
-    validator_statuses = []
-
-    for i in range(0, len(validator_ids), settings.VALIDATORS_FETCH_CHUNK_SIZE):
-        validators = await consensus_client.get_validators_by_ids(
-            validator_ids[i : i + settings.VALIDATORS_FETCH_CHUNK_SIZE]
-        )
-        validator_statuses.extend(validators['data'])
-
-    count = 0
-    for validator in validator_statuses:
-        if validator['status'] not in EXITED_STATUSES:
-            count += 1
-    return count
