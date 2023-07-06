@@ -4,13 +4,15 @@ from itertools import zip_longest
 
 import click
 
+from src.common.contrib import greenify
+
 
 @click.option(
-    '--deposit-data',
+    '--deposit-data-files',
     '-d',
     required=True,
     multiple=True,
-    help='Path to the deposit data file(s). To specify multiple deposit data files, '
+    help='Path to the deposit data file. To specify multiple deposit data files, '
     'use the -d option multiple times. Example: -d /path/to/file1 -d /path/to/file2',
     type=click.Path(exists=True, file_okay=True, dir_okay=False),
 )
@@ -29,8 +31,8 @@ import click
     'from all the deposit data files are processed. '
     'Then it continues with the second key from each file the same way.'
 )
-def merge_deposit_data(deposit_data: tuple, output_file: str) -> None:
-    if len(deposit_data) <= 1:
+def merge_deposit_data(deposit_data_files: tuple, output_file: str) -> None:
+    if len(deposit_data_files) <= 1:
         raise click.BadParameter('You must provide at least 2 deposit data files')
 
     if os.path.exists(output_file):
@@ -38,7 +40,7 @@ def merge_deposit_data(deposit_data: tuple, output_file: str) -> None:
 
     json_data_list = []
 
-    for file_path in deposit_data:
+    for file_path in deposit_data_files:
         with open(file_path, 'r', encoding='utf-8') as file:
             json_data_list.append(json.load(file))
 
@@ -51,3 +53,5 @@ def merge_deposit_data(deposit_data: tuple, output_file: str) -> None:
 
     with open(output_file, 'w', encoding='utf-8') as merged_file:
         json.dump(merged_json, merged_file)
+
+    click.echo(f'The merged deposit data file saved to {greenify(output_file)}')
