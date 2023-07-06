@@ -41,7 +41,6 @@ class Settings(metaclass=Singleton):
     hot_wallet_keystore_password_path: Path
     harvest_vault: bool
     max_fee_per_gas_gwei: int
-    approval_max_validators: int
     validators_fetch_chunk_size: int
     sentry_dsn: str
     metrics_host: str
@@ -68,7 +67,6 @@ class Settings(metaclass=Singleton):
         hot_wallet_keystore_password_path: Path | None = None,
         harvest_vault: bool | None = None,
         max_fee_per_gas_gwei: int | None = None,
-        approval_max_validators: int | None = None,
         validators_fetch_chunk_size: int | None = None,
         sentry_dsn: str | None = None,
         metrics_host: str | None = None,
@@ -119,9 +117,6 @@ class Settings(metaclass=Singleton):
         )
         self.max_fee_per_gas_gwei = max_fee_per_gas_gwei or decouple_config(
             'MAX_FEE_PER_GAS_GWEI', default=70, cast=int
-        )
-        self.approval_max_validators = approval_max_validators or decouple_config(
-            'APPROVAL_MAX_VALIDATORS', default=10, cast=int
         )
         self.validators_fetch_chunk_size = validators_fetch_chunk_size or decouple_config(
             'VALIDATORS_FETCH_CHUNK_SIZE', default=100, cast=int
@@ -219,10 +214,6 @@ class Settings(metaclass=Singleton):
     @property
     def MAX_FEE_PER_GAS_GWEI(self) -> int:
         return self.max_fee_per_gas_gwei
-
-    @property
-    def APPROVAL_MAX_VALIDATORS(self) -> int:
-        return self.approval_max_validators
 
     @property
     def VALIDATORS_FETCH_CHUNK_SIZE(self) -> int:

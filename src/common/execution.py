@@ -74,11 +74,16 @@ async def get_oracles() -> Oracles:
     if len(public_keys) != len(set(public_keys)):
         raise ValueError('Duplicate public keys in oracles config')
 
+    validators_approval_batch_limit = config['validators_approval_batch_limit']
+    validators_exit_rotation_batch_limit = config['validators_exit_rotation_batch_limit']
+
     return Oracles(
         rewards_threshold=rewards_threshold,
         validators_threshold=validators_threshold,
         public_keys=public_keys,
         endpoints=endpoints,
+        validators_approval_batch_limit=validators_approval_batch_limit,
+        validators_exit_rotation_batch_limit=validators_exit_rotation_batch_limit,
     )
 
 

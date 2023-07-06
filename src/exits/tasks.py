@@ -7,6 +7,7 @@ from web3.types import HexStr
 
 from src.common.execution import check_hot_wallet_balance, get_oracles
 from src.common.metrics import metrics
+from src.common.typings import Oracles
 from src.config.settings import OUTDATED_SIGNATURES_URL_PATH, settings
 from src.exits.consensus import get_validator_public_keys
 from src.exits.execution import submit_exit_signatures
@@ -22,6 +23,7 @@ logger = logging.getLogger(__name__)
 async def update_exit_signatures(keystores: Keystores) -> None:
     """Fetches update signature requests from oracles."""
     oracles = await get_oracles()
+    exit_rotation_batch_limit = oracles.validators_exit_rotation_batch_limit
 
     random_oracle = random.choice(oracles.endpoints)  # nosec
     outdated_indexes = await _fetch_outdated_indexes(random_oracle)
@@ -32,7 +34,7 @@ async def update_exit_signatures(keystores: Keystores) -> None:
 
     logger.info('Started exit signature rotation for %d validators', len(outdated_indexes))
 
-    validators = await get_validator_public_keys(outdated_indexes)
+    validators = await get_validator_public_keys(outdated_indexes[:exit_rotation_batch_limit])
     oracles_approval = await get_oracles_approval(
         oracles=oracles,
         keystores=keystores,
@@ -61,10 +63,9 @@ async def _fetch_outdated_indexes(oracle_endpoint: str) -> list[int]:
 
 
 async def get_oracles_approval(
-    oracles, keystores: Keystores, validators: dict[int, HexStr]
+    oracles: Oracles, keystores: Keystores, validators: dict[int, HexStr]
 ) -> OraclesApproval:
     """Fetches approval from oracles."""
-    # get latest oracles
     fork = await get_consensus_fork()
 
     # get exit signature shards
