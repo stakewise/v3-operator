@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
     type=int,
     envvar='MAX_FEE_PER_GAS_GWEI',
     default=70,
-    help='Maximum fee per gas limit. Default is 70 Gwei.',
+    help='Maximum fee per gas limit for transactions. Default is 70 Gwei.',
 )
 @click.option(
     '--hot-wallet-password-file',
@@ -118,7 +118,7 @@ logger = logging.getLogger(__name__)
     '--harvest-vault',
     is_flag=True,
     envvar='HARVEST_VAULT',
-    help='Whether to submit vault harvest transaction. Default is false.',
+    help='Whether to submit vault harvest transactions. Default is false.',
 )
 @click.option(
     '--execution-endpoints',
