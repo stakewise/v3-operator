@@ -13,7 +13,7 @@ from src.config.settings import AVAILABLE_NETWORKS, GOERLI
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
     envvar='SW_DATA_DIR',
-    help='Path where the vault data will be placed. Defaults to ~/.stakewise.',
+    help='Path where the vault data will be placed. Default is ~/.stakewise.',
     type=click.Path(exists=False, file_okay=False, dir_okay=True),
 )
 @click.option(
