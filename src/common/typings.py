@@ -14,6 +14,9 @@ class Oracles:
     public_keys: list[HexStr]
     endpoints: list[str]
 
+    validators_approval_batch_limit: int
+    validators_exit_rotation_batch_limit: int
+
     @cached_property
     def addresses(self) -> list[ChecksumAddress]:
         res = []

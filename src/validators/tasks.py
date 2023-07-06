@@ -10,6 +10,7 @@ from src.common.execution import (
     get_oracles,
 )
 from src.common.metrics import metrics
+from src.common.typings import Oracles
 from src.common.utils import MGNO_RATE, WAD
 from src.config.networks import GNOSIS
 from src.config.settings import DEPOSIT_AMOUNT, settings
@@ -46,8 +47,14 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
 
     metrics.stakeable_assets.set(int(vault_balance))
 
+    # get latest oracles
+    oracles = await get_oracles()
+    logger.debug('Fetched latest oracles: %s', oracles)
+
+    approval_max_validators = oracles.validators_approval_batch_limit
+
     # calculate number of validators that can be registered
-    validators_count: int = min(settings.APPROVAL_MAX_VALIDATORS, vault_balance // DEPOSIT_AMOUNT)
+    validators_count: int = min(approval_max_validators, vault_balance // DEPOSIT_AMOUNT)
     if not validators_count:
         # not enough balance to register validators
         return
@@ -75,7 +82,7 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
         )
         return
 
-    oracles_approval = await get_oracles_approval(keystores, validators)
+    oracles_approval = await get_oracles_approval(oracles, keystores, validators)
 
     if len(validators) == 1:
         validator = validators[0]
@@ -99,12 +106,9 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
 
 
 async def get_oracles_approval(
-    keystores: Keystores, validators: list[Validator]
+    oracles: Oracles, keystores: Keystores, validators: list[Validator]
 ) -> OraclesApproval:
     """Fetches approval from oracles."""
-    # get latest oracles
-    oracles = await get_oracles()
-    logger.debug('Fetched latest oracles: %s', oracles)
 
     # get latest registry root
     registry_root = await get_validators_registry_root()
