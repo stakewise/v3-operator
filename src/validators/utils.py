@@ -15,7 +15,7 @@ from eth_utils import add_0x_prefix
 from multiproof import StandardMerkleTree
 from staking_deposit.key_handling.keystore import ScryptKeystore
 from sw_utils import get_eth1_withdrawal_credentials
-from sw_utils.tenacity_decorators import retry_aiohttp_errors
+from sw_utils.decorators import retry_aiohttp_errors
 from web3 import Web3
 
 from src.common.typings import Oracles

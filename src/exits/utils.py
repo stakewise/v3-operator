@@ -5,7 +5,7 @@ from urllib.parse import urljoin
 
 import aiohttp
 from eth_typing import ChecksumAddress
-from sw_utils.tenacity_decorators import retry_aiohttp_errors
+from sw_utils.decorators import retry_aiohttp_errors
 from web3 import Web3
 
 from src.common.typings import Oracles

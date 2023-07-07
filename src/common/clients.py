@@ -10,7 +10,7 @@ from sw_utils import (
     get_consensus_client,
     get_execution_client,
 )
-from sw_utils.tenacity_decorators import custom_before_log
+from sw_utils.decorators import custom_before_log
 from tenacity import retry, retry_if_exception_type, stop_after_delay, wait_exponential
 from web3 import Web3
 

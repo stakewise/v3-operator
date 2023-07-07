@@ -10,7 +10,7 @@ from sw_utils import (
     get_eth1_withdrawal_credentials,
     is_valid_deposit_data_signature,
 )
-from sw_utils.tenacity_decorators import retry_aiohttp_errors
+from sw_utils.decorators import retry_aiohttp_errors
 from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.types import EventData, Wei
