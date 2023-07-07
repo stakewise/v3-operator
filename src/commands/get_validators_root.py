@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import click
@@ -34,6 +35,11 @@ def get_validators_root(vault: HexAddress, data_dir: str, deposit_data_file: str
         file_path = Path(str(deposit_data_file))
     else:
         file_path = Path(data_dir) / vault.lower() / 'deposit_data.json'
+
+    if not os.path.isfile(file_path):
+        raise click.ClickException(
+            'Deposit data file does not exist. Have you called "create-keys" command?'
+        )
 
     deposit_data = load_deposit_data(vault, file_path)
     click.echo(f'The validator deposit data Merkle tree root: {greenify(deposit_data.tree.root)}')

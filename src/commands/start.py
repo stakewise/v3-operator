@@ -91,7 +91,7 @@ logger = logging.getLogger(__name__)
         case_sensitive=False,
     ),
     envvar='NETWORK',
-    help='The network of the vault. Defaults is the network specified at "init" command.',
+    help='The network of the vault. Default is the network specified at "init" command.',
 )
 @click.option(
     '--metrics-host',
