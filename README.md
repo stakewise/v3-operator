@@ -147,7 +147,7 @@ eye on your wallet balance, otherwise validators will stop registering.
 ```
 Enter the vault address: 0x3320a...68
 Enter the mnemonic for generating the wallet: pumpkin anxiety private salon inquiry ...
-Done. The wallet and password saved to /home/user/Workspace/stakewise/v3-operator/.stakewise/0x3320a...68/wallet directory. The wallet address is: 0x239B...e3Cc
+Done. The wallet and password saved to /home/user/.stakewise/0x3320a...68/wallet directory. The wallet address is: 0x239B...e3Cc
 ```
 
 #### Options:
