@@ -190,17 +190,6 @@ tests = ["attrs[tests-no-zope]", "zope-interface"]
 tests-no-zope = ["cloudpickle", "hypothesis", "mypy (>=1.1.1)", "pympler", "pytest (>=4.3.0)", "pytest-mypy-plugins", "pytest-xdist[psutil]"]
 
 [[package]]
-name = "backoff"
-version = "2.2.1"
-description = "Function decoration for backoff and retry"
-optional = false
-python-versions = ">=3.7,<4.0"
-files = [
-    {file = "backoff-2.2.1-py3-none-any.whl", hash = "sha256:63579f9a0628e06278f7e47b7d7d5b6ce20dc65c5e96a6f3ca99a6adca0396e8"},
-    {file = "backoff-2.2.1.tar.gz", hash = "sha256:03f829f5bb1923180821643f8753b0502c3b682293992485b0eef2807afa5cba"},
-]
-
-[[package]]
 name = "bandit"
 version = "1.7.4"
 description = "Security oriented static analyser for python code."
@@ -1849,7 +1838,7 @@ name = "pycparser"
 version = "2.21"
 description = "C parser in Python"
 optional = false
-python-versions = "*"
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 files = [
     {file = "pycparser-2.21-py2.py3-none-any.whl", hash = "sha256:8ee45429555515e1f6b185e78100aea234072576aa43ab53aefcae078162fca9"},
     {file = "pycparser-2.21.tar.gz", hash = "sha256:e644fdec12f7872f86c58ff790da456218b10f863970249516d60a5eaca77206"},
@@ -2450,7 +2439,7 @@ pbr = ">=2.0.0,<2.1.0 || >2.1.0"
 
 [[package]]
 name = "sw-utils"
-version = "0.3.11"
+version = "0.3.14"
 description = "StakeWise Python utils"
 optional = false
 python-versions = "^3.10"
@@ -2458,10 +2447,10 @@ files = []
 develop = false
 
 [package.dependencies]
-backoff = "^2.2.1"
 ipfshttpclient = "^0.8.0a2"
 milagro-bls-binding = "==1.9.0"
 py-ecc = "^6.0.0"
+pyrsistent = "0.19.3"
 tenacity = "==8.2.2"
 types-requests = "^2.28.11.15"
 web3 = "==6.5.0"
@@ -2469,8 +2458,8 @@ web3 = "==6.5.0"
 [package.source]
 type = "git"
 url = "https://github.com/stakewise/sw-utils.git"
-reference = "v0.3.11"
-resolved_reference = "da1a32c58a624b2139a2e5b46122fe7baaccb362"
+reference = "v0.3.14"
+resolved_reference = "cb2c152e5a9b5880130cae895291531387714ac6"
 
 [[package]]
 name = "tenacity"
@@ -2899,4 +2888,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.11"
-content-hash = "abf9383f7536621efb1f3e4846b500aa2b964abb429d970f89da663ee6485988"
+content-hash = "b380786b262d2111a52dcce6ec4304f6c3516aed1a8d439b737f088b9914c5b8"

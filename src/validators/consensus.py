@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from aiohttp import ClientResponseError
 from eth_typing import BlockNumber
-from sw_utils.tenacity_decorators import retry_aiohttp_errors
+from sw_utils.decorators import retry_aiohttp_errors
 from sw_utils.typings import ConsensusFork
 from web3 import Web3
 from web3.types import Timestamp

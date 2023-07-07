@@ -1,6 +1,6 @@
 import logging
 
-from sw_utils.tenacity_decorators import retry_aiohttp_errors
+from sw_utils.decorators import retry_aiohttp_errors
 from web3 import Web3
 
 from src.common.clients import execution_client

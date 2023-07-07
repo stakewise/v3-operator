@@ -1,4 +1,4 @@
-from sw_utils.tenacity_decorators import retry_aiohttp_errors
+from sw_utils.decorators import retry_aiohttp_errors
 from web3.types import HexStr
 
 from src.common.clients import consensus_client
