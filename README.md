@@ -258,6 +258,7 @@ For example:
 export METRICS_HOST=0.0.0.0
 export METRICS_PORT=9100
 ```
+You can also specify them by providing `--metrics-port` and `--metrics-host` flags to the `start` command.
 
 Now, Operators's metrics will be available at http://[METRICS_HOST]:[METRICS_PORT]/metrics.
 

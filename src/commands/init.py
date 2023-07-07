@@ -1,27 +1,30 @@
+from pathlib import Path
+
 import click
 from eth_typing import HexAddress
 
 from src.common.config import VaultConfig
-from src.common.credentials import CredentialManager
 from src.common.language import LANGUAGES, create_new_mnemonic
 from src.common.validators import validate_eth_address
 from src.config.settings import AVAILABLE_NETWORKS, GOERLI
 
 
 @click.option(
-    '--network',
-    default=GOERLI,
-    help='The network to generate the deposit data for.',
-    prompt='Enter the network name',
-    type=click.Choice(
-        AVAILABLE_NETWORKS,
-        case_sensitive=False,
-    ),
+    '--data-dir',
+    default=str(Path.home() / '.stakewise'),
+    envvar='DATA_DIR',
+    help='Path where the vault data will be placed. Default is ~/.stakewise.',
+    type=click.Path(exists=False, file_okay=False, dir_okay=True),
+)
+@click.option(
+    '--no-verify',
+    is_flag=True,
+    help='Skips mnemonic verification when provided.',
 )
 @click.option(
     '--language',
     default='english',
-    prompt='Choose your mnemonic language.',
+    prompt='Choose your mnemonic language',
     type=click.Choice(
         LANGUAGES,
         case_sensitive=False,
@@ -35,15 +38,14 @@ from src.config.settings import AVAILABLE_NETWORKS, GOERLI
     callback=validate_eth_address,
 )
 @click.option(
-    '--no-verify',
-    is_flag=True,
-    help='Skips mnemonic verification when provided.',
-)
-@click.option(
-    '--data-dir',
-    required=False,
-    help='Path where the vault data will be placed. ' 'Defaults to ~/.stakewise/<vault>',
-    type=click.Path(exists=False, file_okay=False, dir_okay=True),
+    '--network',
+    default=GOERLI,
+    help='The network of your vault.',
+    prompt='Enter the network name',
+    type=click.Choice(
+        AVAILABLE_NETWORKS,
+        case_sensitive=False,
+    ),
 )
 @click.command(help='Initializes vault data directory and generates mnemonic.')
 def init(
@@ -55,7 +57,7 @@ def init(
 ) -> None:
     config = VaultConfig(
         vault=vault,
-        data_dir=data_dir,
+        data_dir=Path(data_dir),
     )
     if config.vault_dir.exists():
         raise click.ClickException(f'Vault directory {config.vault_dir} already exists.')
@@ -68,15 +70,7 @@ def init(
         )
     mnemonic = create_new_mnemonic(language, skip_test=no_verify)
 
-    first_public_key = CredentialManager.generate_credential_first_public_key(
-        network, vault, str(mnemonic)
-    )
-
-    config.save(
-        network=network,
-        mnemonic_next_index=0,
-        first_public_key=first_public_key,
-    )
+    config.save(network, mnemonic)
     if not no_verify:
         click.secho(
             f'Successfully initialized configuration for vault {vault}', bold=True, fg='green'

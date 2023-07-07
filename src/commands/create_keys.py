@@ -1,6 +1,7 @@
 import json
 from multiprocessing import Pool
 from os import makedirs, path
+from pathlib import Path
 
 import click
 from eth_typing import HexAddress
@@ -12,6 +13,19 @@ from src.common.password import generate_password, get_or_create_password_file
 from src.common.validators import validate_eth_address, validate_mnemonic
 
 
+@click.option(
+    '--data-dir',
+    default=str(Path.home() / '.stakewise'),
+    envvar='DATA_DIR',
+    help='Path where the vault data will be placed. Default is ~/.stakewise.',
+    type=click.Path(exists=True, file_okay=False, dir_okay=True),
+)
+@click.option(
+    '--per-keystore-password',
+    is_flag=True,
+    default=False,
+    help='Creates separate password file for each keystore.',
+)
 @click.option(
     '--mnemonic',
     help='The mnemonic for generating the validator keys.',
@@ -27,23 +41,10 @@ from src.common.validators import validate_eth_address, validate_mnemonic
 )
 @click.option(
     '--vault',
-    '--withdrawal-address',
-    help='The withdrawal address where the funds will be sent after validators withdrawals.',
-    prompt='Enter the Vault address',
+    help='The address of the vault.',
+    prompt='Enter the vault address',
     type=str,
     callback=validate_eth_address,
-)
-@click.option(
-    '--data-dir',
-    required=False,
-    help='Path where the vault data will be placed. ' 'Defaults to ~/.stakewise/<vault>',
-    type=click.Path(exists=False, file_okay=False, dir_okay=True),
-)
-@click.option(
-    '--per-keystore-password',
-    is_flag=True,
-    default=False,
-    help='Creates separate password file for each keystore',
 )
 @click.command(help='Creates the validator keys from the mnemonic.')
 @async_command
@@ -54,16 +55,8 @@ async def create_keys(
     data_dir: str,
     per_keystore_password: bool,
 ) -> None:
-    config = VaultConfig(vault=vault, data_dir=data_dir)
-    config.load()
-
-    first_public_key = CredentialManager.generate_credential_first_public_key(
-        config.network, vault, str(mnemonic)
-    )
-    if first_public_key != config.first_public_key:
-        raise click.ClickException(
-            'Invalid mnemonic. Please use mnemonic provided at init command.'
-        )
+    config = VaultConfig(vault, Path(data_dir))
+    config.load(mnemonic)
 
     deposit_data_file = config.vault_dir / 'deposit_data.json'
     keystores_dir = config.vault_dir / 'keystores'
@@ -87,7 +80,7 @@ async def create_keys(
         per_keystore_password=per_keystore_password,
     )
 
-    config.update(mnemonic_next_index=config.mnemonic_next_index + count)
+    config.increment_mnemonic_index(count)
 
     click.echo(
         f'Done. Generated {greenify(count)} keys for {greenify(vault)} vault.\n'

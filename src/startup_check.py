@@ -8,11 +8,10 @@ from sw_utils import IpfsFetchClient, get_consensus_client, get_execution_client
 
 from src.common.clients import db_client
 from src.common.execution import check_hot_wallet_balance, get_oracles
-from src.common.utils import count_files_in_folder
 from src.common.wallet import hot_wallet
 from src.config.settings import settings
 from src.validators.execution import check_deposit_data_root
-from src.validators.utils import count_deposit_data_non_exited_keys, load_deposit_data
+from src.validators.utils import load_deposit_data
 
 logger = logging.getLogger(__name__)
 
@@ -115,32 +114,20 @@ async def collect_healthy_oracles() -> list:
     return healthy_oracles
 
 
-def wait_for_keystores_path() -> None:
-    while not path.exists(settings.KEYSTORES_PATH):
+def wait_for_keystores_dir() -> None:
+    while not path.exists(settings.KEYSTORES_DIR):
         logger.warning(
             "Can't find keystores directory (%s)",
-            settings.KEYSTORES_PATH,
+            settings.KEYSTORES_DIR,
         )
         time.sleep(15)
 
 
-def wait_for_keystores_password_file() -> None:
-    while not path.exists(settings.KEYSTORES_PASSWORD_FILE):  # type: ignore
-        logger.warning("Can't find password file (%s)", settings.KEYSTORES_PASSWORD_FILE)
-        time.sleep(15)
-
-
-def wait_for_keystores_password_dir() -> None:
-    while not path.exists(settings.KEYSTORES_PASSWORD_DIR):  # type: ignore
-        logger.warning("Can't find password dir (%s)", settings.KEYSTORES_PASSWORD_DIR)
-        time.sleep(15)
-
-
 async def wait_for_deposit_data_file() -> None:
-    while not path.exists(settings.DEPOSIT_DATA_PATH):
-        logger.warning("Can't find deposit data file (%s)", settings.DEPOSIT_DATA_PATH)
+    while not path.exists(settings.DEPOSIT_DATA_FILE):
+        logger.warning("Can't find deposit data file (%s)", settings.DEPOSIT_DATA_FILE)
         time.sleep(15)
-    deposit_data = load_deposit_data()
+    deposit_data = load_deposit_data(settings.VAULT, settings.DEPOSIT_DATA_FILE)
 
     while True:
         try:
@@ -149,19 +136,7 @@ async def wait_for_deposit_data_file() -> None:
         except RuntimeError as e:
             logger.warning(e)
             time.sleep(15)
-    logger.info('Found deposit data file %s', settings.DEPOSIT_DATA_PATH)
-
-
-async def wait_for_keystore_files() -> None:
-    keystores_count = count_files_in_folder(settings.KEYSTORES_PATH, '.json')
-    while await count_deposit_data_non_exited_keys() >= keystores_count:
-        logger.warning(
-            '''The number of validators in deposit data
-            (%s) and keystores directory (%s) is different.''',
-            settings.DEPOSIT_DATA_PATH,
-            settings.KEYSTORES_PATH,
-        )
-        time.sleep(15)
+    logger.info('Found deposit data file %s', settings.DEPOSIT_DATA_FILE)
 
 
 async def startup_checks():
@@ -202,31 +177,9 @@ async def startup_checks():
     logger.info('Checking deposit data file...')
     await wait_for_deposit_data_file()
 
-    if not settings.KEYSTORES_PASSWORD_FILE and not settings.KEYSTORES_PASSWORD_DIR:
-        raise ValueError('KEYSTORES_PASSWORD_FILE or KEYSTORES_PASSWORD_DIR must be set')
-
-    if settings.KEYSTORES_PASSWORD_FILE and settings.KEYSTORES_PASSWORD_DIR:
-        raise ValueError(
-            'Only one of KEYSTORES_PASSWORD_FILE or KEYSTORES_PASSWORD_DIR must be set'
-        )
-
     logger.info('Checking keystores dir...')
-    wait_for_keystores_path()
+    wait_for_keystores_dir()
     logger.info('Found keystores dir')
-
-    if settings.KEYSTORES_PASSWORD_FILE:
-        logger.info('Checking keystore password file...')
-        wait_for_keystores_password_file()
-        logger.info('Found keystores password file')
-
-    if settings.KEYSTORES_PASSWORD_DIR:
-        logger.info('Checking keystore password dir...')
-        wait_for_keystores_password_dir()
-        logger.info('Found keystores password dir')
-
-    logger.info('Checking keystore files...')
-    await wait_for_keystore_files()
-    logger.info('Found keystore files')
 
 
 async def _aiohttp_fetch(session, url) -> str:
