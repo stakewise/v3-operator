@@ -11,7 +11,13 @@ import src
 from src.common.config import VaultConfig
 from src.common.metrics import metrics_server
 from src.common.validators import validate_eth_address
-from src.config.settings import AVAILABLE_NETWORKS, settings
+from src.config.settings import (
+    AVAILABLE_NETWORKS,
+    DEFAULT_MAX_FEE_PER_GAS_GWEI,
+    DEFAULT_METRICS_HOST,
+    DEFAULT_METRICS_PORT,
+    settings,
+)
 from src.exits.tasks import update_exit_signatures
 from src.harvest.tasks import harvest_vault as harvest_vault_task
 from src.startup_check import startup_checks
@@ -46,7 +52,8 @@ logger = logging.getLogger(__name__)
     '--max-fee-per-gas-gwei',
     type=int,
     envvar='MAX_FEE_PER_GAS_GWEI',
-    help='Maximum fee per gas limit for transactions. Default is 70 Gwei.',
+    help=f'Maximum fee per gas limit for transactions. '
+    f'Default is {DEFAULT_MAX_FEE_PER_GAS_GWEI} Gwei.',
 )
 @click.option(
     '--hot-wallet-password-file',
@@ -95,13 +102,13 @@ logger = logging.getLogger(__name__)
 @click.option(
     '--metrics-host',
     type=str,
-    help='The prometheus metrics host. Default is 127.0.0.1.',
+    help=f'The prometheus metrics host. Default is {DEFAULT_METRICS_HOST}.',
     envvar='METRICS_HOST',
 )
 @click.option(
     '--metrics-port',
     type=int,
-    help='The prometheus metrics port. Default is 9100.',
+    help=f'The prometheus metrics port. Default is {DEFAULT_METRICS_PORT}.',
     envvar='METRICS_PORT',
 )
 @click.option(

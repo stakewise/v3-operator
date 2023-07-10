@@ -10,6 +10,10 @@ from src.config.networks import GOERLI, NETWORKS, NetworkConfig
 
 DATA_DIR = Path.home() / '.stakewise'
 
+DEFAULT_MAX_FEE_PER_GAS_GWEI = 70
+DEFAULT_METRICS_HOST = '127.0.0.1'
+DEFAULT_METRICS_PORT = 9100
+
 
 class Singleton(type):
     _instances: dict = {}
@@ -29,15 +33,15 @@ class Settings(metaclass=Singleton):
     execution_endpoints: str
     harvest_vault: bool | None
     verbose: bool
-    metrics_host: str
-    metrics_port: int
+    metrics_host: str | None
+    metrics_port: int | None
     deposit_data_file: str | None
     keystores_dir: str | None
     keystores_password_dir: str | None
     keystores_password_file: str | None
     hot_wallet_file: str | None
     hot_wallet_password_file: str | None
-    max_fee_per_gas_gwei: int
+    max_fee_per_gas_gwei: int | None
     database_file: Path
     log_level: str
     ipfs_fetch_endpoints: list[str]
@@ -60,9 +64,9 @@ class Settings(metaclass=Singleton):
         hot_wallet_file: str | None = None,
         hot_wallet_password_file: str | None = None,
         database_dir: str | None = None,
-        metrics_port: int = 9100,
-        metrics_host: str = '127.0.0.1',
-        max_fee_per_gas_gwei: int = 70,
+        metrics_port: int | None = None,
+        metrics_host: str | None = None,
+        max_fee_per_gas_gwei: int | None = None,
     ):
         self.vault = Web3.to_checksum_address(vault)
         self.vault_dir = vault_dir
@@ -191,23 +195,23 @@ class Settings(metaclass=Singleton):
 
     @cached_property
     def MAX_FEE_PER_GAS_GWEI(self) -> int:
-        return self.max_fee_per_gas_gwei
+        return self.max_fee_per_gas_gwei or DEFAULT_MAX_FEE_PER_GAS_GWEI
 
     @cached_property
     def VALIDATORS_FETCH_CHUNK_SIZE(self) -> int:
         return self.validators_fetch_chunk_size
 
     @cached_property
-    def SENTRY_DSN(self) -> str | None:
+    def SENTRY_DSN(self) -> str:
         return self.sentry_dsn
 
     @cached_property
     def METRICS_HOST(self) -> str:
-        return self.metrics_host
+        return self.metrics_host or DEFAULT_METRICS_HOST
 
     @cached_property
     def METRICS_PORT(self) -> int:
-        return self.metrics_port
+        return self.metrics_port or DEFAULT_METRICS_PORT
 
 
 settings = Settings()
