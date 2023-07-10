@@ -11,6 +11,7 @@ from web3.types import Wei
 class Oracles:
     rewards_threshold: int
     validators_threshold: int
+    exit_signature_recover_threshold: int
     public_keys: list[HexStr]
     endpoints: list[str]
 
