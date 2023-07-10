@@ -1,3 +1,4 @@
+from functools import cached_property
 from pathlib import Path
 
 from decouple import Csv
@@ -22,19 +23,20 @@ class Singleton(type):
 # pylint: disable-next=too-many-public-methods
 class Settings(metaclass=Singleton):
     vault: ChecksumAddress
-    consensus_endpoints: list[str]
-    execution_endpoints: list[str]
-    harvest_vault: bool
+    vault_dir: Path
+    network: str
+    consensus_endpoints: str
+    execution_endpoints: str
+    harvest_vault: bool | None
     verbose: bool
     metrics_host: str
     metrics_port: int
-    network: str
-    deposit_data_file: Path
-    keystores_dir: Path
-    keystores_password_dir: Path
-    keystores_password_file: Path
-    hot_wallet_file: Path
-    hot_wallet_password_file: Path
+    deposit_data_file: str | None
+    keystores_dir: str | None
+    keystores_password_dir: str | None
+    keystores_password_file: str | None
+    hot_wallet_file: str | None
+    hot_wallet_password_file: str | None
     max_fee_per_gas_gwei: int
     database_file: Path
     log_level: str
@@ -47,56 +49,46 @@ class Settings(metaclass=Singleton):
         self,
         vault: str,
         vault_dir: Path,
-        consensus_endpoints: str,
-        execution_endpoints: str,
-        harvest_vault: bool,
-        verbose: bool,
-        metrics_host: str,
-        metrics_port: int,
-        max_fee_per_gas_gwei: int,
         network: str,
-        deposit_data_file: str | None,
-        keystores_dir: str | None,
-        keystores_password_file: str | None,
-        hot_wallet_file: str | None,
-        hot_wallet_password_file: str | None,
-        database_dir: str | None,
+        consensus_endpoints: str = '',
+        execution_endpoints: str = '',
+        harvest_vault: bool | None = None,
+        verbose: bool = False,
+        deposit_data_file: str | None = None,
+        keystores_dir: str | None = None,
+        keystores_password_file: str | None = None,
+        hot_wallet_file: str | None = None,
+        hot_wallet_password_file: str | None = None,
+        database_dir: str | None = None,
+        metrics_port: int = 9100,
+        metrics_host: str = '127.0.0.1',
+        max_fee_per_gas_gwei: int = 70,
     ):
         self.vault = Web3.to_checksum_address(vault)
-        self.consensus_endpoints = [node.strip() for node in consensus_endpoints.split(',')]
-        self.execution_endpoints = [node.strip() for node in execution_endpoints.split(',')]
+        self.vault_dir = vault_dir
+        self.network = network
+
+        self.consensus_endpoints = consensus_endpoints
+        self.execution_endpoints = execution_endpoints
         self.harvest_vault = harvest_vault
         self.verbose = verbose
         self.metrics_host = metrics_host
         self.metrics_port = metrics_port
         self.max_fee_per_gas_gwei = max_fee_per_gas_gwei
 
-        self.network = network
-        self.deposit_data_file = (
-            Path(deposit_data_file) if deposit_data_file else vault_dir / 'deposit_data.json'
-        )
+        self.deposit_data_file = deposit_data_file
         # keystores
-        self.keystores_dir = Path(keystores_dir) if keystores_dir else vault_dir / 'keystores'
+        self.keystores_dir = keystores_dir
         self.keystores_password_dir = decouple_config(
             'KEYSTORES_PASSWORD_DIR',
-            cast=Path,
-            default=vault_dir / 'keystores',
+            default='',
         )
-        self.keystores_password_file = (
-            Path(keystores_password_file)
-            if keystores_password_file
-            else vault_dir / 'keystores' / 'password.txt'
-        )
+        self.keystores_password_file = keystores_password_file
 
         # hot wallet
-        self.hot_wallet_file = (
-            Path(hot_wallet_file) if hot_wallet_file else vault_dir / 'wallet' / 'wallet.json'
-        )
-        self.hot_wallet_password_file = (
-            Path(hot_wallet_password_file)
-            if hot_wallet_password_file
-            else vault_dir / 'wallet' / 'password.txt'
-        )
+        self.hot_wallet_file = hot_wallet_file
+        self.hot_wallet_password_file = hot_wallet_password_file
+
         db_dir = Path(database_dir) if database_dir else vault_dir
         self.database_file = db_dir / 'operator.db'
 
@@ -113,87 +105,107 @@ class Settings(metaclass=Singleton):
         )
         self.sentry_dsn = decouple_config('SENTRY_DSN', default='')
 
-    @property
+    @cached_property
     def VERBOSE(self) -> bool:
         return self.verbose
 
-    @property
+    @cached_property
     def LOG_LEVEL(self) -> str:
         return self.log_level
 
-    @property
+    @cached_property
     def NETWORK(self) -> str:
         return self.network
 
-    @property
+    @cached_property
     def NETWORK_CONFIG(self) -> NetworkConfig:
         return NETWORKS[self.NETWORK]
 
-    @property
+    @cached_property
     def EXECUTION_ENDPOINTS(self) -> list[str]:
-        return self.execution_endpoints
+        return [node.strip() for node in self.execution_endpoints.split(',')]
 
-    @property
+    @cached_property
     def CONSENSUS_ENDPOINTS(self) -> list[str]:
-        return self.consensus_endpoints
+        return [node.strip() for node in self.consensus_endpoints.split(',')]
 
-    @property
+    @cached_property
     def IPFS_FETCH_ENDPOINTS(self) -> list[str]:
         return self.ipfs_fetch_endpoints
 
-    @property
+    @cached_property
     def VAULT(self) -> ChecksumAddress:
         return self.vault
 
-    @property
+    @cached_property
     def DATABASE(self) -> Path:
         return self.database_file
 
-    @property
+    @cached_property
     def KEYSTORES_DIR(self) -> Path:
-        return self.keystores_dir
+        return Path(self.keystores_dir) if self.keystores_dir else self.vault_dir / 'keystores'
 
-    @property
+    @cached_property
     def KEYSTORES_PASSWORD_FILE(self) -> Path:
-        return self.keystores_password_file
+        return (
+            Path(self.keystores_password_file)
+            if self.keystores_password_file
+            else self.vault_dir / 'keystores' / 'password.txt'
+        )
 
-    @property
+    @cached_property
     def KEYSTORES_PASSWORD_DIR(self) -> Path:
-        return self.keystores_password_dir
+        return (
+            Path(self.keystores_password_dir)
+            if self.keystores_password_dir
+            else self.vault_dir / 'keystores'
+        )
 
-    @property
+    @cached_property
     def DEPOSIT_DATA_FILE(self) -> Path:
-        return self.deposit_data_file
+        return (
+            Path(self.deposit_data_file)
+            if self.deposit_data_file
+            else self.vault_dir / 'deposit_data.json'
+        )
 
-    @property
+    @cached_property
     def HOT_WALLET_FILE(self) -> Path:
-        return self.hot_wallet_file
+        return (
+            Path(self.hot_wallet_file)
+            if self.hot_wallet_file
+            else self.vault_dir / 'wallet' / 'wallet.json'
+        )
 
-    @property
+    @cached_property
     def HOT_WALLET_PASSWORD_FILE(self) -> Path:
-        return self.hot_wallet_password_file
+        return (
+            Path(self.hot_wallet_password_file)
+            if self.hot_wallet_password_file
+            else self.vault_dir / 'wallet' / 'password.txt'
+        )
 
-    @property
-    def HARVEST_VAULT(self) -> bool:
+    @cached_property
+    def HARVEST_VAULT(self) -> bool | None:
         return self.harvest_vault
 
-    @property
+    @cached_property
     def MAX_FEE_PER_GAS_GWEI(self) -> int:
         return self.max_fee_per_gas_gwei
 
-    @property
+    @cached_property
     def VALIDATORS_FETCH_CHUNK_SIZE(self) -> int:
         return self.validators_fetch_chunk_size
 
-    @property
+    @cached_property
     def SENTRY_DSN(self) -> str | None:
         return self.sentry_dsn
 
-    @property
+    @cached_property
     def METRICS_HOST(self) -> str:
         return self.metrics_host
 
-    @property
+    @cached_property
     def METRICS_PORT(self) -> int:
         return self.metrics_port
 
