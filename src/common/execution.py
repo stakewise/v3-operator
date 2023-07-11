@@ -71,6 +71,11 @@ async def get_oracles() -> Oracles:
     if not 1 <= validators_threshold <= len(config['oracles']):
         raise ValueError('Invalid validators threshold')
 
+    exit_signature_recover_threshold = config['exit_signature_recover_threshold']
+
+    if exit_signature_recover_threshold > validators_threshold:
+        raise ValueError('Invalid exit signature threshold')
+
     if len(public_keys) != len(set(public_keys)):
         raise ValueError('Duplicate public keys in oracles config')
 
@@ -80,6 +85,7 @@ async def get_oracles() -> Oracles:
     return Oracles(
         rewards_threshold=rewards_threshold,
         validators_threshold=validators_threshold,
+        exit_signature_recover_threshold=exit_signature_recover_threshold,
         public_keys=public_keys,
         endpoints=endpoints,
         validators_approval_batch_limit=validators_approval_batch_limit,

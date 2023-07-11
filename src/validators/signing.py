@@ -31,7 +31,7 @@ def get_polynomial_points(coefficients: list[int], num_points: int) -> list[byte
 def get_exit_signature_shards(
     validator_index: int, private_key: BLSPrivkey, oracles: Oracles, fork: ConsensusFork
 ) -> ExitSignatureShards:
-    """Generates exit signature shards and encrypts them with oracles' RSA keys."""
+    """Generates exit signature shards and encrypts them with oracles' public keys."""
     message = get_exit_message_signing_root(
         validator_index=validator_index,
         genesis_validators_root=settings.NETWORK_CONFIG.GENESIS_VALIDATORS_ROOT,
@@ -46,7 +46,8 @@ def get_exit_signature_shards(
         )
 
     coefficients: list[int] = [int.from_bytes(private_key, 'big')]
-    for _ in range(oracles.validators_threshold - 1):
+
+    for _ in range(oracles.exit_signature_recover_threshold - 1):
         coefficients.append(randint(0, curve_order - 1))
 
     private_keys = get_polynomial_points(coefficients, len(oracles.public_keys))
