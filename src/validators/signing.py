@@ -34,7 +34,7 @@ def get_exit_signature_shards(
     """Generates exit signature shards and encrypts them with oracles' RSA keys."""
     message = get_exit_message_signing_root(
         validator_index=validator_index,
-        genesis_validators_root=settings.NETWORK_CONFIG.GENESIS_VALIDATORS_ROOT,
+        genesis_validators_root=settings.network_config.GENESIS_VALIDATORS_ROOT,
         fork=fork,
     )
 

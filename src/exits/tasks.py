@@ -52,7 +52,7 @@ async def update_exit_signatures(keystores: Keystores) -> None:
 
 
 async def _fetch_outdated_indexes(oracle_endpoint: str) -> list[int]:
-    path = OUTDATED_SIGNATURES_URL_PATH.format(vault=settings.VAULT)
+    path = OUTDATED_SIGNATURES_URL_PATH.format(vault=settings.vault)
     url = urljoin(oracle_endpoint, path)
 
     async with aiohttp.ClientSession() as session:
@@ -70,7 +70,7 @@ async def get_oracles_approval(
 
     # get exit signature shards
     request = SignatureRotationRequest(
-        vault_address=settings.VAULT,
+        vault_address=settings.vault,
         public_keys=[],
         public_key_shards=[],
         exit_signature_shards=[],

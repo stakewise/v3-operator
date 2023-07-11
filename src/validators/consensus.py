@@ -34,7 +34,7 @@ async def get_chain_finalized_head() -> ChainHead:
     """Fetches the fork safe chain head."""
     checkpoints = await consensus_client.get_finality_checkpoint()
     epoch: int = int(checkpoints['data']['finalized']['epoch'])
-    slots_per_epoch = settings.NETWORK_CONFIG.SLOTS_PER_EPOCH
+    slots_per_epoch = settings.network_config.SLOTS_PER_EPOCH
     last_slot_id: int = (epoch * slots_per_epoch) + slots_per_epoch - 1
     metrics.slot_number.set(last_slot_id)
     for i in range(slots_per_epoch):

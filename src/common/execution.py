@@ -27,8 +27,8 @@ async def can_harvest(vault_address: ChecksumAddress) -> bool:
 
 
 async def check_hot_wallet_balance() -> None:
-    hot_wallet_min_balance = settings.NETWORK_CONFIG.HOT_WALLET_MIN_BALANCE
-    symbol = settings.NETWORK_CONFIG.SYMBOL
+    hot_wallet_min_balance = settings.network_config.HOT_WALLET_MIN_BALANCE
+    symbol = settings.network_config.SYMBOL
 
     if hot_wallet_min_balance <= 0:
         return
@@ -49,7 +49,7 @@ async def check_hot_wallet_balance() -> None:
 async def get_oracles() -> Oracles:
     """Fetches oracles config."""
     events = await keeper_contract.events.ConfigUpdated.get_logs(
-        fromBlock=settings.NETWORK_CONFIG.KEEPER_GENESIS_BLOCK
+        fromBlock=settings.network_config.KEEPER_GENESIS_BLOCK
     )
     if not events:
         raise ValueError('Failed to fetch IPFS hash of oracles config')
@@ -91,12 +91,12 @@ async def get_oracles() -> Oracles:
 async def get_last_rewards_update() -> RewardVoteInfo | None:
     """Fetches the last rewards update."""
     approx_blocks_per_month: int = int(
-        SECONDS_PER_MONTH // settings.NETWORK_CONFIG.SECONDS_PER_BLOCK
+        SECONDS_PER_MONTH // settings.network_config.SECONDS_PER_BLOCK
     )
     block_number = await execution_client.eth.get_block_number()  # type: ignore
     events = await keeper_contract.events.RewardsUpdated.get_logs(
         fromBlock=max(
-            int(settings.NETWORK_CONFIG.KEEPER_GENESIS_BLOCK),
+            int(settings.network_config.KEEPER_GENESIS_BLOCK),
             block_number - approx_blocks_per_month,
             0,
         ),

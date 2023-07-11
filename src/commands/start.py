@@ -218,8 +218,8 @@ async def main() -> None:
         return
 
     # load deposit data
-    deposit_data = load_deposit_data(settings.VAULT, settings.DEPOSIT_DATA_FILE)
-    logger.info('Loaded deposit data file %s', settings.DEPOSIT_DATA_FILE)
+    deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
+    logger.info('Loaded deposit data file %s', settings.deposit_data_file)
     # start operator tasks
 
     # periodically scan network validator updates
@@ -249,7 +249,7 @@ async def main() -> None:
                 await update_exit_signatures(keystores)
 
                 # submit harvest vault transaction
-                if settings.HARVEST_VAULT:
+                if settings.harvest_vault:
                     await harvest_vault_task()
 
             except Exception as exc:
@@ -257,7 +257,7 @@ async def main() -> None:
 
             block_processing_time = time.time() - start_time
             sleep_time = max(
-                int(settings.NETWORK_CONFIG.SECONDS_PER_BLOCK) - int(block_processing_time), 0
+                int(settings.network_config.SECONDS_PER_BLOCK) - int(block_processing_time), 0
             )
             await asyncio.sleep(sleep_time)
 
@@ -273,18 +273,18 @@ def log_start() -> None:
 
 
 def setup_sentry():
-    if settings.SENTRY_DSN:
+    if settings.sentry_dsn:
         # pylint: disable-next=import-outside-toplevel
         import sentry_sdk
 
-        sentry_sdk.init(settings.SENTRY_DSN, traces_sample_rate=0.1)
-        sentry_sdk.set_tag('network', settings.NETWORK)
-        sentry_sdk.set_tag('vault', settings.VAULT)
+        sentry_sdk.init(settings.sentry_dsn, traces_sample_rate=0.1)
+        sentry_sdk.set_tag('network', settings.network)
+        sentry_sdk.set_tag('vault', settings.vault)
 
 
 def setup_logging():
     logging.basicConfig(
         format='%(asctime)s %(levelname)-8s %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S',
-        level=settings.LOG_LEVEL,
+        level=settings.log_level,
     )

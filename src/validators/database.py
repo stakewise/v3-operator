@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class NetworkValidatorCrud:
     @property
     def NETWORK_VALIDATORS_TABLE(self) -> str:
-        return f'{settings.NETWORK}_network_validators'
+        return f'{settings.network}_network_validators'
 
     def save_network_validators(self, validators: list[NetworkValidator]) -> None:
         """Saves network validators."""

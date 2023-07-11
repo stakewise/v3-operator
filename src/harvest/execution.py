@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 @retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def submit_harvest_transaction(harvest_params: HarvestParams) -> None:
-    if settings.NETWORK not in ETH_NETWORKS:
+    if settings.network not in ETH_NETWORKS:
         raise NotImplementedError('networks other than Ethereum not supported')
 
     logger.info('Submitting harvest transaction...')

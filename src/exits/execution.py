@@ -15,12 +15,12 @@ async def submit_exit_signatures(
     approval: OraclesApproval,
 ) -> None:
     """Sends updateExitSignatures transaction to keeper contract"""
-    if settings.NETWORK not in ETH_NETWORKS:
+    if settings.network not in ETH_NETWORKS:
         raise NotImplementedError('networks other than Ethereum not supported')
 
     logger.info('Submitting UpdateExitSignatures transaction')
     tx = await keeper_contract.functions.updateExitSignatures(
-        settings.VAULT,
+        settings.vault,
         approval.ipfs_hash,
         approval.signatures,
     ).transact()  # type: ignore

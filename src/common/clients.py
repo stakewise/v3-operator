@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 class Database:
     def get_db_connection(self):
-        return sqlite3.connect(settings.DATABASE)
+        return sqlite3.connect(settings.database)
 
     def create_db_dir(self):
         settings.DATABASE.parent.mkdir(parents=True, exist_ok=True)
@@ -31,7 +31,7 @@ class Database:
 class ExecutionClient:
     @cached_property
     def client(self) -> Web3:
-        w3 = get_execution_client(settings.EXECUTION_ENDPOINTS)
+        w3 = get_execution_client(settings.execution_endpoints)
         # Account is required when emitting transactions.
         # For read-only queries account may be omitted.
         if hot_wallet.can_load():
@@ -51,7 +51,7 @@ class ExecutionClient:
 class ConsensusClient:
     @cached_property
     def client(self) -> ExtendedAsyncBeacon:
-        return get_consensus_client(settings.CONSENSUS_ENDPOINTS)
+        return get_consensus_client(settings.consensus_endpoints)
 
     def __getattr__(self, item):
         return getattr(self.client, item)
@@ -69,7 +69,7 @@ def retry_ipfs_exception(delay: int = DEFAULT_RETRY_TIME):
 class IpfsFetchRetryClient:
     @cached_property
     def client(self) -> IpfsFetchClient:
-        return IpfsFetchClient(endpoints=settings.IPFS_FETCH_ENDPOINTS)
+        return IpfsFetchClient(endpoints=settings.ipfs_fetch_endpoints)
 
     @retry_ipfs_exception(delay=DEFAULT_RETRY_TIME)
     async def fetch_bytes(self, ipfs_hash: str) -> bytes:
