@@ -25,7 +25,7 @@ class Database:
         return sqlite3.connect(settings.database)
 
     def create_db_dir(self):
-        settings.DATABASE.parent.mkdir(parents=True, exist_ok=True)
+        settings.database.parent.mkdir(parents=True, exist_ok=True)
 
 
 class ExecutionClient:

@@ -54,6 +54,7 @@ logger = logging.getLogger(__name__)
     envvar='MAX_FEE_PER_GAS_GWEI',
     help=f'Maximum fee per gas limit for transactions. '
     f'Default is {DEFAULT_MAX_FEE_PER_GAS_GWEI} Gwei.',
+    default=DEFAULT_MAX_FEE_PER_GAS_GWEI,
 )
 @click.option(
     '--hot-wallet-password-file',
@@ -104,12 +105,14 @@ logger = logging.getLogger(__name__)
     type=str,
     help=f'The prometheus metrics host. Default is {DEFAULT_METRICS_HOST}.',
     envvar='METRICS_HOST',
+    default=DEFAULT_METRICS_HOST,
 )
 @click.option(
     '--metrics-port',
     type=int,
     help=f'The prometheus metrics port. Default is {DEFAULT_METRICS_PORT}.',
     envvar='METRICS_PORT',
+    default=DEFAULT_METRICS_PORT,
 )
 @click.option(
     '-v',
@@ -170,10 +173,6 @@ def start(
     if network is None:
         vault_config.load()
         network = vault_config.network
-    elif vault_config.exists and vault_config.network != network:
-        raise click.ClickException(
-            f'Invalid vault network. Please use data-dir provided for {vault} init command.'
-        )
 
     settings.set(
         vault=vault,
