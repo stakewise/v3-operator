@@ -1,4 +1,3 @@
-from functools import cached_property
 from pathlib import Path
 
 from decouple import Csv
@@ -123,7 +122,7 @@ class Settings(metaclass=Singleton):
         )
         self.sentry_dsn = decouple_config('SENTRY_DSN', default='')
 
-    @cached_property
+    @property
     def network_config(self) -> NetworkConfig:
         return NETWORKS[self.network]
 
