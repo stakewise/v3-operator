@@ -15,7 +15,7 @@ class ContractWrapper:
 
     @property
     def contract_address(self) -> ChecksumAddress:
-        return getattr(settings.NETWORK_CONFIG, self.settings_key)
+        return getattr(settings.network_config, self.settings_key)
 
     @cached_property
     def contract(self) -> AsyncContract:
@@ -33,7 +33,7 @@ class VaultContract(ContractWrapper):
 
     @property
     def contract_address(self) -> ChecksumAddress:
-        return settings.VAULT
+        return settings.vault
 
 
 class ValidatorsRegistryContract(ContractWrapper):

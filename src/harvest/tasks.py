@@ -18,12 +18,12 @@ logger = logging.getLogger(__name__)
 async def harvest_vault() -> None:
     """Check vault state and send harvest transaction if needed."""
 
-    if not await can_harvest(settings.VAULT):
+    if not await can_harvest(settings.vault):
         return
 
     # check current gas prices
     max_fee_per_gas = await get_max_fee_per_gas()
-    if max_fee_per_gas >= Web3.to_wei(settings.MAX_FEE_PER_GAS_GWEI, 'gwei'):
+    if max_fee_per_gas >= Web3.to_wei(settings.max_fee_per_gas_gwei, 'gwei'):
         logging.warning(
             'Current gas price (%s gwei) is too high. '
             'Will try to harvest on the next block if the gas '
@@ -34,7 +34,7 @@ async def harvest_vault() -> None:
 
     last_rewards = await get_last_rewards_update()
     harvest_params = await fetch_harvest_params(
-        vault_address=settings.VAULT,
+        vault_address=settings.vault,
         ipfs_hash=last_rewards.ipfs_hash,
         rewards_root=last_rewards.rewards_root,
     )

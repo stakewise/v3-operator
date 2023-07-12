@@ -18,8 +18,8 @@ class HotWallet:
 
     @cached_property
     def account(self) -> LocalAccount:
-        keystore_file = settings.HOT_WALLET_FILE
-        keystore_password_file = settings.HOT_WALLET_PASSWORD_FILE
+        keystore_file = settings.hot_wallet_file
+        keystore_password_file = settings.hot_wallet_password_file
         if not os.path.isfile(keystore_file):
             raise ValueError(f"Can't open key file. Path: {keystore_file}")
         if not os.path.isfile(keystore_password_file):

@@ -11,7 +11,13 @@ import src
 from src.common.config import VaultConfig
 from src.common.metrics import metrics_server
 from src.common.validators import validate_eth_address
-from src.config.settings import AVAILABLE_NETWORKS, settings
+from src.config.settings import (
+    AVAILABLE_NETWORKS,
+    DEFAULT_MAX_FEE_PER_GAS_GWEI,
+    DEFAULT_METRICS_HOST,
+    DEFAULT_METRICS_PORT,
+    settings,
+)
 from src.exits.tasks import update_exit_signatures
 from src.harvest.tasks import harvest_vault as harvest_vault_task
 from src.startup_check import startup_checks
@@ -46,8 +52,9 @@ logger = logging.getLogger(__name__)
     '--max-fee-per-gas-gwei',
     type=int,
     envvar='MAX_FEE_PER_GAS_GWEI',
-    default=70,
-    help='Maximum fee per gas limit for transactions. Default is 70 Gwei.',
+    help=f'Maximum fee per gas limit for transactions. '
+    f'Default is {DEFAULT_MAX_FEE_PER_GAS_GWEI} Gwei.',
+    default=DEFAULT_MAX_FEE_PER_GAS_GWEI,
 )
 @click.option(
     '--hot-wallet-password-file',
@@ -96,16 +103,16 @@ logger = logging.getLogger(__name__)
 @click.option(
     '--metrics-host',
     type=str,
-    help='The prometheus metrics host. Default is 127.0.0.1.',
+    help=f'The prometheus metrics host. Default is {DEFAULT_METRICS_HOST}.',
     envvar='METRICS_HOST',
-    default='127.0.0.1',
+    default=DEFAULT_METRICS_HOST,
 )
 @click.option(
     '--metrics-port',
     type=int,
-    help='The prometheus metrics port. Default is 9100.',
+    help=f'The prometheus metrics port. Default is {DEFAULT_METRICS_PORT}.',
     envvar='METRICS_PORT',
-    default=9100,
+    default=DEFAULT_METRICS_PORT,
 )
 @click.option(
     '-v',
@@ -210,8 +217,8 @@ async def main() -> None:
         return
 
     # load deposit data
-    deposit_data = load_deposit_data(settings.VAULT, settings.DEPOSIT_DATA_FILE)
-    logger.info('Loaded deposit data file %s', settings.DEPOSIT_DATA_FILE)
+    deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
+    logger.info('Loaded deposit data file %s', settings.deposit_data_file)
     # start operator tasks
 
     # periodically scan network validator updates
@@ -241,7 +248,7 @@ async def main() -> None:
                 await update_exit_signatures(keystores)
 
                 # submit harvest vault transaction
-                if settings.HARVEST_VAULT:
+                if settings.harvest_vault:
                     await harvest_vault_task()
 
             except Exception as exc:
@@ -249,7 +256,7 @@ async def main() -> None:
 
             block_processing_time = time.time() - start_time
             sleep_time = max(
-                int(settings.NETWORK_CONFIG.SECONDS_PER_BLOCK) - int(block_processing_time), 0
+                int(settings.network_config.SECONDS_PER_BLOCK) - int(block_processing_time), 0
             )
             await asyncio.sleep(sleep_time)
 
@@ -265,18 +272,18 @@ def log_start() -> None:
 
 
 def setup_sentry():
-    if settings.SENTRY_DSN:
+    if settings.sentry_dsn:
         # pylint: disable-next=import-outside-toplevel
         import sentry_sdk
 
-        sentry_sdk.init(settings.SENTRY_DSN, traces_sample_rate=0.1)
-        sentry_sdk.set_tag('network', settings.NETWORK)
-        sentry_sdk.set_tag('vault', settings.VAULT)
+        sentry_sdk.init(settings.sentry_dsn, traces_sample_rate=0.1)
+        sentry_sdk.set_tag('network', settings.network)
+        sentry_sdk.set_tag('vault', settings.vault)
 
 
 def setup_logging():
     logging.basicConfig(
         format='%(asctime)s %(levelname)-8s %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S',
-        level=settings.LOG_LEVEL,
+        level=settings.log_level,
     )

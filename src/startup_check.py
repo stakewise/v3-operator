@@ -19,17 +19,17 @@ IPFS_HASH_EXAMPLE = 'QmawUdo17Fvo7xa6ARCUSMV1eoVwPtVuzx8L8Crj2xozWm'
 
 
 def validate_settings():
-    if not settings.EXECUTION_ENDPOINTS:
+    if not settings.execution_endpoints:
         raise ValueError('EXECUTION_ENDPOINTS is missing')
 
-    if not settings.CONSENSUS_ENDPOINTS:
+    if not settings.consensus_endpoints:
         raise ValueError('CONSENSUS_ENDPOINTS is missing')
 
 
 async def wait_for_consensus_node() -> None:
     done = False
     while True:
-        for consensus_endpoint in settings.CONSENSUS_ENDPOINTS:
+        for consensus_endpoint in settings.consensus_endpoints:
             try:
                 consensus_client = get_consensus_client([consensus_endpoint])
                 syncing = await consensus_client.get_syncing()
@@ -63,7 +63,7 @@ async def wait_for_consensus_node() -> None:
 async def wait_for_execution_node() -> None:
     done = False
     while True:
-        for execution_endpoint in settings.EXECUTION_ENDPOINTS:
+        for execution_endpoint in settings.execution_endpoints:
             try:
                 execution_client = get_execution_client([execution_endpoint])
 
@@ -115,19 +115,19 @@ async def collect_healthy_oracles() -> list:
 
 
 def wait_for_keystores_dir() -> None:
-    while not path.exists(settings.KEYSTORES_DIR):
+    while not path.exists(settings.keystores_dir):
         logger.warning(
             "Can't find keystores directory (%s)",
-            settings.KEYSTORES_DIR,
+            settings.keystores_dir,
         )
         time.sleep(15)
 
 
 async def wait_for_deposit_data_file() -> None:
-    while not path.exists(settings.DEPOSIT_DATA_FILE):
-        logger.warning("Can't find deposit data file (%s)", settings.DEPOSIT_DATA_FILE)
+    while not path.exists(settings.deposit_data_file):
+        logger.warning("Can't find deposit data file (%s)", settings.deposit_data_file)
         time.sleep(15)
-    deposit_data = load_deposit_data(settings.VAULT, settings.DEPOSIT_DATA_FILE)
+    deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
 
     while True:
         try:
@@ -136,7 +136,7 @@ async def wait_for_deposit_data_file() -> None:
         except RuntimeError as e:
             logger.warning(e)
             time.sleep(15)
-    logger.info('Found deposit data file %s', settings.DEPOSIT_DATA_FILE)
+    logger.info('Found deposit data file %s', settings.deposit_data_file)
 
 
 async def startup_checks():
@@ -150,7 +150,7 @@ async def startup_checks():
     db_client.create_db_dir()
     with db_client.get_db_connection() as conn:
         conn.cursor()
-    logger.info('Connected to database %s.', settings.DATABASE)
+    logger.info('Connected to database %s.', settings.database)
 
     logger.info('Checking connection to consensus nodes...')
     await wait_for_consensus_node()
@@ -160,7 +160,7 @@ async def startup_checks():
 
     logger.info('Checking connection to ipfs nodes...')
     healthy_ipfs_endpoint = []
-    for endpoint in settings.IPFS_FETCH_ENDPOINTS:
+    for endpoint in settings.ipfs_fetch_endpoints:
         client = IpfsFetchClient([endpoint])
         try:
             await client.fetch_json(IPFS_HASH_EXAMPLE)

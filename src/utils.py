@@ -16,7 +16,7 @@ def get_build_version() -> str | None:
 
 
 def log_verbose(e: Exception):
-    if settings.VERBOSE:
+    if settings.verbose:
         logger.exception(e)
     else:
         logger.error(e)

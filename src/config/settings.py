@@ -9,6 +9,10 @@ from src.config.networks import GOERLI, NETWORKS, NetworkConfig
 
 DATA_DIR = Path.home() / '.stakewise'
 
+DEFAULT_MAX_FEE_PER_GAS_GWEI = 70
+DEFAULT_METRICS_HOST = '127.0.0.1'
+DEFAULT_METRICS_PORT = 9100
+
 
 class Singleton(type):
     _instances: dict = {}
@@ -22,13 +26,15 @@ class Singleton(type):
 # pylint: disable-next=too-many-public-methods
 class Settings(metaclass=Singleton):
     vault: ChecksumAddress
+    vault_dir: Path
+    network: str
     consensus_endpoints: list[str]
     execution_endpoints: list[str]
+
     harvest_vault: bool
     verbose: bool
     metrics_host: str
     metrics_port: int
-    network: str
     deposit_data_file: Path
     keystores_dir: Path
     keystores_password_dir: Path
@@ -36,7 +42,7 @@ class Settings(metaclass=Singleton):
     hot_wallet_file: Path
     hot_wallet_password_file: Path
     max_fee_per_gas_gwei: int
-    database_file: Path
+    database: Path
     log_level: str
     ipfs_fetch_endpoints: list[str]
     validators_fetch_chunk_size: int
@@ -47,22 +53,25 @@ class Settings(metaclass=Singleton):
         self,
         vault: str,
         vault_dir: Path,
-        consensus_endpoints: str,
-        execution_endpoints: str,
-        harvest_vault: bool,
-        verbose: bool,
-        metrics_host: str,
-        metrics_port: int,
-        max_fee_per_gas_gwei: int,
         network: str,
-        deposit_data_file: str | None,
-        keystores_dir: str | None,
-        keystores_password_file: str | None,
-        hot_wallet_file: str | None,
-        hot_wallet_password_file: str | None,
-        database_dir: str | None,
+        consensus_endpoints: str = '',
+        execution_endpoints: str = '',
+        harvest_vault: bool = False,
+        verbose: bool = False,
+        metrics_port: int = DEFAULT_METRICS_PORT,
+        metrics_host: str = DEFAULT_METRICS_HOST,
+        max_fee_per_gas_gwei: int = DEFAULT_MAX_FEE_PER_GAS_GWEI,
+        deposit_data_file: str | None = None,
+        keystores_dir: str | None = None,
+        keystores_password_file: str | None = None,
+        hot_wallet_file: str | None = None,
+        hot_wallet_password_file: str | None = None,
+        database_dir: str | None = None,
     ):
         self.vault = Web3.to_checksum_address(vault)
+        self.vault_dir = vault_dir
+        self.network = network
+
         self.consensus_endpoints = [node.strip() for node in consensus_endpoints.split(',')]
         self.execution_endpoints = [node.strip() for node in execution_endpoints.split(',')]
         self.harvest_vault = harvest_vault
@@ -71,7 +80,6 @@ class Settings(metaclass=Singleton):
         self.metrics_port = metrics_port
         self.max_fee_per_gas_gwei = max_fee_per_gas_gwei
 
-        self.network = network
         self.deposit_data_file = (
             Path(deposit_data_file) if deposit_data_file else vault_dir / 'deposit_data.json'
         )
@@ -97,8 +105,9 @@ class Settings(metaclass=Singleton):
             if hot_wallet_password_file
             else vault_dir / 'wallet' / 'password.txt'
         )
+
         db_dir = Path(database_dir) if database_dir else vault_dir
-        self.database_file = db_dir / 'operator.db'
+        self.database = db_dir / 'operator.db'
 
         self.log_level = decouple_config('LOG_LEVEL', default='INFO')
         self.ipfs_fetch_endpoints = decouple_config(
@@ -114,88 +123,8 @@ class Settings(metaclass=Singleton):
         self.sentry_dsn = decouple_config('SENTRY_DSN', default='')
 
     @property
-    def VERBOSE(self) -> bool:
-        return self.verbose
-
-    @property
-    def LOG_LEVEL(self) -> str:
-        return self.log_level
-
-    @property
-    def NETWORK(self) -> str:
-        return self.network
-
-    @property
-    def NETWORK_CONFIG(self) -> NetworkConfig:
-        return NETWORKS[self.NETWORK]
-
-    @property
-    def EXECUTION_ENDPOINTS(self) -> list[str]:
-        return self.execution_endpoints
-
-    @property
-    def CONSENSUS_ENDPOINTS(self) -> list[str]:
-        return self.consensus_endpoints
-
-    @property
-    def IPFS_FETCH_ENDPOINTS(self) -> list[str]:
-        return self.ipfs_fetch_endpoints
-
-    @property
-    def VAULT(self) -> ChecksumAddress:
-        return self.vault
-
-    @property
-    def DATABASE(self) -> Path:
-        return self.database_file
-
-    @property
-    def KEYSTORES_DIR(self) -> Path:
-        return self.keystores_dir
-
-    @property
-    def KEYSTORES_PASSWORD_FILE(self) -> Path:
-        return self.keystores_password_file
-
-    @property
-    def KEYSTORES_PASSWORD_DIR(self) -> Path:
-        return self.keystores_password_dir
-
-    @property
-    def DEPOSIT_DATA_FILE(self) -> Path:
-        return self.deposit_data_file
-
-    @property
-    def HOT_WALLET_FILE(self) -> Path:
-        return self.hot_wallet_file
-
-    @property
-    def HOT_WALLET_PASSWORD_FILE(self) -> Path:
-        return self.hot_wallet_password_file
-
-    @property
-    def HARVEST_VAULT(self) -> bool:
-        return self.harvest_vault
-
-    @property
-    def MAX_FEE_PER_GAS_GWEI(self) -> int:
-        return self.max_fee_per_gas_gwei
-
-    @property
-    def VALIDATORS_FETCH_CHUNK_SIZE(self) -> int:
-        return self.validators_fetch_chunk_size
-
-    @property
-    def SENTRY_DSN(self) -> str | None:
-        return self.sentry_dsn
-
-    @property
-    def METRICS_HOST(self) -> str:
-        return self.metrics_host
-
-    @property
-    def METRICS_PORT(self) -> int:
-        return self.metrics_port
+    def network_config(self) -> NetworkConfig:
+        return NETWORKS[self.network]
 
 
 settings = Settings()

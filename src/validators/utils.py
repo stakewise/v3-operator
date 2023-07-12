@@ -111,9 +111,9 @@ async def send_approval_request(
 
 
 def list_keystore_files() -> list[KeystoreFile]:
-    keystores_dir = settings.KEYSTORES_DIR
-    keystores_password_dir = settings.KEYSTORES_PASSWORD_DIR
-    keystores_password_file = settings.KEYSTORES_PASSWORD_FILE
+    keystores_dir = settings.keystores_dir
+    keystores_password_dir = settings.keystores_password_dir
+    keystores_password_file = settings.keystores_password_file
 
     res: list[KeystoreFile] = []
     for f in listdir(keystores_dir):
@@ -134,7 +134,7 @@ def load_keystores() -> Keystores | None:
     """Extracts private keys from the keystores."""
 
     keystore_files = list_keystore_files()
-    logger.info('Loading keystores from %s...', settings.KEYSTORES_DIR)
+    logger.info('Loading keystores from %s...', settings.keystores_dir)
     with Pool() as pool:
         # pylint: disable-next=unused-argument
         def _stop_pool(*args, **kwargs):
@@ -143,7 +143,7 @@ def load_keystores() -> Keystores | None:
         results = [
             pool.apply_async(
                 _process_keystore_file,
-                (keystore_file, settings.KEYSTORES_DIR),
+                (keystore_file, settings.keystores_dir),
                 error_callback=_stop_pool,
             )
             for keystore_file in keystore_files
