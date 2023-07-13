@@ -6,7 +6,7 @@ import click
 import milagro_bls_binding as bls
 from eth_typing import BLSSignature, HexAddress, HexStr
 from sw_utils import ValidatorStatus
-from sw_utils.decorators import retry_aiohttp_errors
+from sw_utils.consensus import EXITED_STATUSES
 from sw_utils.exceptions import AiohttpRecoveredErrors
 from sw_utils.signing import get_exit_message_signing_root
 from sw_utils.typings import ConsensusFork
@@ -14,13 +14,9 @@ from web3 import Web3
 
 from src.common.clients import consensus_client
 from src.common.config import VaultConfig
+from src.common.consensus import get_validators
 from src.common.validators import validate_eth_address
-from src.config.settings import (
-    AVAILABLE_NETWORKS,
-    DEFAULT_RETRY_TIME,
-    NETWORKS,
-    settings,
-)
+from src.config.settings import AVAILABLE_NETWORKS, NETWORKS, settings
 from src.utils import log_verbose
 from src.validators.consensus import get_consensus_fork
 from src.validators.typings import BLSPrivkey, Keystores
@@ -34,13 +30,7 @@ class ExitKeystore:
     index: int
 
 
-EXITING_STATUSES = [
-    ValidatorStatus.ACTIVE_EXITING,
-    ValidatorStatus.EXITED_UNSLASHED,
-    ValidatorStatus.EXITED_SLASHED,
-    ValidatorStatus.WITHDRAWAL_POSSIBLE,
-    ValidatorStatus.WITHDRAWAL_DONE,
-]
+EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
 
 
 @click.option(
@@ -68,7 +58,7 @@ EXITING_STATUSES = [
 )
 @click.option(
     '--count',
-    help='The number of the validator to exit.',
+    help='The number of validators to exit.',
     type=click.IntRange(min=1),
 )
 @click.option(
@@ -175,7 +165,6 @@ def _get_exit_signature(
     return exit_signature
 
 
-@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def _get_validator_indexes(keystores: Keystores) -> list[ExitKeystore]:
     """Fetches validators indexes."""
     results = []
@@ -183,9 +172,7 @@ async def _get_validator_indexes(keystores: Keystores) -> list[ExitKeystore]:
     exited_statuses = [x.value for x in EXITING_STATUSES]
 
     for i in range(0, len(public_keys), settings.validators_fetch_chunk_size):
-        validators = await consensus_client.get_validators_by_ids(
-            public_keys[i : i + settings.validators_fetch_chunk_size]
-        )
+        validators = await get_validators(public_keys[i : i + settings.validators_fetch_chunk_size])
         for beacon_validator in validators['data']:
             if beacon_validator.get('status') in exited_statuses:
                 continue
