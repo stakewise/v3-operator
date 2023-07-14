@@ -32,19 +32,9 @@ class ContractWrapper:
     async def _get_last_event(
         self, f: Callable, current_block: BlockNumber, from_block: BlockNumber
     ) -> EventData | None:
-        @retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
-        async def _retry_f(
-            f: Callable, from_block: BlockNumber, to_block: BlockNumber
-        ) -> list[EventData]:
-            return await f(
-                fromBlock=from_block,
-                toBlock=to_block,
-            )
-
         blocks_range = int(43200 / float(settings.network_config.SECONDS_PER_BLOCK))  # 12 hrs
         while current_block > from_block:
-            events = await _retry_f(
-                f,
+            events = await f(
                 from_block=BlockNumber(max(current_block - blocks_range, from_block)),
                 to_block=current_block,
             )
@@ -71,10 +61,26 @@ class KeeperContract(ContractWrapper):
     abi_path = 'abi/IKeeper.json'
     settings_key = 'KEEPER_CONTRACT_ADDRESS'
 
+    @retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
+    async def get_config_updated_events(
+        self, from_block: BlockNumber, to_block: BlockNumber
+    ) -> list[EventData]:
+        return await keeper_contract.events.ConfigUpdated.get_logs(
+            fromBlock=from_block, toBlock=to_block
+        )
+
+    @retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
+    async def get_reward_updated_events(
+        self, from_block: BlockNumber, to_block: BlockNumber
+    ) -> list[EventData]:
+        return await keeper_contract.events.RewardsUpdated.get_logs(
+            fromBlock=from_block, toBlock=to_block
+        )
+
     async def get_config_updated_event(self) -> EventData | None:
         """Fetches the last oracles config updated event."""
         return await self._get_last_event(
-            keeper_contract.events.ConfigUpdated.get_logs,
+            self.get_config_updated_events,
             current_block=await execution_client.eth.get_block_number(),
             from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
         )
@@ -82,7 +88,7 @@ class KeeperContract(ContractWrapper):
     async def get_reward_updated_event(self) -> EventData | None:
         """Fetches the last oracles config updated event."""
         return await self._get_last_event(
-            keeper_contract.events.RewardsUpdated.get_logs,
+            self.get_reward_updated_events,
             current_block=await execution_client.eth.get_block_number(),
             from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
         )
