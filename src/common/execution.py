@@ -2,14 +2,14 @@ import logging
 
 from sw_utils.decorators import retry_aiohttp_errors
 from web3 import Web3
-from web3.types import ChecksumAddress, EventData, Wei
+from web3.types import ChecksumAddress, Wei
 
 from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.contracts import keeper_contract
 from src.common.metrics import metrics
 from src.common.typings import Oracles, RewardVoteInfo
 from src.common.wallet import hot_wallet
-from src.config.settings import DEFAULT_RETRY_TIME, settings
+from src.config.settings import settings
 
 SECONDS_PER_MONTH: int = 2628000
 
@@ -45,20 +45,17 @@ async def check_hot_wallet_balance() -> None:
         )
 
 
-@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def get_oracles() -> Oracles:
     """Fetches oracles config."""
-    events = await keeper_contract.events.ConfigUpdated.get_logs(
-        fromBlock=settings.network_config.KEEPER_GENESIS_BLOCK
-    )
-    if not events:
+    event = await keeper_contract.get_config_updated_event()
+    if not event:
         raise ValueError('Failed to fetch IPFS hash of oracles config')
 
     # fetch IPFS record
-    ipfs_hash = events[-1]['args']['configIpfsHash']
+    ipfs_hash = event['args']['configIpfsHash']
     config: dict = await ipfs_fetch_client.fetch_json(ipfs_hash)  # type: ignore
-    rewards_threshold = await keeper_contract.functions.rewardsMinOracles().call()
-    validators_threshold = await keeper_contract.functions.validatorsMinOracles().call()
+    rewards_threshold = await keeper_contract.get_rewards_min_oracles()
+    validators_threshold = await keeper_contract.get_validators_min_oracles()
     endpoints = []
     public_keys = []
     for oracle in config['oracles']:
@@ -93,27 +90,11 @@ async def get_oracles() -> Oracles:
     )
 
 
-@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def get_last_rewards_update() -> RewardVoteInfo | None:
     """Fetches the last rewards update."""
-    approx_blocks_per_month: int = int(
-        SECONDS_PER_MONTH // settings.network_config.SECONDS_PER_BLOCK
-    )
-    block_number = await execution_client.eth.get_block_number()  # type: ignore
-    events = await keeper_contract.events.RewardsUpdated.get_logs(
-        fromBlock=max(
-            int(settings.network_config.KEEPER_GENESIS_BLOCK),
-            block_number - approx_blocks_per_month,
-            0,
-        ),
-        toBlock=block_number,
-    )
-    if not events:
+    last_event = await keeper_contract.get_reward_updated_event()
+    if not last_event:
         return None
-
-    last_event: EventData = events[-1]
-
-    metrics.block_number.set(block_number)
 
     voting_info = RewardVoteInfo(
         ipfs_hash=last_event['args']['rewardsIpfsHash'],

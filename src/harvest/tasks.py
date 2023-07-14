@@ -33,6 +33,8 @@ async def harvest_vault() -> None:
         return
 
     last_rewards = await get_last_rewards_update()
+    if not last_rewards:
+        return
     harvest_params = await fetch_harvest_params(
         vault_address=settings.vault,
         ipfs_hash=last_rewards.ipfs_hash,

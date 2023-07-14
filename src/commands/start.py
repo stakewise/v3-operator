@@ -8,8 +8,9 @@ from eth_typing import ChecksumAddress
 from sw_utils import EventScanner, InterruptHandler
 
 import src
+from src.common.clients import execution_client
 from src.common.config import VaultConfig
-from src.common.metrics import metrics_server
+from src.common.metrics import metrics, metrics_server
 from src.common.validators import validate_eth_address
 from src.config.settings import (
     AVAILABLE_NETWORKS,
@@ -250,6 +251,9 @@ async def main() -> None:
                 # submit harvest vault transaction
                 if settings.harvest_vault:
                     await harvest_vault_task()
+
+                # update metrics
+                metrics.block_number.set(await execution_client.eth.get_block_number())
 
             except Exception as exc:
                 log_verbose(exc)
