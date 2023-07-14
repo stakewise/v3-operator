@@ -109,7 +109,7 @@ async def main(count: int) -> None:
         raise click.ClickException('Keystores not found.')
     fork = await get_consensus_fork()
 
-    exit_keystores = await _get_validator_indexes(keystores)
+    exit_keystores = await _get_exit_keystores(keystores)
     if not exit_keystores:
         raise click.ClickException('There are no active validators.')
 
@@ -119,7 +119,7 @@ async def main(count: int) -> None:
         exit_keystores = exit_keystores[:count]
 
     click.confirm(
-        f'You are going to withdrawal {len(exit_keystores)} validators '
+        f'You are going to exit {len(exit_keystores)} validators '
         f'with indexes: {", ".join(str(x.index) for x in exit_keystores)}',
         abort=True,
     )
@@ -165,8 +165,8 @@ def _get_exit_signature(
     return exit_signature
 
 
-async def _get_validator_indexes(keystores: Keystores) -> list[ExitKeystore]:
-    """Fetches validators indexes."""
+async def _get_exit_keystores(keystores: Keystores) -> list[ExitKeystore]:
+    """Fetches validators consensus info."""
     results = []
     public_keys = list(keystores.keys())
     exited_statuses = [x.value for x in EXITING_STATUSES]
