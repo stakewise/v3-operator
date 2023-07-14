@@ -29,26 +29,29 @@ class ContractWrapper:
     def __getattr__(self, item):
         return getattr(self.contract, item)
 
-    @retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
     async def _get_last_event(
         self, f: Callable, current_block: BlockNumber, from_block: BlockNumber
     ) -> EventData | None:
-        if current_block <= from_block:
-            return None
+        @retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
+        async def _retry_f(
+            f: Callable, from_block: BlockNumber, to_block: BlockNumber
+        ) -> list[EventData]:
+            return await f(
+                fromBlock=from_block,
+                toBlock=to_block,
+            )
 
         blocks_range = int(43200 / float(settings.network_config.SECONDS_PER_BLOCK))  # 12 hrs
-
-        events = await f(
-            fromBlock=current_block - blocks_range
-            if current_block - blocks_range > from_block
-            else from_block,
-            toBlock=current_block,
-        )
-        if events:
-            return events[-1]
-        return await self._get_last_event(
-            f, BlockNumber(current_block - blocks_range - 1), from_block
-        )
+        while current_block > from_block:
+            events = await _retry_f(
+                f,
+                from_block=BlockNumber(max(current_block - blocks_range, from_block)),
+                to_block=current_block,
+            )
+            if events:
+                return events[-1]
+            current_block = BlockNumber(current_block - blocks_range - 1)
+        return None
 
 
 class VaultContract(ContractWrapper):
