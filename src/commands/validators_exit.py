@@ -80,7 +80,7 @@ EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
 def validators_exit(
     network: str,
     vault: HexAddress,
-    count: int,
+    count: int | None,
     consensus_endpoints: str,
     data_dir: str,
     verbose: bool,
@@ -103,7 +103,7 @@ def validators_exit(
         log_verbose(e)
 
 
-async def main(count: int) -> None:
+async def main(count: int | None) -> None:
     keystores = load_keystores()
     if not keystores:
         raise click.ClickException('Keystores not found.')
@@ -119,8 +119,8 @@ async def main(count: int) -> None:
         exit_keystores = exit_keystores[:count]
 
     click.confirm(
-        f'You are going to exit {len(exit_keystores)} validators '
-        f'with indexes: {", ".join(str(x.index) for x in exit_keystores)}',
+        f'Are you sure you want to exit {len(exit_keystores)} validators '
+        f'with indexes: {", ".join(str(x.index) for x in exit_keystores)}?',
         abort=True,
     )
     exited_indexes = []
@@ -139,7 +139,7 @@ async def main(count: int) -> None:
             )
             exited_indexes.append(keystore.index)
         except AiohttpRecoveredErrors as e:
-            click.echo(e)
+            raise click.ClickException(f'Consensus error: {e}')
     if exited_indexes:
         click.secho(
             f'Validators {", ".join(str(index) for index in exited_indexes)} '
