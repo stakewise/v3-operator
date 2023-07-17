@@ -266,6 +266,33 @@ export $(grep -v '^#' .env | xargs)
 ./operator start
 ```
 
+## Misc commnads
+
+### Validators voluntary exit
+
+Performs a voluntary exit for active vault validators.
+
+```bash
+./operator validator-exit
+```
+
+```
+Enter the comma separated list of API endpoints for consensus nodes: https://example.com
+Enter your vault address: 0x3320ad928c20187602a2b2c04eeaa813fa899468
+Are you sure you want to exit 3 validators with indexes: 513571, 513572, 513861? [y/N]: y
+Validators 513571, 513572, 513861 exits successfully initiated
+```
+
+#### Options:
+
+- `--network` - The network of your vault.
+- `--vault` - The vault address.
+- `--consensus-endpoints` - Comma separated list of API endpoints for consensus nodes.
+- `--count` - The number of validators to exit. By default, command will force exit all active vault validators.
+- `--data-dir` - Path where the vault data will be placed. Default is ~/.stakewise.
+- `--verbose` - Enable debug mode. Default is false.
+
+
 ## Monitoring Operator with Prometheus
 
 Operator supports monitoring using Prometheus by providing a `/metrics` endpoint that Prometheus can scrape to gather
