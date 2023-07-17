@@ -139,7 +139,7 @@ async def main(count: int | None) -> None:
             )
             exited_indexes.append(keystore.index)
         except AiohttpRecoveredErrors as e:
-            raise click.ClickException(f'Consensus error: {e}')
+            raise click.ClickException(f'Consensus client error: {e}')
     if exited_indexes:
         click.secho(
             f'Validators {", ".join(str(index) for index in exited_indexes)} '
