@@ -11,6 +11,7 @@ from src.commands.get_validators_root import get_validators_root
 from src.commands.init import init
 from src.commands.merge_deposit_data import merge_deposit_data
 from src.commands.start import start
+from src.commands.validators_exit import validators_exit
 
 
 @click.group()
@@ -22,6 +23,7 @@ cli.add_command(init)
 cli.add_command(create_keys)
 cli.add_command(create_wallet)
 cli.add_command(merge_deposit_data)
+cli.add_command(validators_exit)
 cli.add_command(start)
 cli.add_command(get_validators_root)
 
