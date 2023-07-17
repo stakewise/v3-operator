@@ -288,7 +288,7 @@ Validators 513571, 513572, 513861 exits successfully initiated
 - `--network` - The network of your vault.
 - `--vault` - The vault address.
 - `--consensus-endpoints` - Comma separated list of API endpoints for consensus nodes.
-- `--count` - The number of validators to exit. By default, command will force exit for all active vault validators.
+- `--count` - The number of validators to exit. By default, command will force exit all active vault validators.
 - `--data-dir` - Path where the vault data will be placed. Default is ~/.stakewise.
 - `--verbose` - Enable debug mode. Default is false.
 
