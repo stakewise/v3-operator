@@ -1,4 +1,5 @@
 import logging
+import statistics
 
 from sw_utils.decorators import retry_aiohttp_errors
 from web3 import Web3
@@ -104,8 +105,29 @@ async def get_last_rewards_update() -> RewardVoteInfo | None:
 
 
 async def get_max_fee_per_gas() -> Wei:
-    priority_fee = await execution_client.eth.max_priority_fee  # type: ignore
+    priority_fee = await calculate_median_priority_fee()  # type: ignore
     latest_block = await execution_client.eth.get_block('latest')  # type: ignore
     base_fee = latest_block['baseFeePerGas']
     max_fee_per_gas = priority_fee + 2 * base_fee
     return Wei(max_fee_per_gas)
+
+
+async def calculate_median_priority_fee(block_id='latest') -> Wei:
+    try:
+        latest = await execution_client.eth.get_block(block_id)
+
+        # collect maxPriorityFeePerGas for all transactions in the block
+        priority_fees = []
+        for tx_hash in latest.transactions:
+            tx = await execution_client.eth.get_transaction(tx_hash)
+            if 'maxPriorityFeePerGas' in tx:
+                print(tx.maxPriorityFeePerGas)
+                priority_fees.append(tx.maxPriorityFeePerGas)
+
+        # calculate the median priority fee
+        median_priority_fee = statistics.median(priority_fees)
+
+    except statistics.StatisticsError:
+        return await calculate_median_priority_fee(latest['number'] - 1)
+
+    return Wei(median_priority_fee)
