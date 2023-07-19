@@ -112,7 +112,7 @@ async def get_max_fee_per_gas() -> Wei:
     return Wei(max_fee_per_gas)
 
 
-async def calculate_median_priority_fee(block_id: str ='latest') -> Wei:
+async def calculate_median_priority_fee(block_id: str = 'latest') -> Wei:
     block = await execution_client.eth.get_block(block_id)
 
     # collect maxPriorityFeePerGas for all transactions in the block
