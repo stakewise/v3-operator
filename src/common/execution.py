@@ -120,7 +120,6 @@ async def calculate_median_priority_fee(block_id='latest') -> Wei:
     for tx_hash in latest.transactions:
         tx = await execution_client.eth.get_transaction(tx_hash)
         if 'maxPriorityFeePerGas' in tx:
-            print(tx.maxPriorityFeePerGas)
             priority_fees.append(tx.maxPriorityFeePerGas)
 
     if not priority_fees:
