@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import socket
 import time
 from os import path
 
@@ -114,6 +115,21 @@ async def collect_healthy_oracles() -> list:
     return healthy_oracles
 
 
+def check_metrics_port() -> None:
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    while True:
+        result = sock.connect_ex((settings.metrics_host, settings.metrics_port))
+        if result != 0:
+            break
+        logger.warning(
+            "Can't start metrics server at %s:%s. Port is busy. Retrying in 10 seconds...",
+            settings.metrics_host,
+            settings.metrics_port,
+        )
+        time.sleep(10)
+    sock.close()
+
+
 def wait_for_keystores_dir() -> None:
     while not path.exists(settings.keystores_dir):
         logger.warning(
@@ -173,6 +189,9 @@ async def startup_checks():
     logger.info('Checking connection to oracles set...')
     healthy_oracles = await collect_healthy_oracles()
     logger.info('Connected to oracles at %s', ', '.join(healthy_oracles))
+
+    logger.info('Checking metrics server...')
+    check_metrics_port()
 
     logger.info('Checking deposit data file...')
     await wait_for_deposit_data_file()
