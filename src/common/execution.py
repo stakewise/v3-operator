@@ -113,21 +113,20 @@ async def get_max_fee_per_gas() -> Wei:
 
 
 async def calculate_median_priority_fee(block_id='latest') -> Wei:
-    try:
-        latest = await execution_client.eth.get_block(block_id)
+    latest = await execution_client.eth.get_block(block_id)
 
-        # collect maxPriorityFeePerGas for all transactions in the block
-        priority_fees = []
-        for tx_hash in latest.transactions:
-            tx = await execution_client.eth.get_transaction(tx_hash)
-            if 'maxPriorityFeePerGas' in tx:
-                print(tx.maxPriorityFeePerGas)
-                priority_fees.append(tx.maxPriorityFeePerGas)
+    # collect maxPriorityFeePerGas for all transactions in the block
+    priority_fees = []
+    for tx_hash in latest.transactions:
+        tx = await execution_client.eth.get_transaction(tx_hash)
+        if 'maxPriorityFeePerGas' in tx:
+            print(tx.maxPriorityFeePerGas)
+            priority_fees.append(tx.maxPriorityFeePerGas)
 
-        # calculate the median priority fee
-        median_priority_fee = statistics.median(priority_fees)
-
-    except statistics.StatisticsError:
+    if not priority_fees:
         return await calculate_median_priority_fee(latest['number'] - 1)
+
+    # calculate the median priority fee
+    median_priority_fee = statistics.median(priority_fees)
 
     return Wei(median_priority_fee)
