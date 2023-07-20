@@ -3,6 +3,7 @@ import statistics
 
 from sw_utils.decorators import retry_aiohttp_errors
 from web3 import Web3
+from web3.exceptions import MethodUnavailable
 from web3.types import ChecksumAddress, Wei
 
 from src.common.clients import execution_client, ipfs_fetch_client
@@ -105,7 +106,10 @@ async def get_last_rewards_update() -> RewardVoteInfo | None:
 
 
 async def get_max_fee_per_gas() -> Wei:
-    priority_fee = await calculate_median_priority_fee()  # type: ignore
+    try:
+        priority_fee = await execution_client.eth.max_priority_fee  # type: ignore
+    except MethodUnavailable:
+        priority_fee = await calculate_median_priority_fee()  # type: ignore
     latest_block = await execution_client.eth.get_block('latest')  # type: ignore
     base_fee = latest_block['baseFeePerGas']
     max_fee_per_gas = priority_fee + 2 * base_fee
