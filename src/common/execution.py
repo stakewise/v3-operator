@@ -5,7 +5,7 @@ from eth_typing import HexStr
 from sw_utils.decorators import retry_aiohttp_errors
 from web3 import Web3
 from web3.exceptions import MethodUnavailable
-from web3.types import ChecksumAddress, TxData, Wei
+from web3.types import BlockData, ChecksumAddress, TxData, Wei
 
 from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.contracts import keeper_contract
@@ -111,19 +111,19 @@ async def get_max_fee_per_gas() -> Wei:
         priority_fee = await execution_client.eth.max_priority_fee  # type: ignore
     except MethodUnavailable:
         priority_fee = await calculate_median_priority_fee()  # type: ignore
-    latest_block = await execution_client.eth.get_block('latest')  # type: ignore
+    latest_block = await eth_get_block()  # type: ignore
     base_fee = latest_block['baseFeePerGas']
     max_fee_per_gas = priority_fee + 2 * base_fee
     return Wei(max_fee_per_gas)
 
 
 async def calculate_median_priority_fee(block_id: str = 'latest') -> Wei:
-    block = await execution_client.eth.get_block(block_id)
+    block = await eth_get_block(block_id)
 
     # collect maxPriorityFeePerGas for all transactions in the block
     priority_fees = []
     for tx_hash in block.transactions:
-        tx = await execution_client.eth.get_transaction(HexStr(tx_hash))
+        tx = await eth_get_transaction(HexStr(tx_hash))
         if 'maxPriorityFeePerGas' in tx:
             priority_fees.append(tx.maxPriorityFeePerGas)
 
@@ -131,6 +131,11 @@ async def calculate_median_priority_fee(block_id: str = 'latest') -> Wei:
         return await calculate_median_priority_fee(block['number'] - 1)
 
     return Wei(statistics.median(priority_fees))
+
+
+@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
+async def eth_get_block(block_id: str = 'latest') -> BlockData:
+    return await execution_client.eth.get_block(block_id)
 
 
 @retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
