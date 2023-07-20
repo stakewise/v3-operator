@@ -105,6 +105,7 @@ async def get_last_rewards_update() -> RewardVoteInfo | None:
     return voting_info
 
 
+@retry_aiohttp_errors(delay=300)
 async def get_max_fee_per_gas() -> Wei:
     try:
         priority_fee = await execution_client.eth.max_priority_fee  # type: ignore
