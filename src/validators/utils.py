@@ -7,9 +7,8 @@ from os import listdir
 from os.path import isfile, join
 from pathlib import Path
 
-import aiohttp
 import milagro_bls_binding as bls
-from aiohttp import ClientError
+from aiohttp import ClientError, ClientSession, ClientTimeout
 from eth_typing import ChecksumAddress, HexAddress, HexStr
 from eth_utils import add_0x_prefix
 from multiproof import StandardMerkleTree
@@ -19,7 +18,7 @@ from sw_utils.decorators import retry_aiohttp_errors
 from web3 import Web3
 
 from src.common.typings import Oracles
-from src.config.settings import DEFAULT_RETRY_TIME, settings
+from src.config.settings import DEFAULT_RETRY_TIME, ORACLES_VALIDATORS_TIMEOUT, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import (
     KeystoreException,
@@ -51,7 +50,7 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
 
     ipfs_hashes = []
     responses: dict[ChecksumAddress, bytes] = {}
-    async with aiohttp.ClientSession() as session:
+    async with ClientSession(timeout=ClientTimeout(ORACLES_VALIDATORS_TIMEOUT)) as session:
         results = await asyncio.gather(
             *[
                 send_approval_request(session=session, endpoint=endpoint, payload=payload)
@@ -85,7 +84,7 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
 
 @retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def send_approval_request(
-    session: aiohttp.ClientSession, endpoint: str, payload: dict
+    session: ClientSession, endpoint: str, payload: dict
 ) -> OracleApproval:
     """Requests approval from single oracle."""
     try:
