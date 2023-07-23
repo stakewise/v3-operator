@@ -13,12 +13,11 @@ from sw_utils.typings import ConsensusFork
 from web3 import Web3
 
 from src.common.clients import consensus_client
-from src.common.consensus import get_validators
+from src.common.consensus import get_consensus_fork, get_validators
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
 from src.config.settings import AVAILABLE_NETWORKS, NETWORKS, settings
-from src.validators.consensus import get_consensus_fork
 from src.validators.typings import BLSPrivkey, Keystores
 from src.validators.utils import load_keystores
 

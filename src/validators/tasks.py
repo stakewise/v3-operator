@@ -4,13 +4,13 @@ from web3 import Web3
 from web3.types import BlockNumber, Wei
 
 from src.common.clients import ipfs_fetch_client
+from src.common.consensus import get_consensus_fork
 from src.common.execution import check_gas_price, check_hot_wallet_balance, get_oracles
 from src.common.metrics import metrics
 from src.common.typings import Oracles
 from src.common.utils import MGNO_RATE, WAD
 from src.config.networks import GNOSIS
 from src.config.settings import DEPOSIT_AMOUNT, settings
-from src.validators.consensus import get_consensus_fork
 from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import (
     get_available_validators,
