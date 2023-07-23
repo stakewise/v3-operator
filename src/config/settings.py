@@ -23,7 +23,7 @@ class Singleton(type):
         return cls._instances[cls]
 
 
-# pylint: disable-next=too-many-public-methods
+# pylint: disable-next=too-many-public-methods,too-many-instance-attributes
 class Settings(metaclass=Singleton):
     vault: ChecksumAddress
     vault_dir: Path

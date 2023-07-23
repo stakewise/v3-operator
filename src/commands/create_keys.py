@@ -95,11 +95,11 @@ def _export_deposit_data_json(credentials: list[Credential], filename: str) -> s
         label='Generating deposit data JSON\t\t',
         show_percent=False,
         show_pos=True,
-    ) as bar, Pool() as pool:
+    ) as progress_bar, Pool() as pool:
         results = [
             pool.apply_async(
                 cred.deposit_datum_dict,
-                callback=lambda x: bar.update(1),
+                callback=lambda x: progress_bar.update(1),
             )
             for cred in credentials
         ]
@@ -127,7 +127,7 @@ def _export_keystores(
         label='Exporting validator keystores\t\t',
         show_percent=False,
         show_pos=True,
-    ) as bar, Pool() as pool:
+    ) as progress_bar, Pool() as pool:
         results = [
             pool.apply_async(
                 cred.save_signing_keystore,
@@ -136,7 +136,7 @@ def _export_keystores(
                     'folder': keystores_dir,
                     'per_keystore_password': per_keystore_password,
                 },
-                callback=lambda x: bar.update(1),
+                callback=lambda x: progress_bar.update(1),
             )
             for cred in credentials
         ]

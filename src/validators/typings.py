@@ -42,12 +42,6 @@ class OraclesApproval:
 
 
 @dataclass
-class OracleApproval:
-    signature: bytes
-    ipfs_hash: str
-
-
-@dataclass
 class ApprovalRequest:
     validator_index: int
     vault_address: ChecksumAddress

@@ -14,12 +14,6 @@ class OraclesApproval:
 
 
 @dataclass
-class OracleApproval:
-    signature: bytes
-    ipfs_hash: str
-
-
-@dataclass
 class SignatureRotationRequest:
     vault_address: ChecksumAddress
     public_keys: list[HexStr]

@@ -4,6 +4,7 @@ import src
 from src.config.settings import settings
 
 
+# pylint: disable-next=too-few-public-methods
 class Metrics:
     def __init__(self):
         self.app_version = Info('app_version', 'V3 Operator version')

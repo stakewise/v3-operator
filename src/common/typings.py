@@ -39,3 +39,9 @@ class HarvestParams:
     reward: Wei
     unlocked_mev_reward: Wei
     proof: list[bytes]
+
+
+@dataclass
+class OracleApproval:
+    signature: bytes
+    ipfs_hash: str

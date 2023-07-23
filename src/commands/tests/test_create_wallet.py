@@ -6,7 +6,7 @@ from eth_account import Account
 from sw_utils.tests.factories import faker
 
 from src.commands.create_wallet import create_wallet
-from src.commands.init import init
+from src.commands.tests.common import generate_mnemonic
 from src.config.settings import DATA_DIR
 
 
@@ -16,17 +16,8 @@ class TestCreateWallet(unittest.TestCase):
         vault_dir = f'{DATA_DIR}/{vault.lower()}'
         runner = CliRunner()
         with runner.isolated_filesystem():
-            args_init = [
-                '--language',
-                'english',
-                '--no-verify',
-                '--vault',
-                vault,
-                '--network',
-                'goerli',
-            ]
-            init_result = runner.invoke(init, args_init)
-            mnemonic = init_result.output.strip()
+            mnemonic = generate_mnemonic(runner=runner, vault=vault)
+
             Account.enable_unaudited_hdwallet_features()
             account = Account().from_mnemonic(mnemonic=mnemonic)
             result = runner.invoke(create_wallet, ['--mnemonic', f'"{mnemonic}"', '--vault', vault])

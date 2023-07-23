@@ -85,6 +85,7 @@ def validators_exit(
     data_dir: str,
     verbose: bool,
 ) -> None:
+    # pylint: disable=duplicate-code
     vault_config = VaultConfig(vault, Path(data_dir))
     if network is None:
         vault_config.load()

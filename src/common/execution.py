@@ -106,18 +106,32 @@ async def get_last_rewards_update() -> RewardVoteInfo | None:
     return voting_info
 
 
-async def get_max_fee_per_gas() -> Wei:
+async def check_gas_price() -> bool:
+    max_fee_per_gas = await _get_max_fee_per_gas()
+    if max_fee_per_gas >= Web3.to_wei(settings.max_fee_per_gas_gwei, 'gwei'):
+        logging.warning(
+            'Current gas price (%s gwei) is too high. '
+            'Will try to harvest on the next block if the gas '
+            'price is acceptable.',
+            Web3.from_wei(max_fee_per_gas, 'gwei'),
+        )
+        return False
+
+    return True
+
+
+async def _get_max_fee_per_gas() -> Wei:
     try:
         priority_fee = await execution_client.eth.max_priority_fee  # type: ignore
     except MethodUnavailable:
-        priority_fee = await calculate_median_priority_fee()  # type: ignore
+        priority_fee = await _calculate_median_priority_fee()  # type: ignore
     latest_block = await eth_get_block()  # type: ignore
     base_fee = latest_block['baseFeePerGas']
     max_fee_per_gas = priority_fee + 2 * base_fee
     return Wei(max_fee_per_gas)
 
 
-async def calculate_median_priority_fee(block_id: str = 'latest') -> Wei:
+async def _calculate_median_priority_fee(block_id: str = 'latest') -> Wei:
     block = await eth_get_block(block_id)
 
     # collect maxPriorityFeePerGas for all transactions in the block
@@ -128,7 +142,7 @@ async def calculate_median_priority_fee(block_id: str = 'latest') -> Wei:
             priority_fees.append(tx.maxPriorityFeePerGas)
 
     if not priority_fees:
-        return await calculate_median_priority_fee(block['number'] - 1)
+        return await _calculate_median_priority_fee(block['number'] - 1)
 
     return Wei(statistics.median(priority_fees))
 

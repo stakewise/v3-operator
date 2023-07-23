@@ -16,6 +16,7 @@ GNO_NETWORKS = [GNOSIS]
 
 
 @dataclass
+# pylint: disable-next=too-many-instance-attributes
 class NetworkConfig:
     SYMBOL: str
     VALIDATORS_REGISTRY_CONTRACT_ADDRESS: ChecksumAddress  # consensus deposit contract
