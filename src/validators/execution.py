@@ -256,7 +256,7 @@ async def register_single_validator(
 
     credentials = get_eth1_withdrawal_credentials(settings.vault)
     tx_validator = _encode_tx_validator(credentials, validator)
-    proof = tree.get_proof([tx_validator, validator.deposit_data_index])  # type: ignore
+    proof = tree.get_proof([tx_validator, validator.deposit_data_index])
 
     logger.info('Submitting registration transaction')
     register_call_args = [
@@ -273,16 +273,12 @@ async def register_single_validator(
             fn_name='registerValidator',
             args=register_call_args,
         )
-        tx = await vault_contract.functions.multicall(
-            [update_state_call, register_call]
-        ).transact()  # type: ignore
+        tx = await vault_contract.functions.multicall([update_state_call, register_call]).transact()
     else:
-        tx = await vault_contract.functions.registerValidator(
-            *register_call_args
-        ).transact()  # type: ignore
+        tx = await vault_contract.functions.registerValidator(*register_call_args).transact()
 
     logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
-    await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
+    await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)
 
 
 # pylint: disable-next=too-many-locals
@@ -325,16 +321,12 @@ async def register_multiple_validator(
             fn_name='registerValidators',
             args=register_call_args,
         )
-        tx = await vault_contract.functions.multicall(
-            [update_call, register_call]
-        ).transact()  # type: ignore
+        tx = await vault_contract.functions.multicall([update_call, register_call]).transact()
     else:
-        tx = await vault_contract.functions.registerValidators(
-            *register_call_args
-        ).transact()  # type: ignore
+        tx = await vault_contract.functions.registerValidators(*register_call_args).transact()
 
     logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
-    await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
+    await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)
 
 
 def _encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) -> bytes:

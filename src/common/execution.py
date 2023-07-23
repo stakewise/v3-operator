@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 @retry_aiohttp_errors(delay=300)
 async def get_hot_wallet_balance() -> Wei:
-    return await execution_client.eth.get_balance(hot_wallet.address)  # type: ignore
+    return await execution_client.eth.get_balance(hot_wallet.address)
 
 
 @retry_aiohttp_errors(delay=300)
@@ -56,7 +56,7 @@ async def get_oracles() -> Oracles:
 
     # fetch IPFS record
     ipfs_hash = event['args']['configIpfsHash']
-    config: dict = await ipfs_fetch_client.fetch_json(ipfs_hash)  # type: ignore
+    config: dict = await ipfs_fetch_client.fetch_json(ipfs_hash)
     rewards_threshold = await keeper_contract.get_rewards_min_oracles()
     validators_threshold = await keeper_contract.get_validators_min_oracles()
     endpoints = []
@@ -122,10 +122,10 @@ async def check_gas_price() -> bool:
 
 async def _get_max_fee_per_gas() -> Wei:
     try:
-        priority_fee = await execution_client.eth.max_priority_fee  # type: ignore
+        priority_fee = await execution_client.eth.max_priority_fee
     except MethodUnavailable:
-        priority_fee = await _calculate_median_priority_fee()  # type: ignore
-    latest_block = await eth_get_block()  # type: ignore
+        priority_fee = await _calculate_median_priority_fee()
+    latest_block = await eth_get_block()
     base_fee = latest_block['baseFeePerGas']
     max_fee_per_gas = priority_fee + 2 * base_fee
     return Wei(max_fee_per_gas)

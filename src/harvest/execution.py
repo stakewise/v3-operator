@@ -25,6 +25,6 @@ async def submit_harvest_transaction(harvest_params: HarvestParams) -> None:
             harvest_params.unlocked_mev_reward,
             harvest_params.proof,
         )
-    ).transact()  # type: ignore
+    ).transact()
     logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
-    await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)  # type: ignore
+    await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)
