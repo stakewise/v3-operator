@@ -9,11 +9,11 @@ from sw_utils import EventScanner, InterruptHandler
 
 import src
 from src.common.clients import execution_client
-from src.common.config import VaultConfig
 from src.common.metrics import metrics, metrics_server
 from src.common.startup_check import startup_checks
 from src.common.utils import get_build_version, log_verbose
 from src.common.validators import validate_eth_address
+from src.common.vault_config import VaultConfig
 from src.config.settings import (
     AVAILABLE_NETWORKS,
     DEFAULT_MAX_FEE_PER_GAS_GWEI,

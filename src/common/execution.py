@@ -5,12 +5,12 @@ from eth_typing import HexStr
 from sw_utils.decorators import retry_aiohttp_errors
 from web3 import Web3
 from web3.exceptions import MethodUnavailable
-from web3.types import BlockData, ChecksumAddress, TxData, Wei
+from web3.types import BlockData, TxData, Wei
 
 from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.contracts import keeper_contract
 from src.common.metrics import metrics
-from src.common.typings import Oracles, RewardVoteInfo
+from src.common.typings import Oracles
 from src.common.wallet import hot_wallet
 from src.config.settings import DEFAULT_RETRY_TIME, settings
 
@@ -19,14 +19,19 @@ SECONDS_PER_MONTH: int = 2628000
 logger = logging.getLogger(__name__)
 
 
-@retry_aiohttp_errors(delay=300)
+@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def get_hot_wallet_balance() -> Wei:
     return await execution_client.eth.get_balance(hot_wallet.address)
 
 
-@retry_aiohttp_errors(delay=300)
-async def can_harvest(vault_address: ChecksumAddress) -> bool:
-    return await keeper_contract.functions.canHarvest(vault_address).call()
+@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
+async def eth_get_block(block_id: str = 'latest') -> BlockData:
+    return await execution_client.eth.get_block(block_id)
+
+
+@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
+async def eth_get_transaction(tx_hash: HexStr) -> TxData:
+    return await execution_client.eth.get_transaction(tx_hash)
 
 
 async def check_hot_wallet_balance() -> None:
@@ -93,19 +98,6 @@ async def get_oracles() -> Oracles:
     )
 
 
-async def get_last_rewards_update() -> RewardVoteInfo | None:
-    """Fetches the last rewards update."""
-    last_event = await keeper_contract.get_reward_updated_event()
-    if not last_event:
-        return None
-
-    voting_info = RewardVoteInfo(
-        ipfs_hash=last_event['args']['rewardsIpfsHash'],
-        rewards_root=last_event['args']['rewardsRoot'],
-    )
-    return voting_info
-
-
 async def check_gas_price() -> bool:
     max_fee_per_gas = await _get_max_fee_per_gas()
     if max_fee_per_gas >= Web3.to_wei(settings.max_fee_per_gas_gwei, 'gwei'):
@@ -145,13 +137,3 @@ async def _calculate_median_priority_fee(block_id: str = 'latest') -> Wei:
         return await _calculate_median_priority_fee(block['number'] - 1)
 
     return Wei(statistics.median(priority_fees))
-
-
-@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
-async def eth_get_block(block_id: str = 'latest') -> BlockData:
-    return await execution_client.eth.get_block(block_id)
-
-
-@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
-async def eth_get_transaction(tx_hash: HexStr) -> TxData:
-    return await execution_client.eth.get_transaction(tx_hash)

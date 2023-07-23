@@ -12,7 +12,7 @@ from sw_utils import (
 )
 from sw_utils.decorators import custom_before_log
 from tenacity import retry, retry_if_exception_type, stop_after_delay, wait_exponential
-from web3 import Web3
+from web3 import AsyncWeb3
 
 from src.common.wallet import hot_wallet
 from src.config.settings import DEFAULT_RETRY_TIME, settings
@@ -30,7 +30,7 @@ class Database:
 
 class ExecutionClient:
     @cached_property
-    def client(self) -> Web3:
+    def client(self) -> AsyncWeb3:
         w3 = get_execution_client(settings.execution_endpoints)
         # Account is required when emitting transactions.
         # For read-only queries account may be omitted.
