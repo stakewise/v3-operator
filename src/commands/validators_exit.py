@@ -15,9 +15,9 @@ from web3 import Web3
 from src.common.clients import consensus_client
 from src.common.config import VaultConfig
 from src.common.consensus import get_validators
+from src.common.utils import log_verbose
 from src.common.validators import validate_eth_address
 from src.config.settings import AVAILABLE_NETWORKS, NETWORKS, settings
-from src.utils import log_verbose
 from src.validators.consensus import get_consensus_fork
 from src.validators.typings import BLSPrivkey, Keystores
 from src.validators.utils import load_keystores

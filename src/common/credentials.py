@@ -37,8 +37,6 @@ from src.config.settings import DEPOSIT_AMOUNT_GWEI
 PURPOSE = '12381'
 COIN_TYPE = '3600'
 
-w3 = Web3()
-
 
 @dataclass
 class Credential:
@@ -49,7 +47,7 @@ class Credential:
 
     @cached_property
     def public_key(self) -> HexStr:
-        return w3.to_hex(G2ProofOfPossession.SkToPk(self.private_key))
+        return Web3.to_hex(G2ProofOfPossession.SkToPk(self.private_key))
 
     @cached_property
     def private_key_bytes(self) -> bytes:
