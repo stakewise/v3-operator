@@ -3,13 +3,12 @@ import os
 from functools import cached_property
 from typing import Callable
 
-from sw_utils.decorators import retry_aiohttp_errors
 from web3.contract import AsyncContract
 from web3.types import BlockNumber, ChecksumAddress, EventData
 
 from src.common.clients import execution_client
 from src.common.typings import RewardVoteInfo
-from src.config.settings import DEFAULT_RETRY_TIME, settings
+from src.config.settings import settings
 
 
 class ContractWrapper:
@@ -62,7 +61,6 @@ class KeeperContract(ContractWrapper):
     abi_path = 'abi/IKeeper.json'
     settings_key = 'KEEPER_CONTRACT_ADDRESS'
 
-    @retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
     async def get_config_updated_events(
         self, from_block: BlockNumber, to_block: BlockNumber
     ) -> list[EventData]:
@@ -70,7 +68,6 @@ class KeeperContract(ContractWrapper):
             fromBlock=from_block, toBlock=to_block
         )
 
-    @retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
     async def get_reward_updated_events(
         self, from_block: BlockNumber, to_block: BlockNumber
     ) -> list[EventData]:
@@ -102,17 +99,14 @@ class KeeperContract(ContractWrapper):
         )
         return voting_info
 
-    @retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
     async def get_rewards_min_oracles(self) -> int:
         """Fetches the last oracles config updated event."""
         return await self.contract.functions.rewardsMinOracles().call()
 
-    @retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
     async def get_validators_min_oracles(self) -> int:
         """Fetches the last oracles config updated event."""
         return await self.contract.functions.validatorsMinOracles().call()
 
-    @retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
     async def can_harvest(self, vault_address: ChecksumAddress) -> bool:
         return await self.contract.functions.canHarvest(vault_address).call()
 

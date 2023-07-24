@@ -10,7 +10,6 @@ from sw_utils import (
     get_eth1_withdrawal_credentials,
     is_valid_deposit_data_signature,
 )
-from sw_utils.decorators import retry_aiohttp_errors
 from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.types import EventData, Wei
@@ -24,12 +23,7 @@ from src.common.contracts import (
 from src.common.ipfs import fetch_harvest_params
 from src.common.metrics import metrics
 from src.config.networks import ETH_NETWORKS
-from src.config.settings import (
-    DEFAULT_RETRY_TIME,
-    DEPOSIT_AMOUNT,
-    DEPOSIT_AMOUNT_GWEI,
-    settings,
-)
+from src.config.settings import DEPOSIT_AMOUNT, DEPOSIT_AMOUNT_GWEI, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.typings import (
     DepositData,
@@ -99,7 +93,6 @@ def process_network_validator_event(event: EventData) -> HexStr | None:
     return None
 
 
-@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def get_latest_network_validator_public_keys() -> Set[HexStr]:
     """Fetches the latest network validator public keys."""
     last_validator = NetworkValidatorCrud().get_last_network_validator()
@@ -120,7 +113,6 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
     return new_public_keys
 
 
-@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def get_withdrawable_assets() -> tuple[Wei, HexStr | None]:
     """Fetches vault's available assets for staking."""
     before_update_assets = await vault_contract.functions.withdrawableAssets().call()
@@ -165,19 +157,16 @@ async def get_withdrawable_assets() -> tuple[Wei, HexStr | None]:
     return Wei(before_update_assets), None
 
 
-@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def get_validators_registry_root() -> Bytes32:
     """Fetches the latest validators registry root."""
     return await validators_registry_contract.functions.get_deposit_root().call()
 
 
-@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def get_vault_validators_root() -> Bytes32:
     """Fetches vault's validators root."""
     return await vault_contract.functions.validatorsRoot().call()
 
 
-@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def get_vault_validators_index() -> int:
     """Fetches vault's current validators index."""
     return await vault_contract.functions.validatorIndex().call()

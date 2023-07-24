@@ -31,7 +31,7 @@ class Database:
 class ExecutionClient:
     @cached_property
     def client(self) -> AsyncWeb3:
-        w3 = get_execution_client(settings.execution_endpoints)
+        w3 = get_execution_client(settings.execution_endpoints, retry_timeout=DEFAULT_RETRY_TIME)
         # Account is required when emitting transactions.
         # For read-only queries account may be omitted.
         if hot_wallet.can_load():
@@ -51,7 +51,7 @@ class ExecutionClient:
 class ConsensusClient:
     @cached_property
     def client(self) -> ExtendedAsyncBeacon:
-        return get_consensus_client(settings.consensus_endpoints)
+        return get_consensus_client(settings.consensus_endpoints, retry_timeout=DEFAULT_RETRY_TIME)
 
     def __getattr__(self, item):
         return getattr(self.client, item)

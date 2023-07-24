@@ -2,14 +2,13 @@ from dataclasses import dataclass
 
 from aiohttp import ClientResponseError
 from eth_typing import BlockNumber
-from sw_utils.decorators import retry_aiohttp_errors
 from sw_utils.typings import ConsensusFork
 from web3 import Web3
 from web3.types import Timestamp
 
 from src.common.clients import consensus_client
 from src.common.metrics import metrics
-from src.config.settings import DEFAULT_RETRY_TIME, settings
+from src.config.settings import settings
 
 
 @dataclass
@@ -20,7 +19,6 @@ class ChainHead:
     execution_ts: Timestamp
 
 
-@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def get_consensus_fork() -> ConsensusFork:
     """Fetches current fork data."""
     fork_data = (await consensus_client.get_fork_data())['data']
@@ -29,7 +27,6 @@ async def get_consensus_fork() -> ConsensusFork:
     )
 
 
-@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def get_chain_finalized_head() -> ChainHead:
     """Fetches the fork safe chain head."""
     checkpoints = await consensus_client.get_finality_checkpoint()
@@ -55,9 +52,3 @@ async def get_chain_finalized_head() -> ChainHead:
         )
 
     raise RuntimeError(f'Failed to fetch slot for epoch {epoch}')
-
-
-@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
-async def get_validators(validator_ids: list[str]) -> dict:
-    """Fetches validators with retry."""
-    return await consensus_client.get_validators_by_ids(validator_ids)
