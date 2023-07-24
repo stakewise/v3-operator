@@ -5,7 +5,8 @@ from web3.types import BlockNumber, Wei
 
 from src.common.clients import ipfs_fetch_client
 from src.common.consensus import get_consensus_fork
-from src.common.execution import check_gas_price, check_hot_wallet_balance, get_oracles
+from src.common.contracts import validators_registry_contract
+from src.common.execution import check_gas_price, get_oracles
 from src.common.metrics import metrics
 from src.common.typings import Oracles
 from src.common.utils import MGNO_RATE, WAD
@@ -15,7 +16,6 @@ from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import (
     get_available_validators,
     get_latest_network_validator_public_keys,
-    get_validators_registry_root,
     get_withdrawable_assets,
     register_multiple_validator,
     register_single_validator,
@@ -90,9 +90,6 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
         pub_keys = ', '.join([val.public_key for val in validators])
         logger.info('Successfully registered validators with public keys %s', pub_keys)
 
-    # check balance after transaction
-    await check_hot_wallet_balance()
-
 
 async def get_oracles_approval(
     oracles: Oracles, keystores: Keystores, validators: list[Validator]
@@ -100,7 +97,7 @@ async def get_oracles_approval(
     """Fetches approval from oracles."""
 
     # get latest registry root
-    registry_root = await get_validators_registry_root()
+    registry_root = await validators_registry_contract.get_validators_registry_root()
     logger.debug('Fetched latest validators registry root: %s', registry_root)
 
     # get next validator index for exit signature

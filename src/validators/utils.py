@@ -17,6 +17,7 @@ from sw_utils import get_eth1_withdrawal_credentials
 from sw_utils.decorators import retry_aiohttp_errors
 from web3 import Web3
 
+from src.common.contracts import validators_registry_contract
 from src.common.typings import OracleApproval, Oracles
 from src.config.settings import DEFAULT_RETRY_TIME, ORACLES_VALIDATORS_TIMEOUT, settings
 from src.validators.database import NetworkValidatorCrud
@@ -28,7 +29,6 @@ from src.validators.exceptions import (
 from src.validators.execution import (
     _encode_tx_validator,
     get_latest_network_validator_public_keys,
-    get_validators_registry_root,
 )
 from src.validators.typings import (
     ApprovalRequest,
@@ -91,7 +91,7 @@ async def send_approval_request(
             response.raise_for_status()
             data = await response.json()
     except ClientError as e:
-        registry_root = await get_validators_registry_root()
+        registry_root = await validators_registry_contract.get_validators_registry_root()
         if Web3.to_hex(registry_root) != payload['validators_root']:
             raise RegistryRootChangedError from e
 

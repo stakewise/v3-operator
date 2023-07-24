@@ -10,6 +10,7 @@ from sw_utils import EventScanner, InterruptHandler
 import src
 from src.common.clients import execution_client
 from src.common.consensus import get_chain_finalized_head
+from src.common.execution import check_hot_wallet_balance
 from src.common.metrics import metrics, metrics_server
 from src.common.startup_check import startup_checks
 from src.common.utils import get_build_version, log_verbose
@@ -251,6 +252,9 @@ async def main() -> None:
                 # submit harvest vault transaction
                 if settings.harvest_vault:
                     await harvest_vault_task()
+
+                # check balance
+                await check_hot_wallet_balance()
 
                 # update metrics
                 metrics.block_number.set(await execution_client.eth.get_block_number())

@@ -1,7 +1,7 @@
 import logging
 
 from src.common.contracts import keeper_contract
-from src.common.execution import check_gas_price, check_hot_wallet_balance
+from src.common.execution import check_gas_price
 from src.common.ipfs import fetch_harvest_params
 from src.config.settings import settings
 from src.harvest.execution import submit_harvest_transaction
@@ -33,6 +33,3 @@ async def harvest_vault() -> None:
     logger.info('Starting vault harvest')
     await submit_harvest_transaction(harvest_params)
     logger.info('Successfully harvested vault')
-
-    # check balance after transaction
-    await check_hot_wallet_balance()

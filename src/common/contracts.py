@@ -3,6 +3,7 @@ import os
 from functools import cached_property
 from typing import Callable
 
+from sw_utils.typings import Bytes32
 from web3.contract import AsyncContract
 from web3.types import BlockNumber, ChecksumAddress, EventData
 
@@ -51,10 +52,22 @@ class VaultContract(ContractWrapper):
     def contract_address(self) -> ChecksumAddress:
         return settings.vault
 
+    async def get_vault_validators_root(self) -> Bytes32:
+        """Fetches vault's validators root."""
+        return await self.contract.functions.validatorsRoot().call()
+
+    async def get_vault_validators_index(self) -> int:
+        """Fetches vault's current validators index."""
+        return await vault_contract.functions.validatorIndex().call()
+
 
 class ValidatorsRegistryContract(ContractWrapper):
     abi_path = 'abi/IValidatorsRegistry.json'
     settings_key = 'VALIDATORS_REGISTRY_CONTRACT_ADDRESS'
+
+    async def get_validators_registry_root(self) -> Bytes32:
+        """Fetches the latest validators registry root."""
+        return await self.contract.functions.get_deposit_root().call()
 
 
 class KeeperContract(ContractWrapper):
