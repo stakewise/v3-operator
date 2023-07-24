@@ -2,36 +2,24 @@ import logging
 import statistics
 
 from eth_typing import HexStr
-from sw_utils.decorators import retry_aiohttp_errors
 from web3 import Web3
 from web3.exceptions import MethodUnavailable
-from web3.types import BlockData, TxData, Wei
+from web3.types import Wei
 
 from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.contracts import keeper_contract
 from src.common.metrics import metrics
 from src.common.typings import Oracles
 from src.common.wallet import hot_wallet
-from src.config.settings import DEFAULT_RETRY_TIME, settings
+from src.config.settings import settings
 
 SECONDS_PER_MONTH: int = 2628000
 
 logger = logging.getLogger(__name__)
 
 
-@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def get_hot_wallet_balance() -> Wei:
     return await execution_client.eth.get_balance(hot_wallet.address)
-
-
-@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
-async def eth_get_block(block_id: str = 'latest') -> BlockData:
-    return await execution_client.eth.get_block(block_id)
-
-
-@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
-async def eth_get_transaction(tx_hash: HexStr) -> TxData:
-    return await execution_client.eth.get_transaction(tx_hash)
 
 
 async def check_hot_wallet_balance() -> None:
@@ -117,19 +105,19 @@ async def _get_max_fee_per_gas() -> Wei:
         priority_fee = await execution_client.eth.max_priority_fee
     except MethodUnavailable:
         priority_fee = await _calculate_median_priority_fee()
-    latest_block = await eth_get_block()
+    latest_block = await execution_client.eth.get_block('latest')
     base_fee = latest_block['baseFeePerGas']
     max_fee_per_gas = priority_fee + 2 * base_fee
     return Wei(max_fee_per_gas)
 
 
 async def _calculate_median_priority_fee(block_id: str = 'latest') -> Wei:
-    block = await eth_get_block(block_id)
+    block = await execution_client.eth.get_block(block_id)
 
     # collect maxPriorityFeePerGas for all transactions in the block
     priority_fees = []
     for tx_hash in block.transactions:
-        tx = await eth_get_transaction(HexStr(tx_hash))
+        tx = await execution_client.eth.get_transaction(tx_hash)(HexStr(tx_hash))
         if 'maxPriorityFeePerGas' in tx:
             priority_fees.append(tx.maxPriorityFeePerGas)
 

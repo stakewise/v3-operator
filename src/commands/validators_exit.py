@@ -13,7 +13,7 @@ from sw_utils.typings import ConsensusFork
 from web3 import Web3
 
 from src.common.clients import consensus_client
-from src.common.consensus import get_consensus_fork, get_validators
+from src.common.consensus import get_consensus_fork
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
@@ -172,7 +172,9 @@ async def _get_exit_keystores(keystores: Keystores) -> list[ExitKeystore]:
     exited_statuses = [x.value for x in EXITING_STATUSES]
 
     for i in range(0, len(public_keys), settings.validators_fetch_chunk_size):
-        validators = await get_validators(public_keys[i : i + settings.validators_fetch_chunk_size])
+        validators = await consensus_client.get_validators_by_ids(
+            public_keys[i : i + settings.validators_fetch_chunk_size]
+        )
         for beacon_validator in validators['data']:
             if beacon_validator.get('status') in exited_statuses:
                 continue
