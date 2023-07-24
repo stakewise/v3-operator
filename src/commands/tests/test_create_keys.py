@@ -8,7 +8,7 @@ from staking_deposit.settings import DEPOSIT_CLI_VERSION
 from sw_utils.tests.factories import faker
 
 from src.commands.create_keys import create_keys
-from src.commands.init import init
+from src.commands.tests.common import generate_mnemonic
 from src.config.settings import DATA_DIR
 
 
@@ -19,17 +19,7 @@ class TestCreateKeys(unittest.TestCase):
         runner = CliRunner()
 
         with runner.isolated_filesystem():
-            args_init = [
-                '--language',
-                'english',
-                '--no-verify',
-                '--vault',
-                vault,
-                '--network',
-                'goerli',
-            ]
-            init_result = runner.invoke(init, args_init)
-            mnemonic = init_result.output.strip()
+            mnemonic = generate_mnemonic(runner=runner, vault=vault)
             args = ['--mnemonic', f'"{mnemonic}"', '--count', count, '--vault', vault]
             result = runner.invoke(create_keys, args)
             assert result.exit_code == 0
@@ -62,17 +52,7 @@ class TestCreateKeys(unittest.TestCase):
         runner = CliRunner()
 
         with runner.isolated_filesystem():
-            args_init = [
-                '--language',
-                'english',
-                '--no-verify',
-                '--vault',
-                vault,
-                '--network',
-                'goerli',
-            ]
-            init_result = runner.invoke(init, args_init)
-            mnemonic = init_result.output.strip()
+            mnemonic = generate_mnemonic(runner=runner, vault=vault)
             args = [
                 '--mnemonic',
                 f'"{mnemonic}"',

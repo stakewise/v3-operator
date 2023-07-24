@@ -4,11 +4,7 @@ from web3 import Web3
 from web3.types import BlockNumber, Wei
 
 from src.common.clients import ipfs_fetch_client
-from src.common.execution import (
-    check_hot_wallet_balance,
-    get_max_fee_per_gas,
-    get_oracles,
-)
+from src.common.execution import check_gas_price, check_hot_wallet_balance, get_oracles
 from src.common.metrics import metrics
 from src.common.typings import Oracles
 from src.common.utils import MGNO_RATE, WAD
@@ -59,14 +55,7 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
         # not enough balance to register validators
         return
 
-    max_fee_per_gas = await get_max_fee_per_gas()
-    if max_fee_per_gas >= Web3.to_wei(settings.max_fee_per_gas_gwei, 'gwei'):
-        logging.warning(
-            'Current gas price (%s gwei) is too high. '
-            'Will try to register validator on the next block if the gas '
-            'price is acceptable.',
-            Web3.from_wei(max_fee_per_gas, 'gwei'),
-        )
+    if not await check_gas_price():
         return
 
     logger.info('Started registration of %d validator(s)', validators_count)

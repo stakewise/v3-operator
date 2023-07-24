@@ -42,10 +42,10 @@ exclude_dirs = ["*/tests/*", "src/config/networks.py"]
 skips = ["B608"]
 
 [tool.pylint."pre-commit-hook"]
-disable = ["C0103", "C0114", "C0115", "C0116", "R0801", "R0902", "R0903", "W0511", "W0703", "W1514", "E1129"]
+disable = ["C0103", "C0114", "C0115", "C0116", "W0511", "W0703"]
 
 [tool.pylint."BASIC"]
-good-names = ["db", "i", "el", "e", "w", "f", "w3", "bar"]
+good-names = ["db", "i", "w3"]
 ignored-modules=["milagro_bls_binding"]
 
 [tool.flake8]

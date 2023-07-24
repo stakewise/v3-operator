@@ -77,7 +77,7 @@ class Credential:
 
         if per_keystore_password:
             password_file_path = path.join(folder, f'{file_name}.txt')
-            with open(password_file_path, 'w') as password_file:
+            with open(password_file_path, 'w', encoding='utf-8') as password_file:
                 password_file.write(password)
 
         keystore.save(file_path)
@@ -126,10 +126,10 @@ class CredentialManager:
             label='Creating validator keys:\t\t',
             show_percent=False,
             show_pos=True,
-        ) as bar, Pool() as pool:
+        ) as progress_bar, Pool() as pool:
 
             def bar_updated(result):
-                bar.update(len(result))
+                progress_bar.update(len(result))
 
             results = []
             indexes = range(start_index, start_index + count)

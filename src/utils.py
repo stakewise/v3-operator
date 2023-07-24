@@ -11,7 +11,7 @@ def get_build_version() -> str | None:
     if not path.exists():
         return None
 
-    with path.open() as fh:
+    with path.open(encoding='utf-8') as fh:
         return fh.read().strip()
 
 

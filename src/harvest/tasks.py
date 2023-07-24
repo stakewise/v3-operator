@@ -1,12 +1,10 @@
 import logging
 
-from web3 import Web3
-
 from src.common.execution import (
     can_harvest,
+    check_gas_price,
     check_hot_wallet_balance,
     get_last_rewards_update,
-    get_max_fee_per_gas,
 )
 from src.common.ipfs import fetch_harvest_params
 from src.config.settings import settings
@@ -22,14 +20,7 @@ async def harvest_vault() -> None:
         return
 
     # check current gas prices
-    max_fee_per_gas = await get_max_fee_per_gas()
-    if max_fee_per_gas >= Web3.to_wei(settings.max_fee_per_gas_gwei, 'gwei'):
-        logging.warning(
-            'Current gas price (%s gwei) is too high. '
-            'Will try to harvest on the next block if the gas '
-            'price is acceptable.',
-            Web3.from_wei(max_fee_per_gas, 'gwei'),
-        )
+    if not await check_gas_price():
         return
 
     last_rewards = await get_last_rewards_update()

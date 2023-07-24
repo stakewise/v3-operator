@@ -75,7 +75,7 @@ async def wait_for_execution_node() -> None:
                         execution_endpoint,
                     )
                     continue
-                block_number = await execution_client.eth.block_number  # type: ignore
+                block_number = await execution_client.eth.block_number
                 logger.info(
                     'Connected to execution node at %s. Current block number: %s',
                     execution_endpoint,

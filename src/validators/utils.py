@@ -17,7 +17,7 @@ from sw_utils import get_eth1_withdrawal_credentials
 from sw_utils.decorators import retry_aiohttp_errors
 from web3 import Web3
 
-from src.common.typings import Oracles
+from src.common.typings import OracleApproval, Oracles
 from src.config.settings import DEFAULT_RETRY_TIME, ORACLES_VALIDATORS_TIMEOUT, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import (
@@ -36,7 +36,6 @@ from src.validators.typings import (
     DepositData,
     KeystoreFile,
     Keystores,
-    OracleApproval,
     Validator,
 )
 
