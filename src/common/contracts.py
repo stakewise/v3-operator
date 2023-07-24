@@ -8,6 +8,7 @@ from web3.contract import AsyncContract
 from web3.types import BlockNumber, ChecksumAddress, EventData
 
 from src.common.clients import execution_client
+from src.common.typings import RewardVoteInfo
 from src.config.settings import DEFAULT_RETRY_TIME, settings
 
 
@@ -85,13 +86,21 @@ class KeeperContract(ContractWrapper):
             from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
         )
 
-    async def get_reward_updated_event(self) -> EventData | None:
-        """Fetches the last oracles config updated event."""
-        return await self._get_last_event(
+    async def get_last_rewards_update(self) -> RewardVoteInfo | None:
+        """Fetches the last rewards update."""
+        last_event = await self._get_last_event(
             self.get_reward_updated_events,
             current_block=await execution_client.eth.get_block_number(),
             from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
         )
+        if not last_event:
+            return None
+
+        voting_info = RewardVoteInfo(
+            ipfs_hash=last_event['args']['rewardsIpfsHash'],
+            rewards_root=last_event['args']['rewardsRoot'],
+        )
+        return voting_info
 
     @retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
     async def get_rewards_min_oracles(self) -> int:
@@ -102,6 +111,10 @@ class KeeperContract(ContractWrapper):
     async def get_validators_min_oracles(self) -> int:
         """Fetches the last oracles config updated event."""
         return await self.contract.functions.validatorsMinOracles().call()
+
+    @retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
+    async def can_harvest(self, vault_address: ChecksumAddress) -> bool:
+        return await self.contract.functions.canHarvest(vault_address).call()
 
 
 vault_contract = VaultContract()

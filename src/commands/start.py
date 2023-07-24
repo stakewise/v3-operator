@@ -9,9 +9,11 @@ from sw_utils import EventScanner, InterruptHandler
 
 import src
 from src.common.clients import execution_client
-from src.common.config import VaultConfig
 from src.common.metrics import metrics, metrics_server
+from src.common.startup_check import startup_checks
+from src.common.utils import get_build_version, log_verbose
 from src.common.validators import validate_eth_address
+from src.common.vault_config import VaultConfig
 from src.config.settings import (
     AVAILABLE_NETWORKS,
     DEFAULT_MAX_FEE_PER_GAS_GWEI,
@@ -21,8 +23,6 @@ from src.config.settings import (
 )
 from src.exits.tasks import update_exit_signatures
 from src.harvest.tasks import harvest_vault as harvest_vault_task
-from src.startup_check import startup_checks
-from src.utils import get_build_version, log_verbose
 from src.validators.consensus import get_chain_finalized_head
 from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import (

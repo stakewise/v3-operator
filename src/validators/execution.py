@@ -16,8 +16,11 @@ from web3 import Web3
 from web3.types import EventData, Wei
 
 from src.common.clients import execution_client
-from src.common.contracts import validators_registry_contract, vault_contract
-from src.common.execution import can_harvest, get_last_rewards_update
+from src.common.contracts import (
+    keeper_contract,
+    validators_registry_contract,
+    vault_contract,
+)
 from src.common.ipfs import fetch_harvest_params
 from src.common.metrics import metrics
 from src.config.networks import ETH_NETWORKS
@@ -117,12 +120,12 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
     return new_public_keys
 
 
-@retry_aiohttp_errors(delay=300)
+@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def get_withdrawable_assets() -> tuple[Wei, HexStr | None]:
     """Fetches vault's available assets for staking."""
     before_update_assets = await vault_contract.functions.withdrawableAssets().call()
 
-    last_rewards = await get_last_rewards_update()
+    last_rewards = await keeper_contract.get_last_rewards_update()
     if last_rewards is None:
         return before_update_assets, None
 
@@ -154,7 +157,7 @@ async def get_withdrawable_assets() -> tuple[Wei, HexStr | None]:
 
     before_update_validators = before_update_assets // DEPOSIT_AMOUNT
     after_update_validators = after_update_assets // DEPOSIT_AMOUNT
-    if before_update_validators != after_update_validators or await can_harvest(
+    if before_update_validators != after_update_validators or await keeper_contract.can_harvest(
         vault_contract.contract_address
     ):
         return Wei(after_update_assets), update_state_call

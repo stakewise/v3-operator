@@ -6,10 +6,10 @@ import click
 from eth_account import Account
 from eth_typing import ChecksumAddress, HexAddress
 
-from src.common.config import VaultConfig
 from src.common.contrib import greenify
 from src.common.password import get_or_create_password_file
 from src.common.validators import validate_eth_address, validate_mnemonic
+from src.common.vault_config import VaultConfig
 
 
 @click.option(
