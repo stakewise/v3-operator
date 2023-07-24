@@ -91,7 +91,7 @@ async def send_approval_request(
             response.raise_for_status()
             data = await response.json()
     except ClientError as e:
-        registry_root = await validators_registry_contract.get_validators_registry_root()
+        registry_root = await validators_registry_contract.get_registry_root()
         if Web3.to_hex(registry_root) != payload['validators_root']:
             raise RegistryRootChangedError from e
 

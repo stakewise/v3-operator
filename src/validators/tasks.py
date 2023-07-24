@@ -97,7 +97,7 @@ async def get_oracles_approval(
     """Fetches approval from oracles."""
 
     # get latest registry root
-    registry_root = await validators_registry_contract.get_validators_registry_root()
+    registry_root = await validators_registry_contract.get_registry_root()
     logger.debug('Fetched latest validators registry root: %s', registry_root)
 
     # get next validator index for exit signature

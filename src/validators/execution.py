@@ -158,7 +158,7 @@ async def get_withdrawable_assets() -> tuple[Wei, HexStr | None]:
 
 async def check_deposit_data_root(deposit_data_root: str) -> None:
     """Checks whether deposit data root matches validators root in Vault."""
-    if deposit_data_root != Web3.to_hex(await vault_contract.get_vault_validators_root()):
+    if deposit_data_root != Web3.to_hex(await vault_contract.get_validators_root()):
         raise RuntimeError(
             "Deposit data tree root and vault's validators root don't match."
             ' Have you updated vault deposit data?'
@@ -171,7 +171,7 @@ async def get_available_validators(
     """Fetches vault's available validators."""
     await check_deposit_data_root(deposit_data.tree.root)
 
-    start_index = await vault_contract.get_vault_validators_index()
+    start_index = await vault_contract.get_validators_index()
     validators: list[Validator] = []
     if len(deposit_data.validators) < count:
         return []
