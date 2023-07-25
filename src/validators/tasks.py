@@ -3,8 +3,7 @@ import logging
 from web3 import Web3
 from web3.types import BlockNumber, Wei
 
-from src.common.clients import ipfs_fetch_client
-from src.common.consensus import get_consensus_fork
+from src.common.clients import consensus_client, ipfs_fetch_client
 from src.common.contracts import validators_registry_contract
 from src.common.execution import check_gas_price, get_oracles
 from src.common.metrics import metrics
@@ -107,7 +106,7 @@ async def get_oracles_approval(
     logger.debug('Next validator index for exit signature: %d', validator_index)
 
     # fetch current fork data
-    fork = await get_consensus_fork()
+    fork = await consensus_client.get_consensus_fork()
     logger.debug('Fetched current fork data: %s', fork)
 
     # get exit signature shards

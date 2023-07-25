@@ -8,8 +8,7 @@ from eth_typing import ChecksumAddress
 from sw_utils import EventScanner, InterruptHandler
 
 import src
-from src.common.clients import execution_client
-from src.common.consensus import get_chain_finalized_head
+from src.common.clients import consensus_client, execution_client
 from src.common.execution import check_hot_wallet_balance
 from src.common.metrics import metrics, metrics_server
 from src.common.startup_check import startup_checks
@@ -228,7 +227,8 @@ async def main() -> None:
     network_validators_scanner = EventScanner(network_validators_processor)
 
     logger.info('Syncing network validator events...')
-    chain_state = await get_chain_finalized_head()
+    chain_state = await consensus_client.get_chain_finalized_head()
+
     to_block = chain_state.execution_block
     await network_validators_scanner.process_new_events(to_block)
     await metrics_server()
@@ -238,7 +238,9 @@ async def main() -> None:
         while not interrupt_handler.exit:
             start_time = time.time()
             try:
-                chain_state = await get_chain_finalized_head()
+                chain_state = await consensus_client.get_chain_finalized_head()
+                metrics.slot_number.set(chain_state.consensus_block)
+
                 to_block = chain_state.execution_block
                 # process new network validators
                 await network_validators_scanner.process_new_events(to_block)
