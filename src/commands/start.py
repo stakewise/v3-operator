@@ -10,10 +10,11 @@ from sw_utils.typings import ChainHead
 
 import src
 from src.common.clients import consensus_client, execution_client
-from src.common.execution import check_hot_wallet_balance
+from src.common.contrib import chunkify
+from src.common.execution import check_hot_wallet_balance, get_oracles
 from src.common.metrics import metrics, metrics_server
 from src.common.startup_check import startup_checks
-from src.common.utils import get_build_version, log_verbose
+from src.common.utils import get_build_version, log_verbose, wait_block_finalization
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
 from src.config.settings import (
@@ -23,7 +24,7 @@ from src.config.settings import (
     DEFAULT_METRICS_PORT,
     settings,
 )
-from src.exits.tasks import update_exit_signatures
+from src.exits.tasks import fetch_outdated_indexes, update_exit_signatures
 from src.harvest.tasks import harvest_vault as harvest_vault_task
 from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import (
@@ -31,6 +32,7 @@ from src.validators.execution import (
     update_unused_validator_keys_metric,
 )
 from src.validators.tasks import load_genesis_validators, register_validators
+from src.validators.typings import Keystores
 from src.validators.utils import load_deposit_data, load_keystores
 
 logger = logging.getLogger(__name__)
@@ -201,6 +203,28 @@ def start(
         log_verbose(e)
 
 
+async def update_exit_signatures_periodically(keystores: Keystores):
+    while True:
+        timer_start = time.time()
+
+        try:
+            oracles = await get_oracles()
+            outdated_indexes = await fetch_outdated_indexes(oracles)
+
+            if outdated_indexes:
+                chunk_size = oracles.validators_exit_rotation_batch_limit
+
+                for indexes_chunk in chunkify(outdated_indexes, chunk_size):
+                    await update_exit_signatures(keystores, oracles, indexes_chunk)
+
+                await wait_block_finalization()
+        except Exception as e:
+            logger.exception(e)
+
+        elapsed = time.time() - timer_start
+        await asyncio.sleep(float(settings.network_config.SECONDS_PER_BLOCK) - elapsed)
+
+
 async def main() -> None:
     setup_logging()
     setup_sentry()
@@ -234,6 +258,9 @@ async def main() -> None:
     await network_validators_scanner.process_new_events(to_block)
     await metrics_server()
 
+    # process outdated exit signatures
+    asyncio.create_task(update_exit_signatures_periodically(keystores))
+
     logger.info('Started operator service')
     with InterruptHandler() as interrupt_handler:
         while not interrupt_handler.exit:
@@ -248,9 +275,6 @@ async def main() -> None:
                 # check and register new validators
                 await update_unused_validator_keys_metric(keystores, deposit_data)
                 await register_validators(keystores, deposit_data)
-
-                # process outdated exit signatures
-                await update_exit_signatures(keystores)
 
                 # submit harvest vault transaction
                 if settings.harvest_vault:

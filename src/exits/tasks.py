@@ -6,7 +6,6 @@ import aiohttp
 from web3.types import HexStr
 
 from src.common.clients import consensus_client
-from src.common.execution import get_oracles
 from src.common.metrics import metrics
 from src.common.typings import Oracles
 from src.config.settings import OUTDATED_SIGNATURES_URL_PATH, settings
@@ -20,21 +19,23 @@ from src.validators.typings import Keystores
 logger = logging.getLogger(__name__)
 
 
-async def update_exit_signatures(keystores: Keystores) -> None:
-    """Fetches update signature requests from oracles."""
-    oracles = await get_oracles()
-    exit_rotation_batch_limit = oracles.validators_exit_rotation_batch_limit
-
+async def fetch_outdated_indexes(oracles: Oracles) -> list[int]:
     random_oracle = random.choice(oracles.endpoints)  # nosec
     outdated_indexes = await _fetch_outdated_indexes(random_oracle)
-    if not outdated_indexes:
-        metrics.outdated_signatures.set(0)
-        return
     metrics.outdated_signatures.set(len(outdated_indexes))
+    return outdated_indexes
+
+
+async def update_exit_signatures(
+    keystores: Keystores, oracles: Oracles, outdated_indexes: list[int]
+) -> None:
+    """Fetches update signature requests from oracles."""
+    exit_rotation_batch_limit = oracles.validators_exit_rotation_batch_limit
+    outdated_indexes = outdated_indexes[:exit_rotation_batch_limit]
 
     logger.info('Started exit signature rotation for %d validators', len(outdated_indexes))
 
-    validators = await get_validator_public_keys(outdated_indexes[:exit_rotation_batch_limit])
+    validators = await get_validator_public_keys(outdated_indexes)
     oracles_approval = await get_oracles_approval(
         oracles=oracles,
         keystores=keystores,

@@ -1,10 +1,6 @@
 from dataclasses import dataclass
-from typing import NewType
 
 from eth_typing import ChecksumAddress, HexStr
-
-BLSPrivkey = NewType('BLSPrivkey', bytes)
-Keystores = NewType('Keystores', dict[HexStr, BLSPrivkey])
 
 
 @dataclass

@@ -1,9 +1,14 @@
+import asyncio
 import logging
+import time
 from pathlib import Path
 
+from eth_typing import BlockNumber
 from web3 import Web3
 from web3.types import Wei
 
+from src.common.clients import execution_client
+from src.common.consensus import get_chain_finalized_head
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -31,3 +36,18 @@ def log_verbose(e: Exception):
         logger.exception(e)
     else:
         logger.error(e)
+
+
+async def wait_block_finalization(block_number: BlockNumber | None = None):
+    block_number = block_number or await execution_client.eth.get_block_number()
+    chain_head = None
+    sleep_time = 0.0
+
+    while not chain_head or chain_head.execution_block < block_number:
+        await asyncio.sleep(sleep_time)
+        start = time.time()
+
+        chain_head = await get_chain_finalized_head()
+
+        elapsed = time.time() - start
+        sleep_time = float(settings.network_config.SECONDS_PER_BLOCK) - elapsed
