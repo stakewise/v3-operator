@@ -10,7 +10,6 @@ from sw_utils import (
     get_eth1_withdrawal_credentials,
     is_valid_deposit_data_signature,
 )
-from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.types import EventData, Wei
 
@@ -157,24 +156,9 @@ async def get_withdrawable_assets() -> tuple[Wei, HexStr | None]:
     return Wei(before_update_assets), None
 
 
-async def get_validators_registry_root() -> Bytes32:
-    """Fetches the latest validators registry root."""
-    return await validators_registry_contract.functions.get_deposit_root().call()
-
-
-async def get_vault_validators_root() -> Bytes32:
-    """Fetches vault's validators root."""
-    return await vault_contract.functions.validatorsRoot().call()
-
-
-async def get_vault_validators_index() -> int:
-    """Fetches vault's current validators index."""
-    return await vault_contract.functions.validatorIndex().call()
-
-
 async def check_deposit_data_root(deposit_data_root: str) -> None:
     """Checks whether deposit data root matches validators root in Vault."""
-    if deposit_data_root != Web3.to_hex(await get_vault_validators_root()):
+    if deposit_data_root != Web3.to_hex(await vault_contract.get_validators_root()):
         raise RuntimeError(
             "Deposit data tree root and vault's validators root don't match."
             ' Have you updated vault deposit data?'
@@ -187,7 +171,7 @@ async def get_available_validators(
     """Fetches vault's available validators."""
     await check_deposit_data_root(deposit_data.tree.root)
 
-    start_index = await get_vault_validators_index()
+    start_index = await vault_contract.get_validators_index()
     validators: list[Validator] = []
     if len(deposit_data.validators) < count:
         return []

@@ -6,7 +6,7 @@ import aiohttp
 from web3.types import HexStr
 
 from src.common.consensus import get_consensus_fork
-from src.common.execution import check_hot_wallet_balance, get_oracles
+from src.common.execution import get_oracles
 from src.common.metrics import metrics
 from src.common.typings import Oracles
 from src.config.settings import OUTDATED_SIGNATURES_URL_PATH, settings
@@ -46,9 +46,6 @@ async def update_exit_signatures(keystores: Keystores) -> None:
         'Successfully rotated exit signatures for validators with indexes %s',
         ', '.join([str(index) for index in outdated_indexes]),
     )
-
-    # check balance after transaction
-    await check_hot_wallet_balance()
 
 
 async def _fetch_outdated_indexes(oracle_endpoint: str) -> list[int]:
