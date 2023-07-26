@@ -6,6 +6,7 @@ from pathlib import Path
 import click
 from eth_typing import ChecksumAddress
 from sw_utils import EventScanner, InterruptHandler
+from sw_utils.typings import ChainHead
 
 import src
 from src.common.clients import consensus_client, execution_client
@@ -227,7 +228,7 @@ async def main() -> None:
     network_validators_scanner = EventScanner(network_validators_processor)
 
     logger.info('Syncing network validator events...')
-    chain_state = await consensus_client.get_chain_finalized_head()
+    chain_state = await get_chain_finalized_head()
 
     to_block = chain_state.execution_block
     await network_validators_scanner.process_new_events(to_block)
@@ -238,7 +239,7 @@ async def main() -> None:
         while not interrupt_handler.exit:
             start_time = time.time()
             try:
-                chain_state = await consensus_client.get_chain_finalized_head()
+                chain_state = await get_chain_finalized_head()
                 metrics.slot_number.set(chain_state.consensus_block)
 
                 to_block = chain_state.execution_block
@@ -266,7 +267,7 @@ async def main() -> None:
 
             block_processing_time = time.time() - start_time
             sleep_time = max(
-                int(settings.network_config.SECONDS_PER_BLOCK) - int(block_processing_time), 0
+                float(settings.network_config.SECONDS_PER_BLOCK) - block_processing_time, 0
             )
             await asyncio.sleep(sleep_time)
 
@@ -297,3 +298,7 @@ def setup_logging():
         datefmt='%Y-%m-%d %H:%M:%S',
         level=settings.log_level,
     )
+
+
+async def get_chain_finalized_head() -> ChainHead:
+    return await consensus_client.get_chain_finalized_head(settings.network_config.SLOTS_PER_EPOCH)
