@@ -11,7 +11,7 @@ from web3.types import HexStr
 
 from src.commands.validators_exit import EXITING_STATUSES
 from src.common.clients import consensus_client, execution_client
-from src.common.contracts import VaultContract
+from src.common.contracts import vault_contract
 from src.common.credentials import CredentialManager
 from src.common.password import get_or_create_password_file
 from src.common.validators import validate_eth_address, validate_mnemonic
@@ -82,6 +82,7 @@ def recover(
     consensus_endpoints: str,
     execution_endpoints: str,
 ) -> None:
+    # pylint: disable=duplicate-code
     config = VaultConfig(
         vault=vault,
         data_dir=Path(data_dir),
@@ -121,8 +122,6 @@ async def _fetch_registered_validators() -> list[RegisteredValidator]:
     block = await execution_client.eth.get_block('latest')
     current_block = block['number']
     keeper_genesis_block = settings.network_config.KEEPER_GENESIS_BLOCK
-
-    vault_contract = VaultContract()
 
     page_size = 50_000
     public_keys = []
@@ -168,6 +167,9 @@ async def _generate_keystores(
     exited_statuses = [x.value for x in EXITING_STATUSES]
     last_index = 0
     while not all(v.keystore_found for v in validators):
+        if last_index > 100:
+            raise click.ClickException('Keystores not found, check mnemonic')
+
         credentials = CredentialManager.generate_credentials(
             network=network,
             vault=vault,
