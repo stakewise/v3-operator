@@ -5,7 +5,7 @@ from urllib.parse import urljoin
 import aiohttp
 from web3.types import HexStr
 
-from src.common.consensus import get_consensus_fork
+from src.common.clients import consensus_client
 from src.common.execution import get_oracles
 from src.common.metrics import metrics
 from src.common.typings import Oracles
@@ -63,7 +63,7 @@ async def get_oracles_approval(
     oracles: Oracles, keystores: Keystores, validators: dict[int, HexStr]
 ) -> OraclesApproval:
     """Fetches approval from oracles."""
-    fork = await get_consensus_fork()
+    fork = await consensus_client.get_consensus_fork()
 
     # get exit signature shards
     request = SignatureRotationRequest(

@@ -4,14 +4,12 @@ from functools import cached_property
 
 from sw_utils import (
     ExtendedAsyncBeacon,
-    IpfsException,
     IpfsFetchClient,
     construct_async_sign_and_send_raw_middleware,
     get_consensus_client,
     get_execution_client,
 )
-from sw_utils.decorators import custom_before_log
-from tenacity import retry, retry_if_exception_type, stop_after_delay, wait_exponential
+from sw_utils.decorators import retry_ipfs_exception
 from web3 import AsyncWeb3
 
 from src.common.wallet import hot_wallet
@@ -55,15 +53,6 @@ class ConsensusClient:
 
     def __getattr__(self, item):
         return getattr(self.client, item)
-
-
-def retry_ipfs_exception(delay: int = DEFAULT_RETRY_TIME):
-    return retry(
-        retry=retry_if_exception_type(IpfsException),
-        wait=wait_exponential(multiplier=1, min=1, max=delay // 2),
-        stop=stop_after_delay(delay),
-        before=custom_before_log(logger, logging.INFO),
-    )
 
 
 class IpfsFetchRetryClient:

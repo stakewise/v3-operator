@@ -13,7 +13,6 @@ from sw_utils.typings import ConsensusFork
 from web3 import Web3
 
 from src.common.clients import consensus_client
-from src.common.consensus import get_consensus_fork
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
@@ -107,7 +106,7 @@ async def main(count: int | None) -> None:
     keystores = load_keystores()
     if not keystores:
         raise click.ClickException('Keystores not found.')
-    fork = await get_consensus_fork()
+    fork = await consensus_client.get_consensus_fork()
 
     exit_keystores = await _get_exit_keystores(keystores)
     if not exit_keystores:
