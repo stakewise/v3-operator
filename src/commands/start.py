@@ -24,7 +24,11 @@ from src.config.settings import (
     DEFAULT_METRICS_PORT,
     settings,
 )
-from src.exits.tasks import fetch_outdated_indexes, update_exit_signatures
+from src.exits.tasks import (
+    fetch_outdated_indexes,
+    update_exit_signatures,
+    wait_oracle_signature_update,
+)
 from src.harvest.tasks import harvest_vault as harvest_vault_task
 from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import (
@@ -218,6 +222,13 @@ async def update_exit_signatures_periodically(keystores: Keystores):
                     await update_exit_signatures(keystores, oracles, indexes_chunk)
 
                 await wait_block_finalization()
+
+                max_time = 10 * float(settings.network_config.SECONDS_PER_BLOCK)
+                oracle_tasks = (
+                    wait_oracle_signature_update(outdated_indexes, endpoint, max_time=max_time)
+                    for endpoint in oracles.endpoints
+                )
+                await asyncio.gather(*oracle_tasks)
         except Exception as e:
             logger.exception(e)
 

@@ -1,14 +1,17 @@
+import asyncio
 import logging
 import random
+import time
 from urllib.parse import urljoin
 
 import aiohttp
+from sw_utils.decorators import retry_aiohttp_errors
 from web3.types import HexStr
 
 from src.common.clients import consensus_client
 from src.common.metrics import metrics
 from src.common.typings import Oracles
-from src.config.settings import OUTDATED_SIGNATURES_URL_PATH, settings
+from src.config.settings import OUTDATED_SIGNATURES_URL_PATH, settings, DEFAULT_RETRY_TIME
 from src.exits.consensus import get_validator_public_keys
 from src.exits.execution import submit_exit_signatures
 from src.exits.typings import OraclesApproval, SignatureRotationRequest
@@ -24,6 +27,30 @@ async def fetch_outdated_indexes(oracles: Oracles) -> list[int]:
     outdated_indexes = await _fetch_outdated_indexes(random_oracle)
     metrics.outdated_signatures.set(len(outdated_indexes))
     return outdated_indexes
+
+
+async def wait_oracle_signature_update(
+    updated_indexes: list[int], oracle_endpoint: str, max_time: int | float = 0
+) -> None:
+    """
+    Wait the oracle `oracle_endpoint` reads and processes `ExitSignatureUpdate` event
+    for validator indexes `updated_indexes`.
+    """
+    elapsed = 0.0
+    start_time = time.time()
+
+    while elapsed <= max_time:
+        outdated_indexes = await _fetch_outdated_indexes(oracle_endpoint)
+
+        if not set(outdated_indexes) & set(updated_indexes):
+            return
+
+        await asyncio.sleep(float(settings.network_config.SECONDS_PER_BLOCK))
+        elapsed = time.time() - start_time
+
+    raise asyncio.TimeoutError(
+        f'Timeout exceeded for wait_oracle_signature_block_update for {oracle_endpoint}'
+    )
 
 
 async def update_exit_signatures(
@@ -49,6 +76,7 @@ async def update_exit_signatures(
     )
 
 
+@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def _fetch_outdated_indexes(oracle_endpoint: str) -> list[int]:
     path = OUTDATED_SIGNATURES_URL_PATH.format(vault=settings.vault)
     url = urljoin(oracle_endpoint, path)
