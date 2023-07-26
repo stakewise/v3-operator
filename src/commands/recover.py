@@ -10,11 +10,10 @@ from eth_utils import add_0x_prefix
 from web3.types import HexStr
 
 from src.commands.validators_exit import EXITING_STATUSES
-from src.common.clients import consensus_client
-from src.common.config import VaultConfig
+from src.common.clients import execution_client, consensus_client
+from src.common.vault_config import VaultConfig
 from src.common.contracts import VaultContract
 from src.common.credentials import CredentialManager
-from src.common.execution import eth_get_block
 from src.common.password import get_or_create_password_file
 from src.common.validators import validate_eth_address, validate_mnemonic
 from src.config.settings import AVAILABLE_NETWORKS, GOERLI, settings
@@ -119,7 +118,7 @@ def recover(
 # pylint: disable-next=too-many-locals
 async def _fetch_registered_validators() -> list[RegisteredValidator]:
     """Fetch registered validators."""
-    block = await eth_get_block()
+    block = await execution_client.eth.get_block('latest')
     current_block = block['number']
     keeper_genesis_block = settings.network_config.KEEPER_GENESIS_BLOCK
 
