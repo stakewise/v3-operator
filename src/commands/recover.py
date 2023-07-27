@@ -111,8 +111,6 @@ def recover(
     try:
         asyncio.run(
             main(
-                vault,
-                network,
                 mnemonic,
                 str(keystores_dir),
                 str(password_file),
@@ -126,8 +124,6 @@ def recover(
 
 # pylint: disable-next=too-many-arguments
 async def main(
-    vault: HexAddress,
-    network: str,
     mnemonic: str,
     keystores_dir: str,
     password_file: str,
@@ -140,8 +136,6 @@ async def main(
     click.secho(f'Found {len(validators)} validators, start recovering...')
 
     mnemonic_next_index = await _generate_keystores(
-        vault,
-        network,
         mnemonic,
         str(keystores_dir),
         str(password_file),
@@ -149,8 +143,8 @@ async def main(
         per_keystore_password,
     )
 
-    config.save(network, mnemonic, mnemonic_next_index)
-    click.secho(f'Vault {vault} successfully recovered', bold=True, fg='green')
+    config.save(settings.network, mnemonic, mnemonic_next_index)
+    click.secho(f'Vault {settings.vault} successfully recovered', bold=True, fg='green')
 
 
 # pylint: disable-next=too-many-locals
@@ -194,8 +188,6 @@ async def _fetch_registered_validators() -> list[RegisteredValidator]:
 
 # pylint: disable-next=too-many-arguments,too-many-locals
 async def _generate_keystores(
-    vault: HexAddress,
-    network: str,
     mnemonic: str,
     keystores_dir: str,
     password_file: str,
@@ -207,19 +199,17 @@ async def _generate_keystores(
         password = get_or_create_password_file(password_file)
     exited_statuses = [x.value for x in EXITING_STATUSES]
     last_index = 0
+    failed_counter = 0
     while not all(v.keystore_found for v in validators):
-        if last_index > 100:
-            raise click.ClickException('Keystores not found, check mnemonic')
-
         credential = CredentialManager.generate_credential(
-            network=network,
-            vault=vault,
+            network=settings.network,
+            vault=settings.vault,
             mnemonic=mnemonic,
             index=last_index,
         )
         last_index += 1
-
         keystore_pubkey = add_0x_prefix(credential.public_key)
+        found = False
         for validator in validators:
             if validator.public_key == keystore_pubkey:
                 validator.keystore_found = True
@@ -237,5 +227,14 @@ async def _generate_keystores(
                     keystores_dir,
                     per_keystore_password,
                 )
+                found = True
+                break
+
+        if not found:
+            failed_counter += 1
+            if failed_counter > 100:
+                raise click.ClickException('Keystores not found, check mnemonic')
+        else:
+            failed_counter = 0
 
     return last_index + 1
