@@ -196,43 +196,36 @@ async def _generate_keystores(
 ):
     os.makedirs(os.path.abspath(keystores_dir), exist_ok=True)
     exited_statuses = [x.value for x in EXITING_STATUSES]
-    last_index = 0
-    failed_counter = 0
+    index = 0
+    failed_attempts = 0
+
     while not all(v.keystore_found for v in validators):
         credential = CredentialManager.generate_credential(
             network=settings.network,
             vault=settings.vault,
             mnemonic=mnemonic,
-            index=last_index,
+            index=index,
         )
-        last_index += 1
-        keystore_pubkey = add_0x_prefix(credential.public_key)
-        found = False
+
         for validator in validators:
-            if validator.public_key == keystore_pubkey:
+            if validator.public_key == add_0x_prefix(credential.public_key):
                 validator.keystore_found = True
                 if validator.status in exited_statuses:
                     continue
-
-                # Get password if using per_keystore_password
-                if per_keystore_password:
-                    password = generate_password()
-                else:
-                    password = get_or_create_password_file(password_file)
-
-                credential.save_signing_keystore(
-                    password,
-                    keystores_dir,
-                    per_keystore_password,
+                password = (
+                    generate_password()
+                    if per_keystore_password
+                    else get_or_create_password_file(password_file)
                 )
-                found = True
+                credential.save_signing_keystore(password, keystores_dir, per_keystore_password)
+                failed_attempts = 0
                 break
-
-        if not found:
-            failed_counter += 1
-            if failed_counter > 100:
-                raise click.ClickException('Keystores not found, check mnemonic')
         else:
-            failed_counter = 0
+            failed_attempts += 1
 
-    return last_index + 1
+        if failed_attempts > 100:
+            raise click.ClickException('Keystores not found, check mnemonic')
+
+        index += 1
+
+    return index
