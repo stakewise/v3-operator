@@ -195,8 +195,6 @@ async def _generate_keystores(
     per_keystore_password: bool,
 ):
     os.makedirs(os.path.abspath(keystores_dir), exist_ok=True)
-    if not per_keystore_password:
-        password = get_or_create_password_file(password_file)
     exited_statuses = [x.value for x in EXITING_STATUSES]
     last_index = 0
     failed_counter = 0
