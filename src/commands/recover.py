@@ -13,7 +13,7 @@ from src.commands.validators_exit import EXITING_STATUSES
 from src.common.clients import consensus_client, execution_client
 from src.common.contracts import vault_contract
 from src.common.credentials import CredentialManager
-from src.common.password import get_or_create_password_file
+from src.common.password import generate_password, get_or_create_password_file
 from src.common.validators import validate_eth_address, validate_mnemonic
 from src.common.vault_config import VaultConfig
 from src.config.settings import AVAILABLE_NETWORKS, GOERLI, settings
@@ -34,6 +34,12 @@ class RegisteredValidator:
     envvar='DATA_DIR',
     help='Path where the vault data will be placed. Default is ~/.stakewise.',
     type=click.Path(exists=False, file_okay=False, dir_okay=True),
+)
+@click.option(
+    '--per-keystore-password',
+    is_flag=True,
+    default=False,
+    help='Creates separate password file for each keystore.',
 )
 @click.option(
     '--mnemonic',
@@ -81,6 +87,7 @@ def recover(
     mnemonic: str,
     consensus_endpoints: str,
     execution_endpoints: str,
+    per_keystore_password: bool,
 ) -> None:
     # pylint: disable=duplicate-code
     config = VaultConfig(
@@ -106,10 +113,16 @@ def recover(
         raise click.ClickException('Registered validators not found')
     click.secho(f'Found {len(validators)} validators, start recovering...')
 
-    password = get_or_create_password_file(str(password_file))
-
     mnemonic_next_index = asyncio.run(
-        _generate_keystores(vault, network, mnemonic, password, str(keystores_dir), validators)
+        _generate_keystores(
+            vault,
+            network,
+            mnemonic,
+            str(keystores_dir),
+            str(password_file),
+            validators,
+            per_keystore_password,
+        )
     )
 
     config.save(network, mnemonic, mnemonic_next_index)
@@ -155,15 +168,19 @@ async def _fetch_registered_validators() -> list[RegisteredValidator]:
     return results
 
 
-# pylint: disable-next=too-many-arguments
+# pylint: disable-next=too-many-arguments,too-many-locals
 async def _generate_keystores(
     vault: HexAddress,
     network: str,
     mnemonic: str,
-    password: str,
     keystores_dir: str,
+    password_file: str,
     validators: list[RegisteredValidator],
+    per_keystore_password: bool,
 ):
+    os.makedirs(os.path.abspath(keystores_dir), exist_ok=True)
+    if not per_keystore_password:
+        password = get_or_create_password_file(password_file)
     exited_statuses = [x.value for x in EXITING_STATUSES]
     last_index = 0
     while not all(v.keystore_found for v in validators):
@@ -180,9 +197,16 @@ async def _generate_keystores(
         last_index += 1
 
         for cred in credentials:
+            # Get password if using per_keystore_password
+            if per_keystore_password:
+                password = generate_password()
+            else:
+                password = get_or_create_password_file(password_file)
+
             keystore_file = cred.save_signing_keystore(
                 password,
                 keystores_dir,
+                per_keystore_password,
             )
             with open(keystore_file, encoding='utf-8') as f:
                 keystore_data = json.load(f)
@@ -192,7 +216,12 @@ async def _generate_keystores(
                 if validator.public_key == add_0x_prefix(keystore_pubkey):
                     validator.keystore_found = True
                     if validator.status in exited_statuses:
+                        base_name = os.path.splitext(keystore_file)[0]
+                        keystore_password = base_name + '.txt'
+
                         os.remove(keystore_file)
+                        if os.path.isfile(keystore_password):
+                            os.remove(keystore_password)
                     break
 
     return last_index + 1
