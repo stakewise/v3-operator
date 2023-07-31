@@ -10,8 +10,6 @@ from sw_utils.typings import ChainHead
 
 import src
 from src.common.clients import consensus_client, execution_client
-from src.common.clients import execution_client
-from src.common.consensus import get_chain_finalized_head
 from src.common.execution import check_hot_wallet_balance, get_oracles
 from src.common.metrics import metrics, metrics_server
 from src.common.startup_check import startup_checks

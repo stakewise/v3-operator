@@ -7,8 +7,7 @@ from eth_typing import BlockNumber
 from web3 import Web3
 from web3.types import Wei
 
-from src.common.clients import execution_client
-from src.common.consensus import get_chain_finalized_head
+from src.common.clients import consensus_client, execution_client
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -47,7 +46,7 @@ async def wait_block_finalization(block_number: BlockNumber | None = None):
         await asyncio.sleep(sleep_time)
         start = time.time()
 
-        chain_head = await get_chain_finalized_head()
+        chain_head = await consensus_client.get_chain_finalized_head()
 
         elapsed = time.time() - start
         sleep_time = float(settings.network_config.SECONDS_PER_BLOCK) - elapsed
