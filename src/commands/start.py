@@ -13,7 +13,7 @@ from src.common.clients import consensus_client, execution_client
 from src.common.execution import check_hot_wallet_balance, get_oracles
 from src.common.metrics import metrics, metrics_server
 from src.common.startup_check import startup_checks
-from src.common.utils import get_build_version, log_verbose, wait_block_finalization
+from src.common.utils import get_build_version, log_verbose
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
 from src.config.settings import (
@@ -26,7 +26,7 @@ from src.config.settings import (
 from src.exits.tasks import (
     fetch_outdated_indexes,
     update_exit_signatures,
-    wait_oracle_signature_update,
+    wait_oracles_signature_update,
 )
 from src.harvest.tasks import harvest_vault as harvest_vault_task
 from src.validators.database import NetworkValidatorCrud
@@ -207,6 +207,12 @@ def start(
 
 
 async def update_exit_signatures_periodically(keystores: Keystores):
+    # Oracle may have lag if operator was stopped
+    # during `update_exit_signatures_periodically` process.
+    # Wait all oracles sync.
+    oracles = await get_oracles()
+    await wait_oracles_signature_update(oracles)
+
     while True:
         timer_start = time.time()
 
@@ -215,19 +221,10 @@ async def update_exit_signatures_periodically(keystores: Keystores):
             outdated_indexes = await fetch_outdated_indexes(oracles)
 
             if outdated_indexes:
-                tx_hash = await update_exit_signatures(keystores, oracles, outdated_indexes)
+                await update_exit_signatures(keystores, oracles, outdated_indexes)
 
-                tx = await execution_client.eth.get_transaction(tx_hash)
-                update_block = tx['blockNumber']
-
-                await wait_block_finalization(update_block)
-
-                max_time = 10 * float(settings.network_config.SECONDS_PER_BLOCK)
-                oracle_tasks = (
-                    wait_oracle_signature_update(update_block, endpoint, max_time=max_time)
-                    for endpoint in oracles.endpoints
-                )
-                await asyncio.gather(*oracle_tasks)
+                # Wait all oracles sync.
+                await wait_oracles_signature_update(oracles)
         except Exception as e:
             logger.exception(e)
 

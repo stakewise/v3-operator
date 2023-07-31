@@ -112,6 +112,25 @@ class KeeperContract(ContractWrapper):
         )
         return voting_info
 
+    async def get_exit_signatures_updated_events(
+        self, from_block: BlockNumber, to_block: BlockNumber
+    ) -> list[EventData]:
+        return await self.events.ExitSignaturesUpdated.get_logs(
+            fromBlock=from_block, toBlock=to_block
+        )
+
+    async def get_exit_signatures_updated_event(self) -> EventData | None:
+        from_block = settings.network_config.KEEPER_GENESIS_BLOCK
+        to_block = await execution_client.eth.get_block_number()
+
+        last_event = await self._get_last_event(
+            self.get_exit_signatures_updated_events,
+            current_block=to_block,
+            from_block=from_block,
+        )
+
+        return last_event
+
     async def get_rewards_min_oracles(self) -> int:
         """Fetches the last oracles config updated event."""
         return await self.contract.functions.rewardsMinOracles().call()

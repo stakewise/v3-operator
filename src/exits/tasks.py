@@ -10,8 +10,10 @@ from sw_utils.decorators import retry_aiohttp_errors
 from web3.types import HexStr
 
 from src.common.clients import consensus_client
+from src.common.contracts import keeper_contract
 from src.common.metrics import metrics
 from src.common.typings import Oracles
+from src.common.utils import wait_block_finalization
 from src.config.settings import (
     DEFAULT_RETRY_TIME,
     OUTDATED_SIGNATURES_URL_PATH,
@@ -32,6 +34,22 @@ async def fetch_outdated_indexes(oracles: Oracles) -> list[int]:
     outdated_indexes = await _fetch_outdated_indexes(random_oracle)
     metrics.outdated_signatures.set(len(outdated_indexes))
     return outdated_indexes
+
+
+async def wait_oracles_signature_update(oracles: Oracles) -> None:
+    last_event = await keeper_contract.get_exit_signatures_updated_event()
+    if not last_event:
+        return
+    update_block = BlockNumber(last_event['blockNumber'])
+
+    await wait_block_finalization(update_block)
+
+    max_time = 10 * float(settings.network_config.SECONDS_PER_BLOCK)
+    oracle_tasks = (
+        wait_oracle_signature_update(update_block, endpoint, max_time=max_time)
+        for endpoint in oracles.endpoints
+    )
+    await asyncio.gather(*oracle_tasks)
 
 
 async def wait_oracle_signature_update(
