@@ -5,13 +5,18 @@ import time
 from urllib.parse import urljoin
 
 import aiohttp
+from eth_typing import BlockNumber
 from sw_utils.decorators import retry_aiohttp_errors
 from web3.types import HexStr
 
 from src.common.clients import consensus_client
 from src.common.metrics import metrics
 from src.common.typings import Oracles
-from src.config.settings import OUTDATED_SIGNATURES_URL_PATH, settings, DEFAULT_RETRY_TIME
+from src.config.settings import (
+    DEFAULT_RETRY_TIME,
+    OUTDATED_SIGNATURES_URL_PATH,
+    settings,
+)
 from src.exits.consensus import get_validator_public_keys
 from src.exits.execution import submit_exit_signatures
 from src.exits.typings import OraclesApproval, SignatureRotationRequest
@@ -30,19 +35,18 @@ async def fetch_outdated_indexes(oracles: Oracles) -> list[int]:
 
 
 async def wait_oracle_signature_update(
-    updated_indexes: list[int], oracle_endpoint: str, max_time: int | float = 0
+    exit_signature_update_block: BlockNumber, oracle_endpoint: str, max_time: int | float = 0
 ) -> None:
     """
     Wait the oracle `oracle_endpoint` reads and processes `ExitSignatureUpdate` event
-    for validator indexes `updated_indexes`.
+    in the block `exit_signature_update_block`.
     """
     elapsed = 0.0
     start_time = time.time()
 
     while elapsed <= max_time:
-        outdated_indexes = await _fetch_outdated_indexes(oracle_endpoint)
-
-        if not set(outdated_indexes) & set(updated_indexes):
+        oracle_block = await _fetch_exit_signature_block(oracle_endpoint)
+        if oracle_block and oracle_block >= exit_signature_update_block:
             return
 
         await asyncio.sleep(float(settings.network_config.SECONDS_PER_BLOCK))
@@ -55,7 +59,7 @@ async def wait_oracle_signature_update(
 
 async def update_exit_signatures(
     keystores: Keystores, oracles: Oracles, outdated_indexes: list[int]
-) -> None:
+) -> HexStr:
     """Fetches update signature requests from oracles."""
     exit_rotation_batch_limit = oracles.validators_exit_rotation_batch_limit
     outdated_indexes = outdated_indexes[:exit_rotation_batch_limit]
@@ -69,15 +73,26 @@ async def update_exit_signatures(
         validators=validators,
     )
 
-    await submit_exit_signatures(oracles_approval)
+    tx_hash = await submit_exit_signatures(oracles_approval)
     logger.info(
         'Successfully rotated exit signatures for validators with indexes %s',
         ', '.join([str(index) for index in outdated_indexes]),
     )
+    return tx_hash
 
 
 @retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
-async def _fetch_outdated_indexes(oracle_endpoint: str) -> list[int]:
+async def _get_oracle_outdated_signatures_response(oracle_endpoint: str) -> dict:
+    """
+    :param oracle_endpoint:
+    :return: Example response
+    ```
+    {
+        "exit_signature_block_number": 100,
+        "validators": [{"index": 1}, ...]
+    }
+    ```
+    """
     path = OUTDATED_SIGNATURES_URL_PATH.format(vault=settings.vault)
     url = urljoin(oracle_endpoint, path)
 
@@ -85,7 +100,20 @@ async def _fetch_outdated_indexes(oracle_endpoint: str) -> list[int]:
         async with session.get(url=url) as response:
             response.raise_for_status()
             data = await response.json()
-    return [x.get('index') for x in data]
+    return data
+
+
+async def _fetch_outdated_indexes(oracle_endpoint: str) -> list[int]:
+    data = await _get_oracle_outdated_signatures_response(oracle_endpoint)
+    return [x['index'] for x in data['validators']]
+
+
+async def _fetch_exit_signature_block(oracle_endpoint: str) -> BlockNumber | None:
+    data = await _get_oracle_outdated_signatures_response(oracle_endpoint)
+    block_number = data['exit_signature_block_number']
+    if block_number is None:
+        return None
+    return BlockNumber(block_number)
 
 
 async def get_oracles_approval(

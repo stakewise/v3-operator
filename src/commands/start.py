@@ -10,7 +10,8 @@ from sw_utils.typings import ChainHead
 
 import src
 from src.common.clients import consensus_client, execution_client
-from src.common.contrib import chunkify
+from src.common.clients import execution_client
+from src.common.consensus import get_chain_finalized_head
 from src.common.execution import check_hot_wallet_balance, get_oracles
 from src.common.metrics import metrics, metrics_server
 from src.common.startup_check import startup_checks
@@ -216,16 +217,16 @@ async def update_exit_signatures_periodically(keystores: Keystores):
             outdated_indexes = await fetch_outdated_indexes(oracles)
 
             if outdated_indexes:
-                chunk_size = oracles.validators_exit_rotation_batch_limit
+                tx_hash = await update_exit_signatures(keystores, oracles, outdated_indexes)
 
-                for indexes_chunk in chunkify(outdated_indexes, chunk_size):
-                    await update_exit_signatures(keystores, oracles, indexes_chunk)
+                tx = await execution_client.eth.get_transaction(tx_hash)
+                update_block = tx['blockNumber']
 
-                await wait_block_finalization()
+                await wait_block_finalization(update_block)
 
                 max_time = 10 * float(settings.network_config.SECONDS_PER_BLOCK)
                 oracle_tasks = (
-                    wait_oracle_signature_update(outdated_indexes, endpoint, max_time=max_time)
+                    wait_oracle_signature_update(update_block, endpoint, max_time=max_time)
                     for endpoint in oracles.endpoints
                 )
                 await asyncio.gather(*oracle_tasks)
