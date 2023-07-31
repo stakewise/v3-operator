@@ -1,5 +1,4 @@
 import asyncio
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -112,8 +111,8 @@ def recover(
         asyncio.run(
             main(
                 mnemonic,
-                str(keystores_dir),
-                str(password_file),
+                keystores_dir,
+                password_file,
                 per_keystore_password,
                 config,
             )
@@ -125,8 +124,8 @@ def recover(
 # pylint: disable-next=too-many-arguments
 async def main(
     mnemonic: str,
-    keystores_dir: str,
-    password_file: str,
+    keystores_dir: Path,
+    password_file: Path,
     per_keystore_password: bool,
     config: VaultConfig,
 ):
@@ -137,8 +136,8 @@ async def main(
 
     mnemonic_next_index = await _generate_keystores(
         mnemonic,
-        str(keystores_dir),
-        str(password_file),
+        keystores_dir,
+        password_file,
         validators,
         per_keystore_password,
     )
@@ -189,12 +188,12 @@ async def _fetch_registered_validators() -> list[RegisteredValidator]:
 # pylint: disable-next=too-many-arguments,too-many-locals
 async def _generate_keystores(
     mnemonic: str,
-    keystores_dir: str,
-    password_file: str,
+    keystores_dir: Path,
+    password_file: Path,
     validators: list[RegisteredValidator],
     per_keystore_password: bool,
 ):
-    os.makedirs(os.path.abspath(keystores_dir), exist_ok=True)
+    keystores_dir.mkdir(parents=True, exist_ok=True)
     exited_statuses = [x.value for x in EXITING_STATUSES]
     index = 0
     failed_attempts = 0
@@ -215,9 +214,11 @@ async def _generate_keystores(
                 password = (
                     generate_password()
                     if per_keystore_password
-                    else get_or_create_password_file(password_file)
+                    else get_or_create_password_file(str(password_file))
                 )
-                credential.save_signing_keystore(password, keystores_dir, per_keystore_password)
+                credential.save_signing_keystore(
+                    password, str(keystores_dir), per_keystore_password
+                )
                 failed_attempts = 0
                 break
         else:
