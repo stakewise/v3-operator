@@ -143,7 +143,9 @@ async def main(
     )
 
     config.save(settings.network, mnemonic, mnemonic_next_index)
-    click.secho(f'Keystores for vault {settings.vault} successfully recovered', bold=True, fg='green')
+    click.secho(
+        f'Keystores for vault {settings.vault} successfully recovered', bold=True, fg='green'
+    )
 
 
 # pylint: disable-next=too-many-locals

@@ -305,7 +305,7 @@ Enter your vault address: 0x3320ad928c20187602a2b2c04eeaa813fa899468
 Enter comma separated list of API endpoints for execution nodes: https://example.com
 Enter comma separated list of API endpoints for consensus nodes: https://example.com
 Enter the network name: goerli
-Vault data and keystores have been successfully recovered.
+Vault data and keystores have been successfully recovered at `~/.stakewise/{vault_addr}/keystores`.
 ```
 
 #### Options:
