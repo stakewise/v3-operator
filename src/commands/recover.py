@@ -1,11 +1,10 @@
 import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import click
 from eth_typing import HexAddress
 from eth_utils import add_0x_prefix
-from tqdm import tqdm
 from web3.types import HexStr
 
 from src.commands.validators_exit import EXITING_STATUSES
@@ -24,7 +23,6 @@ class RegisteredValidator:
     index: int
     public_key: HexStr
     status: str
-    keystore_found: bool = field(default=False)
 
 
 @click.command(help='Recover vault data directory and keystores.')
@@ -202,44 +200,40 @@ async def _generate_keystores(
     validators_dict = {add_0x_prefix(validator.public_key): validator for validator in validators}
     total_validators = len(validators_dict)
 
-    progress_bar = tqdm(total=total_validators, dynamic_ncols=True)
-
     index = 0
     failed_attempts = 0
 
-    while total_validators > 0:
-        credential = CredentialManager.generate_credential(
-            network=settings.network,
-            vault=settings.vault,
-            mnemonic=mnemonic,
-            index=index,
-        )
+    with click.progressbar(length=total_validators, label='Generating keystores') as progress_bar:
+        while total_validators > 0:
+            credential = CredentialManager.generate_credential(
+                network=settings.network,
+                vault=settings.vault,
+                mnemonic=mnemonic,
+                index=index,
+            )
 
-        # Check the current public key against the dict
-        public_key = add_0x_prefix(credential.public_key)
-        if public_key in validators_dict:
-            validator = validators_dict.pop(public_key)
-            total_validators -= 1
-            progress_bar.update(1)
+            public_key = add_0x_prefix(credential.public_key)
+            if public_key in validators_dict:
+                validator = validators_dict.pop(public_key)
+                total_validators -= 1
+                progress_bar.update(1)
 
-            if validator.status not in exited_statuses:
-                password = (
-                    generate_password()
-                    if per_keystore_password
-                    else get_or_create_password_file(str(password_file))
-                )
-                credential.save_signing_keystore(
-                    password, str(keystores_dir), per_keystore_password
-                )
-            failed_attempts = 0
-        else:
-            failed_attempts += 1
+                if validator.status not in exited_statuses:
+                    password = (
+                        generate_password()
+                        if per_keystore_password
+                        else get_or_create_password_file(str(password_file))
+                    )
+                    credential.save_signing_keystore(
+                        password, str(keystores_dir), per_keystore_password
+                    )
+                failed_attempts = 0
+            else:
+                failed_attempts += 1
 
-        if failed_attempts > 100:
-            progress_bar.close()
-            raise click.ClickException('Keystores not found, check mnemonic')
+            if failed_attempts > 100:
+                raise click.ClickException('Keystores not found, check mnemonic')
 
-        index += 1
+            index += 1
 
-    progress_bar.close()
     return index
