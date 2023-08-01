@@ -131,7 +131,7 @@ async def main(
 ):
     validators = await _fetch_registered_validators()
     if not validators:
-        raise click.ClickException('Registered validators not found')
+        raise click.ClickException('No registered validators')
     click.secho(f'Found {len(validators)} validators, start recovering...')
 
     mnemonic_next_index = await _generate_keystores(
