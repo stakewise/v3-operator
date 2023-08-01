@@ -5,6 +5,7 @@ from pathlib import Path
 import click
 from eth_typing import HexAddress
 from eth_utils import add_0x_prefix
+from tqdm import tqdm
 from web3.types import HexStr
 
 from src.commands.validators_exit import EXITING_STATUSES
@@ -197,10 +198,16 @@ async def _generate_keystores(
 ):
     keystores_dir.mkdir(parents=True, exist_ok=True)
     exited_statuses = [x.value for x in EXITING_STATUSES]
+
+    validators_dict = {add_0x_prefix(validator.public_key): validator for validator in validators}
+    total_validators = len(validators_dict)
+
+    progress_bar = tqdm(total=total_validators, dynamic_ncols=True)
+
     index = 0
     failed_attempts = 0
 
-    while not all(v.keystore_found for v in validators):
+    while total_validators > 0:
         credential = CredentialManager.generate_credential(
             network=settings.network,
             vault=settings.vault,
@@ -208,11 +215,14 @@ async def _generate_keystores(
             index=index,
         )
 
-        for validator in validators:
-            if validator.public_key == add_0x_prefix(credential.public_key):
-                validator.keystore_found = True
-                if validator.status in exited_statuses:
-                    continue
+        # Check the current public key against the dict
+        public_key = add_0x_prefix(credential.public_key)
+        if public_key in validators_dict:
+            validator = validators_dict.pop(public_key)
+            total_validators -= 1
+            progress_bar.update(1)
+
+            if validator.status not in exited_statuses:
                 password = (
                     generate_password()
                     if per_keystore_password
@@ -221,14 +231,15 @@ async def _generate_keystores(
                 credential.save_signing_keystore(
                     password, str(keystores_dir), per_keystore_password
                 )
-                failed_attempts = 0
-                break
+            failed_attempts = 0
         else:
             failed_attempts += 1
 
         if failed_attempts > 100:
+            progress_bar.close()
             raise click.ClickException('Keystores not found, check mnemonic')
 
         index += 1
 
+    progress_bar.close()
     return index
