@@ -1,11 +1,9 @@
 import asyncio
-from dataclasses import dataclass
 from pathlib import Path
 
 import click
 from eth_typing import HexAddress
 from eth_utils import add_0x_prefix
-from web3.types import HexStr
 
 from src.commands.validators_exit import EXITING_STATUSES
 from src.common.clients import consensus_client, execution_client
@@ -16,13 +14,6 @@ from src.common.utils import log_verbose
 from src.common.validators import validate_eth_address, validate_mnemonic
 from src.common.vault_config import VaultConfig
 from src.config.settings import AVAILABLE_NETWORKS, GOERLI, settings
-
-
-@dataclass
-class RegisteredValidator:
-    index: int
-    public_key: HexStr
-    status: str
 
 
 @click.command(help='Recover vault data directory and keystores.')
@@ -143,12 +134,14 @@ async def main(
 
     config.save(settings.network, mnemonic, mnemonic_next_index)
     click.secho(
-        f'Keystores for vault {settings.vault} successfully recovered to {keystores_dir}', bold=True, fg='green'
+        f'Keystores for vault {settings.vault} successfully recovered to {keystores_dir}',
+        bold=True,
+        fg='green',
     )
 
 
 # pylint: disable-next=too-many-locals
-async def _fetch_registered_validators() -> list[RegisteredValidator]:
+async def _fetch_registered_validators() -> dict[str, str]:
     """Fetch registered validators."""
     block = await execution_client.eth.get_block('latest')
     current_block = block['number']
@@ -168,22 +161,16 @@ async def _fetch_registered_validators() -> list[RegisteredValidator]:
             hex_key = event['args']['publicKey'].hex()
             public_keys.append(add_0x_prefix(hex_key))
 
-    results = []
+    validators_status = {}
 
     for i in range(0, len(public_keys), settings.validators_fetch_chunk_size):
         validators = await consensus_client.get_validators_by_ids(
             public_keys[i : i + settings.validators_fetch_chunk_size]
         )
         for beacon_validator in validators['data']:
-            results.append(
-                RegisteredValidator(
-                    index=beacon_validator['index'],
-                    public_key=beacon_validator['validator']['pubkey'],
-                    status=beacon_validator['status'],
-                )
-            )
+            validators_status[beacon_validator['validator']['pubkey']] = beacon_validator['status']
 
-    return results
+    return validators_status
 
 
 # pylint: disable-next=too-many-arguments,too-many-locals
@@ -191,14 +178,13 @@ async def _generate_keystores(
     mnemonic: str,
     keystores_dir: Path,
     password_file: Path,
-    validators: list[RegisteredValidator],
+    validators_status: dict[str, str],
     per_keystore_password: bool,
 ):
     keystores_dir.mkdir(parents=True, exist_ok=True)
     exited_statuses = [x.value for x in EXITING_STATUSES]
 
-    validators_dict = {add_0x_prefix(validator.public_key): validator for validator in validators}
-    total_validators = len(validators_dict)
+    total_validators = len(validators_status)
 
     index = 0
     failed_attempts = 0
@@ -213,12 +199,12 @@ async def _generate_keystores(
             )
 
             public_key = add_0x_prefix(credential.public_key)
-            if public_key in validators_dict:
-                validator = validators_dict.pop(public_key)
+            if public_key in validators_status:
+                validator_status = validators_status.pop(public_key)
                 total_validators -= 1
                 progress_bar.update(1)
 
-                if validator.status not in exited_statuses:
+                if validator_status not in exited_statuses:
                     password = (
                         generate_password()
                         if per_keystore_password
