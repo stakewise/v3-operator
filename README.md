@@ -25,9 +25,7 @@ The validator registration process consists of the following steps:
 ### Exit signatures rotation
 
 Exit signatures from the previous section can become invalid if the oracles set changes. For example, if oracle's private key gets compromised, the DAO will have to propose an update of the oracles set that will trigger exit signature rotation.
-The operator periodically checks active validators for Vault and if some signatures become outdated after rotation request
-release the operator will submit
-a signature update transaction to the Vault.
+The operator periodically checks active validators of the Vault and if some exit signatures become outdated, the operator will submit a signature update transaction to the Vault.
 
 ### Vault state update (optional)
 
