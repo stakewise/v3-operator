@@ -307,7 +307,7 @@ Enter comma separated list of API endpoints for consensus nodes: https://example
 Enter the network name: goerli
 Found 24 validators, recovering...
 Generating keystores  [####################################]  100%
-Keystores for vault {vault} successfully recovered
+Keystores for vault {vault} successfully recovered to {keystores_dir}
 ```
 
 #### Options:

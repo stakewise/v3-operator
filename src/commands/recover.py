@@ -143,7 +143,7 @@ async def main(
 
     config.save(settings.network, mnemonic, mnemonic_next_index)
     click.secho(
-        f'Keystores for vault {settings.vault} successfully recovered', bold=True, fg='green'
+        f'Keystores for vault {settings.vault} successfully recovered to {keystores_dir}', bold=True, fg='green'
     )
 
 
