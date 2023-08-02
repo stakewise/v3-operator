@@ -293,6 +293,35 @@ Validators 513571, 513572, 513861 exits successfully initiated
 - `--verbose` - Enable debug mode. Default is false.
 
 
+### Recover your vault data directory and keystores using this command.
+
+```bash
+./operator recover
+```
+
+```
+Enter the mnemonic for generating the validator keys: [Your Mnemonic Here]
+Enter your vault address: 0x3320ad928c20187602a2b2c04eeaa813fa899468
+Enter comma separated list of API endpoints for execution nodes: https://example.com
+Enter comma separated list of API endpoints for consensus nodes: https://example.com
+Enter the network name: goerli
+Found 24 validators, recovering...
+Generating keystores  [####################################]  100%
+Keystores for vault {vault} successfully recovered to {keystores_dir}
+```
+
+#### Options:
+
+- `--data-dir` - Path where the vault data will be placed. Default is ~/.stakewise.
+- `--per-keystore-password` - Creates separate password file for each keystore.
+- `--mnemonic` - The mnemonic for generating the validator keys.
+- `--vault` - The vault address.
+- `--execution-endpoints` - Comma separated list of API endpoints for execution nodes.
+- `--consensus-endpoints` - Comma separated list of API endpoints for consensus nodes.
+- `--network` - The network of your vault. Default is Goerli.
+
+> Note: For security purposes, make sure to protect your mnemonic as it can be used to generate your validator keys. Always verify the network and endpoints before running the command.
+
 ## Monitoring Operator with Prometheus
 
 Operator supports monitoring using Prometheus by providing a `/metrics` endpoint that Prometheus can scrape to gather

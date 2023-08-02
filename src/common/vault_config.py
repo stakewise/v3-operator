@@ -40,9 +40,9 @@ class VaultConfig:
             )
         self._validate(mnemonic)
 
-    def save(self, network: str, mnemonic: str):
+    def save(self, network: str, mnemonic: str, mnemonic_next_index: int = 0):
         self.network = network
-        self.mnemonic_next_index = 0
+        self.mnemonic_next_index = mnemonic_next_index
         self.first_public_key = CredentialManager.generate_credential_first_public_key(
             self.network, self.vault, mnemonic
         )
