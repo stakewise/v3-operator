@@ -24,8 +24,8 @@ The validator registration process consists of the following steps:
 
 ### Exit signatures rotation
 
-Exit signatures from the previous section are valid only for current and next consensus network forks.
-The operator periodically checks active validators for Vault and if some signatures become outdated after new fork
+Exit signatures from the previous section can become invalid if oracles set will changed. For example if some oracle will compomise it's private keys. In this case DAO can trigger exit signature rotation by increasing exit signature version.
+The operator periodically checks active validators for Vault and if some signatures become outdated after rotation request
 release the operator will submit
 a signature update transaction to the Vault.
 
