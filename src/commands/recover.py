@@ -4,8 +4,8 @@ from pathlib import Path
 import click
 from eth_typing import HexAddress
 from eth_utils import add_0x_prefix
+from sw_utils.consensus import EXITED_STATUSES
 
-from src.commands.validators_exit import EXITING_STATUSES
 from src.common.clients import consensus_client, execution_client
 from src.common.contracts import vault_contract
 from src.common.credentials import CredentialManager
@@ -182,7 +182,7 @@ async def _generate_keystores(
     per_keystore_password: bool,
 ):
     keystores_dir.mkdir(parents=True, exist_ok=True)
-    exited_statuses = [x.value for x in EXITING_STATUSES]
+    exited_statuses = [x.value for x in EXITED_STATUSES]
 
     total_validators = len(validators_status)
 
