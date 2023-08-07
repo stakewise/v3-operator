@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import random
 import time
 from pathlib import Path
 
@@ -218,7 +219,9 @@ async def update_exit_signatures_periodically(keystores: Keystores):
 
         try:
             oracles = await get_oracles()
-            outdated_indexes = await fetch_outdated_indexes(oracles)
+
+            oracle_endpoint = random.choice(oracles.endpoints)  # nosec
+            outdated_indexes = await fetch_outdated_indexes(oracle_endpoint)
 
             if outdated_indexes:
                 await update_exit_signatures(keystores, oracles, outdated_indexes)

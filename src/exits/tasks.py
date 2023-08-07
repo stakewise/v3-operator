@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import random
 import time
 from urllib.parse import urljoin
 
@@ -29,9 +28,10 @@ from src.validators.typings import Keystores
 logger = logging.getLogger(__name__)
 
 
-async def fetch_outdated_indexes(oracles: Oracles) -> list[int]:
-    random_oracle = random.choice(oracles.endpoints)  # nosec
-    outdated_indexes = await _fetch_outdated_indexes(random_oracle)
+async def fetch_outdated_indexes(oracle_endpoint) -> list[int]:
+    response = await _get_oracle_outdated_signatures_response(oracle_endpoint)
+    outdated_indexes = [val['index'] for val in response['validators']]
+
     metrics.outdated_signatures.set(len(outdated_indexes))
     return outdated_indexes
 
@@ -119,11 +119,6 @@ async def _get_oracle_outdated_signatures_response(oracle_endpoint: str) -> dict
             response.raise_for_status()
             data = await response.json()
     return data
-
-
-async def _fetch_outdated_indexes(oracle_endpoint: str) -> list[int]:
-    data = await _get_oracle_outdated_signatures_response(oracle_endpoint)
-    return [x['index'] for x in data['validators']]
 
 
 async def _fetch_exit_signature_block(oracle_endpoint: str) -> BlockNumber | None:
