@@ -1,10 +1,10 @@
 import json
 import os
 from functools import cached_property
-from typing import Callable
 
 from sw_utils.typings import Bytes32
 from web3.contract import AsyncContract
+from web3.contract.contract import ContractEvent
 from web3.types import BlockNumber, ChecksumAddress, EventData
 
 from src.common.clients import execution_client
@@ -15,6 +15,10 @@ from src.config.settings import settings
 class ContractWrapper:
     abi_path: str = ''
     settings_key: str = ''
+
+    @property
+    def events_blocks_range_interval(self) -> int:
+        return int(43200 / float(settings.network_config.SECONDS_PER_BLOCK))  # 12 hrs
 
     @property
     def contract_address(self) -> ChecksumAddress:
@@ -31,18 +35,40 @@ class ContractWrapper:
         return getattr(self.contract, item)
 
     async def _get_last_event(
-        self, f: Callable, current_block: BlockNumber, from_block: BlockNumber
+        self,
+        event: ContractEvent,
+        from_block: BlockNumber,
+        to_block: BlockNumber,
     ) -> EventData | None:
-        blocks_range = int(43200 / float(settings.network_config.SECONDS_PER_BLOCK))  # 12 hrs
-        while current_block > from_block:
-            events = await f(
-                from_block=BlockNumber(max(current_block - blocks_range, from_block)),
-                to_block=current_block,
+        blocks_range = self.events_blocks_range_interval
+
+        while to_block >= from_block:
+            events = await event.get_logs(
+                fromBlock=BlockNumber(max(to_block - blocks_range, from_block)),
+                toBlock=to_block,
             )
             if events:
                 return events[-1]
-            current_block = BlockNumber(current_block - blocks_range - 1)
+            to_block = BlockNumber(to_block - blocks_range - 1)
         return None
+
+    async def _get_events(
+        self,
+        event: ContractEvent,
+        from_block: BlockNumber,
+        to_block: BlockNumber,
+    ) -> list[EventData]:
+        events: list[EventData] = []
+        blocks_range = self.events_blocks_range_interval
+        while to_block >= from_block:
+            range_events = await event.get_logs(
+                fromBlock=from_block,
+                toBlock=BlockNumber(min(from_block + blocks_range, to_block)),
+            )
+            if range_events:
+                events.extend(range_events)
+            from_block = BlockNumber(from_block + blocks_range + 1)
+        return events
 
 
 class VaultContract(ContractWrapper):
@@ -74,34 +100,20 @@ class KeeperContract(ContractWrapper):
     abi_path = 'abi/IKeeper.json'
     settings_key = 'KEEPER_CONTRACT_ADDRESS'
 
-    async def get_config_updated_events(
-        self, from_block: BlockNumber, to_block: BlockNumber
-    ) -> list[EventData]:
-        return await keeper_contract.events.ConfigUpdated.get_logs(
-            fromBlock=from_block, toBlock=to_block
-        )
-
-    async def get_reward_updated_events(
-        self, from_block: BlockNumber, to_block: BlockNumber
-    ) -> list[EventData]:
-        return await keeper_contract.events.RewardsUpdated.get_logs(
-            fromBlock=from_block, toBlock=to_block
-        )
-
     async def get_config_updated_event(self) -> EventData | None:
         """Fetches the last oracles config updated event."""
         return await self._get_last_event(
-            self.get_config_updated_events,
-            current_block=await execution_client.eth.get_block_number(),
+            self.events.ConfigUpdated,
             from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
+            to_block=await execution_client.eth.get_block_number(),
         )
 
     async def get_last_rewards_update(self) -> RewardVoteInfo | None:
         """Fetches the last rewards update."""
         last_event = await self._get_last_event(
-            self.get_reward_updated_events,
-            current_block=await execution_client.eth.get_block_number(),
+            self.events.RewardsUpdated,
             from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
+            to_block=await execution_client.eth.get_block_number(),
         )
         if not last_event:
             return None
@@ -112,21 +124,14 @@ class KeeperContract(ContractWrapper):
         )
         return voting_info
 
-    async def get_exit_signatures_updated_events(
-        self, from_block: BlockNumber, to_block: BlockNumber
-    ) -> list[EventData]:
-        return await self.events.ExitSignaturesUpdated.get_logs(
-            fromBlock=from_block, toBlock=to_block
-        )
-
     async def get_exit_signatures_updated_event(self) -> EventData | None:
         from_block = settings.network_config.KEEPER_GENESIS_BLOCK
         to_block = await execution_client.eth.get_block_number()
 
         last_event = await self._get_last_event(
-            self.get_exit_signatures_updated_events,
-            current_block=to_block,
+            self.events.ExitSignaturesUpdated,
             from_block=from_block,
+            to_block=to_block,
         )
 
         return last_event

@@ -53,8 +53,10 @@ def get_exit_signature_shards(
     private_keys = get_polynomial_points(coefficients, len(oracles.public_keys))
     exit_signature_shards: list[HexStr] = []
     for bls_priv_key, pub_key in zip(private_keys, oracles.public_keys):
+        print(pub_key, 'pub_key')
         shard = ecies.encrypt(pub_key, bls.Sign(bls_priv_key, message))
         exit_signature_shards.append(Web3.to_hex(shard))
+        print('shard', Web3.to_hex(shard))
 
     return ExitSignatureShards(
         public_keys=[Web3.to_hex(bls.SkToPk(priv_key)) for priv_key in private_keys],
