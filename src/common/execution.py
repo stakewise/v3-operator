@@ -1,7 +1,6 @@
 import logging
 import statistics
 
-from eth_typing import HexStr
 from web3 import Web3
 from web3.exceptions import MethodUnavailable
 from web3.types import Wei
@@ -117,7 +116,7 @@ async def _calculate_median_priority_fee(block_id: str = 'latest') -> Wei:
     # collect maxPriorityFeePerGas for all transactions in the block
     priority_fees = []
     for tx_hash in block.transactions:
-        tx = await execution_client.eth.get_transaction(tx_hash)(HexStr(tx_hash))
+        tx = await execution_client.eth.get_transaction(tx_hash)
         if 'maxPriorityFeePerGas' in tx:
             priority_fees.append(tx.maxPriorityFeePerGas)
 
