@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import random
 import time
 from pathlib import Path
 
@@ -11,7 +10,7 @@ from sw_utils.typings import ChainHead
 
 import src
 from src.common.clients import consensus_client, execution_client
-from src.common.execution import check_hot_wallet_balance, get_oracles
+from src.common.execution import check_hot_wallet_balance
 from src.common.metrics import metrics, metrics_server
 from src.common.startup_check import startup_checks
 from src.common.utils import get_build_version, log_verbose
@@ -24,11 +23,7 @@ from src.config.settings import (
     DEFAULT_METRICS_PORT,
     settings,
 )
-from src.exits.tasks import (
-    fetch_outdated_indexes,
-    update_exit_signatures,
-    wait_oracles_signature_update,
-)
+from src.exits.tasks import update_exit_signatures_periodically
 from src.harvest.tasks import harvest_vault as harvest_vault_task
 from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import (
@@ -36,7 +31,6 @@ from src.validators.execution import (
     update_unused_validator_keys_metric,
 )
 from src.validators.tasks import load_genesis_validators, register_validators
-from src.validators.typings import Keystores
 from src.validators.utils import load_deposit_data, load_keystores
 
 logger = logging.getLogger(__name__)
@@ -205,34 +199,6 @@ def start(
         asyncio.run(main())
     except Exception as e:
         log_verbose(e)
-
-
-async def update_exit_signatures_periodically(keystores: Keystores):
-    # Oracle may have lag if operator was stopped
-    # during `update_exit_signatures_periodically` process.
-    # Wait all oracles sync.
-    oracles = await get_oracles()
-    await wait_oracles_signature_update(oracles)
-
-    while True:
-        timer_start = time.time()
-
-        try:
-            oracles = await get_oracles()
-
-            oracle_endpoint = random.choice(oracles.endpoints)  # nosec
-            outdated_indexes = await fetch_outdated_indexes(oracle_endpoint)
-
-            if outdated_indexes:
-                await update_exit_signatures(keystores, oracles, outdated_indexes)
-
-                # Wait all oracles sync.
-                await wait_oracles_signature_update(oracles)
-        except Exception as e:
-            logger.exception(e)
-
-        elapsed = time.time() - timer_start
-        await asyncio.sleep(float(settings.network_config.SECONDS_PER_BLOCK) - elapsed)
 
 
 async def main() -> None:

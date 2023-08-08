@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import random
 import time
 from urllib.parse import urljoin
 
@@ -10,6 +11,7 @@ from web3.types import HexStr
 
 from src.common.clients import consensus_client
 from src.common.contracts import keeper_contract
+from src.common.execution import get_oracles
 from src.common.metrics import metrics
 from src.common.typings import Oracles
 from src.common.utils import wait_block_finalization
@@ -163,3 +165,31 @@ async def get_oracles_approval(
         signatures=signatures,
         ipfs_hash=ipfs_hash,
     )
+
+
+async def update_exit_signatures_periodically(keystores: Keystores):
+    # Oracle may have lag if operator was stopped
+    # during `update_exit_signatures_periodically` process.
+    # Wait all oracles sync.
+    oracles = await get_oracles()
+    await wait_oracles_signature_update(oracles)
+
+    while True:
+        timer_start = time.time()
+
+        try:
+            oracles = await get_oracles()
+
+            oracle_endpoint = random.choice(oracles.endpoints)  # nosec
+            outdated_indexes = await fetch_outdated_indexes(oracle_endpoint)
+
+            if outdated_indexes:
+                await update_exit_signatures(keystores, oracles, outdated_indexes)
+
+                # Wait all oracles sync.
+                await wait_oracles_signature_update(oracles)
+        except Exception as e:
+            logger.exception(e)
+
+        elapsed = time.time() - timer_start
+        await asyncio.sleep(float(settings.network_config.SECONDS_PER_BLOCK) - elapsed)
