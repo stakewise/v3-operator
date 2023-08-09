@@ -297,6 +297,9 @@ Validators 513571, 513572, 513861 exits successfully initiated
 
 ### Update vault deposit data
 
+You can do that from the StakeWise web app by going to the settings on the vault page and uploading the deposit data or
+by using the following command:
+
 1. Generate deposit data validators root for your vault.
 
     ```bash
