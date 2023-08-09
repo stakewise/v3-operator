@@ -24,8 +24,11 @@ The validator registration process consists of the following steps:
 
 ### Exit signatures rotation
 
-Exit signatures from the previous section can become invalid if the oracles set changes. For example, if oracle's private key gets compromised, the DAO will have to propose an update of the oracles set that will trigger exit signature rotation.
-The operator periodically checks active validators of the Vault and if some exit signatures become outdated, the operator will submit a signature update transaction to the Vault.
+Exit signatures from the previous section can become invalid if the oracles set changes. For example, if oracle's
+private key gets compromised, the DAO will have to propose an update of the oracles set that will trigger exit signature
+rotation.
+The operator periodically checks active validators of the Vault and if some exit signatures become outdated, the
+operator will submit a signature update transaction to the Vault.
 
 ### Vault state update (optional)
 
@@ -122,9 +125,10 @@ Deposit data saved to /home/user/.stakewise/0x3320ad928c20187602a2b2c04eeaa813fa
 - `--count` - The number of the validator keys to generate.
 - `--vault` - The vault to generate the keystores and deposit data for.
 - `--per-keystore-password` - Creates separate password file for each keystore.
-- `--data-dir` - Path where the vault data will be placed. Default is ~/.stakewise.
+- `--data-dir` - Path where the vault data is stored. Default is ~/.stakewise.
 
 **NB! You must upload the deposit data to your vault:**
+
 1. Go to [StakeWise vaults](https://pacific.stakewise.io/vaults)
 2. Connect with your wallet
 3. Go to the "Created" tab and click on the vault
@@ -152,7 +156,7 @@ Done. The wallet and password saved to /home/user/.stakewise/0x3320a...68/wallet
 
 - `--vault` - The vault to generate the wallet for.
 - `--mnemonic` - The mnemonic for generating the wallet.
-- `--data-dir` - Path where the vault data will be placed. Default is ~/.stakewise.
+- `--data-dir` - Path where the vault data is stored. Default is ~/.stakewise.
 
 Or you can use any of the tools available for generating the hot wallet. For example,
 
@@ -257,7 +261,8 @@ PYTHONPATH=. poetry run python src/main.py start \
 
 Operator service also can be configured via environment variables instead of cli flags.
 Copy [.env.example](.env.example) file to `.env` file and fill it with correct values.
-Make sure that file paths in .env file represent vault data and client endpoints. You must load environment variables before running the operator.
+Make sure that file paths in .env file represent vault data and client endpoints. You must load environment variables
+before running the operator.
 
 ```sh
 export $(grep -v '^#' .env | xargs)
@@ -287,11 +292,36 @@ Validators 513571, 513572, 513861 exits successfully initiated
 - `--vault` - The vault address.
 - `--consensus-endpoints` - Comma separated list of API endpoints for consensus nodes.
 - `--count` - The number of validators to exit. By default, command will force exit all active vault validators.
-- `--data-dir` - Path where the vault data will be placed. Default is ~/.stakewise.
+- `--data-dir` - Path where the vault data is stored. Default is ~/.stakewise.
 - `--verbose` - Enable debug mode. Default is false.
 
+### Update vault deposit data
 
-### Recover your vault data directory and keystores using this command.
+1. Generate deposit data validators root for your vault.
+
+    ```bash
+    ./operator get-validators-root
+    ```
+
+    ```
+    Enter the vault address: 0xeEFFFD4C23D2E8c845870e273861e7d60Df49663
+    The validator deposit data Merkle tree root: 0x50437ed72066c1a09ee85978f168ac7c58fbc9cd4beb7962c13e68e7faac26d7
+    ```
+
+   #### Options:
+
+    - `--data-dir` - Path where the vault data is stored. Default is ~/.stakewise.
+    - `--deposit-data-file` - Path to the file with deposit data. Default is deposit data file located in the vault
+      directory.
+    - `--vault` - The vault address.
+
+2. Set deposit data root by calling `setValidatorsRoot` function on your vault. You must pass the Merkle
+   tree root generated from the previous command. The ABI of the contract
+   can be found [here](https://github.com/stakewise/v3-core/blob/main/abi/IVaultValidators.json).
+
+   **NB! The function must be called from the keys manager address (vault admin address by default).**
+
+### Recover vault data directory and keystores
 
 ```bash
 ./operator recover
@@ -318,7 +348,8 @@ Keystores for vault {vault} successfully recovered to {keystores_dir}
 - `--consensus-endpoints` - Comma separated list of API endpoints for consensus nodes.
 - `--network` - The network of your vault. Default is Goerli.
 
-> Note: For security purposes, make sure to protect your mnemonic as it can be used to generate your validator keys. Always verify the network and endpoints before running the command.
+> Note: For security purposes, make sure to protect your mnemonic as it can be used to generate your validator keys.
+> Always verify the network and endpoints before running the command.
 
 ## Monitoring Operator with Prometheus
 
