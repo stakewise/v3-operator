@@ -269,14 +269,67 @@ export $(grep -v '^#' .env | xargs)
 ./operator start
 ```
 
-## Misc commnads
+## Remote signer
+
+It is possible to use a remote signer with the `v3-operator` service.
+Because the validator exit signatures are split up and shared among oracles,
+the validator exit message needs to be signed by specific shares of the validator
+private key.
+
+These key shares therefore need to be present in your remote signer.
+
+### Key share generation
+
+This command will split up the private keys in the keystores directory
+into private key shares. The resulting private key share keystores should
+then be imported into your remote signer.
+
+Notes:
+- You will need to regenerate key shares every time the oracle set
+  changes. In order to regenerate key shares, make sure to
+  adjust the "mnemonic_next_index" value in the vault config.json
+  to 0, then run the `create-keys` command, generating the full keystores
+  for all your validators. Then run `generate-key-shares`
+  again to regenerate the key shares for all your validators. You can remove
+  the old private key shares from the remote signer, they will not be used
+  for anything anymore.
+
+```bash
+./operator generate-key-shares \
+ --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
+ --output-dir=keystores_shares
+```
+
+```
+Exporting validator keystores		  [####################################]  11/11
+Successfully generated 11 key shares for 1 private key(s)!
+Successfully configured operator to use remote signer for 1 public key(s)!
+```
+
+### Running the operator
+
+Provide the operator with the URL to your remote signer instance
+using the `--remote-signer-url` flag:
+
+```bash
+./operator start --remote-signer-url=http://remote-signer:9000 ...
+```
+
+You should see a message similar to this one after starting the operator:
+
+```
+Using remote signer at http://remote-signer:9000 for 10 public keys
+```
+
+
+## Misc commands
 
 ### Validators voluntary exit
 
 Performs a voluntary exit for active vault validators.
 
 ```bash
-./operator validator-exit
+./operator validators-exit
 ```
 
 ```sh
@@ -293,6 +346,7 @@ Validators 513571, 513572, 513861 exits successfully initiated
 - `--consensus-endpoints` - Comma separated list of API endpoints for consensus nodes.
 - `--count` - The number of validators to exit. By default, command will force exit all active vault validators.
 - `--data-dir` - Path where the vault data is stored. Default is ~/.stakewise.
+- `--remote-signer-url` - URL to the remote signer instance.
 - `--verbose` - Enable debug mode. Default is false.
 
 ### Update vault deposit data

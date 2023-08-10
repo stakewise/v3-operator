@@ -2,12 +2,12 @@ import json
 import os
 import tempfile
 
-import click.testing
+from click.testing import CliRunner
 
 from src.commands.merge_deposit_data import merge_deposit_data
 
 
-def test_merge_deposit_files():
+def test_merge_deposit_files(runner: CliRunner):
     file1_content = [
         {'id': 1, 'pubkey': '0x1'},
         {'id': 3, 'pubkey': '0x3'},
@@ -28,7 +28,6 @@ def test_merge_deposit_files():
 
         merged_file = _generate_temp_filepath()
 
-        runner = click.testing.CliRunner()
         result = runner.invoke(
             merge_deposit_data,
             [
@@ -43,8 +42,8 @@ def test_merge_deposit_files():
 
         assert result.exit_code == 0
 
-        with open(merged_file, 'r', encoding='utf-8') as result:
-            merged_json = json.load(result)
+        with open(merged_file, 'r', encoding='utf-8') as f:
+            merged_json = json.load(f)
 
         expected_merged_json = [
             {'id': 1, 'pubkey': '0x1'},
