@@ -23,7 +23,7 @@ from src.config.settings import (
     DEFAULT_METRICS_PORT,
     settings,
 )
-from src.exits.tasks import update_exit_signatures
+from src.exits.tasks import update_exit_signatures_periodically
 from src.harvest.tasks import harvest_vault as harvest_vault_task
 from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import (
@@ -234,6 +234,9 @@ async def main() -> None:
     await network_validators_scanner.process_new_events(to_block)
     await metrics_server()
 
+    # process outdated exit signatures
+    asyncio.create_task(update_exit_signatures_periodically(keystores))
+
     logger.info('Started operator service')
     with InterruptHandler() as interrupt_handler:
         while not interrupt_handler.exit:
@@ -248,9 +251,6 @@ async def main() -> None:
                 # check and register new validators
                 await update_unused_validator_keys_metric(keystores, deposit_data)
                 await register_validators(keystores, deposit_data)
-
-                # process outdated exit signatures
-                await update_exit_signatures(keystores)
 
                 # submit harvest vault transaction
                 if settings.harvest_vault:
