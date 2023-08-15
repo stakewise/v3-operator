@@ -57,6 +57,7 @@ jobs:
               copy $ZIP_FILE_NAME \tmp\artifacts\
               $CHECKSUM_FILE_NAME_PASH = "\tmp\artifacts\"  + $BUILD_FILE_NAME + ".sha256"
               certUtil -hashfile $ZIP_FILE_NAME SHA256 | findstr /i /v "SHA256" | findstr /i /v "CertUtil" > $CHECKSUM_FILE_NAME_PASH
+              dir libsecp256k1.dll /s /p C:\
 
     steps:
       - uses: actions/checkout@v2
