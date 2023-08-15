@@ -22,6 +22,7 @@ else:
 
 datas += collect_data_files('certifi')
 datas += collect_data_files('eth_account')
+datas += collect_data_files('coincurve')
 
 
 block_cipher = None
