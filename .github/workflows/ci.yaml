@@ -37,6 +37,14 @@ jobs:
       # Run precommit
       - name: Run precommit
         run: poetry run pre-commit run --all-files
+
+      # Markdown lint
+      - name: markdownlint-cli
+        uses: nosborn/github-action-markdown-cli@v3.3.0
+        with:
+          files: .
+          dot: true
+          ignore_files: .venv/
   test:
     name: Testing
     runs-on: ubuntu-latest

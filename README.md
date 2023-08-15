@@ -47,7 +47,7 @@ Download and decompress the binary file from [releases page](https://github.com/
 Operator generates mnemonic, keystores, deposit data for the validators. It also generates hot wallet used to submit
 validator registration transactions.
 
-#### How can I find the Vault address?
+### How can I find the Vault address?
 
 If you are creating a new Vault:
 
@@ -68,7 +68,7 @@ Create the vault config and mnemonic used to derive validator keys.
 ./operator init
 ```
 
-```
+```sh
 Enter the network name (goerli) [goerli]:
 Enter your vault address: 0x3320ad928c20187602a2b2c04eeaa813fa899468
 Choose your mnemonic language (chinese_simplified, chinese_traditional, czech, english, italian, korean, portuguese, spanish) [english]:
@@ -87,7 +87,7 @@ done.
 Successfully initialized configuration for vault 0x3320ad928c20187602a2b2c04eeaa813fa899468
 ```
 
-#### Options:
+#### Options
 
 - `--network` - The network of your vault.
 - `--vault` - The vault address.
@@ -106,20 +106,20 @@ Creates deposit data and validator keystores for operator service:
 ./operator create-keys
 ```
 
-```
+```sh
 Enter the vault address: 0x3320a...68
 Enter the number of the validator keys to generate: 10
 Enter the mnemonic for generating the validator keys: pumpkin anxiety private salon inquiry ....
-Creating validator keys:		  [####################################]  10/10
-Generating deposit data JSON		  [####################################]  10/10
-Exporting validator keystores		  [####################################]  10/10
+Creating validator keys:    [####################################]  10/10
+Generating deposit data JSON    [####################################]  10/10
+Exporting validator keystores    [####################################]  10/10
 
 Done. Generated 10 keys for 0x3320a...68 vault.
 Keystores saved to /home/user/.stakewise/0x3320ad928c20187602a2b2c04eeaa813fa899468/keystores file
 Deposit data saved to /home/user/.stakewise/0x3320ad928c20187602a2b2c04eeaa813fa899468/keystores/deposit_data.json file
 ```
 
-#### Options:
+#### `create-keys` options
 
 - `--mnemonic` - The mnemonic for generating the validator keys.
 - `--count` - The number of the validator keys to generate.
@@ -146,13 +146,13 @@ eye on your wallet balance, otherwise validators will stop registering.
 ./operator create-wallet
 ```
 
-```
+```sh
 Enter the vault address: 0x3320a...68
 Enter the mnemonic for generating the wallet: pumpkin anxiety private salon inquiry ...
 Done. The wallet and password saved to /home/user/.stakewise/0x3320a...68/wallet directory. The wallet address is: 0x239B...e3Cc
 ```
 
-#### Options:
+#### `create-wallet` options
 
 - `--vault` - The vault to generate the wallet for.
 - `--mnemonic` - The mnemonic for generating the wallet.
@@ -188,7 +188,7 @@ supports [ETH Beacon Node API specification](https://ethereum.github.io/beacon-A
 
 ## Step 4. Run operator service
 
-#### Option 1. From binary executable file
+### Option 1. From binary executable file
 
 See [releases page](https://github.com/stakewise/v3-operator/releases) to download and decompress the corresponding
 binary file. Start the binary with the following command:
@@ -279,14 +279,14 @@ Performs a voluntary exit for active vault validators.
 ./operator validator-exit
 ```
 
-```
+```sh
 Enter the comma separated list of API endpoints for consensus nodes: https://example.com
 Enter your vault address: 0x3320ad928c20187602a2b2c04eeaa813fa899468
 Are you sure you want to exit 3 validators with indexes: 513571, 513572, 513861? [y/N]: y
 Validators 513571, 513572, 513861 exits successfully initiated
 ```
 
-#### Options:
+#### `validator-exit` options
 
 - `--network` - The network of your vault.
 - `--vault` - The vault address.
@@ -306,23 +306,21 @@ by using the following command:
     ./operator get-validators-root
     ```
 
-    ```
+    ```sh
     Enter the vault address: 0xeEFFFD4C23D2E8c845870e273861e7d60Df49663
     The validator deposit data Merkle tree root: 0x50437ed72066c1a09ee85978f168ac7c58fbc9cd4beb7962c13e68e7faac26d7
     ```
 
-   #### Options:
+    `get-validators-root` options
 
     - `--data-dir` - Path where the vault data is stored. Default is ~/.stakewise.
     - `--deposit-data-file` - Path to the file with deposit data. Default is deposit data file located in the vault
       directory.
     - `--vault` - The vault address.
 
-2. Set deposit data root by calling `setValidatorsRoot` function on your vault. You must pass the Merkle
-   tree root generated from the previous command. The ABI of the contract
-   can be found [here](https://github.com/stakewise/v3-core/blob/main/abi/IVaultValidators.json).
+2. Set deposit data root by calling `setValidatorsRoot` function on your vault. You must pass the Merkle tree root generated from the previous command. The ABI of the contract can be found [here](https://github.com/stakewise/v3-core/blob/main/abi/IVaultValidators.json).
 
-   **NB! The function must be called from the keys manager address (vault admin address by default).**
+  **NB! The function must be called from the keys manager address (vault admin address by default).**
 
 ### Recover vault data directory and keystores
 
@@ -330,7 +328,7 @@ by using the following command:
 ./operator recover
 ```
 
-```
+```sh
 Enter the mnemonic for generating the validator keys: [Your Mnemonic Here]
 Enter your vault address: 0x3320ad928c20187602a2b2c04eeaa813fa899468
 Enter comma separated list of API endpoints for execution nodes: https://example.com
@@ -341,7 +339,7 @@ Generating keystores  [####################################]  100%
 Keystores for vault {vault} successfully recovered to {keystores_dir}
 ```
 
-#### Options:
+#### `recover` options
 
 - `--data-dir` - Path where the vault data will be placed. Default is ~/.stakewise.
 - `--per-keystore-password` - Creates separate password file for each keystore.
@@ -359,7 +357,7 @@ Keystores for vault {vault} successfully recovered to {keystores_dir}
 Operator supports monitoring using Prometheus by providing a `/metrics` endpoint that Prometheus can scrape to gather
 various metrics.
 
-### Prerequisites:
+### Prerequisites
 
 1. Operator application running and accessible.
 2. Prometheus server installed and running.
@@ -404,8 +402,8 @@ Replace `<METRICS_HOST>` and `<METRICS_PORT>` with the values you've set in Oper
 
 This configuration tells Prometheus to scrape metrics from Operator every 30 seconds.
 
-# Contacts
+## Contacts
 
-- Dmitri Tsumak - dmitri@stakewise.io
-- Alexander Sysoev - alexander@stakewise.io
-- Evgeny Gusarov - evgeny@stakewise.io
+- Dmitri Tsumak - <dmitri@stakewise.io>
+- Alexander Sysoev - <alexander@stakewise.io>
+- Evgeny Gusarov - <evgeny@stakewise.io>
