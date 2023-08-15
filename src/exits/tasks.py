@@ -137,7 +137,7 @@ async def get_oracles_approval(
 ) -> OraclesApproval:
     """Fetches approval from oracles."""
     fork = await consensus_client.get_consensus_fork()
-    deadline = datetime.utcnow() + timedelta(hours=1)
+    deadline = datetime.utcnow() + timedelta(seconds=settings.exit_signature_deadline)
 
     # get exit signature shards
     request = SignatureRotationRequest(
