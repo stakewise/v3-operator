@@ -2,7 +2,7 @@ import asyncio
 import logging
 import random
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urljoin
 
 import aiohttp
@@ -137,7 +137,7 @@ async def get_oracles_approval(
 ) -> OraclesApproval:
     """Fetches approval from oracles."""
     fork = await consensus_client.get_consensus_fork()
-    deadline = datetime.utcnow() + timedelta(seconds=settings.exit_signature_deadline)
+    deadline = datetime.now(timezone.utc) + timedelta(seconds=settings.exit_signature_deadline)
 
     # get exit signature shards
     request = SignatureRotationRequest(
