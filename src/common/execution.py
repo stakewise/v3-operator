@@ -54,7 +54,11 @@ async def get_oracles() -> Oracles:
     endpoints = []
     public_keys = []
     for oracle in config['oracles']:
-        endpoints.append(oracle['endpoint'])
+        if endpoint := oracle.get('endpoint'):
+            replicas = [endpoint]
+        else:
+            replicas = oracle['endpoints']
+        endpoints.append(replicas)
         public_keys.append(oracle['public_key'])
 
     if not 1 <= rewards_threshold <= len(config['oracles']):
