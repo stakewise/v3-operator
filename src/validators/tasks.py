@@ -1,5 +1,6 @@
 import logging
 
+from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.types import BlockNumber, Wei
 
@@ -70,7 +71,27 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
         )
         return
 
-    oracles_approval = await get_oracles_approval(oracles, keystores, validators)
+    # get latest registry root
+    latest_registry_root = await validators_registry_contract.get_registry_root()
+    logger.debug('Fetched latest validators registry root: %s', latest_registry_root)
+    registry_root = None
+
+    while True:
+        if not registry_root or registry_root != latest_registry_root:
+            registry_root = latest_registry_root
+            oracles_request = await get_oracles_request(
+                registry_root=registry_root,
+                oracles=oracles,
+                keystores=keystores,
+                validators=validators,
+            )
+
+        try:
+            oracles_approval = await get_oracles_approval(oracles=oracles, request=oracles_request)
+            break
+        except Exception as e:
+            logger.exception(e)
+        latest_registry_root = await validators_registry_contract.get_registry_root()
 
     if len(validators) == 1:
         validator = validators[0]
@@ -79,30 +100,30 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
             validator=validator,
             approval=oracles_approval,
             update_state_call=update_state_call,
+            validators_registry_root=registry_root,
         )
         logger.info('Successfully registered validator with public key %s', validator.public_key)
 
     if len(validators) > 1:
         await register_multiple_validator(
-            deposit_data.tree, validators, oracles_approval, update_state_call
+            tree=deposit_data.tree,
+            validators=validators,
+            approval=oracles_approval,
+            update_state_call=update_state_call,
+            validators_registry_root=registry_root,
         )
         pub_keys = ', '.join([val.public_key for val in validators])
         logger.info('Successfully registered validators with public keys %s', pub_keys)
 
 
-async def get_oracles_approval(
-    oracles: Oracles, keystores: Keystores, validators: list[Validator]
-) -> OraclesApproval:
-    """Fetches approval from oracles."""
-
-    # get latest registry root
-    registry_root = await validators_registry_contract.get_registry_root()
-    logger.debug('Fetched latest validators registry root: %s', registry_root)
+async def get_oracles_request(
+    oracles: Oracles, keystores: Keystores, validators: list[Validator], registry_root: Bytes32
+) -> ApprovalRequest:
+    """Generate validator registration request data"""
 
     # get next validator index for exit signature
     latest_public_keys = await get_latest_network_validator_public_keys()
     validator_index = NetworkValidatorCrud().get_next_validator_index(list(latest_public_keys))
-    start_validator_index = validator_index
     logger.debug('Next validator index for exit signature: %d', validator_index)
 
     # fetch current fork data
@@ -118,6 +139,7 @@ async def get_oracles_approval(
         deposit_signatures=[],
         public_key_shards=[],
         exit_signature_shards=[],
+        proof=Bytes32(b''),
     )
     for validator in validators:
         shards = get_exit_signature_shards(
@@ -138,18 +160,21 @@ async def get_oracles_approval(
         request.exit_signature_shards.append(shards.exit_signatures)
 
         validator_index += 1
+    return request
 
+
+async def get_oracles_approval(oracles: Oracles, request: ApprovalRequest) -> OraclesApproval:
+    """Fetches approval from oracles."""
     # send approval request to oracles
     signatures, ipfs_hash = await send_approval_requests(oracles, request)
     logger.info(
         'Fetched oracles approval for validators: count=%d, start index=%d',
-        len(validators),
-        start_validator_index,
+        len(request.public_keys),
+        request.validator_index,
     )
     return OraclesApproval(
         signatures=signatures,
         ipfs_hash=ipfs_hash,
-        validators_registry_root=registry_root,
     )
 
 
