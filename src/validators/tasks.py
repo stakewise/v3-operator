@@ -139,7 +139,6 @@ async def get_oracles_request(
         deposit_signatures=[],
         public_key_shards=[],
         exit_signature_shards=[],
-        proof=Bytes32(b''),
     )
     for validator in validators:
         shards = get_exit_signature_shards(
