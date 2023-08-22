@@ -1038,6 +1038,20 @@ pycodestyle = ">=2.11.0,<2.12.0"
 pyflakes = ">=3.1.0,<3.2.0"
 
 [[package]]
+name = "flake8-datetime-utcnow-plugin"
+version = "0.1.2"
+description = "Plugin to check that utcnow() is not used in favour of now(UTC)"
+optional = false
+python-versions = ">=3.7,<4"
+files = [
+    {file = "flake8-datetime-utcnow-plugin-0.1.2.tar.gz", hash = "sha256:724733581a7b4e08a089a738ee69f4ef0fa7450a6ba0e2d01e3367fcfa6b8a82"},
+    {file = "flake8_datetime_utcnow_plugin-0.1.2-py3-none-any.whl", hash = "sha256:91b60598643ec2d616949d60913a273b1e963b9eeaf46579bee442a2539640be"},
+]
+
+[package.dependencies]
+flake8 = ">=3.0.0"
+
+[[package]]
 name = "flake8-pyproject"
 version = "1.2.2"
 description = "Flake8 plug-in loading the configuration from pyproject.toml"
@@ -1836,7 +1850,7 @@ name = "pycparser"
 version = "2.21"
 description = "C parser in Python"
 optional = false
-python-versions = "*"
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 files = [
     {file = "pycparser-2.21-py2.py3-none-any.whl", hash = "sha256:8ee45429555515e1f6b185e78100aea234072576aa43ab53aefcae078162fca9"},
     {file = "pycparser-2.21.tar.gz", hash = "sha256:e644fdec12f7872f86c58ff790da456218b10f863970249516d60a5eaca77206"},
@@ -3007,4 +3021,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.11"
-content-hash = "dc9cc58fc389af31fc95aa19acd657b4fcaee971299919939e6bd8293e459c95"
+content-hash = "537db68240b2d46e5cc621fd4a04102af3012fca77f26c8792cf50af9ff4255e"
