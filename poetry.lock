@@ -1052,6 +1052,21 @@ files = [
 flake8 = ">=3.0.0"
 
 [[package]]
+name = "flake8-print"
+version = "5.0.0"
+description = "print statement checker plugin for flake8"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "flake8-print-5.0.0.tar.gz", hash = "sha256:76915a2a389cc1c0879636c219eb909c38501d3a43cc8dae542081c9ba48bdf9"},
+    {file = "flake8_print-5.0.0-py3-none-any.whl", hash = "sha256:84a1a6ea10d7056b804221ac5e62b1cee1aefc897ce16f2e5c42d3046068f5d8"},
+]
+
+[package.dependencies]
+flake8 = ">=3.0"
+pycodestyle = "*"
+
+[[package]]
 name = "flake8-pyproject"
 version = "1.2.2"
 description = "Flake8 plug-in loading the configuration from pyproject.toml"
@@ -3021,4 +3036,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.11"
-content-hash = "537db68240b2d46e5cc621fd4a04102af3012fca77f26c8792cf50af9ff4255e"
+content-hash = "5aa890447b8c88b93b7d0a4e13338662d28f99615a2685bcbb72a75847717753"
