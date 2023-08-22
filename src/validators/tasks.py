@@ -2,7 +2,7 @@ import logging
 
 from sw_utils.typings import Bytes32
 from web3 import Web3
-from web3.types import BlockNumber, Wei
+from web3.types import BlockNumber, HexStr, Wei
 
 from src.common.clients import consensus_client, ipfs_fetch_client
 from src.common.contracts import validators_registry_contract
@@ -20,7 +20,7 @@ from src.validators.execution import (
     register_multiple_validator,
     register_single_validator,
 )
-from src.validators.signing import get_exit_signature_shards
+from src.validators.signing import get_exit_signature_shards, get_single_validator_proof
 from src.validators.typings import (
     ApprovalRequest,
     DepositData,
@@ -34,6 +34,7 @@ from src.validators.utils import send_approval_requests
 logger = logging.getLogger(__name__)
 
 
+# pylint: disable-next=too-many-locals
 async def register_validators(keystores: Keystores, deposit_data: DepositData) -> None:
     """Registers vault validators."""
     vault_balance, update_state_call = await get_withdrawable_assets()
@@ -79,11 +80,14 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
     while True:
         if not registry_root or registry_root != latest_registry_root:
             registry_root = latest_registry_root
+            _, proof = get_single_validator_proof(tree=deposit_data.tree, validator=validators[0])
+
             oracles_request = await get_oracles_request(
                 registry_root=registry_root,
                 oracles=oracles,
                 keystores=keystores,
                 validators=validators,
+                proof=proof,
             )
 
         try:
@@ -117,7 +121,11 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
 
 
 async def get_oracles_request(
-    oracles: Oracles, keystores: Keystores, validators: list[Validator], registry_root: Bytes32
+    oracles: Oracles,
+    keystores: Keystores,
+    validators: list[Validator],
+    registry_root: Bytes32,
+    proof: list[HexStr],
 ) -> ApprovalRequest:
     """Generate validator registration request data"""
 
@@ -139,7 +147,7 @@ async def get_oracles_request(
         deposit_signatures=[],
         public_key_shards=[],
         exit_signature_shards=[],
-        proof=Bytes32(b''),
+        proof=proof,
     )
     for validator in validators:
         shards = get_exit_signature_shards(

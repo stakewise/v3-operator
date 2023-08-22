@@ -2,14 +2,16 @@ import ecies
 import milagro_bls_binding as bls
 from Cryptodome.Random.random import randint
 from eth_typing import HexStr
+from multiproof import StandardMerkleTree
 from py_ecc.optimized_bls12_381.optimized_curve import curve_order
-from sw_utils.signing import get_exit_message_signing_root
+from sw_utils import get_eth1_withdrawal_credentials
+from sw_utils.signing import compute_deposit_data, get_exit_message_signing_root
 from sw_utils.typings import ConsensusFork
 from web3 import Web3
 
 from src.common.typings import Oracles
-from src.config.settings import settings
-from src.validators.typings import BLSPrivkey, ExitSignatureShards
+from src.config.settings import DEPOSIT_AMOUNT_GWEI, settings
+from src.validators.typings import BLSPrivkey, ExitSignatureShards, Validator
 
 
 def get_polynomial_points(coefficients: list[int], num_points: int) -> list[bytes]:
@@ -60,3 +62,24 @@ def get_exit_signature_shards(
         public_keys=[Web3.to_hex(bls.SkToPk(priv_key)) for priv_key in private_keys],
         exit_signatures=exit_signature_shards,
     )
+
+
+def get_single_validator_proof(
+    tree: StandardMerkleTree, validator: Validator
+) -> tuple[bytes, list[HexStr]]:
+    credentials = get_eth1_withdrawal_credentials(settings.vault)
+    tx_validator = encode_tx_validator(credentials, validator)
+    proof = tree.get_proof([tx_validator, validator.deposit_data_index])  # type: ignore
+    return tx_validator, proof
+
+
+def encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) -> bytes:
+    public_key = Web3.to_bytes(hexstr=validator.public_key)
+    signature = Web3.to_bytes(hexstr=validator.signature)
+    deposit_root = compute_deposit_data(
+        public_key=public_key,
+        withdrawal_credentials=withdrawal_credentials,
+        amount_gwei=DEPOSIT_AMOUNT_GWEI,
+        signature=signature,
+    ).hash_tree_root
+    return public_key + signature + deposit_root

@@ -26,10 +26,8 @@ from src.validators.exceptions import (
     RegistryRootChangedError,
     ValidatorIndexChangedError,
 )
-from src.validators.execution import (
-    _encode_tx_validator,
-    get_latest_network_validator_public_keys,
-)
+from src.validators.execution import get_latest_network_validator_public_keys
+from src.validators.signing import encode_tx_validator
 from src.validators.typings import (
     ApprovalRequest,
     BLSPrivkey,
@@ -176,7 +174,7 @@ def load_deposit_data(vault: HexAddress, deposit_data_file: Path) -> DepositData
             public_key=add_0x_prefix(data['pubkey']),
             signature=add_0x_prefix(data['signature']),
         )
-        leaves.append((_encode_tx_validator(credentials, validator), i))
+        leaves.append((encode_tx_validator(credentials, validator), i))
         validators.append(validator)
 
     tree = StandardMerkleTree.of(leaves, ['bytes', 'uint256'])
