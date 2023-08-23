@@ -71,15 +71,16 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
         )
         return
 
-    # get latest registry root
-    latest_registry_root = await validators_registry_contract.get_registry_root()
-    logger.debug('Fetched latest validators registry root: %s', latest_registry_root)
     registry_root = None
 
     while True:
+        latest_registry_root = await validators_registry_contract.get_registry_root()
+
         if not registry_root or registry_root != latest_registry_root:
             registry_root = latest_registry_root
-            oracles_request = await get_oracles_request(
+            logger.debug('Fetched latest validators registry root: %s', registry_root)
+
+            oracles_request = await create_approval_request(
                 registry_root=registry_root,
                 oracles=oracles,
                 keystores=keystores,
@@ -91,7 +92,6 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
             break
         except Exception as e:
             logger.exception(e)
-        latest_registry_root = await validators_registry_contract.get_registry_root()
 
     if len(validators) == 1:
         validator = validators[0]
@@ -116,7 +116,7 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
         logger.info('Successfully registered validators with public keys %s', pub_keys)
 
 
-async def get_oracles_request(
+async def create_approval_request(
     oracles: Oracles, keystores: Keystores, validators: list[Validator], registry_root: Bytes32
 ) -> ApprovalRequest:
     """Generate validator registration request data"""
