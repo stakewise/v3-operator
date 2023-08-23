@@ -2,6 +2,7 @@ import asyncio
 import dataclasses
 import json
 import logging
+import random
 from multiprocessing import Pool
 from os import listdir
 from os.path import isfile, join
@@ -89,6 +90,9 @@ async def send_approval_request_to_replicas(
     session: ClientSession, replicas: list[str], payload: dict
 ) -> OracleApproval:
     last_error = None
+
+    # Shuffling may help if the first endpoint is slower than others
+    replicas = random.sample(replicas, len(replicas))
 
     for endpoint in replicas:
         try:
