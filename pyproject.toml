@@ -32,6 +32,8 @@ bandit = { version = "==1.7.4", extras = ["toml"] }
 black = { version = "==23.1.0", extras = ["d"] }
 pyinstaller = "==5.7.0"
 faker = "==18.10.1"
+flake8-datetime-utcnow-plugin = "==0.1.2"
+flake8-print = "==5.0.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
