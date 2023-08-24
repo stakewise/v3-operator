@@ -10,6 +10,7 @@ from sw_utils import (
     get_eth1_withdrawal_credentials,
     is_valid_deposit_data_signature,
 )
+from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.types import EventData, Wei
 
@@ -225,6 +226,7 @@ async def register_single_validator(
     validator: Validator,
     approval: OraclesApproval,
     update_state_call: HexStr | None,
+    validators_registry_root: Bytes32,
 ) -> None:
     """Registers single validator."""
     if settings.network not in ETH_NETWORKS:
@@ -237,7 +239,7 @@ async def register_single_validator(
     logger.info('Submitting registration transaction')
     register_call_args = [
         (
-            approval.validators_registry_root,
+            validators_registry_root,
             tx_validator,
             approval.signatures,
             approval.ipfs_hash,
@@ -262,7 +264,8 @@ async def register_multiple_validator(
     tree: StandardMerkleTree,
     validators: list[Validator],
     approval: OraclesApproval,
-    update_call: HexStr | None,
+    update_state_call: HexStr | None,
+    validators_registry_root: Bytes32,
 ) -> None:
     """Registers multiple validators."""
     if settings.network not in ETH_NETWORKS:
@@ -283,7 +286,7 @@ async def register_multiple_validator(
     logger.info('Submitting registration transaction')
     register_call_args = [
         (
-            approval.validators_registry_root,
+            validators_registry_root,
             b''.join(tx_validators),
             approval.signatures,
             approval.ipfs_hash,
@@ -292,12 +295,12 @@ async def register_multiple_validator(
         multi_proof.proof_flags,
         multi_proof.proof,
     ]
-    if update_call is not None:
+    if update_state_call is not None:
         register_call = vault_contract.encodeABI(
             fn_name='registerValidators',
             args=register_call_args,
         )
-        tx = await vault_contract.functions.multicall([update_call, register_call]).transact()
+        tx = await vault_contract.functions.multicall([update_state_call, register_call]).transact()
     else:
         tx = await vault_contract.functions.registerValidators(*register_call_args).transact()
 

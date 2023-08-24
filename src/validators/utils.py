@@ -2,6 +2,7 @@ import asyncio
 import dataclasses
 import json
 import logging
+import random
 from multiprocessing import Pool
 from os import listdir
 from os.path import isfile, join
@@ -52,8 +53,10 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
     async with ClientSession(timeout=ClientTimeout(ORACLES_VALIDATORS_TIMEOUT)) as session:
         results = await asyncio.gather(
             *[
-                send_approval_request(session=session, endpoint=endpoint, payload=payload)
-                for address, endpoint in endpoints
+                send_approval_request_to_replicas(
+                    session=session, replicas=replicas, payload=payload
+                )
+                for address, replicas in endpoints
             ],
             return_exceptions=True,
         )
@@ -73,7 +76,7 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
         raise RuntimeError('Not enough oracles to get approval from')
 
     if len(set(ipfs_hashes)) != 1:
-        raise ValueError('Different oracles IPFS hashes for approval request')
+        raise ValueError('Different oracles IPFS hashes for approval request.')
 
     signatures = b''
     for address in sorted(responses.keys())[: oracles.validators_threshold]:
@@ -81,16 +84,39 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
     return signatures, ipfs_hashes[0]
 
 
+# pylint: disable=duplicate-code
 @retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
+async def send_approval_request_to_replicas(
+    session: ClientSession, replicas: list[str], payload: dict
+) -> OracleApproval:
+    last_error = None
+
+    # Shuffling may help if the first endpoint is slower than others
+    replicas = random.sample(replicas, len(replicas))
+
+    for endpoint in replicas:
+        try:
+            return await send_approval_request(session, endpoint, payload)
+        except (ClientError, asyncio.TimeoutError) as e:
+            logger.debug('%s for %s', repr(e), endpoint)
+            last_error = e
+
+    if last_error:
+        raise last_error
+
+    raise RuntimeError('Failed to get response from replicas')
+
+
 async def send_approval_request(
     session: ClientSession, endpoint: str, payload: dict
 ) -> OracleApproval:
     """Requests approval from single oracle."""
+    logger.debug('send_approval_request to %s', endpoint)
     try:
         async with session.post(url=endpoint, json=payload) as response:
             response.raise_for_status()
             data = await response.json()
-    except ClientError as e:
+    except (ClientError, asyncio.TimeoutError) as e:
         registry_root = await validators_registry_contract.get_registry_root()
         if Web3.to_hex(registry_root) != payload['validators_root']:
             raise RegistryRootChangedError from e

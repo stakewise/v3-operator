@@ -50,7 +50,8 @@ async def wait_oracles_signature_update(oracles: Oracles) -> None:
     max_time = 10 * float(settings.network_config.SECONDS_PER_BLOCK)
     oracle_tasks = (
         wait_oracle_signature_update(update_block, endpoint, max_time=max_time)
-        for endpoint in oracles.endpoints
+        for replicas in oracles.endpoints
+        for endpoint in replicas
     )
     await asyncio.gather(*oracle_tasks)
 
@@ -180,7 +181,8 @@ async def update_exit_signatures_periodically(keystores: Keystores):
         try:
             oracles = await get_oracles()
 
-            oracle_endpoint = random.choice(oracles.endpoints)  # nosec
+            oracle_replicas = random.choice(oracles.endpoints)  # nosec
+            oracle_endpoint = random.choice(oracle_replicas)  # nosec
             outdated_indexes = await fetch_outdated_indexes(oracle_endpoint)
 
             if outdated_indexes:

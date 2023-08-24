@@ -95,11 +95,15 @@ async def wait_for_execution_node() -> None:
 
 
 async def collect_healthy_oracles() -> list:
-    oracles = (await get_oracles()).endpoints
+    endpoints = (await get_oracles()).endpoints
 
     async with ClientSession(timeout=ClientTimeout(60)) as session:
         results = await asyncio.gather(
-            *[_aiohttp_fetch(session=session, url=endpoint) for endpoint in oracles],
+            *[
+                _aiohttp_fetch(session=session, url=endpoint)
+                for replicas in endpoints
+                for endpoint in replicas
+            ],
             return_exceptions=True
         )
 

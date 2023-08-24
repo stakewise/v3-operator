@@ -36,12 +36,12 @@ class ExitSignatureShards:
 
 @dataclass
 class OraclesApproval:
-    validators_registry_root: Bytes32
     signatures: bytes
     ipfs_hash: str
 
 
 @dataclass
+# pylint: disable-next=too-many-instance-attributes
 class ApprovalRequest:
     validator_index: int
     vault_address: ChecksumAddress

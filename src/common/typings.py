@@ -13,7 +13,7 @@ class Oracles:
     validators_threshold: int
     exit_signature_recover_threshold: int
     public_keys: list[HexStr]
-    endpoints: list[str]
+    endpoints: list[list[str]]
 
     validators_approval_batch_limit: int
     validators_exit_rotation_batch_limit: int
