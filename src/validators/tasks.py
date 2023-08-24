@@ -1,5 +1,6 @@
 import logging
 
+from multiproof.standart import MultiProof
 from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.types import BlockNumber, Wei
@@ -20,7 +21,7 @@ from src.validators.execution import (
     register_multiple_validator,
     register_single_validator,
 )
-from src.validators.signing import get_exit_signature_shards
+from src.validators.signing import get_exit_signature_shards, get_validators_proof
 from src.validators.typings import (
     ApprovalRequest,
     DepositData,
@@ -34,6 +35,7 @@ from src.validators.utils import send_approval_requests
 logger = logging.getLogger(__name__)
 
 
+# pylint: disable-next=too-many-locals
 async def register_validators(keystores: Keystores, deposit_data: DepositData) -> None:
     """Registers vault validators."""
     vault_balance, update_state_call = await get_withdrawable_assets()
@@ -71,8 +73,11 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
         )
         return
 
+    tx_validators, multi_proof = get_validators_proof(
+        tree=deposit_data.tree,
+        validators=validators,
+    )
     registry_root = None
-
     while True:
         latest_registry_root = await validators_registry_contract.get_registry_root()
 
@@ -85,6 +90,7 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
                 oracles=oracles,
                 keystores=keystores,
                 validators=validators,
+                multi_proof=multi_proof,
             )
 
         try:
@@ -96,9 +102,9 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
     if len(validators) == 1:
         validator = validators[0]
         await register_single_validator(
-            tree=deposit_data.tree,
-            validator=validator,
             approval=oracles_approval,
+            multi_proof=multi_proof,
+            tx_validators=tx_validators,
             update_state_call=update_state_call,
             validators_registry_root=registry_root,
         )
@@ -106,9 +112,9 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
 
     if len(validators) > 1:
         await register_multiple_validator(
-            tree=deposit_data.tree,
-            validators=validators,
             approval=oracles_approval,
+            multi_proof=multi_proof,
+            tx_validators=tx_validators,
             update_state_call=update_state_call,
             validators_registry_root=registry_root,
         )
@@ -117,7 +123,11 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
 
 
 async def create_approval_request(
-    oracles: Oracles, keystores: Keystores, validators: list[Validator], registry_root: Bytes32
+    oracles: Oracles,
+    keystores: Keystores,
+    validators: list[Validator],
+    registry_root: Bytes32,
+    multi_proof: MultiProof,
 ) -> ApprovalRequest:
     """Generate validator registration request data"""
 
@@ -139,6 +149,8 @@ async def create_approval_request(
         deposit_signatures=[],
         public_key_shards=[],
         exit_signature_shards=[],
+        proof=multi_proof.proof,
+        proof_flags=multi_proof.proof_flags,
     )
     for validator in validators:
         shards = get_exit_signature_shards(
