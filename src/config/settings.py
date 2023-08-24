@@ -47,6 +47,7 @@ class Settings(metaclass=Singleton):
     ipfs_fetch_endpoints: list[str]
     validators_fetch_chunk_size: int
     sentry_dsn: str
+    exit_signature_deadline: int
 
     # pylint: disable-next=too-many-arguments,too-many-locals
     def set(
@@ -121,6 +122,9 @@ class Settings(metaclass=Singleton):
             'VALIDATORS_FETCH_CHUNK_SIZE', default=100, cast=int
         )
         self.sentry_dsn = decouple_config('SENTRY_DSN', default='')
+        self.exit_signature_deadline = decouple_config(
+            'EXIT_SIGNATURE_DEADLINE', default=600, cast=int
+        )
 
     @property
     def network_config(self) -> NetworkConfig:

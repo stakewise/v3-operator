@@ -2,6 +2,7 @@ import asyncio
 import logging
 import random
 import time
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urljoin
 
 import aiohttp
@@ -137,6 +138,7 @@ async def get_oracles_approval(
 ) -> OraclesApproval:
     """Fetches approval from oracles."""
     fork = await consensus_client.get_consensus_fork()
+    deadline = datetime.now(timezone.utc) + timedelta(seconds=settings.exit_signature_deadline)
 
     # get exit signature shards
     request = SignatureRotationRequest(
@@ -144,6 +146,7 @@ async def get_oracles_approval(
         public_keys=[],
         public_key_shards=[],
         exit_signature_shards=[],
+        deadline=deadline,
     )
     for validator_index, public_key in validators.items():
         shards = get_exit_signature_shards(
@@ -162,10 +165,7 @@ async def get_oracles_approval(
     # send approval request to oracles
     signatures, ipfs_hash = await send_signature_rotation_requests(oracles, request)
     logger.info('Fetched updated signature for validators: count=%d', len(validators))
-    return OraclesApproval(
-        signatures=signatures,
-        ipfs_hash=ipfs_hash,
-    )
+    return OraclesApproval(signatures=signatures, ipfs_hash=ipfs_hash, deadline=deadline)
 
 
 async def update_exit_signatures_periodically(keystores: Keystores):

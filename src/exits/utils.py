@@ -1,5 +1,4 @@
 import asyncio
-import dataclasses
 import logging
 import random
 from urllib.parse import urljoin
@@ -21,7 +20,7 @@ async def send_signature_rotation_requests(
     oracles: Oracles, request: SignatureRotationRequest
 ) -> tuple[bytes, str]:
     """Requests exit signature rotation from all oracles."""
-    payload = dataclasses.asdict(request)
+    payload = request.as_json_dict()
     endpoints = list(zip(oracles.addresses, oracles.endpoints))
     random.shuffle(endpoints)
 
