@@ -3,13 +3,8 @@ import struct
 from typing import Set
 
 from eth_typing import BlockNumber, HexStr
-from multiproof import StandardMerkleTree
-from sw_utils import (
-    EventProcessor,
-    compute_deposit_data,
-    get_eth1_withdrawal_credentials,
-    is_valid_deposit_data_signature,
-)
+from multiproof.standart import MultiProof
+from sw_utils import EventProcessor, is_valid_deposit_data_signature
 from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.types import EventData, Wei
@@ -23,7 +18,7 @@ from src.common.contracts import (
 from src.common.ipfs import fetch_harvest_params
 from src.common.metrics import metrics
 from src.config.networks import ETH_NETWORKS
-from src.config.settings import DEPOSIT_AMOUNT, DEPOSIT_AMOUNT_GWEI, settings
+from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.typings import (
     DepositData,
@@ -222,9 +217,9 @@ async def update_unused_validator_keys_metric(
 
 
 async def register_single_validator(
-    tree: StandardMerkleTree,
-    validator: Validator,
     approval: OraclesApproval,
+    multi_proof: MultiProof,
+    tx_validators: list[bytes],
     update_state_call: HexStr | None,
     validators_registry_root: Bytes32,
 ) -> None:
@@ -232,19 +227,15 @@ async def register_single_validator(
     if settings.network not in ETH_NETWORKS:
         raise NotImplementedError('networks other than Ethereum not supported')
 
-    credentials = get_eth1_withdrawal_credentials(settings.vault)
-    tx_validator = _encode_tx_validator(credentials, validator)
-    proof = tree.get_proof([tx_validator, validator.deposit_data_index])
-
     logger.info('Submitting registration transaction')
     register_call_args = [
         (
             validators_registry_root,
-            tx_validator,
+            tx_validators[0],
             approval.signatures,
             approval.ipfs_hash,
         ),
-        proof,
+        multi_proof.proof,
     ]
     if update_state_call is not None:
         register_call = vault_contract.encodeABI(
@@ -259,10 +250,9 @@ async def register_single_validator(
     await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)
 
 
-# pylint: disable-next=too-many-locals
 async def register_multiple_validator(
-    tree: StandardMerkleTree,
-    validators: list[Validator],
+    multi_proof: MultiProof,
+    tx_validators: list[bytes],
     approval: OraclesApproval,
     update_state_call: HexStr | None,
     validators_registry_root: Bytes32,
@@ -271,18 +261,8 @@ async def register_multiple_validator(
     if settings.network not in ETH_NETWORKS:
         raise NotImplementedError('networks other than Ethereum not supported')
 
-    credentials = get_eth1_withdrawal_credentials(settings.vault)
-    tx_validators: list[bytes] = []
-    leaves: list[tuple[bytes, int]] = []
-    for validator in validators:
-        tx_validator = _encode_tx_validator(credentials, validator)
-        tx_validators.append(tx_validator)
-        leaves.append((tx_validator, validator.deposit_data_index))
-
-    multi_proof = tree.get_multi_proof(leaves)
     sorted_tx_validators: list[bytes] = [v[0] for v in multi_proof.leaves]
     indexes = [sorted_tx_validators.index(v) for v in tx_validators]
-
     logger.info('Submitting registration transaction')
     register_call_args = [
         (
@@ -306,15 +286,3 @@ async def register_multiple_validator(
 
     logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
     await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)
-
-
-def _encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) -> bytes:
-    public_key = Web3.to_bytes(hexstr=validator.public_key)
-    signature = Web3.to_bytes(hexstr=validator.signature)
-    deposit_root = compute_deposit_data(
-        public_key=public_key,
-        withdrawal_credentials=withdrawal_credentials,
-        amount_gwei=DEPOSIT_AMOUNT_GWEI,
-        signature=signature,
-    ).hash_tree_root
-    return public_key + signature + deposit_root
