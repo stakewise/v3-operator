@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from functools import cached_property
 
 from eth_keys.datatypes import PublicKey
@@ -45,3 +46,10 @@ class HarvestParams:
 class OracleApproval:
     signature: bytes
     ipfs_hash: str
+
+
+@dataclass
+class OraclesApproval:
+    signatures: bytes
+    ipfs_hash: str
+    deadline: datetime
