@@ -2137,6 +2137,16 @@ files = [
 ]
 
 [[package]]
+name = "pyunormalize"
+version = "15.0.0"
+description = "Unicode normalization forms (NFC, NFKC, NFD, NFKD). A library independent from the Python core Unicode database."
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "pyunormalize-15.0.0.tar.gz", hash = "sha256:e63fdba0d85ea04579dde2fc29a072dba773dcae600b04faf6cc90714c8b1302"},
+]
+
+[[package]]
 name = "pywin32"
 version = "306"
 description = "Python for Window Extensions"
@@ -2587,7 +2597,7 @@ pbr = ">=2.0.0,<2.1.0 || >2.1.0"
 
 [[package]]
 name = "sw-utils"
-version = "0.3.17"
+version = "0.3.21"
 description = "StakeWise Python utils"
 optional = false
 python-versions = "^3.10"
@@ -2601,13 +2611,13 @@ py-ecc = "^6.0.0"
 pyrsistent = "0.19.3"
 tenacity = "==8.2.2"
 types-requests = "^2.28.11.15"
-web3 = "==6.5.0"
+web3 = "==6.8.0"
 
 [package.source]
 type = "git"
 url = "https://github.com/stakewise/sw-utils.git"
-reference = "v0.3.17"
-resolved_reference = "60a4c142e2e65ea37065e45eca0bd1b2c4751dba"
+reference = "v0.3.21"
+resolved_reference = "2fdd3b0f0d0bdea26ccc1a04680934d93c35fcd4"
 
 [[package]]
 name = "tenacity"
@@ -2752,13 +2762,13 @@ test = ["covdefaults (>=2.3)", "coverage (>=7.2.7)", "coverage-enable-subprocess
 
 [[package]]
 name = "web3"
-version = "6.5.0"
+version = "6.8.0"
 description = "web3.py"
 optional = false
 python-versions = ">=3.7.2"
 files = [
-    {file = "web3-6.5.0-py3-none-any.whl", hash = "sha256:a6e9f6e4e13d75a5a3726d10b1be91cde5951446e8a6f0efdaee1695b5011472"},
-    {file = "web3-6.5.0.tar.gz", hash = "sha256:ebbce3caa0b50015d15a07f17d2a280abbb94a52c6994babb90f3a5482c97712"},
+    {file = "web3-6.8.0-py3-none-any.whl", hash = "sha256:cc383afaf4cfde9fd6c8934ec23c47035520129ee93e4e068520e565d31dee9e"},
+    {file = "web3-6.8.0.tar.gz", hash = "sha256:5db6ed63bca526a5542d9a84778c8b549199009b9f71079ff53a7b82dadf0d0b"},
 ]
 
 [package.dependencies]
@@ -2772,16 +2782,18 @@ hexbytes = ">=0.1.0"
 jsonschema = ">=4.0.0"
 lru-dict = ">=1.1.6"
 protobuf = ">=4.21.6"
+pyunormalize = ">=15.0.0"
 pywin32 = {version = ">=223", markers = "platform_system == \"Windows\""}
 requests = ">=2.16.0"
+typing-extensions = ">=4.0.1"
 websockets = ">=10.0.0"
 
 [package.extras]
-dev = ["black (>=22.1.0)", "build (>=0.9.0)", "bumpversion", "eth-tester[py-evm] (==v0.9.0-b.1)", "flake8 (==3.8.3)", "flaky (>=3.7.0)", "hypothesis (>=3.31.2)", "importlib-metadata (<5.0)", "ipfshttpclient (==0.8.0a2)", "isort (>=5.11.0)", "mypy (==0.910)", "py-geth (>=3.11.0)", "pytest (>=7.0.0)", "pytest-asyncio (>=0.18.1)", "pytest-mock (>=1.10)", "pytest-watch (>=4.2)", "pytest-xdist (>=1.29)", "setuptools (>=38.6.0)", "sphinx (>=5.3.0)", "sphinx-rtd-theme (>=1.0.0)", "towncrier (>=21,<22)", "tox (>=3.18.0)", "tqdm (>4.32)", "twine (>=1.13)", "types-protobuf (==3.19.13)", "types-requests (>=2.26.1)", "types-setuptools (>=57.4.4)", "when-changed (>=0.3.0)"]
+dev = ["black (>=22.1.0)", "build (>=0.9.0)", "bumpversion", "eth-tester[py-evm] (==v0.9.1-b.1)", "flake8 (==3.8.3)", "flaky (>=3.7.0)", "hypothesis (>=3.31.2)", "importlib-metadata (<5.0)", "ipfshttpclient (==0.8.0a2)", "isort (>=5.11.0)", "mypy (>=1.0.0)", "py-geth (>=3.11.0)", "pytest (>=7.0.0)", "pytest-asyncio (>=0.18.1)", "pytest-mock (>=1.10)", "pytest-watch (>=4.2)", "pytest-xdist (>=1.29)", "setuptools (>=38.6.0)", "sphinx (>=5.3.0)", "sphinx-rtd-theme (>=1.0.0)", "towncrier (>=21,<22)", "tox (>=3.18.0)", "tqdm (>4.32)", "twine (>=1.13)", "types-protobuf (==3.19.13)", "types-requests (>=2.26.1)", "types-setuptools (>=57.4.4)", "when-changed (>=0.3.0)"]
 docs = ["sphinx (>=5.3.0)", "sphinx-rtd-theme (>=1.0.0)", "towncrier (>=21,<22)"]
 ipfs = ["ipfshttpclient (==0.8.0a2)"]
-linter = ["black (>=22.1.0)", "flake8 (==3.8.3)", "isort (>=5.11.0)", "mypy (==0.910)", "types-protobuf (==3.19.13)", "types-requests (>=2.26.1)", "types-setuptools (>=57.4.4)"]
-tester = ["eth-tester[py-evm] (==v0.9.0-b.1)", "py-geth (>=3.11.0)"]
+linter = ["black (>=22.1.0)", "flake8 (==3.8.3)", "isort (>=5.11.0)", "mypy (>=1.0.0)", "types-protobuf (==3.19.13)", "types-requests (>=2.26.1)", "types-setuptools (>=57.4.4)"]
+tester = ["eth-tester[py-evm] (==v0.9.1-b.1)", "py-geth (>=3.11.0)"]
 
 [[package]]
 name = "websockets"
@@ -3036,4 +3048,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.11"
-content-hash = "5aa890447b8c88b93b7d0a4e13338662d28f99615a2685bcbb72a75847717753"
+content-hash = "4c5a8a3dae05469cd0f3b878d17288ec4987151355520f6c73b5ecc27e71cd95"
