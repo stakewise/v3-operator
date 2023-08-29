@@ -12,3 +12,4 @@ GIT_SHA
 build
 database
 *.db
+.DS_Store

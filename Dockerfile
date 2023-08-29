@@ -35,7 +35,7 @@ ENV PATH="$POETRY_HOME/bin:$VENV_PATH/bin:/root/.cargo/bin:$PATH"
 FROM python-base as builder-base
 
 RUN apk upgrade --no-cache
-RUN apk add --no-cache gcc musl-dev python3-dev libffi-dev openssl-dev curl libgcc libstdc++
+RUN apk add --no-cache gcc musl-dev python3-dev libffi-dev openssl-dev curl libgcc libstdc++ postgresql-libs postgresql-dev
 RUN curl https://sh.rustup.rs -sSf | \
     sh -s -- --default-toolchain stable -y
 RUN rm -rf /var/cache/apt/*
