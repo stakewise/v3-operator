@@ -82,9 +82,8 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
     while True:
         latest_registry_root = await validators_registry_contract.get_registry_root()
         latest_deadline = datetime.now(timezone.utc) + timedelta(
-            seconds=settings.exit_signature_deadline
+            seconds=oracles.signature_validity_period
         )
-
         if (
             not registry_root
             or registry_root != latest_registry_root

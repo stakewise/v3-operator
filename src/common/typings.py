@@ -14,7 +14,7 @@ class Oracles:
     rewards_threshold: int
     validators_threshold: int
     exit_signature_recover_threshold: int
-    exit_signature_deadline: int
+    signature_validity_period: int
     public_keys: list[HexStr]
     endpoints: list[list[str]]
 
