@@ -72,6 +72,11 @@ async def get_oracles() -> Oracles:
     if exit_signature_recover_threshold > validators_threshold:
         raise ValueError('Invalid exit signature threshold')
 
+    exit_signature_deadline = config['exit_signature_deadline']
+
+    if exit_signature_deadline < 0:
+        raise ValueError('Invalid exit signature deadline')
+
     if len(public_keys) != len(set(public_keys)):
         raise ValueError('Duplicate public keys in oracles config')
 
@@ -82,6 +87,7 @@ async def get_oracles() -> Oracles:
         rewards_threshold=rewards_threshold,
         validators_threshold=validators_threshold,
         exit_signature_recover_threshold=exit_signature_recover_threshold,
+        exit_signature_deadline=exit_signature_deadline,
         public_keys=public_keys,
         endpoints=endpoints,
         validators_approval_batch_limit=validators_approval_batch_limit,

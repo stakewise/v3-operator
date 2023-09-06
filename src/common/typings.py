@@ -9,10 +9,12 @@ from web3.types import Wei
 
 
 @dataclass
+# pylint: disable-next=too-many-instance-attributes
 class Oracles:
     rewards_threshold: int
     validators_threshold: int
     exit_signature_recover_threshold: int
+    exit_signature_deadline: int
     public_keys: list[HexStr]
     endpoints: list[list[str]]
 
