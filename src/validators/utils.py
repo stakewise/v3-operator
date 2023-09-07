@@ -28,7 +28,7 @@ from src.validators.exceptions import (
     ValidatorIndexChangedError,
 )
 from src.validators.execution import get_latest_network_validator_public_keys
-from src.validators.signing import encode_tx_validator
+from src.validators.signing.common import encode_tx_validator
 from src.validators.typings import (
     ApprovalRequest,
     BLSPrivkey,

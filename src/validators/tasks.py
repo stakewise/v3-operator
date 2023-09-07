@@ -22,7 +22,8 @@ from src.validators.execution import (
     register_multiple_validator,
     register_single_validator,
 )
-from src.validators.signing.local import get_exit_signature_shards, get_validators_proof
+from src.validators.signing.common import get_validators_proof
+from src.validators.signing.local import get_exit_signature_shards
 from src.validators.signing.remote import (
     RemoteSignerConfiguration,
     get_exit_signature_shards_remote_signer,
