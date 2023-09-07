@@ -40,6 +40,7 @@ from src.validators.utils import send_approval_requests
 
 logger = logging.getLogger(__name__)
 
+
 # pylint: disable-next=too-many-locals
 async def register_validators(
     keystores: Keystores,
@@ -135,10 +136,11 @@ async def register_validators(
         logger.info('Successfully registered validators with public keys %s', pub_keys)
 
 
+# pylint: disable-next=too-many-arguments
 async def create_approval_request(
     oracles: Oracles,
     keystores: Keystores,
-    remote_signer_config: RemoteSignerConfiguration,
+    remote_signer_config: RemoteSignerConfiguration | None,
     validators: list[Validator],
     registry_root: Bytes32,
     multi_proof: MultiProof,

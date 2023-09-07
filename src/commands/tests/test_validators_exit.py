@@ -16,7 +16,7 @@ from src.validators.utils import _process_keystore_file, list_keystore_files
 
 @pytest.fixture
 async def _patch_get_oracles(mocked_oracles: Oracles) -> AsyncGenerator:
-    with mock.patch('src.commands.generate_key_shares.get_oracles', return_value=mocked_oracles):
+    with mock.patch('src.commands.remote_signer_setup.get_oracles', return_value=mocked_oracles):
         yield
 
 
@@ -51,7 +51,7 @@ class TestValidatorsExit:
         self,
         vault_address: HexAddress,
         consensus_endpoints: str,
-        data_dir: HexAddress,
+        data_dir: Path,
         vault_dir: Path,
         keystores_dir: Path,
         runner: CliRunner,
@@ -92,14 +92,14 @@ class TestValidatorsExit:
             result = runner.invoke(validators_exit, args, input='y')
         assert result.exit_code == 0
 
-        assert 'Validators 0, 1, 2, 3, 4 exits successfully initiated\n' in result.output
+        assert 'Validators 0, 1, 2 exits successfully initiated\n' in result.output
 
-    @pytest.mark.usefixtures('_mocked_remote_signer')
+    @pytest.mark.usefixtures('_remote_signer_setup')
     def test_remote_signer(
         self,
         vault_address: HexAddress,
         consensus_endpoints: str,
-        data_dir: HexAddress,
+        data_dir: Path,
         vault_dir: Path,
         keystores_dir: Path,
         runner: CliRunner,
@@ -142,6 +142,6 @@ class TestValidatorsExit:
 
         for expected_line in (
             f'Using remote signer at {remote_signer_url}',
-            'Validators 0, 1, 2, 3, 4 exits successfully initiated',
+            'Validators 0, 1, 2 exits successfully initiated',
         ):
             assert expected_line in result.output

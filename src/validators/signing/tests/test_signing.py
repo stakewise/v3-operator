@@ -1,7 +1,6 @@
 from typing import Callable
 
 import pytest
-from eth_typing import HexStr
 from eth_typing.bls import BLSPubkey
 from sw_utils.typings import ConsensusFork
 from web3 import Web3
@@ -14,7 +13,7 @@ from src.validators.signing.remote import (
     get_exit_signature_shards_remote_signer,
 )
 from src.validators.signing.tests.oracle_functions import OracleCommittee
-from src.validators.typings import BLSPrivkey, ExitSignatureShards
+from src.validators.typings import ExitSignatureShards
 
 
 class TestSigning:
@@ -98,7 +97,6 @@ class TestSigning:
         mocked_oracles: Oracles,
         remote_signer_config: RemoteSignerConfiguration,
         _mocked_oracle_committee: OracleCommittee,
-        _mocked_remote_signer: dict[HexStr, BLSPrivkey],
     ):
         validator_index = 123
         settings.remote_signer_url = remote_signer_url
@@ -121,7 +119,7 @@ class TestSigning:
                 fork=fork,
             )
 
-    @pytest.mark.usefixtures('_mocked_remote_signer')
+    @pytest.mark.usefixtures('mocked_remote_signer')
     async def test_remote_signer_pubkey_not_present(
         self,
         create_validator_keypair: Callable,
