@@ -87,7 +87,7 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
         if (
             not registry_root
             or registry_root != latest_registry_root
-            or deadline < datetime.now(timezone.utc)
+            or deadline <= datetime.now(timezone.utc)
         ):
             registry_root = latest_registry_root
             deadline = latest_deadline
