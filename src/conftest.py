@@ -1,7 +1,5 @@
 # pylint: disable=redefined-outer-name
 # pylint: disable=unused-argument
-import os
-import re
 from pathlib import Path
 from random import randint
 from tempfile import TemporaryDirectory
@@ -9,27 +7,27 @@ from typing import Callable, Generator
 from unittest import mock
 
 import ecies
-import milagro_bls_binding as bls
 import pytest
 from _pytest.fixtures import SubRequest
-from aioresponses import CallbackResult, aioresponses
 from click.testing import CliRunner
 from eth_typing import HexAddress, HexStr
 from sw_utils.tests import faker
-from web3 import Web3
 
 from src.commands.create_keys import create_keys
 from src.commands.create_wallet import create_wallet
-from src.commands.generate_key_shares import generate_key_shares
+from src.commands.remote_signer_setup import remote_signer_setup
 from src.common.credentials import CredentialManager
 from src.common.typings import Oracles
 from src.common.vault_config import VaultConfig
 from src.config.networks import GOERLI
 from src.config.settings import settings
+from src.test_fixtures.remote_signer import (  # noqa: F401, pylint: disable=unused-import
+    mocked_remote_signer,
+    remote_signer_url,
+)
 from src.validators.signing.remote import RemoteSignerConfiguration
 from src.validators.signing.tests.oracle_functions import OracleCommittee
-from src.validators.typings import BLSPrivkey, KeystoreFile
-from src.validators.utils import _process_keystore_file
+from src.validators.typings import BLSPrivkey
 
 
 @pytest.fixture
@@ -89,7 +87,7 @@ def _create_keys(
     _test_keystore_password_file: Path,
     runner: CliRunner,
 ) -> None:
-    count = 5
+    count = 3
 
     result = runner.invoke(
         create_keys,
@@ -126,88 +124,38 @@ def _create_wallet(
 
 
 @pytest.fixture
-def remote_signer_keystores_dir(temp_dir: Path) -> Path:
-    return temp_dir / 'remote_signer_keystores'
-
-
-@pytest.fixture
 # pylint: disable-next=too-many-arguments
-def _generate_key_shares(
+def _remote_signer_setup(
     vault_address: HexAddress,
     data_dir: Path,
     keystores_dir: Path,
-    remote_signer_keystores_dir: Path,
+    remote_signer_url: str,  # noqa: F811
     execution_endpoints: str,
     runner: CliRunner,
     mocked_oracles: Oracles,
+    mocked_remote_signer,  # noqa: F811
     _create_keys,
 ) -> None:
-    with mock.patch('src.commands.generate_key_shares.get_oracles', return_value=mocked_oracles):
+    with mock.patch('src.commands.remote_signer_setup.get_oracles', return_value=mocked_oracles):
         result = runner.invoke(
-            generate_key_shares,
+            remote_signer_setup,
             [
                 '--vault',
                 str(vault_address),
+                '--remote-signer-url',
+                remote_signer_url,
                 '--data-dir',
                 str(data_dir),
                 '--execution-endpoints',
                 execution_endpoints,
-                '--output-dir',
-                str(remote_signer_keystores_dir),
             ],
         )
         assert result.exit_code == 0
 
 
 @pytest.fixture
-def remote_signer_config(_generate_key_shares) -> RemoteSignerConfiguration:
+def remote_signer_config(_remote_signer_setup) -> RemoteSignerConfiguration:
     return RemoteSignerConfiguration.from_file(settings.remote_signer_config_file)
-
-
-@pytest.fixture
-def remote_signer_url() -> str:
-    return 'http://web3signer:9000'
-
-
-@pytest.fixture
-def _mocked_remote_signer(
-    remote_signer_keystores_dir: Path,
-    _test_keystore_password: str,
-    remote_signer_url: str,
-    _generate_key_shares,
-) -> Generator:
-    _remote_signer_pubkey_privkey_mapping: dict[HexStr, BLSPrivkey] = {}
-
-    for filename in os.listdir(remote_signer_keystores_dir):
-        pubkey, priv_key = _process_keystore_file(
-            KeystoreFile(name=filename, password=_test_keystore_password),
-            keystore_path=remote_signer_keystores_dir,
-        )
-        _remote_signer_pubkey_privkey_mapping[pubkey] = priv_key
-
-    def _mocked_remote_signer(url, **kwargs) -> CallbackResult:
-        public_key_to_sign_for = url.path.split('/')[-1]
-
-        try:
-            corresponding_private_key = _remote_signer_pubkey_privkey_mapping[
-                public_key_to_sign_for
-            ]
-        except KeyError:
-            return CallbackResult(status=404, body='Not Found')
-
-        signature = bls.Sign(
-            corresponding_private_key, Web3.to_bytes(hexstr=kwargs['json']['signingRoot'])
-        )
-
-        return CallbackResult(payload={'signature': f'0x{signature.hex()}'})
-
-    with aioresponses() as m:
-        m.post(
-            re.compile(f'^{remote_signer_url}/api/v1/eth2/sign/\\w{{98}}$'),
-            callback=_mocked_remote_signer,
-            repeat=True,
-        )
-        yield
 
 
 @pytest.fixture
@@ -293,7 +241,7 @@ def mocked_oracles(
             for pubkey in _mocked_oracle_committee.oracle_pubkeys
         ],
         endpoints=[
-            f'http://oracle-endpoint-{i}'
+            [f'http://oracle-endpoint-{i}']
             for i in range(len(_mocked_oracle_committee.oracle_pubkeys))
         ],
         validators_approval_batch_limit=1,
