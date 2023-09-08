@@ -191,7 +191,8 @@ async def main(remove_existing_keys: bool) -> None:
             inactive_pubkeys = pubkeys_remote_signer - active_pubkey_shares
 
             resp = await session.delete(
-                f'{settings.remote_signer_url}/eth/v1/keystores', json={'pubkeys': inactive_pubkeys}
+                f'{settings.remote_signer_url}/eth/v1/keystores',
+                json={'pubkeys': list(inactive_pubkeys)},
             )
             if resp.status != 200:
                 raise RuntimeError(
