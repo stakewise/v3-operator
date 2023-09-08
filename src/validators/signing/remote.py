@@ -37,8 +37,7 @@ class VoluntaryExitMessage:
 @dataclass
 class VoluntaryExitRequestModel:
     fork_info: ForkInfo
-    # Camel case for this parameter only as per the docs
-    signingRoot: HexStr
+    signing_root: HexStr
     type: str
     voluntary_exit: VoluntaryExitMessage
 
@@ -80,7 +79,7 @@ async def get_signature_shard(
             ),
             genesis_validators_root=HexStr(settings.network_config.GENESIS_VALIDATORS_ROOT.hex()),
         ),
-        signingRoot=HexStr(message.hex()),
+        signing_root=HexStr(message.hex()),
         type='VOLUNTARY_EXIT',
         voluntary_exit=VoluntaryExitMessage(epoch=fork.epoch, validator_index=validator_index),
     )

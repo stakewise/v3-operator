@@ -69,7 +69,7 @@ def mocked_remote_signer(
             return CallbackResult(status=404, body='Not Found')
 
         signature = bls.Sign(
-            corresponding_private_key, Web3.to_bytes(hexstr=kwargs['json']['signingRoot'])
+            corresponding_private_key, Web3.to_bytes(hexstr=kwargs['json']['signing_root'])
         )
 
         return CallbackResult(payload={'signature': f'0x{signature.hex()}'})
