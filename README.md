@@ -292,7 +292,7 @@ Notes:
   changes. In order to regenerate key shares, make sure to
   adjust the `mnemonic_next_index` value in the vault config.json
   to 0, then run the `create-keys` command, generating the full keystores
-  for all your validators. Then run the `remote-signer-setup`
+  for all your validators. Next, run the `remote-signer-setup` command
   to regenerate and import the new key shares for all your validators
   into the remote signer.
   You can remove the previously generated private key shares from the
@@ -358,7 +358,7 @@ Are you sure you want to exit 3 validators with indexes: 513571, 513572, 513861?
 Validators 513571, 513572, 513861 exits successfully initiated
 ```
 
-#### `validator-exit` options
+#### `validators-exit` options
 
 - `--network` - The network of your vault.
 - `--vault` - The vault address.
