@@ -207,8 +207,9 @@ def _mocked_oracle_committee(request: SubRequest) -> OracleCommittee:
         oracle_count, exit_signature_recover_threshold = request.param
     except AttributeError:
         # Fallback values if unspecified
-        oracle_count = 11
-        exit_signature_recover_threshold = 8
+        # Intentionally using lower values here to speed up tests
+        oracle_count = 3
+        exit_signature_recover_threshold = 2
 
     oracle_privkeys = []
     oracle_pubkeys = []

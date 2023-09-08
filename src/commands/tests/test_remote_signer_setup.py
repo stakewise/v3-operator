@@ -178,7 +178,7 @@ class TestOperatorRemoteSignerSetup:
 
         # We remove 1 oracle and run the `remote-signer-setup` command again.
         mocked_oracles.public_keys.pop()
-        assert len(mocked_oracles.public_keys) > mocked_oracles.exit_signature_recover_threshold
+        assert len(mocked_oracles.public_keys) >= mocked_oracles.exit_signature_recover_threshold
 
         # We also need to reset the mnemonic_next_index value so the keys are generated from
         # the 0th index again.
