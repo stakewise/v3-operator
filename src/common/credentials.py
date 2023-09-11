@@ -122,7 +122,7 @@ class CredentialManager:
         mnemonic: str,
         count: int,
         start_index: int,
-        concurrency: int | None = None,
+        pool_size: int | None = None,
     ) -> list[Credential]:
         credentials: list[Credential] = []
         with click.progressbar(
@@ -130,7 +130,7 @@ class CredentialManager:
             label='Creating validator keys:\t\t',
             show_percent=False,
             show_pos=True,
-        ) as progress_bar, Pool(processes=concurrency) as pool:
+        ) as progress_bar, Pool(processes=pool_size) as pool:
 
             def bar_updated(result):
                 progress_bar.update(len(result))

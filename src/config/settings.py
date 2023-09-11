@@ -47,7 +47,7 @@ class Settings(metaclass=Singleton):
     ipfs_fetch_endpoints: list[str]
     validators_fetch_chunk_size: int
     sentry_dsn: str
-    load_keystores_concurrency: int | None
+    pool_size: int | None
 
     # pylint: disable-next=too-many-arguments,too-many-locals
     def set(
@@ -122,8 +122,8 @@ class Settings(metaclass=Singleton):
             'VALIDATORS_FETCH_CHUNK_SIZE', default=100, cast=int
         )
         self.sentry_dsn = decouple_config('SENTRY_DSN', default='')
-        self.load_keystores_concurrency = decouple_config(
-            'LOAD_KEYSTORES_CONCURRENCY', default=None, cast=lambda x: int(x) if x else None
+        self.pool_size = decouple_config(
+            'POOL_SIZE', default=None, cast=lambda x: int(x) if x else None
         )
 
     @property

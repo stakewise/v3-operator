@@ -47,7 +47,7 @@ from src.common.vault_config import VaultConfig
     callback=validate_eth_address,
 )
 @click.option(
-    '--concurrency',
+    '--pool-size',
     help='Number of processes in a pool.',
     # do not prompt
     type=int,
@@ -60,7 +60,7 @@ def create_keys(
     vault: HexAddress,
     data_dir: str,
     per_keystore_password: bool,
-    concurrency: int | None,
+    pool_size: int | None,
 ) -> None:
     config = VaultConfig(vault, Path(data_dir))
     config.load(mnemonic)
@@ -75,10 +75,10 @@ def create_keys(
         mnemonic=mnemonic,
         count=count,
         start_index=config.mnemonic_next_index,
-        concurrency=concurrency,
+        pool_size=pool_size,
     )
     deposit_data = _export_deposit_data_json(
-        credentials=credentials, filename=str(deposit_data_file), concurrency=concurrency
+        credentials=credentials, filename=str(deposit_data_file), pool_size=pool_size
     )
 
     _export_keystores(
@@ -86,7 +86,7 @@ def create_keys(
         keystores_dir=str(keystores_dir),
         password_file=str(password_file),
         per_keystore_password=per_keystore_password,
-        concurrency=concurrency,
+        pool_size=pool_size,
     )
 
     config.increment_mnemonic_index(count)
@@ -99,14 +99,14 @@ def create_keys(
 
 
 def _export_deposit_data_json(
-    credentials: list[Credential], filename: str, concurrency: int | None = None
+    credentials: list[Credential], filename: str, pool_size: int | None = None
 ) -> str:
     with click.progressbar(
         length=len(credentials),
         label='Generating deposit data JSON\t\t',
         show_percent=False,
         show_pos=True,
-    ) as progress_bar, Pool(processes=concurrency) as pool:
+    ) as progress_bar, Pool(processes=pool_size) as pool:
         results = [
             pool.apply_async(
                 cred.deposit_datum_dict,
@@ -129,7 +129,7 @@ def _export_keystores(
     keystores_dir: str,
     password_file: str,
     per_keystore_password: bool,
-    concurrency: int | None = None,
+    pool_size: int | None = None,
 ) -> None:
     makedirs(path.abspath(keystores_dir), exist_ok=True)
     if not per_keystore_password:
@@ -139,7 +139,7 @@ def _export_keystores(
         label='Exporting validator keystores\t\t',
         show_percent=False,
         show_pos=True,
-    ) as progress_bar, Pool(processes=concurrency) as pool:
+    ) as progress_bar, Pool(processes=pool_size) as pool:
         results = [
             pool.apply_async(
                 cred.save_signing_keystore,
