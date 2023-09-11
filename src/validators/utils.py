@@ -157,7 +157,7 @@ def load_keystores() -> Keystores | None:
 
     keystore_files = list_keystore_files()
     logger.info('Loading keystores from %s...', settings.keystores_dir)
-    with Pool() as pool:
+    with Pool(processes=settings.pool_size) as pool:
         # pylint: disable-next=unused-argument
         def _stop_pool(*args, **kwargs):
             pool.close()
