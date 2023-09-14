@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timedelta, timezone
 
 from multiproof.standart import MultiProof
 from sw_utils.typings import Bytes32
@@ -9,7 +10,7 @@ from src.common.clients import consensus_client, ipfs_fetch_client
 from src.common.contracts import validators_registry_contract
 from src.common.execution import check_gas_price, get_oracles
 from src.common.metrics import metrics
-from src.common.typings import Oracles
+from src.common.typings import Oracles, OraclesApproval
 from src.common.utils import MGNO_RATE, WAD
 from src.config.networks import GNOSIS
 from src.config.settings import DEPOSIT_AMOUNT, settings
@@ -27,7 +28,6 @@ from src.validators.typings import (
     DepositData,
     Keystores,
     NetworkValidator,
-    OraclesApproval,
     Validator,
 )
 from src.validators.utils import send_approval_requests
@@ -78,11 +78,19 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
         validators=validators,
     )
     registry_root = None
+    deadline = None
     while True:
         latest_registry_root = await validators_registry_contract.get_registry_root()
-
-        if not registry_root or registry_root != latest_registry_root:
+        latest_deadline = datetime.now(timezone.utc) + timedelta(
+            seconds=oracles.signature_validity_period
+        )
+        if (
+            not registry_root
+            or registry_root != latest_registry_root
+            or deadline <= datetime.now(timezone.utc)
+        ):
             registry_root = latest_registry_root
+            deadline = latest_deadline
             logger.debug('Fetched latest validators registry root: %s', registry_root)
 
             oracles_request = await create_approval_request(
@@ -90,6 +98,7 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
                 oracles=oracles,
                 keystores=keystores,
                 validators=validators,
+                deadline=deadline,
                 multi_proof=multi_proof,
             )
 
@@ -122,12 +131,14 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
         logger.info('Successfully registered validators with public keys %s', pub_keys)
 
 
+# pylint: disable-next=too-many-arguments
 async def create_approval_request(
     oracles: Oracles,
     keystores: Keystores,
     validators: list[Validator],
     registry_root: Bytes32,
     multi_proof: MultiProof,
+    deadline: datetime,
 ) -> ApprovalRequest:
     """Generate validator registration request data"""
 
@@ -151,6 +162,7 @@ async def create_approval_request(
         exit_signature_shards=[],
         proof=multi_proof.proof,
         proof_flags=multi_proof.proof_flags,
+        deadline=deadline,
     )
     for validator in validators:
         shards = get_exit_signature_shards(
@@ -186,6 +198,7 @@ async def get_oracles_approval(oracles: Oracles, request: ApprovalRequest) -> Or
     return OraclesApproval(
         signatures=signatures,
         ipfs_hash=ipfs_hash,
+        deadline=request.deadline,
     )
 
 

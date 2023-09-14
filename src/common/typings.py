@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from functools import cached_property
 
 from eth_keys.datatypes import PublicKey
@@ -13,7 +14,7 @@ class Oracles:
     rewards_threshold: int
     validators_threshold: int
     exit_signature_recover_threshold: int
-    exit_signature_deadline: int
+    signature_validity_period: int
     public_keys: list[HexStr]
     endpoints: list[list[str]]
 
@@ -47,3 +48,10 @@ class HarvestParams:
 class OracleApproval:
     signature: bytes
     ipfs_hash: str
+
+
+@dataclass
+class OraclesApproval:
+    signatures: bytes
+    ipfs_hash: str
+    deadline: datetime

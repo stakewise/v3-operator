@@ -17,16 +17,11 @@ from src.common.contracts import (
 )
 from src.common.ipfs import fetch_harvest_params
 from src.common.metrics import metrics
+from src.common.typings import OraclesApproval
 from src.config.networks import ETH_NETWORKS
 from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.validators.database import NetworkValidatorCrud
-from src.validators.typings import (
-    DepositData,
-    Keystores,
-    NetworkValidator,
-    OraclesApproval,
-    Validator,
-)
+from src.validators.typings import DepositData, Keystores, NetworkValidator, Validator
 
 logger = logging.getLogger(__name__)
 
@@ -234,6 +229,7 @@ async def register_single_validator(
             tx_validators[0],
             approval.signatures,
             approval.ipfs_hash,
+            approval.deadline,
         ),
         multi_proof.proof,
     ]
@@ -270,6 +266,7 @@ async def register_multiple_validator(
             b''.join(tx_validators),
             approval.signatures,
             approval.ipfs_hash,
+            approval.deadline,
         ),
         indexes,
         multi_proof.proof_flags,

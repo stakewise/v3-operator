@@ -1,4 +1,6 @@
+import dataclasses
 from dataclasses import dataclass
+from datetime import datetime
 from typing import NewType
 
 from eth_typing import BlockNumber, ChecksumAddress, HexStr
@@ -35,12 +37,6 @@ class ExitSignatureShards:
 
 
 @dataclass
-class OraclesApproval:
-    signatures: bytes
-    ipfs_hash: str
-
-
-@dataclass
 # pylint: disable-next=too-many-instance-attributes
 class ApprovalRequest:
     validator_index: int
@@ -52,6 +48,15 @@ class ApprovalRequest:
     exit_signature_shards: list[list[HexStr]]
     proof: list[HexStr]
     proof_flags: list[bool]
+    deadline: datetime
+
+    def as_json_dict(self) -> dict:
+        """
+        :return: dict which can be serialized by `json.dumps()`
+        """
+        res = dataclasses.asdict(self)
+        res['deadline'] = int(self.deadline.timestamp())
+        return res
 
 
 @dataclass
