@@ -80,7 +80,12 @@ jobs:
 
       # Run tests
       - name: Run tests
-        run: poetry run pytest src
+        run: poetry run coverage run -m pytest src
+
+      # Check coverage
+      - name: Check test coverage
+        run: poetry run coverage report
+
   security:
     name: pip-audit
     runs-on: ubuntu-latest
