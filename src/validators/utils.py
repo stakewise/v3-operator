@@ -1,5 +1,4 @@
 import asyncio
-import dataclasses
 import json
 import logging
 import random
@@ -43,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> tuple[bytes, str]:
     """Requests approval from all oracles."""
-    payload = dataclasses.asdict(request)
+    payload = request.as_json_dict()
     endpoints = list(zip(oracles.addresses, oracles.endpoints))
 
     ipfs_hashes = []
