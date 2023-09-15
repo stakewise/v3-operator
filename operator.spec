@@ -10,7 +10,22 @@ if platform == "linux" or platform == "linux2":
         ('./GIT_SHA', '.'),
         ('/usr/lib/x86_64-linux-gnu/libssl.so.1.1', '.'),
         ('/usr/lib/x86_64-linux-gnu/libcrypto.so.1.1', '.'),
-        ('/usr/lib/x86_64-linux-gnu/libffi.so.7', '.')
+        ('/usr/lib/x86_64-linux-gnu/libffi.so.7', '.'),
+        ('/usr/lib/x86_64-linux-gnu/libexpat.so.1', '.'),
+        ('/usr/lib/x86_64-linux-gnu/libpq.so.5', '.'),
+        ('/usr/lib/x86_64-linux-gnu/libldap_r-2.4.so.2', '.'),
+        ('/usr/lib/x86_64-linux-gnu/liblber-2.4.so.2', '.'),
+        ('/usr/lib/x86_64-linux-gnu/libsasl2.so.2', '.'),
+        ('/usr/lib/x86_64-linux-gnu/libgssapi.so.3', '.'),
+        ('/usr/lib/x86_64-linux-gnu/libheimntlm.so.0', '.'),
+        ('/usr/lib/x86_64-linux-gnu/libkrb5.so.26', '.'),
+        ('/usr/lib/x86_64-linux-gnu/libasn1.so.8', '.'),
+        ('/usr/lib/x86_64-linux-gnu/libhcrypto.so.4', '.'),
+        ('/usr/lib/x86_64-linux-gnu/libroken.so.18', '.'),
+        ('/usr/lib/x86_64-linux-gnu/libwind.so.0', '.'),
+        ('/usr/lib/x86_64-linux-gnu/libheimbase.so.1', '.'),
+        ('/usr/lib/x86_64-linux-gnu/libhx509.so.5', '.'),
+        ('/usr/lib/x86_64-linux-gnu/libsqlite3.so.0', '.')
     ]
 else:
     datas = [
@@ -22,7 +37,6 @@ else:
 
 datas += collect_data_files('certifi')
 datas += collect_data_files('eth_account')
-
 
 block_cipher = None
 
