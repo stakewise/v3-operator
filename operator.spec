@@ -8,9 +8,6 @@ if platform == "linux" or platform == "linux2":
         ('src/common/word_lists/*', 'src/common/word_lists/'),
         ('./pyproject.toml', '.'),
         ('./GIT_SHA', '.'),
-        ('/usr/lib/x86_64-linux-gnu/libssl.so.1.1', '.'),
-        ('/usr/lib/x86_64-linux-gnu/libcrypto.so.1.1', '.'),
-        ('/usr/lib/x86_64-linux-gnu/libffi.so.7', '.')
     ]
 else:
     datas = [
@@ -42,7 +39,6 @@ a = Analysis(
     cipher=block_cipher,
     noarchive=False,
 )
-a.exclude_system_libraries()
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(
