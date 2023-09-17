@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import AsyncGenerator, Generator
+from typing import Generator
 from unittest import mock
 
 import pytest
@@ -15,7 +15,7 @@ from src.validators.utils import _process_keystore_file, list_keystore_files
 
 
 @pytest.fixture
-async def _patch_get_oracles(mocked_oracles: Oracles) -> AsyncGenerator:
+def _patch_get_oracles(mocked_oracles: Oracles) -> Generator:
     with mock.patch('src.commands.remote_signer_setup.get_oracles', return_value=mocked_oracles):
         yield
 
