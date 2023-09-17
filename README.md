@@ -289,7 +289,9 @@ as a result of this command since they no longer need to be present.
 
 Notes:
 - You will need to run this command every time the oracle set
-  changes. In order to regenerate key shares, make sure to
+  changes, or the threshold needed to recover exit signatures
+  (`exit_signature_recover_threshold`) changes.
+- In order to regenerate key shares, make sure to
   adjust the `mnemonic_next_index` value in the vault config.json
   to 0, then run the `create-keys` command, generating the full keystores
   for all your validators. Next, run the `remote-signer-setup` command
