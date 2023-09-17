@@ -143,18 +143,12 @@ async def main(remove_existing_keys: bool) -> None:
     )
 
     # Import as keystores to remote signer
+    password = get_or_create_password_file(str(settings.keystores_password_file))
     key_share_keystores = []
     for credential in credentials:
-        key_share_keystores.append(
-            deepcopy(
-                credential.encrypt_signing_keystore(
-                    password=get_or_create_password_file(str(settings.keystores_password_file))
-                )
-            )
-        )
+        key_share_keystores.append(deepcopy(credential.encrypt_signing_keystore(password=password)))
 
     async with aiohttp.ClientSession() as session:
-        password = get_or_create_password_file(str(settings.keystores_password_file))
         data = {
             'keystores': [ksk.as_json() for ksk in key_share_keystores],
             'passwords': [password for _ in key_share_keystores],
