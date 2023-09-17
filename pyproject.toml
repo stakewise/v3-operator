@@ -49,7 +49,8 @@ skips = ["B608"]
 
 [tool.pylint."pre-commit-hook"]
 disable = ["C0103", "C0114", "C0115", "C0116", "W0511", "W0703"]
-ignore-paths=["src/.*/tests/.*"]
+ignore-paths=["src/.*/tests/.*", "src/test_fixtures/.*"]
+ignore=["conftest.py"]
 
 [tool.pylint."BASIC"]
 good-names = ["db", "i", "w3"]
@@ -57,6 +58,7 @@ ignored-modules=["milagro_bls_binding"]
 
 [tool.flake8]
 extend-ignore = ["E203", "E501"]  # line length will be checked by pylint
+exclude = ["conftest.py"]
 
 [tool.mypy]
 ignore_missing_imports = true

@@ -1,4 +1,3 @@
-# pylint: disable=redefined-outer-name
 import json
 import re
 from typing import Generator
@@ -24,7 +23,6 @@ def mocked_remote_signer(
 ) -> Generator:
     _remote_signer_pubkey_privkey_mapping: dict[HexStr, BLSPrivkey] = {}
 
-    # pylint: disable-next=unused-argument
     def _mocked_import_endpoint(url, **kwargs) -> CallbackResult:
         data = kwargs['json']
         keystores = [Keystore.from_json(json.loads(keystore)) for keystore in data['keystores']]
@@ -39,7 +37,6 @@ def mocked_remote_signer(
             status=200, payload={'data': [{'status': 'imported'} for _ in keystores]}
         )
 
-    # pylint: disable-next=unused-argument
     def _mocked_delete_endpoint(url, **kwargs) -> CallbackResult:
         data = kwargs['json']
         pubkeys = data['pubkeys']
@@ -51,9 +48,7 @@ def mocked_remote_signer(
             status=200, payload={'data': [{'status': 'deleted'} for _ in pubkeys]}
         )
 
-    # pylint: disable-next=unused-argument
     def _mocked_list_pubkeys_endpoint(url, **kwargs) -> CallbackResult:
-        # noqa:
         return CallbackResult(
             status=200, payload=list(_remote_signer_pubkey_privkey_mapping.keys())  # type: ignore
         )

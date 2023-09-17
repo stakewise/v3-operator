@@ -1,5 +1,3 @@
-# pylint: disable=redefined-outer-name
-# pylint: disable=unused-argument
 from pathlib import Path
 from random import randint
 from tempfile import TemporaryDirectory
@@ -21,10 +19,7 @@ from src.common.typings import Oracles
 from src.common.vault_config import VaultConfig
 from src.config.networks import GOERLI
 from src.config.settings import settings
-from src.test_fixtures.remote_signer import (  # noqa: F401, pylint: disable=unused-import
-    mocked_remote_signer,
-    remote_signer_url,
-)
+from src.test_fixtures.remote_signer import mocked_remote_signer, remote_signer_url
 from src.validators.signing.remote import RemoteSignerConfiguration
 from src.validators.signing.tests.oracle_functions import OracleCommittee
 from src.validators.typings import BLSPrivkey
@@ -124,16 +119,15 @@ def _create_wallet(
 
 
 @pytest.fixture
-# pylint: disable-next=too-many-arguments
 def _remote_signer_setup(
     vault_address: HexAddress,
     data_dir: Path,
     keystores_dir: Path,
-    remote_signer_url: str,  # noqa: F811
+    remote_signer_url: str,
     execution_endpoints: str,
     runner: CliRunner,
     mocked_oracles: Oracles,
-    mocked_remote_signer,  # noqa: F811
+    mocked_remote_signer,
     _create_keys,
 ) -> None:
     with mock.patch('src.commands.remote_signer_setup.get_oracles', return_value=mocked_oracles):
@@ -180,7 +174,6 @@ def execution_endpoints() -> str:
 
 
 @pytest.fixture
-# pylint: disable-next=too-many-arguments
 def fake_settings(
     data_dir: Path,
     vault_dir: Path,
