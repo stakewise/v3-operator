@@ -1,5 +1,6 @@
 import asyncio
 import os
+from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from pathlib import Path
 
@@ -95,7 +96,21 @@ def remote_signer_setup(
     )
 
     try:
-        asyncio.run(main(remove_existing_keys=remove_existing_keys))
+        # Try-catch to enable async calls in test - an event loop
+        #  will already be running in that case
+        try:
+            asyncio.get_running_loop()
+            # we need to create a separate thread so we can block before returning
+            with ThreadPoolExecutor(1) as pool:
+                pool.submit(
+                    lambda: asyncio.run(main(remove_existing_keys=remove_existing_keys))
+                ).result()
+        except RuntimeError as e:
+            if 'no running event loop' == e.args[0]:
+                # no event loop running
+                asyncio.run(main(remove_existing_keys=remove_existing_keys))
+            else:
+                raise e
     except Exception as e:
         log_verbose(e)
 

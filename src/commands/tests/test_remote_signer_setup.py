@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Generator
 from unittest import mock
 
+import aiohttp
 import pytest
 from click.testing import CliRunner
 from eth_typing import HexAddress
@@ -46,7 +47,7 @@ class TestOperatorRemoteSignerSetup:
         assert "Error: Missing option '--remote-signer-url'" in result.output
 
     @pytest.mark.usefixtures('_init_vault', '_create_keys', 'mocked_remote_signer')
-    def test_basic(
+    async def test_basic(
         self,
         vault_address: HexAddress,
         execution_endpoints: str,
@@ -93,6 +94,11 @@ class TestOperatorRemoteSignerSetup:
 
         for _, shares in config.pubkeys_to_shares.items():
             assert len(shares) == oracle_count
+
+        async with aiohttp.ClientSession() as session:
+            resp = await session.get(f'{settings.remote_signer_url}/api/v1/eth2/publicKeys')
+            pubkeys_remote_signer = set(await resp.json())
+            assert len(pubkeys_remote_signer) == key_count * oracle_count
 
     @pytest.mark.usefixtures('_init_vault', 'mocked_remote_signer')
     def test_add_more_keys_later(
