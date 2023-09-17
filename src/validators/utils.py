@@ -112,6 +112,8 @@ async def send_approval_request(
     logger.debug('send_approval_request to %s', endpoint)
     try:
         async with session.post(url=endpoint, json=payload) as response:
+            if response.status == 400:
+                logger.warning('%s response: %s', endpoint, await response.json())
             response.raise_for_status()
             data = await response.json()
     except (ClientError, asyncio.TimeoutError) as e:
