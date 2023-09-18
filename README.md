@@ -288,6 +288,7 @@ then imported to the remote signer. Local keystores are removed
 as a result of this command since they no longer need to be present.
 
 Notes:
+
 - You will need to run this command every time the oracle set
   changes, or the threshold needed to recover exit signatures
   (`exit_signature_recover_threshold`) changes.
@@ -308,7 +309,7 @@ Notes:
  --remote-signer-url=http://signer:9000
 ```
 
-```
+``` text
 Successfully generated 11 key shares for 1 private key(s)!
 Successfully imported 11 key shares into remote signer.
 Removed keystores from local filesystem.
@@ -318,7 +319,7 @@ Done. Successfully configured operator to use remote signer for 1 public key(s)!
 #### `remote-signer-setup` options
 
 - `--vault` - The vault address.
-- `--remote-signer-url` - The base URL of the remote signer, e.g. http://signer:9000
+- `--remote-signer-url` - The base URL of the remote signer, e.g. <http://signer:9000>
 - `--remove-existing-keys` - Include this flag to remove any keys present in the signer that are not needed by the operator.
   Can be used to remove outdated keyshares from the remote signer when the set of oracles changes,
   see note above.
@@ -338,10 +339,9 @@ using the `--remote-signer-url` flag:
 
 You should see a message similar to this one after starting the operator:
 
-```
+``` text
 Using remote signer at http://remote-signer:9000 for 10 public keys
 ```
-
 
 ## Misc commands
 
