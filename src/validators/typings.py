@@ -1,4 +1,3 @@
-import dataclasses
 from dataclasses import dataclass
 from typing import NewType
 
@@ -48,13 +47,6 @@ class ApprovalRequest:
     deadline: int
     proof: list[HexStr]
     proof_flags: list[bool]
-
-    def as_json_dict(self) -> dict:
-        """
-        :return: dict which can be serialized by `json.dumps()`
-        """
-        res = dataclasses.asdict(self)
-        return res
 
 
 @dataclass

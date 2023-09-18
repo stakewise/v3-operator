@@ -77,10 +77,11 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
         validators=validators,
     )
     registry_root = None
+    oracles_request = None
     while True:
         latest_registry_root = await validators_registry_contract.get_registry_root()
-
         deadline = get_current_timestamp() + oracles.signature_validity_period
+
         if not registry_root or registry_root != latest_registry_root:
             registry_root = latest_registry_root
             logger.debug('Fetched latest validators registry root: %s', registry_root)
@@ -93,6 +94,8 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
                 multi_proof=multi_proof,
                 deadline=deadline,
             )
+        else:
+            oracles_request.deadline = deadline
 
         try:
             oracles_approval = await get_oracles_approval(oracles=oracles, request=oracles_request)
