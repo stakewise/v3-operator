@@ -9,7 +9,7 @@ from src.config.networks import GOERLI, NETWORKS, NetworkConfig
 
 DATA_DIR = Path.home() / '.stakewise'
 
-DEFAULT_MAX_FEE_PER_GAS_GWEI = 70
+DEFAULT_MAX_FEE_PER_GAS_GWEI = 100
 DEFAULT_METRICS_HOST = '127.0.0.1'
 DEFAULT_METRICS_PORT = 9100
 

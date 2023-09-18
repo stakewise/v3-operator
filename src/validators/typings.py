@@ -1,6 +1,4 @@
-import dataclasses
 from dataclasses import dataclass
-from datetime import datetime
 from typing import NewType
 
 from eth_typing import BlockNumber, ChecksumAddress, HexStr
@@ -46,17 +44,9 @@ class ApprovalRequest:
     deposit_signatures: list[HexStr]
     public_key_shards: list[list[HexStr]]
     exit_signature_shards: list[list[HexStr]]
+    deadline: int
     proof: list[HexStr]
     proof_flags: list[bool]
-    deadline: datetime
-
-    def as_json_dict(self) -> dict:
-        """
-        :return: dict which can be serialized by `json.dumps()`
-        """
-        res = dataclasses.asdict(self)
-        res['deadline'] = int(self.deadline.timestamp())
-        return res
 
 
 @dataclass

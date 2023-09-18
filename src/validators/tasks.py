@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime, timedelta, timezone
 
 from multiproof.standart import MultiProof
 from sw_utils.typings import Bytes32
@@ -11,7 +10,7 @@ from src.common.contracts import validators_registry_contract
 from src.common.execution import check_gas_price, get_oracles
 from src.common.metrics import metrics
 from src.common.typings import Oracles, OraclesApproval
-from src.common.utils import MGNO_RATE, WAD
+from src.common.utils import MGNO_RATE, WAD, get_current_timestamp
 from src.config.networks import GNOSIS
 from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.validators.database import NetworkValidatorCrud
@@ -78,19 +77,13 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
         validators=validators,
     )
     registry_root = None
-    deadline = None
+    oracles_request = None
     while True:
         latest_registry_root = await validators_registry_contract.get_registry_root()
-        latest_deadline = datetime.now(timezone.utc) + timedelta(
-            seconds=oracles.signature_validity_period
-        )
-        if (
-            not registry_root
-            or registry_root != latest_registry_root
-            or deadline <= datetime.now(timezone.utc)
-        ):
+        deadline = get_current_timestamp() + oracles.signature_validity_period
+
+        if not registry_root or registry_root != latest_registry_root:
             registry_root = latest_registry_root
-            deadline = latest_deadline
             logger.debug('Fetched latest validators registry root: %s', registry_root)
 
             oracles_request = await create_approval_request(
@@ -98,9 +91,11 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
                 oracles=oracles,
                 keystores=keystores,
                 validators=validators,
-                deadline=deadline,
                 multi_proof=multi_proof,
+                deadline=deadline,
             )
+        else:
+            oracles_request.deadline = deadline
 
         try:
             oracles_approval = await get_oracles_approval(oracles=oracles, request=oracles_request)
@@ -138,7 +133,7 @@ async def create_approval_request(
     validators: list[Validator],
     registry_root: Bytes32,
     multi_proof: MultiProof,
-    deadline: datetime,
+    deadline: int,
 ) -> ApprovalRequest:
     """Generate validator registration request data"""
 
@@ -195,11 +190,7 @@ async def get_oracles_approval(oracles: Oracles, request: ApprovalRequest) -> Or
         len(request.public_keys),
         request.validator_index,
     )
-    return OraclesApproval(
-        signatures=signatures,
-        ipfs_hash=ipfs_hash,
-        deadline=request.deadline,
-    )
+    return OraclesApproval(signatures=signatures, ipfs_hash=ipfs_hash, deadline=request.deadline)
 
 
 async def load_genesis_validators() -> None:

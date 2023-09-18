@@ -1,11 +1,12 @@
 import asyncio
 import logging
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 from eth_typing import BlockNumber
 from web3 import Web3
-from web3.types import Wei
+from web3.types import Timestamp, Wei
 
 from src.common.clients import consensus_client, execution_client
 from src.config.settings import settings
@@ -50,3 +51,7 @@ async def wait_block_finalization(block_number: BlockNumber | None = None):
 
         elapsed = time.time() - start
         sleep_time = float(settings.network_config.SECONDS_PER_BLOCK) - elapsed
+
+
+def get_current_timestamp() -> Timestamp:
+    return Timestamp(int(datetime.now(timezone.utc).timestamp()))
