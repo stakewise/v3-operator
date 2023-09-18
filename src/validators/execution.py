@@ -173,11 +173,7 @@ async def get_available_validators(
         return []
 
     for i in range(start_index, start_index + count):
-        try:
-            validator = deposit_data.validators[i]
-        except IndexError:
-            break
-
+        validator = deposit_data.validators[i]
         if validator.public_key not in keystores:
             logger.warning(
                 'Cannot find validator with public key %s in imported keystores.',
