@@ -18,6 +18,7 @@ else:
      ]
 
 datas += collect_data_files('certifi')
+datas += collect_data_files('coincurve')
 datas += collect_data_files('eth_account')
 
 
