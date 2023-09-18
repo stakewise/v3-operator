@@ -39,6 +39,8 @@ class Settings(metaclass=Singleton):
     keystores_dir: Path
     keystores_password_dir: Path
     keystores_password_file: Path
+    remote_signer_config_file: Path
+    remote_signer_url: str | None
     hot_wallet_file: Path
     hot_wallet_password_file: Path
     max_fee_per_gas_gwei: int
@@ -65,11 +67,14 @@ class Settings(metaclass=Singleton):
         deposit_data_file: str | None = None,
         keystores_dir: str | None = None,
         keystores_password_file: str | None = None,
+        remote_signer_config_file: str | None = None,
+        remote_signer_url: str | None = None,
         hot_wallet_file: str | None = None,
         hot_wallet_password_file: str | None = None,
         database_dir: str | None = None,
     ):
         self.vault = Web3.to_checksum_address(vault)
+        vault_dir.mkdir(parents=True, exist_ok=True)
         self.vault_dir = vault_dir
         self.network = network
 
@@ -84,6 +89,7 @@ class Settings(metaclass=Singleton):
         self.deposit_data_file = (
             Path(deposit_data_file) if deposit_data_file else vault_dir / 'deposit_data.json'
         )
+
         # keystores
         self.keystores_dir = Path(keystores_dir) if keystores_dir else vault_dir / 'keystores'
         self.keystores_password_dir = decouple_config(
@@ -96,6 +102,14 @@ class Settings(metaclass=Singleton):
             if keystores_password_file
             else vault_dir / 'keystores' / 'password.txt'
         )
+
+        # remote signer configuration
+        self.remote_signer_config_file = (
+            Path(remote_signer_config_file)
+            if remote_signer_config_file
+            else vault_dir / 'remote_signer_config.json'
+        )
+        self.remote_signer_url = remote_signer_url
 
         # hot wallet
         self.hot_wallet_file = (
@@ -148,3 +162,6 @@ DEPOSIT_AMOUNT_GWEI = int(Web3.from_wei(DEPOSIT_AMOUNT, 'gwei'))
 
 # Backoff retries
 DEFAULT_RETRY_TIME = 60
+
+# Remote signer timeout
+REMOTE_SIGNER_TIMEOUT = 10

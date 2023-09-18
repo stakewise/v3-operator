@@ -5,8 +5,9 @@ import time
 from urllib.parse import urljoin
 
 import aiohttp
-from eth_typing import BlockNumber
+from eth_typing import BlockNumber, BLSPubkey
 from sw_utils.decorators import retry_aiohttp_errors
+from web3 import Web3
 from web3.types import HexStr
 
 from src.common.clients import consensus_client
@@ -24,7 +25,11 @@ from src.exits.consensus import get_validator_public_keys
 from src.exits.execution import submit_exit_signatures
 from src.exits.typings import OraclesApproval, SignatureRotationRequest
 from src.exits.utils import send_signature_rotation_requests
-from src.validators.signing import get_exit_signature_shards
+from src.validators.signing.local import get_exit_signature_shards
+from src.validators.signing.remote import (
+    RemoteSignerConfiguration,
+    get_exit_signature_shards_remote_signer,
+)
 from src.validators.typings import Keystores
 
 logger = logging.getLogger(__name__)
@@ -79,7 +84,10 @@ async def wait_oracle_signature_update(
 
 
 async def update_exit_signatures(
-    keystores: Keystores, oracles: Oracles, outdated_indexes: list[int]
+    keystores: Keystores,
+    remote_signer_config: RemoteSignerConfiguration | None,
+    oracles: Oracles,
+    outdated_indexes: list[int],
 ) -> HexStr:
     """Fetches update signature requests from oracles."""
     exit_rotation_batch_limit = oracles.validators_exit_rotation_batch_limit
@@ -87,10 +95,12 @@ async def update_exit_signatures(
 
     logger.info('Started exit signature rotation for %d validators', len(outdated_indexes))
 
+    # pylint: disable=duplicate-code
     validators = await get_validator_public_keys(outdated_indexes)
     oracles_approval = await get_oracles_approval(
         oracles=oracles,
         keystores=keystores,
+        remote_signer_config=remote_signer_config,
         validators=validators,
     )
 
@@ -133,7 +143,10 @@ async def _fetch_exit_signature_block(oracle_endpoint: str) -> BlockNumber | Non
 
 
 async def get_oracles_approval(
-    oracles: Oracles, keystores: Keystores, validators: dict[int, HexStr]
+    oracles: Oracles,
+    keystores: Keystores,
+    remote_signer_config: RemoteSignerConfiguration | None,
+    validators: dict[int, HexStr],
 ) -> OraclesApproval:
     """Fetches approval from oracles."""
     fork = await consensus_client.get_consensus_fork()
@@ -146,12 +159,25 @@ async def get_oracles_approval(
         exit_signature_shards=[],
     )
     for validator_index, public_key in validators.items():
-        shards = get_exit_signature_shards(
-            validator_index=validator_index,
-            private_key=keystores[public_key],
-            oracles=oracles,
-            fork=fork,
-        )
+        if len(keystores) > 0:
+            shards = get_exit_signature_shards(
+                validator_index=validator_index,
+                private_key=keystores[public_key],
+                oracles=oracles,
+                fork=fork,
+            )
+        elif remote_signer_config:
+            # pylint: disable=duplicate-code
+            pubkey_shares = remote_signer_config.pubkeys_to_shares[public_key]
+            shards = await get_exit_signature_shards_remote_signer(
+                validator_index=validator_index,
+                validator_pubkey_shares=[BLSPubkey(Web3.to_bytes(hexstr=s)) for s in pubkey_shares],
+                oracles=oracles,
+                fork=fork,
+            )
+        else:
+            raise RuntimeError('No keystores and no remote signer URL provided')
+
         if not shards:
             break
 
@@ -168,7 +194,10 @@ async def get_oracles_approval(
     )
 
 
-async def update_exit_signatures_periodically(keystores: Keystores):
+async def update_exit_signatures_periodically(
+    keystores: Keystores,
+    remote_signer_config: RemoteSignerConfiguration | None,
+):
     # Oracle may have lag if operator was stopped
     # during `update_exit_signatures_periodically` process.
     # Wait all oracles sync.
@@ -186,7 +215,12 @@ async def update_exit_signatures_periodically(keystores: Keystores):
             outdated_indexes = await fetch_outdated_indexes(oracle_endpoint)
 
             if outdated_indexes:
-                await update_exit_signatures(keystores, oracles, outdated_indexes)
+                await update_exit_signatures(
+                    keystores=keystores,
+                    remote_signer_config=remote_signer_config,
+                    oracles=oracles,
+                    outdated_indexes=outdated_indexes,
+                )
 
                 # Wait all oracles sync.
                 await wait_oracles_signature_update(oracles)

@@ -1,14 +1,24 @@
 import asyncio
+from pathlib import Path
+from random import randint
+from typing import Callable
 from unittest import mock
 
 import pytest
 from eth_typing import BlockNumber
+from sw_utils.typings import ConsensusFork
 
-from src.exits.tasks import wait_oracle_signature_update
+from src.common.typings import Oracles
+from src.config.settings import settings
+from src.exits.tasks import get_oracles_approval, wait_oracle_signature_update
+from src.exits.typings import OraclesApproval
+from src.validators.signing.remote import RemoteSignerConfiguration
+from src.validators.typings import ExitSignatureShards, Keystores
 
 
+@pytest.mark.usefixtures('fake_settings')
 class TestWaitOracleSignatureUpdate:
-    async def test_normal(self, fake_settings):
+    async def test_normal(self):
         update_block = BlockNumber(3)
         with (
             mock.patch('asyncio.sleep'),
@@ -21,7 +31,7 @@ class TestWaitOracleSignatureUpdate:
 
         assert fetch_mock.call_count == 4
 
-    async def test_timeout(self, fake_settings):
+    async def test_timeout(self):
         update_block = BlockNumber(3)
         with (
             mock.patch('asyncio.sleep'),
@@ -34,3 +44,75 @@ class TestWaitOracleSignatureUpdate:
             await wait_oracle_signature_update(update_block, 'http://oracle', max_time=5)
 
         assert fetch_mock.call_count == 2
+
+
+@pytest.mark.usefixtures('fake_settings')
+class TestGetOraclesApproval:
+    async def test_local_keystores(
+        self, mocked_oracles: Oracles, create_validator_keypair: Callable
+    ):
+        oracles = mocked_oracles
+        test_validator_privkey, test_validator_pubkey = create_validator_keypair()
+
+        with (
+            mock.patch(
+                'sw_utils.consensus.ExtendedAsyncBeacon.get_consensus_fork',
+                return_value=ConsensusFork(
+                    version=bytes.fromhex('00000000'),
+                    epoch=1,
+                ),
+            ),
+            mock.patch(
+                'src.exits.tasks.send_signature_rotation_requests',
+                return_value=(b'', 'mock_ipfs_hash'),
+            ),
+        ):
+            approval = await get_oracles_approval(
+                oracles=oracles,
+                keystores=Keystores({test_validator_pubkey: test_validator_privkey}),
+                remote_signer_config=None,
+                validators={123: test_validator_pubkey},
+            )
+            assert approval == OraclesApproval(signatures=b'', ipfs_hash='mock_ipfs_hash')
+
+    async def test_remote_signer(
+        self,
+        vault_dir: Path,
+        mocked_oracles: Oracles,
+        remote_signer_config: RemoteSignerConfiguration,
+        remote_signer_url: str,
+    ):
+        oracles = mocked_oracles
+        settings.remote_signer_url = remote_signer_url
+
+        with (
+            mock.patch(
+                'sw_utils.consensus.ExtendedAsyncBeacon.get_consensus_fork',
+                return_value=ConsensusFork(
+                    version=bytes.fromhex('00000001'),
+                    epoch=1,
+                ),
+            ),
+            mock.patch(
+                'src.exits.tasks.get_exit_signature_shards_remote_signer',
+                return_value=ExitSignatureShards(
+                    public_keys=[],
+                    exit_signatures=[],
+                ),
+            ),
+            mock.patch(
+                'src.exits.tasks.send_signature_rotation_requests',
+                return_value=(b'', 'mock_ipfs_hash'),
+            ),
+        ):
+            approval = await get_oracles_approval(
+                oracles=oracles,
+                keystores=Keystores(dict()),
+                remote_signer_config=remote_signer_config,
+                validators={
+                    randint(0, int(1e6)): pubkey
+                    for pubkey in remote_signer_config.pubkeys_to_shares.keys()
+                },
+            )
+
+            assert approval == OraclesApproval(signatures=b'', ipfs_hash='mock_ipfs_hash')
