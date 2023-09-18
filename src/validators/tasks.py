@@ -78,12 +78,13 @@ async def register_validators(
         deposit_data=deposit_data,
         count=validators_count,
     )
-    if not validators:
+    if len(validators) < validators_count:
         logger.warning(
             'There are not enough available validators in the current deposit data '
             'to proceed with registration. '
             'To register additional validators, you must upload new deposit data.'
         )
+    if not validators:
         return
 
     tx_validators, multi_proof = get_validators_proof(

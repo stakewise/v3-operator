@@ -181,7 +181,10 @@ async def get_available_validators(
         remote_signer_pubkeys = list(remote_signer_config.pubkeys_to_shares.keys())
 
     for i in range(start_index, start_index + count):
-        validator = deposit_data.validators[i]
+        try:
+            validator = deposit_data.validators[i]
+        except IndexError:
+            break
         if len(keystores) > 0 and validator.public_key not in keystores:
             logger.warning(
                 'Cannot find validator with public key %s in imported keystores.',
