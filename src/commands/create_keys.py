@@ -83,7 +83,7 @@ def create_keys(
 
     _export_keystores(
         credentials=credentials,
-        keystores_dir=str(keystores_dir),
+        keystores_dir=keystores_dir,
         password_file=str(password_file),
         per_keystore_password=per_keystore_password,
         pool_size=pool_size,
@@ -126,12 +126,13 @@ def _export_deposit_data_json(
 
 def _export_keystores(
     credentials: list[Credential],
-    keystores_dir: str,
+    keystores_dir: Path,
     password_file: str,
     per_keystore_password: bool,
     pool_size: int | None = None,
 ) -> None:
-    makedirs(path.abspath(keystores_dir), exist_ok=True)
+    keystores_dir.mkdir(exist_ok=True)
+
     if not per_keystore_password:
         password = get_or_create_password_file(password_file)
     with click.progressbar(
@@ -145,7 +146,7 @@ def _export_keystores(
                 cred.save_signing_keystore,
                 kwds={
                     'password': generate_password() if per_keystore_password else password,
-                    'folder': keystores_dir,
+                    'folder': str(keystores_dir),
                     'per_keystore_password': per_keystore_password,
                 },
                 callback=lambda x: progress_bar.update(1),
@@ -154,4 +155,5 @@ def _export_keystores(
         ]
 
         for result in results:
-            result.wait()
+            # Use result.get() to reraise exceptions
+            result.get()

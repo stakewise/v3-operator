@@ -1,5 +1,6 @@
 import logging
 
+from eth_typing import BLSPubkey
 from multiproof.standart import MultiProof
 from sw_utils.typings import Bytes32
 from web3 import Web3
@@ -21,7 +22,12 @@ from src.validators.execution import (
     register_multiple_validator,
     register_single_validator,
 )
-from src.validators.signing import get_exit_signature_shards, get_validators_proof
+from src.validators.signing.common import get_validators_proof
+from src.validators.signing.local import get_exit_signature_shards
+from src.validators.signing.remote import (
+    RemoteSignerConfiguration,
+    get_exit_signature_shards_remote_signer,
+)
 from src.validators.typings import (
     ApprovalRequest,
     DepositData,
@@ -36,7 +42,11 @@ logger = logging.getLogger(__name__)
 
 
 # pylint: disable-next=too-many-locals
-async def register_validators(keystores: Keystores, deposit_data: DepositData) -> None:
+async def register_validators(
+    keystores: Keystores,
+    remote_signer_config: RemoteSignerConfiguration | None,
+    deposit_data: DepositData,
+) -> None:
     """Registers vault validators."""
     vault_balance, update_state_call = await get_withdrawable_assets()
     if settings.network == GNOSIS:
@@ -63,7 +73,10 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
     logger.info('Started registration of %d validator(s)', validators_count)
 
     validators: list[Validator] = await get_available_validators(
-        keystores, deposit_data, validators_count
+        keystores=keystores,
+        remote_signer_config=remote_signer_config,
+        deposit_data=deposit_data,
+        count=validators_count,
     )
     if not validators:
         logger.warning(
@@ -86,10 +99,11 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
             logger.debug('Fetched latest validators registry root: %s', registry_root)
 
             oracles_request = await create_approval_request(
-                registry_root=registry_root,
                 oracles=oracles,
                 keystores=keystores,
+                remote_signer_config=remote_signer_config,
                 validators=validators,
+                registry_root=registry_root,
                 multi_proof=multi_proof,
             )
 
@@ -122,9 +136,11 @@ async def register_validators(keystores: Keystores, deposit_data: DepositData) -
         logger.info('Successfully registered validators with public keys %s', pub_keys)
 
 
+# pylint: disable-next=too-many-arguments
 async def create_approval_request(
     oracles: Oracles,
     keystores: Keystores,
+    remote_signer_config: RemoteSignerConfiguration | None,
     validators: list[Validator],
     registry_root: Bytes32,
     multi_proof: MultiProof,
@@ -153,12 +169,24 @@ async def create_approval_request(
         proof_flags=multi_proof.proof_flags,
     )
     for validator in validators:
-        shards = get_exit_signature_shards(
-            validator_index=validator_index,
-            private_key=keystores[validator.public_key],
-            oracles=oracles,
-            fork=fork,
-        )
+        if len(keystores) > 0:
+            shards = get_exit_signature_shards(
+                validator_index=validator_index,
+                private_key=keystores[validator.public_key],
+                oracles=oracles,
+                fork=fork,
+            )
+        elif remote_signer_config:
+            pubkey_shares = remote_signer_config.pubkeys_to_shares[validator.public_key]
+            shards = await get_exit_signature_shards_remote_signer(
+                validator_index=validator_index,
+                validator_pubkey_shares=[BLSPubkey(Web3.to_bytes(hexstr=s)) for s in pubkey_shares],
+                oracles=oracles,
+                fork=fork,
+            )
+        else:
+            raise RuntimeError('No keystores and no remote signer URL provided')
+
         if not shards:
             logger.warning(
                 'Failed to get exit signature shards for validator %s', validator.public_key

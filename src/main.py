@@ -11,6 +11,7 @@ from src.commands.get_validators_root import get_validators_root
 from src.commands.init import init
 from src.commands.merge_deposit_data import merge_deposit_data
 from src.commands.recover import recover
+from src.commands.remote_signer_setup import remote_signer_setup
 from src.commands.start import start
 from src.commands.sync_validator import sync_validator
 from src.commands.sync_web3signer import sync_web3signer
@@ -25,6 +26,7 @@ def cli() -> None:
 
 cli.add_command(init)
 cli.add_command(create_keys)
+cli.add_command(remote_signer_setup)
 cli.add_command(create_wallet)
 cli.add_command(merge_deposit_data)
 cli.add_command(validators_exit)
