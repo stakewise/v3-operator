@@ -28,7 +28,7 @@ from src.validators.exceptions import (
     ValidatorIndexChangedError,
 )
 from src.validators.execution import get_latest_network_validator_public_keys
-from src.validators.signing import encode_tx_validator
+from src.validators.signing.common import encode_tx_validator
 from src.validators.typings import (
     ApprovalRequest,
     BLSPrivkey,
@@ -112,6 +112,8 @@ async def send_approval_request(
     logger.debug('send_approval_request to %s', endpoint)
     try:
         async with session.post(url=endpoint, json=payload) as response:
+            if response.status == 400:
+                logger.warning('%s response: %s', endpoint, await response.json())
             response.raise_for_status()
             data = await response.json()
     except (ClientError, asyncio.TimeoutError) as e:
@@ -152,12 +154,12 @@ def list_keystore_files() -> list[KeystoreFile]:
     return res
 
 
-def load_keystores() -> Keystores | None:
+def load_keystores() -> Keystores:
     """Extracts private keys from the keystores."""
 
     keystore_files = list_keystore_files()
     logger.info('Loading keystores from %s...', settings.keystores_dir)
-    with Pool() as pool:
+    with Pool(processes=settings.pool_size) as pool:
         # pylint: disable-next=unused-argument
         def _stop_pool(*args, **kwargs):
             pool.close()
@@ -177,7 +179,7 @@ def load_keystores() -> Keystores | None:
                 keys.append(result.get())
             except KeystoreException as e:
                 logger.error(e)
-                return None
+                raise RuntimeError('Failed to load keystores') from e
 
         existing_keys: list[tuple[HexStr, BLSPrivkey]] = [key for key in keys if key]
         keystores = Keystores(dict(existing_keys))
@@ -210,7 +212,7 @@ def load_deposit_data(vault: HexAddress, deposit_data_file: Path) -> DepositData
 
 def _process_keystore_file(
     keystore_file: KeystoreFile, keystore_path: Path
-) -> tuple[HexStr, BLSPrivkey] | None:
+) -> tuple[HexStr, BLSPrivkey]:
     file_name = keystore_file.name
     keystores_password = keystore_file.password
     file_path = join(keystore_path, file_name)

@@ -269,14 +269,88 @@ export $(grep -v '^#' .env | xargs)
 ./operator start
 ```
 
-## Misc commnads
+## Remote signer
+
+You may not want the operator service to have direct access to the validator
+keys. Validator keystores do not need to be present directly in the operator.
+The operator can query a remote signer to get signatures for validator
+exit messages. Because the validator exit signatures are split up and
+shared among oracles, the validator exit message needs to be signed by
+specific shares of the validator private key.
+
+These key shares therefore need to be present in your remote signer.
+
+### Remote signer setup
+
+This command will split up the private keys in the keystores directory
+into private key shares. The resulting private key shares are
+then imported to the remote signer. Local keystores are removed
+as a result of this command since they no longer need to be present.
+
+Notes:
+
+- You will need to run this command every time the oracle set
+  changes, or the threshold needed to recover exit signatures
+  (`exit_signature_recover_threshold`) changes.
+- In order to regenerate key shares, make sure to
+  adjust the `mnemonic_next_index` value in the vault config.json
+  to 0, then run the `create-keys` command, generating the full keystores
+  for all your validators. Next, run the `remote-signer-setup` command
+  to regenerate and import the new key shares for all your validators
+  into the remote signer.
+  You can remove the previously generated private key shares from the
+  remote signer, they will not be used anymore. This can optionally be
+  done by the setup command automatically by using the
+  `--remove-existing-keys` flag.
+
+```bash
+./operator remote-signer-setup \
+ --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
+ --remote-signer-url=http://signer:9000
+```
+
+``` text
+Successfully generated 11 key shares for 1 private key(s)!
+Successfully imported 11 key shares into remote signer.
+Removed keystores from local filesystem.
+Done. Successfully configured operator to use remote signer for 1 public key(s)!
+```
+
+#### `remote-signer-setup` options
+
+- `--vault` - The vault address.
+- `--remote-signer-url` - The base URL of the remote signer, e.g. <http://signer:9000>
+- `--remove-existing-keys` - Include this flag to remove any keys present in the signer that are not needed by the operator.
+  Can be used to remove outdated keyshares from the remote signer when the set of oracles changes,
+  see note above.
+- `--data-dir` - Path where the vault data is stored. Default is ~/.stakewise.
+- `--keystores-dir` - The directory with validator keys in the EIP-2335 standard.
+- `--execution-endpoints` - Comma separated list of API endpoints for execution nodes.
+- `--verbose` - Enable debug mode. Default is false.
+
+### Running the operator
+
+Provide the operator with the URL to your remote signer instance
+using the `--remote-signer-url` flag:
+
+```bash
+./operator start --remote-signer-url=http://remote-signer:9000 ...
+```
+
+You should see a message similar to this one after starting the operator:
+
+``` text
+Using remote signer at http://remote-signer:9000 for 10 public keys
+```
+
+## Misc commands
 
 ### Validators voluntary exit
 
 Performs a voluntary exit for active vault validators.
 
 ```bash
-./operator validator-exit
+./operator validators-exit
 ```
 
 ```sh
@@ -286,13 +360,14 @@ Are you sure you want to exit 3 validators with indexes: 513571, 513572, 513861?
 Validators 513571, 513572, 513861 exits successfully initiated
 ```
 
-#### `validator-exit` options
+#### `validators-exit` options
 
 - `--network` - The network of your vault.
 - `--vault` - The vault address.
 - `--consensus-endpoints` - Comma separated list of API endpoints for consensus nodes.
 - `--count` - The number of validators to exit. By default, command will force exit all active vault validators.
 - `--data-dir` - Path where the vault data is stored. Default is ~/.stakewise.
+- `--remote-signer-url` - URL to the remote signer instance.
 - `--verbose` - Enable debug mode. Default is false.
 
 ### Update vault deposit data

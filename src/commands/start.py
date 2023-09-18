@@ -30,6 +30,7 @@ from src.validators.execution import (
     NetworkValidatorsProcessor,
     update_unused_validator_keys_metric,
 )
+from src.validators.signing.remote import RemoteSignerConfiguration
 from src.validators.tasks import load_genesis_validators, register_validators
 from src.validators.utils import load_deposit_data, load_keystores
 
@@ -151,6 +152,12 @@ logger = logging.getLogger(__name__)
     prompt='Enter the vault address',
     help='Address of the vault to register validators for.',
 )
+@click.option(
+    '--remote-signer-url',
+    type=str,
+    envvar='REMOTE_SIGNER_URL',
+    help='The base URL of the remote signer, e.g. http://signer:9000',
+)
 @click.command(help='Start operator service')
 # pylint: disable-next=too-many-arguments,too-many-locals
 def start(
@@ -166,6 +173,7 @@ def start(
     deposit_data_file: str | None,
     keystores_dir: str | None,
     keystores_password_file: str | None,
+    remote_signer_url: str | None,
     hot_wallet_file: str | None,
     hot_wallet_password_file: str | None,
     max_fee_per_gas_gwei: int,
@@ -189,6 +197,7 @@ def start(
         deposit_data_file=deposit_data_file,
         keystores_dir=keystores_dir,
         keystores_password_file=keystores_password_file,
+        remote_signer_url=remote_signer_url,
         hot_wallet_file=hot_wallet_file,
         hot_wallet_password_file=hot_wallet_password_file,
         max_fee_per_gas_gwei=max_fee_per_gas_gwei,
@@ -213,10 +222,24 @@ async def main() -> None:
     # load network validators from ipfs dump
     await load_genesis_validators()
 
-    # load keystores
+    # load keystores / remote signer configuration
     keystores = load_keystores()
-    if not keystores:
-        return
+
+    remote_signer_config = None
+
+    if len(keystores) == 0:
+        if not settings.remote_signer_url:
+            raise RuntimeError('No keystores and no remote signer URL provided')
+
+        # No keystores loaded but remote signer URL provided
+        remote_signer_config = RemoteSignerConfiguration.from_file(
+            settings.remote_signer_config_file
+        )
+        logger.info(
+            'Using remote signer at %s for %i public keys',
+            settings.remote_signer_url,
+            len(remote_signer_config.pubkeys_to_shares.keys()),
+        )
 
     # load deposit data
     deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
@@ -235,7 +258,12 @@ async def main() -> None:
     await metrics_server()
 
     # process outdated exit signatures
-    asyncio.create_task(update_exit_signatures_periodically(keystores))
+    asyncio.create_task(
+        update_exit_signatures_periodically(
+            keystores=keystores,
+            remote_signer_config=remote_signer_config,
+        )
+    )
 
     logger.info('Started operator service')
     with InterruptHandler() as interrupt_handler:
@@ -249,8 +277,16 @@ async def main() -> None:
                 # process new network validators
                 await network_validators_scanner.process_new_events(to_block)
                 # check and register new validators
-                await update_unused_validator_keys_metric(keystores, deposit_data)
-                await register_validators(keystores, deposit_data)
+                await update_unused_validator_keys_metric(
+                    keystores=keystores,
+                    remote_signer_config=remote_signer_config,
+                    deposit_data=deposit_data,
+                )
+                await register_validators(
+                    keystores=keystores,
+                    remote_signer_config=remote_signer_config,
+                    deposit_data=deposit_data,
+                )
 
                 # submit harvest vault transaction
                 if settings.harvest_vault:

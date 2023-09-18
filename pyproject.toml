@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "v3-operator"
-version = "0.2.6"
+version = "0.2.7"
 description = "StakeWise operator service for registering vault validators"
 authors = ["StakeWise Labs <info@stakewise.io>"]
 
@@ -36,6 +36,8 @@ faker = "==18.10.1"
 flake8-datetime-utcnow-plugin = "==0.1.2"
 flake8-print = "==5.0.0"
 types-pyyaml = "==6.0.12.11"
+coverage = "==7.3.1"
+aioresponses = "^0.7.4"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -47,7 +49,8 @@ skips = ["B608"]
 
 [tool.pylint."pre-commit-hook"]
 disable = ["C0103", "C0114", "C0115", "C0116", "W0511", "W0703"]
-ignore-paths=["src/.*/tests/.*"]
+ignore-paths=["src/.*/tests/.*", "src/test_fixtures/.*"]
+ignore=["conftest.py"]
 
 [tool.pylint."BASIC"]
 good-names = ["db", "i", "w3"]
@@ -55,6 +58,7 @@ ignored-modules=["milagro_bls_binding"]
 
 [tool.flake8]
 extend-ignore = ["E203", "E501"]  # line length will be checked by pylint
+exclude = ["conftest.py"]
 
 [tool.mypy]
 ignore_missing_imports = true
@@ -81,3 +85,6 @@ exclude = '''
   | dist
 )/
 '''
+
+[tool.coverage.report]
+fail_under = 76

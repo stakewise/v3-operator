@@ -115,8 +115,14 @@ class Credential:
 
 class CredentialManager:
     @staticmethod
+    # pylint: disable-next=too-many-arguments
     def generate_credentials(
-        network: str, vault: HexAddress, mnemonic: str, count: int, start_index: int
+        network: str,
+        vault: HexAddress,
+        mnemonic: str,
+        count: int,
+        start_index: int,
+        pool_size: int | None = None,
     ) -> list[Credential]:
         credentials: list[Credential] = []
         with click.progressbar(
@@ -124,7 +130,7 @@ class CredentialManager:
             label='Creating validator keys:\t\t',
             show_percent=False,
             show_pos=True,
-        ) as progress_bar, Pool() as pool:
+        ) as progress_bar, Pool(processes=pool_size) as pool:
 
             def bar_updated(result):
                 progress_bar.update(len(result))
