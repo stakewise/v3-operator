@@ -2,7 +2,6 @@ import asyncio
 import logging
 import random
 import time
-from datetime import datetime, timedelta, timezone
 from urllib.parse import urljoin
 
 import aiohttp
@@ -14,8 +13,8 @@ from src.common.clients import consensus_client
 from src.common.contracts import keeper_contract
 from src.common.execution import get_oracles
 from src.common.metrics import metrics
-from src.common.typings import Oracles
-from src.common.utils import wait_block_finalization
+from src.common.typings import Oracles, OraclesApproval
+from src.common.utils import get_current_timestamp, wait_block_finalization
 from src.config.settings import (
     DEFAULT_RETRY_TIME,
     OUTDATED_SIGNATURES_URL_PATH,
@@ -23,7 +22,7 @@ from src.config.settings import (
 )
 from src.exits.consensus import get_validator_public_keys
 from src.exits.execution import submit_exit_signatures
-from src.exits.typings import OraclesApproval, SignatureRotationRequest
+from src.exits.typings import SignatureRotationRequest
 from src.exits.utils import send_signature_rotation_requests
 from src.validators.signing import get_exit_signature_shards
 from src.validators.typings import Keystores
@@ -86,7 +85,7 @@ async def update_exit_signatures(
     exit_rotation_batch_limit = oracles.validators_exit_rotation_batch_limit
     outdated_indexes = outdated_indexes[:exit_rotation_batch_limit]
 
-    logger.info('Started exit signature rotation for %d validators', len(outdated_indexes))
+    logger.info('Starting exit signature rotation for %d validators', len(outdated_indexes))
 
     validators = await get_validator_public_keys(outdated_indexes)
     oracles_approval = await get_oracles_approval(
@@ -138,7 +137,6 @@ async def get_oracles_approval(
 ) -> OraclesApproval:
     """Fetches approval from oracles."""
     fork = await consensus_client.get_consensus_fork()
-    deadline = datetime.now(timezone.utc) + timedelta(seconds=oracles.signature_validity_period)
 
     # get exit signature shards
     request = SignatureRotationRequest(
@@ -146,7 +144,7 @@ async def get_oracles_approval(
         public_keys=[],
         public_key_shards=[],
         exit_signature_shards=[],
-        deadline=deadline,
+        deadline=get_current_timestamp() + oracles.signature_validity_period,
     )
     for validator_index, public_key in validators.items():
         shards = get_exit_signature_shards(
@@ -165,7 +163,11 @@ async def get_oracles_approval(
     # send approval request to oracles
     signatures, ipfs_hash = await send_signature_rotation_requests(oracles, request)
     logger.info('Fetched updated signature for validators: count=%d', len(validators))
-    return OraclesApproval(signatures=signatures, ipfs_hash=ipfs_hash, deadline=deadline)
+    return OraclesApproval(
+        signatures=signatures,
+        ipfs_hash=ipfs_hash,
+        deadline=request.deadline,
+    )
 
 
 async def update_exit_signatures_periodically(keystores: Keystores):
