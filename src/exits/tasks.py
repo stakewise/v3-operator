@@ -14,8 +14,8 @@ from src.common.clients import consensus_client
 from src.common.contracts import keeper_contract
 from src.common.execution import get_oracles
 from src.common.metrics import metrics
-from src.common.typings import Oracles
-from src.common.utils import wait_block_finalization
+from src.common.typings import Oracles, OraclesApproval
+from src.common.utils import get_current_timestamp, wait_block_finalization
 from src.config.settings import (
     DEFAULT_RETRY_TIME,
     OUTDATED_SIGNATURES_URL_PATH,
@@ -23,7 +23,7 @@ from src.config.settings import (
 )
 from src.exits.consensus import get_validator_public_keys
 from src.exits.execution import submit_exit_signatures
-from src.exits.typings import OraclesApproval, SignatureRotationRequest
+from src.exits.typings import SignatureRotationRequest
 from src.exits.utils import send_signature_rotation_requests
 from src.validators.signing.local import get_exit_signature_shards
 from src.validators.signing.remote import (
@@ -93,7 +93,7 @@ async def update_exit_signatures(
     exit_rotation_batch_limit = oracles.validators_exit_rotation_batch_limit
     outdated_indexes = outdated_indexes[:exit_rotation_batch_limit]
 
-    logger.info('Started exit signature rotation for %d validators', len(outdated_indexes))
+    logger.info('Starting exit signature rotation for %d validators', len(outdated_indexes))
 
     # pylint: disable=duplicate-code
     validators = await get_validator_public_keys(outdated_indexes)
@@ -157,6 +157,7 @@ async def get_oracles_approval(
         public_keys=[],
         public_key_shards=[],
         exit_signature_shards=[],
+        deadline=get_current_timestamp() + oracles.signature_validity_period,
     )
     for validator_index, public_key in validators.items():
         if len(keystores) > 0:
@@ -191,6 +192,7 @@ async def get_oracles_approval(
     return OraclesApproval(
         signatures=signatures,
         ipfs_hash=ipfs_hash,
+        deadline=request.deadline,
     )
 
 

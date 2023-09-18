@@ -2,6 +2,7 @@ import json
 import os
 from functools import cached_property
 
+from eth_typing import HexStr
 from sw_utils.typings import Bytes32
 from web3.contract import AsyncContract
 from web3.contract.contract import ContractEvent
@@ -30,6 +31,9 @@ class ContractWrapper:
         with open(os.path.join(current_dir, self.abi_path), encoding='utf-8') as f:
             abi = json.load(f)
         return execution_client.eth.contract(abi=abi, address=self.contract_address)
+
+    def encode_abi(self, fn_name: str, args: list | None = None) -> HexStr:
+        return self.contract.encodeABI(fn_name=fn_name, args=args)
 
     def __getattr__(self, item):
         return getattr(self.contract, item)

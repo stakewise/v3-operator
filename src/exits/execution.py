@@ -5,9 +5,9 @@ from web3 import Web3
 
 from src.common.clients import execution_client
 from src.common.contracts import keeper_contract
+from src.common.typings import OraclesApproval
 from src.config.networks import ETH_NETWORKS
 from src.config.settings import settings
-from src.exits.typings import OraclesApproval
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +22,7 @@ async def submit_exit_signatures(
     logger.info('Submitting UpdateExitSignatures transaction')
     tx = await keeper_contract.functions.updateExitSignatures(
         settings.vault,
+        approval.deadline,
         approval.ipfs_hash,
         approval.signatures,
     ).transact()

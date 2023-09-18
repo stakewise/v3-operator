@@ -240,6 +240,7 @@ def mocked_oracles(
         ],
         validators_approval_batch_limit=1,
         validators_exit_rotation_batch_limit=1,
+        signature_validity_period=60,
     )
 
 

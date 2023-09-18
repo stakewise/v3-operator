@@ -76,6 +76,14 @@ async def wait_for_execution_node() -> None:
                     )
                     continue
                 block_number = await execution_client.eth.block_number
+                if block_number <= 0:
+                    # There was a case when `block_number` equals to 0 although `syncing` is False.
+                    logger.warning(
+                        'Execution node %s. Current block number is %s',
+                        execution_endpoint,
+                        block_number,
+                    )
+                    continue
                 logger.info(
                     'Connected to execution node at %s. Current block number: %s',
                     execution_endpoint,
@@ -90,7 +98,7 @@ async def wait_for_execution_node() -> None:
                 )
         if done:
             return
-        logger.warning('Failed to connect to consensus nodes. Retrying in 10 seconds...')
+        logger.warning('Failed to connect to execution nodes. Retrying in 10 seconds...')
         await asyncio.sleep(10)
 
 

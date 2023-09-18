@@ -10,8 +10,8 @@ from src.common.clients import consensus_client, ipfs_fetch_client
 from src.common.contracts import validators_registry_contract
 from src.common.execution import check_gas_price, get_oracles
 from src.common.metrics import metrics
-from src.common.typings import Oracles
-from src.common.utils import MGNO_RATE, WAD
+from src.common.typings import Oracles, OraclesApproval
+from src.common.utils import MGNO_RATE, WAD, get_current_timestamp
 from src.config.networks import GNOSIS
 from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.validators.database import NetworkValidatorCrud
@@ -33,7 +33,6 @@ from src.validators.typings import (
     DepositData,
     Keystores,
     NetworkValidator,
-    OraclesApproval,
     Validator,
 )
 from src.validators.utils import send_approval_requests
@@ -92,8 +91,10 @@ async def register_validators(
         validators=validators,
     )
     registry_root = None
+    oracles_request = None
     while True:
         latest_registry_root = await validators_registry_contract.get_registry_root()
+        deadline = get_current_timestamp() + oracles.signature_validity_period
 
         if not registry_root or registry_root != latest_registry_root:
             registry_root = latest_registry_root
@@ -106,7 +107,10 @@ async def register_validators(
                 validators=validators,
                 registry_root=registry_root,
                 multi_proof=multi_proof,
+                deadline=deadline,
             )
+        else:
+            oracles_request.deadline = deadline
 
         try:
             oracles_approval = await get_oracles_approval(oracles=oracles, request=oracles_request)
@@ -145,6 +149,7 @@ async def create_approval_request(
     validators: list[Validator],
     registry_root: Bytes32,
     multi_proof: MultiProof,
+    deadline: int,
 ) -> ApprovalRequest:
     """Generate validator registration request data"""
 
@@ -168,6 +173,7 @@ async def create_approval_request(
         exit_signature_shards=[],
         proof=multi_proof.proof,
         proof_flags=multi_proof.proof_flags,
+        deadline=deadline,
     )
     for validator in validators:
         if len(keystores) > 0:
@@ -212,10 +218,7 @@ async def get_oracles_approval(oracles: Oracles, request: ApprovalRequest) -> Or
         len(request.public_keys),
         request.validator_index,
     )
-    return OraclesApproval(
-        signatures=signatures,
-        ipfs_hash=ipfs_hash,
-    )
+    return OraclesApproval(signatures=signatures, ipfs_hash=ipfs_hash, deadline=request.deadline)
 
 
 async def load_genesis_validators() -> None:

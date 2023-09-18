@@ -8,10 +8,10 @@ import pytest
 from eth_typing import BlockNumber
 from sw_utils.typings import ConsensusFork
 
-from src.common.typings import Oracles
+from src.common.typings import Oracles, OraclesApproval
+from src.common.utils import get_current_timestamp
 from src.config.settings import settings
 from src.exits.tasks import get_oracles_approval, wait_oracle_signature_update
-from src.exits.typings import OraclesApproval
 from src.validators.signing.remote import RemoteSignerConfiguration
 from src.validators.typings import ExitSignatureShards, Keystores
 
@@ -73,7 +73,11 @@ class TestGetOraclesApproval:
                 remote_signer_config=None,
                 validators={123: test_validator_pubkey},
             )
-            assert approval == OraclesApproval(signatures=b'', ipfs_hash='mock_ipfs_hash')
+            assert approval == OraclesApproval(
+                signatures=b'',
+                ipfs_hash='mock_ipfs_hash',
+                deadline=get_current_timestamp() + oracles.signature_validity_period,
+            )
 
     async def test_remote_signer(
         self,
@@ -115,4 +119,8 @@ class TestGetOraclesApproval:
                 },
             )
 
-            assert approval == OraclesApproval(signatures=b'', ipfs_hash='mock_ipfs_hash')
+            assert approval == OraclesApproval(
+                signatures=b'',
+                ipfs_hash='mock_ipfs_hash',
+                deadline=get_current_timestamp() + oracles.signature_validity_period,
+            )

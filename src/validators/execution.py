@@ -17,17 +17,12 @@ from src.common.contracts import (
 )
 from src.common.ipfs import fetch_harvest_params
 from src.common.metrics import metrics
+from src.common.typings import OraclesApproval
 from src.config.networks import ETH_NETWORKS
 from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.signing.remote import RemoteSignerConfiguration
-from src.validators.typings import (
-    DepositData,
-    Keystores,
-    NetworkValidator,
-    OraclesApproval,
-    Validator,
-)
+from src.validators.typings import DepositData, Keystores, NetworkValidator, Validator
 
 logger = logging.getLogger(__name__)
 
@@ -122,10 +117,12 @@ async def get_withdrawable_assets() -> tuple[Wei, HexStr | None]:
         ipfs_hash=last_rewards.ipfs_hash,
         rewards_root=last_rewards.rewards_root,
     )
-    if harvest_params is None:
+    if harvest_params is None or not await keeper_contract.can_harvest(
+        vault_contract.contract_address
+    ):
         return before_update_assets, None
 
-    update_state_call = vault_contract.encodeABI(
+    update_state_call = vault_contract.encode_abi(
         fn_name='updateState',
         args=[
             (
@@ -136,7 +133,7 @@ async def get_withdrawable_assets() -> tuple[Wei, HexStr | None]:
             )
         ],
     )
-    withdrawable_assets_call = vault_contract.encodeABI(fn_name='withdrawableAssets', args=[])
+    withdrawable_assets_call = vault_contract.encode_abi(fn_name='withdrawableAssets', args=[])
 
     multicall = await vault_contract.functions.multicall(
         [update_state_call, withdrawable_assets_call]
@@ -265,14 +262,16 @@ async def register_single_validator(
     register_call_args = [
         (
             validators_registry_root,
+            approval.deadline,
             tx_validators[0],
             approval.signatures,
             approval.ipfs_hash,
+            approval.deadline,
         ),
         multi_proof.proof,
     ]
     if update_state_call is not None:
-        register_call = vault_contract.encodeABI(
+        register_call = vault_contract.encode_abi(
             fn_name='registerValidator',
             args=register_call_args,
         )
@@ -301,16 +300,18 @@ async def register_multiple_validator(
     register_call_args = [
         (
             validators_registry_root,
+            approval.deadline,
             b''.join(tx_validators),
             approval.signatures,
             approval.ipfs_hash,
+            approval.deadline,
         ),
         indexes,
         multi_proof.proof_flags,
         multi_proof.proof,
     ]
     if update_state_call is not None:
-        register_call = vault_contract.encodeABI(
+        register_call = vault_contract.encode_abi(
             fn_name='registerValidators',
             args=register_call_args,
         )
