@@ -69,22 +69,21 @@ async def register_validators(
     if not await check_gas_price():
         return
 
-    logger.info('Started registration of %d validator(s)', validators_count)
-
     validators: list[Validator] = await get_available_validators(
         keystores=keystores,
         remote_signer_config=remote_signer_config,
         deposit_data=deposit_data,
         count=validators_count,
     )
-    if len(validators) < validators_count:
+    if not validators:
         logger.warning(
-            'There are not enough available validators in the current deposit data '
+            'There are no available validators in the current deposit data '
             'to proceed with registration. '
             'To register additional validators, you must upload new deposit data.'
         )
-    if not validators:
         return
+
+    logger.info('Started registration of %d validator(s)', len(validators))
 
     tx_validators, multi_proof = get_validators_proof(
         tree=deposit_data.tree,
@@ -213,9 +212,10 @@ async def get_oracles_approval(oracles: Oracles, request: ApprovalRequest) -> Or
     """Fetches approval from oracles."""
     # send approval request to oracles
     signatures, ipfs_hash = await send_approval_requests(oracles, request)
+
     logger.info(
-        'Fetched oracles approval for validators: count=%d, start index=%d',
-        len(request.public_keys),
+        'Fetched oracles approval for validators: deadline=%d, start index=%d',
+        request.deadline,
         request.validator_index,
     )
     return OraclesApproval(signatures=signatures, ipfs_hash=ipfs_hash, deadline=request.deadline)
