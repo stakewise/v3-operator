@@ -1,7 +1,11 @@
 import click
-import psycopg2
 from eth_typing import HexStr
-from psycopg2.extras import execute_values
+
+try:
+    import psycopg2
+    from psycopg2.extras import execute_values
+except ImportError:
+    pass
 
 from src.key_manager.typings import DatabaseKeyRecord
 
