@@ -51,7 +51,7 @@ validator registration transactions.
 
 If you are creating a new Vault:
 
-1. Go to [StakeWise vaults](https://pacific.stakewise.io/vaults)
+1. Go to [StakeWise vaults](https://testnet.stakewise.io/)
 2. Connect with your wallet
 3. Click on "Create Vault"
 4. Process vault setup step by step
@@ -129,7 +129,7 @@ Deposit data saved to /home/user/.stakewise/0x3320ad928c20187602a2b2c04eeaa813fa
 
 **NB! You must upload the deposit data to your vault:**
 
-1. Go to [StakeWise vaults](https://pacific.stakewise.io/vaults)
+1. Go to [StakeWise vaults](https://testnet.stakewise.io/)
 2. Connect with your wallet
 3. Go to the "Created" tab and click on the vault
 4. In the upper right corner, click on settings, open the "Deposit data" tab
@@ -210,7 +210,7 @@ docker build --pull -t stakewiselabs/v3-operator .
 or pull existing one:
 
 ```sh
-docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:latest
+docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v0.3.1
 ```
 
 You have to mount keystores and deposit data folders into docker container.
@@ -220,7 +220,7 @@ Start the container with the following command:
 ```sh
 docker run --restart on-failure:10 \
   -v ~/.stakewise/:/data \
-  europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:latest \
+  europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v0.3.1 \
   src/main.py start \
   --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
   --data-dir=/data \
