@@ -170,8 +170,7 @@ async def get_available_validators(
 
     start_index = await vault_contract.get_validators_index()
     validators: list[Validator] = []
-    if len(deposit_data.validators) < count:
-        return []
+    count = min(count, len(deposit_data.validators) - start_index)
 
     remote_signer_pubkeys = []
     if remote_signer_config:
@@ -266,7 +265,6 @@ async def register_single_validator(
             tx_validators[0],
             approval.signatures,
             approval.ipfs_hash,
-            approval.deadline,
         ),
         multi_proof.proof,
     ]
