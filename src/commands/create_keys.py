@@ -101,12 +101,15 @@ def create_keys(
 def _export_deposit_data_json(
     credentials: list[Credential], filename: str, pool_size: int | None = None
 ) -> str:
-    with click.progressbar(
-        length=len(credentials),
-        label='Generating deposit data JSON\t\t',
-        show_percent=False,
-        show_pos=True,
-    ) as progress_bar, Pool(processes=pool_size) as pool:
+    with (
+        click.progressbar(  # type: ignore
+            length=len(credentials),
+            label='Generating deposit data JSON\t\t',
+            show_percent=False,
+            show_pos=True,
+        ) as progress_bar,
+        Pool(processes=pool_size) as pool,
+    ):
         results = [
             pool.apply_async(
                 cred.deposit_datum_dict,

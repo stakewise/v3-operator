@@ -189,7 +189,9 @@ async def _generate_keystores(
     index = 0
     failed_attempts = 0
 
-    with click.progressbar(length=total_validators, label='Generating keystores') as progress_bar:
+    with click.progressbar(  # type: ignore
+        length=total_validators, label='Generating keystores'
+    ) as progress_bar:
         while total_validators > 0:
             credential = CredentialManager.generate_credential(
                 network=settings.network,
