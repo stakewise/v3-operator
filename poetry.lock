@@ -1711,7 +1711,7 @@ files = [
 
 [[package]]
 name = "multiproof"
-version = "v0.1.4"
+version = "v0.1.5"
 description = "A Python library to generate merkle trees and merkle proofs."
 optional = false
 python-versions = "^3.10"
@@ -1725,8 +1725,8 @@ web3 = "^6.8.0"
 [package.source]
 type = "git"
 url = "https://github.com/stakewise/multiproof.git"
-reference = "v0.1.4"
-resolved_reference = "35d37c4009186ad22c1013cad2480210be18ea30"
+reference = "v0.1.5"
+resolved_reference = "aa736a6b4efc06b7d458e66c7a3d0a8ead822f01"
 
 [[package]]
 name = "mypy"
@@ -3228,4 +3228,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.11"
-content-hash = "1fae32f6e664980c3a300455e47474bf337f343e1a2dc2c374410ec32b9be9fa"
+content-hash = "c4f2801f21cb348ec1bcae321f704473338e083c50760f146df51e0c24415c45"

@@ -3,7 +3,7 @@ import struct
 from typing import Set
 
 from eth_typing import BlockNumber, HexStr
-from multiproof.standart import MultiProof
+from multiproof.standard import MultiProof
 from sw_utils import EventProcessor, is_valid_deposit_data_signature
 from sw_utils.typings import Bytes32
 from web3 import Web3

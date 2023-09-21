@@ -1,7 +1,7 @@
 import logging
 
 from eth_typing import BLSPubkey
-from multiproof.standart import MultiProof
+from multiproof.standard import MultiProof
 from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.types import BlockNumber, Wei
