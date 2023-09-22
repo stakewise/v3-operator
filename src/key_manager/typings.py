@@ -8,3 +8,9 @@ class DatabaseKeyRecord:
     public_key: HexStr
     private_key: str
     nonce: str
+
+
+@dataclass
+class DatabaseConfigRecord:
+    name: str
+    data: str

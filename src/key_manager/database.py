@@ -7,7 +7,7 @@ try:
 except ImportError:
     pass
 
-from src.key_manager.typings import DatabaseKeyRecord
+from src.key_manager.typings import DatabaseConfigRecord, DatabaseKeyRecord
 
 
 class Database:
@@ -44,6 +44,37 @@ class Database:
                     ],
                 )
 
+    def upload_configs(self, configs: list[DatabaseConfigRecord]) -> None:
+        """Updates database records to new state."""
+        with _get_db_connection(self.db_url) as conn:
+            with conn.cursor() as cur:
+                # recreate table
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS configs (
+                        id SERIAL PRIMARY KEY,
+                        name TEXT UNIQUE NOT NULL,
+                        data TEXT NOT NULL
+                    );
+                    """
+                )
+
+                # insert keys
+                execute_values(
+                    cur,
+                    'INSERT INTO configs (name, data) '
+                    'VALUES %s '
+                    'ON CONFLICT (name) '
+                    'DO UPDATE SET data = EXCLUDED.data;',
+                    [
+                        (
+                            x.name,
+                            x.data,
+                        )
+                        for x in configs
+                    ],
+                )
+
     def fetch_public_keys_by_range(self, start_index: int, end_index: int) -> list[HexStr]:
         with _get_db_connection(self.db_url) as conn:
             with conn.cursor() as cur:
@@ -73,6 +104,19 @@ class Database:
                         public_key=row[0],
                         private_key=row[1],
                         nonce=row[2],
+                    )
+                    for row in rows
+                ]
+
+    def fetch_configs(self) -> list[DatabaseConfigRecord]:
+        with _get_db_connection(self.db_url) as conn:
+            with conn.cursor() as cur:
+                cur.execute('SELECT * FROM configs')
+                rows = cur.fetchall()
+                return [
+                    DatabaseConfigRecord(
+                        name=row[1],
+                        data=row[2],
                     )
                     for row in rows
                 ]

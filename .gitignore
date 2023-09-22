@@ -1,6 +1,7 @@
 __pycache__/
 venv
 dist
+data
 .mypy_cache
 .pytest_cache
 .idea

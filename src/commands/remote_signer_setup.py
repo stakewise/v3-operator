@@ -1,4 +1,6 @@
 import asyncio
+import glob
+import json
 import os
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
@@ -8,8 +10,11 @@ import aiohttp
 import click
 import milagro_bls_binding as bls
 from eth_typing import BLSPrivateKey, HexAddress
+from py_ecc.bls import G2ProofOfPossession
+from staking_deposit.key_handling.keystore import ScryptKeystore
 from web3 import Web3
 
+from src.common.contrib import bytes_to_str
 from src.common.credentials import Credential
 from src.common.execution import get_oracles
 from src.common.password import get_or_create_password_file
@@ -17,9 +22,14 @@ from src.common.utils import log_verbose
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
 from src.config.settings import settings
+from src.key_manager.database import Database, check_db_connection
+from src.key_manager.encryptor import Encryptor
+from src.key_manager.typings import DatabaseConfigRecord, DatabaseKeyRecord
 from src.validators.signing.key_shares import private_key_to_private_key_shares
 from src.validators.signing.remote import RemoteSignerConfiguration
 from src.validators.utils import load_keystores
+
+w3 = Web3()
 
 
 @click.option(
@@ -66,6 +76,32 @@ from src.validators.utils import load_keystores
     help='Comma separated list of API endpoints for execution nodes.',
 )
 @click.option(
+    '--update-db',
+    is_flag=True,
+    help='Whether to update the database with keystores data for web3signer.',
+    default=False,
+)
+@click.option(
+    '--db-url',
+    help='The database connection address.' "ex. 'postgresql://username:pass@hostname/dbname'",
+    prompt=False,
+    required=False,
+)
+@click.option(
+    '--encryption-key',
+    help='The key for encrypting database record. '
+    'If you are upload new keystores use the same encryption key.',
+    required=False,
+    prompt=False,
+)
+@click.option(
+    '--no-confirm',
+    is_flag=True,
+    default=False,
+    help='Skips confirmation messages when provided.',
+    required=False,
+)
+@click.option(
     '-v',
     '--verbose',
     help='Enable debug mode. Default is false.',
@@ -82,6 +118,10 @@ def remote_signer_setup(
     keystores_dir: str | None,
     execution_endpoints: str,
     verbose: bool,
+    update_db: bool,
+    db_url: str | None = None,
+    encryption_key: str | None = None,
+    no_confirm: bool = False,
 ) -> None:
     config = VaultConfig(vault, Path(data_dir))
     config.load()
@@ -103,12 +143,28 @@ def remote_signer_setup(
             # we need to create a separate thread so we can block before returning
             with ThreadPoolExecutor(1) as pool:
                 pool.submit(
-                    lambda: asyncio.run(main(remove_existing_keys=remove_existing_keys))
+                    lambda: asyncio.run(
+                        main(
+                            remove_existing_keys=remove_existing_keys,
+                            update_db=update_db,
+                            db_url=db_url,
+                            encryption_key=encryption_key,
+                            no_confirm=no_confirm,
+                        )
+                    )
                 ).result()
         except RuntimeError as e:
             if 'no running event loop' == e.args[0]:
                 # no event loop running
-                asyncio.run(main(remove_existing_keys=remove_existing_keys))
+                asyncio.run(
+                    main(
+                        remove_existing_keys=remove_existing_keys,
+                        update_db=update_db,
+                        db_url=db_url,
+                        encryption_key=encryption_key,
+                        no_confirm=no_confirm,
+                    )
+                )
             else:
                 raise e
     except Exception as e:
@@ -116,7 +172,13 @@ def remote_signer_setup(
 
 
 # pylint: disable-next=too-many-locals
-async def main(remove_existing_keys: bool) -> None:
+async def main(
+    remove_existing_keys: bool,
+    update_db: bool,
+    db_url: str | None,
+    encryption_key: str | None,
+    no_confirm: bool,
+) -> None:
     keystores = load_keystores()
 
     if len(keystores) == 0:
@@ -179,6 +241,13 @@ async def main(remove_existing_keys: bool) -> None:
         f'Successfully imported {len(key_share_keystores)} key shares into remote signer.',
     )
 
+    if update_db:
+        _update_db(
+            db_url=db_url,
+            encryption_key=encryption_key,
+            no_confirm=no_confirm,
+        )
+
     # Remove local keystores - keys are loaded in remote signer and are not
     # needed locally anymore
     for keystore_file in os.listdir(settings.keystores_dir):
@@ -220,3 +289,98 @@ async def main(remove_existing_keys: bool) -> None:
         f' Successfully configured operator to use remote signer'
         f' for {len(keystores)} public key(s)!',
     )
+
+
+# pylint: disable-next=too-many-locals
+def _update_db(
+    db_url: str | None,
+    encryption_key: str | None,
+    no_confirm: bool,
+) -> None:
+    check_db_connection(db_url)
+
+    with open(str(settings.keystores_password_file), 'r', encoding='utf-8') as f:
+        keystores_password = f.read().strip()
+
+    private_keys = []
+
+    with click.progressbar(
+        glob.glob(os.path.join(str(settings.keystores_dir), 'keystore-*.json')),
+        label='Loading keystores...\t\t',
+        show_percent=False,
+        show_pos=True,
+    ) as _keystore_files:
+        for filename in _keystore_files:
+            try:
+                keystore = ScryptKeystore.from_file(filename).decrypt(keystores_password)
+                private_keys.append(int.from_bytes(keystore, 'big'))
+            except (json.JSONDecodeError, KeyError) as e:
+                click.secho(
+                    f'Failed to load keystore {filename}. Error: {str(e)}.',
+                    fg='red',
+                )
+
+    database = Database(
+        db_url=str(db_url),
+    )
+    encryptor = Encryptor(encryption_key)
+
+    database_records = _encrypt_private_keys(
+        private_keys=private_keys,
+        encryptor=encryptor,
+    )
+    if not no_confirm:
+        click.confirm(
+            f'Fetched {len(private_keys)} validator keys, upload them to the database?',
+            default=True,
+            abort=True,
+        )
+    database.upload_keys(keys=database_records)
+    total_keys_count = database.fetch_public_keys_count()
+
+    configs = []
+    with open(settings.remote_signer_config_file, 'r', encoding='utf-8') as file:
+        configs.append(
+            DatabaseConfigRecord(name='remote_signer_config.json', data=json.dumps(json.load(file)))
+        )
+    with open(settings.deposit_data_file, 'r', encoding='utf-8') as file:
+        configs.append(
+            DatabaseConfigRecord(name='deposit_data.json', data=json.dumps(json.load(file)))
+        )
+    database.upload_configs(configs)
+
+    click.clear()
+
+    click.secho(
+        f'The database contains {total_keys_count} validator keys.\n'
+        f"The decryption key: '{encryptor.str_key}'",
+        bold=True,
+        fg='green',
+    )
+    click.secho(
+        'The configuration files have been uploaded to the remote database.',
+        bold=True,
+        fg='green',
+    )
+
+
+def _encrypt_private_keys(private_keys: list[int], encryptor: Encryptor) -> list[DatabaseKeyRecord]:
+    """
+    Returns prepared database key records from the private keys.
+    """
+
+    click.secho('Encrypting database keys...', bold=True)
+    key_records: list[DatabaseKeyRecord] = []
+    for private_key in private_keys:
+        encrypted_private_key, nonce = encryptor.encrypt(str(private_key))
+
+        key_record = DatabaseKeyRecord(
+            public_key=w3.to_hex(G2ProofOfPossession.SkToPk(private_key)),
+            private_key=bytes_to_str(encrypted_private_key),
+            nonce=bytes_to_str(nonce),
+        )
+
+        if key_record not in key_records:
+            key_records.append(key_record)
+
+    return key_records

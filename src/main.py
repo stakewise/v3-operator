@@ -13,9 +13,9 @@ from src.commands.merge_deposit_data import merge_deposit_data
 from src.commands.recover import recover
 from src.commands.remote_signer_setup import remote_signer_setup
 from src.commands.start import start
+from src.commands.sync_operator import sync_operator
 from src.commands.sync_validator import sync_validator
 from src.commands.sync_web3signer import sync_web3signer
-from src.commands.update_db import update_db
 from src.commands.validators_exit import validators_exit
 
 
@@ -35,7 +35,7 @@ cli.add_command(recover)
 cli.add_command(get_validators_root)
 cli.add_command(sync_validator)
 cli.add_command(sync_web3signer)
-cli.add_command(update_db)
+cli.add_command(sync_operator)
 
 
 if __name__ == '__main__':
