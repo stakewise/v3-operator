@@ -172,6 +172,7 @@ async def create_approval_request(
         exit_signature_shards=[],
         proof=multi_proof.proof,
         proof_flags=multi_proof.proof_flags,
+        proof_indexes=[val[1] for val in multi_proof.leaves],
         deadline=deadline,
     )
     for validator in validators:
