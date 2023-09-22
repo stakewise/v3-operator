@@ -51,7 +51,7 @@ validator registration transactions.
 
 If you are creating a new Vault:
 
-1. Go to [StakeWise vaults](https://testnet.stakewise.io/)
+1. Go to [Operate page](https://testnet.stakewise.io/operate)
 2. Connect with your wallet
 3. Click on "Create Vault"
 4. Process vault setup step by step
@@ -129,10 +129,10 @@ Deposit data saved to /home/user/.stakewise/0x3320ad928c20187602a2b2c04eeaa813fa
 
 **NB! You must upload the deposit data to your vault:**
 
-1. Go to [StakeWise vaults](https://testnet.stakewise.io/)
+1. Go to [Operate page](https://testnet.stakewise.io/operate)
 2. Connect with your wallet
-3. Go to the "Created" tab and click on the vault
-4. In the upper right corner, click on settings, open the "Deposit data" tab
+3. Go to your vault page
+4. In the upper right corner, click on "Settings", open the "Deposit data" tab
 5. Upload generated deposit data file and click "Save"
 
 ### 3. Create wallet
@@ -320,7 +320,8 @@ Done. Successfully configured operator to use remote signer for 1 public key(s)!
 
 - `--vault` - The vault address.
 - `--remote-signer-url` - The base URL of the remote signer, e.g. <http://signer:9000>
-- `--remove-existing-keys` - Include this flag to remove any keys present in the signer that are not needed by the operator.
+- `--remove-existing-keys` - Include this flag to remove any keys present in the signer that are not needed by the
+  operator.
   Can be used to remove outdated keyshares from the remote signer when the set of oracles changes,
   see note above.
 - `--data-dir` - Path where the vault data is stored. Default is ~/.stakewise.
@@ -386,16 +387,18 @@ by using the following command:
     The validator deposit data Merkle tree root: 0x50437ed72066c1a09ee85978f168ac7c58fbc9cd4beb7962c13e68e7faac26d7
     ```
 
-    `get-validators-root` options
+   `get-validators-root` options
 
     - `--data-dir` - Path where the vault data is stored. Default is ~/.stakewise.
     - `--deposit-data-file` - Path to the file with deposit data. Default is deposit data file located in the vault
       directory.
     - `--vault` - The vault address.
 
-2. Set deposit data root by calling `setValidatorsRoot` function on your vault. You must pass the Merkle tree root generated from the previous command. The ABI of the contract can be found [here](https://github.com/stakewise/v3-core/blob/main/abi/IVaultValidators.json).
+2. Set deposit data root by calling `setValidatorsRoot` function on your vault. You must pass the Merkle tree root
+   generated from the previous command. The ABI of the contract can be
+   found [here](https://github.com/stakewise/v3-core/blob/main/abi/IVaultValidators.json).
 
-  **NB! The function must be called from the keys manager address (vault admin address by default).**
+**NB! The function must be called from the keys manager address (vault admin address by default).**
 
 ### Recover vault data directory and keystores
 
@@ -445,9 +448,11 @@ Save decryption key: '<DECRYPTION KEYS>'
 ##### update-db options
 
 - `--keystores-dir` - The directory with validator keys in the EIP-2335 standard. Defaults to ./data/keystores.
-- `--keystores-password-file` - The path to file with password for encrypting the keystores. Defaults to ./data/keystores/password.txt.
+- `--keystores-password-file` - The path to file with password for encrypting the keystores. Defaults to
+  ./data/keystores/password.txt.
 - `--db-url` - The database connection address.
-- `--encryption-key` - The key for encrypting database record. If you are upload new keystores use the same encryption key.
+- `--encryption-key` - The key for encrypting database record. If you are upload new keystores use the same encryption
+  key.
 - `--no-confirm` - Skips confirmation messages when provided.
 
 **NB! You must store the decryption key in a secure place.
@@ -517,6 +522,8 @@ Setup Operator for Monitoring:
 
 Operator provides the flexibility to define the host and port for the metrics endpoint via environment variables:
 
+- `ENABLE_METRICS`: This defines whether the metrics endpoint should be enabled or not. By default, it is set
+  to `false`.
 - `METRICS_HOST`: This defines the hostname or IP on which the metrics endpoint will be available.
 - `METRICS_PORT`: This defines the port on which the metrics endpoint will be available.
 
@@ -525,11 +532,13 @@ Ensure that these environment variables are set as per your requirements.
 For example:
 
 ```bash
+export ENABLE_METRICS=true
 export METRICS_HOST=0.0.0.0
 export METRICS_PORT=9100
 ```
 
-You can also specify them by providing `--metrics-port` and `--metrics-host` flags to the `start` command.
+You can also specify them by providing `--enable-metrics`, `--metrics-port` and `--metrics-host` flags to the `start`
+command.
 
 Now, Operators's metrics will be available at <http://[METRICS_HOST]:[METRICS_PORT]/metrics>.
 

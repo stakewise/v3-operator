@@ -202,8 +202,9 @@ async def startup_checks():
     healthy_oracles = await collect_healthy_oracles()
     logger.info('Connected to oracles at %s', ', '.join(healthy_oracles))
 
-    logger.info('Checking metrics server...')
-    check_metrics_port()
+    if settings.enable_metrics:
+        logger.info('Checking metrics server...')
+        check_metrics_port()
 
     logger.info('Checking deposit data file...')
     await wait_for_deposit_data_file()

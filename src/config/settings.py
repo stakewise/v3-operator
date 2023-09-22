@@ -33,6 +33,7 @@ class Settings(metaclass=Singleton):
 
     harvest_vault: bool
     verbose: bool
+    enable_metrics: bool
     metrics_host: str
     metrics_port: int
     deposit_data_file: Path
@@ -61,6 +62,7 @@ class Settings(metaclass=Singleton):
         execution_endpoints: str = '',
         harvest_vault: bool = False,
         verbose: bool = False,
+        enable_metrics: bool = False,
         metrics_port: int = DEFAULT_METRICS_PORT,
         metrics_host: str = DEFAULT_METRICS_HOST,
         max_fee_per_gas_gwei: int = DEFAULT_MAX_FEE_PER_GAS_GWEI,
@@ -82,6 +84,7 @@ class Settings(metaclass=Singleton):
         self.execution_endpoints = [node.strip() for node in execution_endpoints.split(',')]
         self.harvest_vault = harvest_vault
         self.verbose = verbose
+        self.enable_metrics = enable_metrics
         self.metrics_host = metrics_host
         self.metrics_port = metrics_port
         self.max_fee_per_gas_gwei = max_fee_per_gas_gwei
@@ -153,7 +156,7 @@ AVAILABLE_NETWORKS = [GOERLI]
 UPDATE_SIGNATURES_URL_PATH = '/signatures'
 OUTDATED_SIGNATURES_URL_PATH = '/signatures/{vault}'
 ORACLES_VALIDATORS_TIMEOUT: int = decouple_config(
-    'ORACLES_VALIDATORS_TIMEOUT', default=10, cast=int
+    'ORACLES_VALIDATORS_TIMEOUT', default=60, cast=int
 )
 
 # common
