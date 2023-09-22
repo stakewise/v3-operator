@@ -1,7 +1,7 @@
 import ecies
 from eth_typing import BLSSignature, HexStr
 from multiproof import StandardMerkleTree
-from multiproof.standart import MultiProof
+from multiproof.standard import MultiProof
 from sw_utils import get_eth1_withdrawal_credentials
 from sw_utils.signing import compute_deposit_data
 from web3 import Web3
