@@ -104,6 +104,12 @@ logger = logging.getLogger(__name__)
     help='The network of the vault. Default is the network specified at "init" command.',
 )
 @click.option(
+    '--enable-metrics',
+    is_flag=True,
+    envvar='ENABLE_METRICS',
+    help='Whether to enable metrics server. Disabled by default.',
+)
+@click.option(
     '--metrics-host',
     type=str,
     help=f'The prometheus metrics host. Default is {DEFAULT_METRICS_HOST}.',
@@ -166,6 +172,7 @@ def start(
     execution_endpoints: str,
     harvest_vault: bool,
     verbose: bool,
+    enable_metrics: bool,
     metrics_host: str,
     metrics_port: int,
     data_dir: str,
@@ -191,6 +198,7 @@ def start(
         execution_endpoints=execution_endpoints,
         harvest_vault=harvest_vault,
         verbose=verbose,
+        enable_metrics=enable_metrics,
         metrics_host=metrics_host,
         metrics_port=metrics_port,
         network=network,
@@ -255,7 +263,9 @@ async def main() -> None:
 
     to_block = chain_state.execution_block
     await network_validators_scanner.process_new_events(to_block)
-    await metrics_server()
+
+    if settings.enable_metrics:
+        await metrics_server()
 
     # process outdated exit signatures
     asyncio.create_task(
