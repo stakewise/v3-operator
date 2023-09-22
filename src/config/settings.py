@@ -156,7 +156,7 @@ AVAILABLE_NETWORKS = [GOERLI]
 UPDATE_SIGNATURES_URL_PATH = '/signatures'
 OUTDATED_SIGNATURES_URL_PATH = '/signatures/{vault}'
 ORACLES_VALIDATORS_TIMEOUT: int = decouple_config(
-    'ORACLES_VALIDATORS_TIMEOUT', default=60, cast=int
+    'ORACLES_VALIDATORS_TIMEOUT', default=10, cast=int
 )
 
 # common
