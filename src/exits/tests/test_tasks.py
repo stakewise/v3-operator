@@ -53,7 +53,7 @@ class TestGetOraclesApproval:
     ):
         oracles = mocked_oracles
         test_validator_privkey, test_validator_pubkey = create_validator_keypair()
-
+        deadline = get_current_timestamp() + oracles.signature_validity_period
         with (
             mock.patch(
                 'sw_utils.consensus.ExtendedAsyncBeacon.get_consensus_fork',
@@ -64,7 +64,9 @@ class TestGetOraclesApproval:
             ),
             mock.patch(
                 'src.exits.tasks.send_signature_rotation_requests',
-                return_value=(b'', 'mock_ipfs_hash'),
+                return_value=OraclesApproval(
+                    signatures=b'', ipfs_hash='mock_ipfs_hash', deadline=deadline
+                ),
             ),
         ):
             approval = await get_oracles_approval(
@@ -76,7 +78,7 @@ class TestGetOraclesApproval:
             assert approval == OraclesApproval(
                 signatures=b'',
                 ipfs_hash='mock_ipfs_hash',
-                deadline=get_current_timestamp() + oracles.signature_validity_period,
+                deadline=deadline,
             )
 
     async def test_remote_signer(
@@ -88,6 +90,7 @@ class TestGetOraclesApproval:
     ):
         oracles = mocked_oracles
         settings.remote_signer_url = remote_signer_url
+        deadline = get_current_timestamp() + oracles.signature_validity_period
 
         with (
             mock.patch(
@@ -106,7 +109,9 @@ class TestGetOraclesApproval:
             ),
             mock.patch(
                 'src.exits.tasks.send_signature_rotation_requests',
-                return_value=(b'', 'mock_ipfs_hash'),
+                return_value=OraclesApproval(
+                    signatures=b'', ipfs_hash='mock_ipfs_hash', deadline=deadline
+                ),
             ),
         ):
             approval = await get_oracles_approval(
@@ -122,5 +127,5 @@ class TestGetOraclesApproval:
             assert approval == OraclesApproval(
                 signatures=b'',
                 ipfs_hash='mock_ipfs_hash',
-                deadline=get_current_timestamp() + oracles.signature_validity_period,
+                deadline=deadline,
             )

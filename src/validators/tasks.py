@@ -10,7 +10,7 @@ from src.common.clients import consensus_client, ipfs_fetch_client
 from src.common.contracts import validators_registry_contract
 from src.common.execution import check_gas_price, get_oracles
 from src.common.metrics import metrics
-from src.common.typings import Oracles, OraclesApproval
+from src.common.typings import Oracles
 from src.common.utils import MGNO_RATE, WAD, get_current_timestamp
 from src.config.networks import GNOSIS
 from src.config.settings import DEPOSIT_AMOUNT, settings
@@ -91,12 +91,17 @@ async def register_validators(
     )
     registry_root = None
     oracles_request = None
+    deadline = get_current_timestamp() + oracles.signature_validity_period
     while True:
         latest_registry_root = await validators_registry_contract.get_registry_root()
-        deadline = get_current_timestamp() + oracles.signature_validity_period
-
-        if not registry_root or registry_root != latest_registry_root:
+        current_timestamp = get_current_timestamp()
+        if (
+            not registry_root
+            or registry_root != latest_registry_root
+            or deadline <= current_timestamp
+        ):
             registry_root = latest_registry_root
+            deadline = current_timestamp + oracles.signature_validity_period
             logger.debug('Fetched latest validators registry root: %s', registry_root)
 
             oracles_request = await create_approval_request(
@@ -108,11 +113,14 @@ async def register_validators(
                 multi_proof=multi_proof,
                 deadline=deadline,
             )
-        else:
-            oracles_request.deadline = deadline
 
         try:
-            oracles_approval = await get_oracles_approval(oracles=oracles, request=oracles_request)
+            oracles_approval = await send_approval_requests(oracles, oracles_request)
+            logger.info(
+                'Fetched oracles approval for validators: deadline=%d, start index=%d',
+                oracles_request.deadline,
+                oracles_request.validator_index,
+            )
             break
         except Exception as e:
             logger.exception(e)
@@ -206,19 +214,6 @@ async def create_approval_request(
 
         validator_index += 1
     return request
-
-
-async def get_oracles_approval(oracles: Oracles, request: ApprovalRequest) -> OraclesApproval:
-    """Fetches approval from oracles."""
-    # send approval request to oracles
-    signatures, ipfs_hash = await send_approval_requests(oracles, request)
-
-    logger.info(
-        'Fetched oracles approval for validators: deadline=%d, start index=%d',
-        request.deadline,
-        request.validator_index,
-    )
-    return OraclesApproval(signatures=signatures, ipfs_hash=ipfs_hash, deadline=request.deadline)
 
 
 async def load_genesis_validators() -> None:

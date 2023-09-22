@@ -103,6 +103,7 @@ async def update_exit_signatures(
         remote_signer_config=remote_signer_config,
         validators=validators,
     )
+    logger.info('Fetched updated signature for validators: count=%d', len(validators))
 
     tx_hash = await submit_exit_signatures(oracles_approval)
     logger.info(
@@ -187,13 +188,7 @@ async def get_oracles_approval(
         request.exit_signature_shards.append(shards.exit_signatures)
 
     # send approval request to oracles
-    signatures, ipfs_hash = await send_signature_rotation_requests(oracles, request)
-    logger.info('Fetched updated signature for validators: count=%d', len(validators))
-    return OraclesApproval(
-        signatures=signatures,
-        ipfs_hash=ipfs_hash,
-        deadline=request.deadline,
-    )
+    return await send_signature_rotation_requests(oracles, request)
 
 
 async def update_exit_signatures_periodically(
