@@ -1,5 +1,5 @@
 INVALID_ORACLES_REQUEST = 'Invalid oracles request'
-VALIDATOR_INDEX_CHANGED = 'Not enough oracle approvals received'
+NOT_ENOUGH_ORACLE_APPROVALS = 'Not enough oracle approvals received'
 
 
 class InvalidOraclesRequestError(ValueError):
@@ -9,4 +9,4 @@ class InvalidOraclesRequestError(ValueError):
 
 class NotEnoughOracleApprovalsError(ValueError):
     def __init__(self, *args, **kwargs):
-        super().__init__(VALIDATOR_INDEX_CHANGED, *args, **kwargs)
+        super().__init__(NOT_ENOUGH_ORACLE_APPROVALS, *args, **kwargs)
