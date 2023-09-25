@@ -5,13 +5,13 @@ from typing import Callable
 from unittest import mock
 
 import pytest
-from eth_typing import BlockNumber
+from eth_typing import BlockNumber, ChecksumAddress
 from sw_utils.typings import ConsensusFork
 
-from src.common.typings import Oracles, OraclesApproval
+from src.common.typings import Oracles
 from src.common.utils import get_current_timestamp
 from src.config.settings import settings
-from src.exits.tasks import get_oracles_approval, wait_oracle_signature_update
+from src.exits.tasks import get_oracles_request, wait_oracle_signature_update
 from src.validators.signing.remote import RemoteSignerConfiguration
 from src.validators.typings import ExitSignatureShards, Keystores
 
@@ -47,9 +47,12 @@ class TestWaitOracleSignatureUpdate:
 
 
 @pytest.mark.usefixtures('fake_settings')
-class TestGetOraclesApproval:
+class TestGetOraclesRequest:
     async def test_local_keystores(
-        self, mocked_oracles: Oracles, create_validator_keypair: Callable
+        self,
+        mocked_oracles: Oracles,
+        vault_address: ChecksumAddress,
+        create_validator_keypair: Callable,
     ):
         oracles = mocked_oracles
         test_validator_privkey, test_validator_pubkey = create_validator_keypair()
@@ -62,28 +65,21 @@ class TestGetOraclesApproval:
                     epoch=1,
                 ),
             ),
-            mock.patch(
-                'src.exits.tasks.send_signature_rotation_requests',
-                return_value=OraclesApproval(
-                    signatures=b'', ipfs_hash='mock_ipfs_hash', deadline=deadline
-                ),
-            ),
         ):
-            approval = await get_oracles_approval(
+            request = await get_oracles_request(
                 oracles=oracles,
                 keystores=Keystores({test_validator_pubkey: test_validator_privkey}),
                 remote_signer_config=None,
                 validators={123: test_validator_pubkey},
             )
-            assert approval == OraclesApproval(
-                signatures=b'',
-                ipfs_hash='mock_ipfs_hash',
-                deadline=deadline,
-            )
+            assert request.vault_address == vault_address
+            assert request.public_keys == [test_validator_pubkey]
+            assert request.deadline == deadline
 
     async def test_remote_signer(
         self,
         vault_dir: Path,
+        vault_address: ChecksumAddress,
         mocked_oracles: Oracles,
         remote_signer_config: RemoteSignerConfiguration,
         remote_signer_url: str,
@@ -107,25 +103,18 @@ class TestGetOraclesApproval:
                     exit_signatures=[],
                 ),
             ),
-            mock.patch(
-                'src.exits.tasks.send_signature_rotation_requests',
-                return_value=OraclesApproval(
-                    signatures=b'', ipfs_hash='mock_ipfs_hash', deadline=deadline
-                ),
-            ),
         ):
-            approval = await get_oracles_approval(
+            validators = {
+                randint(0, int(1e6)): pubkey
+                for pubkey in remote_signer_config.pubkeys_to_shares.keys()
+            }
+            request = await get_oracles_request(
                 oracles=oracles,
                 keystores=Keystores(dict()),
                 remote_signer_config=remote_signer_config,
-                validators={
-                    randint(0, int(1e6)): pubkey
-                    for pubkey in remote_signer_config.pubkeys_to_shares.keys()
-                },
+                validators=validators,
             )
 
-            assert approval == OraclesApproval(
-                signatures=b'',
-                ipfs_hash='mock_ipfs_hash',
-                deadline=deadline,
-            )
+            assert request.vault_address == vault_address
+            assert request.public_keys == list(validators.values())
+            assert request.deadline == deadline

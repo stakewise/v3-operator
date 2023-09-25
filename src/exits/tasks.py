@@ -14,7 +14,7 @@ from src.common.clients import consensus_client
 from src.common.contracts import keeper_contract
 from src.common.execution import get_oracles
 from src.common.metrics import metrics
-from src.common.typings import Oracles, OraclesApproval
+from src.common.typings import Oracles
 from src.common.utils import get_current_timestamp, wait_block_finalization
 from src.config.settings import (
     DEFAULT_RETRY_TIME,
@@ -97,13 +97,24 @@ async def update_exit_signatures(
 
     # pylint: disable=duplicate-code
     validators = await get_validator_public_keys(outdated_indexes)
-    oracles_approval = await get_oracles_approval(
-        oracles=oracles,
-        keystores=keystores,
-        remote_signer_config=remote_signer_config,
-        validators=validators,
-    )
-    logger.info('Fetched updated signature for validators: count=%d', len(validators))
+    deadline = None
+    while True:
+        current_timestamp = get_current_timestamp()
+        if not deadline or deadline <= current_timestamp:
+            deadline = current_timestamp + oracles.signature_validity_period
+            oracles_request = await get_oracles_request(
+                oracles=oracles,
+                keystores=keystores,
+                remote_signer_config=remote_signer_config,
+                validators=validators,
+            )
+        try:
+            # send approval request to oracles
+            oracles_approval = await send_signature_rotation_requests(oracles, oracles_request)
+            logger.info('Fetched updated signature for validators: count=%d', len(validators))
+            break
+        except Exception as e:
+            logger.exception(e)
 
     tx_hash = await submit_exit_signatures(oracles_approval)
     logger.info(
@@ -143,12 +154,12 @@ async def _fetch_exit_signature_block(oracle_endpoint: str) -> BlockNumber | Non
     return BlockNumber(block_number)
 
 
-async def get_oracles_approval(
+async def get_oracles_request(
     oracles: Oracles,
     keystores: Keystores,
     remote_signer_config: RemoteSignerConfiguration | None,
     validators: dict[int, HexStr],
-) -> OraclesApproval:
+) -> SignatureRotationRequest:
     """Fetches approval from oracles."""
     fork = await consensus_client.get_consensus_fork()
 
@@ -187,8 +198,7 @@ async def get_oracles_approval(
         request.public_key_shards.append(shards.public_keys)
         request.exit_signature_shards.append(shards.exit_signatures)
 
-    # send approval request to oracles
-    return await send_signature_rotation_requests(oracles, request)
+    return request
 
 
 async def update_exit_signatures_periodically(
