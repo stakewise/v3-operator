@@ -47,6 +47,7 @@ class HarvestParams:
 class OracleApproval:
     signature: bytes
     ipfs_hash: str
+    deadline: int
 
 
 @dataclass
