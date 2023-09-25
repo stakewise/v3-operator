@@ -33,7 +33,7 @@ def sync_operator(
     if not configs:
         raise click.ClickException('Database does not contain any configuration files')
 
-    Path.mkdir(Path(output_dir), exist_ok=True, parents=True)
+    Path(output_dir).mkdir(exist_ok=True, parents=True)
 
     for config in configs:
         config_path = Path(output_dir) / config.name
