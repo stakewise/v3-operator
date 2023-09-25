@@ -338,30 +338,30 @@ def _update_db(
     database.upload_keys(keys=database_records)
     total_keys_count = database.fetch_public_keys_count()
 
-    configs = []
-    with open(settings.remote_signer_config_file, 'r', encoding='utf-8') as file:
-        configs.append(
-            DatabaseConfigRecord(name='remote_signer_config.json', data=json.dumps(json.load(file)))
-        )
-    with open(settings.deposit_data_file, 'r', encoding='utf-8') as file:
-        configs.append(
-            DatabaseConfigRecord(name='deposit_data.json', data=json.dumps(json.load(file)))
-        )
+    configs = [
+        _read_config_file_to_record(
+            settings.remote_signer_config_file, 'remote_signer_config.json'
+        ),
+        _read_config_file_to_record(settings.deposit_data_file, 'deposit_data.json'),
+    ]
     database.upload_configs(configs)
 
     click.clear()
 
     click.secho(
         f'The database contains {total_keys_count} validator keys.\n'
-        f"The decryption key: '{encryptor.str_key}'",
-        bold=True,
-        fg='green',
-    )
-    click.secho(
+        f"The decryption key: '{encryptor.str_key}'\n"
         'The configuration files have been uploaded to the remote database.',
         bold=True,
         fg='green',
     )
+
+
+def _read_config_file_to_record(filepath: Path, filename: str) -> DatabaseConfigRecord:
+    """Reads a JSON config file and returns a DatabaseConfigRecord instance."""
+    with open(filepath, 'r', encoding='utf-8') as file:
+        data = json.dumps(json.load(file))
+    return DatabaseConfigRecord(name=filename, data=data)
 
 
 def _encrypt_private_keys(private_keys: list[int], encryptor: Encryptor) -> list[DatabaseKeyRecord]:
