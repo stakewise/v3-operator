@@ -83,7 +83,9 @@ w3 = Web3()
 )
 @click.option(
     '--db-url',
-    help='The database connection address.' "ex. 'postgresql://username:pass@hostname/dbname'",
+    help='When provided will upload encrypted keystores to the Postgres DB. '
+    'The new encryption key will be generated if `db-encrypt-key` is not provided. '
+    'For example, postgresql://username:pass@hostname/dbname.',
     prompt=False,
     required=False,
 )
