@@ -29,8 +29,6 @@ from src.validators.signing.key_shares import private_key_to_private_key_shares
 from src.validators.signing.remote import RemoteSignerConfiguration
 from src.validators.utils import load_keystores
 
-w3 = Web3()
-
 
 @click.option(
     '--vault',
@@ -76,12 +74,6 @@ w3 = Web3()
     help='Comma separated list of API endpoints for execution nodes.',
 )
 @click.option(
-    '--update-db',
-    is_flag=True,
-    help='Whether to update the database with keystores data for web3signer.',
-    default=False,
-)
-@click.option(
     '--db-url',
     help='When provided will upload encrypted keystores to the Postgres DB. '
     'The new encryption key will be generated if `db-encrypt-key` is not provided. '
@@ -90,19 +82,11 @@ w3 = Web3()
     required=False,
 )
 @click.option(
-    '--encryption-key',
-    help='The key for encrypting Postgres DB records. '
-    'Use the same encryption key if you want to add new keystores to the database.',
+    '--db-encrypt-key',
+    help='The key for encrypting database record. '
     'If you are upload new keystores use the same encryption key.',
     required=False,
     prompt=False,
-)
-@click.option(
-    '--no-confirm',
-    is_flag=True,
-    default=False,
-    help='Skips confirmation messages when provided.',
-    required=False,
 )
 @click.option(
     '-v',
@@ -121,10 +105,8 @@ def remote_signer_setup(
     keystores_dir: str | None,
     execution_endpoints: str,
     verbose: bool,
-    update_db: bool,
     db_url: str | None = None,
-    encryption_key: str | None = None,
-    no_confirm: bool = False,
+    db_encrypt_key: str | None = None,
 ) -> None:
     config = VaultConfig(vault, Path(data_dir))
     config.load()
@@ -149,10 +131,8 @@ def remote_signer_setup(
                     lambda: asyncio.run(
                         main(
                             remove_existing_keys=remove_existing_keys,
-                            update_db=update_db,
                             db_url=db_url,
-                            encryption_key=encryption_key,
-                            no_confirm=no_confirm,
+                            db_encrypt_key=db_encrypt_key,
                         )
                     )
                 ).result()
@@ -162,10 +142,8 @@ def remote_signer_setup(
                 asyncio.run(
                     main(
                         remove_existing_keys=remove_existing_keys,
-                        update_db=update_db,
                         db_url=db_url,
-                        encryption_key=encryption_key,
-                        no_confirm=no_confirm,
+                        db_encrypt_key=db_encrypt_key,
                     )
                 )
             else:
@@ -177,10 +155,8 @@ def remote_signer_setup(
 # pylint: disable-next=too-many-locals
 async def main(
     remove_existing_keys: bool,
-    update_db: bool,
     db_url: str | None,
-    encryption_key: str | None,
-    no_confirm: bool,
+    db_encrypt_key: str | None,
 ) -> None:
     keystores = load_keystores()
 
@@ -228,28 +204,28 @@ async def main(
     for credential in credentials:
         key_share_keystores.append(deepcopy(credential.encrypt_signing_keystore(password=password)))
 
-    async with aiohttp.ClientSession() as session:
-        data = {
-            'keystores': [ksk.as_json() for ksk in key_share_keystores],
-            'passwords': [password for _ in key_share_keystores],
-        }
-        resp = await session.post(f'{settings.remote_signer_url}/eth/v1/keystores', json=data)
-        if resp.status != 200:
-            raise RuntimeError(
-                f'Error occurred during import of keystores to remote signer'
-                f' - status code {resp.status}, body: {await resp.text()}'
+    key_shares = {
+        'keystores': [ksk.as_json() for ksk in key_share_keystores],
+        'passwords': [password for _ in key_share_keystores],
+    }
+
+    if not db_url:
+        async with aiohttp.ClientSession() as session:
+            resp = await session.post(
+                f'{settings.remote_signer_url}/eth/v1/keystores', json=key_shares
             )
+            if resp.status != 200:
+                raise RuntimeError(
+                    f'Error occurred during import of keystores to remote signer'
+                    f' - status code {resp.status}, body: {await resp.text()}'
+                )
 
     click.echo(
         f'Successfully imported {len(key_share_keystores)} key shares into remote signer.',
     )
 
-    if update_db:
-        _update_db(
-            db_url=db_url,
-            encryption_key=encryption_key,
-            no_confirm=no_confirm,
-        )
+    if db_url:
+        _update_db(db_url=db_url, db_encrypt_key=db_encrypt_key, key_shares=key_shares)
 
     # Remove local keystores - keys are loaded in remote signer and are not
     # needed locally anymore
@@ -297,8 +273,8 @@ async def main(
 # pylint: disable-next=too-many-locals
 def _update_db(
     db_url: str | None,
-    encryption_key: str | None,
-    no_confirm: bool,
+    db_encrypt_key: str | None,
+    key_shares: dict | None,
 ) -> None:
     check_db_connection(db_url)
 
@@ -323,21 +299,38 @@ def _update_db(
                     fg='red',
                 )
 
+    if key_shares is None or 'keystores' not in key_shares or 'passwords' not in key_shares:
+        raise ValueError('key_shares is malformed or None')
+
+    with click.progressbar(
+        length=len(key_shares['keystores']),
+        label='Loading key shares...\t\t',
+        show_percent=False,
+        show_pos=True,
+    ) as progressbar:
+        for index, key_share_str in enumerate(key_shares['keystores']):
+            try:
+                keystore_password = key_shares['passwords'][index]
+                # Parse key_share from string to dictionary
+                key_share = json.loads(key_share_str)
+                keystore = ScryptKeystore.from_json(key_share).decrypt(keystore_password)
+                private_keys.append(int.from_bytes(keystore, 'big'))
+            except (json.JSONDecodeError, KeyError) as e:
+                click.secho(
+                    f'Failed to load keystore {key_share_str}. Error: {str(e)}.',
+                    fg='red',
+                )
+            progressbar.update(1)
+
     database = Database(
         db_url=str(db_url),
     )
-    encryptor = Encryptor(encryption_key)
+    encryptor = Encryptor(db_encrypt_key)
 
     database_records = _encrypt_private_keys(
         private_keys=private_keys,
         encryptor=encryptor,
     )
-    if not no_confirm:
-        click.confirm(
-            f'Fetched {len(private_keys)} validator keys, upload them to the database?',
-            default=True,
-            abort=True,
-        )
     database.upload_keys(keys=database_records)
     total_keys_count = database.fetch_public_keys_count()
 
@@ -378,7 +371,7 @@ def _encrypt_private_keys(private_keys: list[int], encryptor: Encryptor) -> list
         encrypted_private_key, nonce = encryptor.encrypt(str(private_key))
 
         key_record = DatabaseKeyRecord(
-            public_key=w3.to_hex(G2ProofOfPossession.SkToPk(private_key)),
+            public_key=Web3.to_hex(G2ProofOfPossession.SkToPk(private_key)),
             private_key=bytes_to_str(encrypted_private_key),
             nonce=bytes_to_str(nonce),
         )
