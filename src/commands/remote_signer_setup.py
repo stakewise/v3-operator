@@ -299,7 +299,7 @@ def _update_db(
 ) -> None:
     check_db_connection(db_url)
 
-    with open(str(settings.keystores_password_file), 'r', encoding='utf-8') as f:
+    with open(settings.keystores_password_file, encoding='utf-8') as f:
         keystores_password = f.read().strip()
 
     private_keys = []
