@@ -1,6 +1,7 @@
 import logging
 import sqlite3
 from functools import cached_property
+from typing import cast
 
 from sw_utils import (
     ExtendedAsyncBeacon,
@@ -70,6 +71,6 @@ class IpfsFetchRetryClient:
 
 
 db_client = Database()
-execution_client = ExecutionClient()
-consensus_client = ConsensusClient()
+execution_client = cast(AsyncWeb3, ExecutionClient())
+consensus_client = cast(ExtendedAsyncBeacon, ConsensusClient())
 ipfs_fetch_client = IpfsFetchRetryClient()

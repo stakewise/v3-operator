@@ -2009,7 +2009,7 @@ name = "pycparser"
 version = "2.21"
 description = "C parser in Python"
 optional = false
-python-versions = "*"
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 files = [
     {file = "pycparser-2.21-py2.py3-none-any.whl", hash = "sha256:8ee45429555515e1f6b185e78100aea234072576aa43ab53aefcae078162fca9"},
     {file = "pycparser-2.21.tar.gz", hash = "sha256:e644fdec12f7872f86c58ff790da456218b10f863970249516d60a5eaca77206"},
@@ -2777,7 +2777,7 @@ pbr = ">=2.0.0,<2.1.0 || >2.1.0"
 
 [[package]]
 name = "sw-utils"
-version = "0.3.24"
+version = "0.3.25"
 description = "StakeWise Python utils"
 optional = false
 python-versions = "^3.10"
@@ -2796,8 +2796,8 @@ web3 = "==6.8.0"
 [package.source]
 type = "git"
 url = "https://github.com/stakewise/sw-utils.git"
-reference = "v0.3.24"
-resolved_reference = "67203b59c055fd87c380b6e664d4510aa4dfe913"
+reference = "v0.3.25"
+resolved_reference = "20bdb91d5efc0ddf82d22e789e8452527cc0200d"
 
 [[package]]
 name = "tenacity"
@@ -3228,4 +3228,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.11"
-content-hash = "c4f2801f21cb348ec1bcae321f704473338e083c50760f146df51e0c24415c45"
+content-hash = "7c898000fcc12e30ef72fc10a1179675e0e9992fbe82a7513f35464c633872dd"

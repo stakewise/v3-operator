@@ -3,7 +3,7 @@ import statistics
 
 from web3 import Web3
 from web3.exceptions import MethodUnavailable
-from web3.types import Wei
+from web3.types import BlockIdentifier, Wei
 
 from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.contracts import keeper_contract
@@ -120,15 +120,15 @@ async def _get_max_fee_per_gas() -> Wei:
     return Wei(max_fee_per_gas)
 
 
-async def _calculate_median_priority_fee(block_id: str = 'latest') -> Wei:
+async def _calculate_median_priority_fee(block_id: BlockIdentifier = 'latest') -> Wei:
     block = await execution_client.eth.get_block(block_id)
 
     # collect maxPriorityFeePerGas for all transactions in the block
     priority_fees = []
-    for tx_hash in block.transactions:
+    for tx_hash in block.transactions:  # type: ignore[attr-defined]
         tx = await execution_client.eth.get_transaction(tx_hash)
         if 'maxPriorityFeePerGas' in tx:
-            priority_fees.append(tx.maxPriorityFeePerGas)
+            priority_fees.append(tx.maxPriorityFeePerGas)  # type: ignore[attr-defined]
 
     if not priority_fees:
         return await _calculate_median_priority_fee(block['number'] - 1)
