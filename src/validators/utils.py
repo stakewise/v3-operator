@@ -61,7 +61,7 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
     approvals: dict[ChecksumAddress, OracleApproval] = {}
     for address, result in zip(oracles.addresses, results):
         if isinstance(result, Exception):
-            logger.error(result)
+            logger.error(repr(result))
             continue
 
         approvals[address] = result

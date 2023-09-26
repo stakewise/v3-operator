@@ -117,8 +117,8 @@ async def collect_healthy_oracles() -> list:
 
     healthy_oracles = []
     for result in results:
-        if isinstance(result, BaseException):
-            logger.error(result)
+        if isinstance(result, Exception):
+            logger.error(repr(result))
             continue
 
         if result:

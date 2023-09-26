@@ -41,7 +41,7 @@ def log_verbose(e: Exception):
     if settings.verbose:
         logger.exception(e)
     else:
-        logger.error(e)
+        logger.error(repr(e))
 
 
 async def wait_block_finalization(block_number: BlockNumber | None = None):
