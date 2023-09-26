@@ -53,7 +53,9 @@ async def wait_block_finalization(block_number: BlockNumber | None = None):
         await asyncio.sleep(sleep_time)
         start = time.time()
 
-        chain_head = await consensus_client.get_chain_finalized_head()
+        chain_head = await consensus_client.get_chain_finalized_head(
+            settings.network_config.SLOTS_PER_EPOCH
+        )
 
         elapsed = time.time() - start
         sleep_time = float(settings.network_config.SECONDS_PER_BLOCK) - elapsed

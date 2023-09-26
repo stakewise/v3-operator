@@ -18,6 +18,8 @@ from src.common.typings import Oracles
 from src.common.utils import get_current_timestamp, wait_block_finalization
 from src.config.settings import (
     DEFAULT_RETRY_TIME,
+    ORACLE_SIGNATURE_UPDATE_SYNC_DELAY,
+    ORACLES_SIGNATURE_UPDATE_SYNC_TIMEOUT,
     OUTDATED_SIGNATURES_URL_PATH,
     settings,
 )
@@ -44,20 +46,25 @@ async def fetch_outdated_indexes(oracle_endpoint) -> list[int]:
 
 
 async def wait_oracles_signature_update(oracles: Oracles) -> None:
-    last_event = await keeper_contract.get_exit_signatures_updated_event()
+    last_event = await keeper_contract.get_exit_signatures_updated_event(vault=settings.vault)
     if not last_event:
         return
     update_block = BlockNumber(last_event['blockNumber'])
 
+    logger.info('Waiting for block %d finalization...', update_block)
     await wait_block_finalization(update_block)
 
-    max_time = 10 * float(settings.network_config.SECONDS_PER_BLOCK)
     oracle_tasks = (
-        wait_oracle_signature_update(update_block, endpoint, max_time=max_time)
+        wait_oracle_signature_update(
+            exit_signature_update_block=update_block,
+            oracle_endpoint=endpoint,
+            max_time=ORACLES_SIGNATURE_UPDATE_SYNC_TIMEOUT,
+        )
         for replicas in oracles.endpoints
         for endpoint in replicas
     )
     await asyncio.gather(*oracle_tasks)
+    logger.info('All the oracles have fetched exit signatures update')
 
 
 async def wait_oracle_signature_update(
@@ -75,7 +82,10 @@ async def wait_oracle_signature_update(
         if oracle_block and oracle_block >= exit_signature_update_block:
             return
 
-        await asyncio.sleep(float(settings.network_config.SECONDS_PER_BLOCK))
+        logger.info(
+            'Waiting for %s to sync block %d...', oracle_endpoint, exit_signature_update_block
+        )
+        await asyncio.sleep(ORACLE_SIGNATURE_UPDATE_SYNC_DELAY)
         elapsed = time.time() - start_time
 
     raise asyncio.TimeoutError(
