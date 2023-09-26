@@ -171,5 +171,5 @@ REMOTE_SIGNER_TIMEOUT = 10
 
 # Oracles signature update sync (10 minutes)
 ORACLES_SIGNATURE_UPDATE_SYNC_TIMEOUT = 600
-# How often to pull update for oracle signature update
+# How often to pull update for oracle signature update (every minute)
 ORACLE_SIGNATURE_UPDATE_SYNC_DELAY = 60
