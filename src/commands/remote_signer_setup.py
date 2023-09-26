@@ -359,7 +359,7 @@ def _update_db(
 
 def _read_config_file_to_record(filepath: Path, filename: str) -> DatabaseConfigRecord:
     """Reads a JSON config file and returns a DatabaseConfigRecord instance."""
-    with open(filepath, 'r', encoding='utf-8') as file:
+    with open(filepath, encoding='utf-8') as file:
         data = json.dumps(json.load(file))
     return DatabaseConfigRecord(name=filename, data=data)
 
