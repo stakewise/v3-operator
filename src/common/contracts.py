@@ -43,6 +43,7 @@ class ContractWrapper:
         event: ContractEvent,
         from_block: BlockNumber,
         to_block: BlockNumber,
+        argument_filters: dict | None = None,
     ) -> EventData | None:
         blocks_range = self.events_blocks_range_interval
 
@@ -50,6 +51,7 @@ class ContractWrapper:
             events = await event.get_logs(
                 fromBlock=BlockNumber(max(to_block - blocks_range, from_block)),
                 toBlock=to_block,
+                argument_filters=argument_filters,
             )
             if events:
                 return events[-1]
@@ -128,7 +130,7 @@ class KeeperContract(ContractWrapper):
         )
         return voting_info
 
-    async def get_exit_signatures_updated_event(self) -> EventData | None:
+    async def get_exit_signatures_updated_event(self, vault: ChecksumAddress) -> EventData | None:
         from_block = settings.network_config.KEEPER_GENESIS_BLOCK
         to_block = await execution_client.eth.get_block_number()
 
@@ -136,6 +138,7 @@ class KeeperContract(ContractWrapper):
             self.events.ExitSignaturesUpdated,
             from_block=from_block,
             to_block=to_block,
+            argument_filters={'vault': vault},
         )
 
         return last_event
