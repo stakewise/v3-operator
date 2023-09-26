@@ -91,7 +91,8 @@ w3 = Web3()
 )
 @click.option(
     '--encryption-key',
-    help='The key for encrypting database record. '
+    help='The key for encrypting Postgres DB records. '
+    'Use the same encryption key if you want to add new keystores to the database.',
     'If you are upload new keystores use the same encryption key.',
     required=False,
     prompt=False,
