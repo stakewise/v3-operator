@@ -305,7 +305,7 @@ def _update_db(
     private_keys = []
 
     with click.progressbar(
-        glob.glob(os.path.join(str(settings.keystores_dir), 'keystore-*.json')),
+        glob.glob(os.path.join(settings.keystores_dir, 'keystore-*.json')),
         label='Loading keystores...\t\t',
         show_percent=False,
         show_pos=True,
