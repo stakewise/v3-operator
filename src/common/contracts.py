@@ -4,6 +4,7 @@ from functools import cached_property
 
 from eth_typing import HexStr
 from sw_utils.typings import Bytes32
+from web3 import Web3
 from web3.contract import AsyncContract
 from web3.contract.contract import ContractEvent
 from web3.types import BlockNumber, ChecksumAddress, EventData
@@ -11,6 +12,8 @@ from web3.types import BlockNumber, ChecksumAddress, EventData
 from src.common.clients import execution_client
 from src.common.typings import RewardVoteInfo
 from src.config.settings import settings
+
+SECONDS_PER_MONTH: int = 2628000
 
 
 class ContractWrapper:
@@ -92,6 +95,36 @@ class VaultContract(ContractWrapper):
         """Fetches vault's current validators index."""
         return await self.contract.functions.validatorIndex().call()
 
+    async def get_registered_validators_public_keys(self) -> list[HexStr]:
+        """Fetches the validator registered events."""
+        events = await self._get_events(
+            self.events.ValidatorRegistered,
+            from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
+            to_block=await execution_client.eth.get_block_number(),
+        )
+        return [Web3.to_hex(event['args']['publicKey']) for event in events]
+
+
+class V2PoolContract(ContractWrapper):
+    abi_path = 'abi/IV2Pool.json'
+    settings_key = 'V2_POOL_CONTRACT_ADDRESS'
+
+    async def get_registered_validators_public_keys(self) -> list[HexStr]:
+        """Fetches the validator registered events."""
+        blocks_per_month = int(SECONDS_PER_MONTH // settings.network_config.SECONDS_PER_BLOCK)
+        to_block = BlockNumber(
+            min(
+                settings.network_config.KEEPER_GENESIS_BLOCK + blocks_per_month,
+                await execution_client.eth.get_block_number(),
+            )
+        )
+        events = await self._get_events(
+            self.events.ValidatorRegistered,
+            from_block=settings.network_config.V2_POOL_GENESIS_BLOCK,
+            to_block=to_block,
+        )
+        return [Web3.to_hex(event['args']['publicKey']) for event in events]
+
 
 class ValidatorsRegistryContract(ContractWrapper):
     abi_path = 'abi/IValidatorsRegistry.json'
@@ -158,3 +191,4 @@ class KeeperContract(ContractWrapper):
 vault_contract = VaultContract()
 validators_registry_contract = ValidatorsRegistryContract()
 keeper_contract = KeeperContract()
+v2_pool_contract = V2PoolContract()
