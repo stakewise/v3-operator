@@ -34,7 +34,7 @@ async def send_signature_rotation_requests(
                     session=session, replicas=replicas, payload=payload
                 )
             except Exception as e:
-                logger.error(e)
+                logger.error(repr(e))
                 continue
             approvals[address] = response
 
