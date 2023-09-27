@@ -182,14 +182,14 @@ async def get_oracles_request(
         deadline=get_current_timestamp() + oracles.signature_validity_period,
     )
     for validator_index, public_key in validators.items():
-        if len(keystores) > 0:
+        if len(keystores) > 0 and public_key in keystores:
             shards = get_exit_signature_shards(
                 validator_index=validator_index,
                 private_key=keystores[public_key],
                 oracles=oracles,
                 fork=fork,
             )
-        elif remote_signer_config:
+        elif remote_signer_config and public_key in remote_signer_config.pubkeys_to_shares:
             # pylint: disable=duplicate-code
             pubkey_shares = remote_signer_config.pubkeys_to_shares[public_key]
             shards = await get_exit_signature_shards_remote_signer(
@@ -199,10 +199,12 @@ async def get_oracles_request(
                 fork=fork,
             )
         else:
-            raise RuntimeError('No keystores and no remote signer URL provided')
-
-        if not shards:
-            break
+            logger.warning(
+                'Failed to rotate validator exit signature: '
+                'public key %s not found in keystores or remote signer',
+                public_key,
+            )
+            continue
 
         request.public_keys.append(public_key)
         request.public_key_shards.append(shards.public_keys)
