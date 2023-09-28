@@ -95,12 +95,12 @@ class VaultContract(ContractWrapper):
         """Fetches vault's current validators index."""
         return await self.contract.functions.validatorIndex().call()
 
-    async def get_registered_validators_public_keys(self) -> list[HexStr]:
+    async def get_registered_validators_public_keys(
+        self, from_block: BlockNumber, to_block: BlockNumber
+    ) -> list[HexStr]:
         """Fetches the validator registered events."""
         events = await self._get_events(
-            self.events.ValidatorRegistered,
-            from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
-            to_block=await execution_client.eth.get_block_number(),
+            event=self.events.ValidatorRegistered, from_block=from_block, to_block=to_block
         )
         return [Web3.to_hex(event['args']['publicKey']) for event in events]
 
@@ -109,19 +109,12 @@ class V2PoolContract(ContractWrapper):
     abi_path = 'abi/IV2Pool.json'
     settings_key = 'V2_POOL_CONTRACT_ADDRESS'
 
-    async def get_registered_validators_public_keys(self) -> list[HexStr]:
+    async def get_registered_validators_public_keys(
+        self, from_block: BlockNumber, to_block: BlockNumber
+    ) -> list[HexStr]:
         """Fetches the validator registered events."""
-        blocks_per_month = int(SECONDS_PER_MONTH // settings.network_config.SECONDS_PER_BLOCK)
-        to_block = BlockNumber(
-            min(
-                settings.network_config.KEEPER_GENESIS_BLOCK + blocks_per_month,
-                await execution_client.eth.get_block_number(),
-            )
-        )
         events = await self._get_events(
-            self.events.ValidatorRegistered,
-            from_block=settings.network_config.V2_POOL_GENESIS_BLOCK,
-            to_block=to_block,
+            event=self.events.ValidatorRegistered, from_block=from_block, to_block=to_block
         )
         return [Web3.to_hex(event['args']['publicKey']) for event in events]
 

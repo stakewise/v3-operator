@@ -2,14 +2,15 @@ import asyncio
 from pathlib import Path
 
 import click
-from eth_typing import HexAddress, HexStr
+from eth_typing import BlockNumber, HexAddress, HexStr
 from eth_utils import add_0x_prefix
 from sw_utils.consensus import EXITED_STATUSES, ValidatorStatus
 
-from src.common.clients import consensus_client
+from src.common.clients import consensus_client, execution_client
 from src.common.contracts import v2_pool_contract, vault_contract
 from src.common.contrib import greenify
 from src.common.credentials import CredentialManager
+from src.common.execution import SECONDS_PER_MONTH
 from src.common.password import generate_password, get_or_create_password_file
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_address, validate_mnemonic
@@ -162,10 +163,28 @@ async def main(
 async def _fetch_registered_validators() -> dict[HexStr, ValidatorStatus | None]:
     """Fetch registered validators."""
     click.secho('Fetching registered validators...', bold=True)
-    public_keys = await vault_contract.get_registered_validators_public_keys()
+    current_block = await execution_client.eth.get_block_number()
+    public_keys = await vault_contract.get_registered_validators_public_keys(
+        from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
+        to_block=current_block,
+    )
 
     if vault_contract.contract_address == settings.network_config.GENESIS_VAULT_CONTRACT_ADDRESS:
-        public_keys.extend(await v2_pool_contract.get_registered_validators_public_keys())
+        # fetch registered validators from v2 pool contract
+        # new validators won't be registered after upgrade to the v3,
+        # no need to check up to the latest block
+        blocks_per_month = int(SECONDS_PER_MONTH // settings.network_config.SECONDS_PER_BLOCK)
+        to_block = BlockNumber(
+            min(
+                settings.network_config.KEEPER_GENESIS_BLOCK + blocks_per_month,
+                current_block,
+            )
+        )
+        public_keys.extend(
+            await v2_pool_contract.get_registered_validators_public_keys(
+                from_block=settings.network_config.V2_POOL_GENESIS_BLOCK, to_block=to_block
+            )
+        )
     click.secho(f'Fetched {len(public_keys)} registered validators', bold=True)
 
     click.secho('Fetching validators statuses...', bold=True)
