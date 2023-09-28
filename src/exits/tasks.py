@@ -98,7 +98,7 @@ async def update_exit_signatures(
     remote_signer_config: RemoteSignerConfiguration | None,
     oracles: Oracles,
     outdated_indexes: list[int],
-) -> HexStr:
+) -> None:
     """Fetches update signature requests from oracles."""
     exit_rotation_batch_limit = oracles.validators_exit_rotation_batch_limit
     outdated_indexes = outdated_indexes[:exit_rotation_batch_limit]
@@ -118,6 +118,10 @@ async def update_exit_signatures(
                 remote_signer_config=remote_signer_config,
                 validators=validators,
             )
+
+        if not oracles_request.public_keys:
+            logger.warning('No keys to rotate exit signatures')
+            return
         try:
             # send approval request to oracles
             oracles_approval = await send_signature_rotation_requests(oracles, oracles_request)
@@ -128,10 +132,10 @@ async def update_exit_signatures(
 
     tx_hash = await submit_exit_signatures(oracles_approval)
     logger.info(
-        'Successfully rotated exit signatures for validators with indexes %s',
+        'Successfully rotated exit signatures for validators with indexes %s, tx hash: %s',
         ', '.join([str(index) for index in outdated_indexes]),
+        tx_hash,
     )
-    return tx_hash
 
 
 @retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
