@@ -12,7 +12,12 @@ from web3 import Web3
 
 from src.common.typings import OracleApproval, Oracles, OraclesApproval
 from src.common.utils import process_oracles_approvals
-from src.config.settings import DEFAULT_RETRY_TIME, UPDATE_SIGNATURES_URL_PATH
+from src.config.settings import (
+    DEFAULT_RETRY_TIME,
+    OUTDATED_SIGNATURES_URL_PATH,
+    UPDATE_SIGNATURES_URL_PATH,
+    settings,
+)
 from src.exits.typings import SignatureRotationRequest
 
 logger = logging.getLogger(__name__)
@@ -81,3 +86,25 @@ async def send_signature_rotation_request(
         signature=Web3.to_bytes(hexstr=data['signature']),
         deadline=data['deadline'],
     )
+
+
+@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
+async def get_oracle_outdated_signatures_response(oracle_endpoint: str) -> dict:
+    """
+    :param oracle_endpoint:
+    :return: Example response
+    ```
+    {
+        "exit_signature_block_number": 100,
+        "validators": [{"index": 1}, ...]
+    }
+    ```
+    """
+    path = OUTDATED_SIGNATURES_URL_PATH.format(vault=settings.vault)
+    url = urljoin(oracle_endpoint, path)
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url=url) as response:
+            response.raise_for_status()
+            data = await response.json()
+    return data
