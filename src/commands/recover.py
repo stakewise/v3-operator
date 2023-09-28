@@ -237,4 +237,4 @@ async def _generate_keystores(
             f'recovered from mnemonic index {greenify(index - 1)}',
         )
 
-    return index
+    return index - failed_attempts
