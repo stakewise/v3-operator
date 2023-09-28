@@ -38,8 +38,6 @@ class ExecutionClient:
                 construct_async_sign_and_send_raw_middleware(hot_wallet.account)
             )
             w3.eth.default_account = hot_wallet.address
-        else:
-            logger.warning('Unable to load hot wallet')
 
         return w3
 
