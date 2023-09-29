@@ -7,6 +7,10 @@ from web3 import Web3
 
 from src.common.typings import Oracles
 from src.config.settings import settings
+from src.validators.signing.hashi_vault import (
+    HashiVaultConfiguration,
+    load_hashi_vault_keys,
+)
 from src.validators.signing.local import get_exit_signature_shards
 from src.validators.signing.remote import (
     RemoteSignerConfiguration,
@@ -138,3 +142,45 @@ class TestSigning:
                 oracles=mocked_oracles,
                 fork=fork,
             )
+
+    @pytest.mark.usefixtures('mocked_hashi_vault')
+    async def test_hashi_vault_keystores_loading(
+        self,
+        hashi_vault_url: str,
+    ):
+        settings.hashi_vault_url = hashi_vault_url
+        settings.hashi_vault_token = 'Secret'
+        settings.hashi_vault_key_path = 'ethereum/signing/keystores'
+
+        config = HashiVaultConfiguration.from_settings()
+
+        keystores = await load_hashi_vault_keys(config)
+
+        assert len(keystores) == 2
+
+    @pytest.mark.usefixtures('mocked_hashi_vault')
+    async def test_hashi_vault_keystores_not_configured(
+        self,
+        hashi_vault_url: str,
+    ):
+        settings.hashi_vault_url = hashi_vault_url
+        settings.hashi_vault_token = None
+        settings.hashi_vault_key_path = None
+
+        with pytest.raises(RuntimeError, match='URL, token and key path must be specified'):
+            await HashiVaultConfiguration.from_settings()
+
+    @pytest.mark.usefixtures('mocked_hashi_vault')
+    async def test_hashi_vault_keystores_inaccessible(
+        self,
+        hashi_vault_url: str,
+    ):
+        settings.hashi_vault_url = hashi_vault_url
+        settings.hashi_vault_token = 'Secret'
+        settings.hashi_vault_key_path = 'ethereum/inaccessible/keystores'
+
+        with pytest.raises(
+            RuntimeError, match='Can not retrieve validator signing keys from hashi vault'
+        ):
+            config = HashiVaultConfiguration.from_settings()
+            await load_hashi_vault_keys(config)

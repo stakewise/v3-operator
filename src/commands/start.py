@@ -30,6 +30,10 @@ from src.validators.execution import (
     NetworkValidatorsProcessor,
     update_unused_validator_keys_metric,
 )
+from src.validators.signing.hashi_vault import (
+    HashiVaultConfiguration,
+    load_hashi_vault_keys,
+)
 from src.validators.signing.remote import RemoteSignerConfiguration
 from src.validators.tasks import load_genesis_validators, register_validators
 from src.validators.utils import load_deposit_data, load_keystores
@@ -164,6 +168,21 @@ logger = logging.getLogger(__name__)
     envvar='REMOTE_SIGNER_URL',
     help='The base URL of the remote signer, e.g. http://signer:9000',
 )
+@click.option(
+    '--hashi-vault-url',
+    envvar='HASHI_VAULT_URL',
+    help='The base URL of the vault service, e.g. http://vault:8200.',
+)
+@click.option(
+    '--hashi-vault-token',
+    envvar='HASHI_VAULT_TOKEN',
+    help='Authentication token for accessing Hashi vault.',
+)
+@click.option(
+    '--hashi-vault-key-path',
+    envvar='HASHI_VAULT_KEY_PATH',
+    help='Key path in the K/V secret engine where validator signing keys are stored.',
+)
 @click.command(help='Start operator service')
 # pylint: disable-next=too-many-arguments,too-many-locals
 def start(
@@ -181,6 +200,9 @@ def start(
     keystores_dir: str | None,
     keystores_password_file: str | None,
     remote_signer_url: str | None,
+    hashi_vault_key_path: str | None,
+    hashi_vault_token: str | None,
+    hashi_vault_url: str | None,
     hot_wallet_file: str | None,
     hot_wallet_password_file: str | None,
     max_fee_per_gas_gwei: int,
@@ -206,6 +228,9 @@ def start(
         keystores_dir=keystores_dir,
         keystores_password_file=keystores_password_file,
         remote_signer_url=remote_signer_url,
+        hashi_vault_token=hashi_vault_token,
+        hashi_vault_key_path=hashi_vault_key_path,
+        hashi_vault_url=hashi_vault_url,
         hot_wallet_file=hot_wallet_file,
         hot_wallet_password_file=hot_wallet_password_file,
         max_fee_per_gas_gwei=max_fee_per_gas_gwei,
@@ -236,18 +261,25 @@ async def main() -> None:
     remote_signer_config = None
 
     if len(keystores) == 0:
-        if not settings.remote_signer_url:
-            raise RuntimeError('No keystores and no remote signer URL provided')
+        if not settings.remote_signer_url and not settings.hashi_vault_url:
+            raise RuntimeError('No keystores, no remote signer or hashi vault URL provided')
 
-        # No keystores loaded but remote signer URL provided
-        remote_signer_config = RemoteSignerConfiguration.from_file(
-            settings.remote_signer_config_file
-        )
-        logger.info(
-            'Using remote signer at %s for %i public keys',
-            settings.remote_signer_url,
-            len(remote_signer_config.pubkeys_to_shares.keys()),
-        )
+        if settings.hashi_vault_url:
+            # No keystores loaded but hashi vault configuration specified
+            hashi_vault_config = HashiVaultConfiguration.from_settings()
+            logger.info('Using hashi vault at %s for loading public keys')
+            keystores = await load_hashi_vault_keys(hashi_vault_config)
+
+        else:
+            # No keystores loaded but remote signer URL provided
+            remote_signer_config = RemoteSignerConfiguration.from_file(
+                settings.remote_signer_config_file
+            )
+            logger.info(
+                'Using remote signer at %s for %i public keys',
+                settings.remote_signer_url,
+                len(remote_signer_config.pubkeys_to_shares.keys()),
+            )
 
     # load deposit data
     deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
