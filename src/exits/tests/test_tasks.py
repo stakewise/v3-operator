@@ -11,7 +11,7 @@ from sw_utils.typings import ConsensusFork
 from src.common.typings import Oracles
 from src.common.utils import get_current_timestamp
 from src.config.settings import settings
-from src.exits.tasks import get_oracles_request, wait_oracle_signature_update
+from src.exits.tasks import _get_oracles_request, _wait_oracle_signature_update
 from src.validators.signing.remote import RemoteSignerConfiguration
 from src.validators.typings import ExitSignatureShards, Keystores
 
@@ -27,7 +27,7 @@ class TestWaitOracleSignatureUpdate:
                 'src.exits.tasks._fetch_exit_signature_block', side_effect=[None, 1, 2, 3]
             ) as fetch_mock,
         ):
-            await wait_oracle_signature_update(update_block, 'http://oracle', max_time=5)
+            await _wait_oracle_signature_update(update_block, 'http://oracle', max_time=5)
 
         assert fetch_mock.call_count == 4
 
@@ -41,7 +41,7 @@ class TestWaitOracleSignatureUpdate:
             ) as fetch_mock,
             pytest.raises(asyncio.TimeoutError),
         ):
-            await wait_oracle_signature_update(update_block, 'http://oracle', max_time=5)
+            await _wait_oracle_signature_update(update_block, 'http://oracle', max_time=5)
 
         assert fetch_mock.call_count == 2
 
@@ -66,7 +66,7 @@ class TestGetOraclesRequest:
                 ),
             ),
         ):
-            request = await get_oracles_request(
+            request = await _get_oracles_request(
                 oracles=oracles,
                 keystores=Keystores({test_validator_pubkey: test_validator_privkey}),
                 remote_signer_config=None,
@@ -108,7 +108,7 @@ class TestGetOraclesRequest:
                 randint(0, int(1e6)): pubkey
                 for pubkey in remote_signer_config.pubkeys_to_shares.keys()
             }
-            request = await get_oracles_request(
+            request = await _get_oracles_request(
                 oracles=oracles,
                 keystores=Keystores(dict()),
                 remote_signer_config=remote_signer_config,
