@@ -4,6 +4,7 @@ from pathlib import Path
 
 import click
 from eth_typing import HexAddress
+from web3 import Web3
 
 from src.common.credentials import CredentialManager
 from src.config.settings import AVAILABLE_NETWORKS
@@ -19,7 +20,7 @@ class VaultConfig:
         vault: HexAddress,
         data_dir: Path,
     ):
-        self.vault = vault
+        self.vault = Web3.to_checksum_address(vault)
         self.vault_dir = Path(data_dir) / vault.lower()
         self.config_path = self.vault_dir / 'config.json'
 

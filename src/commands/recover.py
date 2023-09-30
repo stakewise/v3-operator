@@ -98,7 +98,7 @@ def recover(
         consensus_endpoints=consensus_endpoints,
         vault=vault,
         network=network,
-        vault_dir=Path(data_dir, vault),
+        vault_dir=config.vault_dir,
     )
 
     try:
