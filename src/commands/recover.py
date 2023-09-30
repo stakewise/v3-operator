@@ -33,6 +33,12 @@ from src.config.settings import AVAILABLE_NETWORKS, GOERLI, settings
     help='Creates separate password file for each keystore.',
 )
 @click.option(
+    '--no-confirm',
+    is_flag=True,
+    default=False,
+    help='Skips confirmation messages when provided.',
+)
+@click.option(
     '--mnemonic',
     help='The mnemonic for generating the validator keys.',
     prompt='Enter the mnemonic for generating the validator keys',
@@ -79,6 +85,7 @@ def recover(
     consensus_endpoints: str,
     execution_endpoints: str,
     per_keystore_password: bool,
+    no_confirm: bool,
 ) -> None:
     # pylint: disable=duplicate-code
     config = VaultConfig(
@@ -104,11 +111,12 @@ def recover(
     try:
         asyncio.run(
             main(
-                mnemonic,
-                keystores_dir,
-                password_file,
-                per_keystore_password,
-                config,
+                mnemonic=mnemonic,
+                keystores_dir=keystores_dir,
+                password_file=password_file,
+                per_keystore_password=per_keystore_password,
+                no_confirm=no_confirm,
+                config=config,
             )
         )
     except Exception as e:
@@ -121,6 +129,7 @@ async def main(
     keystores_dir: Path,
     password_file: Path,
     per_keystore_password: bool,
+    no_confirm: bool,
     config: VaultConfig,
 ):
     validators = await _fetch_registered_validators()
@@ -128,21 +137,32 @@ async def main(
         raise click.ClickException('No registered validators')
 
     total_validators = len(validators)
-    click.confirm(
-        f'Vault has {total_validators} registered validator(s), '
-        f'recover active keystores from provided mnemonic?',
-        default=True,
-        abort=True,
-    )
-
-    if keystores_dir.exists():
+    if no_confirm:
+        click.secho(
+            f'Vault has {total_validators} registered validator(s), '
+            f'recovering active keystores from provided mnemonic...',
+        )
+    else:
         click.confirm(
-            f'Clean up existing {keystores_dir} keystores directory?',
+            f'Vault has {total_validators} registered validator(s), '
+            f'recover active keystores from provided mnemonic?',
             default=True,
             abort=True,
         )
+
+    if keystores_dir.exists():
+        if no_confirm:
+            click.secho(f'Removing existing {keystores_dir} keystores directory...')
+        else:
+            click.confirm(
+                f'Remove existing {keystores_dir} keystores directory?',
+                default=True,
+                abort=True,
+            )
         for file in keystores_dir.glob('*'):
             file.unlink()
+    else:
+        keystores_dir.mkdir(parents=True)
 
     mnemonic_next_index = await _generate_keystores(
         mnemonic=mnemonic,
