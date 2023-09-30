@@ -152,10 +152,10 @@ async def main(
 
     if keystores_dir.exists():
         if no_confirm:
-            click.secho(f'Clean up existing {keystores_dir} keystores directory...')
+            click.secho(f'Removing existing {keystores_dir} keystores directory...')
         else:
             click.confirm(
-                f'Clean up existing {keystores_dir} keystores directory?',
+                f'Remove existing {keystores_dir} keystores directory?',
                 default=True,
                 abort=True,
             )
