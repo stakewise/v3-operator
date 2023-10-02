@@ -15,7 +15,7 @@ from src.key_manager.database import Database, check_db_connection
 @click.option(
     '--output-dir',
     required=False,
-    help='The directory to save configuration files. Defaults to ./data/configs.',
+    help='The directory to save configuration files. Defaults to ./configs.',
     default='./data',
     type=click.Path(exists=False, file_okay=False, dir_okay=True),
 )
