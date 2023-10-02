@@ -84,7 +84,7 @@ from src.validators.utils import load_keystores
 @click.option(
     '--db-encrypt-key',
     help='The key for encrypting database record. '
-    'If you are upload new keystores use the same encryption key.',
+    'If you upload new keystores use the same encryption key.',
     required=False,
     prompt=False,
 )
