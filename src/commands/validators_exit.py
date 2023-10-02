@@ -4,10 +4,10 @@ from pathlib import Path
 
 import click
 import milagro_bls_binding as bls
+from aiohttp import ClientResponseError
 from eth_typing import BLSPubkey, BLSSignature, HexAddress, HexStr
 from sw_utils import ValidatorStatus
 from sw_utils.consensus import EXITED_STATUSES
-from sw_utils.exceptions import AiohttpRecoveredErrors
 from sw_utils.signing import get_exit_message_signing_root
 from sw_utils.typings import ConsensusFork
 from web3 import Web3
@@ -152,24 +152,31 @@ async def main(count: int | None) -> None:
     )
     exited_indexes = []
     for exit_keystore in exit_keystores:
+        exit_signature = await _get_exit_signature(
+            exit_keystore=exit_keystore,
+            remote_signer_config=remote_signer_config,
+            fork=fork,
+            network=settings.network,
+        )
         try:
-            exit_signature = await _get_exit_signature(
-                exit_keystore=exit_keystore,
-                remote_signer_config=remote_signer_config,
-                fork=fork,
-                network=settings.network,
-            )
             await consensus_client.submit_voluntary_exit(
                 validator_index=exit_keystore.index,
                 signature=Web3.to_hex(exit_signature),
                 epoch=fork.epoch,
             )
-            exited_indexes.append(exit_keystore.index)
-        except AiohttpRecoveredErrors as e:
-            raise click.ClickException(f'Consensus client error: {e}')
+        except ClientResponseError as e:
+            # Validator status is updated in CL after some delay.
+            # Status may be active in CL although validator has started exit process.
+            # CL will return status 400 for exit request in this case.
+            log_verbose(e)
+            continue
+
+        exited_indexes.append(exit_keystore.index)
+
     if exited_indexes:
         click.secho(
             f'Validators {", ".join(str(index) for index in exited_indexes)} '
+            f'({len(exited_indexes)} of {len(exit_keystores)}) '
             f'exits successfully initiated',
             bold=True,
             fg='green',
