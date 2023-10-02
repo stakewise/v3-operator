@@ -17,6 +17,10 @@ from src.common.utils import log_verbose
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
 from src.config.settings import AVAILABLE_NETWORKS, NETWORKS, settings
+from src.validators.signing.hashi_vault import (
+    HashiVaultConfiguration,
+    load_hashi_vault_keys,
+)
 from src.validators.signing.key_shares import reconstruct_shared_bls_signature
 from src.validators.signing.remote import RemoteSignerConfiguration, get_signature_shard
 from src.validators.typings import BLSPrivkey, Keystores
@@ -75,6 +79,21 @@ EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
     help='The base URL of the remote signer, e.g. http://signer:9000',
 )
 @click.option(
+    '--hashi-vault-url',
+    envvar='HASHI_VAULT_URL',
+    help='The base URL of the vault service, e.g. http://vault:8200.',
+)
+@click.option(
+    '--hashi-vault-token',
+    envvar='HASHI_VAULT_TOKEN',
+    help='Authentication token for accessing Hashi vault.',
+)
+@click.option(
+    '--hashi-vault-key-path',
+    envvar='HASHI_VAULT_KEY_PATH',
+    help='Key path in the K/V secret engine where validator signing keys are stored.',
+)
+@click.option(
     '-v',
     '--verbose',
     help='Enable debug mode. Default is false.',
@@ -89,6 +108,9 @@ def validators_exit(
     count: int | None,
     consensus_endpoints: str,
     remote_signer_url: str,
+    hashi_vault_key_path: str | None,
+    hashi_vault_token: str | None,
+    hashi_vault_url: str | None,
     data_dir: str,
     verbose: bool,
 ) -> None:
@@ -104,6 +126,9 @@ def validators_exit(
         vault_dir=vault_config.vault_dir,
         consensus_endpoints=consensus_endpoints,
         remote_signer_url=remote_signer_url,
+        hashi_vault_token=hashi_vault_token,
+        hashi_vault_key_path=hashi_vault_key_path,
+        hashi_vault_url=hashi_vault_url,
         verbose=verbose,
     )
     try:
@@ -115,24 +140,30 @@ def validators_exit(
 async def main(count: int | None) -> None:
     keystores = load_keystores()
     remote_signer_config = None
-
     fork = await consensus_client.get_consensus_fork()
 
     if len(keystores) > 0:
         all_validator_pubkeys = list(keystores.keys())  # pylint: disable=no-member
     else:
-        if not settings.remote_signer_url:
-            raise RuntimeError('No keystores and no remote signer URL provided')
+        if settings.hashi_vault_url:
+            # No keystores loaded but hashi vault configuration specified
+            hashi_vault_config = HashiVaultConfiguration.from_settings()
+            click.echo('Using hashi vault at %s for loading public keys')
+            keystores = await load_hashi_vault_keys(hashi_vault_config)
+            all_validator_pubkeys = list(keystores.keys())
 
-        # No keystores loaded but remote signer URL provided
-        remote_signer_config = RemoteSignerConfiguration.from_file(
-            settings.remote_signer_config_file
-        )
-        all_validator_pubkeys = list(remote_signer_config.pubkeys_to_shares.keys())
-        click.echo(
-            f'Using remote signer at {settings.remote_signer_url}'
-            f' for {len(all_validator_pubkeys)} public keys',
-        )
+        elif settings.remote_signer_url:
+            # No keystores loaded but remote signer URL provided
+            remote_signer_config = RemoteSignerConfiguration.from_file(
+                settings.remote_signer_config_file
+            )
+            all_validator_pubkeys = list(remote_signer_config.pubkeys_to_shares.keys())
+            click.echo(
+                f'Using remote signer at {settings.remote_signer_url}'
+                f' for {len(all_validator_pubkeys)} public keys',
+            )
+        else:
+            raise RuntimeError('No keystores, no remote signer or hashi vault URL provided')
 
     exit_keystores = await _get_exit_keystores(
         keystores=keystores, public_keys=all_validator_pubkeys

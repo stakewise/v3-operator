@@ -42,6 +42,9 @@ class Settings(metaclass=Singleton):
     keystores_password_file: Path
     remote_signer_config_file: Path
     remote_signer_url: str | None
+    hashi_vault_key_path: str | None
+    hashi_vault_url: str | None
+    hashi_vault_token: str | None
     hot_wallet_file: Path
     hot_wallet_password_file: Path
     max_fee_per_gas_gwei: int
@@ -71,6 +74,9 @@ class Settings(metaclass=Singleton):
         keystores_password_file: str | None = None,
         remote_signer_config_file: str | None = None,
         remote_signer_url: str | None = None,
+        hashi_vault_key_path: str | None = None,
+        hashi_vault_url: str | None = None,
+        hashi_vault_token: str | None = None,
         hot_wallet_file: str | None = None,
         hot_wallet_password_file: str | None = None,
         database_dir: str | None = None,
@@ -113,6 +119,11 @@ class Settings(metaclass=Singleton):
             else vault_dir / 'remote_signer_config.json'
         )
         self.remote_signer_url = remote_signer_url
+
+        # hashi vault configuration
+        self.hashi_vault_url = hashi_vault_url
+        self.hashi_vault_key_path = hashi_vault_key_path
+        self.hashi_vault_token = hashi_vault_token
 
         # hot wallet
         self.hot_wallet_file = (
@@ -168,6 +179,9 @@ DEFAULT_RETRY_TIME = 60
 
 # Remote signer timeout
 REMOTE_SIGNER_TIMEOUT = 10
+
+# Hashi vault timeout
+HASHI_VAULT_TIMEOUT = 10
 
 # Oracles signature update sync (10 minutes)
 ORACLES_SIGNATURE_UPDATE_SYNC_TIMEOUT = 600
