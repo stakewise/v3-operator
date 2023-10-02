@@ -19,7 +19,7 @@ from src.key_manager.database import Database, check_db_connection
     default='./data',
     type=click.Path(exists=False, file_okay=False, dir_okay=True),
 )
-@click.command(help='Get operator configuration files from the remote database.')
+@click.command(help='Fetches operator configuration files from the remote database.')
 def sync_operator(
     db_url: str,
     output_dir: str,
