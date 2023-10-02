@@ -261,16 +261,13 @@ async def main() -> None:
     remote_signer_config = None
 
     if len(keystores) == 0:
-        if not settings.remote_signer_url and not settings.hashi_vault_url:
-            raise RuntimeError('No keystores, no remote signer or hashi vault URL provided')
-
         if settings.hashi_vault_url:
             # No keystores loaded but hashi vault configuration specified
             hashi_vault_config = HashiVaultConfiguration.from_settings()
             logger.info('Using hashi vault at %s for loading public keys')
             keystores = await load_hashi_vault_keys(hashi_vault_config)
 
-        else:
+        elif settings.remote_signer_url:
             # No keystores loaded but remote signer URL provided
             remote_signer_config = RemoteSignerConfiguration.from_file(
                 settings.remote_signer_config_file
@@ -280,6 +277,8 @@ async def main() -> None:
                 settings.remote_signer_url,
                 len(remote_signer_config.pubkeys_to_shares.keys()),
             )
+        else:
+            raise RuntimeError('No keystores, no remote signer or hashi vault URL provided')
 
     # load deposit data
     deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)

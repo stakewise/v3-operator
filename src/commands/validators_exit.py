@@ -145,9 +145,6 @@ async def main(count: int | None) -> None:
     if len(keystores) > 0:
         all_validator_pubkeys = list(keystores.keys())  # pylint: disable=no-member
     else:
-        if not settings.remote_signer_url and not settings.hashi_vault_url:
-            raise RuntimeError('No keystores, no remote signer or hashi vault URL provided')
-
         if settings.hashi_vault_url:
             # No keystores loaded but hashi vault configuration specified
             hashi_vault_config = HashiVaultConfiguration.from_settings()
@@ -155,7 +152,7 @@ async def main(count: int | None) -> None:
             keystores = await load_hashi_vault_keys(hashi_vault_config)
             all_validator_pubkeys = list(keystores.keys())
 
-        else:
+        elif settings.remote_signer_url:
             # No keystores loaded but remote signer URL provided
             remote_signer_config = RemoteSignerConfiguration.from_file(
                 settings.remote_signer_config_file
@@ -165,6 +162,8 @@ async def main(count: int | None) -> None:
                 f'Using remote signer at {settings.remote_signer_url}'
                 f' for {len(all_validator_pubkeys)} public keys',
             )
+        else:
+            raise RuntimeError('No keystores, no remote signer or hashi vault URL provided')
 
     exit_keystores = await _get_exit_keystores(
         keystores=keystores, public_keys=all_validator_pubkeys

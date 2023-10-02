@@ -365,8 +365,8 @@ in K/V engine. Internal structure of the secret must resemble following json:
 }
 ```
 
-Note that public and private signing keys must be stored in hex form, but without
-0x prefix.
+Note that public and private signing keys must be stored in hex form, with or
+without 0x prefix.
 
 After loading keys from hashi vault, operator behaves in the same way as if it
 had loaded them from keystores, no additional operations needed to support

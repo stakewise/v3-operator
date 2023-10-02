@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from aiohttp import ClientSession, ClientTimeout
 from eth_typing import HexStr
+from eth_utils import add_0x_prefix
 from web3 import Web3
 
 from src.config.settings import HASHI_VAULT_TIMEOUT, settings
@@ -46,7 +47,7 @@ async def load_hashi_vault_keys(config: HashiVaultConfiguration) -> Keystores:
     Load public and private keys from hashi vault
     K/V secret engine.
 
-    All public and private keys must be stored as hex string without 0x prefix.
+    All public and private keys must be stored as hex string  with or without 0x prefix.
     """
     keys = []
     logger.info('Will load validator keys from %s', config.secret_url())
@@ -65,6 +66,6 @@ async def load_hashi_vault_keys(config: HashiVaultConfiguration) -> Keystores:
 
     for pk, sk in key_data['data']['data'].items():
         sk_bytes = Web3.to_bytes(hexstr=sk)
-        keys.append((HexStr(f'0x{pk}'), BLSPrivkey(sk_bytes)))
+        keys.append((add_0x_prefix(HexStr(pk)), BLSPrivkey(sk_bytes)))
     validator_keys = Keystores(dict(keys))
     return validator_keys
