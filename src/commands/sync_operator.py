@@ -16,7 +16,7 @@ from src.key_manager.database import Database, check_db_connection
     '--output-dir',
     required=False,
     help='The directory to save configuration files. Defaults to ./configs.',
-    default='./data',
+    default='./configs',
     type=click.Path(exists=False, file_okay=False, dir_okay=True),
 )
 @click.command(help='Fetches operator configuration files from the remote database.')
