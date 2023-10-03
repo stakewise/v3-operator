@@ -2783,7 +2783,7 @@ pbr = ">=2.0.0,<2.1.0 || >2.1.0"
 
 [[package]]
 name = "sw-utils"
-version = "0.3.25"
+version = "0.3.26"
 description = "StakeWise Python utils"
 optional = false
 python-versions = "^3.10"
@@ -2797,13 +2797,13 @@ py-ecc = "^6.0.0"
 pyrsistent = "0.19.3"
 tenacity = "==8.2.2"
 types-requests = "^2.28.11.15"
-web3 = "==6.8.0"
+web3 = "==6.10.0"
 
 [package.source]
 type = "git"
 url = "https://github.com/stakewise/sw-utils.git"
-reference = "v0.3.25"
-resolved_reference = "20bdb91d5efc0ddf82d22e789e8452527cc0200d"
+reference = "v0.3.26"
+resolved_reference = "d09a111268c3f147ff079541eeee773cf4ff8612"
 
 [[package]]
 name = "tenacity"
@@ -2937,13 +2937,13 @@ test = ["covdefaults (>=2.3)", "coverage (>=7.2.7)", "coverage-enable-subprocess
 
 [[package]]
 name = "web3"
-version = "6.8.0"
+version = "6.10.0"
 description = "web3.py"
 optional = false
 python-versions = ">=3.7.2"
 files = [
-    {file = "web3-6.8.0-py3-none-any.whl", hash = "sha256:cc383afaf4cfde9fd6c8934ec23c47035520129ee93e4e068520e565d31dee9e"},
-    {file = "web3-6.8.0.tar.gz", hash = "sha256:5db6ed63bca526a5542d9a84778c8b549199009b9f71079ff53a7b82dadf0d0b"},
+    {file = "web3-6.10.0-py3-none-any.whl", hash = "sha256:070625a0da4f0fcac090fa95186e0b865a1bbc43efb78fd2ee805f7bf9cd8986"},
+    {file = "web3-6.10.0.tar.gz", hash = "sha256:ea89f8a6ee74b74c3ff21954eafe00ec914365adb904c6c374f559bc46d4a61c"},
 ]
 
 [package.dependencies]
@@ -3223,4 +3223,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.11"
-content-hash = "7c898000fcc12e30ef72fc10a1179675e0e9992fbe82a7513f35464c633872dd"
+content-hash = "ac7d2122169737e526f68717258a21cdd67dc33979453b409063b117fdaf5647"
