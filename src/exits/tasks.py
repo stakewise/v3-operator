@@ -203,6 +203,8 @@ async def _get_oracles_request(
         exit_signature_shards=[],
         deadline=get_current_timestamp() + oracles.signature_validity_period,
     )
+    failed_indexes = []
+
     for validator_index, public_key in validators.items():
         if len(keystores) > 0 and public_key in keystores:
             shards = get_exit_signature_shards(
@@ -221,15 +223,25 @@ async def _get_oracles_request(
                 fork=fork,
             )
         else:
-            logger.warning(
-                'Failed to rotate validator exit signature: '
-                'public key %s not found in keystores or remote signer',
-                public_key,
-            )
+            failed_indexes.append(validator_index)
             continue
 
         request.public_keys.append(public_key)
         request.public_key_shards.append(shards.public_keys)
         request.exit_signature_shards.append(shards.exit_signatures)
 
+    if failed_indexes:
+        logger.warning(
+            'Failed to rotate validator exit signature for indexes: %s. '
+            'Reason: public key not found in keystores or remote signer',
+            _format_indexes(failed_indexes),
+        )
+
     return request
+
+
+def _format_indexes(indexes: list[int], max_len: int = 10) -> str:
+    if len(indexes) <= max_len:
+        return ', '.join(str(i) for i in indexes)
+
+    return f"{', '.join(str(i) for i in indexes)}..."
