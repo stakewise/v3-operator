@@ -92,7 +92,7 @@ class TestValidatorsExit:
             result = runner.invoke(validators_exit, args, input='y')
         assert result.exit_code == 0
 
-        assert 'Validators 0, 1, 2 exits successfully initiated\n' in result.output
+        assert 'Validators 0, 1, 2 (3 of 3) exits successfully initiated\n' in result.output
 
     @pytest.mark.usefixtures('_remote_signer_setup')
     def test_remote_signer(
@@ -142,6 +142,6 @@ class TestValidatorsExit:
 
         for expected_line in (
             f'Using remote signer at {remote_signer_url}',
-            'Validators 0, 1, 2 exits successfully initiated',
+            'Validators 0, 1, 2 (3 of 3) exits successfully initiated',
         ):
             assert expected_line in result.output
