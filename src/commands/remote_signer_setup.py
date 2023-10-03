@@ -1,5 +1,4 @@
 import asyncio
-import glob
 import json
 import os
 from concurrent.futures import ThreadPoolExecutor
@@ -27,7 +26,7 @@ from src.key_manager.encryptor import Encryptor
 from src.key_manager.typings import DatabaseConfigRecord, DatabaseKeyRecord
 from src.validators.signing.key_shares import private_key_to_private_key_shares
 from src.validators.signing.remote import RemoteSignerConfiguration
-from src.validators.utils import load_keystores
+from src.validators.utils import list_keystore_files, load_keystores
 
 
 @click.option(
@@ -74,7 +73,7 @@ from src.validators.utils import load_keystores
     help='Comma separated list of API endpoints for execution nodes.',
 )
 @click.option(
-    '--db-url',
+    '--remote-db-url',
     help='When provided will upload encrypted keystores to the Postgres DB. '
     'The new encryption key will be generated if `db-encrypt-key` is not provided. '
     'For example, postgresql://username:pass@hostname/dbname.',
@@ -82,7 +81,7 @@ from src.validators.utils import load_keystores
     required=False,
 )
 @click.option(
-    '--db-encrypt-key',
+    '--remote-db-key',
     help='The key for encrypting database record. '
     'If you upload new keystores use the same encryption key.',
     required=False,
@@ -105,8 +104,8 @@ def remote_signer_setup(
     keystores_dir: str | None,
     execution_endpoints: str,
     verbose: bool,
-    db_url: str | None = None,
-    db_encrypt_key: str | None = None,
+    remote_db_url: str | None = None,
+    remote_db_key: str | None = None,
 ) -> None:
     config = VaultConfig(vault, Path(data_dir))
     config.load()
@@ -131,8 +130,8 @@ def remote_signer_setup(
                     lambda: asyncio.run(
                         main(
                             remove_existing_keys=remove_existing_keys,
-                            db_url=db_url,
-                            db_encrypt_key=db_encrypt_key,
+                            remote_db_url=remote_db_url,
+                            remote_db_key=remote_db_key,
                         )
                     )
                 ).result()
@@ -142,8 +141,8 @@ def remote_signer_setup(
                 asyncio.run(
                     main(
                         remove_existing_keys=remove_existing_keys,
-                        db_url=db_url,
-                        db_encrypt_key=db_encrypt_key,
+                        remote_db_url=remote_db_url,
+                        remote_db_key=remote_db_key,
                     )
                 )
             else:
@@ -152,11 +151,11 @@ def remote_signer_setup(
         log_verbose(e)
 
 
-# pylint: disable-next=too-many-locals
+# pylint: disable-next=too-many-locals,too-many-branches
 async def main(
     remove_existing_keys: bool,
-    db_url: str | None,
-    db_encrypt_key: str | None,
+    remote_db_url: str | None,
+    remote_db_key: str | None,
 ) -> None:
     keystores = load_keystores()
 
@@ -193,6 +192,9 @@ async def main(
             Web3.to_hex(bls.SkToPk(priv_key)) for priv_key in private_key_shares
         ]
 
+    if not credentials:
+        click.echo('Credentials list is empty')
+
     click.echo(
         f'Successfully generated {len(credentials)} key shares'
         f' for {len(keystores)} private key(s)!',
@@ -209,7 +211,9 @@ async def main(
         'passwords': [password for _ in key_share_keystores],
     }
 
-    if not db_url:
+    if remote_db_url:
+        _update_db(remote_db_url=remote_db_url, remote_db_key=remote_db_key, key_shares=key_shares)
+    else:
         async with aiohttp.ClientSession() as session:
             resp = await session.post(
                 f'{settings.remote_signer_url}/eth/v1/keystores', json=key_shares
@@ -219,13 +223,9 @@ async def main(
                     f'Error occurred during import of keystores to remote signer'
                     f' - status code {resp.status}, body: {await resp.text()}'
                 )
-
-    click.echo(
-        f'Successfully imported {len(key_share_keystores)} key shares into remote signer.',
-    )
-
-    if db_url:
-        _update_db(db_url=db_url, db_encrypt_key=db_encrypt_key, key_shares=key_shares)
+        click.echo(
+            f'Successfully imported {len(key_share_keystores)} key shares into remote signer.',
+        )
 
     # Remove local keystores - keys are loaded in remote signer and are not
     # needed locally anymore
@@ -239,27 +239,37 @@ async def main(
         active_pubkey_shares = {
             pk for pk_list in remote_signer_config.pubkeys_to_shares.values() for pk in pk_list
         }
-
-        async with aiohttp.ClientSession() as session:
-            resp = await session.get(f'{settings.remote_signer_url}/api/v1/eth2/publicKeys')
-            pubkeys_remote_signer = set(await resp.json())
-
-            # Only remove pubkeys from signer that are no longer needed
-            inactive_pubkeys = pubkeys_remote_signer - active_pubkey_shares
-
-            resp = await session.delete(
-                f'{settings.remote_signer_url}/eth/v1/keystores',
-                json={'pubkeys': list(inactive_pubkeys)},
+        if remote_db_url:
+            database = Database(
+                db_url=str(remote_db_url),
             )
-            if resp.status != 200:
-                raise RuntimeError(
-                    f'Error occurred while deleting existing keys from remote signer'
-                    f' - status code {resp.status}, body: {await resp.text()}'
-                )
-
+            all_db_public_keys = set(database.fetch_all_public_keys())
+            inactive_pubkeys = all_db_public_keys - active_pubkey_shares
+            database.delete_keys_by_public_key(list(inactive_pubkeys))
             click.echo(
-                f'Removed {len(inactive_pubkeys)} keys from remote signer',
+                f'Removed {len(inactive_pubkeys)} keys from remote database',
             )
+        else:
+            async with aiohttp.ClientSession() as session:
+                resp = await session.get(f'{settings.remote_signer_url}/api/v1/eth2/publicKeys')
+                pubkeys_remote_signer = set(await resp.json())
+
+                # Only remove pubkeys from signer that are no longer needed
+                inactive_pubkeys = pubkeys_remote_signer - active_pubkey_shares
+
+                resp = await session.delete(
+                    f'{settings.remote_signer_url}/eth/v1/keystores',
+                    json={'pubkeys': list(inactive_pubkeys)},
+                )
+                if resp.status != 200:
+                    raise RuntimeError(
+                        f'Error occurred while deleting existing keys from remote signer'
+                        f' - status code {resp.status}, body: {await resp.text()}'
+                    )
+
+                click.echo(
+                    f'Removed {len(inactive_pubkeys)} keys from remote signer',
+                )
 
     remote_signer_config.save(settings.remote_signer_config_file)
 
@@ -272,19 +282,18 @@ async def main(
 
 # pylint: disable-next=too-many-locals
 def _update_db(
-    db_url: str | None,
-    db_encrypt_key: str | None,
+    remote_db_url: str | None,
+    remote_db_key: str | None,
     key_shares: dict | None,
 ) -> None:
-    check_db_connection(db_url)
+    check_db_connection(remote_db_url)
 
-    with open(settings.keystores_password_file, encoding='utf-8') as f:
-        keystores_password = f.read().strip()
+    keystores_password = get_or_create_password_file(str(settings.keystores_password_file))
 
     private_keys = []
 
     with click.progressbar(
-        glob.glob(os.path.join(settings.keystores_dir, 'keystore-*.json')),
+        list_keystore_files(),
         label='Loading keystores...\t\t',
         show_percent=False,
         show_pos=True,
@@ -299,18 +308,15 @@ def _update_db(
                     fg='red',
                 )
 
-    if key_shares is None or 'keystores' not in key_shares or 'passwords' not in key_shares:
-        raise ValueError('key_shares is malformed or None')
-
     with click.progressbar(
-        length=len(key_shares['keystores']),
+        length=len(key_shares['keystores']),  # type: ignore
         label='Loading key shares...\t\t',
         show_percent=False,
         show_pos=True,
     ) as progressbar:
-        for index, key_share_str in enumerate(key_shares['keystores']):
+        for index, key_share_str in enumerate(key_shares['keystores']):  # type: ignore
             try:
-                keystore_password = key_shares['passwords'][index]
+                keystore_password = key_shares['passwords'][index]  # type: ignore
                 # Parse key_share from string to dictionary
                 key_share = json.loads(key_share_str)
                 keystore = ScryptKeystore.from_json(key_share).decrypt(keystore_password)
@@ -323,9 +329,9 @@ def _update_db(
             progressbar.update(1)
 
     database = Database(
-        db_url=str(db_url),
+        db_url=str(remote_db_url),
     )
-    encryptor = Encryptor(db_encrypt_key)
+    encryptor = Encryptor(remote_db_key)
 
     database_records = _encrypt_private_keys(
         private_keys=private_keys,

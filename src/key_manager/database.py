@@ -108,6 +108,18 @@ class Database:
                     for row in rows
                 ]
 
+    def fetch_all_public_keys(self) -> list[HexStr]:
+        with _get_db_connection(self.db_url) as conn:
+            with conn.cursor() as cur:
+                cur.execute('SELECT public_key FROM keys')
+                rows = cur.fetchall()
+                return [row[0] for row in rows]
+
+    def delete_keys_by_public_key(self, public_keys: list[HexStr]) -> None:
+        with _get_db_connection(self.db_url) as conn:
+            with conn.cursor() as cur:
+                execute_values(cur, 'DELETE FROM keys WHERE public_key = ANY(%s)', (public_keys,))
+
     def fetch_configs(self) -> list[DatabaseConfigRecord]:
         with _get_db_connection(self.db_url) as conn:
             with conn.cursor() as cur:
