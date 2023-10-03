@@ -117,8 +117,8 @@ async def collect_healthy_oracles() -> list:
 
     healthy_oracles = []
     for result in results:
-        if isinstance(result, BaseException):
-            logger.error(result)
+        if isinstance(result, Exception):
+            logger.error(repr(result))
             continue
 
         if result:
@@ -202,8 +202,9 @@ async def startup_checks():
     healthy_oracles = await collect_healthy_oracles()
     logger.info('Connected to oracles at %s', ', '.join(healthy_oracles))
 
-    logger.info('Checking metrics server...')
-    check_metrics_port()
+    if settings.enable_metrics:
+        logger.info('Checking metrics server...')
+        check_metrics_port()
 
     logger.info('Checking deposit data file...')
     await wait_for_deposit_data_file()

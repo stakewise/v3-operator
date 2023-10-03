@@ -47,6 +47,7 @@ class ApprovalRequest:
     deadline: int
     proof: list[HexStr]
     proof_flags: list[bool]
+    proof_indexes: list[int]
 
 
 @dataclass

@@ -33,6 +33,7 @@ class Settings(metaclass=Singleton):
 
     harvest_vault: bool
     verbose: bool
+    enable_metrics: bool
     metrics_host: str
     metrics_port: int
     deposit_data_file: Path
@@ -41,6 +42,9 @@ class Settings(metaclass=Singleton):
     keystores_password_file: Path
     remote_signer_config_file: Path
     remote_signer_url: str | None
+    hashi_vault_key_path: str | None
+    hashi_vault_url: str | None
+    hashi_vault_token: str | None
     hot_wallet_file: Path
     hot_wallet_password_file: Path
     max_fee_per_gas_gwei: int
@@ -61,6 +65,7 @@ class Settings(metaclass=Singleton):
         execution_endpoints: str = '',
         harvest_vault: bool = False,
         verbose: bool = False,
+        enable_metrics: bool = False,
         metrics_port: int = DEFAULT_METRICS_PORT,
         metrics_host: str = DEFAULT_METRICS_HOST,
         max_fee_per_gas_gwei: int = DEFAULT_MAX_FEE_PER_GAS_GWEI,
@@ -69,6 +74,9 @@ class Settings(metaclass=Singleton):
         keystores_password_file: str | None = None,
         remote_signer_config_file: str | None = None,
         remote_signer_url: str | None = None,
+        hashi_vault_key_path: str | None = None,
+        hashi_vault_url: str | None = None,
+        hashi_vault_token: str | None = None,
         hot_wallet_file: str | None = None,
         hot_wallet_password_file: str | None = None,
         database_dir: str | None = None,
@@ -82,6 +90,7 @@ class Settings(metaclass=Singleton):
         self.execution_endpoints = [node.strip() for node in execution_endpoints.split(',')]
         self.harvest_vault = harvest_vault
         self.verbose = verbose
+        self.enable_metrics = enable_metrics
         self.metrics_host = metrics_host
         self.metrics_port = metrics_port
         self.max_fee_per_gas_gwei = max_fee_per_gas_gwei
@@ -110,6 +119,11 @@ class Settings(metaclass=Singleton):
             else vault_dir / 'remote_signer_config.json'
         )
         self.remote_signer_url = remote_signer_url
+
+        # hashi vault configuration
+        self.hashi_vault_url = hashi_vault_url
+        self.hashi_vault_key_path = hashi_vault_key_path
+        self.hashi_vault_token = hashi_vault_token
 
         # hot wallet
         self.hot_wallet_file = (
@@ -165,3 +179,11 @@ DEFAULT_RETRY_TIME = 60
 
 # Remote signer timeout
 REMOTE_SIGNER_TIMEOUT = 10
+
+# Hashi vault timeout
+HASHI_VAULT_TIMEOUT = 10
+
+# Oracles signature update sync (10 minutes)
+ORACLES_SIGNATURE_UPDATE_SYNC_TIMEOUT = 600
+# How often to pull update for oracle signature update (every minute)
+ORACLE_SIGNATURE_UPDATE_SYNC_DELAY = 60

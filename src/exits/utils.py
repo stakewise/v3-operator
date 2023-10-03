@@ -10,8 +10,14 @@ from eth_typing import ChecksumAddress
 from sw_utils.decorators import retry_aiohttp_errors
 from web3 import Web3
 
-from src.common.typings import OracleApproval, Oracles
-from src.config.settings import DEFAULT_RETRY_TIME, UPDATE_SIGNATURES_URL_PATH
+from src.common.typings import OracleApproval, Oracles, OraclesApproval
+from src.common.utils import process_oracles_approvals
+from src.config.settings import (
+    DEFAULT_RETRY_TIME,
+    OUTDATED_SIGNATURES_URL_PATH,
+    UPDATE_SIGNATURES_URL_PATH,
+    settings,
+)
 from src.exits.typings import SignatureRotationRequest
 
 logger = logging.getLogger(__name__)
@@ -19,32 +25,25 @@ logger = logging.getLogger(__name__)
 
 async def send_signature_rotation_requests(
     oracles: Oracles, request: SignatureRotationRequest
-) -> tuple[bytes, str]:
+) -> OraclesApproval:
     """Requests exit signature rotation from all oracles."""
     payload = dataclasses.asdict(request)
     endpoints = list(zip(oracles.addresses, oracles.endpoints))
     random.shuffle(endpoints)
 
-    ipfs_hash = None
-    responses: dict[ChecksumAddress, bytes] = {}
+    approvals: dict[ChecksumAddress, OracleApproval] = {}
     async with aiohttp.ClientSession() as session:
         for address, replicas in endpoints:
-            response = await send_signature_rotation_request_to_replicas(session, replicas, payload)
-            if ipfs_hash is None:
-                ipfs_hash = response.ipfs_hash
-            elif ipfs_hash != response.ipfs_hash:
-                raise ValueError('Different oracles ipfs hashes for signature rotation request')
+            try:
+                response = await send_signature_rotation_request_to_replicas(
+                    session=session, replicas=replicas, payload=payload
+                )
+            except Exception as e:
+                logger.error(repr(e))
+                continue
+            approvals[address] = response
 
-            responses[address] = response.signature
-
-    if ipfs_hash is None:
-        raise RuntimeError('No oracles to get signature rotation from')
-
-    signatures = b''
-    for address in sorted(responses.keys()):
-        signatures += responses[address]
-
-    return signatures, ipfs_hash
+    return process_oracles_approvals(approvals, oracles.validators_threshold)
 
 
 # pylint: disable=duplicate-code
@@ -83,5 +82,29 @@ async def send_signature_rotation_request(
         data = await response.json()
 
     return OracleApproval(
-        ipfs_hash=data['ipfs_hash'], signature=Web3.to_bytes(hexstr=data['signature'])
+        ipfs_hash=data['ipfs_hash'],
+        signature=Web3.to_bytes(hexstr=data['signature']),
+        deadline=data['deadline'],
     )
+
+
+@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
+async def get_oracle_outdated_signatures_response(oracle_endpoint: str) -> dict:
+    """
+    :param oracle_endpoint:
+    :return: Example response
+    ```
+    {
+        "exit_signature_block_number": 100,
+        "validators": [{"index": 1}, ...]
+    }
+    ```
+    """
+    path = OUTDATED_SIGNATURES_URL_PATH.format(vault=settings.vault)
+    url = urljoin(oracle_endpoint, path)
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url=url) as response:
+            response.raise_for_status()
+            data = await response.json()
+    return data

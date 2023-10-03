@@ -19,7 +19,8 @@ from sw_utils.decorators import retry_aiohttp_errors
 from web3 import Web3
 
 from src.common.contracts import validators_registry_contract
-from src.common.typings import OracleApproval, Oracles
+from src.common.typings import OracleApproval, Oracles, OraclesApproval
+from src.common.utils import process_oracles_approvals
 from src.config.settings import DEFAULT_RETRY_TIME, ORACLES_VALIDATORS_TIMEOUT, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import (
@@ -41,13 +42,11 @@ from src.validators.typings import (
 logger = logging.getLogger(__name__)
 
 
-async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> tuple[bytes, str]:
+async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> OraclesApproval:
     """Requests approval from all oracles."""
     payload = dataclasses.asdict(request)
     endpoints = list(zip(oracles.addresses, oracles.endpoints))
 
-    ipfs_hashes = []
-    responses: dict[ChecksumAddress, bytes] = {}
     async with ClientSession(timeout=ClientTimeout(ORACLES_VALIDATORS_TIMEOUT)) as session:
         results = await asyncio.gather(
             *[
@@ -59,27 +58,15 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
             return_exceptions=True,
         )
 
+    approvals: dict[ChecksumAddress, OracleApproval] = {}
     for address, result in zip(oracles.addresses, results):
         if isinstance(result, Exception):
-            logger.error(result)
+            logger.error(repr(result))
             continue
 
-        ipfs_hashes.append(result.ipfs_hash)
-        responses[address] = result.signature
+        approvals[address] = result
 
-    if not ipfs_hashes:
-        raise RuntimeError('No oracles to get approval from')
-
-    if len(ipfs_hashes) < oracles.validators_threshold:
-        raise RuntimeError('Not enough oracles to get approval from')
-
-    if len(set(ipfs_hashes)) != 1:
-        raise ValueError('Different oracles IPFS hashes for approval request.')
-
-    signatures = b''
-    for address in sorted(responses.keys())[: oracles.validators_threshold]:
-        signatures += responses[address]
-    return signatures, ipfs_hashes[0]
+    return process_oracles_approvals(approvals, oracles.validators_threshold)
 
 
 # pylint: disable=duplicate-code
@@ -131,6 +118,7 @@ async def send_approval_request(
     return OracleApproval(
         ipfs_hash=data['ipfs_hash'],
         signature=Web3.to_bytes(hexstr=data['signature']),
+        deadline=data['deadline'],
     )
 
 
