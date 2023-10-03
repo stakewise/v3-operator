@@ -308,7 +308,7 @@ def _update_db(
                     fg='red',
                 )
 
-    with click.progressbar(
+    with click.progressbar(  # type: ignore
         length=len(key_shares['keystores']),  # type: ignore
         label='Loading key shares...\t\t',
         show_percent=False,
