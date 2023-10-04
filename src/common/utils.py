@@ -46,10 +46,12 @@ def log_verbose(e: Exception):
 
 async def wait_block_finalization(block_number: BlockNumber | None = None):
     block_number = block_number or await execution_client.eth.get_block_number()
-    chain_head = None
     sleep_time = 0.0
-
-    while not chain_head or chain_head.execution_block < block_number:
+    chain_head = await consensus_client.get_chain_finalized_head(
+        settings.network_config.SLOTS_PER_EPOCH
+    )
+    while chain_head.execution_block < block_number:
+        logger.info('Waiting for block %d finalization...', block_number)
         await asyncio.sleep(sleep_time)
         start = time.time()
 

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import time
+from random import shuffle
 
 from eth_typing import BlockNumber, BLSPubkey
 from web3 import Web3
@@ -12,11 +13,7 @@ from src.common.execution import get_oracles
 from src.common.metrics import metrics
 from src.common.typings import Oracles
 from src.common.utils import get_current_timestamp, wait_block_finalization
-from src.config.settings import (
-    ORACLE_SIGNATURE_UPDATE_SYNC_DELAY,
-    ORACLES_SIGNATURE_UPDATE_SYNC_TIMEOUT,
-    settings,
-)
+from src.config.settings import settings
 from src.exits.consensus import get_validator_public_keys
 from src.exits.execution import submit_exit_signatures
 from src.exits.typings import SignatureRotationRequest
@@ -40,17 +37,9 @@ async def update_exit_signatures_periodically(
 ):
     while True:
         timer_start = time.time()
-
         try:
-            # Oracle may have lag if operator was stopped
-            # during `update_exit_signatures_periodically` process
-            # or need to wait for oracles sync.
-            # Wait oracles sync and choose random synced endpoint.
             oracles = await get_oracles()
-            synced_endpoint = await _get_synced_oracle_endpoint(oracles)
-            if not synced_endpoint:
-                raise RuntimeError('Oracles are not synced exit signatures, waiting...')
-            outdated_indexes = await _fetch_outdated_indexes(synced_endpoint)
+            outdated_indexes = await _fetch_outdated_indexes(oracles)
 
             if outdated_indexes:
                 await _update_exit_signatures(
@@ -59,7 +48,6 @@ async def update_exit_signatures_periodically(
                     oracles=oracles,
                     outdated_indexes=outdated_indexes,
                 )
-
         except Exception as e:
             logger.exception(e)
 
@@ -67,74 +55,23 @@ async def update_exit_signatures_periodically(
         await asyncio.sleep(float(settings.network_config.SECONDS_PER_BLOCK) - elapsed)
 
 
-async def _fetch_outdated_indexes(oracle_endpoint) -> list[int]:
-    response = await get_oracle_outdated_signatures_response(oracle_endpoint)
-    outdated_indexes = [val['index'] for val in response['validators']]
-
-    metrics.outdated_signatures.set(len(outdated_indexes))
-    return outdated_indexes
-
-
-async def _get_synced_oracle_endpoint(oracles: Oracles) -> str | None:
+async def _fetch_outdated_indexes(oracles) -> list[int]:
     last_event = await keeper_contract.get_exit_signatures_updated_event(vault=settings.vault)
     if not last_event:
-        return None
-    update_block = BlockNumber(last_event['blockNumber'])
+        update_block = None
+    else:
+        update_block = BlockNumber(last_event['blockNumber'])
+        await wait_block_finalization(update_block)
+    endpoints = [endpoint for replicas in oracles.endpoints for endpoint in replicas]
+    shuffle(endpoints)
 
-    logger.info('Waiting for block %d finalization...', update_block)
-    await wait_block_finalization(update_block)
-
-    pending = {
-        asyncio.create_task(
-            _wait_oracle_signature_update(
-                exit_signature_update_block=update_block,
-                oracle_endpoint=endpoint,
-                max_time=ORACLES_SIGNATURE_UPDATE_SYNC_TIMEOUT,
-            )
-        )
-        for replicas in oracles.endpoints
-        for endpoint in replicas
-    }
-    synced_endpoint = None
-    while pending:
-        done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
-        for task in done:
-            if task.cancelled():
-                continue
-            if task.exception():
-                logger.error(task.exception())
-                continue
-            synced_endpoint = task.result()
-            for pending_task in pending:
-                pending_task.cancel()
-    logger.info('Oracles have fetched exit signatures update')
-    return synced_endpoint
-
-
-async def _wait_oracle_signature_update(
-    exit_signature_update_block: BlockNumber, oracle_endpoint: str, max_time: int | float = 0
-) -> str:
-    """
-    Wait the oracle `oracle_endpoint` reads and processes `ExitSignatureUpdate` event
-    in the block `exit_signature_update_block`.
-    """
-    elapsed = 0.0
-    start_time = time.time()
-
-    while elapsed <= max_time:
-        oracle_block = await _fetch_exit_signature_block(oracle_endpoint)
-        if oracle_block and oracle_block >= exit_signature_update_block:
-            return oracle_endpoint
-
-        logger.info(
-            'Waiting for %s to sync block %d...', oracle_endpoint, exit_signature_update_block
-        )
-        await asyncio.sleep(ORACLE_SIGNATURE_UPDATE_SYNC_DELAY)
-        elapsed = time.time() - start_time
-
-    raise asyncio.TimeoutError(
-        f'Timeout exceeded for wait_oracle_signature_block_update for {oracle_endpoint}'
-    )
+    for oracle_endpoint in endpoints:
+        response = await get_oracle_outdated_signatures_response(oracle_endpoint)
+        if not update_block or response['exit_signature_block_number'] >= update_block:
+            outdated_indexes = [val['index'] for val in response['validators']]
+            metrics.outdated_signatures.set(len(outdated_indexes))
+            return outdated_indexes
+    raise RuntimeError('Oracles are not synced exit signatures, waiting...')
 
 
 async def _update_exit_signatures(
