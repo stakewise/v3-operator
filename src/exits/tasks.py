@@ -1,6 +1,4 @@
-import asyncio
 import logging
-import time
 from random import shuffle
 
 from eth_typing import BlockNumber, BLSPubkey
@@ -12,7 +10,7 @@ from src.common.contracts import keeper_contract
 from src.common.execution import get_oracles
 from src.common.metrics import metrics
 from src.common.typings import Oracles
-from src.common.utils import get_current_timestamp, wait_block_finalization
+from src.common.utils import get_current_timestamp, is_block_synced
 from src.config.settings import settings
 from src.exits.consensus import get_validator_public_keys
 from src.exits.execution import submit_exit_signatures
@@ -35,33 +33,29 @@ async def update_exit_signatures_periodically(
     keystores: Keystores,
     remote_signer_config: RemoteSignerConfiguration | None,
 ):
-    while True:
-        timer_start = time.time()
-        try:
-            oracles = await get_oracles()
-            outdated_indexes = await _fetch_outdated_indexes(oracles)
-
-            if outdated_indexes:
-                await _update_exit_signatures(
-                    keystores=keystores,
-                    remote_signer_config=remote_signer_config,
-                    oracles=oracles,
-                    outdated_indexes=outdated_indexes,
-                )
-        except Exception as e:
-            logger.exception(e)
-
-        elapsed = time.time() - timer_start
-        await asyncio.sleep(float(settings.network_config.SECONDS_PER_BLOCK) - elapsed)
+    oracles = await get_oracles()
+    update_block = await _fetch_last_update_block()
+    if update_block and await is_block_synced(update_block):
+        logger.info('Waiting for block %d finalization...', update_block)
+        return
+    outdated_indexes = await _fetch_outdated_indexes(oracles, update_block)
+    if outdated_indexes:
+        await _update_exit_signatures(
+            keystores=keystores,
+            remote_signer_config=remote_signer_config,
+            oracles=oracles,
+            outdated_indexes=outdated_indexes,
+        )
 
 
-async def _fetch_outdated_indexes(oracles) -> list[int]:
+async def _fetch_last_update_block() -> BlockNumber | None:
     last_event = await keeper_contract.get_exit_signatures_updated_event(vault=settings.vault)
-    if not last_event:
-        update_block = None
-    else:
-        update_block = BlockNumber(last_event['blockNumber'])
-        await wait_block_finalization(update_block)
+    if last_event:
+        return BlockNumber(last_event['blockNumber'])
+    return None
+
+
+async def _fetch_outdated_indexes(oracles: Oracles, update_block: BlockNumber | None) -> list[int]:
     endpoints = [endpoint for replicas in oracles.endpoints for endpoint in replicas]
     shuffle(endpoints)
 
