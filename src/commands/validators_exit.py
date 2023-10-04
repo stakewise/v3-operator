@@ -13,7 +13,7 @@ from sw_utils.typings import ConsensusFork
 from web3 import Web3
 
 from src.common.clients import consensus_client
-from src.common.utils import log_verbose
+from src.common.utils import format_error, log_verbose
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
 from src.config.settings import AVAILABLE_NETWORKS, NETWORKS, settings
@@ -199,7 +199,10 @@ async def main(count: int | None) -> None:
             # Validator status is updated in CL after some delay.
             # Status may be active in CL although validator has started exit process.
             # CL will return status 400 for exit request in this case.
-            log_verbose(e)
+            click.secho(
+                f'{format_error(e)} for validator_index {exit_keystore.index}',
+                fg='yellow',
+            )
             continue
 
         exited_indexes.append(exit_keystore.index)
