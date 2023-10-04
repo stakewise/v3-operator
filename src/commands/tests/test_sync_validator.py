@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 from click.testing import CliRunner
 
-from src.commands.sync_validator import sync_validator
+from src.commands.remote_db_validator import remote_db_validator
 
 from .factories import faker
 
@@ -34,15 +34,15 @@ class TestSyncValidator(unittest.TestCase):
         ]
 
         with runner.isolated_filesystem(), patch(
-            'src.commands.sync_validator.check_db_connection'
+            'src.commands.remote_db_validator.check_db_connection'
         ), patch(
-            'src.commands.sync_validator.Database.fetch_public_keys_count',
+            'src.commands.remote_db_validator.Database.fetch_public_keys_count',
             return_value=keys_count,
         ), patch(
-            'src.commands.sync_validator.Database.fetch_public_keys_by_range',
+            'src.commands.remote_db_validator.Database.fetch_public_keys_by_range',
             return_value=public_keys[400:600],
         ):
-            result = runner.invoke(sync_validator, args)
+            result = runner.invoke(remote_db_validator, args)
             assert result.exit_code == 0
             output = '''
 Done. Generated configs with 200 keys for validator #3.

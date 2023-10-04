@@ -38,7 +38,7 @@ DECRYPTION_KEY_ENV = 'DECRYPTION_KEY'
 )
 @click.command(help='Synchronizes web3signer private keys from the database')
 # pylint: disable-next=too-many-locals
-def sync_web3signer(db_url: str, output_dir: str, decryption_key_env: str) -> None:
+def remote_db_web3signer(db_url: str, output_dir: str, decryption_key_env: str) -> None:
     """
     The command is running by the init container in web3signer pods.
     Fetch and decrypt keys for web3signer and store them as keypairs in the output_dir.

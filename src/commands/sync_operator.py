@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import click
@@ -37,7 +38,7 @@ def sync_operator(
     for config in configs:
         config_path = Path(output_dir) / config.name
         with config_path.open('w', encoding='utf-8') as f:
-            f.write(config.data)
+            json.dump(config.data, f)
 
     click.secho(
         f'Done. Saved {len(configs)} configuration files.',

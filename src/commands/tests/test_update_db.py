@@ -14,7 +14,7 @@ from staking_deposit.key_handling.key_derivation.tree import (
 )
 from web3 import Web3
 
-from src.commands.sync_web3signer import sync_web3signer
+from src.commands.remote_db_web3signer import remote_db_web3signer
 from src.common.contrib import bytes_to_str
 from src.key_manager.encryptor import Encryptor
 from src.key_manager.typings import DatabaseKeyRecord
@@ -47,14 +47,14 @@ class TestSyncWeb3signer(unittest.TestCase):
         ]
 
         with runner.isolated_filesystem(), patch(
-            'src.commands.sync_web3signer.check_db_connection'
+            'src.commands.remote_db_web3signer.check_db_connection'
         ), patch(
-            'src.commands.sync_web3signer.Database.fetch_keys',
+            'src.commands.remote_db_web3signer.Database.fetch_keys',
             return_value=db_records,
         ), patch.dict(
             os.environ, {'DECRYPT_ENV': encryptor.str_key}
         ):
-            result = runner.invoke(sync_web3signer, args)
+            result = runner.invoke(remote_db_web3signer, args)
             assert result.exit_code == 0
             output = f'Web3Signer now uses {len(db_records)} private keys.\n'
             assert output.strip() == result.output.strip()
@@ -69,7 +69,7 @@ type: file-raw"""
                     assert f.read() == s
 
             # second run
-            result = runner.invoke(sync_web3signer, args)
+            result = runner.invoke(remote_db_web3signer, args)
 
             assert result.exit_code == 0
             output = 'Keys already synced to the last version.\n'

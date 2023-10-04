@@ -62,7 +62,7 @@ PROPOSER_CONFIG_FILENAME = 'proposer_config.json'
     'Prysm, and Teku clients to sign data using keys from database.'
 )
 # pylint: disable-next=too-many-arguments,too-many-locals
-def sync_validator(
+def remote_db_validator(
     validator_index: int,
     total_validators: int,
     db_url: str,
