@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import random
 import time
 
 from eth_typing import BlockNumber, BLSPubkey
@@ -39,21 +38,19 @@ async def update_exit_signatures_periodically(
     keystores: Keystores,
     remote_signer_config: RemoteSignerConfiguration | None,
 ):
-    # Oracle may have lag if operator was stopped
-    # during `update_exit_signatures_periodically` process.
-    # Wait oracles sync.
-    oracles = await get_oracles()
-    await _wait_oracles_signature_update(oracles)
-
     while True:
         timer_start = time.time()
 
         try:
+            # Oracle may have lag if operator was stopped
+            # during `update_exit_signatures_periodically` process
+            # or need to wait for oracles sync.
+            # Wait oracles sync and choose random synced endpoint.
             oracles = await get_oracles()
-
-            oracle_replicas = random.choice(oracles.endpoints)  # nosec
-            oracle_endpoint = random.choice(oracle_replicas)  # nosec
-            outdated_indexes = await _fetch_outdated_indexes(oracle_endpoint)
+            synced_endpoint = await _get_synced_oracle_endpoint(oracles)
+            if not synced_endpoint:
+                raise RuntimeError('Oracles are not synced exit signatures, waiting...')
+            outdated_indexes = await _fetch_outdated_indexes(synced_endpoint)
 
             if outdated_indexes:
                 await _update_exit_signatures(
@@ -63,8 +60,6 @@ async def update_exit_signatures_periodically(
                     outdated_indexes=outdated_indexes,
                 )
 
-                # Wait oracles sync.
-                await _wait_oracles_signature_update(oracles)
         except Exception as e:
             logger.exception(e)
 
@@ -80,16 +75,16 @@ async def _fetch_outdated_indexes(oracle_endpoint) -> list[int]:
     return outdated_indexes
 
 
-async def _wait_oracles_signature_update(oracles: Oracles) -> None:
+async def _get_synced_oracle_endpoint(oracles: Oracles) -> str | None:
     last_event = await keeper_contract.get_exit_signatures_updated_event(vault=settings.vault)
     if not last_event:
-        return
+        return None
     update_block = BlockNumber(last_event['blockNumber'])
 
     logger.info('Waiting for block %d finalization...', update_block)
     await wait_block_finalization(update_block)
 
-    oracle_tasks = {
+    pending = {
         asyncio.create_task(
             _wait_oracle_signature_update(
                 exit_signature_update_block=update_block,
@@ -100,17 +95,25 @@ async def _wait_oracles_signature_update(oracles: Oracles) -> None:
         for replicas in oracles.endpoints
         for endpoint in replicas
     }
-    while oracle_tasks:
-        done, oracle_tasks = await asyncio.wait(oracle_tasks, return_when=asyncio.FIRST_COMPLETED)
-        if done:
-            for pending_task in oracle_tasks:
+    synced_endpoint = None
+    while pending:
+        done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+        for task in done:
+            if task.cancelled():
+                continue
+            if task.exception():
+                logger.error(task.exception())
+                continue
+            synced_endpoint = task.result()
+            for pending_task in pending:
                 pending_task.cancel()
     logger.info('Oracles have fetched exit signatures update')
+    return synced_endpoint
 
 
 async def _wait_oracle_signature_update(
     exit_signature_update_block: BlockNumber, oracle_endpoint: str, max_time: int | float = 0
-) -> None:
+) -> str:
     """
     Wait the oracle `oracle_endpoint` reads and processes `ExitSignatureUpdate` event
     in the block `exit_signature_update_block`.
@@ -121,7 +124,7 @@ async def _wait_oracle_signature_update(
     while elapsed <= max_time:
         oracle_block = await _fetch_exit_signature_block(oracle_endpoint)
         if oracle_block and oracle_block >= exit_signature_update_block:
-            return
+            return oracle_endpoint
 
         logger.info(
             'Waiting for %s to sync block %d...', oracle_endpoint, exit_signature_update_block
