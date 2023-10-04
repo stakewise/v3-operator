@@ -62,7 +62,10 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
     for address, result in zip(oracles.addresses, results):
         if isinstance(result, Exception):
             logger.error(
-                'All endpoints failed for oracle %s. Last error: %s', address, format_error(result)
+                'All endpoints for oracle %s failed to sign validators approval request. '
+                'Last error: %s',
+                address,
+                format_error(result),
             )
             continue
 

@@ -11,7 +11,7 @@ from sw_utils.decorators import retry_aiohttp_errors
 from web3 import Web3
 
 from src.common.typings import OracleApproval, Oracles, OraclesApproval
-from src.common.utils import log_verbose, process_oracles_approvals
+from src.common.utils import format_error, process_oracles_approvals
 from src.config.settings import (
     DEFAULT_RETRY_TIME,
     OUTDATED_SIGNATURES_URL_PATH,
@@ -39,7 +39,12 @@ async def send_signature_rotation_requests(
                     session=session, replicas=replicas, payload=payload
                 )
             except Exception as e:
-                log_verbose(e)
+                logger.error(
+                    'All endpoints for oracle %s failed to sign signature rotation request. '
+                    'Last error: %s',
+                    address,
+                    format_error(e),
+                )
                 continue
             approvals[address] = response
 
@@ -60,7 +65,7 @@ async def send_signature_rotation_request_to_replicas(
         try:
             return await send_signature_rotation_request(session, endpoint, payload)
         except (ClientError, asyncio.TimeoutError) as e:
-            log_verbose(e)
+            logger.warning('%s for endpoint %s', format_error(e), endpoint)
             last_error = e
 
     if last_error:
