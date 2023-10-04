@@ -46,7 +46,7 @@ async def is_block_synced(block_number: BlockNumber):
     chain_head = await consensus_client.get_chain_finalized_head(
         settings.network_config.SLOTS_PER_EPOCH
     )
-    return chain_head.execution_block < block_number
+    return chain_head.execution_block >= block_number
 
 
 def get_current_timestamp() -> Timestamp:

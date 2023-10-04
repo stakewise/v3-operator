@@ -35,7 +35,7 @@ async def update_exit_signatures_periodically(
 ):
     oracles = await get_oracles()
     update_block = await _fetch_last_update_block()
-    if update_block and await is_block_synced(update_block):
+    if update_block and not await is_block_synced(update_block):
         logger.info('Waiting for block %d finalization...', update_block)
         return
     outdated_indexes = await _fetch_outdated_indexes(oracles, update_block)
