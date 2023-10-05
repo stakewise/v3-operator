@@ -42,7 +42,7 @@ def log_verbose(e: Exception):
         logger.error(repr(e))
 
 
-async def is_block_synced(block_number: BlockNumber) -> bool:
+async def is_block_finalized(block_number: BlockNumber) -> bool:
     chain_head = await consensus_client.get_chain_finalized_head(
         settings.network_config.SLOTS_PER_EPOCH
     )

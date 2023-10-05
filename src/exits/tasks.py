@@ -10,7 +10,7 @@ from src.common.contracts import keeper_contract
 from src.common.execution import get_oracles
 from src.common.metrics import metrics
 from src.common.typings import Oracles
-from src.common.utils import get_current_timestamp, is_block_synced
+from src.common.utils import get_current_timestamp, is_block_finalized
 from src.config.settings import settings
 from src.exits.consensus import get_validator_public_keys
 from src.exits.execution import submit_exit_signatures
@@ -35,8 +35,8 @@ async def update_exit_signatures_periodically(
 ):
     oracles = await get_oracles()
     update_block = await _fetch_last_update_block()
-    if update_block and not await is_block_synced(update_block):
-        logger.info('Waiting for block %d finalization...', update_block)
+    if update_block and not await is_block_finalized(update_block):
+        logger.info('Signatures update block %d has not finalized yet', update_block)
         return
     outdated_indexes = await _fetch_outdated_indexes(oracles, update_block)
     if outdated_indexes:
@@ -65,7 +65,7 @@ async def _fetch_outdated_indexes(oracles: Oracles, update_block: BlockNumber | 
             outdated_indexes = [val['index'] for val in response['validators']]
             metrics.outdated_signatures.set(len(outdated_indexes))
             return outdated_indexes
-    raise RuntimeError('Oracles are not synced exit signatures, waiting...')
+    raise RuntimeError('Oracles have not synced exit signatures yet')
 
 
 async def _update_exit_signatures(
