@@ -298,14 +298,6 @@ async def main() -> None:
     if settings.enable_metrics:
         await metrics_server()
 
-    # process outdated exit signatures
-    asyncio.create_task(
-        update_exit_signatures_periodically(
-            keystores=keystores,
-            remote_signer_config=remote_signer_config,
-        )
-    )
-
     logger.info('Started operator service')
     with InterruptHandler() as interrupt_handler:
         while not interrupt_handler.exit:
@@ -333,6 +325,11 @@ async def main() -> None:
                 if settings.harvest_vault:
                     await harvest_vault_task()
 
+                # process outdated exit signatures
+                await update_exit_signatures_periodically(
+                    keystores=keystores,
+                    remote_signer_config=remote_signer_config,
+                )
                 # check balance
                 await check_hot_wallet_balance()
 

@@ -1,6 +1,4 @@
-import asyncio
 import logging
-import time
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -10,7 +8,7 @@ from eth_typing import BlockNumber, ChecksumAddress
 from web3 import Web3
 from web3.types import Timestamp, Wei
 
-from src.common.clients import consensus_client, execution_client
+from src.common.clients import consensus_client
 from src.common.exceptions import (
     InvalidOraclesRequestError,
     NotEnoughOracleApprovalsError,
@@ -58,21 +56,11 @@ def format_error(e: Exception) -> str:
     return repr(e)
 
 
-async def wait_block_finalization(block_number: BlockNumber | None = None):
-    block_number = block_number or await execution_client.eth.get_block_number()
-    chain_head = None
-    sleep_time = 0.0
-
-    while not chain_head or chain_head.execution_block < block_number:
-        await asyncio.sleep(sleep_time)
-        start = time.time()
-
-        chain_head = await consensus_client.get_chain_finalized_head(
-            settings.network_config.SLOTS_PER_EPOCH
-        )
-
-        elapsed = time.time() - start
-        sleep_time = float(settings.network_config.SECONDS_PER_BLOCK) - elapsed
+async def is_block_finalized(block_number: BlockNumber) -> bool:
+    chain_head = await consensus_client.get_chain_finalized_head(
+        settings.network_config.SLOTS_PER_EPOCH
+    )
+    return chain_head.execution_block >= block_number
 
 
 def get_current_timestamp() -> Timestamp:

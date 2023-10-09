@@ -1,49 +1,18 @@
-import asyncio
 from pathlib import Path
 from random import randint
 from typing import Callable
 from unittest import mock
 
 import pytest
-from eth_typing import BlockNumber, ChecksumAddress
+from eth_typing import ChecksumAddress
 from sw_utils.typings import ConsensusFork
 
 from src.common.typings import Oracles
 from src.common.utils import get_current_timestamp
 from src.config.settings import settings
-from src.exits.tasks import _get_oracles_request, _wait_oracle_signature_update
+from src.exits.tasks import _get_oracles_request
 from src.validators.signing.remote import RemoteSignerConfiguration
 from src.validators.typings import ExitSignatureShards, Keystores
-
-
-@pytest.mark.usefixtures('fake_settings')
-class TestWaitOracleSignatureUpdate:
-    async def test_normal(self):
-        update_block = BlockNumber(3)
-        with (
-            mock.patch('asyncio.sleep'),
-            mock.patch('src.exits.tasks.time.time', return_value=100),
-            mock.patch(
-                'src.exits.tasks._fetch_exit_signature_block', side_effect=[None, 1, 2, 3]
-            ) as fetch_mock,
-        ):
-            await _wait_oracle_signature_update(update_block, 'http://oracle', max_time=5)
-
-        assert fetch_mock.call_count == 4
-
-    async def test_timeout(self):
-        update_block = BlockNumber(3)
-        with (
-            mock.patch('asyncio.sleep'),
-            mock.patch('src.exits.tasks.time.time', side_effect=[100, 103, 106]),
-            mock.patch(
-                'src.exits.tasks._fetch_exit_signature_block', return_value=None
-            ) as fetch_mock,
-            pytest.raises(asyncio.TimeoutError),
-        ):
-            await _wait_oracle_signature_update(update_block, 'http://oracle', max_time=5)
-
-        assert fetch_mock.call_count == 2
 
 
 @pytest.mark.usefixtures('fake_settings')
