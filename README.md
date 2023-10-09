@@ -65,7 +65,7 @@ the bottom of the page.
 Create the vault config and mnemonic used to derive validator keys.
 
 ```bash
-./operator init
+./v3-operator init
 ```
 
 ```sh
@@ -103,7 +103,7 @@ It will allow you to restore the keys in case the Vault will get corrupted or lo
 Creates deposit data and validator keystores for operator service:
 
 ```bash
-./operator create-keys
+./v3-operator create-keys
 ```
 
 ```sh
@@ -143,7 +143,7 @@ wallet for the gas expenses. The validator registration costs around 0.01 ETH wi
 eye on your wallet balance, otherwise validators will stop registering.
 
 ```bash
-./operator create-wallet
+./v3-operator create-wallet
 ```
 
 ```sh
@@ -194,7 +194,7 @@ See [releases page](https://github.com/stakewise/v3-operator/releases) to downlo
 binary file. Start the binary with the following command:
 
 ```sh
-./operator start --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468  --consensus-endpoints=https://consensus.com --execution-endpoints=https://execution.com
+./v3-operator start --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468  --consensus-endpoints=https://consensus.com --execution-endpoints=https://execution.com
 ```
 
 Or you can use environment variables. Check [.env.example](.env.example) file for details
@@ -266,7 +266,7 @@ before running the operator.
 
 ```sh
 export $(grep -v '^#' .env | xargs)
-./operator start
+./v3-operator start
 ```
 
 ## Remote signer
@@ -304,7 +304,7 @@ Notes:
   `--remove-existing-keys` flag.
 
 ```bash
-./operator remote-signer-setup \
+./v3-operator remote-signer-setup \
  --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
  --remote-signer-url=http://signer:9000
 ```
@@ -329,13 +329,29 @@ Done. Successfully configured operator to use remote signer for 1 public key(s)!
 - `--execution-endpoints` - Comma separated list of API endpoints for execution nodes.
 - `--verbose` - Enable debug mode. Default is false.
 
+#### `remote-signer-setup` upload keystores to web3signer
+
+If `--remote-db-url` flag sepcified the command encrypts and loads validator keys from keystore files into the database
+
+```bash
+./v3-operator remote-signer-setup --remote-db-url postgresql://postgres:postgres@localhost:5432/web3signer --vaul=0x3320ad928c20187602a2b2c04eeaa813fa899468
+Loading keystores...              [####################################]  10/10
+Encrypting database keys...
+Generated 10 validator keys, upload them to the database? [Y/n]: Y
+The database contains 10 validator keys.
+Save decryption key: '<DECRYPTION KEYS>'
+```
+
+**NB! You must store the decryption key in a secure place.
+It will allow you to upload new keystores in the existing database**
+
 ### Running the operator
 
 Provide the operator with the URL to your remote signer instance
 using the `--remote-signer-url` flag:
 
 ```bash
-./operator start --remote-signer-url=http://remote-signer:9000 ...
+./v3-operator start --remote-signer-url=http://remote-signer:9000 ...
 ```
 
 You should see a message similar to this one after starting the operator:
@@ -390,7 +406,7 @@ will prefer local keystores.
 Performs a voluntary exit for active vault validators.
 
 ```bash
-./operator validators-exit
+./v3-operator validators-exit
 ```
 
 ```sh
@@ -421,7 +437,7 @@ by using the following command:
 1. Generate deposit data validators root for your vault.
 
     ```bash
-    ./operator get-validators-root
+    ./v3-operator get-validators-root
     ```
 
     ```sh
@@ -445,7 +461,7 @@ by using the following command:
 ### Recover vault data directory and keystores
 
 ```bash
-./operator recover
+./v3-operator recover
 ```
 
 ```sh
@@ -474,38 +490,14 @@ Keystores for vault {vault} successfully recovered to {keystores_dir}
 
 ### Web3Signer infrastructure commands
 
-#### 1. Update database
-
-The command encrypts and loads validator keys from keystore files into the database
-
-```bash
-./v3-operator update-db --db-url postgresql://postgres:postgres@localhost:5432/web3signer --keystores-dir ./data/keystores --keystores-password-file ./data/keystores/password.txt
-Loading keystores...              [####################################]  10/10
-Encrypting database keys...
-Generated 10 validator keys, upload them to the database? [Y/n]: Y
-The database contains 10 validator keys.
-Save decryption key: '<DECRYPTION KEYS>'
-```
-
-##### update-db options
-
-- `--keystores-dir` - The directory with validator keys in the EIP-2335 standard. Defaults to ./data/keystores.
-- `--keystores-password-file` - The path to file with password for encrypting the keystores. Defaults to
-  ./data/keystores/password.txt.
-- `--db-url` - The database connection address.
-- `--encryption-key` - The key for encrypting database record. If you are upload new keystores use the same encryption
-  key.
-- `--no-confirm` - Skips confirmation messages when provided.
-
-**NB! You must store the decryption key in a secure place.
-It will allow you to upload new keystores in the existing database**
+#### 1. Upload keystores to web3signer. See `Remote signer setup` section
 
 #### 2. Sync validator configs
 
 Creates validator configuration files for Lighthouse, Prysm, and Teku clients to sign data using keys form database.
 
 ```bash
-./v3-operator sync-validator
+./v3-operator remote-db-validator
 Enter the recipient address for MEV & priority fees: 0xB31...1
 Enter the endpoint of the web3signer service: https://web3signer-example.com
 Enter the database connection string, ex. 'postgresql://username:pass@hostname/dbname': postgresql://postgres:postgres@localhost/web3signer
@@ -518,7 +510,7 @@ Signer keys for Teku\Prysm saved to data/configs/signer_keys.yml file.
 Proposer config for Teku\Prysm saved to data/configs/proposer_config.json file.
 ```
 
-##### sync-validator options
+##### remote-db-validator options
 
 - `--validator-index` - The validator index to generate the configuration files.
 - `--total-validators` - The total number of validators connected to the web3signer.
@@ -536,13 +528,13 @@ Fetch and decrypt keys for web3signer and store them as keypairs in the output_d
 Set `DECRYPTION_KEY` env, use value generated by `update-db` command
 
 ```bash
-./v3-operator sync-web3signer
+./v3-operator remote-db-web3signer
 Enter the folder where web3signer keystores will be saved: /data/web3signer
 Enter the database connection string, ex. 'postgresql://username:pass@hostname/dbname': postgresql://postgres:postgres@localhost/web3signer
 Web3Signer now uses 7 private keys.
 ```
 
-##### sync-web3signer options
+##### remote-db-web3signer options
 
 - `--db-url` - The database connection address.
 - `--output-dir` - The folder where Web3Signer keystores will be saved.
