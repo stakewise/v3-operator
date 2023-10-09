@@ -20,7 +20,7 @@ from web3 import Web3
 
 from src.common.contracts import validators_registry_contract
 from src.common.typings import OracleApproval, Oracles, OraclesApproval
-from src.common.utils import process_oracles_approvals
+from src.common.utils import format_error, process_oracles_approvals
 from src.config.settings import DEFAULT_RETRY_TIME, ORACLES_VALIDATORS_TIMEOUT, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import (
@@ -61,7 +61,12 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
     approvals: dict[ChecksumAddress, OracleApproval] = {}
     for address, result in zip(oracles.addresses, results):
         if isinstance(result, Exception):
-            logger.error(repr(result))
+            logger.error(
+                'All endpoints for oracle %s failed to sign validators approval request. '
+                'Last error: %s',
+                address,
+                format_error(result),
+            )
             continue
 
         approvals[address] = result
@@ -83,7 +88,7 @@ async def send_approval_request_to_replicas(
         try:
             return await send_approval_request(session, endpoint, payload)
         except (ClientError, asyncio.TimeoutError) as e:
-            logger.debug('%s for %s', repr(e), endpoint)
+            logger.warning('%s for endpoint %s', format_error(e), endpoint)
             last_error = e
 
     if last_error:

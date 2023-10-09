@@ -5,6 +5,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+import aiohttp
 from eth_typing import BlockNumber, ChecksumAddress
 from web3 import Web3
 from web3.types import Timestamp, Wei
@@ -41,7 +42,20 @@ def log_verbose(e: Exception):
     if settings.verbose:
         logger.exception(e)
     else:
-        logger.error(repr(e))
+        logger.error(format_error(e))
+
+
+def format_error(e: Exception) -> str:
+    if isinstance(e, aiohttp.ClientResponseError):
+        # repr(e) gives too much output
+        return (
+            f'ClientResponseError('
+            f'status={e.status}, '
+            f'message="{e.message}", '
+            f'url="{e.request_info.url}")'
+        )
+
+    return repr(e)
 
 
 async def wait_block_finalization(block_number: BlockNumber | None = None):
