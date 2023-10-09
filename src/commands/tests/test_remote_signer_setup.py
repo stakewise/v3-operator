@@ -98,8 +98,9 @@ class TestOperatorRemoteSignerSetup:
             assert len(shares) == oracle_count
 
         async with aiohttp.ClientSession() as session:
-            resp = await session.get(f'{settings.remote_signer_url}/api/v1/eth2/publicKeys')
-            pubkeys_remote_signer = set(await resp.json())
+            resp = await session.get(f'{settings.remote_signer_url}/eth/v1/keystores')
+            data = (await resp.json())['data']
+            pubkeys_remote_signer = {pubkey_dict.get('validating_pubkey') for pubkey_dict in data}
             assert len(pubkeys_remote_signer) == key_count * oracle_count
 
     @pytest.mark.usefixtures('_init_vault', 'mocked_remote_signer', 'mock_scrypt_keystore')
