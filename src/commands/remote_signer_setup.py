@@ -194,6 +194,7 @@ async def main(
 
     if not credentials:
         click.echo('Credentials list is empty')
+        return
 
     click.echo(
         f'Successfully generated {len(credentials)} key shares'
