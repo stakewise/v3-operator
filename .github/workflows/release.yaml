@@ -59,16 +59,19 @@ jobs:
               certUtil -hashfile $ZIP_FILE_NAME SHA256 | findstr /i /v "SHA256" | findstr /i /v "CertUtil" > $CHECKSUM_FILE_NAME_PASH
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.PYTHON_VERSION }}
 
       - name: Install Poetry
-        uses: Gr1N/setup-poetry@v8
+        uses: snok/install-poetry@v1
         with:
-          poetry-version: "1.3.2"
+          version: 1.6.1
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
 
       - name: Install dependencies
         run: poetry install --no-interaction --no-root
@@ -83,7 +86,7 @@ jobs:
         run: ${{ matrix.BUILD_CMD }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.OS }}
           path: /tmp/artifacts/*
@@ -94,7 +97,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           path: /tmp/artifacts
 

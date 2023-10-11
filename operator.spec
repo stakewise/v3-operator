@@ -2,28 +2,18 @@
 from PyInstaller.utils.hooks import collect_data_files
 from sys import platform
 
-if platform == "linux" or platform == "linux2":
-    datas = [
-        ('src/common/abi/*', 'src/common/abi/'),
-        ('src/common/word_lists/*', 'src/common/word_lists/'),
-        ('./pyproject.toml', '.'),
-        ('./GIT_SHA', '.'),
-    ]
-else:
-    datas = [
-      ('src/common/abi/*', 'src/common/abi/'),
-      ('src/common/word_lists/*', 'src/common/word_lists/'),
-      ('./pyproject.toml', '.'),
-      ('./GIT_SHA', '.')
-     ]
+datas = [
+    ('src/common/abi/*', 'src/common/abi/'),
+    ('src/common/word_lists/*', 'src/common/word_lists/'),
+    ('./pyproject.toml', '.'),
+    ('./GIT_SHA', '.'),
+]
 
 datas += collect_data_files('certifi')
 datas += collect_data_files('coincurve')
 datas += collect_data_files('eth_account')
 
-
 block_cipher = None
-
 
 a = Analysis(
     ['src/main.py'],
