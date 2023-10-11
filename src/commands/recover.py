@@ -1,7 +1,6 @@
-import asyncio
 from pathlib import Path
 
-import click
+import asyncclick as click
 from eth_typing import BlockNumber, HexAddress, HexStr
 from eth_utils import add_0x_prefix
 from sw_utils.consensus import EXITED_STATUSES, ValidatorStatus
@@ -77,7 +76,7 @@ from src.config.settings import AVAILABLE_NETWORKS, GOERLI, settings
     ),
 )
 # pylint: disable-next=too-many-arguments
-def recover(
+async def recover(
     data_dir: str,
     vault: HexAddress,
     network: str,
@@ -109,15 +108,13 @@ def recover(
     )
 
     try:
-        asyncio.run(
-            main(
-                mnemonic=mnemonic,
-                keystores_dir=keystores_dir,
-                password_file=password_file,
-                per_keystore_password=per_keystore_password,
-                no_confirm=no_confirm,
-                config=config,
-            )
+        await main(
+            mnemonic=mnemonic,
+            keystores_dir=keystores_dir,
+            password_file=password_file,
+            per_keystore_password=per_keystore_password,
+            no_confirm=no_confirm,
+            config=config,
         )
     except Exception as e:
         log_verbose(e)

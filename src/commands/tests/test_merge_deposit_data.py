@@ -2,12 +2,12 @@ import json
 import os
 import tempfile
 
-from click.testing import CliRunner
+from asyncclick.testing import CliRunner
 
 from src.commands.merge_deposit_data import merge_deposit_data
 
 
-def test_merge_deposit_files(runner: CliRunner):
+async def test_merge_deposit_files(runner: CliRunner):
     file1_content = [
         {'id': 1, 'pubkey': '0x1'},
         {'id': 3, 'pubkey': '0x3'},
@@ -28,7 +28,7 @@ def test_merge_deposit_files(runner: CliRunner):
 
         merged_file = _generate_temp_filepath()
 
-        result = runner.invoke(
+        result = await runner.invoke(
             merge_deposit_data,
             [
                 '-d',

@@ -1,11 +1,9 @@
-import asyncio
 import os
-from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from pathlib import Path
 
 import aiohttp
-import click
+import asyncclick as click
 import milagro_bls_binding as bls
 from eth_typing import BLSPrivateKey, HexAddress
 from web3 import Web3
@@ -74,7 +72,7 @@ from src.validators.utils import load_keystores
 )
 @click.command(help='Generates and uploads private key shares to a remote signer.')
 # pylint: disable-next=too-many-arguments
-def remote_signer_setup(
+async def remote_signer_setup(
     vault: HexAddress,
     remote_signer_url: str,
     remove_existing_keys: bool,
@@ -96,21 +94,7 @@ def remote_signer_setup(
     )
 
     try:
-        # Try-catch to enable async calls in test - an event loop
-        #  will already be running in that case
-        try:
-            asyncio.get_running_loop()
-            # we need to create a separate thread so we can block before returning
-            with ThreadPoolExecutor(1) as pool:
-                pool.submit(
-                    lambda: asyncio.run(main(remove_existing_keys=remove_existing_keys))
-                ).result()
-        except RuntimeError as e:
-            if 'no running event loop' == e.args[0]:
-                # no event loop running
-                asyncio.run(main(remove_existing_keys=remove_existing_keys))
-            else:
-                raise e
+        await main(remove_existing_keys=remove_existing_keys)
     except Exception as e:
         log_verbose(e)
 

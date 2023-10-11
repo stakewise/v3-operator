@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-import click
+import asyncclick as click
 import yaml
 from eth_typing import HexStr
 

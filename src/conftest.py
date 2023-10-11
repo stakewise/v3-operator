@@ -7,7 +7,7 @@ from unittest import mock
 import ecies
 import pytest
 from _pytest.fixtures import SubRequest
-from click.testing import CliRunner
+from asyncclick.testing import CliRunner
 from Crypto.Protocol.KDF import scrypt as raw_scrypt
 from eth_typing import HexAddress, HexStr
 from sw_utils.tests import faker
@@ -102,7 +102,7 @@ def mock_scrypt_keystore():
 
 
 @pytest.fixture
-def _create_keys(
+async def _create_keys(
     test_mnemonic: str,
     vault_address: HexAddress,
     data_dir: Path,
@@ -112,7 +112,7 @@ def _create_keys(
 ) -> None:
     count = 3
 
-    result = runner.invoke(
+    result = await runner.invoke(
         create_keys,
         [
             '--mnemonic',
@@ -131,10 +131,10 @@ def _create_keys(
 
 
 @pytest.fixture
-def _create_wallet(
+async def _create_wallet(
     vault_address: HexAddress, data_dir: Path, test_mnemonic: str, runner: CliRunner
 ) -> None:
-    result = runner.invoke(
+    result = await runner.invoke(
         create_wallet,
         [
             '--mnemonic',
@@ -149,7 +149,7 @@ def _create_wallet(
 
 
 @pytest.fixture
-def _remote_signer_setup(
+async def _remote_signer_setup(
     vault_address: HexAddress,
     data_dir: Path,
     keystores_dir: Path,
@@ -161,7 +161,7 @@ def _remote_signer_setup(
     _create_keys,
 ) -> None:
     with mock.patch('src.commands.remote_signer_setup.get_oracles', return_value=mocked_oracles):
-        result = runner.invoke(
+        result = await runner.invoke(
             remote_signer_setup,
             [
                 '--vault',

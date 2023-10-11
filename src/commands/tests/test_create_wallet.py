@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
-from click.testing import CliRunner
+from asyncclick.testing import CliRunner
 from eth_account import Account
 from eth_typing import HexAddress
 
@@ -11,7 +11,7 @@ from src.commands.create_wallet import create_wallet
 
 class TestCreateWallet:
     @pytest.mark.usefixtures('_init_vault')
-    def test_basic(
+    async def test_basic(
         self,
         test_mnemonic: str,
         data_dir: Path,
@@ -21,7 +21,7 @@ class TestCreateWallet:
     ):
         Account.enable_unaudited_hdwallet_features()
         account = Account().from_mnemonic(mnemonic=test_mnemonic)
-        result = runner.invoke(
+        result = await runner.invoke(
             create_wallet,
             [
                 '--mnemonic',

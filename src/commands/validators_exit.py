@@ -1,8 +1,7 @@
-import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 
-import click
+import asyncclick as click
 import milagro_bls_binding as bls
 from aiohttp import ClientResponseError
 from eth_typing import BLSPubkey, BLSSignature, HexAddress, HexStr
@@ -102,7 +101,7 @@ EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
 )
 @click.command(help='Performs a voluntary exit for active vault validators.')
 # pylint: disable-next=too-many-arguments
-def validators_exit(
+async def validators_exit(
     network: str,
     vault: HexAddress,
     count: int | None,
@@ -132,7 +131,7 @@ def validators_exit(
         verbose=verbose,
     )
     try:
-        asyncio.run(main(count))
+        await main(count)
     except Exception as e:
         log_verbose(e)
 

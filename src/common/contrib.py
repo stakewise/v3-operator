@@ -1,7 +1,7 @@
 import collections
 from base64 import b64decode, b64encode
 
-import click
+import asyncclick as click
 
 
 def chunkify(items, size):

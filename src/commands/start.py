@@ -3,7 +3,7 @@ import logging
 import time
 from pathlib import Path
 
-import click
+import asyncclick as click
 from eth_typing import ChecksumAddress
 from sw_utils import EventScanner, InterruptHandler
 from sw_utils.typings import ChainHead
@@ -185,7 +185,7 @@ logger = logging.getLogger(__name__)
 )
 @click.command(help='Start operator service')
 # pylint: disable-next=too-many-arguments,too-many-locals
-def start(
+async def start(
     vault: ChecksumAddress,
     consensus_endpoints: str,
     execution_endpoints: str,
@@ -238,7 +238,7 @@ def start(
     )
 
     try:
-        asyncio.run(main())
+        await main()
     except Exception as e:
         log_verbose(e)
 

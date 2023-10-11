@@ -1,15 +1,14 @@
-import unittest
 from unittest.mock import patch
 
-from click.testing import CliRunner
+from asyncclick.testing import CliRunner
 
 from src.commands.sync_validator import sync_validator
 
 from .factories import faker
 
 
-class TestSyncValidator(unittest.TestCase):
-    def test_basic(self):
+class TestSyncValidator:
+    async def test_basic(self):
         fee_recipient = faker.eth_address()
         keys_count = 1000
         validator_index = 3
@@ -42,7 +41,7 @@ class TestSyncValidator(unittest.TestCase):
             'src.commands.sync_validator.Database.fetch_public_keys_by_range',
             return_value=public_keys[400:600],
         ):
-            result = runner.invoke(sync_validator, args)
+            result = await runner.invoke(sync_validator, args)
             assert result.exit_code == 0
             output = '''
 Done. Generated configs with 200 keys for validator #3.

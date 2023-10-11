@@ -3,7 +3,7 @@ from typing import Generator
 from unittest import mock
 
 import pytest
-from click.testing import CliRunner
+from asyncclick.testing import CliRunner
 from eth_typing import HexAddress
 from sw_utils.typings import ConsensusFork
 
@@ -47,7 +47,7 @@ def _patch_submit_voluntary_exit() -> Generator:
 @pytest.mark.usefixtures('_init_vault', '_create_keys')
 class TestValidatorsExit:
     @pytest.mark.usefixtures('fake_settings')
-    def test_local_keystores(
+    async def test_local_keystores(
         self,
         vault_address: HexAddress,
         consensus_endpoints: str,
@@ -89,13 +89,13 @@ class TestValidatorsExit:
                 },
             ),
         ):
-            result = runner.invoke(validators_exit, args, input='y')
+            result = await runner.invoke(validators_exit, args, input='y')
         assert result.exit_code == 0
 
         assert 'Validators 0, 1, 2 (3 of 3) exits successfully initiated\n' in result.output
 
     @pytest.mark.usefixtures('_remote_signer_setup')
-    def test_remote_signer(
+    async def test_remote_signer(
         self,
         vault_address: HexAddress,
         consensus_endpoints: str,
@@ -137,7 +137,7 @@ class TestValidatorsExit:
                 },
             ),
         ):
-            result = runner.invoke(validators_exit, args, input='y')
+            result = await runner.invoke(validators_exit, args, input='y')
         assert result.exit_code == 0
 
         for expected_line in (

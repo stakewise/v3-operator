@@ -5,7 +5,7 @@ from unittest import mock
 
 import aiohttp
 import pytest
-from click.testing import CliRunner
+from asyncclick.testing import CliRunner
 from eth_typing import HexAddress
 
 from src.commands.create_keys import create_keys
@@ -27,14 +27,14 @@ def _patch_get_oracles(mocked_oracles: Oracles) -> Generator:
 @pytest.mark.usefixtures('_patch_get_oracles')
 class TestOperatorRemoteSignerSetup:
     @pytest.mark.usefixtures('_init_vault')
-    def test_invalid_input(
+    async def test_invalid_input(
         self,
         vault_address: HexAddress,
         data_dir: Path,
         execution_endpoints: str,
         runner: CliRunner,
     ):
-        result = runner.invoke(
+        result = await runner.invoke(
             remote_signer_setup,
             [
                 '--vault',
@@ -75,7 +75,7 @@ class TestOperatorRemoteSignerSetup:
             execution_endpoints,
         ]
 
-        result = runner.invoke(remote_signer_setup, args)
+        result = await runner.invoke(remote_signer_setup, args)
         assert result.exit_code == 0
         for expected_output_message in [
             f'Successfully generated {oracle_count * key_count} key shares for {key_count} private key(s)!',
@@ -103,7 +103,7 @@ class TestOperatorRemoteSignerSetup:
             assert len(pubkeys_remote_signer) == key_count * oracle_count
 
     @pytest.mark.usefixtures('_init_vault', 'mocked_remote_signer', 'mock_scrypt_keystore')
-    def test_add_more_keys_later(
+    async def test_add_more_keys_later(
         self,
         vault_address: HexAddress,
         test_mnemonic: str,
@@ -131,7 +131,7 @@ class TestOperatorRemoteSignerSetup:
                 '--data-dir',
                 str(data_dir),
             ]
-            result = runner.invoke(create_keys, args)
+            result = await runner.invoke(create_keys, args)
             assert result.exit_code == 0
             assert f'Done. Generated {key_count} keys' in result.output
 
@@ -146,7 +146,7 @@ class TestOperatorRemoteSignerSetup:
                 execution_endpoints,
             ]
 
-            result = runner.invoke(remote_signer_setup, args)
+            result = await runner.invoke(remote_signer_setup, args)
             assert result.exit_code == 0
             assert (
                 f'Done. Successfully configured operator to use remote signer for {key_count} public key(s)'
@@ -160,7 +160,7 @@ class TestOperatorRemoteSignerSetup:
 
     @pytest.mark.parametrize(['remove_existing_keys'], [pytest.param(False), pytest.param(True)])
     @pytest.mark.usefixtures('_init_vault', '_remote_signer_setup', 'mock_scrypt_keystore')
-    def test_oracle_set_change(
+    async def test_oracle_set_change(
         self,
         vault_address: HexAddress,
         remove_existing_keys: bool,
@@ -209,7 +209,7 @@ class TestOperatorRemoteSignerSetup:
             '--data-dir',
             str(data_dir),
         ]
-        result = runner.invoke(create_keys, args)
+        result = await runner.invoke(create_keys, args)
         assert result.exit_code == 0
         assert f'Done. Generated {key_count} keys' in result.output
 
@@ -232,7 +232,7 @@ class TestOperatorRemoteSignerSetup:
             if remove_existing_keys:
                 args.append('--remove-existing-keys')
 
-            result = runner.invoke(remote_signer_setup, args)
+            result = await runner.invoke(remote_signer_setup, args)
             assert result.exit_code == 0
 
             for msg in (

@@ -3,7 +3,7 @@ from multiprocessing import Pool
 from os import makedirs, path
 from pathlib import Path
 
-import click
+import asyncclick as click
 from eth_typing import HexAddress
 
 from src.common.contrib import greenify

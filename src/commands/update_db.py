@@ -3,7 +3,7 @@ import json
 import os
 from pathlib import Path
 
-import click
+import asyncclick as click
 from py_ecc.bls import G2ProofOfPossession
 from staking_deposit.key_handling.keystore import ScryptKeystore
 from web3 import Web3

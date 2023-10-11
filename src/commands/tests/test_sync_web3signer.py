@@ -1,8 +1,7 @@
 import os
-import unittest
 from unittest.mock import patch
 
-from click.testing import CliRunner
+from asyncclick.testing import CliRunner
 from eth_typing import BLSPrivateKey
 from eth_utils import add_0x_prefix
 from py_ecc.bls import G2ProofOfPossession
@@ -24,8 +23,8 @@ PURPOSE = '12381'
 COIN_TYPE = '3600'
 
 
-class TestSyncWeb3signer(unittest.TestCase):
-    def test_basic(self):
+class TestSyncWeb3signer:
+    async def test_basic(self):
         db_url = 'postgresql://username:pass@hostname/dbname'
         keys_count = 3
         encryptor = Encryptor()
@@ -54,7 +53,7 @@ class TestSyncWeb3signer(unittest.TestCase):
         ), patch.dict(
             os.environ, {'DECRYPT_ENV': encryptor.str_key}
         ):
-            result = runner.invoke(sync_web3signer, args)
+            result = await runner.invoke(sync_web3signer, args)
             assert result.exit_code == 0
             output = f'Web3Signer now uses {len(db_records)} private keys.\n'
             assert output.strip() == result.output.strip()
@@ -69,7 +68,7 @@ type: file-raw"""
                     assert f.read() == s
 
             # second run
-            result = runner.invoke(sync_web3signer, args)
+            result = await runner.invoke(sync_web3signer, args)
 
             assert result.exit_code == 0
             output = 'Keys already synced to the last version.\n'

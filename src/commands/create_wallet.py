@@ -2,7 +2,7 @@ import json
 from os import path
 from pathlib import Path
 
-import click
+import asyncclick as click
 from eth_account import Account
 from eth_typing import ChecksumAddress, HexAddress
 

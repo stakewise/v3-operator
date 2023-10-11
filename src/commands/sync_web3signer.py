@@ -4,7 +4,7 @@ from os import mkdir
 from os.path import exists
 from typing import List
 
-import click
+import asyncclick as click
 import yaml
 from eth_utils import add_0x_prefix
 from web3 import Web3

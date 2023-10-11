@@ -1,6 +1,6 @@
 from pathlib import Path
 
-import click
+import asyncclick as click
 from eth_typing import HexAddress
 
 from src.common.language import LANGUAGES, create_new_mnemonic

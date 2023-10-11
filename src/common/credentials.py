@@ -5,7 +5,7 @@ from functools import cached_property
 from multiprocessing import Pool
 from os import path
 
-import click
+import asyncclick as click
 import milagro_bls_binding as bls
 from eth_typing import BLSPrivateKey, HexAddress, HexStr
 from py_ecc.bls import G2ProofOfPossession

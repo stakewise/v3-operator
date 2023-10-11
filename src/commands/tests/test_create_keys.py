@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 import pytest
-from click.testing import CliRunner
+from asyncclick.testing import CliRunner
 from eth_typing import HexAddress
 from staking_deposit.settings import DEPOSIT_CLI_VERSION
 
@@ -13,7 +13,7 @@ from src.commands.create_keys import create_keys
 
 @pytest.mark.usefixtures('_init_vault')
 class TestCreateKeys:
-    def test_basic(
+    async def test_basic(
         self,
         test_mnemonic: str,
         data_dir: Path,
@@ -35,7 +35,7 @@ class TestCreateKeys:
             '--pool-size',
             '2',
         ]
-        result = runner.invoke(create_keys, args)
+        result = await runner.invoke(create_keys, args)
         assert result.exit_code == 0
 
         output = (
@@ -58,7 +58,7 @@ class TestCreateKeys:
 
         assert len(os.listdir(f'{vault_dir}/keystores')) == count + 1
 
-    def test_per_keystore_password(
+    async def test_per_keystore_password(
         self,
         test_mnemonic: str,
         data_dir: Path,
@@ -82,7 +82,7 @@ class TestCreateKeys:
             '2',
             '--per-keystore-password',
         ]
-        result = runner.invoke(create_keys, args)
+        result = await runner.invoke(create_keys, args)
         assert result.exit_code == 0
 
         output = (

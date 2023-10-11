@@ -1,6 +1,6 @@
 import os
 
-import click
+import asyncclick as click
 from staking_deposit.key_handling.key_derivation.mnemonic import (
     get_mnemonic,
     reconstruct_mnemonic,

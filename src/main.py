@@ -3,7 +3,7 @@ import os
 import ssl
 import sys
 
-import click
+import asyncclick as click
 
 from src.commands.create_keys import create_keys
 from src.commands.create_wallet import create_wallet

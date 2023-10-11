@@ -1,7 +1,7 @@
 import os
 import re
 
-import click
+import asyncclick as click
 from eth_utils import is_address, to_checksum_address
 
 from src.common.language import validate_mnemonic as verify_mnemonic

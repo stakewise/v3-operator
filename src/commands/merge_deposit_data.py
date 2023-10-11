@@ -2,7 +2,7 @@ import json
 import os
 from itertools import zip_longest
 
-import click
+import asyncclick as click
 
 from src.common.contrib import greenify
 

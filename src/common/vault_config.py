@@ -2,7 +2,7 @@ import json
 import re
 from pathlib import Path
 
-import click
+import asyncclick as click
 from eth_typing import HexAddress
 from web3 import Web3
 
