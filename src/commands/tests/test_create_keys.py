@@ -32,6 +32,8 @@ class TestCreateKeys:
             str(vault_address),
             '--data-dir',
             str(data_dir),
+            '--pool-size',
+            '2',
         ]
         result = runner.invoke(create_keys, args)
         assert result.exit_code == 0
@@ -76,6 +78,8 @@ class TestCreateKeys:
             str(vault_address),
             '--data-dir',
             str(data_dir),
+            '--pool-size',
+            '2',
             '--per-keystore-password',
         ]
         result = runner.invoke(create_keys, args)

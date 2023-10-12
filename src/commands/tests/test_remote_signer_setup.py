@@ -46,7 +46,9 @@ class TestOperatorRemoteSignerSetup:
         assert result.exit_code == 2
         assert "Error: Missing option '--remote-signer-url'" in result.output
 
-    @pytest.mark.usefixtures('_init_vault', '_create_keys', 'mocked_remote_signer')
+    @pytest.mark.usefixtures(
+        '_init_vault', '_create_keys', 'mocked_remote_signer', 'mock_scrypt_keystore'
+    )
     async def test_basic(
         self,
         vault_address: HexAddress,
@@ -100,7 +102,7 @@ class TestOperatorRemoteSignerSetup:
             pubkeys_remote_signer = set(await resp.json())
             assert len(pubkeys_remote_signer) == key_count * oracle_count
 
-    @pytest.mark.usefixtures('_init_vault', 'mocked_remote_signer')
+    @pytest.mark.usefixtures('_init_vault', 'mocked_remote_signer', 'mock_scrypt_keystore')
     def test_add_more_keys_later(
         self,
         vault_address: HexAddress,
@@ -157,7 +159,7 @@ class TestOperatorRemoteSignerSetup:
         assert len(config.pubkeys_to_shares) == key_count_total
 
     @pytest.mark.parametrize(['remove_existing_keys'], [pytest.param(False), pytest.param(True)])
-    @pytest.mark.usefixtures('_init_vault', '_remote_signer_setup')
+    @pytest.mark.usefixtures('_init_vault', '_remote_signer_setup', 'mock_scrypt_keystore')
     def test_oracle_set_change(
         self,
         vault_address: HexAddress,
