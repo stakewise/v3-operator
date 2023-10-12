@@ -1,5 +1,5 @@
 # `python-base` sets up all our shared environment variables
-FROM python:3.10-alpine as python-base
+FROM python:3.10.13-slim-bookworm as python-base
 
     # python
 ENV PYTHONUNBUFFERED=1 \
@@ -34,11 +34,11 @@ ENV PATH="$POETRY_HOME/bin:$VENV_PATH/bin:/root/.cargo/bin:$PATH"
 # `builder-base` stage is used to build deps + create our virtual environment
 FROM python-base as builder-base
 
-RUN apk upgrade --no-cache
-RUN apk add --no-cache gcc musl-dev python3-dev libffi-dev openssl-dev curl libgcc libstdc++ postgresql-libs postgresql-dev
+RUN apt-get update
+RUN apt-get upgrade -y; apt-get install --no-install-recommends -y build-essential curl libpq-dev postgresql-client && \
+    rm -rf /var/lib/apt/lists/*
 RUN curl https://sh.rustup.rs -sSf | \
     sh -s -- --default-toolchain stable -y
-RUN rm -rf /var/cache/apt/*
 
 # install poetry - respects $POETRY_VERSION & $POETRY_HOME
 RUN curl -sSL https://install.python-poetry.org | python -
