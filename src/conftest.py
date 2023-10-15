@@ -8,7 +8,7 @@ import ecies
 import pytest
 from _pytest.fixtures import SubRequest
 from click.testing import CliRunner
-from Crypto.Protocol.KDF import scrypt as raw_scrypt
+from Cryptodome.Protocol.KDF import scrypt as raw_scrypt
 from eth_typing import HexAddress, HexStr
 from sw_utils.tests import faker
 

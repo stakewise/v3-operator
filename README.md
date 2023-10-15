@@ -34,7 +34,8 @@ operator will submit a signature update transaction to the Vault.
 
 The oracles periodically submit consensus rewards of all the vaults to the Keeper contract.
 By default, every vault pulls these updates on the user interaction with the vault (deposit, withdraw, etc.), but it
-also can be done by the vault operator by passing the `--harvest-vault` flag to the `start` command.
+also can be done by the vault operator by passing the `--harvest-vault` flag to the `start` command. Harvesting vault
+rewards simplifies calls to the vault contracts, e.g., you don't need to sync rewards before calling deposit.
 
 ## Usage
 

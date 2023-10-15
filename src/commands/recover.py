@@ -268,7 +268,7 @@ async def _generate_keystores(
         password = (
             generate_password()
             if per_keystore_password
-            else get_or_create_password_file(str(password_file))
+            else get_or_create_password_file(password_file)
         )
         credential.save_signing_keystore(password, str(keystores_dir), per_keystore_password)
         click.secho(
