@@ -119,7 +119,8 @@ async def collect_healthy_oracles() -> list:
     healthy_oracles = []
     for result, endpoint in zip(results, endpoints):
         if isinstance(result, Exception):
-            logger.warning('%s for endpoint %s', format_error(result), endpoint)
+            if settings.verbose:
+                logger.warning('%s for endpoint %s', format_error(result), endpoint)
             continue
 
         if result:

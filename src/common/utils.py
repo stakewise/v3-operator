@@ -82,8 +82,9 @@ def process_oracles_approvals(
     votes = candidates[winner]
     if len(votes) < votes_threshold:
         # not enough oracles have approved the request
+        # Fill `failed_endpoints` later
         raise NotEnoughOracleApprovalsError(
-            f'Received {len(votes)} approvals, but {votes_threshold} is required'
+            num_votes=len(votes), threshold=votes_threshold, failed_endpoints=[]
         )
 
     signatures = b''

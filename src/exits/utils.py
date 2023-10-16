@@ -39,12 +39,13 @@ async def send_signature_rotation_requests(
                     session=session, replicas=replicas, payload=payload
                 )
             except Exception as e:
-                logger.error(
-                    'All endpoints for oracle %s failed to sign signature rotation request. '
-                    'Last error: %s',
-                    address,
-                    format_error(e),
-                )
+                if settings.verbose:
+                    logger.warning(
+                        'All endpoints for oracle %s failed to sign signature rotation request. '
+                        'Last error: %s',
+                        address,
+                        format_error(e),
+                    )
                 continue
             approvals[address] = response
 
@@ -65,7 +66,8 @@ async def send_signature_rotation_request_to_replicas(
         try:
             return await send_signature_rotation_request(session, endpoint, payload)
         except (ClientError, asyncio.TimeoutError) as e:
-            logger.warning('%s for endpoint %s', format_error(e), endpoint)
+            if settings.verbose:
+                logger.warning('%s for endpoint %s', format_error(e), endpoint)
             last_error = e
 
     if last_error:

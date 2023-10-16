@@ -19,6 +19,7 @@ from sw_utils.decorators import retry_aiohttp_errors
 from web3 import Web3
 
 from src.common.contracts import validators_registry_contract
+from src.common.exceptions import NotEnoughOracleApprovalsError
 from src.common.typings import OracleApproval, Oracles, OraclesApproval
 from src.common.utils import format_error, process_oracles_approvals
 from src.config.settings import DEFAULT_RETRY_TIME, ORACLES_VALIDATORS_TIMEOUT, settings
@@ -59,19 +60,27 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
         )
 
     approvals: dict[ChecksumAddress, OracleApproval] = {}
-    for address, result in zip(oracles.addresses, results):
+    failed_endpoints: list[str] = []
+
+    for address, replicas, result in zip(oracles.addresses, oracles.endpoints, results):
         if isinstance(result, Exception):
-            logger.error(
-                'All endpoints for oracle %s failed to sign validators approval request. '
-                'Last error: %s',
-                address,
-                format_error(result),
-            )
+            if settings.verbose:
+                logger.warning(
+                    'All endpoints for oracle %s failed to sign validators approval request. '
+                    'Last error: %s',
+                    address,
+                    format_error(result),
+                )
+            failed_endpoints.extend(replicas)
             continue
 
         approvals[address] = result
 
-    return process_oracles_approvals(approvals, oracles.validators_threshold)
+    try:
+        return process_oracles_approvals(approvals, oracles.validators_threshold)
+    except NotEnoughOracleApprovalsError as e:
+        e.failed_endpoints = failed_endpoints
+        raise
 
 
 # pylint: disable=duplicate-code
@@ -88,7 +97,8 @@ async def send_approval_request_to_replicas(
         try:
             return await send_approval_request(session, endpoint, payload)
         except (ClientError, asyncio.TimeoutError) as e:
-            logger.warning('%s for endpoint %s', format_error(e), endpoint)
+            if settings.verbose:
+                logger.warning('%s for endpoint %s', format_error(e), endpoint)
             last_error = e
 
     if last_error:
