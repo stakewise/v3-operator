@@ -326,11 +326,14 @@ class TestRemoteDbSetupValidator:
         ):
             result = runner.invoke(remote_db_group, args)
             output = (
-                'Done. Generated configs with 12 keys for validator #0.\n'
-                'Validator definitions for Lighthouse saved to validator'
-                '/validator_definitions.yml file.\nSigner keys for Teku\\'
-                'Prysm saved to validator/signer_keys.yml file.\n'
-                'Proposer config for Teku\\Prysm saved to validator/proposer_config.json file.\n'
+                'Generated configs with 12 keys '
+                'for validator with index 0.\n'
+                'Validator definitions for Lighthouse saved to '
+                'validator/validator_definitions.yml file.\n'
+                'Signer keys for Teku\\Prysm saved to '
+                'validator/signer_keys.yml file.\n'
+                'Proposer config for Teku\\Prysm saved to '
+                'validator/proposer_config.json file.\n'
             )
             assert output.strip() in result.output.strip()
 

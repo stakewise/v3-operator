@@ -10,6 +10,7 @@ from Cryptodome.Random import get_random_bytes
 from eth_typing import ChecksumAddress, HexStr
 from web3 import Web3
 
+from src.common.contrib import greenify
 from src.common.execution import get_oracles
 from src.config.settings import settings
 from src.remote_db.database import ConfigsCrud, KeyPairsCrud, get_db_connection
@@ -84,7 +85,7 @@ async def upload_keypairs(db_url: str, b64_encrypt_key: str) -> None:
         remote_signer_config = RemoteSignerConfiguration.load(remote_signer_config_data)
     existing_pub_keys = set(remote_signer_config.pubkeys_to_shares.keys())
 
-    click.echo(f'Calculating and encrypting shares for the {len(keystores)} keystores...')
+    click.echo(f'Calculating and encrypting shares for {len(keystores)} keystores...')
     total_oracles = len(oracles.public_keys)
     key_records: list[RemoteDatabaseKeyPair] = []
     for public_key, private_key in keystores.items():  # pylint: disable=no-member
@@ -219,15 +220,15 @@ def setup_validator(
         filepath=proposer_config_filepath,
     )
 
-    click.clear()
     click.secho(
-        f'Done. '
-        f'Generated configs with {len(public_keys)} keys for validator #{validator_index}.\n'
-        f'Validator definitions for Lighthouse saved to {validator_definitions_filepath} file.\n'
-        f'Signer keys for Teku\\Prysm saved to {signer_keys_filepath} file.\n'
-        f'Proposer config for Teku\\Prysm saved to {proposer_config_filepath} file.\n',
-        bold=True,
-        fg='green',
+        f'Generated configs with {greenify(len(public_keys))} keys '
+        f'for validator with index {greenify(f"{validator_index}")}.\n'
+        f'Validator definitions for Lighthouse saved to '
+        f'{greenify(validator_definitions_filepath)} file.\n'
+        f'Signer keys for Teku\\Prysm saved to '
+        f'{greenify(signer_keys_filepath)} file.\n'
+        f'Proposer config for Teku\\Prysm saved to '
+        f'{greenify(proposer_config_filepath)} file.\n',
     )
 
 
