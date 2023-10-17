@@ -510,7 +510,7 @@ The command loads encrypted keystores and operator config to the remote DB:
 ```bash
 ./v3-operator remote-db \
   --db-url=postgresql://postgres:postgres@localhost/operator \
-  --vault=0x8189aF89A7718C1baB5628399FC0ba50C6949bCc
+  --vault=0x8189aF89A7718C1baB5628399FC0ba50C6949bCc \
   upload-keypairs \
   --encrypt-key=D/6CbpJen3J0ue0tWcd+d4KKHpT4kaSz3IzG5jz5LFI= \
   --execution-endpoints=http://localhost:8545
@@ -529,6 +529,7 @@ The command syncs encrypted keystores to the web3signer:
 ./v3-operator remote-db \
   --db-url=postgresql://postgres:postgres@localhost/operator \
   --vault=0x8189aF89A7718C1baB5628399FC0ba50C6949bCc \
+  --network=mainnet \
   setup-web3signer \
   --encrypt-key=D/6CbpJen3J0ue0tWcd+d4KKHpT4kaSz3IzG5jz5LFI= \
   --output-dir=./web3signer
@@ -546,6 +547,7 @@ The command syncs web3signer config for every validator:
 ./v3-operator remote-db \
   --db-url=postgresql://postgres:postgres@localhost/operator \
   --vault=0x8189aF89A7718C1baB5628399FC0ba50C6949bCc \
+  --network=mainnet \
   setup-validator \
   --validator-index=0 \
   --total-validators=10 \
@@ -568,6 +570,7 @@ The command syncs web3signer config and deposit data for the operator:
 ./v3-operator remote-db \
   --db-url=postgresql://postgres:postgres@localhost/operator \
   --vault=0x8189aF89A7718C1baB5628399FC0ba50C6949bCc \
+  --network=mainnet \
   setup-operator
 Operator remote signer configuration saved to /Users/user/.stakewise/0x8189af89a7718c1bab5628399fc0ba50c6949bcc/remote_signer_config.json file.
 Operator deposit data saved to /Users/user/.stakewise/0x8189af89a7718c1bab5628399fc0ba50c6949bcc/deposit_data.json file.
