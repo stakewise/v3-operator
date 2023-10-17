@@ -495,7 +495,6 @@ The command creates tables and generates encryption key for the database:
   --db-url=postgresql://postgres:postgres@localhost/operator \
   --vault=0x8189aF89A7718C1baB5628399FC0ba50C6949bCc \
   setup
-Loading keystores...              [####################################]  10/10
 Successfully configured remote database.
 Encryption key: D/6CbpJen3J0ue0tWcd+d4KKHpT4kaSz3IzG5jz5LFI=
 NB! You must store your encryption in a secure cold storage!
