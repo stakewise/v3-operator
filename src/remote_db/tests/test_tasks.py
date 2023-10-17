@@ -36,6 +36,12 @@ def _patch_get_db_connection() -> Generator:
 
 
 @pytest.fixture
+def _patch_check_deposit_data_root() -> Generator:
+    with mock.patch('src.remote_db.tasks.check_deposit_data_root'):
+        yield
+
+
+@pytest.fixture
 def _patch_get_oracles(mocked_oracles: Oracles) -> Generator:
     with mock.patch('src.remote_db.tasks.get_oracles', return_value=mocked_oracles):
         yield
@@ -194,6 +200,7 @@ class TestRemoteDbSetup:
     '_patch_get_oracles',
     '_patch_check_db_connection',
     '_patch_get_db_connection',
+    '_patch_check_deposit_data_root',
 )
 @pytest.mark.usefixtures('_init_vault', '_create_keys')
 class TestRemoteDbUploadKeypairs:
@@ -382,6 +389,8 @@ class TestRemoteDbSetupOperator:
             KeyPairsCrud, 'get_keypairs', return_value=keypairs
         ), mock.patch.object(
             ConfigsCrud, 'get_remote_signer_config', return_value=remote_config
+        ), mock.patch.object(
+            ConfigsCrud, 'get_deposit_data', return_value=[]
         ):
             result = runner.invoke(remote_db_group, args)
             output = 'Successfully created operator configuration file.\n'

@@ -15,10 +15,11 @@ from src.common.execution import get_oracles
 from src.config.settings import settings
 from src.remote_db.database import ConfigsCrud, KeyPairsCrud, get_db_connection
 from src.remote_db.typings import RemoteDatabaseKeyPair
+from src.validators.execution import check_deposit_data_root
 from src.validators.signing.key_shares import private_key_to_private_key_shares
 from src.validators.signing.remote import RemoteSignerConfiguration
 from src.validators.typings import BLSPrivkey
-from src.validators.utils import load_keystores
+from src.validators.utils import load_deposit_data, load_keystores
 
 CIPHER_KEY_LENGTH = 32
 VALIDATOR_DEFINITIONS_FILENAME = 'validator_definitions.yml'
@@ -67,6 +68,10 @@ def cleanup(db_url: str) -> None:
 async def upload_keypairs(db_url: str, b64_encrypt_key: str) -> None:
     """Generates shares for the local keypairs, updates configs in the remote DB."""
     encryption_key = _check_encryption_key(db_url, b64_encrypt_key)
+
+    # load and check deposit data file
+    deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
+    await check_deposit_data_root(deposit_data.tree.root)
 
     click.echo(f'Loading keystores from {settings.keystores_dir}...')
     keystores = load_keystores()
@@ -133,6 +138,7 @@ async def upload_keypairs(db_url: str, b64_encrypt_key: str) -> None:
         # upload remote signer config to remote db
         configs_crud = ConfigsCrud(db_connection=conn)
         configs_crud.update_remote_signer_config(remote_signer_config.pubkeys_to_shares)
+        configs_crud.update_deposit_data(deposit_data.validators)
 
 
 def setup_web3signer(db_url: str, b64_encrypt_key: str, output_dir: Path) -> None:
@@ -234,16 +240,26 @@ def setup_validator(
 
 def setup_operator(db_url: str, output_dir: Path) -> None:
     """Create operator remote signer configuration."""
-    config_data = ConfigsCrud(db_url=db_url).get_remote_signer_config()
+    config_crud = ConfigsCrud(db_url=db_url)
+    config_data = config_crud.get_remote_signer_config()
     if config_data is None:
         raise click.ClickException('No remote signer configuration found in the remote db.')
+
+    deposit_data = config_crud.get_deposit_data()
+    if deposit_data is None:
+        raise click.ClickException('No deposit data found in the remote db.')
 
     if not output_dir.exists():
         output_dir.mkdir(parents=True, exist_ok=True)
 
     output_file = output_dir / ConfigsCrud.remote_signer_config_name
     RemoteSignerConfiguration.load(config_data).save(output_file)
-    click.echo(f'Operator remote signer configuration saved to {output_file} file.')
+    click.secho(f'Operator remote signer configuration saved to {greenify(output_file)} file.')
+
+    output_file = output_dir / ConfigsCrud.deposit_data_name
+    with open(output_file, 'w', encoding='utf-8') as f:
+        json.dump(deposit_data, f)
+    click.secho(f'Operator deposit data saved to {greenify(output_file)} file.')
 
 
 def _encrypt_private_key(private_key: BLSPrivkey, encryption_key: bytes) -> tuple[bytes, bytes]:

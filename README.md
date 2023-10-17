@@ -560,9 +560,9 @@ Proposer config for Teku\Prysm saved to validator0/proposer_config.json file.
 Successfully created validator configuration files.
 ```
 
-#### 4. Sync web3signer config for the operator
+#### 4. Sync configs for the operator
 
-The command syncs web3signer config for the operator:
+The command syncs web3signer config and deposit data for the operator:
 
 ```bash
 ./v3-operator remote-db \
@@ -570,6 +570,7 @@ The command syncs web3signer config for the operator:
   --vault=0x8189aF89A7718C1baB5628399FC0ba50C6949bCc \
   setup-operator
 Operator remote signer configuration saved to /Users/user/.stakewise/0x8189af89a7718c1bab5628399fc0ba50c6949bcc/remote_signer_config.json file.
+Operator deposit data saved to /Users/user/.stakewise/0x8189af89a7718c1bab5628399fc0ba50c6949bcc/deposit_data.json file.
 Successfully created operator configuration file.
 ```
 

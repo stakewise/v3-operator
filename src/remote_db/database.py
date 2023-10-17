@@ -1,3 +1,4 @@
+import dataclasses
 import json
 
 import click
@@ -5,6 +6,7 @@ from eth_typing import HexStr
 
 from src.config.settings import settings
 from src.remote_db.typings import RemoteDatabaseKeyPair
+from src.validators.typings import Validator
 
 
 def get_db_connection(db_url):
@@ -167,6 +169,7 @@ class KeyPairsCrud:
 
 class ConfigsCrud:
     remote_signer_config_name = 'remote_signer_config.json'
+    deposit_data_name = 'deposit_data.json'
 
     def __init__(self, db_connection=None, db_url: str | None = None):
         self.db_connection = db_connection or get_db_connection(db_url)
@@ -197,6 +200,18 @@ class ConfigsCrud:
                 return None
             return json.loads(row[0])
 
+    def get_deposit_data(self) -> list | None:
+        """Returns the deposit data from the database."""
+        with self.db_connection.cursor() as cur:
+            cur.execute(
+                f'SELECT data FROM {self.table} WHERE vault = %s AND name = %s',
+                (settings.vault, self.deposit_data_name),
+            )
+            row = cur.fetchone()
+            if row is None:
+                return None
+            return json.loads(row[0])
+
     def update_remote_signer_config(self, data: dict) -> None:
         """Updates the remote signer config in the database."""
         data_string = json.dumps(data)
@@ -208,6 +223,20 @@ class ConfigsCrud:
                     ON CONFLICT (vault, name) DO UPDATE SET data = %s
                 ''',
                 (settings.vault, self.remote_signer_config_name, data_string, data_string),
+            )
+
+    def update_deposit_data(self, validators: list[Validator]) -> None:
+        """Updates the deposit data in the database."""
+        data = [dataclasses.asdict(v) for v in validators]
+        data_string = json.dumps(data)
+        with self.db_connection.cursor() as cur:
+            cur.execute(
+                f'''
+                    INSERT INTO {self.table} (vault, name, data)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (vault, name) DO UPDATE SET data = %s
+                ''',
+                (settings.vault, self.deposit_data_name, data_string, data_string),
             )
 
     def remove_configs(self) -> None:
