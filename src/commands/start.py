@@ -189,7 +189,7 @@ logger = logging.getLogger(__name__)
     '--restart-always',
     is_flag=True,
     envvar='RESTART_ALWAYS',
-    help='Restart always. Default is false.',
+    help='Restart always. Useful for NodeWise. Default is false.',
 )
 @click.command(help='Start operator service')
 # pylint: disable-next=too-many-arguments,too-many-locals
