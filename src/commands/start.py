@@ -37,6 +37,7 @@ from src.validators.signing.hashi_vault import (
 )
 from src.validators.signing.remote import RemoteSignerConfiguration
 from src.validators.tasks import load_genesis_validators, register_validators
+from src.validators.typings import Keystores
 from src.validators.utils import load_deposit_data, load_keystores
 
 logger = logging.getLogger(__name__)
@@ -184,6 +185,12 @@ logger = logging.getLogger(__name__)
     envvar='HASHI_VAULT_KEY_PATH',
     help='Key path in the K/V secret engine where validator signing keys are stored.',
 )
+@click.option(
+    '--restart-always',
+    is_flag=True,
+    envvar='RESTART_ALWAYS',
+    help='Restart always. Default is false.',
+)
 @click.command(help='Start operator service')
 # pylint: disable-next=too-many-arguments,too-many-locals
 def start(
@@ -208,6 +215,7 @@ def start(
     hot_wallet_password_file: str | None,
     max_fee_per_gas_gwei: int,
     database_dir: str | None,
+    restart_always: bool,
 ) -> None:
     vault_config = VaultConfig(vault, Path(data_dir))
     if network is None:
@@ -236,6 +244,7 @@ def start(
         hot_wallet_password_file=hot_wallet_password_file,
         max_fee_per_gas_gwei=max_fee_per_gas_gwei,
         database_dir=database_dir,
+        restart_always=restart_always,
     )
 
     try:
@@ -249,52 +258,40 @@ async def main() -> None:
     setup_sentry()
     log_start()
 
-    await startup_checks()
-
     NetworkValidatorCrud().setup()
 
-    # load network validators from ipfs dump
-    await load_genesis_validators()
+    while True:
+        try:
+            await startup_checks()
 
-    # load keystores / remote signer configuration
-    keystores = load_keystores()
+            # load network validators from ipfs dump
+            await load_genesis_validators()
 
-    remote_signer_config = None
+            # load keystores / remote signer configuration
+            keystores, remote_signer_config = await load_keystores_from_local_or_remote()
 
-    if len(keystores) == 0:
-        if settings.hashi_vault_url:
-            # No keystores loaded but hashi vault configuration specified
-            hashi_vault_config = HashiVaultConfiguration.from_settings()
-            logger.info('Using hashi vault at %s for loading public keys')
-            keystores = await load_hashi_vault_keys(hashi_vault_config)
+            # load deposit data
+            deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
+            logger.info('Loaded deposit data file %s', settings.deposit_data_file)
+            # start operator tasks
 
-        elif settings.remote_signer_url:
-            # No keystores loaded but remote signer URL provided
-            remote_signer_config = RemoteSignerConfiguration.from_file(
-                settings.remote_signer_config_file
-            )
-            logger.info(
-                'Using remote signer at %s for %i public keys',
-                settings.remote_signer_url,
-                len(remote_signer_config.pubkeys_to_shares.keys()),
-            )
-        else:
-            raise RuntimeError('No keystores, no remote signer or hashi vault URL provided')
+            # periodically scan network validator updates
+            network_validators_processor = NetworkValidatorsProcessor()
+            network_validators_scanner = EventScanner(network_validators_processor)
 
-    # load deposit data
-    deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
-    logger.info('Loaded deposit data file %s', settings.deposit_data_file)
-    # start operator tasks
+            logger.info('Syncing network validator events...')
+            chain_state = await get_chain_finalized_head()
 
-    # periodically scan network validator updates
-    network_validators_processor = NetworkValidatorsProcessor()
-    network_validators_scanner = EventScanner(network_validators_processor)
+            to_block = chain_state.execution_block
+            await network_validators_scanner.process_new_events(to_block)
+            break
+        except Exception as e:
+            if not settings.restart_always:
+                raise
+            log_verbose(e)
 
-    logger.info('Syncing network validator events...')
-    chain_state = await get_chain_finalized_head()
-
-    to_block = chain_state.execution_block
-    await network_validators_scanner.process_new_events(to_block)
+            restart_always_wait_time = 10
+            await asyncio.sleep(restart_always_wait_time)
 
     if settings.enable_metrics:
         await metrics_server()
@@ -345,6 +342,36 @@ async def main() -> None:
                 float(settings.network_config.SECONDS_PER_BLOCK) - block_processing_time, 0
             )
             await asyncio.sleep(sleep_time)
+
+
+async def load_keystores_from_local_or_remote() -> tuple[
+    Keystores, RemoteSignerConfiguration | None
+]:
+    keystores = load_keystores()
+
+    remote_signer_config = None
+
+    if len(keystores) == 0:
+        if settings.hashi_vault_url:
+            # No keystores loaded but hashi vault configuration specified
+            hashi_vault_config = HashiVaultConfiguration.from_settings()
+            logger.info('Using hashi vault at %s for loading public keys')
+            keystores = await load_hashi_vault_keys(hashi_vault_config)
+
+        elif settings.remote_signer_url:
+            # No keystores loaded but remote signer URL provided
+            remote_signer_config = RemoteSignerConfiguration.from_file(
+                settings.remote_signer_config_file
+            )
+            logger.info(
+                'Using remote signer at %s for %i public keys',
+                settings.remote_signer_url,
+                len(remote_signer_config.pubkeys_to_shares.keys()),
+            )
+        else:
+            raise RuntimeError('No keystores, no remote signer or hashi vault URL provided')
+
+    return keystores, remote_signer_config
 
 
 def log_start() -> None:

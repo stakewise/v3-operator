@@ -171,10 +171,6 @@ async def wait_for_deposit_data_file() -> None:
 async def startup_checks():
     validate_settings()
 
-    logger.info('Checking hot wallet balance %s...', hot_wallet.address)
-
-    await check_hot_wallet_balance()
-
     logger.info('Checking connection to database...')
     db_client.create_db_dir()
     with db_client.get_db_connection() as conn:
@@ -186,6 +182,9 @@ async def startup_checks():
 
     logger.info('Checking connection to execution nodes...')
     await wait_for_execution_node()
+
+    logger.info('Checking hot wallet balance %s...', hot_wallet.address)
+    await check_hot_wallet_balance()
 
     logger.info('Checking connection to ipfs nodes...')
     healthy_ipfs_endpoint = []

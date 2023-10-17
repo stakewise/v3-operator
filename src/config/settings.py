@@ -54,6 +54,7 @@ class Settings(metaclass=Singleton):
     validators_fetch_chunk_size: int
     sentry_dsn: str
     pool_size: int | None
+    restart_always: bool
 
     # pylint: disable-next=too-many-arguments,too-many-locals
     def set(
@@ -80,6 +81,7 @@ class Settings(metaclass=Singleton):
         hot_wallet_file: str | None = None,
         hot_wallet_password_file: str | None = None,
         database_dir: str | None = None,
+        restart_always: bool = False,
     ):
         self.vault = Web3.to_checksum_address(vault)
         vault_dir.mkdir(parents=True, exist_ok=True)
@@ -153,6 +155,7 @@ class Settings(metaclass=Singleton):
         self.pool_size = decouple_config(
             'POOL_SIZE', default=None, cast=lambda x: int(x) if x else None
         )
+        self.restart_always = restart_always
 
     @property
     def network_config(self) -> NetworkConfig:
