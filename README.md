@@ -572,12 +572,6 @@ The command syncs web3signer config for the operator:
   setup-operator
 Operator remote signer configuration saved to /Users/user/.stakewise/0x8189af89a7718c1bab5628399fc0ba50c6949bcc/remote_signer_config.json file.
 Successfully created operator configuration file.
-Generated configs with 1000 keys for validator with index 0.
-Validator definitions for Lighthouse saved to validator0/validator_definitions.yml file.
-Signer keys for Teku\Prysm saved to validator0/signer_keys.yml file.
-Proposer config for Teku\Prysm saved to validator0/proposer_config.json file.
-
-Successfully created validator configuration files.
 ```
 
 By default, the config will be created in the vault directory, but
