@@ -2,6 +2,7 @@ import logging
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import aiohttp
 from eth_typing import BlockNumber, ChecksumAddress
@@ -41,6 +42,11 @@ def log_verbose(e: Exception):
         logger.exception(e)
     else:
         logger.error(format_error(e))
+
+
+def warning_verbose(msg: str, *args: Any) -> None:
+    if settings.verbose:
+        logger.warning(msg, *args)
 
 
 def format_error(e: Exception) -> str:

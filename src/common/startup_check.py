@@ -9,7 +9,7 @@ from sw_utils import IpfsFetchClient, get_consensus_client, get_execution_client
 
 from src.common.clients import db_client
 from src.common.execution import check_hot_wallet_balance, get_oracles
-from src.common.utils import format_error
+from src.common.utils import format_error, warning_verbose
 from src.common.wallet import hot_wallet
 from src.config.settings import settings
 from src.validators.execution import check_deposit_data_root
@@ -119,8 +119,7 @@ async def collect_healthy_oracles() -> list:
     healthy_oracles = []
     for result, endpoint in zip(results, endpoints):
         if isinstance(result, Exception):
-            if settings.verbose:
-                logger.warning('%s for endpoint %s', format_error(result), endpoint)
+            warning_verbose('%s for endpoint %s', format_error(result), endpoint)
             continue
 
         if result:
