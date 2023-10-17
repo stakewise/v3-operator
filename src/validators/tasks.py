@@ -8,6 +8,7 @@ from web3.types import BlockNumber, Wei
 
 from src.common.clients import consensus_client, ipfs_fetch_client
 from src.common.contracts import validators_registry_contract
+from src.common.exceptions import NotEnoughOracleApprovalsError
 from src.common.execution import check_gas_price, get_oracles
 from src.common.metrics import metrics
 from src.common.typings import Oracles
@@ -122,8 +123,14 @@ async def register_validators(
                 oracles_request.validator_index,
             )
             break
-        except Exception as e:
-            logger.exception(e)
+        except NotEnoughOracleApprovalsError as e:
+            logger.error(
+                'Failed to fetch oracle approvals. Received %d out of %d, '
+                'the oracles with endpoints %s have failed to respond.',
+                e.num_votes,
+                e.threshold,
+                ', '.join(e.failed_endpoints),
+            )
 
     if len(validators) == 1:
         validator = validators[0]

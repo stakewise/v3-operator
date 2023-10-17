@@ -10,7 +10,7 @@ from src.common.contracts import keeper_contract
 from src.common.execution import get_oracles
 from src.common.metrics import metrics
 from src.common.typings import Oracles
-from src.common.utils import get_current_timestamp, is_block_finalized
+from src.common.utils import get_current_timestamp, is_block_finalized, log_verbose
 from src.config.settings import settings
 from src.exits.consensus import get_validator_public_keys
 from src.exits.execution import submit_exit_signatures
@@ -102,7 +102,7 @@ async def _update_exit_signatures(
             logger.info('Fetched updated signature for validators: count=%d', len(validators))
             break
         except Exception as e:
-            logger.exception(e)
+            log_verbose(e)
 
     tx_hash = await submit_exit_signatures(oracles_approval)
     logger.info(

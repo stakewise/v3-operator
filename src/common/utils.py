@@ -2,6 +2,7 @@ import logging
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import aiohttp
 from eth_typing import BlockNumber, ChecksumAddress
@@ -43,6 +44,11 @@ def log_verbose(e: Exception):
         logger.error(format_error(e))
 
 
+def warning_verbose(msg: str, *args: Any) -> None:
+    if settings.verbose:
+        logger.warning(msg, *args)
+
+
 def format_error(e: Exception) -> str:
     if isinstance(e, aiohttp.ClientResponseError):
         # repr(e) gives too much output
@@ -82,8 +88,9 @@ def process_oracles_approvals(
     votes = candidates[winner]
     if len(votes) < votes_threshold:
         # not enough oracles have approved the request
+        # Fill `failed_endpoints` later
         raise NotEnoughOracleApprovalsError(
-            f'Received {len(votes)} approvals, but {votes_threshold} is required'
+            num_votes=len(votes), threshold=votes_threshold, failed_endpoints=[]
         )
 
     signatures = b''
