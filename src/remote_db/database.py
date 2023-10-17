@@ -1,4 +1,3 @@
-import dataclasses
 import json
 
 import click
@@ -6,7 +5,6 @@ from eth_typing import HexStr
 
 from src.config.settings import settings
 from src.remote_db.typings import RemoteDatabaseKeyPair
-from src.validators.typings import Validator
 
 
 def get_db_connection(db_url):
@@ -225,10 +223,9 @@ class ConfigsCrud:
                 (settings.vault, self.remote_signer_config_name, data_string, data_string),
             )
 
-    def update_deposit_data(self, validators: list[Validator]) -> None:
+    def update_deposit_data(self, deposit_data: list[dict]) -> None:
         """Updates the deposit data in the database."""
-        data = [dataclasses.asdict(v) for v in validators]
-        data_string = json.dumps(data)
+        data_string = json.dumps(deposit_data)
         with self.db_connection.cursor() as cur:
             cur.execute(
                 f'''

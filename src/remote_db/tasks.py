@@ -19,7 +19,7 @@ from src.validators.execution import check_deposit_data_root
 from src.validators.signing.key_shares import private_key_to_private_key_shares
 from src.validators.signing.remote import RemoteSignerConfiguration
 from src.validators.typings import BLSPrivkey
-from src.validators.utils import load_deposit_data, load_keystores
+from src.validators.utils import generate_validators_tree, load_keystores
 
 CIPHER_KEY_LENGTH = 32
 VALIDATOR_DEFINITIONS_FILENAME = 'validator_definitions.yml'
@@ -70,8 +70,11 @@ async def upload_keypairs(db_url: str, b64_encrypt_key: str) -> None:
     encryption_key = _check_encryption_key(db_url, b64_encrypt_key)
 
     # load and check deposit data file
-    deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
-    await check_deposit_data_root(deposit_data.tree.root)
+    with open(settings.deposit_data_file, 'r', encoding='utf-8') as f:
+        deposit_data: list[dict] = json.load(f)
+
+    deposit_data_tree, _ = generate_validators_tree(settings.vault, deposit_data)
+    await check_deposit_data_root(deposit_data_tree.root)
 
     click.echo(f'Loading keystores from {settings.keystores_dir}...')
     keystores = load_keystores()
@@ -138,7 +141,7 @@ async def upload_keypairs(db_url: str, b64_encrypt_key: str) -> None:
         # upload remote signer config to remote db
         configs_crud = ConfigsCrud(db_connection=conn)
         configs_crud.update_remote_signer_config(remote_signer_config.pubkeys_to_shares)
-        configs_crud.update_deposit_data(deposit_data.validators)
+        configs_crud.update_deposit_data(deposit_data)
 
 
 def setup_web3signer(db_url: str, b64_encrypt_key: str, output_dir: Path) -> None:

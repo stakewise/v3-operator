@@ -191,6 +191,14 @@ def load_deposit_data(vault: HexAddress, deposit_data_file: Path) -> DepositData
     with open(deposit_data_file, 'r', encoding='utf-8') as f:
         deposit_data = json.load(f)
 
+    tree, validators = generate_validators_tree(vault, deposit_data)
+    return DepositData(validators=validators, tree=tree)
+
+
+def generate_validators_tree(
+    vault: HexAddress, deposit_data: list[dict]
+) -> tuple[StandardMerkleTree, list[Validator]]:
+    """Generates validators tree."""
     credentials = get_eth1_withdrawal_credentials(vault)
     leaves: list[tuple[bytes, int]] = []
     validators: list[Validator] = []
@@ -204,8 +212,7 @@ def load_deposit_data(vault: HexAddress, deposit_data_file: Path) -> DepositData
         validators.append(validator)
 
     tree = StandardMerkleTree.of(leaves, ['bytes', 'uint256'])
-
-    return DepositData(validators=validators, tree=tree)
+    return tree, validators
 
 
 def _process_keystore_file(
