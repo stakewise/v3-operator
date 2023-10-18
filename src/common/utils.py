@@ -44,7 +44,7 @@ def log_verbose(e: Exception):
     else:
         if isinstance(e, tenacity.RetryError):
             # get original error
-            e = e.last_attempt.exception()
+            e = e.last_attempt.exception()  # type: ignore
 
         logger.error(format_error(e))
 
