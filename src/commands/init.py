@@ -33,7 +33,7 @@ from src.config.settings import AVAILABLE_NETWORKS, GOERLI
 @click.option(
     '--vault',
     prompt='Enter your vault address',
-    help='Vault address',
+    help='The vault address.',
     type=str,
     callback=validate_eth_address,
 )

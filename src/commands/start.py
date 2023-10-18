@@ -37,6 +37,7 @@ from src.validators.signing.hashi_vault import (
 )
 from src.validators.signing.remote import RemoteSignerConfiguration
 from src.validators.tasks import load_genesis_validators, register_validators
+from src.validators.typings import Keystores
 from src.validators.utils import load_deposit_data, load_keystores
 
 logger = logging.getLogger(__name__)
@@ -257,28 +258,26 @@ async def main() -> None:
     await load_genesis_validators()
 
     # load keystores / remote signer configuration
-    keystores = load_keystores()
-
     remote_signer_config = None
-
-    if len(keystores) == 0:
-        if settings.hashi_vault_url:
-            # No keystores loaded but hashi vault configuration specified
-            hashi_vault_config = HashiVaultConfiguration.from_settings()
-            logger.info('Using hashi vault at %s for loading public keys')
-            keystores = await load_hashi_vault_keys(hashi_vault_config)
-
-        elif settings.remote_signer_url:
-            # No keystores loaded but remote signer URL provided
-            remote_signer_config = RemoteSignerConfiguration.from_file(
-                settings.remote_signer_config_file
-            )
-            logger.info(
-                'Using remote signer at %s for %i public keys',
-                settings.remote_signer_url,
-                len(remote_signer_config.pubkeys_to_shares.keys()),
-            )
-        else:
+    keystores = Keystores({})
+    if settings.remote_signer_url:
+        # No keystores loaded but remote signer URL provided
+        remote_signer_config = RemoteSignerConfiguration.from_file(
+            settings.remote_signer_config_file
+        )
+        logger.info(
+            'Using remote signer at %s for %i public keys',
+            settings.remote_signer_url,
+            len(remote_signer_config.pubkeys_to_shares.keys()),
+        )
+    elif settings.hashi_vault_url:
+        # No keystores loaded but hashi vault configuration specified
+        hashi_vault_config = HashiVaultConfiguration.from_settings()
+        logger.info('Using hashi vault at %s for loading public keys')
+        keystores = await load_hashi_vault_keys(hashi_vault_config)
+    else:
+        keystores = load_keystores()
+        if not keystores:
             raise RuntimeError('No keystores, no remote signer or hashi vault URL provided')
 
     # load deposit data

@@ -54,14 +54,18 @@ class RemoteSignerConfiguration:
     def from_file(cls, path: str | Path) -> 'RemoteSignerConfiguration':
         with open(path, 'r', encoding='utf-8') as f:
             data = json.load(f)
-            pubkeys_to_shares = {}
-            for full_pubkey, pubkey_shares in data['pubkeys_to_shares'].items():
-                pubkeys_to_shares[full_pubkey] = [HexStr(s) for s in pubkey_shares]
+        return cls.load(data['pubkeys_to_shares'])
 
-            if len(pubkeys_to_shares.keys()) == 0:
-                raise RuntimeError('Remote signer config does not contain any pubkeys')
+    @classmethod
+    def load(cls, data: dict) -> 'RemoteSignerConfiguration':
+        pubkeys_to_shares = {}
+        for full_pubkey, pubkey_shares in data.items():
+            pubkeys_to_shares[full_pubkey] = [HexStr(s) for s in pubkey_shares]
 
-            return cls(pubkeys_to_shares=pubkeys_to_shares)
+        if len(pubkeys_to_shares.keys()) == 0:
+            raise RuntimeError('Remote signer config does not contain any pubkeys')
+
+        return cls(pubkeys_to_shares=pubkeys_to_shares)
 
 
 async def get_signature_shard(

@@ -1,6 +1,6 @@
 import secrets
 import string
-from os import makedirs, path
+from pathlib import Path
 
 SPECIAL_CHARS = '!@#$%^&*()_'
 
@@ -23,13 +23,13 @@ def generate_password() -> str:
             return ''.join(password)
 
 
-def get_or_create_password_file(password_file: str) -> str:
+def get_or_create_password_file(password_file: Path) -> str:
     try:
         with open(password_file, 'r', encoding='utf-8') as file:
             password = file.readline()
     except FileNotFoundError:
         password = generate_password()
-        makedirs(path.dirname(path.abspath(password_file)), exist_ok=True)
+        password_file.parent.mkdir(parents=True, exist_ok=True)
         with open(password_file, 'w', encoding='utf-8') as file:
             file.write(password)
 

@@ -34,7 +34,8 @@ operator will submit a signature update transaction to the Vault.
 
 The oracles periodically submit consensus rewards of all the vaults to the Keeper contract.
 By default, every vault pulls these updates on the user interaction with the vault (deposit, withdraw, etc.), but it
-also can be done by the vault operator by passing the `--harvest-vault` flag to the `start` command.
+also can be done by the vault operator by passing the `--harvest-vault` flag to the `start` command. Harvesting vault
+rewards simplifies calls to the vault contracts, e.g., you don't need to sync rewards before calling deposit.
 
 ## Usage
 
@@ -472,81 +473,112 @@ Keystores for vault {vault} successfully recovered to {keystores_dir}
 > Note: For security purposes, make sure to protect your mnemonic as it can be used to generate your validator keys.
 > Always verify the network and endpoints before running the command.
 
-### Web3Signer infrastructure commands
+### Remote Postgres database
 
-#### 1. Update database
+This feature is used in conjunction with the [StakeWise Helm charts](https://github.com/stakewise/helm-charts). It
+stores encrypted validator keys and shares in the remote database.
+The [web3signer helm chart](https://github.com/stakewise/helm-charts/tree/main/charts/web3signer) pulls the private keys
+and decrypts
+them on
+start. The [validator pods](https://github.com/stakewise/helm-charts/tree/main/charts/validators) use the web3signer
+service to sign blocks and fetch the public keys they're validating for
+from the DB. The [operator chart](https://github.com/stakewise/helm-charts/tree/main/charts/v3-operator) pulls the
+config from the DB and uses
+web3signer to sign exit messages.
 
-The command encrypts and loads validator keys from keystore files into the database
+#### 1. Setup Postgres DB
 
-```bash
-./v3-operator update-db --db-url postgresql://postgres:postgres@localhost:5432/web3signer --keystores-dir ./data/keystores --keystores-password-file ./data/keystores/password.txt
-Loading keystores...              [####################################]  10/10
-Encrypting database keys...
-Generated 10 validator keys, upload them to the database? [Y/n]: Y
-The database contains 10 validator keys.
-Save decryption key: '<DECRYPTION KEYS>'
-```
-
-##### update-db options
-
-- `--keystores-dir` - The directory with validator keys in the EIP-2335 standard. Defaults to ./data/keystores.
-- `--keystores-password-file` - The path to file with password for encrypting the keystores. Defaults to
-  ./data/keystores/password.txt.
-- `--db-url` - The database connection address.
-- `--encryption-key` - The key for encrypting database record. If you are upload new keystores use the same encryption
-  key.
-- `--no-confirm` - Skips confirmation messages when provided.
-
-**NB! You must store the decryption key in a secure place.
-It will allow you to upload new keystores in the existing database**
-
-#### 2. Sync validator configs
-
-Creates validator configuration files for Lighthouse, Prysm, and Teku clients to sign data using keys form database.
+The command creates tables and generates encryption key for the database:
 
 ```bash
-./v3-operator sync-validator
-Enter the recipient address for MEV & priority fees: 0xB31...1
-Enter the endpoint of the web3signer service: https://web3signer-example.com
-Enter the database connection string, ex. 'postgresql://username:pass@hostname/dbname': postgresql://postgres:postgres@localhost/web3signer
-Enter the total number of validators connected to the web3signer: 30
-Enter the validator index to generate the configuration files: 5
-
-Done. Generated configs with 50 keys for validator #5.
-Validator definitions for Lighthouse saved to data/configs/validator_definitions.yml file.
-Signer keys for Teku\Prysm saved to data/configs/signer_keys.yml file.
-Proposer config for Teku\Prysm saved to data/configs/proposer_config.json file.
+./v3-operator remote-db \
+  --db-url=postgresql://postgres:postgres@localhost/operator \
+  --vault=0x8189aF89A7718C1baB5628399FC0ba50C6949bCc \
+  setup
+Successfully configured remote database.
+Encryption key: D/6CbpJen3J0ue0tWcd+d4KKHpT4kaSz3IzG5jz5LFI=
+NB! You must store your encryption in a secure cold storage!
 ```
 
-##### sync-validator options
+**NB! You must store the generated encryption key in a secure cold storage. You would have to re-do the setup if you
+lose it.**
 
-- `--validator-index` - The validator index to generate the configuration files.
-- `--total-validators` - The total number of validators connected to the web3signer.
-- `--db-url` - The database connection address.
-- `--web3signer-endpoint` - The endpoint of the web3signer service.
-- `--fee-recipient` - The recipient address for MEV & priority fees.
-- `--disable-proposal-builder` - Disable proposal builder for Teku and Prysm clients.
-- `--output-dir` - The directory to save configuration files. Defaults to ./data/configs.
+#### 2. Load keystores to the remote DB
 
-#### 3. Sync Web3Signer config
-
-The command is running by the init container in web3signer pods.
-Fetch and decrypt keys for web3signer and store them as keypairs in the output_dir.
-
-Set `DECRYPTION_KEY` env, use value generated by `update-db` command
+The command loads encrypted keystores and operator config to the remote DB:
 
 ```bash
-./v3-operator sync-web3signer
-Enter the folder where web3signer keystores will be saved: /data/web3signer
-Enter the database connection string, ex. 'postgresql://username:pass@hostname/dbname': postgresql://postgres:postgres@localhost/web3signer
-Web3Signer now uses 7 private keys.
+./v3-operator remote-db \
+  --db-url=postgresql://postgres:postgres@localhost/operator \
+  --vault=0x8189aF89A7718C1baB5628399FC0ba50C6949bCc \
+  upload-keypairs \
+  --encrypt-key=D/6CbpJen3J0ue0tWcd+d4KKHpT4kaSz3IzG5jz5LFI= \
+  --execution-endpoints=http://localhost:8545
+Loading keystores from /Users/user/.stakewise/0x8189af89a7718c1bab5628399fc0ba50c6949bcc/keystores...
+Fetching oracles config...
+Calculating and encrypting shares for 10000 keystores...
+Uploading updates to the remote db...
+Successfully uploaded keypairs and shares for the 0x8189aF89A7718C1baB5628399FC0ba50C6949bCc vault.
 ```
 
-##### sync-web3signer options
+#### 3. Sync keystores to the web3signer
 
-- `--db-url` - The database connection address.
-- `--output-dir` - The folder where Web3Signer keystores will be saved.
-- `--decryption-key-env` - The environment variable with the decryption key for private keys in the database.
+The command syncs encrypted keystores to the web3signer:
+
+```bash
+./v3-operator remote-db \
+  --db-url=postgresql://postgres:postgres@localhost/operator \
+  --vault=0x8189aF89A7718C1baB5628399FC0ba50C6949bCc \
+  --network=mainnet \
+  setup-web3signer \
+  --encrypt-key=D/6CbpJen3J0ue0tWcd+d4KKHpT4kaSz3IzG5jz5LFI= \
+  --output-dir=./web3signer
+Fetching keypairs from the remote db...
+Decrypting 120000 keystores...
+Saving 120000 private keys to web3signer...
+Successfully retrieved web3signer private keys from the database.
+```
+
+#### 3. Sync web3signer configs for the validators
+
+The command syncs web3signer config for every validator:
+
+```bash
+./v3-operator remote-db \
+  --db-url=postgresql://postgres:postgres@localhost/operator \
+  --vault=0x8189aF89A7718C1baB5628399FC0ba50C6949bCc \
+  --network=mainnet \
+  setup-validator \
+  --validator-index=0 \
+  --total-validators=10 \
+  --web3signer-endpoint=http://localhost:9000 \
+  --fee-recipient=0xb793c3D2Cec1d0F35fF88BCA7655B88A44669e4B \
+  --output-dir=./validator0
+Generated configs with 1000 keys for validator with index 0.
+Validator definitions for Lighthouse saved to validator0/validator_definitions.yml file.
+Signer keys for Teku\Prysm saved to validator0/signer_keys.yml file.
+Proposer config for Teku\Prysm saved to validator0/proposer_config.json file.
+
+Successfully created validator configuration files.
+```
+
+#### 4. Sync configs for the operator
+
+The command syncs web3signer config and deposit data for the operator:
+
+```bash
+./v3-operator remote-db \
+  --db-url=postgresql://postgres:postgres@localhost/operator \
+  --vault=0x8189aF89A7718C1baB5628399FC0ba50C6949bCc \
+  --network=mainnet \
+  setup-operator
+Operator remote signer configuration saved to /Users/user/.stakewise/0x8189af89a7718c1bab5628399fc0ba50c6949bcc/remote_signer_config.json file.
+Operator deposit data saved to /Users/user/.stakewise/0x8189af89a7718c1bab5628399fc0ba50c6949bcc/deposit_data.json file.
+Successfully created operator configuration file.
+```
+
+By default, the config will be created in the vault directory, but
+you can override it by providing `--output-dir`.
 
 ## Monitoring Operator with Prometheus
 

@@ -5,7 +5,7 @@ import logging
 import random
 from multiprocessing import Pool
 from os import listdir
-from os.path import isfile, join
+from os.path import isfile
 from pathlib import Path
 
 import milagro_bls_binding as bls
@@ -157,9 +157,9 @@ def list_keystore_files() -> list[KeystoreFile]:
 
 def load_keystores() -> Keystores:
     """Extracts private keys from the keystores."""
-
     keystore_files = list_keystore_files()
     logger.info('Loading keystores from %s...', settings.keystores_dir)
+    keystores = {}
     with Pool(processes=settings.pool_size) as pool:
         # pylint: disable-next=unused-argument
         def _stop_pool(*args, **kwargs):
@@ -173,20 +173,17 @@ def load_keystores() -> Keystores:
             )
             for keystore_file in keystore_files
         ]
-        keys = []
         for result in results:
             result.wait()
             try:
-                keys.append(result.get())
+                pub_key, priv_key = result.get()
+                keystores[pub_key] = priv_key
             except KeystoreException as e:
                 logger.error(e)
                 raise RuntimeError('Failed to load keystores') from e
 
-        existing_keys: list[tuple[HexStr, BLSPrivkey]] = [key for key in keys if key]
-        keystores = Keystores(dict(existing_keys))
-
     logger.info('Loaded %d keystores', len(keystores))
-    return keystores
+    return Keystores(keystores)
 
 
 def load_deposit_data(vault: HexAddress, deposit_data_file: Path) -> DepositData:
@@ -194,6 +191,14 @@ def load_deposit_data(vault: HexAddress, deposit_data_file: Path) -> DepositData
     with open(deposit_data_file, 'r', encoding='utf-8') as f:
         deposit_data = json.load(f)
 
+    tree, validators = generate_validators_tree(vault, deposit_data)
+    return DepositData(validators=validators, tree=tree)
+
+
+def generate_validators_tree(
+    vault: HexAddress, deposit_data: list[dict]
+) -> tuple[StandardMerkleTree, list[Validator]]:
+    """Generates validators tree."""
     credentials = get_eth1_withdrawal_credentials(vault)
     leaves: list[tuple[bytes, int]] = []
     validators: list[Validator] = []
@@ -207,8 +212,7 @@ def load_deposit_data(vault: HexAddress, deposit_data_file: Path) -> DepositData
         validators.append(validator)
 
     tree = StandardMerkleTree.of(leaves, ['bytes', 'uint256'])
-
-    return DepositData(validators=validators, tree=tree)
+    return tree, validators
 
 
 def _process_keystore_file(
@@ -216,7 +220,7 @@ def _process_keystore_file(
 ) -> tuple[HexStr, BLSPrivkey]:
     file_name = keystore_file.name
     keystores_password = keystore_file.password
-    file_path = join(keystore_path, file_name)
+    file_path = keystore_path / file_name
 
     try:
         keystore = ScryptKeystore.from_file(file_path)

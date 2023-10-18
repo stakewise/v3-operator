@@ -84,7 +84,7 @@ def create_keys(
     _export_keystores(
         credentials=credentials,
         keystores_dir=keystores_dir,
-        password_file=str(password_file),
+        password_file=password_file,
         per_keystore_password=per_keystore_password,
         pool_size=pool_size,
     )
@@ -130,7 +130,7 @@ def _export_deposit_data_json(
 def _export_keystores(
     credentials: list[Credential],
     keystores_dir: Path,
-    password_file: str,
+    password_file: Path,
     per_keystore_password: bool,
     pool_size: int | None = None,
 ) -> None:
