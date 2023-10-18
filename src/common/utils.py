@@ -1,10 +1,11 @@
+import asyncio
 import logging
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import aiohttp
+import tenacity
 from eth_typing import BlockNumber, ChecksumAddress
 from web3 import Web3
 from web3.types import Timestamp, Wei
@@ -41,6 +42,10 @@ def log_verbose(e: Exception):
     if settings.verbose:
         logger.exception(e)
     else:
+        if isinstance(e, tenacity.RetryError):
+            # get original error
+            e = e.last_attempt.exception()  # type: ignore
+
         logger.error(format_error(e))
 
 
@@ -50,16 +55,11 @@ def warning_verbose(msg: str, *args: Any) -> None:
 
 
 def format_error(e: Exception) -> str:
-    if isinstance(e, aiohttp.ClientResponseError):
-        # repr(e) gives too much output
-        return (
-            f'ClientResponseError('
-            f'status={e.status}, '
-            f'message="{e.message}", '
-            f'url="{e.request_info.url}")'
-        )
+    if isinstance(e, asyncio.TimeoutError):
+        # str(e) returns empty string
+        return repr(e)
 
-    return repr(e)
+    return str(e)
 
 
 async def is_block_finalized(block_number: BlockNumber) -> bool:
