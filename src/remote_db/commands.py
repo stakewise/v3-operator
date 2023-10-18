@@ -47,6 +47,14 @@ from src.remote_db.database import check_db_connection
     type=click.Path(file_okay=False, dir_okay=True),
 )
 @click.option(
+    '--keystores-dir',
+    type=click.Path(exists=True, file_okay=False, dir_okay=True),
+    envvar='KEYSTORES_DIR',
+    help='Absolute path to the directory with all the encrypted keystores. '
+    'Default is the directory generated with "create-keys" command.',
+    required=False,
+)
+@click.option(
     '-v',
     '--verbose',
     help='Enable debug mode. Default is false.',
@@ -59,6 +67,7 @@ def remote_db_group(
     ctx,
     vault: HexAddress,
     data_dir: str,
+    keystores_dir: str | None,
     db_url: str,
     network: str | None,
     verbose: bool,
@@ -74,6 +83,7 @@ def remote_db_group(
         vault=vault,
         vault_dir=config.vault_dir,
         network=network,
+        keystores_dir=keystores_dir,
         verbose=verbose,
     )
 
@@ -117,14 +127,6 @@ def cleanup(ctx) -> None:
     help='Comma separated list of API endpoints for execution nodes.',
 )
 @click.option(
-    '--keystores-dir',
-    type=click.Path(exists=True, file_okay=False, dir_okay=True),
-    envvar='KEYSTORES_DIR',
-    help='Absolute path to the directory with all the encrypted keystores. '
-    'Default is the directory generated with "create-keys" command.',
-    required=False,
-)
-@click.option(
     '--deposit-data-file',
     type=click.Path(exists=True, file_okay=True, dir_okay=False),
     envvar='DEPOSIT_DATA_FILE',
@@ -136,14 +138,13 @@ def upload_keypairs(
     ctx,
     encrypt_key: str,
     execution_endpoints: str,
-    keystores_dir: str | None,
     deposit_data_file: str | None,
 ) -> None:
     settings.set(
         vault=settings.vault,
         vault_dir=settings.vault_dir,
         network=settings.network,
-        keystores_dir=keystores_dir,
+        keystores_dir=str(settings.keystores_dir),
         deposit_data_file=deposit_data_file,
         verbose=settings.verbose,
         execution_endpoints=execution_endpoints,
