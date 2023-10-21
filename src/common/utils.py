@@ -94,6 +94,6 @@ def process_oracles_approvals(
         )
 
     signatures = b''
-    for _, signature in sorted(votes, key=lambda x: x[0])[:votes_threshold]:
+    for _, signature in sorted(votes, key=lambda x: Web3.to_int(hexstr=x[0]))[:votes_threshold]:
         signatures += signature
     return OraclesApproval(ipfs_hash=winner[0], signatures=signatures, deadline=winner[1])
