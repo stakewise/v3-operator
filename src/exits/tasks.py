@@ -105,6 +105,9 @@ async def _update_exit_signatures(
             log_verbose(e)
 
     tx_hash = await submit_exit_signatures(oracles_approval)
+    if not tx_hash:
+        return
+
     logger.info(
         'Successfully rotated exit signatures for validators with indexes %s, tx hash: %s',
         ', '.join([str(index) for index in outdated_indexes]),

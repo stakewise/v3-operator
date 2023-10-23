@@ -134,25 +134,29 @@ async def register_validators(
 
     if len(validators) == 1:
         validator = validators[0]
-        await register_single_validator(
+        tx_hash = await register_single_validator(
             approval=oracles_approval,
             multi_proof=multi_proof,
             tx_validators=tx_validators,
             update_state_call=update_state_call,
             validators_registry_root=registry_root,
         )
-        logger.info('Successfully registered validator with public key %s', validator.public_key)
+        if tx_hash:
+            logger.info(
+                'Successfully registered validator with public key %s', validator.public_key
+            )
 
     if len(validators) > 1:
-        await register_multiple_validator(
+        tx_hash = await register_multiple_validator(
             approval=oracles_approval,
             multi_proof=multi_proof,
             tx_validators=tx_validators,
             update_state_call=update_state_call,
             validators_registry_root=registry_root,
         )
-        pub_keys = ', '.join([val.public_key for val in validators])
-        logger.info('Successfully registered validators with public keys %s', pub_keys)
+        if tx_hash:
+            pub_keys = ', '.join([val.public_key for val in validators])
+            logger.info('Successfully registered validators with public keys %s', pub_keys)
 
 
 # pylint: disable-next=too-many-arguments
