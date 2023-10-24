@@ -29,7 +29,11 @@ class Settings(metaclass=Singleton):
     vault_dir: Path
     network: str
     consensus_endpoints: list[str]
+    consensus_timeout: int
+    consensus_retry_timeout: int
     execution_endpoints: list[str]
+    execution_timeout: int
+    execution_retry_timeout: int
 
     harvest_vault: bool
     verbose: bool
@@ -51,6 +55,8 @@ class Settings(metaclass=Singleton):
     database: Path
     log_level: str
     ipfs_fetch_endpoints: list[str]
+    ipfs_timeout: int
+    ipfs_retry_timeout: int
     validators_fetch_chunk_size: int
     sentry_dsn: str
     pool_size: int | None
@@ -146,12 +152,22 @@ class Settings(metaclass=Singleton):
             'http://cloudflare-ipfs.com,'
             'https://gateway.pinata.cloud,https://ipfs.io',
         )
+        self.ipfs_timeout = decouple_config('IPFS_TIMEOUT', default=60)
+        self.ipfs_retry_timeout = decouple_config('IPFS_RETRY_TIMEOUT', default=120)
         self.validators_fetch_chunk_size = decouple_config(
             'VALIDATORS_FETCH_CHUNK_SIZE', default=100, cast=int
         )
         self.sentry_dsn = decouple_config('SENTRY_DSN', default='')
         self.pool_size = decouple_config(
             'POOL_SIZE', default=None, cast=lambda x: int(x) if x else None
+        )
+        self.execution_timeout = decouple_config('EXECUTION_TIMEOUT', default=30, cast=int)
+        self.execution_retry_timeout = decouple_config(
+            'EXECUTION_RETRY_TIMEOUT', default=60, cast=int
+        )
+        self.consensus_timeout = decouple_config('CONSENSUS_TIMEOUT', default=60, cast=int)
+        self.consensus_retry_timeout = decouple_config(
+            'CONSENSUS_RETRY_TIMEOUT', default=120, cast=int
         )
 
     @property
