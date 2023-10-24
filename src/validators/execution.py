@@ -18,6 +18,7 @@ from src.common.contracts import (
 from src.common.ipfs import fetch_harvest_params
 from src.common.metrics import metrics
 from src.common.typings import OraclesApproval
+from src.common.utils import format_error
 from src.config.networks import ETH_NETWORKS
 from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.validators.database import NetworkValidatorCrud
@@ -253,7 +254,7 @@ async def register_single_validator(
     tx_validators: list[bytes],
     update_state_call: HexStr | None,
     validators_registry_root: Bytes32,
-) -> None:
+) -> HexStr | None:
     """Registers single validator."""
     if settings.network not in ETH_NETWORKS:
         raise NotImplementedError('networks other than Ethereum not supported')
@@ -269,17 +270,27 @@ async def register_single_validator(
         ),
         multi_proof.proof,
     ]
-    if update_state_call is not None:
-        register_call = vault_contract.encode_abi(
-            fn_name='registerValidator',
-            args=register_call_args,
-        )
-        tx = await vault_contract.functions.multicall([update_state_call, register_call]).transact()
-    else:
-        tx = await vault_contract.functions.registerValidator(*register_call_args).transact()
+    try:
+        if update_state_call is not None:
+            register_call = vault_contract.encode_abi(
+                fn_name='registerValidator',
+                args=register_call_args,
+            )
+            tx = await vault_contract.functions.multicall(
+                [update_state_call, register_call]
+            ).transact()
+        else:
+            tx = await vault_contract.functions.registerValidator(*register_call_args).transact()
+    except Exception as e:
+        logger.error('Failed to register validator: %s', format_error(e))
+        if settings.verbose:
+            logger.exception(e)
+        return None
 
-    logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
+    tx_hash = Web3.to_hex(tx)
+    logger.info('Waiting for transaction %s confirmation', tx_hash)
     await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)
+    return tx_hash
 
 
 async def register_multiple_validator(
@@ -288,7 +299,7 @@ async def register_multiple_validator(
     approval: OraclesApproval,
     update_state_call: HexStr | None,
     validators_registry_root: Bytes32,
-) -> None:
+) -> HexStr | None:
     """Registers multiple validators."""
     if settings.network not in ETH_NETWORKS:
         raise NotImplementedError('networks other than Ethereum not supported')
@@ -309,14 +320,24 @@ async def register_multiple_validator(
         multi_proof.proof_flags,
         multi_proof.proof,
     ]
-    if update_state_call is not None:
-        register_call = vault_contract.encode_abi(
-            fn_name='registerValidators',
-            args=register_call_args,
-        )
-        tx = await vault_contract.functions.multicall([update_state_call, register_call]).transact()
-    else:
-        tx = await vault_contract.functions.registerValidators(*register_call_args).transact()
+    try:
+        if update_state_call is not None:
+            register_call = vault_contract.encode_abi(
+                fn_name='registerValidators',
+                args=register_call_args,
+            )
+            tx = await vault_contract.functions.multicall(
+                [update_state_call, register_call]
+            ).transact()
+        else:
+            tx = await vault_contract.functions.registerValidators(*register_call_args).transact()
+    except Exception as e:
+        logger.error('Failed to register validators: %s', format_error(e))
+        if settings.verbose:
+            logger.exception(e)
+        return None
 
-    logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
+    tx_hash = Web3.to_hex(tx)
+    logger.info('Waiting for transaction %s confirmation', tx_hash)
     await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)
+    return tx_hash

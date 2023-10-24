@@ -8,6 +8,7 @@ from typing import Any
 import tenacity
 from eth_typing import BlockNumber, ChecksumAddress
 from web3 import Web3
+from web3.exceptions import Web3Exception
 from web3.types import Timestamp, Wei
 
 from src.common.clients import consensus_client
@@ -58,6 +59,10 @@ def format_error(e: Exception) -> str:
     if isinstance(e, asyncio.TimeoutError):
         # str(e) returns empty string
         return repr(e)
+
+    if isinstance(e, Web3Exception):
+        # str(e) gives hex output. Not user-friendly.
+        return e.__class__.__name__
 
     return str(e)
 

@@ -31,5 +31,7 @@ async def harvest_vault() -> None:
         return
 
     logger.info('Starting vault harvest')
-    await submit_harvest_transaction(harvest_params)
+    tx_hash = await submit_harvest_transaction(harvest_params)
+    if not tx_hash:
+        return
     logger.info('Successfully harvested vault')
