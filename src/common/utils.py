@@ -43,10 +43,6 @@ def log_verbose(e: Exception):
     if settings.verbose:
         logger.exception(e)
     else:
-        if isinstance(e, tenacity.RetryError):
-            # get original error
-            e = e.last_attempt.exception()  # type: ignore
-
         logger.error(format_error(e))
 
 
@@ -56,6 +52,10 @@ def warning_verbose(msg: str, *args: Any) -> None:
 
 
 def format_error(e: Exception) -> str:
+    if isinstance(e, tenacity.RetryError):
+        # get original error
+        e = e.last_attempt.exception()  # type: ignore
+
     if isinstance(e, asyncio.TimeoutError):
         # str(e) returns empty string
         return repr(e)

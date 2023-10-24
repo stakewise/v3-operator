@@ -48,7 +48,7 @@ async def get_oracles() -> Oracles:
 
     # fetch IPFS record
     ipfs_hash = event['args']['configIpfsHash']
-    config: dict = await ipfs_fetch_client.fetch_json(ipfs_hash)
+    config: dict = await ipfs_fetch_client.fetch_json(ipfs_hash)  # type: ignore
     rewards_threshold = await keeper_contract.get_rewards_min_oracles()
     validators_threshold = await keeper_contract.get_validators_min_oracles()
     endpoints = []

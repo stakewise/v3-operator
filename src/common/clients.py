@@ -14,7 +14,7 @@ from sw_utils.decorators import retry_ipfs_exception
 from web3 import AsyncWeb3
 
 from src.common.wallet import hot_wallet
-from src.config.settings import DEFAULT_RETRY_TIME, settings
+from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,11 @@ class Database:
 class ExecutionClient:
     @cached_property
     def client(self) -> AsyncWeb3:
-        w3 = get_execution_client(settings.execution_endpoints, retry_timeout=DEFAULT_RETRY_TIME)
+        w3 = get_execution_client(
+            settings.execution_endpoints,
+            timeout=settings.execution_timeout,
+            retry_timeout=settings.execution_retry_timeout,
+        )
         # Account is required when emitting transactions.
         # For read-only queries account may be omitted.
         if hot_wallet.can_load():
@@ -48,7 +52,11 @@ class ExecutionClient:
 class ConsensusClient:
     @cached_property
     def client(self) -> ExtendedAsyncBeacon:
-        return get_consensus_client(settings.consensus_endpoints, retry_timeout=DEFAULT_RETRY_TIME)
+        return get_consensus_client(
+            settings.consensus_endpoints,
+            timeout=settings.consensus_timeout,
+            retry_timeout=settings.consensus_retry_timeout,
+        )
 
     def __getattr__(self, item):
         return getattr(self.client, item)
@@ -57,15 +65,17 @@ class ConsensusClient:
 class IpfsFetchRetryClient:
     @cached_property
     def client(self) -> IpfsFetchClient:
-        return IpfsFetchClient(endpoints=settings.ipfs_fetch_endpoints)
+        return IpfsFetchClient(
+            endpoints=settings.ipfs_fetch_endpoints, timeout=settings.ipfs_timeout
+        )
 
-    @retry_ipfs_exception(delay=DEFAULT_RETRY_TIME)
     async def fetch_bytes(self, ipfs_hash: str) -> bytes:
-        return await self.client.fetch_bytes(ipfs_hash)
+        decorator = retry_ipfs_exception(delay=settings.ipfs_retry_timeout)
+        return await decorator(self.client.fetch_bytes)(ipfs_hash)
 
-    @retry_ipfs_exception(delay=DEFAULT_RETRY_TIME)
     async def fetch_json(self, ipfs_hash: str) -> dict | list:
-        return await self.client.fetch_json(ipfs_hash)
+        decorator = retry_ipfs_exception(delay=settings.ipfs_retry_timeout)
+        return await decorator(self.client.fetch_json)(ipfs_hash)
 
 
 db_client = Database()
