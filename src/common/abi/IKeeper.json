@@ -173,12 +173,6 @@
       },
       {
         "indexed": false,
-        "internalType": "bytes",
-        "name": "validators",
-        "type": "bytes"
-      },
-      {
-        "indexed": false,
         "internalType": "string",
         "name": "exitSignaturesIpfsHash",
         "type": "string"
@@ -388,8 +382,26 @@
         "internalType": "uint256",
         "name": "unlockedMevDelta",
         "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "harvested",
+        "type": "bool"
       }
     ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_owner",
+        "type": "address"
+      }
+    ],
+    "name": "initialize",
+    "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },
