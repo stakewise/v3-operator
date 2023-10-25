@@ -96,7 +96,7 @@ NETWORKS = {
                 hexstr=HexStr('0x9143aa7c615a7f7115e2b6aac319c03529df8242ae705fba9df39b79c59fa8b1')
             )
         ),
-        GENESIS_VALIDATORS_IPFS_HASH='QmRQC77DywyAofaYdiNPm8wvskMMd88S65aCfoxEnDfKEr',
+        GENESIS_VALIDATORS_IPFS_HASH='bafybeih2zhayrd6t5nnvzwmechcrxeejphr45lv4q7byxjqlapizghdtde',
         SLOTS_PER_EPOCH=32,
         SECONDS_PER_BLOCK=Decimal(12),
         GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x01017000')),
