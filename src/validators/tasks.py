@@ -6,7 +6,7 @@ from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.types import BlockNumber, Wei
 
-from src.common.clients import consensus_client, ipfs_fetch_client
+from src.common.clients import ipfs_fetch_client
 from src.common.contracts import validators_registry_contract
 from src.common.exceptions import NotEnoughOracleApprovalsError
 from src.common.execution import check_gas_price, get_oracles
@@ -176,10 +176,6 @@ async def create_approval_request(
     validator_index = NetworkValidatorCrud().get_next_validator_index(list(latest_public_keys))
     logger.debug('Next validator index for exit signature: %d', validator_index)
 
-    # fetch current fork data
-    fork = await consensus_client.get_consensus_fork()
-    logger.debug('Fetched current fork data: %s', fork)
-
     # get exit signature shards
     request = ApprovalRequest(
         validator_index=validator_index,
@@ -200,7 +196,7 @@ async def create_approval_request(
                 validator_index=validator_index,
                 private_key=keystores[validator.public_key],
                 oracles=oracles,
-                fork=fork,
+                fork=settings.network_config.SHAPELLA_FORK,
             )
         elif remote_signer_config:
             pubkey_shares = remote_signer_config.pubkeys_to_shares[validator.public_key]
@@ -208,7 +204,7 @@ async def create_approval_request(
                 validator_index=validator_index,
                 validator_pubkey_shares=[BLSPubkey(Web3.to_bytes(hexstr=s)) for s in pubkey_shares],
                 oracles=oracles,
-                fork=fork,
+                fork=settings.network_config.SHAPELLA_FORK,
             )
         else:
             raise RuntimeError('No keystores and no remote signer URL provided')

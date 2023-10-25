@@ -140,7 +140,6 @@ def validators_exit(
 async def main(count: int | None) -> None:
     keystores = load_keystores()
     remote_signer_config = None
-    fork = await consensus_client.get_consensus_fork()
 
     if len(keystores) > 0:
         all_validator_pubkeys = list(keystores.keys())  # pylint: disable=no-member
@@ -186,14 +185,14 @@ async def main(count: int | None) -> None:
         exit_signature = await _get_exit_signature(
             exit_keystore=exit_keystore,
             remote_signer_config=remote_signer_config,
-            fork=fork,
+            fork=settings.network_config.SHAPELLA_FORK,
             network=settings.network,
         )
         try:
             await consensus_client.submit_voluntary_exit(
                 validator_index=exit_keystore.index,
                 signature=Web3.to_hex(exit_signature),
-                epoch=fork.epoch,
+                epoch=settings.network_config.SHAPELLA_FORK.epoch,
             )
         except ClientResponseError as e:
             # Validator status is updated in CL after some delay.

@@ -3,15 +3,16 @@ from decimal import Decimal
 
 from ens.constants import EMPTY_ADDR_HEX
 from eth_typing import BlockNumber, ChecksumAddress, HexStr
-from sw_utils.typings import Bytes32
+from sw_utils.typings import Bytes32, ConsensusFork
 from web3 import Web3
 from web3.types import Wei
 
 MAINNET = 'mainnet'
 GOERLI = 'goerli'
 GNOSIS = 'gnosis'
+HOLESKY = 'holesky'
 
-ETH_NETWORKS = [MAINNET, GOERLI]
+ETH_NETWORKS = [MAINNET, GOERLI, HOLESKY]
 GNO_NETWORKS = [GNOSIS]
 
 
@@ -33,6 +34,15 @@ class NetworkConfig:
     GENESIS_FORK_VERSION: bytes
     IS_POA: bool
     HOT_WALLET_MIN_BALANCE: Wei
+    SHAPELLA_FORK_VERSION: bytes
+    SHAPELLA_EPOCH: int
+
+    @property
+    def SHAPELLA_FORK(self) -> ConsensusFork:
+        return ConsensusFork(
+            version=self.SHAPELLA_FORK_VERSION,
+            epoch=self.SHAPELLA_EPOCH,
+        )
 
 
 NETWORKS = {
@@ -58,9 +68,42 @@ NETWORKS = {
         GENESIS_VALIDATORS_IPFS_HASH='',
         SLOTS_PER_EPOCH=32,
         SECONDS_PER_BLOCK=Decimal(12),
-        GENESIS_FORK_VERSION=bytes.fromhex('00000000'),
+        GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x00000000')),
         IS_POA=False,
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
+        SHAPELLA_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x03000000')),
+        SHAPELLA_EPOCH=194048,
+    ),
+    HOLESKY: NetworkConfig(
+        SYMBOL='HolETH',
+        VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x4242424242424242424242424242424242424242'
+        ),
+        VALIDATORS_REGISTRY_GENESIS_BLOCK=BlockNumber(0),
+        KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0xc3e8c8BA310b62540FBb5eB81c9028444D35e568'
+        ),
+        KEEPER_GENESIS_BLOCK=BlockNumber(167109),
+        V2_POOL_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x0000000000000000000000000000000000000000'
+        ),
+        V2_POOL_GENESIS_BLOCK=BlockNumber(167109),
+        GENESIS_VAULT_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0xcca5bB5089B83060793B9b6DF35Bfe62B922b8E4'
+        ),
+        GENESIS_VALIDATORS_ROOT=Bytes32(
+            Web3.to_bytes(
+                hexstr=HexStr('0x9143aa7c615a7f7115e2b6aac319c03529df8242ae705fba9df39b79c59fa8b1')
+            )
+        ),
+        GENESIS_VALIDATORS_IPFS_HASH='QmRQC77DywyAofaYdiNPm8wvskMMd88S65aCfoxEnDfKEr',
+        SLOTS_PER_EPOCH=32,
+        SECONDS_PER_BLOCK=Decimal(12),
+        GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x01017000')),
+        IS_POA=False,
+        HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
+        SHAPELLA_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x01017000')),
+        SHAPELLA_EPOCH=256,
     ),
     GOERLI: NetworkConfig(
         SYMBOL='GoerliETH',
@@ -87,9 +130,11 @@ NETWORKS = {
         GENESIS_VALIDATORS_IPFS_HASH='QmQo3oLYxqWm75fbgJJkCaUttZoYVqZhZj9r99r1UsZVpu',
         SLOTS_PER_EPOCH=32,
         SECONDS_PER_BLOCK=Decimal(12),
-        GENESIS_FORK_VERSION=bytes.fromhex('00001020'),
+        GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x00001020')),
         IS_POA=True,
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
+        SHAPELLA_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x03001020')),
+        SHAPELLA_EPOCH=162304,
     ),
     GNOSIS: NetworkConfig(
         SYMBOL='xDAI',
@@ -113,8 +158,10 @@ NETWORKS = {
         GENESIS_VALIDATORS_IPFS_HASH='',
         SLOTS_PER_EPOCH=32,
         SECONDS_PER_BLOCK=Decimal('6.8'),
-        GENESIS_FORK_VERSION=bytes.fromhex('00000064'),
+        GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x00000064')),
         IS_POA=False,
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
+        SHAPELLA_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x0')),
+        SHAPELLA_EPOCH=0,  # todo
     ),
 }

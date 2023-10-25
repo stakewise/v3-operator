@@ -248,7 +248,13 @@
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "coveredShares",
+        "name": "osTokenShares",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "shares",
         "type": "uint256"
       },
       {
@@ -318,6 +324,12 @@
         "internalType": "address",
         "name": "receiver",
         "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "osTokenShares",
+        "type": "uint256"
       },
       {
         "indexed": false,
@@ -414,25 +426,6 @@
   {
     "inputs": [
       {
-        "internalType": "address",
-        "name": "account",
-        "type": "address"
-      }
-    ],
-    "name": "balanceOf",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
         "internalType": "uint128",
         "name": "osTokenShares",
         "type": "uint128"
@@ -459,6 +452,11 @@
       {
         "internalType": "uint256",
         "name": "positionTicket",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "timestamp",
         "type": "uint256"
       },
       {
@@ -506,6 +504,11 @@
       {
         "internalType": "uint256",
         "name": "positionTicket",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "timestamp",
         "type": "uint256"
       },
       {
@@ -667,6 +670,25 @@
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "getShares",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "implementation",
     "outputs": [
@@ -737,13 +759,7 @@
       }
     ],
     "name": "liquidateOsToken",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "receivedAssets",
-        "type": "uint256"
-      }
-    ],
+    "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },
@@ -903,13 +919,7 @@
       }
     ],
     "name": "redeemOsToken",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "receivedAssets",
-        "type": "uint256"
-      }
-    ],
+    "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },
@@ -1080,7 +1090,7 @@
   },
   {
     "inputs": [],
-    "name": "totalSupply",
+    "name": "totalShares",
     "outputs": [
       {
         "internalType": "uint256",

@@ -5,7 +5,7 @@ from decouple import config as decouple_config
 from web3 import Web3
 from web3.types import ChecksumAddress
 
-from src.config.networks import GOERLI, NETWORKS, NetworkConfig
+from src.config.networks import GOERLI, HOLESKY, NETWORKS, NetworkConfig
 
 DATA_DIR = Path.home() / '.stakewise'
 
@@ -177,7 +177,7 @@ class Settings(metaclass=Singleton):
 
 settings = Settings()
 
-AVAILABLE_NETWORKS = [GOERLI]
+AVAILABLE_NETWORKS = [GOERLI, HOLESKY]
 
 # oracles
 UPDATE_SIGNATURES_URL_PATH = '/signatures'

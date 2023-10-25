@@ -5,7 +5,6 @@ from eth_typing import BlockNumber, BLSPubkey
 from web3 import Web3
 from web3.types import HexStr
 
-from src.common.clients import consensus_client
 from src.common.contracts import keeper_contract
 from src.common.execution import get_oracles
 from src.common.metrics import metrics
@@ -130,8 +129,6 @@ async def _get_oracles_request(
     validators: dict[int, HexStr],
 ) -> SignatureRotationRequest:
     """Fetches approval from oracles."""
-    fork = await consensus_client.get_consensus_fork()
-
     # get exit signature shards
     request = SignatureRotationRequest(
         vault_address=settings.vault,
@@ -148,7 +145,7 @@ async def _get_oracles_request(
                 validator_index=validator_index,
                 private_key=keystores[public_key],
                 oracles=oracles,
-                fork=fork,
+                fork=settings.network_config.SHAPELLA_FORK,
             )
         elif remote_signer_config and public_key in remote_signer_config.pubkeys_to_shares:
             # pylint: disable=duplicate-code
@@ -157,7 +154,7 @@ async def _get_oracles_request(
                 validator_index=validator_index,
                 validator_pubkey_shares=[BLSPubkey(Web3.to_bytes(hexstr=s)) for s in pubkey_shares],
                 oracles=oracles,
-                fork=fork,
+                fork=settings.network_config.SHAPELLA_FORK,
             )
         else:
             failed_indexes.append(validator_index)
