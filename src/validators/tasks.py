@@ -9,7 +9,7 @@ from web3.types import BlockNumber, Wei
 from src.common.clients import ipfs_fetch_client
 from src.common.contracts import validators_registry_contract
 from src.common.exceptions import NotEnoughOracleApprovalsError
-from src.common.execution import check_gas_price, get_oracles
+from src.common.execution import get_oracles
 from src.common.metrics import metrics
 from src.common.typings import Oracles
 from src.common.utils import MGNO_RATE, WAD, get_current_timestamp
@@ -17,6 +17,7 @@ from src.config.networks import GNOSIS
 from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import (
+    check_gas_price_for_validator_registration,
     get_available_validators,
     get_latest_network_validator_public_keys,
     get_withdrawable_assets,
@@ -67,7 +68,7 @@ async def register_validators(
         # not enough balance to register validators
         return
 
-    if not await check_gas_price():
+    if not await check_gas_price_for_validator_registration():
         return
 
     validators: list[Validator] = await get_available_validators(
