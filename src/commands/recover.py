@@ -131,7 +131,7 @@ async def main(
     per_keystore_password: bool,
     no_confirm: bool,
     config: VaultConfig,
-):
+) -> None:
     validators = await _fetch_registered_validators()
     if not validators:
         raise click.ClickException('No registered validators')
@@ -230,7 +230,7 @@ async def _generate_keystores(
     password_file: Path,
     validator_statuses: dict[HexStr, ValidatorStatus | None],
     per_keystore_password: bool,
-):
+) -> int:
     index = 0
     failed_attempts = 0
 

@@ -45,7 +45,7 @@ class NetworkValidatorsProcessor(EventProcessor):
 
     @staticmethod
     # pylint: disable-next=unused-argument
-    async def process_events(events: list[EventData], *args, **kwargs) -> None:
+    async def process_events(events: list[EventData], *args, **kwargs) -> None:  # type: ignore
         validators = process_network_validator_events(events)
         NetworkValidatorCrud().save_network_validators(validators)
 

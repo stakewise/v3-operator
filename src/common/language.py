@@ -41,7 +41,7 @@ def create_new_mnemonic(mnemonic_language: str, skip_test: bool) -> str:
     return mnemonic
 
 
-def validate_mnemonic(mnemonic) -> str:
+def validate_mnemonic(mnemonic: str) -> str:
     if reconstruct_mnemonic(mnemonic, WORD_LISTS_PATH):
         return mnemonic
     raise click.BadParameter('That is not a valid mnemonic, please check for typos.')

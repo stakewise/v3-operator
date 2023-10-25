@@ -214,7 +214,7 @@ async def startup_checks():
     logger.info('Found keystores dir')
 
 
-async def _aiohttp_fetch(session, url) -> str:
+async def _aiohttp_fetch(session: ClientSession, url: str) -> str:
     async with session.get(url=url) as response:
         response.raise_for_status()
     return url

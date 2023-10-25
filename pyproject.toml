@@ -61,8 +61,10 @@ extend-ignore = ["E203", "E501"]  # line length will be checked by pylint
 exclude = ["conftest.py"]
 
 [tool.mypy]
+exclude = ["test"]
 ignore_missing_imports = true
 python_version = "3.10"
+disallow_incomplete_defs = true
 
 [tool.isort]
 profile = "black"
