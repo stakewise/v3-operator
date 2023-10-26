@@ -28,7 +28,7 @@ class VaultConfig:
     def exists(self) -> bool:
         return self.config_path.is_file()
 
-    def load(self, mnemonic: str | None = None):
+    def load(self, mnemonic: str | None = None) -> None:
         if self.config_path.is_file():
             with self.config_path.open('r') as f:
                 config = json.load(f)
@@ -41,7 +41,7 @@ class VaultConfig:
             )
         self._validate(mnemonic)
 
-    def save(self, network: str, mnemonic: str, mnemonic_next_index: int = 0):
+    def save(self, network: str, mnemonic: str, mnemonic_next_index: int = 0) -> None:
         self.network = network
         self.mnemonic_next_index = mnemonic_next_index
         self.first_public_key = CredentialManager.generate_credential_first_public_key(
@@ -58,7 +58,7 @@ class VaultConfig:
         with self.config_path.open('w') as f:
             json.dump(config, f)
 
-    def increment_mnemonic_index(self, count: int):
+    def increment_mnemonic_index(self, count: int) -> None:
         self.mnemonic_next_index += count
         self._validate()
         config = {
@@ -69,7 +69,7 @@ class VaultConfig:
         with self.config_path.open('w') as f:
             json.dump(config, f)
 
-    def _validate(self, mnemonic: str | None = None):
+    def _validate(self, mnemonic: str | None = None) -> None:
         """Validates the loaded configuration data."""
         if not self.network:
             raise click.ClickException('Network is not set in vault configuration.')

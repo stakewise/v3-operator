@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 
 import click
+from click import Context
 from eth_typing import ChecksumAddress, HexAddress
 
 from src.common.contrib import greenify
@@ -64,14 +65,14 @@ from src.remote_db.database import check_db_connection
 @click.pass_context
 # pylint: disable-next=too-many-arguments,too-many-locals
 def remote_db_group(
-    ctx,
+    ctx: Context,
     vault: HexAddress,
     data_dir: str,
     keystores_dir: str | None,
     db_url: str,
     network: str | None,
     verbose: bool,
-):
+) -> None:
     ctx.ensure_object(dict)
 
     config = VaultConfig(vault, Path(data_dir))
@@ -93,7 +94,7 @@ def remote_db_group(
 
 @remote_db_group.command(help='Creates database tables and generates new encryption key.')
 @click.pass_context
-def setup(ctx) -> None:
+def setup(ctx: Context) -> None:
     encryption_key = tasks.setup(ctx.obj['db_url'])
     click.echo(
         f'Successfully configured remote database.\n'
@@ -104,7 +105,7 @@ def setup(ctx) -> None:
 
 @remote_db_group.command(help='Removes all the entries for the vault from the database.')
 @click.pass_context
-def cleanup(ctx) -> None:
+def cleanup(ctx: Context) -> None:
     tasks.cleanup(ctx.obj['db_url'])
     click.echo(f'Successfully removed all the entries for the {greenify(settings.vault)} vault.')
 
@@ -135,7 +136,7 @@ def cleanup(ctx) -> None:
 )
 @click.pass_context
 def upload_keypairs(
-    ctx,
+    ctx: Context,
     encrypt_key: str,
     execution_endpoints: str,
     deposit_data_file: str | None,
@@ -175,7 +176,7 @@ def upload_keypairs(
     type=click.Path(exists=False, file_okay=False, dir_okay=True),
 )
 @click.pass_context
-def setup_web3signer(ctx, encrypt_key: str, output_dir: str) -> None:
+def setup_web3signer(ctx: Context, encrypt_key: str, output_dir: str) -> None:
     tasks.setup_web3signer(ctx.obj['db_url'], encrypt_key, Path(output_dir))
     click.echo('Successfully retrieved web3signer private keys from the database.')
 
@@ -224,7 +225,7 @@ def setup_web3signer(ctx, encrypt_key: str, output_dir: str) -> None:
 @click.pass_context
 # pylint: disable-next=too-many-arguments
 def setup_validator(
-    ctx,
+    ctx: Context,
     validator_index: int,
     total_validators: int,
     web3signer_endpoint: str,
@@ -256,7 +257,7 @@ def setup_validator(
     type=click.Path(exists=False, file_okay=False, dir_okay=True),
 )
 @click.pass_context
-def setup_operator(ctx, output_dir: str | None) -> None:
+def setup_operator(ctx: Context, output_dir: str | None) -> None:
     dest_dir = Path(output_dir) if output_dir is not None else settings.vault_dir
     tasks.setup_operator(
         db_url=ctx.obj['db_url'],

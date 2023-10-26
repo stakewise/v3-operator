@@ -86,7 +86,7 @@ class Settings(metaclass=Singleton):
         hot_wallet_file: str | None = None,
         hot_wallet_password_file: str | None = None,
         database_dir: str | None = None,
-    ):
+    ) -> None:
         self.vault = Web3.to_checksum_address(vault)
         vault_dir.mkdir(parents=True, exist_ok=True)
         self.vault_dir = vault_dir

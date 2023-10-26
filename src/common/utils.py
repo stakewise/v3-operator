@@ -3,7 +3,6 @@ import logging
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 import tenacity
 from eth_typing import BlockNumber, ChecksumAddress
@@ -39,14 +38,14 @@ def get_build_version() -> str | None:
         return fh.read().strip()
 
 
-def log_verbose(e: Exception):
+def log_verbose(e: Exception) -> None:
     if settings.verbose:
         logger.exception(e)
     else:
         logger.error(format_error(e))
 
 
-def warning_verbose(msg: str, *args: Any) -> None:
+def warning_verbose(msg: str, *args) -> None:  # type: ignore
     if settings.verbose:
         logger.warning(msg, *args)
 

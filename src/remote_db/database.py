@@ -1,4 +1,5 @@
 import json
+from typing import Any
 
 import click
 from eth_typing import HexStr
@@ -13,7 +14,7 @@ def get_db_connection(db_url):
     return psycopg2.connect(dsn=db_url)
 
 
-def check_db_connection(db_url: str):
+def check_db_connection(db_url: str) -> None:
     import psycopg2  # pylint: disable=import-outside-toplevel
 
     try:
@@ -27,7 +28,7 @@ def check_db_connection(db_url: str):
 
 
 class KeyPairsCrud:
-    def __init__(self, db_connection=None, db_url: str | None = None):
+    def __init__(self, db_connection: Any | None = None, db_url: str | None = None):
         self.db_connection = db_connection or get_db_connection(db_url)
 
     @property
@@ -169,7 +170,7 @@ class ConfigsCrud:
     remote_signer_config_name = 'remote_signer_config.json'
     deposit_data_name = 'deposit_data.json'
 
-    def __init__(self, db_connection=None, db_url: str | None = None):
+    def __init__(self, db_connection: Any | None = None, db_url: str | None = None):
         self.db_connection = db_connection or get_db_connection(db_url)
 
     @property
