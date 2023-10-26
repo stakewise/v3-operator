@@ -7,6 +7,7 @@ from pathlib import Path
 import aiohttp
 import click
 import milagro_bls_binding as bls
+from aiohttp import ClientTimeout
 from eth_typing import BLSPrivateKey, HexAddress
 from web3 import Web3
 
@@ -16,7 +17,7 @@ from src.common.password import get_or_create_password_file
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
-from src.config.settings import settings
+from src.config.settings import REMOTE_SIGNER_TIMEOUT, settings
 from src.validators.signing.key_shares import private_key_to_private_key_shares
 from src.validators.signing.remote import RemoteSignerConfiguration
 from src.validators.utils import load_keystores
@@ -122,6 +123,14 @@ async def main(remove_existing_keys: bool) -> None:
     if len(keystores) == 0:
         raise click.ClickException('Keystores not found.')
 
+    # Check if remote signer's keymanager API is reachable before taking further steps
+    async with aiohttp.ClientSession(
+        timeout=ClientTimeout(connect=REMOTE_SIGNER_TIMEOUT)
+    ) as session:
+        resp = await session.get(f'{settings.remote_signer_url}/eth/v1/keystores')
+        if resp.status != 200:
+            raise RuntimeError(f'Failed to connect to remote signer, returned {await resp.text()}')
+
     oracles = await get_oracles()
 
     try:
@@ -163,7 +172,9 @@ async def main(remove_existing_keys: bool) -> None:
     for credential in credentials:
         key_share_keystores.append(deepcopy(credential.encrypt_signing_keystore(password=password)))
 
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(
+        timeout=ClientTimeout(connect=REMOTE_SIGNER_TIMEOUT)
+    ) as session:
         data = {
             'keystores': [ksk.as_json() for ksk in key_share_keystores],
             'passwords': [password for _ in key_share_keystores],
@@ -192,9 +203,14 @@ async def main(remove_existing_keys: bool) -> None:
             pk for pk_list in remote_signer_config.pubkeys_to_shares.values() for pk in pk_list
         }
 
-        async with aiohttp.ClientSession() as session:
-            resp = await session.get(f'{settings.remote_signer_url}/api/v1/eth2/publicKeys')
-            pubkeys_remote_signer = set(await resp.json())
+        async with aiohttp.ClientSession(
+            timeout=ClientTimeout(connect=REMOTE_SIGNER_TIMEOUT)
+        ) as session:
+            resp = await session.get(f'{settings.remote_signer_url}/eth/v1/keystores')
+            pubkeys_data = (await resp.json())['data']
+            pubkeys_remote_signer = {
+                pubkey_dict.get('validating_pubkey') for pubkey_dict in pubkeys_data
+            }
 
             # Only remove pubkeys from signer that are no longer needed
             inactive_pubkeys = pubkeys_remote_signer - active_pubkey_shares
