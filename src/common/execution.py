@@ -100,7 +100,7 @@ async def check_gas_price() -> bool:
     if max_fee_per_gas >= Web3.to_wei(settings.max_fee_per_gas_gwei, 'gwei'):
         logging.warning(
             'Current gas price (%s gwei) is too high. '
-            'Will try to harvest on the next block if the gas '
+            'Will try to submit transaction on the next block if the gas '
             'price is acceptable.',
             Web3.from_wei(max_fee_per_gas, 'gwei'),
         )
