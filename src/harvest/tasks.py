@@ -1,12 +1,10 @@
 import logging
 
 from src.common.contracts import keeper_contract
+from src.common.execution import check_gas_price
 from src.common.ipfs import fetch_harvest_params
 from src.config.settings import settings
-from src.harvest.execution import (
-    check_gas_price_for_harvest,
-    submit_harvest_transaction,
-)
+from src.harvest.execution import submit_harvest_transaction
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +16,7 @@ async def harvest_vault() -> None:
         return
 
     # check current gas prices
-    if not await check_gas_price_for_harvest():
+    if not await check_gas_price():
         return
 
     last_rewards = await keeper_contract.get_last_rewards_update()

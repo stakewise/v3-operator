@@ -15,7 +15,6 @@ from src.common.contracts import (
     validators_registry_contract,
     vault_contract,
 )
-from src.common.execution import get_max_fee_per_gas
 from src.common.ipfs import fetch_harvest_params
 from src.common.metrics import metrics
 from src.common.typings import OraclesApproval
@@ -342,17 +341,3 @@ async def register_multiple_validator(
     logger.info('Waiting for transaction %s confirmation', tx_hash)
     await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)
     return tx_hash
-
-
-async def check_gas_price_for_validator_registration() -> bool:
-    max_fee_per_gas = await get_max_fee_per_gas()
-    if max_fee_per_gas >= Web3.to_wei(settings.max_fee_per_gas_gwei, 'gwei'):
-        logging.warning(
-            'Current gas price (%s gwei) is too high. '
-            'Will try to register validator on the next block if the gas '
-            'price is acceptable.',
-            Web3.from_wei(max_fee_per_gas, 'gwei'),
-        )
-        return False
-
-    return True

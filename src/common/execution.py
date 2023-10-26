@@ -95,7 +95,21 @@ async def get_oracles() -> Oracles:
     )
 
 
-async def get_max_fee_per_gas() -> Wei:
+async def check_gas_price() -> bool:
+    max_fee_per_gas = await _get_max_fee_per_gas()
+    if max_fee_per_gas >= Web3.to_wei(settings.max_fee_per_gas_gwei, 'gwei'):
+        logging.warning(
+            'Current gas price (%s gwei) is too high. '
+            'Will try to harvest on the next block if the gas '
+            'price is acceptable.',
+            Web3.from_wei(max_fee_per_gas, 'gwei'),
+        )
+        return False
+
+    return True
+
+
+async def _get_max_fee_per_gas() -> Wei:
     try:
         priority_fee = await execution_client.eth.max_priority_fee
     except MethodUnavailable:
