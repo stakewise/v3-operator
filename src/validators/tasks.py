@@ -9,7 +9,7 @@ from web3.types import BlockNumber, Wei
 from src.common.clients import ipfs_fetch_client
 from src.common.contracts import validators_registry_contract
 from src.common.exceptions import NotEnoughOracleApprovalsError
-from src.common.execution import check_gas_price, get_oracles
+from src.common.execution import check_gas_price
 from src.common.metrics import metrics
 from src.common.typings import Oracles
 from src.common.utils import MGNO_RATE, WAD, get_current_timestamp
@@ -46,6 +46,7 @@ async def register_validators(
     keystores: Keystores,
     remote_signer_config: RemoteSignerConfiguration | None,
     deposit_data: DepositData,
+    oracles: Oracles,
 ) -> None:
     """Registers vault validators."""
     vault_balance, update_state_call = await get_withdrawable_assets()
@@ -55,8 +56,6 @@ async def register_validators(
 
     metrics.stakeable_assets.set(int(vault_balance))
 
-    # get latest oracles
-    oracles = await get_oracles()
     logger.debug('Fetched latest oracles: %s', oracles)
 
     approval_max_validators = oracles.validators_approval_batch_limit

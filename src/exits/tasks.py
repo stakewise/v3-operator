@@ -6,7 +6,6 @@ from web3 import Web3
 from web3.types import HexStr
 
 from src.common.contracts import keeper_contract
-from src.common.execution import get_oracles
 from src.common.metrics import metrics
 from src.common.typings import Oracles
 from src.common.utils import get_current_timestamp, is_block_finalized, log_verbose
@@ -29,10 +28,8 @@ logger = logging.getLogger(__name__)
 
 
 async def update_exit_signatures_periodically(
-    keystores: Keystores,
-    remote_signer_config: RemoteSignerConfiguration | None,
+    keystores: Keystores, remote_signer_config: RemoteSignerConfiguration | None, oracles: Oracles
 ) -> None:
-    oracles = await get_oracles()
     update_block = await _fetch_last_update_block()
     if update_block and not await is_block_finalized(update_block):
         logger.info('Signatures update block %d has not finalized yet', update_block)
