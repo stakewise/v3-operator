@@ -81,15 +81,15 @@ NETWORKS = {
         ),
         VALIDATORS_REGISTRY_GENESIS_BLOCK=BlockNumber(0),
         KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xc3e8c8BA310b62540FBb5eB81c9028444D35e568'
+            '0xB580799Bf7d62721D1a523f0FDF2f5Ed7BA4e259'
         ),
-        KEEPER_GENESIS_BLOCK=BlockNumber(167109),
+        KEEPER_GENESIS_BLOCK=BlockNumber(215379),
         V2_POOL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000000000000000000000000000000000000000'
         ),
-        V2_POOL_GENESIS_BLOCK=BlockNumber(167109),
+        V2_POOL_GENESIS_BLOCK=BlockNumber(215379),
         GENESIS_VAULT_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xcca5bB5089B83060793B9b6DF35Bfe62B922b8E4'
+            '0xf42cEAFa21Beb670573f32C31485E84233AFDB6b'
         ),
         GENESIS_VALIDATORS_ROOT=Bytes32(
             Web3.to_bytes(
