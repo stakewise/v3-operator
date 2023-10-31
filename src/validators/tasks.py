@@ -63,10 +63,9 @@ async def register_validators(
 
     # get latest oracles
     oracles = await get_oracles()
-    logger.info('Fetched latest oracles: %s', oracles)
+    logger.debug('Fetched latest oracles: %s', oracles)
 
-    approval_max_validators = oracles.validators_approval_batch_limit
-    validators_count = min(approval_max_validators, validators_count)
+    validators_count = min(oracles.validators_approval_batch_limit, validators_count)
 
     if not await check_gas_price():
         return
