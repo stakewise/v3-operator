@@ -55,17 +55,18 @@ async def register_validators(
 
     metrics.stakeable_assets.set(int(vault_balance))
 
-    # get latest oracles
-    oracles = await get_oracles()
-    logger.debug('Fetched latest oracles: %s', oracles)
-
-    approval_max_validators = oracles.validators_approval_batch_limit
-
     # calculate number of validators that can be registered
-    validators_count: int = min(approval_max_validators, vault_balance // DEPOSIT_AMOUNT)
+    validators_count = vault_balance // DEPOSIT_AMOUNT
     if not validators_count:
         # not enough balance to register validators
         return
+
+    # get latest oracles
+    oracles = await get_oracles()
+    logger.info('Fetched latest oracles: %s', oracles)
+
+    approval_max_validators = oracles.validators_approval_batch_limit
+    validators_count = min(approval_max_validators, validators_count)
 
     if not await check_gas_price():
         return
