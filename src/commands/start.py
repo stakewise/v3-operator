@@ -11,7 +11,7 @@ from sw_utils.typings import ChainHead
 
 import src
 from src.common.clients import consensus_client, execution_client
-from src.common.execution import check_hot_wallet_balance, get_oracles
+from src.common.execution import check_hot_wallet_balance
 from src.common.metrics import metrics, metrics_server
 from src.common.startup_check import startup_checks
 from src.common.utils import get_build_version, log_verbose
@@ -245,7 +245,7 @@ def start(
         log_verbose(e)
 
 
-async def main() -> None:  # pylint: disable=too-many-statements
+async def main() -> None:
     setup_logging()
     setup_sentry()
     log_start()
@@ -315,13 +315,10 @@ async def main() -> None:  # pylint: disable=too-many-statements
                     remote_signer_config=remote_signer_config,
                     deposit_data=deposit_data,
                 )
-                oracles = await get_oracles()
-
                 await register_validators(
                     keystores=keystores,
                     remote_signer_config=remote_signer_config,
                     deposit_data=deposit_data,
-                    oracles=oracles,
                 )
 
                 # submit harvest vault transaction
@@ -330,7 +327,8 @@ async def main() -> None:  # pylint: disable=too-many-statements
 
                 # process outdated exit signatures
                 await update_exit_signatures_periodically(
-                    keystores=keystores, remote_signer_config=remote_signer_config, oracles=oracles
+                    keystores=keystores,
+                    remote_signer_config=remote_signer_config,
                 )
                 # check balance
                 await check_hot_wallet_balance()
