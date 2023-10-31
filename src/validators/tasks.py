@@ -63,7 +63,6 @@ async def register_validators(
 
     # get latest oracles
     oracles = await get_oracles()
-    logger.debug('Fetched latest oracles: %s', oracles)
 
     validators_count = min(oracles.validators_approval_batch_limit, validators_count)
 
