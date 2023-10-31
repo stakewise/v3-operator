@@ -2,6 +2,7 @@ import multiprocessing
 import os
 import ssl
 import sys
+from importlib.metadata import metadata
 
 import click
 
@@ -35,6 +36,7 @@ cli.add_command(remote_db_group)
 
 if __name__ == '__main__':
     # Pyinstaller hacks
+    eth_typing_metadata = metadata('eth-typing')
     multiprocessing.set_start_method('spawn')
     multiprocessing.freeze_support()
     # Use certificate from certifi only if cafile could not find by ssl.
