@@ -54,7 +54,7 @@ RUN poetry install --only main
 # `production` image used for runtime
 FROM python-base as production
 
-USER nobody:nobody
+USER nobody
 
 # Copy dependencies from build container
 WORKDIR /app
