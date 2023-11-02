@@ -36,7 +36,7 @@ FROM python-base as builder-base
 
 RUN apk add --no-cache g++ make curl libpq-dev postgresql-client libffi-dev gcc musl-dev
 RUN curl https://sh.rustup.rs -sSf | \
-    sh -s -- --default-toolchain=1.60.0 stable -y
+    sh -s -- --default-toolchain=1.60.0 -y
 
 # install poetry - respects $POETRY_VERSION & $POETRY_HOME
 RUN curl -sSL https://install.python-poetry.org | python -
