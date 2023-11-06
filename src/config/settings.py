@@ -5,7 +5,7 @@ from decouple import config as decouple_config
 from web3 import Web3
 from web3.types import ChecksumAddress
 
-from src.config.networks import GOERLI, HOLESKY, NETWORKS, NetworkConfig
+from src.config.networks import GOERLI, HOLESKY, MAINNET, NETWORKS, NetworkConfig
 
 DATA_DIR = Path.home() / '.stakewise'
 
@@ -174,10 +174,15 @@ class Settings(metaclass=Singleton):
     def network_config(self) -> NetworkConfig:
         return NETWORKS[self.network]
 
+    @property
+    def is_genesis_vault(self) -> bool:
+        return self.vault == settings.network_config.GENESIS_VAULT_CONTRACT_ADDRESS
+
 
 settings = Settings()
 
-AVAILABLE_NETWORKS = [GOERLI, HOLESKY]
+AVAILABLE_NETWORKS = [MAINNET, GOERLI, HOLESKY]
+DEFAULT_NETWORK = MAINNET
 
 # oracles
 UPDATE_SIGNATURES_URL_PATH = '/signatures'

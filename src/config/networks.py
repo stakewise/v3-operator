@@ -26,6 +26,7 @@ class NetworkConfig:
     KEEPER_GENESIS_BLOCK: BlockNumber
     V2_POOL_CONTRACT_ADDRESS: ChecksumAddress
     V2_POOL_GENESIS_BLOCK: BlockNumber
+    V2_POOL_ESCROW_CONTRACT_ADDRESS: ChecksumAddress
     GENESIS_VAULT_CONTRACT_ADDRESS: ChecksumAddress
     GENESIS_VALIDATORS_ROOT: Bytes32
     GENESIS_VALIDATORS_IPFS_HASH: str
@@ -44,6 +45,15 @@ class NetworkConfig:
             epoch=self.SHAPELLA_EPOCH,
         )
 
+    @property
+    def IS_SUPPORT_V2_MIGRATION(self) -> bool:
+        """Check if network support for v2-to-v3 protocol migration"""
+        return Web3.to_checksum_address(EMPTY_ADDR_HEX) not in [
+            self.V2_POOL_CONTRACT_ADDRESS,
+            self.V2_POOL_ESCROW_CONTRACT_ADDRESS,
+            self.GENESIS_VAULT_CONTRACT_ADDRESS,
+        ]
+
 
 NETWORKS = {
     MAINNET: NetworkConfig(
@@ -52,20 +62,26 @@ NETWORKS = {
             '0x00000000219ab540356cBB839Cbe05303d7705Fa'
         ),
         VALIDATORS_REGISTRY_GENESIS_BLOCK=BlockNumber(11052983),
-        # TODO: replace with real values once contracts deployed
-        KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
-        KEEPER_GENESIS_BLOCK=BlockNumber(0),
+        KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x6B5815467da09DaA7DC83Db21c9239d98Bb487b5'
+        ),
+        KEEPER_GENESIS_BLOCK=BlockNumber(18470089),
         V2_POOL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xC874b064f465bdD6411D45734b56fac750Cda29A'
         ),
         V2_POOL_GENESIS_BLOCK=BlockNumber(11726297),
-        GENESIS_VAULT_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x2296e122c1a20Fca3CAc3371357BdAd3be0dF079'
+        ),
+        GENESIS_VAULT_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0xAC0F906E433d58FA868F936E8A43230473652885'
+        ),
         GENESIS_VALIDATORS_ROOT=Bytes32(
             Web3.to_bytes(
                 hexstr=HexStr('0x4b363db94e286120d76eb905340fdd4e54bfe9f06bf33ff6cf5ad27f511bfe95')
             )
         ),
-        GENESIS_VALIDATORS_IPFS_HASH='',
+        GENESIS_VALIDATORS_IPFS_HASH='bafybeidcgs5ijtdjm4y2m2p4oh6us3gcb7rjv4n75ub6ugv4tku44dgy3y',
         SLOTS_PER_EPOCH=32,
         SECONDS_PER_BLOCK=Decimal(12),
         GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x00000000')),
@@ -84,13 +100,10 @@ NETWORKS = {
             '0xB580799Bf7d62721D1a523f0FDF2f5Ed7BA4e259'
         ),
         KEEPER_GENESIS_BLOCK=BlockNumber(215379),
-        V2_POOL_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x0000000000000000000000000000000000000000'
-        ),
-        V2_POOL_GENESIS_BLOCK=BlockNumber(215379),
-        GENESIS_VAULT_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xf42cEAFa21Beb670573f32C31485E84233AFDB6b'
-        ),
+        V2_POOL_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        V2_POOL_GENESIS_BLOCK=BlockNumber(0),
+        V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        GENESIS_VAULT_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         GENESIS_VALIDATORS_ROOT=Bytes32(
             Web3.to_bytes(
                 hexstr=HexStr('0x9143aa7c615a7f7115e2b6aac319c03529df8242ae705fba9df39b79c59fa8b1')
@@ -119,6 +132,9 @@ NETWORKS = {
             '0x8c1EfEcFb5c4F1099AB0460b5659342943764Df7'
         ),
         V2_POOL_GENESIS_BLOCK=BlockNumber(4468086),
+        V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x040F15C6b5Bfc5F324eCaB5864C38D4e1EEF4218'
+        ),
         GENESIS_VAULT_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x8B5c0d4c067Cf480766140B251B464de7F03B515'
         ),
@@ -149,6 +165,7 @@ NETWORKS = {
             '0x2f99472b727e15EECf9B9eFF9F7481B85d3b4444'
         ),
         V2_POOL_GENESIS_BLOCK=BlockNumber(21275812),
+        V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         GENESIS_VAULT_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         GENESIS_VALIDATORS_ROOT=Bytes32(
             Web3.to_bytes(

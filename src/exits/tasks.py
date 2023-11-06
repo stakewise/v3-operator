@@ -28,15 +28,16 @@ from src.validators.typings import Keystores
 logger = logging.getLogger(__name__)
 
 
-async def update_exit_signatures_periodically(
+async def update_exit_signatures(
     keystores: Keystores,
     remote_signer_config: RemoteSignerConfiguration | None,
 ) -> None:
     oracles = await get_oracles()
     update_block = await _fetch_last_update_block()
     if update_block and not await is_block_finalized(update_block):
-        logger.info('Signatures update block %d has not finalized yet', update_block)
+        logger.info('Waiting for signatures update block %d to finalize...', update_block)
         return
+
     outdated_indexes = await _fetch_outdated_indexes(oracles, update_block)
     if outdated_indexes:
         await _update_exit_signatures(
