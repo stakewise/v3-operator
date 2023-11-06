@@ -39,18 +39,13 @@ async def update_exit_signatures(
         return
 
     outdated_indexes = await _fetch_outdated_indexes(oracles, update_block)
-    if not outdated_indexes:
-        return
-
-    if update_block:
-        await _check_majority_oracles_synced(oracles, update_block)
-
-    await _update_exit_signatures(
-        keystores=keystores,
-        remote_signer_config=remote_signer_config,
-        oracles=oracles,
-        outdated_indexes=outdated_indexes,
-    )
+    if outdated_indexes:
+        await _update_exit_signatures(
+            keystores=keystores,
+            remote_signer_config=remote_signer_config,
+            oracles=oracles,
+            outdated_indexes=outdated_indexes,
+        )
 
 
 async def _fetch_last_update_block() -> BlockNumber | None:
@@ -126,25 +121,6 @@ async def _fetch_exit_signature_block(oracle_endpoint: str) -> BlockNumber | Non
     if block_number is None:
         return None
     return BlockNumber(block_number)
-
-
-async def _check_majority_oracles_synced(oracles: Oracles, update_block: BlockNumber) -> None:
-    """Checks if the majority of oracles have synced exit signatures update block."""
-    if update_block is None:
-        return
-
-    threshold = oracles.validators_threshold
-    for replicas in oracles.endpoints:
-        for replica in replicas:
-            block_number = await _fetch_exit_signature_block(replica)
-            if not block_number or block_number < update_block:
-                continue
-
-            threshold -= 1
-            if threshold <= 0:
-                return
-            break
-    raise RuntimeError('The majority of oracles have not synced exit signatures yet')
 
 
 async def _get_oracles_request(
