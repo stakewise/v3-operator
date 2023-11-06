@@ -43,7 +43,7 @@ async def update_exit_signatures(
         return
 
     if update_block:
-        await _check_majority_oracles_synced_update_block(oracles, update_block)
+        await _check_majority_oracles_synced(oracles, update_block)
 
     await _update_exit_signatures(
         keystores=keystores,
@@ -128,10 +128,11 @@ async def _fetch_exit_signature_block(oracle_endpoint: str) -> BlockNumber | Non
     return BlockNumber(block_number)
 
 
-async def _check_majority_oracles_synced_update_block(
-    oracles: Oracles, update_block: BlockNumber
-) -> None:
+async def _check_majority_oracles_synced(oracles: Oracles, update_block: BlockNumber) -> None:
     """Checks if the majority of oracles have synced exit signatures update block."""
+    if update_block is None:
+        return
+
     threshold = oracles.validators_threshold
     for replicas in oracles.endpoints:
         for replica in replicas:
