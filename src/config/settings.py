@@ -174,10 +174,15 @@ class Settings(metaclass=Singleton):
     def network_config(self) -> NetworkConfig:
         return NETWORKS[self.network]
 
+    @property
+    def is_genesis_vault(self) -> bool:
+        return self.vault == settings.network_config.GENESIS_VAULT_CONTRACT_ADDRESS
+
 
 settings = Settings()
 
 AVAILABLE_NETWORKS = [MAINNET, GOERLI, HOLESKY]
+DEFAULT_NETWORK = MAINNET
 
 # oracles
 UPDATE_SIGNATURES_URL_PATH = '/signatures'

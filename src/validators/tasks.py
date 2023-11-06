@@ -50,7 +50,7 @@ async def register_validators(
     """Registers vault validators."""
     if (
         settings.network_config.IS_SUPPORT_V2_MIGRATION
-        and settings.vault == settings.network_config.GENESIS_VAULT_CONTRACT_ADDRESS
+        and settings.is_genesis_vault
         and await v2_pool_escrow_contract.get_owner() != settings.vault
     ):
         logger.info(
