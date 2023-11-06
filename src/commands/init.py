@@ -6,7 +6,7 @@ from eth_typing import HexAddress
 from src.common.language import LANGUAGES, create_new_mnemonic
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
-from src.config.settings import AVAILABLE_NETWORKS, GOERLI
+from src.config.settings import AVAILABLE_NETWORKS, MAINNET
 
 
 @click.option(
@@ -39,7 +39,7 @@ from src.config.settings import AVAILABLE_NETWORKS, GOERLI
 )
 @click.option(
     '--network',
-    default=GOERLI,
+    default=MAINNET,
     help='The network of your vault.',
     prompt='Enter the network name',
     type=click.Choice(

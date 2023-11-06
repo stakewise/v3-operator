@@ -15,7 +15,8 @@ from src.common.password import generate_password, get_or_create_password_file
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_address, validate_mnemonic
 from src.common.vault_config import VaultConfig
-from src.config.settings import AVAILABLE_NETWORKS, GOERLI, settings
+from src.config.networks import MAINNET
+from src.config.settings import AVAILABLE_NETWORKS, settings
 
 
 @click.command(help='Recover vault data directory and keystores.')
@@ -68,7 +69,7 @@ from src.config.settings import AVAILABLE_NETWORKS, GOERLI, settings
 )
 @click.option(
     '--network',
-    default=GOERLI,
+    default=MAINNET,
     help='The network of your vault.',
     prompt='Enter the network name',
     type=click.Choice(
@@ -189,7 +190,11 @@ async def _fetch_registered_validators() -> dict[HexStr, ValidatorStatus | None]
         to_block=current_block,
     )
 
-    if vault_contract.contract_address == settings.network_config.GENESIS_VAULT_CONTRACT_ADDRESS:
+    if (
+        settings.network_config.IS_SUPPORT_V2_MIGRATION
+        and vault_contract.contract_address
+        == settings.network_config.GENESIS_VAULT_CONTRACT_ADDRESS
+    ):
         # fetch registered validators from v2 pool contract
         # new validators won't be registered after upgrade to the v3,
         # no need to check up to the latest block

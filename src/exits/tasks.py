@@ -28,23 +28,29 @@ from src.validators.typings import Keystores
 logger = logging.getLogger(__name__)
 
 
-async def update_exit_signatures_periodically(
+async def update_exit_signatures(
     keystores: Keystores,
     remote_signer_config: RemoteSignerConfiguration | None,
 ) -> None:
     oracles = await get_oracles()
     update_block = await _fetch_last_update_block()
     if update_block and not await is_block_finalized(update_block):
-        logger.info('Signatures update block %d has not finalized yet', update_block)
+        logger.info('Waiting for signatures update block %d to finalize...', update_block)
         return
+
     outdated_indexes = await _fetch_outdated_indexes(oracles, update_block)
-    if outdated_indexes:
-        await _update_exit_signatures(
-            keystores=keystores,
-            remote_signer_config=remote_signer_config,
-            oracles=oracles,
-            outdated_indexes=outdated_indexes,
-        )
+    if not outdated_indexes:
+        return
+
+    if update_block:
+        await _check_majority_oracles_synced_update_block(oracles, update_block)
+
+    await _update_exit_signatures(
+        keystores=keystores,
+        remote_signer_config=remote_signer_config,
+        oracles=oracles,
+        outdated_indexes=outdated_indexes,
+    )
 
 
 async def _fetch_last_update_block() -> BlockNumber | None:
@@ -120,6 +126,24 @@ async def _fetch_exit_signature_block(oracle_endpoint: str) -> BlockNumber | Non
     if block_number is None:
         return None
     return BlockNumber(block_number)
+
+
+async def _check_majority_oracles_synced_update_block(
+    oracles: Oracles, update_block: BlockNumber
+) -> None:
+    """Checks if the majority of oracles have synced exit signatures update block."""
+    threshold = oracles.validators_threshold
+    for replicas in oracles.endpoints:
+        for replica in replicas:
+            block_number = await _fetch_exit_signature_block(replica)
+            if not block_number or block_number < update_block:
+                continue
+
+            threshold -= 1
+            if threshold <= 0:
+                return
+            break
+    raise RuntimeError('The majority of oracles have not synced exit signatures yet')
 
 
 async def _get_oracles_request(

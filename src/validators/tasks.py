@@ -7,7 +7,7 @@ from web3 import Web3
 from web3.types import BlockNumber, Wei
 
 from src.common.clients import ipfs_fetch_client
-from src.common.contracts import validators_registry_contract
+from src.common.contracts import v2_pool_escrow_contract, validators_registry_contract
 from src.common.exceptions import NotEnoughOracleApprovalsError
 from src.common.execution import check_gas_price, get_oracles
 from src.common.metrics import metrics
@@ -48,6 +48,16 @@ async def register_validators(
     deposit_data: DepositData,
 ) -> None:
     """Registers vault validators."""
+    if (
+        settings.network_config.IS_SUPPORT_V2_MIGRATION
+        and settings.vault == settings.network_config.GENESIS_VAULT_CONTRACT_ADDRESS
+        and await v2_pool_escrow_contract.get_owner() != settings.vault
+    ):
+        logger.info(
+            'Waiting for vault to become owner of v2 pool escrow to start registering validators...'
+        )
+        return
+
     vault_balance, update_state_call = await get_withdrawable_assets()
     if settings.network == GNOSIS:
         # apply GNO -> mGNO exchange rate

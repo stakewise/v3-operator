@@ -119,6 +119,15 @@ class V2PoolContract(ContractWrapper):
         return [Web3.to_hex(event['args']['publicKey']) for event in events]
 
 
+class V2PoolEscrowContract(ContractWrapper):
+    abi_path = 'abi/IV2PoolEscrow.json'
+    settings_key = 'V2_POOL_ESCROW_CONTRACT_ADDRESS'
+
+    async def get_owner(self) -> ChecksumAddress:
+        """Fetches the owner of the contract."""
+        return await self.contract.functions.owner().call()
+
+
 class ValidatorsRegistryContract(ContractWrapper):
     abi_path = 'abi/IValidatorsRegistry.json'
     settings_key = 'VALIDATORS_REGISTRY_CONTRACT_ADDRESS'
@@ -185,3 +194,4 @@ vault_contract = VaultContract()
 validators_registry_contract = ValidatorsRegistryContract()
 keeper_contract = KeeperContract()
 v2_pool_contract = V2PoolContract()
+v2_pool_escrow_contract = V2PoolEscrowContract()

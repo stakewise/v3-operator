@@ -24,7 +24,7 @@ from src.config.settings import (
     DEFAULT_METRICS_PORT,
     settings,
 )
-from src.exits.tasks import update_exit_signatures_periodically
+from src.exits.tasks import update_exit_signatures
 from src.harvest.tasks import harvest_vault as harvest_vault_task
 from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import (
@@ -326,7 +326,7 @@ async def main() -> None:
                     await harvest_vault_task()
 
                 # process outdated exit signatures
-                await update_exit_signatures_periodically(
+                await update_exit_signatures(
                     keystores=keystores,
                     remote_signer_config=remote_signer_config,
                 )
