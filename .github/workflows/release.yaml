@@ -112,9 +112,9 @@ jobs:
           tag_name: latest
           fail_on_unmatched_files: true
           files: |
-            /tmp/artifacts/ubuntu-20.04/operator-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz
-            /tmp/artifacts/ubuntu-20.04/operator-${{ steps.get_version.outputs.VERSION }}-linux-amd64.sha256
-            /tmp/artifacts/macos-11/operator-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.tar.gz
-            /tmp/artifacts/macos-11/operator-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.sha256
-            /tmp/artifacts/windows-latest/operator-${{ steps.get_version.outputs.VERSION }}-windows-amd64.zip
-            /tmp/artifacts/windows-latest/operator-${{ steps.get_version.outputs.VERSION }}-windows-amd64.sha256
+            /tmp/artifacts/ubuntu-20.04/operator-linux-amd64.tar.gz
+            /tmp/artifacts/ubuntu-20.04/operator-linux-amd64.sha256
+            /tmp/artifacts/macos-11/operator-darwin-amd64.tar.gz
+            /tmp/artifacts/macos-11/operator-darwin-amd64.sha256
+            /tmp/artifacts/windows-latest/operator-windows-amd64.zip
+            /tmp/artifacts/windows-latest/operator-windows-amd64.sha256
