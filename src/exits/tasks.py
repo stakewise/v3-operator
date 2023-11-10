@@ -74,11 +74,14 @@ async def _check_majority_oracles_synced(oracles: Oracles, update_block: BlockNu
 
 async def _fetch_last_update_block_replicas(replicas: list[str]) -> BlockNumber | None:
     results = await asyncio.gather(
-        *[_fetch_exit_signature_block(endpoint) for endpoint in replicas],
+        *[_fetch_exit_signature_block(endpoint) for endpoint in replicas], return_exceptions=True
     )
-    results = [item for item in results if item]
-    if results:
-        return max(results)
+    blocks = []
+    for res in results:
+        if not isinstance(res, Exception) and res is not None:
+            blocks.append(res)
+    if blocks:
+        return max(blocks)
     return None
 
 
