@@ -39,8 +39,9 @@ async def update_exit_signatures(
         logger.info('Waiting for signatures update block %d to finalize...', update_block)
         return
 
-    if update_block:
-        await _check_majority_oracles_synced(oracles, update_block)
+    if update_block and not await _check_majority_oracles_synced(oracles, update_block):
+        logger.info('Waiting for the majority of oracles to sync exit signatures')
+        return
 
     outdated_indexes = await _fetch_outdated_indexes(oracles, update_block)
     if outdated_indexes:
