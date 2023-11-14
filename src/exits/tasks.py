@@ -82,7 +82,7 @@ async def _fetch_last_update_block_replicas(replicas: list[str]) -> BlockNumber 
         if not isinstance(res, Exception) and res is not None:
             blocks.append(res)
     if blocks:
-        return max(blocks)
+        return min(blocks)
     return None
 
 
