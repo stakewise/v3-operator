@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from random import shuffle
 
@@ -38,6 +39,10 @@ async def update_exit_signatures(
         logger.info('Waiting for signatures update block %d to finalize...', update_block)
         return
 
+    if update_block and not await _check_majority_oracles_synced(oracles, update_block):
+        logger.info('Waiting for the majority of oracles to sync exit signatures')
+        return
+
     outdated_indexes = await _fetch_outdated_indexes(oracles, update_block)
     if outdated_indexes:
         await _update_exit_signatures(
@@ -46,6 +51,39 @@ async def update_exit_signatures(
             oracles=oracles,
             outdated_indexes=outdated_indexes,
         )
+
+
+async def _check_majority_oracles_synced(oracles: Oracles, update_block: BlockNumber) -> bool:
+    threshold = oracles.validators_threshold
+    pending = {
+        asyncio.create_task(_fetch_last_update_block_replicas(replicas))
+        for replicas in oracles.endpoints
+    }
+    while pending:
+        done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+        for task in done:
+            block_number = task.result()
+            if not block_number or block_number < update_block:
+                continue
+            threshold -= 1
+            if threshold <= 0:
+                for task in pending:
+                    task.cancel()
+                return True
+    return False
+
+
+async def _fetch_last_update_block_replicas(replicas: list[str]) -> BlockNumber | None:
+    results = await asyncio.gather(
+        *[_fetch_exit_signature_block(endpoint) for endpoint in replicas], return_exceptions=True
+    )
+    blocks = []
+    for res in results:
+        if not isinstance(res, Exception) and res is not None:
+            blocks.append(res)
+    if blocks:
+        return min(blocks)
+    return None
 
 
 async def _fetch_last_update_block() -> BlockNumber | None:
