@@ -7,10 +7,12 @@ from web3 import Web3
 from web3.types import HexStr
 
 from src.common.contracts import keeper_contract
+from src.common.exceptions import NotEnoughOracleApprovalsError
 from src.common.execution import get_oracles
 from src.common.metrics import metrics
+from src.common.tasks import BaseTask
 from src.common.typings import Oracles
-from src.common.utils import get_current_timestamp, is_block_finalized, log_verbose
+from src.common.utils import get_current_timestamp, is_block_finalized
 from src.config.settings import settings
 from src.exits.consensus import get_validator_public_keys
 from src.exits.execution import submit_exit_signatures
@@ -29,28 +31,35 @@ from src.validators.typings import Keystores
 logger = logging.getLogger(__name__)
 
 
-async def update_exit_signatures(
-    keystores: Keystores,
-    remote_signer_config: RemoteSignerConfiguration | None,
-) -> None:
-    oracles = await get_oracles()
-    update_block = await _fetch_last_update_block()
-    if update_block and not await is_block_finalized(update_block):
-        logger.info('Waiting for signatures update block %d to finalize...', update_block)
-        return
+class ExitSignatureTask(BaseTask):
+    keystores: Keystores
+    remote_signer_config: RemoteSignerConfiguration | None
 
-    if update_block and not await _check_majority_oracles_synced(oracles, update_block):
-        logger.info('Waiting for the majority of oracles to sync exit signatures')
-        return
+    def __init__(
+        self, keystores: Keystores, remote_signer_config: RemoteSignerConfiguration | None
+    ):
+        self.keystores = keystores
+        self.remote_signer_config = remote_signer_config
 
-    outdated_indexes = await _fetch_outdated_indexes(oracles, update_block)
-    if outdated_indexes:
-        await _update_exit_signatures(
-            keystores=keystores,
-            remote_signer_config=remote_signer_config,
-            oracles=oracles,
-            outdated_indexes=outdated_indexes,
-        )
+    async def process(self) -> None:
+        oracles = await get_oracles()
+        update_block = await _fetch_last_update_block()
+        if update_block and not await is_block_finalized(update_block):
+            logger.info('Waiting for signatures update block %d to finalize...', update_block)
+            return
+
+        if update_block and not await _check_majority_oracles_synced(oracles, update_block):
+            logger.info('Waiting for the majority of oracles to sync exit signatures')
+            return
+
+        outdated_indexes = await _fetch_outdated_indexes(oracles, update_block)
+        if outdated_indexes:
+            await _update_exit_signatures(
+                keystores=self.keystores,
+                remote_signer_config=self.remote_signer_config,
+                oracles=oracles,
+                outdated_indexes=outdated_indexes,
+            )
 
 
 async def _check_majority_oracles_synced(oracles: Oracles, update_block: BlockNumber) -> bool:
@@ -139,8 +148,14 @@ async def _update_exit_signatures(
             oracles_approval = await send_signature_rotation_requests(oracles, oracles_request)
             logger.info('Fetched updated signature for validators: count=%d', len(validators))
             break
-        except Exception as e:
-            log_verbose(e)
+        except NotEnoughOracleApprovalsError as e:
+            logger.error(
+                'Failed to fetch oracle exit signatures update. Received %d out of %d, '
+                'the oracles with endpoints %s have failed to respond.',
+                e.num_votes,
+                e.threshold,
+                ', '.join(e.failed_endpoints),
+            )
 
     tx_hash = await submit_exit_signatures(oracles_approval)
     if not tx_hash:
