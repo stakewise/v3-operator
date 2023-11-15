@@ -211,7 +211,7 @@ docker build --pull -t stakewiselabs/v3-operator .
 or pull existing one:
 
 ```sh
-docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v0.3.4
+docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.0.0
 ```
 
 You have to mount keystores and deposit data folders into docker container.
@@ -221,7 +221,7 @@ Start the container with the following command:
 ```sh
 docker run --restart on-failure:10 \
   -v ~/.stakewise/:/data \
-  europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v0.3.4 \
+  europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.0.0 \
   src/main.py start \
   --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
   --data-dir=/data \
