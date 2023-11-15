@@ -138,5 +138,5 @@ async def _calculate_median_priority_fee(block_id: BlockIdentifier = 'latest') -
 
 
 class WalletTask(BaseTask):
-    async def process(self) -> None:
+    async def process_block(self) -> None:
         await check_hot_wallet_balance()

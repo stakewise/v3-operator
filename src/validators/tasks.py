@@ -63,7 +63,7 @@ class ValidatorsTask(BaseTask):
         network_validators_processor = NetworkValidatorsProcessor()
         self.network_validators_scanner = EventScanner(network_validators_processor)
 
-    async def process(self) -> None:
+    async def process_block(self) -> None:
         chain_state = await get_chain_finalized_head()
 
         # process new network validators

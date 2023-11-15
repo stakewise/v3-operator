@@ -9,14 +9,14 @@ logger = logging.getLogger(__name__)
 
 
 class BaseTask:
-    async def process(self):
+    async def process_block(self):
         raise NotImplementedError
 
     async def run(self):
         while True:
             start_time = time.time()
             try:
-                await self.process()
+                await self.process_block()
             except Exception as exc:
                 log_verbose(exc)
 

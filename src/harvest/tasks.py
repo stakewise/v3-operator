@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class HarvestTask(BaseTask):
-    async def process(self) -> None:
+    async def process_block(self) -> None:
         """Check vault state and send harvest transaction if needed."""
         if not settings.harvest_vault:
             return

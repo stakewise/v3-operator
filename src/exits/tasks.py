@@ -41,7 +41,7 @@ class ExitSignatureTask(BaseTask):
         self.keystores = keystores
         self.remote_signer_config = remote_signer_config
 
-    async def process(self) -> None:
+    async def process_block(self) -> None:
         oracles = await get_oracles()
         update_block = await _fetch_last_update_block()
         if update_block and not await is_block_finalized(update_block):

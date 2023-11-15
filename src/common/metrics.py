@@ -33,7 +33,7 @@ async def metrics_server() -> None:
 
 
 class MetricsTask(BaseTask):
-    async def process(self) -> None:
+    async def process_block(self) -> None:
         chain_state = await get_chain_finalized_head()
         metrics.block_number.set(await execution_client.eth.get_block_number())
         metrics.slot_number.set(chain_state.consensus_block)
