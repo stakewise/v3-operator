@@ -294,7 +294,6 @@ async def main() -> None:
     logger.info('Started operator service')
     with InterruptHandler() as interrupt_handler:
         while not interrupt_handler.exit:
-            await HarvestTask().run()
             await ValidatorsTask(
                 keystores=keystores,
                 remote_signer_config=remote_signer_config,
@@ -304,6 +303,8 @@ async def main() -> None:
                 keystores=keystores,
                 remote_signer_config=remote_signer_config,
             ).run()
+            if settings.harvest_vault:
+                await HarvestTask().run()
             await MetricsTask().run()
             await WalletTask().run()
 
