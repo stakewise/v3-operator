@@ -41,7 +41,7 @@ from src.validators.utils import send_approval_requests
 logger = logging.getLogger(__name__)
 
 
-# pylint: disable-next=too-many-locals
+# pylint: disable-next=too-many-locals,too-many-branches
 async def register_validators(
     keystores: Keystores,
     remote_signer_config: RemoteSignerConfiguration | None,
@@ -140,6 +140,12 @@ async def register_validators(
                 e.threshold,
                 ', '.join(e.failed_endpoints),
             )
+    # compare validators root just before transaction to reduce reverted calls
+    if registry_root != await validators_registry_contract.get_registry_root():
+        logger.info(
+            'Registry root has changed during validators registration. Retrying...',
+        )
+        return
 
     if len(validators) == 1:
         validator = validators[0]
