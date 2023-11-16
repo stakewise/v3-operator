@@ -4,7 +4,7 @@ from pathlib import Path
 import click
 from eth_typing import HexAddress
 
-from src.common.contrib import greenify
+from src.common.utils import greenify
 from src.common.validators import validate_eth_address
 from src.validators.utils import load_deposit_data
 
