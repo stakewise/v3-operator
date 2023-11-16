@@ -7,10 +7,11 @@ from web3 import Web3
 from web3.types import HexStr
 
 from src.common.contracts import keeper_contract
+from src.common.exceptions import NotEnoughOracleApprovalsError
 from src.common.execution import get_oracles
 from src.common.metrics import metrics
 from src.common.typings import Oracles
-from src.common.utils import get_current_timestamp, is_block_finalized, log_verbose
+from src.common.utils import get_current_timestamp, is_block_finalized
 from src.config.settings import settings
 from src.exits.consensus import get_validator_public_keys
 from src.exits.execution import submit_exit_signatures
@@ -139,8 +140,14 @@ async def _update_exit_signatures(
             oracles_approval = await send_signature_rotation_requests(oracles, oracles_request)
             logger.info('Fetched updated signature for validators: count=%d', len(validators))
             break
-        except Exception as e:
-            log_verbose(e)
+        except NotEnoughOracleApprovalsError as e:
+            logger.error(
+                'Failed to fetch oracle approvals. Received %d out of %d, '
+                'the oracles with endpoints %s have failed to respond.',
+                e.num_votes,
+                e.threshold,
+                ', '.join(e.failed_endpoints),
+            )
 
     tx_hash = await submit_exit_signatures(oracles_approval)
     if not tx_hash:
