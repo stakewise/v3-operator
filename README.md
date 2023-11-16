@@ -52,7 +52,7 @@ validator registration transactions.
 
 If you are creating a new Vault:
 
-1. Go to [Operate page](https://testnet.stakewise.io/operate)
+1. Go to [Operate page](https://app.stakewise.io/operate)
 2. Connect with your wallet
 3. Click on "Create Vault"
 4. Process vault setup step by step
@@ -70,8 +70,8 @@ Create the vault config and mnemonic used to derive validator keys.
 ```
 
 ```sh
-Enter the network name (goerli) [goerli]:
-Enter your vault address: 0x3320ad928c20187602a2b2c04eeaa813fa899468
+Enter the network name (mainnet, goerli, holesky) [mainnet]:
+Enter your vault address: 0x3320a...68
 Choose your mnemonic language (chinese_simplified, chinese_traditional, czech, english, italian, korean, portuguese, spanish) [english]:
 This is your seed phrase. Write it down and store it safely, it is the ONLY way to recover your validator keys.
 
@@ -85,7 +85,7 @@ Please type your mnemonic (separated by spaces) to confirm you have written it d
 : pumpkin anxiety private salon inquiry ....
 
 done.
-Successfully initialized configuration for vault 0x3320ad928c20187602a2b2c04eeaa813fa899468
+Successfully initialized configuration for vault 0x3320a...68
 ```
 
 #### Options
@@ -116,8 +116,8 @@ Generating deposit data JSON    [####################################]  10/10
 Exporting validator keystores    [####################################]  10/10
 
 Done. Generated 10 keys for 0x3320a...68 vault.
-Keystores saved to /home/user/.stakewise/0x3320ad928c20187602a2b2c04eeaa813fa899468/keystores file
-Deposit data saved to /home/user/.stakewise/0x3320ad928c20187602a2b2c04eeaa813fa899468/keystores/deposit_data.json file
+Keystores saved to /home/user/.stakewise/0x3320a...68/keystores file
+Deposit data saved to /home/user/.stakewise/0x3320a...68/keystores/deposit_data.json file
 ```
 
 #### `create-keys` options
@@ -130,7 +130,7 @@ Deposit data saved to /home/user/.stakewise/0x3320ad928c20187602a2b2c04eeaa813fa
 
 **NB! You must upload the deposit data to your vault:**
 
-1. Go to [Operate page](https://testnet.stakewise.io/operate)
+1. Go to [Operate page](https://app.stakewise.io/operate)
 2. Connect with your wallet
 3. Go to your vault page
 4. In the upper right corner, click on "Settings", open the "Deposit data" tab
@@ -195,7 +195,7 @@ See [releases page](https://github.com/stakewise/v3-operator/releases) to downlo
 binary file. Start the binary with the following command:
 
 ```sh
-./operator start --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468  --consensus-endpoints=https://consensus.com --execution-endpoints=https://execution.com
+./operator start --vault=0x3320a...68  --consensus-endpoints=https://consensus.com --execution-endpoints=https://execution.com
 ```
 
 Or you can use environment variables. Check [.env.example](.env.example) file for details
@@ -223,7 +223,7 @@ docker run --restart on-failure:10 \
   -v ~/.stakewise/:/data \
   europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.0.0 \
   src/main.py start \
-  --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
+  --vault=0x3320a...68 \
   --data-dir=/data \
   --consensus-endpoints=https://example.com \
   --execution-endpoints=https://example.com
@@ -253,7 +253,7 @@ Install dependencies and start operator:
 ```sh
 poetry install --only main
 PYTHONPATH=. poetry run python src/main.py start \
---vault=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
+--vault=0x3320a...68 \
 --consensus-endpoints=https://example.com \
 --execution-endpoints=https://example.com
 ```
@@ -306,7 +306,7 @@ Notes:
 
 ```bash
 ./operator remote-signer-setup \
- --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
+ --vault=0x3320a...68 \
  --remote-signer-url=http://signer:9000
 ```
 
@@ -396,7 +396,7 @@ Performs a voluntary exit for active vault validators.
 
 ```sh
 Enter the comma separated list of API endpoints for consensus nodes: https://example.com
-Enter your vault address: 0x3320ad928c20187602a2b2c04eeaa813fa899468
+Enter your vault address: 0x3320a...68
 Are you sure you want to exit 3 validators with indexes: 513571, 513572, 513861? [y/N]: y
 Validators 513571, 513572, 513861 exits successfully initiated
 ```
@@ -451,7 +451,7 @@ by using the following command:
 
 ```sh
 Enter the mnemonic for generating the validator keys: [Your Mnemonic Here]
-Enter your vault address: 0x3320ad928c20187602a2b2c04eeaa813fa899468
+Enter your vault address: 0x3320a...68
 Enter comma separated list of API endpoints for execution nodes: https://example.com
 Enter comma separated list of API endpoints for consensus nodes: https://example.com
 Enter the network name: goerli
