@@ -4,6 +4,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+import click
 import tenacity
 from eth_typing import BlockNumber, ChecksumAddress
 from web3 import Web3
@@ -101,3 +102,12 @@ def process_oracles_approvals(
     for _, signature in sorted(votes, key=lambda x: Web3.to_int(hexstr=x[0]))[:votes_threshold]:
         signatures += signature
     return OraclesApproval(ipfs_hash=winner[0], signatures=signatures, deadline=winner[1])
+
+
+def chunkify(items, size):
+    for i in range(0, len(items), size):
+        yield items[i : i + size]
+
+
+def greenify(value):
+    return click.style(value, bold=True, fg='green')

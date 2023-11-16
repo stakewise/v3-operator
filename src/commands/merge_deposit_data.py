@@ -4,7 +4,7 @@ from itertools import zip_longest
 
 import click
 
-from src.common.contrib import greenify
+from src.common.utils import greenify
 
 
 @click.option(

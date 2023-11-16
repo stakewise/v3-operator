@@ -28,7 +28,7 @@ from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3._utils import request
 
-from src.common.contrib import chunkify
+from src.common.utils import chunkify
 from src.config.networks import NETWORKS
 from src.config.settings import DEPOSIT_AMOUNT_GWEI
 
