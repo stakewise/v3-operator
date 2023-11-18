@@ -8,7 +8,7 @@ from web3.types import HexStr
 
 from src.common.contracts import keeper_contract
 from src.common.exceptions import NotEnoughOracleApprovalsError
-from src.common.execution import get_oracles
+from src.common.execution import get_oracles, update_oracles_cache
 from src.common.metrics import metrics
 from src.common.typings import Oracles
 from src.common.utils import get_current_timestamp, is_block_finalized
@@ -34,6 +34,7 @@ async def update_exit_signatures(
     keystores: Keystores,
     remote_signer_config: RemoteSignerConfiguration | None,
 ) -> None:
+    await update_oracles_cache()
     oracles = await get_oracles()
     update_block = await _fetch_last_update_block()
     if update_block and not await is_block_finalized(update_block):

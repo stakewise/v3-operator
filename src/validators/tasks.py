@@ -9,7 +9,7 @@ from web3.types import BlockNumber, Wei
 from src.common.clients import ipfs_fetch_client
 from src.common.contracts import v2_pool_escrow_contract, validators_registry_contract
 from src.common.exceptions import NotEnoughOracleApprovalsError
-from src.common.execution import check_gas_price, get_oracles
+from src.common.execution import check_gas_price, get_oracles, update_oracles_cache
 from src.common.metrics import metrics
 from src.common.typings import Oracles
 from src.common.utils import MGNO_RATE, WAD, get_current_timestamp
@@ -72,6 +72,7 @@ async def register_validators(
         return
 
     # get latest oracles
+    await update_oracles_cache()
     oracles = await get_oracles()
 
     validators_count = min(oracles.validators_approval_batch_limit, validators_count)
