@@ -54,7 +54,7 @@ If you are creating a new Vault:
 
 1. Go to [Operate page](https://app.stakewise.io/operate)
 2. Connect with your wallet
-3. Click on "Create Vault"
+ Click on "Create Vault"
 4. Process vault setup step by step
 5. Once vault is deployed go to its page
 
@@ -132,11 +132,11 @@ Deposit data saved to /home/user/.stakewise/0x3320a...68/keystores/deposit_data.
 
 1. Go to [Operate page](https://app.stakewise.io/operate)
 2. Connect with your wallet
-3. Go to your vault page
+ Go to your vault page
 4. In the upper right corner, click on "Settings", open the "Deposit data" tab
 5. Upload generated deposit data file and click "Save"
 
-### 3. Create wallet
+###  Create wallet
 
 Creates the encrypted hot wallet from the mnemonic.
 The hot wallet is used to submit validator registration transaction. You must send some ETH (DAI for Gnosis) to the
@@ -176,7 +176,7 @@ supports [ETH Execution API specification](https://ethereum.github.io/execution-
 - [Erigon](https://launchpad.ethereum.org/en/erigon) (Ethereum)
 - [Geth](https://launchpad.ethereum.org/en/geth) (Ethereum)
 
-## Step 3. Install consensus node
+## Step  Install consensus node
 
 The consensus node is used to fetch consensus fork data required for generating exit signatures. Any consensus client
 that
@@ -236,7 +236,7 @@ Example `docker-compose.yml` included. Adjust it for yourself and run:
 docker-compose up
 ```
 
-#### Option 3. Use Kubernetes helm chart
+#### Option  Use Kubernetes helm chart
 
 You can use [Operator V3 helm chart](https://github.com/stakewise/helm-charts/tree/main/charts/v3-operator) to host
 operator in Kubernetes
@@ -245,7 +245,7 @@ operator in Kubernetes
 
 Build requirements:
 
-- [Python 3.10+](https://www.python.org/downloads/)
+- [Python 10+](https://www.python.org/downloads/)
 - [Poetry](https://python-poetry.org/docs/)
 
 Install dependencies and start operator:
@@ -539,7 +539,7 @@ Saving 120000 private keys to web3signer...
 Successfully retrieved web3signer private keys from the database.
 ```
 
-#### 3. Sync web3signer configs for the validators
+#### 4. Sync web3signer configs for the validators
 
 The command syncs web3signer config for every validator:
 
@@ -562,7 +562,7 @@ Proposer config for Teku\Prysm saved to validator0/proposer_config.json file.
 Successfully created validator configuration files.
 ```
 
-#### 4. Sync configs for the operator
+#### 5. Sync configs for the operator
 
 The command syncs web3signer config and deposit data for the operator:
 
