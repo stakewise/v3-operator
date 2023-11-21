@@ -54,9 +54,9 @@ If you are creating a new Vault:
 
 1. Go to [Operate page](https://app.stakewise.io/operate)
 2. Connect with your wallet
- Click on "Create Vault"
-4. Process vault setup step by step
-5. Once vault is deployed go to its page
+   Click on "Create Vault"
+3. Process vault setup step by step
+4. Once vault is deployed go to its page
 
 You can find the vault address either in the URL bar or in the "Contract address" field by scrolling to the "Details" at
 the bottom of the page.
@@ -132,11 +132,11 @@ Deposit data saved to /home/user/.stakewise/0x3320a...68/keystores/deposit_data.
 
 1. Go to [Operate page](https://app.stakewise.io/operate)
 2. Connect with your wallet
- Go to your vault page
+   Go to your vault page
 4. In the upper right corner, click on "Settings", open the "Deposit data" tab
 5. Upload generated deposit data file and click "Save"
 
-###  Create wallet
+### Create wallet
 
 Creates the encrypted hot wallet from the mnemonic.
 The hot wallet is used to submit validator registration transaction. You must send some ETH (DAI for Gnosis) to the
