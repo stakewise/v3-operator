@@ -132,7 +132,7 @@ Deposit data saved to /home/user/.stakewise/0x3320a...68/keystores/deposit_data.
 
 1. Go to [Operate page](https://app.stakewise.io/operate)
 2. Connect with your wallet
-   Go to your vault page
+3. Go to your vault page
 4. In the upper right corner, click on "Settings", open the "Deposit data" tab
 5. Upload generated deposit data file and click "Save"
 
