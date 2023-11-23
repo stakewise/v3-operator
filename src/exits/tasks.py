@@ -122,9 +122,6 @@ async def _update_exit_signatures(
     outdated_indexes: list[int],
 ) -> None:
     """Fetches update signature requests from oracles."""
-    exit_rotation_batch_limit = oracles.validators_exit_rotation_batch_limit
-    outdated_indexes = outdated_indexes[:exit_rotation_batch_limit]
-
     logger.info('Starting exit signature rotation for %d validators', len(outdated_indexes))
     # pylint: disable=duplicate-code
     validators = await get_validator_public_keys(outdated_indexes)
@@ -192,8 +189,12 @@ async def _get_oracles_request(
         deadline=get_current_timestamp() + oracles.signature_validity_period,
     )
     failed_indexes = []
+    exit_rotation_batch_limit = oracles.validators_exit_rotation_batch_limit
 
     for validator_index, public_key in validators.items():
+        if len(request.public_keys) >= exit_rotation_batch_limit:
+            break
+
         if len(keystores) > 0 and public_key in keystores:
             shards = get_exit_signature_shards(
                 validator_index=validator_index,

@@ -85,5 +85,8 @@ class TestGetOraclesRequest:
             )
 
             assert request.vault_address == vault_address
-            assert request.public_keys == list(validators.values())
+            assert (
+                request.public_keys
+                == list(validators.values())[: oracles.validators_exit_rotation_batch_limit]
+            )
             assert request.deadline == deadline

@@ -6,8 +6,7 @@ import click
 from click import Context
 from eth_typing import ChecksumAddress, HexAddress
 
-from src.common.contrib import greenify
-from src.common.utils import log_verbose
+from src.common.utils import greenify, log_verbose
 from src.common.validators import validate_db_uri, validate_eth_address
 from src.common.vault_config import VaultConfig
 from src.config.settings import AVAILABLE_NETWORKS, settings

@@ -6,9 +6,9 @@ from pathlib import Path
 import click
 from eth_typing import HexAddress
 
-from src.common.contrib import greenify
 from src.common.credentials import Credential, CredentialManager
 from src.common.password import generate_password, get_or_create_password_file
+from src.common.utils import greenify
 from src.common.validators import validate_eth_address, validate_mnemonic
 from src.common.vault_config import VaultConfig
 

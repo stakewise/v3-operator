@@ -52,11 +52,11 @@ validator registration transactions.
 
 If you are creating a new Vault:
 
-1. Go to [Operate page](https://testnet.stakewise.io/operate)
+1. Go to [Operate page](https://app.stakewise.io/operate)
 2. Connect with your wallet
-3. Click on "Create Vault"
-4. Process vault setup step by step
-5. Once vault is deployed go to its page
+   Click on "Create Vault"
+3. Process vault setup step by step
+4. Once vault is deployed go to its page
 
 You can find the vault address either in the URL bar or in the "Contract address" field by scrolling to the "Details" at
 the bottom of the page.
@@ -70,8 +70,8 @@ Create the vault config and mnemonic used to derive validator keys.
 ```
 
 ```sh
-Enter the network name (goerli) [goerli]:
-Enter your vault address: 0x3320ad928c20187602a2b2c04eeaa813fa899468
+Enter the network name (mainnet, goerli, holesky) [mainnet]:
+Enter your vault address: 0x3320a...68
 Choose your mnemonic language (chinese_simplified, chinese_traditional, czech, english, italian, korean, portuguese, spanish) [english]:
 This is your seed phrase. Write it down and store it safely, it is the ONLY way to recover your validator keys.
 
@@ -85,7 +85,7 @@ Please type your mnemonic (separated by spaces) to confirm you have written it d
 : pumpkin anxiety private salon inquiry ....
 
 done.
-Successfully initialized configuration for vault 0x3320ad928c20187602a2b2c04eeaa813fa899468
+Successfully initialized configuration for vault 0x3320a...68
 ```
 
 #### Options
@@ -116,8 +116,8 @@ Generating deposit data JSON    [####################################]  10/10
 Exporting validator keystores    [####################################]  10/10
 
 Done. Generated 10 keys for 0x3320a...68 vault.
-Keystores saved to /home/user/.stakewise/0x3320ad928c20187602a2b2c04eeaa813fa899468/keystores file
-Deposit data saved to /home/user/.stakewise/0x3320ad928c20187602a2b2c04eeaa813fa899468/keystores/deposit_data.json file
+Keystores saved to /home/user/.stakewise/0x3320a...68/keystores file
+Deposit data saved to /home/user/.stakewise/0x3320a...68/keystores/deposit_data.json file
 ```
 
 #### `create-keys` options
@@ -130,13 +130,13 @@ Deposit data saved to /home/user/.stakewise/0x3320ad928c20187602a2b2c04eeaa813fa
 
 **NB! You must upload the deposit data to your vault:**
 
-1. Go to [Operate page](https://testnet.stakewise.io/operate)
+1. Go to [Operate page](https://app.stakewise.io/operate)
 2. Connect with your wallet
 3. Go to your vault page
 4. In the upper right corner, click on "Settings", open the "Deposit data" tab
 5. Upload generated deposit data file and click "Save"
 
-### 3. Create wallet
+### Create wallet
 
 Creates the encrypted hot wallet from the mnemonic.
 The hot wallet is used to submit validator registration transaction. You must send some ETH (DAI for Gnosis) to the
@@ -176,7 +176,7 @@ supports [ETH Execution API specification](https://ethereum.github.io/execution-
 - [Erigon](https://launchpad.ethereum.org/en/erigon) (Ethereum)
 - [Geth](https://launchpad.ethereum.org/en/geth) (Ethereum)
 
-## Step 3. Install consensus node
+## Step  Install consensus node
 
 The consensus node is used to fetch consensus fork data required for generating exit signatures. Any consensus client
 that
@@ -195,7 +195,7 @@ See [releases page](https://github.com/stakewise/v3-operator/releases) to downlo
 binary file. Start the binary with the following command:
 
 ```sh
-./operator start --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468  --consensus-endpoints=https://consensus.com --execution-endpoints=https://execution.com
+./operator start --vault=0x3320a...68  --consensus-endpoints=https://consensus.com --execution-endpoints=https://execution.com
 ```
 
 Or you can use environment variables. Check [.env.example](.env.example) file for details
@@ -211,7 +211,7 @@ docker build --pull -t stakewiselabs/v3-operator .
 or pull existing one:
 
 ```sh
-docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.0.0
+docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.0.1
 ```
 
 You have to mount keystores and deposit data folders into docker container.
@@ -221,9 +221,9 @@ Start the container with the following command:
 ```sh
 docker run --restart on-failure:10 \
   -v ~/.stakewise/:/data \
-  europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.0.0 \
+  europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.0.1 \
   src/main.py start \
-  --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
+  --vault=0x3320a...68 \
   --data-dir=/data \
   --consensus-endpoints=https://example.com \
   --execution-endpoints=https://example.com
@@ -236,7 +236,7 @@ Example `docker-compose.yml` included. Adjust it for yourself and run:
 docker-compose up
 ```
 
-#### Option 3. Use Kubernetes helm chart
+#### Option  Use Kubernetes helm chart
 
 You can use [Operator V3 helm chart](https://github.com/stakewise/helm-charts/tree/main/charts/v3-operator) to host
 operator in Kubernetes
@@ -245,7 +245,7 @@ operator in Kubernetes
 
 Build requirements:
 
-- [Python 3.10+](https://www.python.org/downloads/)
+- [Python 10+](https://www.python.org/downloads/)
 - [Poetry](https://python-poetry.org/docs/)
 
 Install dependencies and start operator:
@@ -253,7 +253,7 @@ Install dependencies and start operator:
 ```sh
 poetry install --only main
 PYTHONPATH=. poetry run python src/main.py start \
---vault=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
+--vault=0x3320a...68 \
 --consensus-endpoints=https://example.com \
 --execution-endpoints=https://example.com
 ```
@@ -306,7 +306,7 @@ Notes:
 
 ```bash
 ./operator remote-signer-setup \
- --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
+ --vault=0x3320a...68 \
  --remote-signer-url=http://signer:9000
 ```
 
@@ -396,7 +396,7 @@ Performs a voluntary exit for active vault validators.
 
 ```sh
 Enter the comma separated list of API endpoints for consensus nodes: https://example.com
-Enter your vault address: 0x3320ad928c20187602a2b2c04eeaa813fa899468
+Enter your vault address: 0x3320a...68
 Are you sure you want to exit 3 validators with indexes: 513571, 513572, 513861? [y/N]: y
 Validators 513571, 513572, 513861 exits successfully initiated
 ```
@@ -451,7 +451,7 @@ by using the following command:
 
 ```sh
 Enter the mnemonic for generating the validator keys: [Your Mnemonic Here]
-Enter your vault address: 0x3320ad928c20187602a2b2c04eeaa813fa899468
+Enter your vault address: 0x3320a...68
 Enter comma separated list of API endpoints for execution nodes: https://example.com
 Enter comma separated list of API endpoints for consensus nodes: https://example.com
 Enter the network name: goerli
@@ -539,7 +539,7 @@ Saving 120000 private keys to web3signer...
 Successfully retrieved web3signer private keys from the database.
 ```
 
-#### 3. Sync web3signer configs for the validators
+#### 4. Sync web3signer configs for the validators
 
 The command syncs web3signer config for every validator:
 
@@ -562,7 +562,7 @@ Proposer config for Teku\Prysm saved to validator0/proposer_config.json file.
 Successfully created validator configuration files.
 ```
 
-#### 4. Sync configs for the operator
+#### 5. Sync configs for the operator
 
 The command syncs web3signer config and deposit data for the operator:
 

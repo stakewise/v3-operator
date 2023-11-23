@@ -10,8 +10,8 @@ from Cryptodome.Random import get_random_bytes
 from eth_typing import ChecksumAddress, HexStr
 from web3 import Web3
 
-from src.common.contrib import greenify
 from src.common.execution import get_oracles
+from src.common.utils import greenify
 from src.config.settings import settings
 from src.remote_db.database import ConfigsCrud, KeyPairsCrud, get_db_connection
 from src.remote_db.typings import RemoteDatabaseKeyPair
