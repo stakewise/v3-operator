@@ -293,24 +293,23 @@ async def main() -> None:
 
     logger.info('Started operator service')
     with InterruptHandler() as interrupt_handler:
-        while not interrupt_handler.exit:
-            tasks = [
-                ValidatorsTask(
-                    keystores=keystores,
-                    remote_signer_config=remote_signer_config,
-                    deposit_data=deposit_data,
-                ).run(),
-                ExitSignatureTask(
-                    keystores=keystores,
-                    remote_signer_config=remote_signer_config,
-                ).run(),
-                MetricsTask().run(),
-                WalletTask().run(),
-            ]
-            if settings.harvest_vault:
-                tasks.append(HarvestTask().run())
+        tasks = [
+            ValidatorsTask(
+                keystores=keystores,
+                remote_signer_config=remote_signer_config,
+                deposit_data=deposit_data,
+            ).run(interrupt_handler),
+            ExitSignatureTask(
+                keystores=keystores,
+                remote_signer_config=remote_signer_config,
+            ).run(interrupt_handler),
+            MetricsTask().run(interrupt_handler),
+            WalletTask().run(interrupt_handler),
+        ]
+        if settings.harvest_vault:
+            tasks.append(HarvestTask().run(interrupt_handler))
 
-            await asyncio.gather(*tasks)
+        await asyncio.gather(*tasks)
 
 
 def log_start() -> None:

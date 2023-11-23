@@ -2,6 +2,8 @@ import asyncio
 import logging
 import time
 
+from sw_utils import InterruptHandler
+
 from src.common.utils import log_verbose
 from src.config.settings import settings
 
@@ -12,8 +14,8 @@ class BaseTask:
     async def process_block(self):
         raise NotImplementedError
 
-    async def run(self):
-        while True:
+    async def run(self, interrupt_handler: InterruptHandler) -> None:
+        while not interrupt_handler.exit:
             start_time = time.time()
             try:
                 await self.process_block()
