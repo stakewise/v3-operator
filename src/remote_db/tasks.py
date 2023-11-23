@@ -357,11 +357,7 @@ def _get_key_indexes(
     total_validators: int,
     validator_index: int,
 ) -> tuple[int, int]:
-    keys_per_validator = public_keys_count // total_validators
-    remainder = public_keys_count % total_validators
-    start_index = keys_per_validator * validator_index + min(validator_index, remainder)
-    extra = 0
-    if validator_index < remainder:
-        extra = 1
-    end_index = min(start_index + keys_per_validator + extra, public_keys_count)
+    keys_per_validator = (public_keys_count - 1) // total_validators + 1
+    start_index = keys_per_validator * validator_index
+    end_index = min(start_index + keys_per_validator, public_keys_count)
     return start_index, end_index
