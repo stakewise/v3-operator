@@ -83,23 +83,16 @@ async def update_oracles_cache() -> None:
     rewards_threshold = Web3.to_int(multicall_response[0][1])
     validators_threshold = Web3.to_int(multicall_response[1][1])
 
-    if _oracles_cache:
-        _oracles_cache.config = config
-        _oracles_cache.validators_threshold = validators_threshold
-        _oracles_cache.rewards_threshold = rewards_threshold
-        _oracles_cache.checkpoint_block = to_block
-    else:
-        _oracles_cache = OraclesCache(
-            config=config,
-            validators_threshold=validators_threshold,
-            rewards_threshold=rewards_threshold,
-            checkpoint_block=to_block,
-        )
+    _oracles_cache = OraclesCache(
+        config=config,
+        validators_threshold=validators_threshold,
+        rewards_threshold=rewards_threshold,
+        checkpoint_block=to_block,
+    )
 
 
 async def get_oracles() -> Oracles:
-    if not _oracles_cache:
-        await update_oracles_cache()
+    await update_oracles_cache()
 
     oracles_cache = cast(OraclesCache, _oracles_cache)
 
