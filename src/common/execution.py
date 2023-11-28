@@ -1,7 +1,9 @@
 import logging
+import statistics
 
 from web3 import Web3
-from web3.types import Wei
+from web3.exceptions import MethodUnavailable
+from web3.types import BlockIdentifier, Wei
 
 from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.contracts import keeper_contract
@@ -95,8 +97,7 @@ async def get_oracles() -> Oracles:
 
 
 async def check_gas_price() -> bool:
-    max_fee_per_gas = await execution_client.eth.gas_price
-
+    max_fee_per_gas = await _get_max_fee_per_gas()
     if max_fee_per_gas >= Web3.to_wei(settings.max_fee_per_gas_gwei, 'gwei'):
         logging.warning(
             'Current gas price (%s gwei) is too high. '
@@ -107,3 +108,30 @@ async def check_gas_price() -> bool:
         return False
 
     return True
+
+
+async def _get_max_fee_per_gas() -> Wei:
+    try:
+        priority_fee = await execution_client.eth.max_priority_fee
+    except MethodUnavailable:
+        priority_fee = await _calculate_median_priority_fee()
+    latest_block = await execution_client.eth.get_block('latest')
+    base_fee = latest_block['baseFeePerGas']
+    max_fee_per_gas = priority_fee + 2 * base_fee
+    return Wei(max_fee_per_gas)
+
+
+async def _calculate_median_priority_fee(block_id: BlockIdentifier = 'latest') -> Wei:
+    block = await execution_client.eth.get_block(block_id)
+
+    # collect maxPriorityFeePerGas for all transactions in the block
+    priority_fees = []
+    for tx_hash in block.transactions:  # type: ignore[attr-defined]
+        tx = await execution_client.eth.get_transaction(tx_hash)
+        if 'maxPriorityFeePerGas' in tx:
+            priority_fees.append(tx.maxPriorityFeePerGas)  # type: ignore[attr-defined]
+
+    if not priority_fees:
+        return await _calculate_median_priority_fee(block['number'] - 1)
+
+    return Wei(statistics.median(priority_fees))
