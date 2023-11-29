@@ -132,19 +132,12 @@ async def register_validators(
 
         try:
             oracles_approval = await send_approval_requests(oracles, oracles_request)
-            logger.info(
-                'Fetched oracles approval for validators: deadline=%d, start index=%d',
-                oracles_request.deadline,
-                oracles_request.validator_index,
-            )
             break
         except NotEnoughOracleApprovalsError as e:
             logger.error(
-                'Failed to fetch oracle approvals. Received %d out of %d, '
-                'the oracles with endpoints %s have failed to respond.',
+                'Not enough votes for validator registration: %d. Threshold is %d',
                 e.num_votes,
                 e.threshold,
-                ', '.join(e.failed_endpoints),
             )
         approvals_time = time.time() - approval_start_time
         await asyncio.sleep(approvals_min_interval - approvals_time)
