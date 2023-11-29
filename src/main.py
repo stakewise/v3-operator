@@ -6,6 +6,7 @@ from importlib.metadata import metadata
 
 import click
 
+import src
 from src.commands.create_keys import create_keys
 from src.commands.create_wallet import create_wallet
 from src.commands.get_validators_root import get_validators_root
@@ -15,9 +16,16 @@ from src.commands.recover import recover
 from src.commands.remote_signer_setup import remote_signer_setup
 from src.commands.start import start
 from src.commands.validators_exit import validators_exit
+from src.common.utils import get_build_version
 from src.remote_db.commands import remote_db_group
 
+build = get_build_version()
+version = src.__version__
+if build:
+    version += f'-{build}'
 
+
+@click.version_option(version=version, prog_name='Stakewise v3 operator service')
 @click.group()
 def cli() -> None:
     pass
