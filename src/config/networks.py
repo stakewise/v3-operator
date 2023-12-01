@@ -37,6 +37,7 @@ class NetworkConfig:
     HOT_WALLET_MIN_BALANCE: Wei
     SHAPELLA_FORK_VERSION: bytes
     SHAPELLA_EPOCH: int
+    MULTICALL_CONTRACT_ADDRESS: ChecksumAddress
 
     @property
     def SHAPELLA_FORK(self) -> ConsensusFork:
@@ -89,6 +90,9 @@ NETWORKS = {
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
         SHAPELLA_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x03000000')),
         SHAPELLA_EPOCH=194048,
+        MULTICALL_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0xcA11bde05977b3631167028862bE2a173976CA11'
+        ),
     ),
     HOLESKY: NetworkConfig(
         SYMBOL='HolETH',
@@ -117,6 +121,9 @@ NETWORKS = {
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
         SHAPELLA_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x01017000')),
         SHAPELLA_EPOCH=256,
+        MULTICALL_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0xcA11bde05977b3631167028862bE2a173976CA11'
+        ),
     ),
     GOERLI: NetworkConfig(
         SYMBOL='GoerliETH',
@@ -151,6 +158,9 @@ NETWORKS = {
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
         SHAPELLA_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x03001020')),
         SHAPELLA_EPOCH=162304,
+        MULTICALL_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0xcA11bde05977b3631167028862bE2a173976CA11'
+        ),
     ),
     GNOSIS: NetworkConfig(
         SYMBOL='xDAI',
@@ -180,5 +190,8 @@ NETWORKS = {
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
         SHAPELLA_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x0')),
         SHAPELLA_EPOCH=0,  # todo
+        MULTICALL_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0xcA11bde05977b3631167028862bE2a173976CA11'
+        ),
     ),
 }
