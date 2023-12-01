@@ -1,4 +1,6 @@
+import asyncio
 import logging
+import time
 
 from eth_typing import BLSPubkey
 from multiproof.standard import MultiProof
@@ -102,7 +104,11 @@ async def register_validators(
     registry_root = None
     oracles_request = None
     deadline = get_current_timestamp() + oracles.signature_validity_period
+    approvals_min_interval = 1
+
     while True:
+        approval_start_time = time.time()
+
         latest_registry_root = await validators_registry_contract.get_registry_root()
         current_timestamp = get_current_timestamp()
         if (
@@ -140,6 +146,9 @@ async def register_validators(
                 e.threshold,
                 ', '.join(e.failed_endpoints),
             )
+        approvals_time = time.time() - approval_start_time
+        await asyncio.sleep(approvals_min_interval - approvals_time)
+
     # compare validators root just before transaction to reduce reverted calls
     if registry_root != await validators_registry_contract.get_registry_root():
         logger.info(
