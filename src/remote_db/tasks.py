@@ -195,9 +195,11 @@ def setup_validator(
         raise click.ClickException('No keypairs found in the remote db.')
 
     public_keys_count = len(keypairs)
-    keys_per_validator = public_keys_count // total_validators
-    start_index = keys_per_validator * validator_index
-    end_index = min(start_index + keys_per_validator, public_keys_count)
+    start_index, end_index = _get_key_indexes(
+        public_keys_count=public_keys_count,
+        validator_index=validator_index,
+        total_validators=total_validators,
+    )
     if not 0 <= start_index < end_index <= public_keys_count:
         raise click.ClickException('Invalid validator index')
 
@@ -348,3 +350,14 @@ def _generate_proposer_config(
     }
     with open(filepath, 'w', encoding='utf-8') as f:
         json.dump(config, f, ensure_ascii=False, indent=4)
+
+
+def _get_key_indexes(
+    public_keys_count: int,
+    total_validators: int,
+    validator_index: int,
+) -> tuple[int, int]:
+    keys_per_validator = (public_keys_count - 1) // total_validators + 1
+    start_index = keys_per_validator * validator_index
+    end_index = min(start_index + keys_per_validator, public_keys_count)
+    return start_index, end_index
