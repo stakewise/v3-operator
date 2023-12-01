@@ -10,6 +10,7 @@ from web3.types import BlockIdentifier, Wei
 from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.contracts import keeper_contract, multicall_contract
 from src.common.metrics import metrics
+from src.common.tasks import BaseTask
 from src.common.typings import Oracles, OraclesCache
 from src.common.wallet import hot_wallet
 from src.config.settings import settings
@@ -179,3 +180,8 @@ async def _calculate_median_priority_fee(block_id: BlockIdentifier = 'latest') -
         return await _calculate_median_priority_fee(block['number'] - 1)
 
     return Wei(statistics.median(priority_fees))
+
+
+class WalletTask(BaseTask):
+    async def process_block(self) -> None:
+        await check_hot_wallet_balance()
