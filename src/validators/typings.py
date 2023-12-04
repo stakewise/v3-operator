@@ -6,7 +6,6 @@ from multiproof import StandardMerkleTree
 from sw_utils.typings import Bytes32
 
 BLSPrivkey = NewType('BLSPrivkey', bytes)
-Keystores = NewType('Keystores', dict[HexStr, BLSPrivkey])
 
 
 @dataclass
@@ -56,9 +55,3 @@ class KeeperApprovalParams:
     validators: HexStr | bytes
     signatures: HexStr | bytes
     exitSignaturesIpfsHash: str
-
-
-@dataclass
-class KeystoreFile:
-    name: str
-    password: str

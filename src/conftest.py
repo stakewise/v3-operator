@@ -20,9 +20,8 @@ from src.common.typings import Oracles
 from src.common.vault_config import VaultConfig
 from src.config.networks import GOERLI
 from src.config.settings import settings
-from src.test_fixtures.hashi_vault import hashi_vault_url, mocked_hashi_vault
 from src.test_fixtures.remote_signer import mocked_remote_signer, remote_signer_url
-from src.validators.signing.remote import RemoteSignerConfiguration
+from src.validators.keystores.remote import RemoteSignerKeystore
 from src.validators.signing.tests.oracle_functions import OracleCommittee
 from src.validators.typings import BLSPrivkey
 
@@ -178,8 +177,8 @@ def _remote_signer_setup(
 
 
 @pytest.fixture
-def remote_signer_config(_remote_signer_setup) -> RemoteSignerConfiguration:
-    return RemoteSignerConfiguration.from_file(settings.remote_signer_config_file)
+def remote_signer_keystore(_remote_signer_setup) -> RemoteSignerKeystore:
+    return RemoteSignerKeystore.load_from_file(settings.remote_signer_config_file)
 
 
 @pytest.fixture

@@ -18,9 +18,9 @@ from src.common.utils import log_verbose
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
 from src.config.settings import REMOTE_SIGNER_TIMEOUT, settings
+from src.validators.keystores.local import LocalKeystore
+from src.validators.keystores.remote import RemoteSignerKeystore
 from src.validators.signing.key_shares import private_key_to_private_key_shares
-from src.validators.signing.remote import RemoteSignerConfiguration
-from src.validators.utils import load_keystores
 
 
 @click.option(
@@ -118,8 +118,7 @@ def remote_signer_setup(
 
 # pylint: disable-next=too-many-locals
 async def main(remove_existing_keys: bool) -> None:
-    keystores = load_keystores()
-
+    keystores = await LocalKeystore.load()
     if len(keystores) == 0:
         raise click.ClickException('Keystores not found.')
 
@@ -134,14 +133,14 @@ async def main(remove_existing_keys: bool) -> None:
     oracles = await get_oracles()
 
     try:
-        remote_signer_config = RemoteSignerConfiguration.from_file(
+        remote_signer_keystore = RemoteSignerKeystore.load_from_file(
             settings.remote_signer_config_file
         )
     except FileNotFoundError:
-        remote_signer_config = RemoteSignerConfiguration(pubkeys_to_shares={})
+        remote_signer_keystore = RemoteSignerKeystore({})
 
     credentials = []
-    for pubkey, private_key in keystores.items():  # pylint: disable=no-member
+    for pubkey, private_key in keystores.keystores.items():  # pylint: disable=no-member
         private_key_shares = private_key_to_private_key_shares(
             private_key=private_key,
             threshold=oracles.exit_signature_recover_threshold,
@@ -157,7 +156,7 @@ async def main(remove_existing_keys: bool) -> None:
                     vault=settings.vault,
                 )
             )
-        remote_signer_config.pubkeys_to_shares[pubkey] = [
+        remote_signer_keystore.pubkeys_to_shares[pubkey] = [
             Web3.to_hex(bls.SkToPk(priv_key)) for priv_key in private_key_shares
         ]
 
@@ -200,7 +199,7 @@ async def main(remove_existing_keys: bool) -> None:
     # Remove outdated keystores from remote signer
     if remove_existing_keys:
         active_pubkey_shares = {
-            pk for pk_list in remote_signer_config.pubkeys_to_shares.values() for pk in pk_list
+            pk for pk_list in remote_signer_keystore.pubkeys_to_shares.values() for pk in pk_list
         }
 
         async with aiohttp.ClientSession(
@@ -229,7 +228,7 @@ async def main(remove_existing_keys: bool) -> None:
                 f'Removed {len(inactive_pubkeys)} keys from remote signer',
             )
 
-    remote_signer_config.save(settings.remote_signer_config_file)
+    remote_signer_keystore.save(settings.remote_signer_config_file)
 
     click.echo(
         f'Done.'

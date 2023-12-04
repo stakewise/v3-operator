@@ -10,8 +10,8 @@ from sw_utils.typings import ConsensusFork
 from src.commands.validators_exit import validators_exit
 from src.common.typings import Oracles
 from src.config.settings import settings
-from src.validators.signing.remote import RemoteSignerConfiguration
-from src.validators.utils import _process_keystore_file, list_keystore_files
+from src.validators.keystores.local import LocalKeystore
+from src.validators.keystores.remote import RemoteSignerKeystore
 
 
 @pytest.fixture
@@ -57,10 +57,10 @@ class TestValidatorsExit:
         runner: CliRunner,
     ):
         # Get pubkey(s) to exit
-        keystore_files = list_keystore_files()
+        keystore_files = LocalKeystore.list_keystore_files()
         pubkeys = []
         for keystore_file in keystore_files:
-            pubkey, _ = _process_keystore_file(keystore_file, keystores_dir)
+            pubkey, _ = LocalKeystore._process_keystore_file(keystore_file, keystores_dir)
             pubkeys.append(pubkey)
 
         args = [
@@ -91,7 +91,6 @@ class TestValidatorsExit:
         ):
             result = runner.invoke(validators_exit, args, input='y')
         assert result.exit_code == 0
-
         assert 'Validators 0, 1, 2 (3 of 3) exits successfully initiated\n' in result.output
 
     @pytest.mark.usefixtures('_remote_signer_setup')
@@ -106,7 +105,7 @@ class TestValidatorsExit:
         remote_signer_url: str,
     ):
         # Get pubkey(s) to exit
-        config = RemoteSignerConfiguration.from_file(settings.remote_signer_config_file)
+        config = RemoteSignerKeystore.load_from_file(settings.remote_signer_config_file)
         pubkeys = list(config.pubkeys_to_shares.keys())
 
         args = [
@@ -140,8 +139,5 @@ class TestValidatorsExit:
             result = runner.invoke(validators_exit, args, input='y')
         assert result.exit_code == 0
 
-        for expected_line in (
-            f'Using remote signer at {remote_signer_url}',
-            'Validators 0, 1, 2 (3 of 3) exits successfully initiated',
-        ):
+        for expected_line in ('Validators 0, 1, 2 (3 of 3) exits successfully initiated',):
             assert expected_line in result.output

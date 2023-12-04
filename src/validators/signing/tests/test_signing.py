@@ -7,15 +7,12 @@ from web3 import Web3
 
 from src.common.typings import Oracles
 from src.config.settings import settings
-from src.validators.signing.hashi_vault import (
+from src.validators.keystores.hashi_vault import (
     HashiVaultConfiguration,
-    load_hashi_vault_keys,
+    HashiVaultKeystore,
 )
-from src.validators.signing.local import get_exit_signature_shards
-from src.validators.signing.remote import (
-    RemoteSignerConfiguration,
-    get_exit_signature_shards_remote_signer,
-)
+from src.validators.keystores.local import LocalKeystore
+from src.validators.keystores.remote import RemoteSignerKeystore
 from src.validators.signing.tests.oracle_functions import OracleCommittee
 from src.validators.typings import ExitSignatureShards
 
@@ -69,9 +66,11 @@ class TestSigning:
         validator_privkey, validator_pubkey = create_validator_keypair()
         validator_index = 123
 
-        shards = get_exit_signature_shards(
+        shards = await LocalKeystore(
+            {validator_pubkey: validator_privkey}
+        ).get_exit_signature_shards(
             validator_index=validator_index,
-            private_key=validator_privkey,
+            public_key=validator_pubkey,
             oracles=mocked_oracles,
             fork=fork,
         )
@@ -99,18 +98,20 @@ class TestSigning:
         fork: ConsensusFork,
         remote_signer_url: str,
         mocked_oracles: Oracles,
-        remote_signer_config: RemoteSignerConfiguration,
+        remote_signer_keystore: RemoteSignerKeystore,
         _mocked_oracle_committee: OracleCommittee,
     ):
         validator_index = 123
         settings.remote_signer_url = remote_signer_url
-
-        for pubkey, pubkey_shares in remote_signer_config.pubkeys_to_shares.items():
-            shards = await get_exit_signature_shards_remote_signer(
-                validator_index=validator_index,
-                validator_pubkey_shares=[
+        '''
+        validator_pubkey_shares=[
                     BLSPubkey(Web3.to_bytes(hexstr=share)) for share in pubkey_shares
                 ],
+        '''
+        for pubkey, pubkey_shares in remote_signer_keystore.pubkeys_to_shares.items():
+            shards = await remote_signer_keystore.get_exit_signature_shards(
+                validator_index=validator_index,
+                public_key=pubkey,
                 oracles=mocked_oracles,
                 fork=fork,
             )
@@ -130,15 +131,18 @@ class TestSigning:
         fork: ConsensusFork,
         mocked_oracles: Oracles,
         remote_signer_url: str,
+        fake_settings: None,
     ):
         _, bls_pubkey = create_validator_keypair()
         validator_index = 123
         settings.remote_signer_url = remote_signer_url
-
+        '''
+        [BLSPubkey(Web3.to_bytes(hexstr=bls_pubkey))]
+        '''
         with pytest.raises(RuntimeError, match='Failed to get signature'):
-            _ = await get_exit_signature_shards_remote_signer(
+            _ = await RemoteSignerKeystore({}).get_exit_signature_shards(
                 validator_index=validator_index,
-                validator_pubkey_shares=[BLSPubkey(Web3.to_bytes(hexstr=bls_pubkey))],
+                public_key=bls_pubkey,
                 oracles=mocked_oracles,
                 fork=fork,
             )
@@ -154,7 +158,7 @@ class TestSigning:
 
         config = HashiVaultConfiguration.from_settings()
 
-        keystores = await load_hashi_vault_keys(config)
+        keystores = await HashiVaultKeystore._load_hashi_vault_keys(config)
 
         assert len(keystores) == 2
 
@@ -183,4 +187,4 @@ class TestSigning:
             RuntimeError, match='Can not retrieve validator signing keys from hashi vault'
         ):
             config = HashiVaultConfiguration.from_settings()
-            await load_hashi_vault_keys(config)
+            await HashiVaultKeystore._load_hashi_vault_keys(config)
