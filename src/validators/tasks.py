@@ -135,7 +135,7 @@ async def register_validators(
             break
         except NotEnoughOracleApprovalsError as e:
             logger.error(
-                'Not enough votes for validator registration: %d. Threshold is %d',
+                'Not enough oracle approvals for validator registration: %d. Threshold is %d.',
                 e.num_votes,
                 e.threshold,
             )

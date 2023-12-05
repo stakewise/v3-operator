@@ -143,7 +143,7 @@ async def _update_exit_signatures(
             break
         except NotEnoughOracleApprovalsError as e:
             logger.error(
-                'Not enough votes for exit signature update: %d. Threshold is %d',
+                'Not enough oracle approvals for exit signature update: %d. Threshold is %d',
                 e.num_votes,
                 e.threshold,
             )

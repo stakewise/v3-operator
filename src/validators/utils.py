@@ -76,7 +76,7 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
 
     logger.info(
         'Fetched oracle approvals for validator registration: '
-        'deadline=%d, start index=%d. Received %d out of %d.',
+        'deadline=%d, start index=%d. Received %d out of %d approvals.',
         request.deadline,
         request.validator_index,
         len(approvals),

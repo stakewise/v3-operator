@@ -51,8 +51,8 @@ async def send_signature_rotation_requests(
             approvals[address] = response
 
     logger.info(
-        'Fetched oracle approvals for signature update: validators count = %d. '
-        'Received: %d out of %d.',
+        'Fetched oracle approvals for signatures update of %d validators. '
+        'Received approvals: %d out of %d',
         len(request.public_keys),
         len(approvals),
         len(oracles.endpoints),
