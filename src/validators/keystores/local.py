@@ -30,21 +30,21 @@ class KeystoreFile:
     password: str
 
 
-Keystores = NewType('Keystores', dict[HexStr, BLSPrivkey])
+Keys = NewType('Keys', dict[HexStr, BLSPrivkey])
 
 
 class LocalKeystore(BaseKeystore):
-    keystores: Keystores
+    keys: Keys
 
-    def __init__(self, keystores: Keystores):
-        self.keystores = keystores
+    def __init__(self, keys: Keys):
+        self.keys = keys
 
     @staticmethod
     async def load() -> 'LocalKeystore':
-        """Extracts private keys from the keystores."""
+        """Extracts private keys from the keys."""
         keystore_files = LocalKeystore.list_keystore_files()
-        logger.info('Loading keystores from %s...', settings.keystores_dir)
-        keystores = {}
+        logger.info('Loading keys from %s...', settings.keystores_dir)
+        keys = {}
         with Pool(processes=settings.pool_size) as pool:
             # pylint: disable-next=unused-argument
             def _stop_pool(*args, **kwargs):
@@ -62,22 +62,22 @@ class LocalKeystore(BaseKeystore):
                 result.wait()
                 try:
                     pub_key, priv_key = result.get()
-                    keystores[pub_key] = priv_key
+                    keys[pub_key] = priv_key
                 except KeystoreException as e:
                     logger.error(e)
-                    raise RuntimeError('Failed to load keystores') from e
+                    raise RuntimeError('Failed to load keys') from e
 
-        logger.info('Loaded %d keystores', len(keystores))
-        return LocalKeystore(Keystores(keystores))
+        logger.info('Loaded %d keys', len(keys))
+        return LocalKeystore(Keys(keys))
 
     def __bool__(self) -> bool:
-        return len(self.keystores) > 0
+        return len(self.keys) > 0
 
     def __contains__(self, public_key):
-        return public_key in self.keystores
+        return public_key in self.keys
 
     def __len__(self) -> int:
-        return len(self.keystores)
+        return len(self.keys)
 
     async def get_exit_signature_shards(
         self, validator_index: int, public_key: HexStr, oracles: Oracles, fork: ConsensusFork
@@ -90,7 +90,7 @@ class LocalKeystore(BaseKeystore):
         )
 
         private_key_shares = private_key_to_private_key_shares(
-            private_key=self.keystores[public_key],
+            private_key=self.keys[public_key],
             threshold=oracles.exit_signature_recover_threshold,
             total=len(oracles.public_keys),
         )
@@ -108,7 +108,7 @@ class LocalKeystore(BaseKeystore):
     async def get_exit_signature(
         self, validator_index: int, public_key: HexStr, network: str, fork: ConsensusFork
     ) -> BLSSignature:
-        private_key = self.keystores[public_key]
+        private_key = self.keys[public_key]
 
         message = get_exit_message_signing_root(
             validator_index=validator_index,
@@ -120,7 +120,7 @@ class LocalKeystore(BaseKeystore):
 
     @property
     def public_keys(self) -> list[HexStr]:
-        return list(self.keystores.keys())
+        return list(self.keys.keys())
 
     @staticmethod
     def list_keystore_files() -> list[KeystoreFile]:

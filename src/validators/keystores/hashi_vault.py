@@ -8,7 +8,7 @@ from eth_utils import add_0x_prefix
 from web3 import Web3
 
 from src.config.settings import HASHI_VAULT_TIMEOUT, settings
-from src.validators.keystores.local import Keystores, LocalKeystore
+from src.validators.keystores.local import Keys, LocalKeystore
 from src.validators.typings import BLSPrivkey
 
 logger = logging.getLogger(__name__)
@@ -49,11 +49,11 @@ class HashiVaultKeystore(LocalKeystore):
         """Extracts private keys from the keystores."""
         hashi_vault_config = HashiVaultConfiguration.from_settings()
         logger.info('Using hashi vault at %s for loading public keys')
-        keystores = await HashiVaultKeystore._load_hashi_vault_keys(hashi_vault_config)
-        return HashiVaultKeystore(keystores)
+        keys = await HashiVaultKeystore._load_hashi_vault_keys(hashi_vault_config)
+        return HashiVaultKeystore(keys)
 
     @staticmethod
-    async def _load_hashi_vault_keys(config: HashiVaultConfiguration) -> Keystores:
+    async def _load_hashi_vault_keys(config: HashiVaultConfiguration) -> Keys:
         """
         Load public and private keys from hashi vault
         K/V secret engine.
@@ -80,5 +80,5 @@ class HashiVaultKeystore(LocalKeystore):
         for pk, sk in key_data['data']['data'].items():
             sk_bytes = Web3.to_bytes(hexstr=sk)
             keys.append((add_0x_prefix(HexStr(pk)), BLSPrivkey(sk_bytes)))
-        validator_keys = Keystores(dict(keys))
+        validator_keys = Keys(dict(keys))
         return validator_keys

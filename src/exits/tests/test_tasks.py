@@ -11,7 +11,7 @@ from src.common.typings import Oracles
 from src.common.utils import get_current_timestamp
 from src.config.settings import settings
 from src.exits.tasks import _get_oracles_request
-from src.validators.keystores.local import Keystores, LocalKeystore
+from src.validators.keystores.local import Keys, LocalKeystore
 from src.validators.keystores.remote import RemoteSignerKeystore
 from src.validators.typings import ExitSignatureShards
 
@@ -38,9 +38,7 @@ class TestGetOraclesRequest:
         ):
             request = await _get_oracles_request(
                 oracles=oracles,
-                keystores=LocalKeystore(
-                    keystores=Keystores({test_validator_pubkey: test_validator_privkey})
-                ),
+                keystore=LocalKeystore(Keys({test_validator_pubkey: test_validator_privkey})),
                 validators={123: test_validator_pubkey},
             )
             assert request.vault_address == vault_address
@@ -81,7 +79,7 @@ class TestGetOraclesRequest:
             }
             request = await _get_oracles_request(
                 oracles=oracles,
-                keystores=remote_signer_keystore,
+                keystore=remote_signer_keystore,
                 validators=validators,
             )
 

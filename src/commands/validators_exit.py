@@ -15,7 +15,7 @@ from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
 from src.config.settings import AVAILABLE_NETWORKS, settings
 from src.validators.keystores.base import BaseKeystore
-from src.validators.keystores.load import load_keystores
+from src.validators.keystores.load import load_keystore
 
 
 @dataclass
@@ -128,8 +128,8 @@ def validators_exit(
 
 
 async def main(count: int | None) -> None:
-    keystores = await load_keystores()
-    validators_exits = await _get_validators_exits(keystores=keystores)
+    keystore = await load_keystore()
+    validators_exits = await _get_validators_exits(keystore=keystore)
     if not validators_exits:
         raise click.ClickException('There are no active validators.')
 
@@ -147,7 +147,7 @@ async def main(count: int | None) -> None:
     for validator_exit in validators_exits:
         # todo: validatate that pk in keystores
 
-        exit_signature = await keystores.get_exit_signature(
+        exit_signature = await keystore.get_exit_signature(
             validator_index=validator_exit.index,
             public_key=validator_exit.public_key,
             network=settings.network,
@@ -182,10 +182,10 @@ async def main(count: int | None) -> None:
 
 
 async def _get_validators_exits(
-    keystores: BaseKeystore,
+    keystore: BaseKeystore,
 ) -> list[ValidatorExit]:
     """Fetches validators consensus info."""
-    public_keys = keystores.public_keys
+    public_keys = keystore.public_keys
     results = []
     exited_statuses = [x.value for x in EXITING_STATUSES]
 

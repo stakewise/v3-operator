@@ -158,9 +158,9 @@ class TestSigning:
 
         config = HashiVaultConfiguration.from_settings()
 
-        keystores = await HashiVaultKeystore._load_hashi_vault_keys(config)
+        keystore = await HashiVaultKeystore._load_hashi_vault_keys(config)
 
-        assert len(keystores) == 2
+        assert len(keystore) == 2
 
     @pytest.mark.usefixtures('mocked_hashi_vault')
     async def test_hashi_vault_keystores_not_configured(

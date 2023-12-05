@@ -78,9 +78,9 @@ async def upload_keypairs(db_url: str, b64_encrypt_key: str) -> None:
     await check_deposit_data_root(deposit_data_tree.root)
 
     click.echo(f'Loading keystores from {settings.keystores_dir}...')
-    keystores = await LocalKeystore.load()
-    if len(keystores) == 0:
-        raise click.ClickException('Keystores not found.')
+    keystore = await LocalKeystore.load()
+    if len(keystore) == 0:
+        raise click.ClickException('Keystore not found.')
 
     # get oracles for calculating key shares
     click.echo('Fetching oracles config...')
@@ -91,10 +91,10 @@ async def upload_keypairs(db_url: str, b64_encrypt_key: str) -> None:
     remote_signer_keystore = RemoteSignerKeystore(remote_signer_config_data)
     existing_pub_keys = set(remote_signer_keystore.public_keys)
     pubkeys_to_shares = remote_signer_keystore.pubkeys_to_shares
-    click.echo(f'Calculating and encrypting shares for {len(keystores)} keystores...')
+    click.echo(f'Calculating and encrypting shares for {len(keystore)} keystores...')
     total_oracles = len(oracles.public_keys)
     key_records: list[RemoteDatabaseKeyPair] = []
-    for public_key, private_key in keystores.keystores.items():  # pylint: disable=no-member
+    for public_key, private_key in keystore.keys.items():  # pylint: disable=no-member
         encrypted_priv_key, nonce = _encrypt_private_key(private_key, encryption_key)
         key_records.append(
             RemoteDatabaseKeyPair(

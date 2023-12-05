@@ -41,15 +41,15 @@ logger = logging.getLogger(__name__)
 
 
 class ValidatorsTask(BaseTask):
-    keystores: BaseKeystore
+    keystore: BaseKeystore
     deposit_data: DepositData
 
     def __init__(
         self,
-        keystores: BaseKeystore,
+        keystore: BaseKeystore,
         deposit_data: DepositData,
     ):
-        self.keystores = keystores
+        self.keystore = keystore
         self.deposit_data = deposit_data
         network_validators_processor = NetworkValidatorsProcessor()
         self.network_validators_scanner = EventScanner(network_validators_processor)
@@ -61,18 +61,18 @@ class ValidatorsTask(BaseTask):
         await self.network_validators_scanner.process_new_events(chain_state.execution_block)
         # check and register new validators
         await update_unused_validator_keys_metric(
-            keystores=self.keystores,
+            keystore=self.keystore,
             deposit_data=self.deposit_data,
         )
         await register_validators(
-            keystores=self.keystores,
+            keystore=self.keystore,
             deposit_data=self.deposit_data,
         )
 
 
 # pylint: disable-next=too-many-locals,too-many-branches
 async def register_validators(
-    keystores: BaseKeystore,
+    keystore: BaseKeystore,
     deposit_data: DepositData,
 ) -> None:
     """Registers vault validators."""
@@ -108,7 +108,7 @@ async def register_validators(
         return
 
     validators: list[Validator] = await get_available_validators(
-        keystores=keystores,
+        keystore=keystore,
         deposit_data=deposit_data,
         count=validators_count,
     )
@@ -143,7 +143,7 @@ async def register_validators(
 
             oracles_request = await create_approval_request(
                 oracles=oracles,
-                keystores=keystores,
+                keystore=keystore,
                 validators=validators,
                 registry_root=registry_root,
                 multi_proof=multi_proof,
@@ -203,7 +203,7 @@ async def register_validators(
 # pylint: disable-next=too-many-arguments
 async def create_approval_request(
     oracles: Oracles,
-    keystores: BaseKeystore,
+    keystore: BaseKeystore,
     validators: list[Validator],
     registry_root: Bytes32,
     multi_proof: MultiProof,
@@ -231,7 +231,7 @@ async def create_approval_request(
         deadline=deadline,
     )
     for validator in validators:
-        shards = await keystores.get_exit_signature_shards(
+        shards = await keystore.get_exit_signature_shards(
             validator_index=validator_index,
             public_key=validator.public_key,
             oracles=oracles,

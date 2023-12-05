@@ -26,10 +26,10 @@ logger = logging.getLogger(__name__)
 
 
 class ExitSignatureTask(BaseTask):
-    keystores: BaseKeystore
+    keystore: BaseKeystore
 
-    def __init__(self, keystores: BaseKeystore):
-        self.keystores = keystores
+    def __init__(self, keystore: BaseKeystore):
+        self.keystore = keystore
 
     async def process_block(self) -> None:
         oracles = await get_oracles()
@@ -45,7 +45,7 @@ class ExitSignatureTask(BaseTask):
         outdated_indexes = await _fetch_outdated_indexes(oracles, update_block)
         if outdated_indexes:
             await _update_exit_signatures(
-                keystores=self.keystores,
+                keystore=self.keystore,
                 oracles=oracles,
                 outdated_indexes=outdated_indexes,
             )
@@ -105,7 +105,7 @@ async def _fetch_outdated_indexes(oracles: Oracles, update_block: BlockNumber | 
 
 
 async def _update_exit_signatures(
-    keystores: BaseKeystore,
+    keystore: BaseKeystore,
     oracles: Oracles,
     outdated_indexes: list[int],
 ) -> None:
@@ -120,7 +120,7 @@ async def _update_exit_signatures(
             deadline = current_timestamp + oracles.signature_validity_period
             oracles_request = await _get_oracles_request(
                 oracles=oracles,
-                keystores=keystores,
+                keystore=keystore,
                 validators=validators,
             )
 
@@ -162,7 +162,7 @@ async def _fetch_exit_signature_block(oracle_endpoint: str) -> BlockNumber | Non
 
 async def _get_oracles_request(
     oracles: Oracles,
-    keystores: BaseKeystore,
+    keystore: BaseKeystore,
     validators: dict[int, HexStr],
 ) -> SignatureRotationRequest:
     """Fetches approval from oracles."""
@@ -181,8 +181,8 @@ async def _get_oracles_request(
         if len(request.public_keys) >= exit_rotation_batch_limit:
             break
 
-        if public_key in keystores:
-            shards = await keystores.get_exit_signature_shards(
+        if public_key in keystore:
+            shards = await keystore.get_exit_signature_shards(
                 validator_index=validator_index,
                 public_key=public_key,
                 oracles=oracles,

@@ -162,7 +162,7 @@ async def check_deposit_data_root(deposit_data_root: str) -> None:
 
 
 async def get_available_validators(
-    keystores: BaseKeystore,
+    keystore: BaseKeystore,
     deposit_data: DepositData,
     count: int,
 ) -> list[Validator]:
@@ -178,7 +178,7 @@ async def get_available_validators(
             validator = deposit_data.validators[i]
         except IndexError:
             break
-        if validator.public_key not in keystores:
+        if validator.public_key not in keystore:
             logger.warning(
                 'Cannot find validator with public key %s in keystores.',
                 validator.public_key,
@@ -199,7 +199,7 @@ async def get_available_validators(
 
 
 async def update_unused_validator_keys_metric(
-    keystores: BaseKeystore,
+    keystore: BaseKeystore,
     deposit_data: DepositData,
 ) -> int:
     try:
@@ -210,7 +210,7 @@ async def update_unused_validator_keys_metric(
 
     validators: int = 0
     for validator in deposit_data.validators:
-        if validator.public_key not in keystores:
+        if validator.public_key not in keystore:
             logger.warning(
                 'Cannot find validator with public key %s in keystores.',
                 validator.public_key,

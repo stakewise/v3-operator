@@ -140,7 +140,7 @@ async def main(remove_existing_keys: bool) -> None:
         remote_signer_keystore = RemoteSignerKeystore({})
 
     credentials = []
-    for pubkey, private_key in keystores.keystores.items():  # pylint: disable=no-member
+    for pubkey, private_key in keystores.keys.items():  # pylint: disable=no-member
         private_key_shares = private_key_to_private_key_shares(
             private_key=private_key,
             threshold=oracles.exit_signature_recover_threshold,

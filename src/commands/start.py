@@ -26,7 +26,7 @@ from src.exits.tasks import ExitSignatureTask
 from src.harvest.tasks import HarvestTask
 from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import NetworkValidatorsProcessor
-from src.validators.keystores.load import load_keystores
+from src.validators.keystores.load import load_keystore
 from src.validators.tasks import ValidatorsTask, load_genesis_validators
 from src.validators.utils import load_deposit_data
 
@@ -247,8 +247,8 @@ async def main() -> None:
     # load network validators from ipfs dump
     await load_genesis_validators()
 
-    # load keystores
-    keystores = await load_keystores()
+    # load keystore
+    keystore = await load_keystore()
 
     # load deposit data
     deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
@@ -270,11 +270,11 @@ async def main() -> None:
     with InterruptHandler() as interrupt_handler:
         tasks = [
             ValidatorsTask(
-                keystores=keystores,
+                keystore=keystore,
                 deposit_data=deposit_data,
             ).run(interrupt_handler),
             ExitSignatureTask(
-                keystores=keystores,
+                keystore=keystore,
             ).run(interrupt_handler),
             MetricsTask().run(interrupt_handler),
             WalletTask().run(interrupt_handler),
