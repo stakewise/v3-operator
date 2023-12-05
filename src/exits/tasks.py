@@ -140,15 +140,12 @@ async def _update_exit_signatures(
         try:
             # send approval request to oracles
             oracles_approval = await send_signature_rotation_requests(oracles, oracles_request)
-            logger.info('Fetched updated signature for validators: count=%d', len(validators))
             break
         except NotEnoughOracleApprovalsError as e:
             logger.error(
-                'Failed to fetch oracle approvals. Received %d out of %d, '
-                'the oracles with endpoints %s have failed to respond.',
+                'Not enough oracle approvals for exit signature update: %d. Threshold is %d',
                 e.num_votes,
                 e.threshold,
-                ', '.join(e.failed_endpoints),
             )
         approvals_time = time.time() - approval_start_time
         await asyncio.sleep(approvals_min_interval - approvals_time)
