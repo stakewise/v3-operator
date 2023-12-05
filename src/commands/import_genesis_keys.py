@@ -32,7 +32,7 @@ from src.config.settings import settings
 )
 @click.option(
     '--exported-keys-dir',
-    help='Path where the encrypted keys are placed.',
+    help='Path where the encrypted keys are located.',
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
 )
 @click.option(
@@ -42,7 +42,7 @@ from src.config.settings import settings
     type=str,
     callback=validate_eth_address,
 )
-@click.command(help='Import encrypted keystores. Only for genesis vault')
+@click.command(help='Import encrypted keystores. Only for the genesis vault')
 # pylint: disable-next=too-many-arguments
 def import_genesis_keys(
     rsa_key: str,
@@ -60,7 +60,7 @@ def import_genesis_keys(
         vault_dir=vault_config.vault_dir,
     )
     if settings.network_config.GENESIS_VAULT_CONTRACT_ADDRESS != vault:
-        raise click.ClickException('Only genesis vault support keys import.')
+        raise click.ClickException('The command is only for the genesis vault.')
 
     keystores_dir = vault_config.vault_dir / 'keystores'
     password_file = keystores_dir / 'password.txt'
