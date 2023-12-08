@@ -57,6 +57,8 @@ class Settings(metaclass=Singleton):
     ipfs_fetch_endpoints: list[str]
     ipfs_timeout: int
     ipfs_retry_timeout: int
+    genesis_validators_ipfs_timeout: int
+    genesis_validators_ipfs_retry_timeout: int
     validators_fetch_chunk_size: int
     sentry_dsn: str
     pool_size: int | None
@@ -152,8 +154,17 @@ class Settings(metaclass=Singleton):
             'http://cloudflare-ipfs.com,'
             'https://gateway.pinata.cloud,https://ipfs.io',
         )
-        self.ipfs_timeout = decouple_config('IPFS_TIMEOUT', default=60)
-        self.ipfs_retry_timeout = decouple_config('IPFS_RETRY_TIMEOUT', default=120)
+        self.ipfs_timeout = decouple_config('IPFS_TIMEOUT', default=60, cast=int)
+        self.ipfs_retry_timeout = decouple_config('IPFS_RETRY_TIMEOUT', default=120, cast=int)
+
+        # Genesis validators ipfs fetch may have larger timeouts
+        self.genesis_validators_ipfs_timeout = decouple_config(
+            'GENESIS_VALIDATORS_IPFS_TIMEOUT', default=300, cast=int
+        )
+        self.genesis_validators_ipfs_retry_timeout = decouple_config(
+            'GENESIS_VALIDATORS_IPFS_RETRY_TIMEOUT', default=300, cast=int
+        )
+
         self.validators_fetch_chunk_size = decouple_config(
             'VALIDATORS_FETCH_CHUNK_SIZE', default=100, cast=int
         )
