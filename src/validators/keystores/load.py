@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 async def load_keystore() -> BaseKeystore:
     if settings.remote_signer_url:
-        # No keystores loaded but remote signer URL provided
         remote_keystore = await RemoteSignerKeystore.load()
         logger.info(
             'Using remote signer at %s for %i public keys',
