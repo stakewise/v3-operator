@@ -1,4 +1,6 @@
+import asyncio
 import logging
+import time
 
 from eth_typing import BLSPubkey
 from multiproof.standard import MultiProof
@@ -142,7 +144,11 @@ async def register_validators(
     registry_root = None
     oracles_request = None
     deadline = get_current_timestamp() + oracles.signature_validity_period
+    approvals_min_interval = 1
+
     while True:
+        approval_start_time = time.time()
+
         latest_registry_root = await validators_registry_contract.get_registry_root()
         current_timestamp = get_current_timestamp()
         if (
@@ -166,20 +172,16 @@ async def register_validators(
 
         try:
             oracles_approval = await send_approval_requests(oracles, oracles_request)
-            logger.info(
-                'Fetched oracles approval for validators: deadline=%d, start index=%d',
-                oracles_request.deadline,
-                oracles_request.validator_index,
-            )
             break
         except NotEnoughOracleApprovalsError as e:
             logger.error(
-                'Failed to fetch oracle approvals. Received %d out of %d, '
-                'the oracles with endpoints %s have failed to respond.',
+                'Not enough oracle approvals for validator registration: %d. Threshold is %d.',
                 e.num_votes,
                 e.threshold,
-                ', '.join(e.failed_endpoints),
             )
+        approvals_time = time.time() - approval_start_time
+        await asyncio.sleep(approvals_min_interval - approvals_time)
+
     # compare validators root just before transaction to reduce reverted calls
     if registry_root != await validators_registry_contract.get_registry_root():
         logger.info(

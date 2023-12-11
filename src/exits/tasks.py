@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from random import shuffle
 
 from eth_typing import BlockNumber, BLSPubkey
@@ -126,7 +127,11 @@ async def _update_exit_signatures(
     # pylint: disable=duplicate-code
     validators = await get_validator_public_keys(outdated_indexes)
     deadline = None
+    approvals_min_interval = 1
+
     while True:
+        approval_start_time = time.time()
+
         current_timestamp = get_current_timestamp()
         if not deadline or deadline <= current_timestamp:
             deadline = current_timestamp + oracles.signature_validity_period
@@ -143,16 +148,15 @@ async def _update_exit_signatures(
         try:
             # send approval request to oracles
             oracles_approval = await send_signature_rotation_requests(oracles, oracles_request)
-            logger.info('Fetched updated signature for validators: count=%d', len(validators))
             break
         except NotEnoughOracleApprovalsError as e:
             logger.error(
-                'Failed to fetch oracle exit signatures update. Received %d out of %d, '
-                'the oracles with endpoints %s have failed to respond.',
+                'Not enough oracle approvals for exit signature update: %d. Threshold is %d',
                 e.num_votes,
                 e.threshold,
-                ', '.join(e.failed_endpoints),
             )
+        approvals_time = time.time() - approval_start_time
+        await asyncio.sleep(approvals_min_interval - approvals_time)
 
     tx_hash = await submit_exit_signatures(oracles_approval)
     if not tx_hash:
