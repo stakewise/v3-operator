@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from functools import cached_property
 
 from eth_keys.datatypes import PublicKey
-from eth_typing import ChecksumAddress, HexStr
+from eth_typing import BlockNumber, ChecksumAddress, HexStr
 from web3 import Web3
 from web3.types import Wei
 
@@ -27,6 +27,14 @@ class Oracles:
             public_key_obj = PublicKey(Web3.to_bytes(hexstr=public_key))
             res.append(public_key_obj.to_checksum_address())
         return res
+
+
+@dataclass
+class OraclesCache:
+    checkpoint_block: BlockNumber
+    config: dict
+    validators_threshold: int
+    rewards_threshold: int
 
 
 @dataclass
