@@ -162,7 +162,7 @@ class Settings(metaclass=Singleton):
             'GENESIS_VALIDATORS_IPFS_TIMEOUT', default=300, cast=int
         )
         self.genesis_validators_ipfs_retry_timeout = decouple_config(
-            'GENESIS_VALIDATORS_IPFS_RETRY_TIMEOUT', default=300, cast=int
+            'GENESIS_VALIDATORS_IPFS_RETRY_TIMEOUT', default=600, cast=int
         )
 
         self.validators_fetch_chunk_size = decouple_config(
