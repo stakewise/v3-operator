@@ -4,12 +4,11 @@ import time
 
 from eth_typing import BLSPubkey
 from multiproof.standard import MultiProof
-from sw_utils import EventScanner
+from sw_utils import EventScanner, IpfsFetchClient
 from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.types import BlockNumber, Wei
 
-from src.common.clients import ipfs_fetch_client
 from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import v2_pool_escrow_contract, validators_registry_contract
 from src.common.exceptions import NotEnoughOracleApprovalsError
@@ -290,6 +289,11 @@ async def load_genesis_validators() -> None:
     if not (NetworkValidatorCrud().get_last_network_validator() is None and ipfs_hash):
         return
 
+    ipfs_fetch_client = IpfsFetchClient(
+        endpoints=settings.ipfs_fetch_endpoints,
+        timeout=settings.genesis_validators_ipfs_timeout,
+        retry_timeout=settings.genesis_validators_ipfs_retry_timeout,
+    )
     data = await ipfs_fetch_client.fetch_bytes(ipfs_hash)
     genesis_validators: list[NetworkValidator] = []
     logger.info('Loading genesis validators...')

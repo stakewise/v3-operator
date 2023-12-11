@@ -38,6 +38,6 @@ class TestCreateWallet:
         assert output.strip() in result.output.strip()
         with open(f'{vault_dir}/wallet/{filename}', encoding='utf-8') as f:
             data = json.load(f)
-            assert data.get('address') == account.address.lower()[2:]
+            assert data.get('address').lower() == account.address.lower()[2:]
         with open(f'{vault_dir}/wallet/password.txt', encoding='utf-8') as f:
             assert len(f.readline()) == 20
