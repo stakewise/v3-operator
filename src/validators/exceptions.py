@@ -7,10 +7,10 @@ class KeystoreException(Exception):
 
 
 class RegistryRootChangedError(ValueError):
-    def __init__(self, *args, **kwargs):
-        super().__init__(REGISTRY_ROOT_CHANGED, *args, **kwargs)
+    def __init__(self):
+        super().__init__(REGISTRY_ROOT_CHANGED)
 
 
 class ValidatorIndexChangedError(ValueError):
-    def __init__(self, *args, **kwargs):
-        super().__init__(VALIDATOR_INDEX_CHANGED, *args, **kwargs)
+    def __init__(self):
+        super().__init__(VALIDATOR_INDEX_CHANGED)
