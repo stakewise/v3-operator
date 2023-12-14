@@ -14,7 +14,6 @@ from sw_utils.decorators import retry_aiohttp_errors
 from web3 import Web3
 
 from src.common.contracts import validators_registry_contract
-from src.common.exceptions import NotEnoughOracleApprovalsError
 from src.common.typings import OracleApproval, Oracles, OraclesApproval
 from src.common.utils import format_error, process_oracles_approvals, warning_verbose
 from src.config.settings import DEFAULT_RETRY_TIME, ORACLES_VALIDATORS_TIMEOUT
@@ -62,11 +61,21 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
 
         approvals[address] = result
 
-    try:
-        return process_oracles_approvals(approvals, oracles.validators_threshold)
-    except NotEnoughOracleApprovalsError as e:
-        e.failed_endpoints = failed_endpoints
-        raise
+    logger.info(
+        'Fetched oracle approvals for validator registration: '
+        'deadline=%d, start index=%d. Received %d out of %d approvals.',
+        request.deadline,
+        request.validator_index,
+        len(approvals),
+        len(oracles.endpoints),
+    )
+
+    if failed_endpoints:
+        logger.error(
+            'The oracles with endpoints %s have failed to respond.', ', '.join(failed_endpoints)
+        )
+
+    return process_oracles_approvals(approvals, oracles.validators_threshold)
 
 
 # pylint: disable=duplicate-code
