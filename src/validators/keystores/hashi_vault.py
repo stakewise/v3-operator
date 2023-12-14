@@ -48,7 +48,6 @@ class HashiVaultKeystore(LocalKeystore):
     async def load() -> 'HashiVaultKeystore':
         """Extracts private keys from the keystores."""
         hashi_vault_config = HashiVaultConfiguration.from_settings()
-        logger.info('Using hashi vault at %s for loading public keys')
         keys = await HashiVaultKeystore._load_hashi_vault_keys(hashi_vault_config)
         return HashiVaultKeystore(keys)
 

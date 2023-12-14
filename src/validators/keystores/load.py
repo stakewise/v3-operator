@@ -19,7 +19,7 @@ async def load_keystore() -> BaseKeystore:
         )
         return remote_keystore
     if settings.hashi_vault_url:
-        logger.info('Using hashi vault at %s for loading public keys')
+        logger.info('Using hashi vault at %s for loading public keys', settings.hashi_vault_url)
         return await HashiVaultKeystore.load()
     local_keystore = await LocalKeystore.load()
     if not local_keystore:
