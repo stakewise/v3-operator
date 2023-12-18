@@ -54,6 +54,9 @@ RUN poetry install --only main
 # `production` image used for runtime
 FROM python-base as production
 
+RUN apt-get update && apt-get upgrade -y; \
+    rm -rf /var/lib/apt/lists/*
+
 USER nobody
 
 # Copy dependencies from build container
