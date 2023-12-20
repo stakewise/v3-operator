@@ -18,7 +18,7 @@ from src.commands.remote_signer_setup import remote_signer_setup
 from src.common.credentials import CredentialManager, ScryptKeystore
 from src.common.typings import Oracles
 from src.common.vault_config import VaultConfig
-from src.config.networks import GOERLI
+from src.config.networks import HOLESKY
 from src.config.settings import settings
 from src.test_fixtures.hashi_vault import hashi_vault_url, mocked_hashi_vault
 from src.test_fixtures.remote_signer import mocked_remote_signer, remote_signer_url
@@ -68,7 +68,7 @@ def test_mnemonic() -> str:
 @pytest.fixture
 def _init_vault(vault_address: HexAddress, data_dir: Path, test_mnemonic: str) -> None:
     config = VaultConfig(vault=vault_address, data_dir=data_dir)
-    config.save(GOERLI, test_mnemonic)
+    config.save(HOLESKY, test_mnemonic)
 
 
 @pytest.fixture
@@ -217,7 +217,7 @@ def fake_settings(
         vault_dir=vault_dir,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
-        network=GOERLI,
+        network=HOLESKY,
         keystores_dir=str(keystores_dir),
         database_dir=str(data_dir),
     )
@@ -281,7 +281,7 @@ def create_validator_keypair(
     def _generate_keypair_function() -> tuple[BLSPrivkey, HexStr]:
         """Returns a random validator keypair"""
         credential = CredentialManager.generate_credential(
-            network=GOERLI,
+            network=HOLESKY,
             vault=vault_address,
             mnemonic=test_mnemonic,
             index=randint(0, 100_000),
