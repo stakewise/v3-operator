@@ -8,11 +8,10 @@ from web3 import Web3
 from web3.types import Wei
 
 MAINNET = 'mainnet'
-GOERLI = 'goerli'
 GNOSIS = 'gnosis'
 HOLESKY = 'holesky'
 
-ETH_NETWORKS = [MAINNET, GOERLI, HOLESKY]
+ETH_NETWORKS = [MAINNET, HOLESKY]
 GNO_NETWORKS = [GNOSIS]
 
 
@@ -121,43 +120,6 @@ NETWORKS = {
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
         SHAPELLA_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x01017000')),
         SHAPELLA_EPOCH=256,
-        MULTICALL_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xcA11bde05977b3631167028862bE2a173976CA11'
-        ),
-    ),
-    GOERLI: NetworkConfig(
-        SYMBOL='GoerliETH',
-        VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xff50ed3d0ec03aC01D4C79aAd74928BFF48a7b2b'
-        ),
-        VALIDATORS_REGISTRY_GENESIS_BLOCK=BlockNumber(4367321),
-        KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x893ceb1cF23475defE3747670EbE4b40e629c6fD'
-        ),
-        KEEPER_GENESIS_BLOCK=BlockNumber(9583358),
-        V2_POOL_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x8c1EfEcFb5c4F1099AB0460b5659342943764Df7'
-        ),
-        V2_POOL_GENESIS_BLOCK=BlockNumber(4468086),
-        V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x040F15C6b5Bfc5F324eCaB5864C38D4e1EEF4218'
-        ),
-        GENESIS_VAULT_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x8B5c0d4c067Cf480766140B251B464de7F03B515'
-        ),
-        GENESIS_VALIDATORS_ROOT=Bytes32(
-            Web3.to_bytes(
-                hexstr=HexStr('0x043db0d9a83813551ee2f33450d23797757d430911a9320530ad8a0eabc43efb')
-            )
-        ),
-        GENESIS_VALIDATORS_IPFS_HASH='QmQo3oLYxqWm75fbgJJkCaUttZoYVqZhZj9r99r1UsZVpu',
-        SLOTS_PER_EPOCH=32,
-        SECONDS_PER_BLOCK=Decimal(12),
-        GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x00001020')),
-        IS_POA=True,
-        HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
-        SHAPELLA_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x03001020')),
-        SHAPELLA_EPOCH=162304,
         MULTICALL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xcA11bde05977b3631167028862bE2a173976CA11'
         ),
