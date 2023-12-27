@@ -26,14 +26,9 @@ from src.exits.tasks import ExitSignatureTask
 from src.harvest.tasks import HarvestTask
 from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import NetworkValidatorsProcessor
-from src.validators.signing.hashi_vault import (
-    HashiVaultConfiguration,
-    load_hashi_vault_keys,
-)
-from src.validators.signing.remote import RemoteSignerConfiguration
+from src.validators.keystores.load import load_keystore
 from src.validators.tasks import ValidatorsTask, load_genesis_validators
-from src.validators.typings import Keystores
-from src.validators.utils import load_deposit_data, load_keystores
+from src.validators.utils import load_deposit_data
 
 logger = logging.getLogger(__name__)
 
@@ -252,28 +247,8 @@ async def main() -> None:
     # load network validators from ipfs dump
     await load_genesis_validators()
 
-    # load keystores / remote signer configuration
-    remote_signer_config = None
-    keystores = Keystores({})
-    if settings.remote_signer_url:
-        # No keystores loaded but remote signer URL provided
-        remote_signer_config = RemoteSignerConfiguration.from_file(
-            settings.remote_signer_config_file
-        )
-        logger.info(
-            'Using remote signer at %s for %i public keys',
-            settings.remote_signer_url,
-            len(remote_signer_config.pubkeys_to_shares.keys()),
-        )
-    elif settings.hashi_vault_url:
-        # No keystores loaded but hashi vault configuration specified
-        hashi_vault_config = HashiVaultConfiguration.from_settings()
-        logger.info('Using hashi vault at %s for loading public keys')
-        keystores = await load_hashi_vault_keys(hashi_vault_config)
-    else:
-        keystores = load_keystores()
-        if not keystores:
-            raise RuntimeError('No keystores, no remote signer or hashi vault URL provided')
+    # load keystore
+    keystore = await load_keystore()
 
     # load deposit data
     deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
@@ -295,13 +270,11 @@ async def main() -> None:
     with InterruptHandler() as interrupt_handler:
         tasks = [
             ValidatorsTask(
-                keystores=keystores,
-                remote_signer_config=remote_signer_config,
+                keystore=keystore,
                 deposit_data=deposit_data,
             ).run(interrupt_handler),
             ExitSignatureTask(
-                keystores=keystores,
-                remote_signer_config=remote_signer_config,
+                keystore=keystore,
             ).run(interrupt_handler),
             MetricsTask().run(interrupt_handler),
             WalletTask().run(interrupt_handler),

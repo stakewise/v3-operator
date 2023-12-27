@@ -16,10 +16,11 @@ from src.config.settings import settings
 from src.remote_db.database import ConfigsCrud, KeyPairsCrud, get_db_connection
 from src.remote_db.typings import RemoteDatabaseKeyPair
 from src.validators.execution import check_deposit_data_root
+from src.validators.keystores.local import LocalKeystore
+from src.validators.keystores.remote import RemoteSignerKeystore
 from src.validators.signing.key_shares import private_key_to_private_key_shares
-from src.validators.signing.remote import RemoteSignerConfiguration
 from src.validators.typings import BLSPrivkey
-from src.validators.utils import generate_validators_tree, load_keystores
+from src.validators.utils import generate_validators_tree
 
 CIPHER_KEY_LENGTH = 32
 VALIDATOR_DEFINITIONS_FILENAME = 'validator_definitions.yml'
@@ -77,26 +78,23 @@ async def upload_keypairs(db_url: str, b64_encrypt_key: str) -> None:
     await check_deposit_data_root(deposit_data_tree.root)
 
     click.echo(f'Loading keystores from {settings.keystores_dir}...')
-    keystores = load_keystores()
-    if len(keystores) == 0:
-        raise click.ClickException('Keystores not found.')
+    keystore = await LocalKeystore.load()
+    if len(keystore) == 0:
+        raise click.ClickException('Keystore not found.')
 
     # get oracles for calculating key shares
     click.echo('Fetching oracles config...')
     oracles = await get_oracles()
 
     # fetch remote signer configuration file
-    remote_signer_config_data = ConfigsCrud(db_url=db_url).get_remote_signer_config()
-    if remote_signer_config_data is None:
-        remote_signer_config = RemoteSignerConfiguration(pubkeys_to_shares={})
-    else:
-        remote_signer_config = RemoteSignerConfiguration.load(remote_signer_config_data)
-    existing_pub_keys = set(remote_signer_config.pubkeys_to_shares.keys())
-
-    click.echo(f'Calculating and encrypting shares for {len(keystores)} keystores...')
+    remote_signer_config_data = ConfigsCrud(db_url=db_url).get_remote_signer_config() or {}
+    remote_signer_keystore = RemoteSignerKeystore(remote_signer_config_data)
+    existing_pub_keys = set(remote_signer_keystore.public_keys)
+    pubkeys_to_shares = remote_signer_keystore.pubkeys_to_shares
+    click.echo(f'Calculating and encrypting shares for {len(keystore)} keystores...')
     total_oracles = len(oracles.public_keys)
     key_records: list[RemoteDatabaseKeyPair] = []
-    for public_key, private_key in keystores.items():  # pylint: disable=no-member
+    for public_key, private_key in keystore.keys.items():  # pylint: disable=no-member
         encrypted_priv_key, nonce = _encrypt_private_key(private_key, encryption_key)
         key_records.append(
             RemoteDatabaseKeyPair(
@@ -114,7 +112,7 @@ async def upload_keypairs(db_url: str, b64_encrypt_key: str) -> None:
         )
 
         # update remote signer config and shares keystores
-        remote_signer_config.pubkeys_to_shares[public_key] = []
+        pubkeys_to_shares[public_key] = []
         for share_private_key in private_key_shares:
             share_public_key = Web3.to_hex(bls.SkToPk(share_private_key))
             encrypted_priv_key, nonce = _encrypt_private_key(share_private_key, encryption_key)
@@ -127,7 +125,7 @@ async def upload_keypairs(db_url: str, b64_encrypt_key: str) -> None:
                     nonce=Web3.to_hex(nonce),
                 )
             )
-            remote_signer_config.pubkeys_to_shares[public_key].append(share_public_key)
+            pubkeys_to_shares[public_key].append(share_public_key)
 
     click.echo('Uploading updates to the remote db...')
     with get_db_connection(db_url) as conn:
@@ -140,7 +138,7 @@ async def upload_keypairs(db_url: str, b64_encrypt_key: str) -> None:
 
         # upload remote signer config to remote db
         configs_crud = ConfigsCrud(db_connection=conn)
-        configs_crud.update_remote_signer_config(remote_signer_config.pubkeys_to_shares)
+        configs_crud.update_remote_signer_config(pubkeys_to_shares)
         configs_crud.update_deposit_data(deposit_data)
 
 
@@ -258,7 +256,7 @@ def setup_operator(db_url: str, output_dir: Path) -> None:
         output_dir.mkdir(parents=True, exist_ok=True)
 
     output_file = output_dir / ConfigsCrud.remote_signer_config_name
-    RemoteSignerConfiguration.load(config_data).save(output_file)
+    RemoteSignerKeystore.load_from_data(config_data).save(output_file)
     click.secho(f'Operator remote signer configuration saved to {greenify(output_file)} file.')
 
     output_file = output_dir / ConfigsCrud.deposit_data_name

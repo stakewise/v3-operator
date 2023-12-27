@@ -2,7 +2,6 @@ import asyncio
 import logging
 import time
 
-from eth_typing import BLSPubkey
 from multiproof.standard import MultiProof
 from sw_utils import EventScanner, IpfsFetchClient
 from sw_utils.typings import Bytes32
@@ -29,16 +28,11 @@ from src.validators.execution import (
     register_single_validator,
     update_unused_validator_keys_metric,
 )
+from src.validators.keystores.base import BaseKeystore
 from src.validators.signing.common import get_validators_proof
-from src.validators.signing.local import get_exit_signature_shards
-from src.validators.signing.remote import (
-    RemoteSignerConfiguration,
-    get_exit_signature_shards_remote_signer,
-)
 from src.validators.typings import (
     ApprovalRequest,
     DepositData,
-    Keystores,
     NetworkValidator,
     Validator,
 )
@@ -48,18 +42,15 @@ logger = logging.getLogger(__name__)
 
 
 class ValidatorsTask(BaseTask):
-    keystores: Keystores
-    remote_signer_config: RemoteSignerConfiguration | None
+    keystore: BaseKeystore
     deposit_data: DepositData
 
     def __init__(
         self,
-        keystores: Keystores,
-        remote_signer_config: RemoteSignerConfiguration | None,
+        keystore: BaseKeystore,
         deposit_data: DepositData,
     ):
-        self.keystores = keystores
-        self.remote_signer_config = remote_signer_config
+        self.keystore = keystore
         self.deposit_data = deposit_data
         network_validators_processor = NetworkValidatorsProcessor()
         self.network_validators_scanner = EventScanner(network_validators_processor)
@@ -71,21 +62,18 @@ class ValidatorsTask(BaseTask):
         await self.network_validators_scanner.process_new_events(chain_state.execution_block)
         # check and register new validators
         await update_unused_validator_keys_metric(
-            keystores=self.keystores,
-            remote_signer_config=self.remote_signer_config,
+            keystore=self.keystore,
             deposit_data=self.deposit_data,
         )
         await register_validators(
-            keystores=self.keystores,
-            remote_signer_config=self.remote_signer_config,
+            keystore=self.keystore,
             deposit_data=self.deposit_data,
         )
 
 
 # pylint: disable-next=too-many-locals,too-many-branches
 async def register_validators(
-    keystores: Keystores,
-    remote_signer_config: RemoteSignerConfiguration | None,
+    keystore: BaseKeystore,
     deposit_data: DepositData,
 ) -> None:
     """Registers vault validators."""
@@ -121,8 +109,7 @@ async def register_validators(
         return
 
     validators: list[Validator] = await get_available_validators(
-        keystores=keystores,
-        remote_signer_config=remote_signer_config,
+        keystore=keystore,
         deposit_data=deposit_data,
         count=validators_count,
     )
@@ -161,8 +148,7 @@ async def register_validators(
 
             oracles_request = await create_approval_request(
                 oracles=oracles,
-                keystores=keystores,
-                remote_signer_config=remote_signer_config,
+                keystore=keystore,
                 validators=validators,
                 registry_root=registry_root,
                 multi_proof=multi_proof,
@@ -218,8 +204,7 @@ async def register_validators(
 # pylint: disable-next=too-many-arguments
 async def create_approval_request(
     oracles: Oracles,
-    keystores: Keystores,
-    remote_signer_config: RemoteSignerConfiguration | None,
+    keystore: BaseKeystore,
     validators: list[Validator],
     registry_root: Bytes32,
     multi_proof: MultiProof,
@@ -247,23 +232,12 @@ async def create_approval_request(
         deadline=deadline,
     )
     for validator in validators:
-        if len(keystores) > 0:
-            shards = get_exit_signature_shards(
-                validator_index=validator_index,
-                private_key=keystores[validator.public_key],
-                oracles=oracles,
-                fork=settings.network_config.SHAPELLA_FORK,
-            )
-        elif remote_signer_config:
-            pubkey_shares = remote_signer_config.pubkeys_to_shares[validator.public_key]
-            shards = await get_exit_signature_shards_remote_signer(
-                validator_index=validator_index,
-                validator_pubkey_shares=[BLSPubkey(Web3.to_bytes(hexstr=s)) for s in pubkey_shares],
-                oracles=oracles,
-                fork=settings.network_config.SHAPELLA_FORK,
-            )
-        else:
-            raise RuntimeError('No keystores and no remote signer URL provided')
+        shards = await keystore.get_exit_signature_shards(
+            validator_index=validator_index,
+            public_key=validator.public_key,
+            oracles=oracles,
+            fork=settings.network_config.SHAPELLA_FORK,
+        )
 
         if not shards:
             logger.warning(

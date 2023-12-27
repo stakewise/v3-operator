@@ -12,9 +12,9 @@ from src.commands.create_keys import create_keys
 from src.commands.remote_signer_setup import remote_signer_setup
 from src.common.typings import Oracles
 from src.common.vault_config import VaultConfig
-from src.config.networks import GOERLI
+from src.config.networks import HOLESKY
 from src.config.settings import settings
-from src.validators.signing.remote import RemoteSignerConfiguration
+from src.validators.keystores.remote import RemoteSignerKeystore
 from src.validators.signing.tests.oracle_functions import OracleCommittee
 
 
@@ -90,7 +90,7 @@ class TestOperatorRemoteSignerSetup:
 
         assert settings.remote_signer_config_file.is_file()
 
-        config = RemoteSignerConfiguration.from_file(settings.remote_signer_config_file)
+        config = RemoteSignerKeystore.load_from_file(settings.remote_signer_config_file)
 
         assert len(config.pubkeys_to_shares) == key_count
 
@@ -156,7 +156,7 @@ class TestOperatorRemoteSignerSetup:
 
         # The remote signer configuration should contain public keys and their
         # corresponding shares from both key batches
-        config = RemoteSignerConfiguration.from_file(settings.remote_signer_config_file)
+        config = RemoteSignerKeystore.load_from_file(settings.remote_signer_config_file)
         assert len(config.pubkeys_to_shares) == key_count_total
 
     @pytest.mark.parametrize(['remove_existing_keys'], [pytest.param(False), pytest.param(True)])
@@ -194,7 +194,7 @@ class TestOperatorRemoteSignerSetup:
         vault_config = VaultConfig(vault=vault_address, data_dir=data_dir)
         vault_config.load()
         key_count = vault_config.mnemonic_next_index
-        vault_config.save(network=GOERLI, mnemonic=test_mnemonic, mnemonic_next_index=0)
+        vault_config.save(network=HOLESKY, mnemonic=test_mnemonic, mnemonic_next_index=0)
 
         prev_key_share_count = key_count * prev_oracle_count
         expected_new_key_share_count = key_count * (prev_oracle_count - 1)

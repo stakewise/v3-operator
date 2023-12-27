@@ -22,8 +22,8 @@ from src.common.utils import format_error
 from src.config.networks import ETH_NETWORKS
 from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.validators.database import NetworkValidatorCrud
-from src.validators.signing.remote import RemoteSignerConfiguration
-from src.validators.typings import DepositData, Keystores, NetworkValidator, Validator
+from src.validators.keystores.base import BaseKeystore
+from src.validators.typings import DepositData, NetworkValidator, Validator
 
 logger = logging.getLogger(__name__)
 
@@ -162,8 +162,7 @@ async def check_deposit_data_root(deposit_data_root: str) -> None:
 
 
 async def get_available_validators(
-    keystores: Keystores,
-    remote_signer_config: RemoteSignerConfiguration | None,
+    keystore: BaseKeystore,
     deposit_data: DepositData,
     count: int,
 ) -> list[Validator]:
@@ -174,24 +173,14 @@ async def get_available_validators(
     validators: list[Validator] = []
     count = min(count, len(deposit_data.validators) - start_index)
 
-    remote_signer_pubkeys = []
-    if remote_signer_config:
-        remote_signer_pubkeys = list(remote_signer_config.pubkeys_to_shares.keys())
-
     for i in range(start_index, start_index + count):
         try:
             validator = deposit_data.validators[i]
         except IndexError:
             break
-        if len(keystores) > 0 and validator.public_key not in keystores:
+        if validator.public_key not in keystore:
             logger.warning(
-                'Cannot find validator with public key %s in imported keystores.',
-                validator.public_key,
-            )
-            break
-        if remote_signer_config and validator.public_key not in remote_signer_pubkeys:
-            logger.warning(
-                'Cannot find validator with public key %s in remote signer config.',
+                'Cannot find validator with public key %s in keystores.',
                 validator.public_key,
             )
             break
@@ -210,8 +199,7 @@ async def get_available_validators(
 
 
 async def update_unused_validator_keys_metric(
-    keystores: Keystores,
-    remote_signer_config: RemoteSignerConfiguration | None,
+    keystore: BaseKeystore,
     deposit_data: DepositData,
 ) -> int:
     try:
@@ -220,21 +208,11 @@ async def update_unused_validator_keys_metric(
         metrics.unused_validator_keys.set(0)
         return 0
 
-    remote_signer_pubkeys = []
-    if remote_signer_config:
-        remote_signer_pubkeys = list(remote_signer_config.pubkeys_to_shares.keys())
-
     validators: int = 0
     for validator in deposit_data.validators:
-        if len(keystores) > 0 and validator.public_key not in keystores:
+        if validator.public_key not in keystore:
             logger.warning(
-                'Cannot find validator with public key %s in imported keystores.',
-                validator.public_key,
-            )
-            continue
-        if remote_signer_config and validator.public_key not in remote_signer_pubkeys:
-            logger.warning(
-                'Cannot find validator with public key %s in remote signer config.',
+                'Cannot find validator with public key %s in keystores.',
                 validator.public_key,
             )
             continue

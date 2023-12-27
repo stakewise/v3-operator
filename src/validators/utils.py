@@ -3,17 +3,12 @@ import dataclasses
 import json
 import logging
 import random
-from multiprocessing import Pool
-from os import listdir
-from os.path import isfile
 from pathlib import Path
 
-import milagro_bls_binding as bls
 from aiohttp import ClientError, ClientSession, ClientTimeout
-from eth_typing import ChecksumAddress, HexAddress, HexStr
+from eth_typing import ChecksumAddress, HexAddress
 from eth_utils import add_0x_prefix
 from multiproof import StandardMerkleTree
-from staking_deposit.key_handling.keystore import ScryptKeystore
 from sw_utils import get_eth1_withdrawal_credentials
 from sw_utils.decorators import retry_aiohttp_errors
 from web3 import Web3
@@ -21,23 +16,15 @@ from web3 import Web3
 from src.common.contracts import validators_registry_contract
 from src.common.typings import OracleApproval, Oracles, OraclesApproval
 from src.common.utils import format_error, process_oracles_approvals, warning_verbose
-from src.config.settings import DEFAULT_RETRY_TIME, ORACLES_VALIDATORS_TIMEOUT, settings
+from src.config.settings import DEFAULT_RETRY_TIME, ORACLES_VALIDATORS_TIMEOUT
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import (
-    KeystoreException,
     RegistryRootChangedError,
     ValidatorIndexChangedError,
 )
 from src.validators.execution import get_latest_network_validator_public_keys
 from src.validators.signing.common import encode_tx_validator
-from src.validators.typings import (
-    ApprovalRequest,
-    BLSPrivkey,
-    DepositData,
-    KeystoreFile,
-    Keystores,
-    Validator,
-)
+from src.validators.typings import ApprovalRequest, DepositData, Validator
 
 logger = logging.getLogger(__name__)
 
@@ -144,57 +131,6 @@ async def send_approval_request(
     )
 
 
-def list_keystore_files() -> list[KeystoreFile]:
-    keystores_dir = settings.keystores_dir
-    keystores_password_dir = settings.keystores_password_dir
-    keystores_password_file = settings.keystores_password_file
-
-    res: list[KeystoreFile] = []
-    for f in listdir(keystores_dir):
-        if not (isfile(keystores_dir / f) and f.startswith('keystore') and f.endswith('.json')):
-            continue
-
-        password_file = keystores_password_dir / f.replace('.json', '.txt')
-        if not isfile(password_file):
-            password_file = keystores_password_file
-
-        password = _load_keystores_password(password_file)
-        res.append(KeystoreFile(name=f, password=password))
-
-    return res
-
-
-def load_keystores() -> Keystores:
-    """Extracts private keys from the keystores."""
-    keystore_files = list_keystore_files()
-    logger.info('Loading keystores from %s...', settings.keystores_dir)
-    keystores = {}
-    with Pool(processes=settings.pool_size) as pool:
-        # pylint: disable-next=unused-argument
-        def _stop_pool(*args, **kwargs):
-            pool.close()
-
-        results = [
-            pool.apply_async(
-                _process_keystore_file,
-                (keystore_file, settings.keystores_dir),
-                error_callback=_stop_pool,
-            )
-            for keystore_file in keystore_files
-        ]
-        for result in results:
-            result.wait()
-            try:
-                pub_key, priv_key = result.get()
-                keystores[pub_key] = priv_key
-            except KeystoreException as e:
-                logger.error(e)
-                raise RuntimeError('Failed to load keystores') from e
-
-    logger.info('Loaded %d keystores', len(keystores))
-    return Keystores(keystores)
-
-
 def load_deposit_data(vault: HexAddress, deposit_data_file: Path) -> DepositData:
     """Loads and verifies deposit data."""
     with open(deposit_data_file, 'r', encoding='utf-8') as f:
@@ -222,28 +158,3 @@ def generate_validators_tree(
 
     tree = StandardMerkleTree.of(leaves, ['bytes', 'uint256'])
     return tree, validators
-
-
-def _process_keystore_file(
-    keystore_file: KeystoreFile, keystore_path: Path
-) -> tuple[HexStr, BLSPrivkey]:
-    file_name = keystore_file.name
-    keystores_password = keystore_file.password
-    file_path = keystore_path / file_name
-
-    try:
-        keystore = ScryptKeystore.from_file(file_path)
-    except BaseException as e:
-        raise KeystoreException(f'Invalid keystore format in file "{file_name}"') from e
-
-    try:
-        private_key = BLSPrivkey(keystore.decrypt(keystores_password))
-    except BaseException as e:
-        raise KeystoreException(f'Invalid password for keystore "{file_name}"') from e
-    public_key = Web3.to_hex(bls.SkToPk(private_key))
-    return public_key, private_key
-
-
-def _load_keystores_password(password_path: Path) -> str:
-    with open(password_path, 'r', encoding='utf-8') as f:
-        return f.read().strip()
