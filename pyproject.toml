@@ -12,7 +12,7 @@ py-ecc = "==6.0.0"
 multiproof = { git = "https://github.com/stakewise/multiproof.git", rev = "v0.1.6" }
 sw-utils = { git = "https://github.com/stakewise/sw-utils.git", rev = "v0.3.33" }
 staking-deposit = { git = "https://github.com/ethereum/staking-deposit-cli.git", rev = "v2.4.0" }
-pycryptodomex = "==3.19.0"
+pycryptodomex = "==3.19.1"
 milagro-bls-binding = "==1.9.0"
 click = "==8.1.7"
 tomli = "~2"
@@ -21,7 +21,7 @@ prometheus-client = "==0.17.1"
 psycopg2 = "==2.9.9"
 pyyaml = "==6.0.1"
 aiohttp = "==3.9.1"
-python-json-logger = "^2.0.7"
+python-json-logger = "==2.0.7"
 
 [tool.poetry.group.dev.dependencies]
 pylint = "==3.0.1"
