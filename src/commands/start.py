@@ -12,7 +12,7 @@ from src.common.consensus import get_chain_finalized_head
 from src.common.execution import WalletTask
 from src.common.metrics import MetricsTask, metrics_server
 from src.common.startup_check import startup_checks
-from src.common.utils import get_build_version, log_verbose
+from src.common.utils import JsonFormatter, get_build_version, log_verbose
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
 from src.config.settings import (
@@ -20,6 +20,9 @@ from src.config.settings import (
     DEFAULT_MAX_FEE_PER_GAS_GWEI,
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
+    LOG_FORMATS,
+    LOG_JSON,
+    LOG_PLAIN,
     settings,
 )
 from src.exits.tasks import ExitSignatureTask
@@ -175,6 +178,32 @@ logger = logging.getLogger(__name__)
     envvar='HASHI_VAULT_KEY_PATH',
     help='Key path in the K/V secret engine where validator signing keys are stored.',
 )
+@click.option(
+    '--log-format',
+    type=click.Choice(
+        LOG_FORMATS,
+        case_sensitive=False,
+    ),
+    default=LOG_PLAIN,
+    envvar='LOG_FORMAT',
+    help='The log record format. Can be "plain" or "json".',
+)
+@click.option(
+    '--log-level',
+    type=click.Choice(
+        [
+            'FATAL',
+            'ERROR',
+            'WARNING',
+            'INFO',
+            'DEBUG',
+        ],
+        case_sensitive=False,
+    ),
+    default='INFO',
+    envvar='LOG_LEVEL',
+    help='The log level.',
+)
 @click.command(help='Start operator service')
 # pylint: disable-next=too-many-arguments,too-many-locals
 def start(
@@ -199,6 +228,8 @@ def start(
     hot_wallet_password_file: str | None,
     max_fee_per_gas_gwei: int,
     database_dir: str | None,
+    log_level: str | None,
+    log_format: str | None,
 ) -> None:
     vault_config = VaultConfig(vault, Path(data_dir))
     if network is None:
@@ -227,6 +258,8 @@ def start(
         hot_wallet_password_file=hot_wallet_password_file,
         max_fee_per_gas_gwei=max_fee_per_gas_gwei,
         database_dir=database_dir,
+        log_level=log_level,
+        log_format=log_format,
     )
 
     try:
@@ -241,7 +274,7 @@ async def main() -> None:
     log_start()
 
     await startup_checks()
-
+    logger.error('test')
     NetworkValidatorCrud().setup()
 
     # load network validators from ipfs dump
@@ -306,11 +339,20 @@ def setup_sentry():
 
 
 def setup_logging():
-    logging.basicConfig(
-        format='%(asctime)s %(levelname)-8s %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S',
-        level=settings.log_level,
-    )
+    if settings.log_format == LOG_JSON:
+        formatter = JsonFormatter('%(timestamp)s %(level)s %(name)s %(message)s')
+        logHandler = logging.StreamHandler()
+        logHandler.setFormatter(formatter)
+        logging.basicConfig(
+            level=settings.log_level,
+            handlers=[logHandler],
+        )
+    else:
+        logging.basicConfig(
+            format='%(asctime)s %(levelname)-8s %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S',
+            level=settings.log_level,
+        )
     if not settings.verbose:
         logging.getLogger('sw_utils.execution').setLevel(logging.ERROR)
         logging.getLogger('sw_utils.consensus').setLevel(logging.ERROR)

@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 import tenacity
 from eth_typing import BlockNumber, ChecksumAddress
+from pythonjsonlogger import jsonlogger
 from web3 import Web3
 from web3.exceptions import Web3Exception
 from web3.types import Timestamp, Wei
@@ -109,3 +110,16 @@ def chunkify(items, size):
 
 def greenify(value):
     return click.style(value, bold=True, fg='green')
+
+
+class JsonFormatter(jsonlogger.JsonFormatter):
+    def add_fields(self, log_record, record, message_dict):
+        super().add_fields(log_record, record, message_dict)
+        if not log_record.get('timestamp'):
+            # this doesn't use record.created, so it is slightly off
+            now = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')
+            log_record['timestamp'] = now
+        if log_record.get('level'):
+            log_record['level'] = log_record['level'].upper()
+        else:
+            log_record['level'] = record.levelname

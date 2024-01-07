@@ -54,6 +54,7 @@ class Settings(metaclass=Singleton):
     max_fee_per_gas_gwei: int
     database: Path
     log_level: str
+    log_format: str
     ipfs_fetch_endpoints: list[str]
     ipfs_timeout: int
     ipfs_retry_timeout: int
@@ -88,6 +89,8 @@ class Settings(metaclass=Singleton):
         hot_wallet_file: str | None = None,
         hot_wallet_password_file: str | None = None,
         database_dir: str | None = None,
+        log_level: str | None = None,
+        log_format: str | None = None,
     ) -> None:
         self.vault = Web3.to_checksum_address(vault)
         vault_dir.mkdir(parents=True, exist_ok=True)
@@ -146,7 +149,10 @@ class Settings(metaclass=Singleton):
         db_dir = Path(database_dir) if database_dir else vault_dir
         self.database = db_dir / 'operator.db'
 
-        self.log_level = decouple_config('LOG_LEVEL', default='INFO')
+        self.log_level = log_level or 'INFO'
+        self.log_format = log_format or LOG_PLAIN
+        self.sentry_dsn = decouple_config('SENTRY_DSN', default='')
+
         self.ipfs_fetch_endpoints = decouple_config(
             'IPFS_FETCH_ENDPOINTS',
             cast=Csv(),
@@ -168,7 +174,6 @@ class Settings(metaclass=Singleton):
         self.validators_fetch_chunk_size = decouple_config(
             'VALIDATORS_FETCH_CHUNK_SIZE', default=100, cast=int
         )
-        self.sentry_dsn = decouple_config('SENTRY_DSN', default='')
         self.pool_size = decouple_config(
             'POOL_SIZE', default=None, cast=lambda x: int(x) if x else None
         )
@@ -214,3 +219,8 @@ REMOTE_SIGNER_TIMEOUT = 10
 
 # Hashi vault timeout
 HASHI_VAULT_TIMEOUT = 10
+
+# logging
+LOG_PLAIN = 'plain'
+LOG_JSON = 'json'
+LOG_FORMATS = [LOG_PLAIN, LOG_JSON]
