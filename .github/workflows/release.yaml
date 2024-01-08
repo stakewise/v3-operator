@@ -130,6 +130,8 @@ jobs:
           files: |
             /tmp/artifacts/ubuntu-20.04/operator-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz
             /tmp/artifacts/ubuntu-20.04/operator-${{ steps.get_version.outputs.VERSION }}-linux-amd64.sha256
+            /tmp/artifacts/self-hosted/operator-${{ steps.get_version.outputs.VERSION }}-linux-arm64.tar.gz
+            /tmp/artifacts/self-hosted/operator-${{ steps.get_version.outputs.VERSION }}-linux-arm64.sha256
             /tmp/artifacts/macos-11/operator-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.tar.gz
             /tmp/artifacts/macos-11/operator-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.sha256
             /tmp/artifacts/windows-latest/operator-${{ steps.get_version.outputs.VERSION }}-windows-amd64.zip
