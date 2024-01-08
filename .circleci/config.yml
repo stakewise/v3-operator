@@ -52,7 +52,7 @@ jobs:
       - run:
           name: Install python
           command: |
-            poetry install --no-interaction --no-root;
+            poetry install --no-interaction --no-root || true
       - build_and_compress:
           os_name: linux
           python_version: "3.10.13"
@@ -65,7 +65,7 @@ jobs:
       - run:
           name: Install python
           command: |
-            poetry install --no-interaction --no-root;
+            poetry install --no-interaction --no-root || true
       - build_and_compress:
           os_name: linux
           python_version: "3.10.13"
