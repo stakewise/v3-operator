@@ -14,10 +14,6 @@ executors:
   macos:
     macos:
       xcode: 13.4.1
-  windows:
-    machine:
-      image: windows-server-2019-vs2019:stable
-    resource_class: windows.medium
 
 commands:
   build_and_compress:
@@ -98,7 +94,9 @@ jobs:
           path: /tmp/artifacts
 
   build-windows:
-    executor: windows
+    executor:
+      name: win/default
+      shell: powershell.exe
     steps:
       - checkout
       - run:
@@ -110,7 +108,7 @@ jobs:
       - run:
           name: Build executable for Windows
           command: |
-            $ENV:PYTHONHASHSEED = 42
+            $PYTHONHASHSEED = 42
             $BUILD_FILE_NAME = "operator-" + ${CIRCLE_TAG} + "-windows-amd64"
             mkdir $BUILD_FILE_NAME
             pyinstaller --distpath ./$BUILD_FILE_NAME ./operator.spec
