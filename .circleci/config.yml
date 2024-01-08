@@ -21,6 +21,8 @@ commands:
     parameters:
       os_name:
         type: string
+      os_arch:
+        type: string
       python_version:
         type: string
       build_file_name:
