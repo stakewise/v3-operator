@@ -31,7 +31,7 @@ commands:
           command: |
             git rev-parse --short HEAD > GIT_SHA
             export PYTHONHASHSEED=42
-            export BUILD_FILE_NAME=<< parameters.build_file_name >>-<< parameters.os_name >>-amd64
+            export BUILD_FILE_NAME=<< parameters.build_file_name >>-${CIRCLE_SHORT_SHA1}-<< parameters.os_name >>-<< parameters.os_arch >>
             mkdir $BUILD_FILE_NAME
             poetry run pyinstaller --distpath ./$BUILD_FILE_NAME ./operator.spec
             tar -zcvf $BUILD_FILE_NAME.tar.gz $BUILD_FILE_NAME
@@ -52,8 +52,9 @@ jobs:
             poetry install --no-root --no-interaction
       - build_and_compress:
           os_name: linux
+          os_arch: amd64
           python_version: "3.10.13"
-          build_file_name: operator-${CIRCLE_SHORT_SHA1}
+          build_file_name: operator
       - store_artifacts:
           path: /tmp/artifacts
 
@@ -69,8 +70,9 @@ jobs:
             poetry install --no-root --no-interaction
       - build_and_compress:
           os_name: linux
+          os_arch: arm64
           python_version: "3.10.13"
-          build_file_name: operator-${CIRCLE_SHORT_SHA1}-arm64
+          build_file_name: operator
       - store_artifacts:
           path: /tmp/artifacts
 
@@ -89,8 +91,9 @@ jobs:
             python3 -m poetry install --no-interaction --no-root;
       - build_and_compress:
           os_name: macos
+          os_arch: amd64
           python_version: "3.10.13"
-          build_file_name: operator-${CIRCLE_SHORT_SHA1}
+          build_file_name: operator
       - store_artifacts:
           path: /tmp/artifacts
 
