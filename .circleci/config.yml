@@ -81,11 +81,11 @@ jobs:
       - run:
           name: Install python
           command: |
-            brew install pyenv
-            pyenv install 3.10.13
-            pyenv global 3.10.13
-            python3.10 --version
-            curl -sSL https://install.python-poetry.org | python3.10 -
+            brew install pyenv;
+            pyenv install 3.10.13;
+            pyenv global 3.10.13;
+            python3.10 --version;
+            curl -sSL https://install.python-poetry.org | python3.10 -;
             python3.10 -m poetry install --no-interaction --no-root;
       - build_and_compress:
           os_name: macos
