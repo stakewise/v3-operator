@@ -59,6 +59,7 @@ jobs:
             env PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install -f 3.10.13;
             pyenv global 3.10.13;
             pip install poetry;
+            apt update && apt install libpq-dev -y;
       - install_dependencies
       - build_and_compress:
           os_name: linux
@@ -75,6 +76,7 @@ jobs:
             env PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install -f 3.10.13;
             pyenv global 3.10.13;
             pip install poetry;
+            apt update && apt install libpq-dev -y;
       - install_dependencies
       - build_and_compress:
           os_name: linux
@@ -88,7 +90,7 @@ jobs:
       - run:
           name: Install python
           command: |
-            pip install poetry
+            pip3 install poetry
       - build_and_compress:
           os_name: macos
           python_version: "3.10.13"
