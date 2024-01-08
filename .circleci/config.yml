@@ -80,7 +80,7 @@ jobs:
       - run:
           name: Install python
           command: |
-            pyenv global 3.10;
+            python3 --version
             curl -sSL https://install.python-poetry.org | POETRY_UNINSTALL=1 python3 -
             curl -sSL https://install.python-poetry.org | python3 -
             poetry install --no-interaction --no-root;
