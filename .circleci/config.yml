@@ -104,6 +104,7 @@ jobs:
     executor:
       name: win/default
       shell: powershell.exe
+    resource_class: windows.large
     steps:
       - checkout
       - run:
