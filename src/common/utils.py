@@ -18,7 +18,7 @@ from src.common.exceptions import (
     NotEnoughOracleApprovalsError,
 )
 from src.common.typings import OracleApproval, OraclesApproval
-from src.config.settings import settings
+from src.config.settings import LOG_DATE_FORMAT, settings
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +117,7 @@ class JsonFormatter(jsonlogger.JsonFormatter):
         super().add_fields(log_record, record, message_dict)
         if not log_record.get('timestamp'):
             date = datetime.fromtimestamp(int(record.created))
-            log_record['timestamp'] = date.strftime('%Y-%m-%dT%H:%M:%S')
+            log_record['timestamp'] = date.strftime(LOG_DATE_FORMAT)
         if log_record.get('level'):
             log_record['level'] = log_record['level'].upper()
         else:

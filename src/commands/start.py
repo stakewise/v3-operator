@@ -20,6 +20,7 @@ from src.config.settings import (
     DEFAULT_MAX_FEE_PER_GAS_GWEI,
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
+    LOG_DATE_FORMAT,
     LOG_FORMATS,
     LOG_JSON,
     LOG_PLAIN,
@@ -216,6 +217,8 @@ def start(
     metrics_host: str,
     metrics_port: int,
     data_dir: str,
+    log_level: str,
+    log_format: str,
     network: str | None,
     deposit_data_file: str | None,
     keystores_dir: str | None,
@@ -228,8 +231,6 @@ def start(
     hot_wallet_password_file: str | None,
     max_fee_per_gas_gwei: int,
     database_dir: str | None,
-    log_level: str | None,
-    log_format: str | None,
 ) -> None:
     vault_config = VaultConfig(vault, Path(data_dir))
     if network is None:
@@ -274,7 +275,7 @@ async def main() -> None:
     log_start()
 
     await startup_checks()
-    logger.error('test')
+
     NetworkValidatorCrud().setup()
 
     # load network validators from ipfs dump
@@ -350,7 +351,7 @@ def setup_logging():
     else:
         logging.basicConfig(
             format='%(asctime)s %(levelname)-8s %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S',
+            datefmt=LOG_DATE_FORMAT,
             level=settings.log_level,
         )
     if not settings.verbose:
