@@ -7,12 +7,10 @@ executors:
   linux-amd64:
     docker:
       - image: cimg/python:3.10
-    working_directory: ~/app
   linux-arm64:
     docker:
       - image: cimg/python:3.10
     resource_class: arm.medium
-    working_directory: ~/app
   macos:
     macos:
       xcode: 13.4.1
@@ -20,7 +18,6 @@ executors:
     machine:
       image: windows-server-2019-vs2019:stable
     resource_class: windows.medium
-    working_directory: ~/app
 
 commands:
   build_and_compress:
