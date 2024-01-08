@@ -10,9 +10,7 @@ executors:
   linux-arm64:
     docker:
       - image: cimg/python:3.10.13
-    machine:
-      image: ubuntu-2004:202101-01
-      resource_class: arm.medium
+    resource_class: arm.medium
   macos:
     macos:
       xcode: "12.0.0"
