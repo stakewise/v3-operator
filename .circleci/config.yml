@@ -94,8 +94,7 @@ jobs:
           command: |
             choco install python --version=3.10.11;
             pip install poetry;
-            poetry install --no-interaction --no-root
-      - install_dependencies
+            poetry install --no-interaction --no-root;
       - run:
           name: Build executable for Windows
           command: |
