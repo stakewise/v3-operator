@@ -5,12 +5,12 @@ orbs:
 
 executors:
   linux-amd64:
-    machine:
-      image: ubuntu-2204:2023.10.1
+    docker:
+      - image: cimg/python:3.10
     working_directory: ~/app
   linux-arm64:
-    machine:
-      image: ubuntu-2204:2023.10.1
+    docker:
+      - image: cimg/python:3.10
     resource_class: arm.medium
     working_directory: ~/app
   macos:
@@ -56,9 +56,6 @@ jobs:
       - run:
           name: Install python
           command: |
-            env PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install -f 3.10.13;
-            pyenv global 3.10.13;
-            pip install poetry;
             sudo apt-get install libpq-dev -y;
       - install_dependencies
       - build_and_compress:
@@ -73,9 +70,6 @@ jobs:
       - run:
           name: Install python
           command: |
-            env PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install -f 3.10.13;
-            pyenv global 3.10.13;
-            pip install poetry;
             sudo apt-get install libpq-dev -y;
       - install_dependencies
       - build_and_compress:
