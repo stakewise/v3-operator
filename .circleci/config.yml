@@ -2,6 +2,7 @@ version: 2.1
 
 orbs:
   python: circleci/python@1.2.0
+  win: circleci/windows@2.2.0
 
 executors:
   linux-amd64:
