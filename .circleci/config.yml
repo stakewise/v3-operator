@@ -57,6 +57,8 @@ jobs:
           os_name: linux
           python_version: "3.10.13"
           build_file_name: operator-${CIRCLE_TAG}
+      - store_artifacts:
+          path: /tmp/artifacts
 
   build-linux-arm64:
     executor: linux-arm64
@@ -72,6 +74,8 @@ jobs:
           os_name: linux
           python_version: "3.10.13"
           build_file_name: operator-${CIRCLE_TAG}-arm64
+      - store_artifacts:
+          path: /tmp/artifacts
 
   build-macos:
     executor: macos
@@ -83,13 +87,15 @@ jobs:
             brew install pyenv
             pyenv install 3.10.13
             pyenv global 3.10.13
-            python3 --version
-            curl -sSL https://install.python-poetry.org | python3 -
-            poetry install --no-interaction --no-root;
+            python3.10.13 --version
+            curl -sSL https://install.python-poetry.org | python3.10.13 -
+            python3.10.13 -m poetry install --no-interaction --no-root;
       - build_and_compress:
           os_name: macos
           python_version: "3.10.13"
           build_file_name: operator-${CIRCLE_TAG}
+      - store_artifacts:
+          path: /tmp/artifacts
 
   build-windows:
     executor: windows
@@ -113,6 +119,8 @@ jobs:
             copy $BUILD_FILE_NAME.zip \tmp\artifacts
             $CHECKSUM_FILE_NAME = "\tmp\artifacts\" + $BUILD_FILE_NAME + ".sha256"
             certUtil -hashfile $BUILD_FILE_NAME.zip SHA256 | findstr /i /v "SHA256" | findstr /i /v "CertUtil" > $CHECKSUM_FILE_NAME
+      - store_artifacts:
+          path: /tmp/artifacts
 
 workflows:
   version: 2
