@@ -32,6 +32,7 @@ commands:
       - run:
           name: Build executable for << parameters.os_name >>
           command: |
+            git rev-parse --short HEAD > GIT_SHA
             export PYTHONHASHSEED=42
             export BUILD_FILE_NAME=<< parameters.build_file_name >>-<< parameters.os_name >>-amd64
             mkdir $BUILD_FILE_NAME
