@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 import tenacity
 from eth_typing import BlockNumber, ChecksumAddress
+from pythonjsonlogger import jsonlogger
 from web3 import Web3
 from web3.exceptions import Web3Exception
 from web3.types import Timestamp, Wei
@@ -17,7 +18,7 @@ from src.common.exceptions import (
     NotEnoughOracleApprovalsError,
 )
 from src.common.typings import OracleApproval, OraclesApproval
-from src.config.settings import settings
+from src.config.settings import LOG_DATE_FORMAT, settings
 
 logger = logging.getLogger(__name__)
 
@@ -109,3 +110,15 @@ def chunkify(items, size):
 
 def greenify(value):
     return click.style(value, bold=True, fg='green')
+
+
+class JsonFormatter(jsonlogger.JsonFormatter):
+    def add_fields(self, log_record, record, message_dict):
+        super().add_fields(log_record, record, message_dict)
+        if not log_record.get('timestamp'):
+            date = datetime.fromtimestamp(record.created, tz=timezone.utc)
+            log_record['timestamp'] = date.strftime(LOG_DATE_FORMAT)
+        if log_record.get('level'):
+            log_record['level'] = log_record['level'].upper()
+        else:
+            log_record['level'] = record.levelname
