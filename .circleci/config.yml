@@ -1,0 +1,116 @@
+version: 2.1
+
+orbs:
+  python: circleci/python@1.2.0
+
+executors:
+  linux-amd64:
+    docker:
+      - image: cimg/python:3.10.13
+  linux-arm64:
+    machine:
+      image: ubuntu-2004:202101-01
+      resource_class: arm.medium
+  macos:
+    macos:
+      xcode: "12.0.0"
+  windows:
+    machine:
+      image: windows-server-2019-vs2019:stable
+      resource_class: windows.medium
+
+commands:
+  install_dependencies:
+    steps:
+      - run: poetry install --no-interaction --no-root
+
+  build_and_compress:
+    parameters:
+      os_name:
+        type: string
+      python_version:
+        type: string
+      build_file_name:
+        type: string
+    steps:
+      - run:
+          name: Build executable for << parameters.os_name >>
+          command: |
+            export PYTHONHASHSEED=42
+            export BUILD_FILE_NAME=<< parameters.build_file_name >>-<< parameters.os_name >>-amd64
+            mkdir $BUILD_FILE_NAME
+            poetry run pyinstaller --distpath ./$BUILD_FILE_NAME ./operator.spec
+            tar -zcvf $BUILD_FILE_NAME.tar.gz $BUILD_FILE_NAME
+            mkdir /tmp/artifacts
+            cp $BUILD_FILE_NAME.tar.gz /tmp/artifacts
+            sha256sum $BUILD_FILE_NAME.tar.gz | head -c 64 > /tmp/artifacts/$BUILD_FILE_NAME.sha256
+
+jobs:
+  build-linux-amd64:
+    executor: linux-amd64
+    steps:
+      - checkout
+      - install_dependencies
+      - build_and_compress:
+          os_name: linux
+          python_version: "3.10.13"
+          build_file_name: operator-${CIRCLE_TAG}
+
+  build-linux-arm64:
+    executor: linux-arm64
+    steps:
+      - checkout
+      - install_dependencies
+      - build_and_compress:
+          os_name: linux
+          python_version: "3.10.13"
+          build_file_name: operator-${CIRCLE_TAG}-arm64
+
+  build-macos:
+    executor: macos
+    steps:
+      - checkout
+      - install_dependencies
+      - build_and_compress:
+          os_name: macos
+          python_version: "3.10.13"
+          build_file_name: operator-${CIRCLE_TAG}
+
+  build-windows:
+    executor: windows
+    steps:
+      - checkout
+      - install_dependencies
+      - run:
+          name: Build executable for Windows
+          command: |
+            $ENV:PYTHONHASHSEED = 42
+            $BUILD_FILE_NAME = "operator-" + ${CIRCLE_TAG} + "-windows-amd64"
+            mkdir $BUILD_FILE_NAME
+            pyinstaller --distpath ./$BUILD_FILE_NAME ./operator.spec
+            Compress-Archive -Path $BUILD_FILE_NAME -DestinationPath $BUILD_FILE_NAME.zip
+            mkdir \tmp\artifacts
+            copy $BUILD_FILE_NAME.zip \tmp\artifacts
+            $CHECKSUM_FILE_NAME = "\tmp\artifacts\" + $BUILD_FILE_NAME + ".sha256"
+            certUtil -hashfile $BUILD_FILE_NAME.zip SHA256 | findstr /i /v "SHA256" | findstr /i /v "CertUtil" > $CHECKSUM_FILE_NAME
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - build-linux-amd64:
+          filters:
+            tags:
+              only: /^v.*/
+      - build-linux-arm64:
+          filters:
+            tags:
+              only: /^v.*/
+      - build-macos:
+          filters:
+            tags:
+              only: /^v.*/
+      - build-windows:
+          filters:
+            tags:
+              only: /^v.*/
