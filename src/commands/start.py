@@ -1,18 +1,16 @@
 import asyncio
 import logging
-import time
 import warnings
 from pathlib import Path
 
 import click
 from eth_typing import ChecksumAddress
 from sw_utils import EventScanner, InterruptHandler
-from sw_utils.typings import ChainHead
 
 import src
-from src.common.clients import consensus_client, execution_client
-from src.common.execution import check_hot_wallet_balance
-from src.common.metrics import metrics, metrics_server
+from src.common.consensus import get_chain_finalized_head
+from src.common.execution import WalletTask
+from src.common.metrics import MetricsTask, metrics_server
 from src.common.startup_check import startup_checks
 from src.common.utils import get_build_version, log_verbose
 from src.common.validators import validate_eth_address
@@ -24,19 +22,16 @@ from src.config.settings import (
     DEFAULT_METRICS_PORT,
     settings,
 )
-from src.exits.tasks import update_exit_signatures
-from src.harvest.tasks import harvest_vault as harvest_vault_task
+from src.exits.tasks import ExitSignatureTask
+from src.harvest.tasks import HarvestTask
 from src.validators.database import NetworkValidatorCrud
-from src.validators.execution import (
-    NetworkValidatorsProcessor,
-    update_unused_validator_keys_metric,
-)
+from src.validators.execution import NetworkValidatorsProcessor
 from src.validators.signing.hashi_vault import (
     HashiVaultConfiguration,
     load_hashi_vault_keys,
 )
 from src.validators.signing.remote import RemoteSignerConfiguration
-from src.validators.tasks import load_genesis_validators, register_validators
+from src.validators.tasks import ValidatorsTask, load_genesis_validators
 from src.validators.typings import Keystores
 from src.validators.utils import load_deposit_data, load_keystores
 
@@ -291,59 +286,30 @@ async def main() -> None:
 
     logger.info('Syncing network validator events...')
     chain_state = await get_chain_finalized_head()
-
-    to_block = chain_state.execution_block
-    await network_validators_scanner.process_new_events(to_block)
+    await network_validators_scanner.process_new_events(chain_state.execution_block)
 
     if settings.enable_metrics:
         await metrics_server()
 
     logger.info('Started operator service')
     with InterruptHandler() as interrupt_handler:
-        while not interrupt_handler.exit:
-            start_time = time.time()
-            try:
-                chain_state = await get_chain_finalized_head()
-                metrics.slot_number.set(chain_state.consensus_block)
+        tasks = [
+            ValidatorsTask(
+                keystores=keystores,
+                remote_signer_config=remote_signer_config,
+                deposit_data=deposit_data,
+            ).run(interrupt_handler),
+            ExitSignatureTask(
+                keystores=keystores,
+                remote_signer_config=remote_signer_config,
+            ).run(interrupt_handler),
+            MetricsTask().run(interrupt_handler),
+            WalletTask().run(interrupt_handler),
+        ]
+        if settings.harvest_vault:
+            tasks.append(HarvestTask().run(interrupt_handler))
 
-                to_block = chain_state.execution_block
-                # process new network validators
-                await network_validators_scanner.process_new_events(to_block)
-                # check and register new validators
-                await update_unused_validator_keys_metric(
-                    keystores=keystores,
-                    remote_signer_config=remote_signer_config,
-                    deposit_data=deposit_data,
-                )
-                await register_validators(
-                    keystores=keystores,
-                    remote_signer_config=remote_signer_config,
-                    deposit_data=deposit_data,
-                )
-
-                # submit harvest vault transaction
-                if settings.harvest_vault:
-                    await harvest_vault_task()
-
-                # process outdated exit signatures
-                await update_exit_signatures(
-                    keystores=keystores,
-                    remote_signer_config=remote_signer_config,
-                )
-                # check balance
-                await check_hot_wallet_balance()
-
-                # update metrics
-                metrics.block_number.set(await execution_client.eth.get_block_number())
-
-            except Exception as exc:
-                log_verbose(exc)
-
-            block_processing_time = time.time() - start_time
-            sleep_time = max(
-                float(settings.network_config.SECONDS_PER_BLOCK) - block_processing_time, 0
-            )
-            await asyncio.sleep(sleep_time)
+        await asyncio.gather(*tasks)
 
 
 def log_start() -> None:
@@ -380,7 +346,3 @@ def setup_logging():
 
         # Logging config does not affect messages issued by `warnings` module
         warnings.simplefilter('ignore')
-
-
-async def get_chain_finalized_head() -> ChainHead:
-    return await consensus_client.get_chain_finalized_head(settings.network_config.SLOTS_PER_EPOCH)

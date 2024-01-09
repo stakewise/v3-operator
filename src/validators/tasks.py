@@ -4,26 +4,31 @@ import time
 
 from eth_typing import BLSPubkey
 from multiproof.standard import MultiProof
+from sw_utils import EventScanner
 from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.types import BlockNumber, Wei
 
 from src.common.clients import ipfs_fetch_client
+from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import v2_pool_escrow_contract, validators_registry_contract
 from src.common.exceptions import NotEnoughOracleApprovalsError
 from src.common.execution import check_gas_price, get_oracles
 from src.common.metrics import metrics
+from src.common.tasks import BaseTask
 from src.common.typings import Oracles
 from src.common.utils import MGNO_RATE, WAD, get_current_timestamp
 from src.config.networks import GNOSIS
 from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import (
+    NetworkValidatorsProcessor,
     get_available_validators,
     get_latest_network_validator_public_keys,
     get_withdrawable_assets,
     register_multiple_validator,
     register_single_validator,
+    update_unused_validator_keys_metric,
 )
 from src.validators.signing.common import get_validators_proof
 from src.validators.signing.local import get_exit_signature_shards
@@ -41,6 +46,41 @@ from src.validators.typings import (
 from src.validators.utils import send_approval_requests
 
 logger = logging.getLogger(__name__)
+
+
+class ValidatorsTask(BaseTask):
+    keystores: Keystores
+    remote_signer_config: RemoteSignerConfiguration | None
+    deposit_data: DepositData
+
+    def __init__(
+        self,
+        keystores: Keystores,
+        remote_signer_config: RemoteSignerConfiguration | None,
+        deposit_data: DepositData,
+    ):
+        self.keystores = keystores
+        self.remote_signer_config = remote_signer_config
+        self.deposit_data = deposit_data
+        network_validators_processor = NetworkValidatorsProcessor()
+        self.network_validators_scanner = EventScanner(network_validators_processor)
+
+    async def process_block(self) -> None:
+        chain_state = await get_chain_finalized_head()
+
+        # process new network validators
+        await self.network_validators_scanner.process_new_events(chain_state.execution_block)
+        # check and register new validators
+        await update_unused_validator_keys_metric(
+            keystores=self.keystores,
+            remote_signer_config=self.remote_signer_config,
+            deposit_data=self.deposit_data,
+        )
+        await register_validators(
+            keystores=self.keystores,
+            remote_signer_config=self.remote_signer_config,
+            deposit_data=self.deposit_data,
+        )
 
 
 # pylint: disable-next=too-many-locals,too-many-branches

@@ -94,9 +94,7 @@ def process_oracles_approvals(
     if len(votes) < votes_threshold:
         # not enough oracles have approved the request
         # Fill `failed_endpoints` later
-        raise NotEnoughOracleApprovalsError(
-            num_votes=len(votes), threshold=votes_threshold, failed_endpoints=[]
-        )
+        raise NotEnoughOracleApprovalsError(num_votes=len(votes), threshold=votes_threshold)
 
     signatures = b''
     for _, signature in sorted(votes, key=lambda x: Web3.to_int(hexstr=x[0]))[:votes_threshold]:

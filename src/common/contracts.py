@@ -1,13 +1,14 @@
 import json
 import os
 from functools import cached_property
+from typing import cast
 
 from eth_typing import HexStr
 from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.contract import AsyncContract
 from web3.contract.contract import ContractEvent
-from web3.types import BlockNumber, ChecksumAddress, EventData
+from web3.types import BlockIdentifier, BlockNumber, ChecksumAddress, EventData
 
 from src.common.clients import execution_client
 from src.common.typings import RewardVoteInfo
@@ -141,12 +142,14 @@ class KeeperContract(ContractWrapper):
     abi_path = 'abi/IKeeper.json'
     settings_key = 'KEEPER_CONTRACT_ADDRESS'
 
-    async def get_config_updated_event(self) -> EventData | None:
+    async def get_config_updated_event(
+        self, from_block: BlockNumber | None = None, to_block: BlockNumber | None = None
+    ) -> EventData | None:
         """Fetches the last oracles config updated event."""
         return await self._get_last_event(
             self.events.ConfigUpdated,
-            from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
-            to_block=await execution_client.eth.get_block_number(),
+            from_block=from_block or settings.network_config.KEEPER_GENESIS_BLOCK,
+            to_block=to_block or await execution_client.eth.get_block_number(),
         )
 
     async def get_last_rewards_update(self) -> RewardVoteInfo | None:
@@ -190,8 +193,23 @@ class KeeperContract(ContractWrapper):
         return await self.contract.functions.canHarvest(vault_address).call()
 
 
+class MulticallContract(ContractWrapper):
+    abi_path = 'abi/Multicall.json'
+    settings_key = 'MULTICALL_CONTRACT_ADDRESS'
+
+    async def aggregate(
+        self,
+        data: list[tuple[ChecksumAddress, bool, HexStr]],
+        block_number: BlockNumber | None = None,
+    ) -> list:
+        return await self.contract.functions.aggregate3(data).call(
+            block_identifier=cast(BlockIdentifier, block_number)
+        )
+
+
 vault_contract = VaultContract()
 validators_registry_contract = ValidatorsRegistryContract()
 keeper_contract = KeeperContract()
 v2_pool_contract = V2PoolContract()
 v2_pool_escrow_contract = V2PoolEscrowContract()
+multicall_contract = MulticallContract()

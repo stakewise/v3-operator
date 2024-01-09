@@ -5,7 +5,7 @@ from decouple import config as decouple_config
 from web3 import Web3
 from web3.types import ChecksumAddress
 
-from src.config.networks import GOERLI, HOLESKY, MAINNET, NETWORKS, NetworkConfig
+from src.config.networks import HOLESKY, MAINNET, NETWORKS, NetworkConfig
 
 DATA_DIR = Path.home() / '.stakewise'
 
@@ -181,7 +181,7 @@ class Settings(metaclass=Singleton):
 
 settings = Settings()
 
-AVAILABLE_NETWORKS = [MAINNET, GOERLI, HOLESKY]
+AVAILABLE_NETWORKS = [MAINNET, HOLESKY]
 DEFAULT_NETWORK = MAINNET
 
 # oracles

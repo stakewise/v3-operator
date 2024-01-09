@@ -1,14 +1,17 @@
 import logging
 import statistics
+from typing import cast
 
+from eth_typing import BlockNumber
 from web3 import Web3
 from web3.exceptions import MethodUnavailable
 from web3.types import BlockIdentifier, Wei
 
 from src.common.clients import execution_client, ipfs_fetch_client
-from src.common.contracts import keeper_contract
+from src.common.contracts import keeper_contract, multicall_contract
 from src.common.metrics import metrics
-from src.common.typings import Oracles
+from src.common.tasks import BaseTask
+from src.common.typings import Oracles, OraclesCache
 from src.common.wallet import hot_wallet
 from src.config.settings import settings
 
@@ -41,25 +44,67 @@ async def check_hot_wallet_balance() -> None:
         )
 
 
-async def get_oracles() -> Oracles:
-    """Fetches oracles config."""
-    event = await keeper_contract.get_config_updated_event()
-    if not event:
-        raise ValueError('Failed to fetch IPFS hash of oracles config')
+_oracles_cache: OraclesCache | None = None
 
-    # fetch IPFS record
-    ipfs_hash = event['args']['configIpfsHash']
-    config: dict = await ipfs_fetch_client.fetch_json(ipfs_hash)  # type: ignore
-    rewards_threshold = await keeper_contract.get_rewards_min_oracles()
-    validators_threshold = await keeper_contract.get_validators_min_oracles()
+
+async def update_oracles_cache() -> None:
+    """
+    Fetches latest oracle config from IPFS. Uses cache if possible.
+    """
+    global _oracles_cache  # pylint: disable=global-statement
+
+    # Find the latest block for which oracle config is cached
+    if _oracles_cache:
+        from_block = BlockNumber(_oracles_cache.checkpoint_block + 1)
+    else:
+        from_block = settings.network_config.KEEPER_GENESIS_BLOCK
+
+    to_block = await execution_client.eth.get_block_number()
+
+    if from_block > to_block:
+        return
+
+    logger.debug('update_oracles_cache: get logs from_block %s, to_block %s', from_block, to_block)
+    event = await keeper_contract.get_config_updated_event(from_block=from_block, to_block=to_block)
+    if event:
+        ipfs_hash = event['args']['configIpfsHash']
+        config = cast(dict, await ipfs_fetch_client.fetch_json(ipfs_hash))
+    else:
+        config = _oracles_cache.config  # type: ignore
+
+    rewards_threshold_call = keeper_contract.encode_abi(fn_name='rewardsMinOracles', args=[])
+    validators_threshold_call = keeper_contract.encode_abi(fn_name='validatorsMinOracles', args=[])
+    multicall_response = await multicall_contract.aggregate(
+        [
+            (keeper_contract.address, False, rewards_threshold_call),
+            (keeper_contract.address, False, validators_threshold_call),
+        ],
+        block_number=to_block,
+    )
+    rewards_threshold = Web3.to_int(multicall_response[0][1])
+    validators_threshold = Web3.to_int(multicall_response[1][1])
+
+    _oracles_cache = OraclesCache(
+        config=config,
+        validators_threshold=validators_threshold,
+        rewards_threshold=rewards_threshold,
+        checkpoint_block=to_block,
+    )
+
+
+async def get_oracles() -> Oracles:
+    await update_oracles_cache()
+
+    oracles_cache = cast(OraclesCache, _oracles_cache)
+
+    config = oracles_cache.config
+    rewards_threshold = oracles_cache.rewards_threshold
+    validators_threshold = oracles_cache.validators_threshold
+
     endpoints = []
     public_keys = []
     for oracle in config['oracles']:
-        if endpoint := oracle.get('endpoint'):
-            replicas = [endpoint]
-        else:
-            replicas = oracle['endpoints']
-        endpoints.append(replicas)
+        endpoints.append(oracle['endpoints'])
         public_keys.append(oracle['public_key'])
 
     if not 1 <= rewards_threshold <= len(config['oracles']):
@@ -135,3 +180,8 @@ async def _calculate_median_priority_fee(block_id: BlockIdentifier = 'latest') -
         return await _calculate_median_priority_fee(block['number'] - 1)
 
     return Wei(statistics.median(priority_fees))
+
+
+class WalletTask(BaseTask):
+    async def process_block(self) -> None:
+        await check_hot_wallet_balance()
