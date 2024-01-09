@@ -52,6 +52,7 @@ jobs:
                 --distpath ./${BUILD_FILE_NAME} \
                 ./operator.spec;
               tar -zcvf ${BUILD_FILE_NAME}.tar.gz ${BUILD_FILE_NAME};
+              rm -rf /tmp/artifacts/* || true;
               mkdir /tmp/artifacts;
               cp ${BUILD_FILE_NAME}.tar.gz /tmp/artifacts;
               shasum -a 256 ${BUILD_FILE_NAME}.tar.gz | head -c 64 > /tmp/artifacts/${BUILD_FILE_NAME}.sha256
