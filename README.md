@@ -166,8 +166,8 @@ Head to [Usage](#usage) to launch your operator service.
 ### Kubernetes (advanced)
 
 A separate guide runs through the set-up of Operator Service via Kubernetes, designed to run large numbers of
-validators (up to 10,000). Visit the [Kubernetes setup](https://docs.stakewise.io/for-operators/kubernetes) for more
-details.
+validators (up to 10,000). Visit
+the [Kubernetes setup](https://docs.stakewise.io/for-operators/kubernetes-staking-setup) for more details.
 
 ## Usage
 
