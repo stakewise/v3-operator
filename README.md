@@ -306,7 +306,7 @@ using [eth-cli](https://github.com/protofire/eth-cli) and `eth contract:send` fo
 contract can be found [here](https://github.com/stakewise/v3-core/blob/v1.0.0/abi/IVaultValidators.json).
 
 1. Head to your Vault's contract address page on Etherscan in your browser (e.g. replacing 0x000 with your Vault
-   contract address: https://etherscan.io/address/0x000).
+   contract address: `https://etherscan.io/address/0x000...`).
 2. Select the Contract tab and then Write as Proxy. If you don't have Write As Proxy option, click on the Code tab, then
    More Options, Is this a Proxy?, Verify, Save. Now you should have Write As Proxy option.
 3. Connect your wallet to Etherscan (note this must be either the Vault Admin or Keys Manager).
