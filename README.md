@@ -22,6 +22,8 @@
     3. [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
     4. [Merge deposit data files from multiple operators](#merge-deposit-data-files-from-multiple-operators)
     5. [Recover validator keystores](#recover-validator-keystores)
+    6. [Max gas fee](#max-gas-fee)
+    7. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
 6. [Contacts](#contacts)
 
 ## What is V3 Operator?
@@ -193,7 +195,7 @@ running Operator Service from binary, you would use:
 ./operator init
 ```
 
-```
+```text
 Enter the network name (mainnet, holesky) [mainnet]:
 Enter your vault address: 0x3320a...68
 Choose your mnemonic language (chinese_simplified, chinese_traditional, czech, english, italian, korean, portuguese, spanish) [english]:
@@ -221,7 +223,7 @@ you have your newly created mnemonic to hand:
 ./operator create-keys
 ```
 
-```
+```text
 Enter the vault address: 0x3320a...68
 Enter the number of the validator keys to generate: 10
 Enter the mnemonic for generating the validator keys: pumpkin anxiety private salon inquiry ....
@@ -252,7 +254,7 @@ the one used to generate the validator keys, or a new mnemonic if you desire).
 ./operator create-wallet
 ```
 
-```
+```text
 Enter the vault address: 0x3320a...68
 Enter the mnemonic for generating the wallet: pumpkin anxiety private salon inquiry ...
 Done. The wallet and password saved to /home/user/.stakewise/0x3320a...68/wallet directory. The wallet address is: 0x239B...e3Cc
@@ -293,7 +295,7 @@ following command:
 ./operator get-validators-root
 ```
 
-```
+```text
 Enter the vault address: 0xeEFFFD4C23D2E8c845870e273861e7d60Df49663
 The validator deposit data Merkle tree root: 0x50437ed72066c1a09ee85978f168ac7c58fbc9cd4beb7962c13e68e7faac26d7
 ```
@@ -336,7 +338,7 @@ multiple operators, you will need to add the following flag:
 
 - `--deposit-data-file` - Path to the deposit data file (Vault directory is default).
 
-#### Binary
+#### Using binary
 
 You can start the operator service using binary with the following command:
 
@@ -344,7 +346,7 @@ You can start the operator service using binary with the following command:
 ./operator start --vault=0x000... --consensus-endpoints=http://localhost:5052 --execution-endpoints=http://localhost:8545
 ```
 
-#### Docker
+#### Using docker
 
 For docker, you first need to mount the folder containing validator keystores and deposit data file generated
 into the docker container. You then need to also include the `--data-dir` flag alongside the `start` command as per the
@@ -369,7 +371,7 @@ and fill it with correct values. Run docker compose with the following command:
 docker-compose up
 ```
 
-#### Source Files
+#### Using Source Files
 
 ```bash
 PYTHONPATH=. poetry run python src/main.py start \
@@ -410,7 +412,7 @@ validators, you can run the following command:
 
 Follow the steps, confirming your consensus node endpoint, Vault address, and the validator indexes to exit.
 
-```bash
+```text
 Enter the comma separated list of API endpoints for consensus nodes: https://example.com
 Enter your vault address: 0x3320ad928c20187602a2b2c04eeaa813fa899468
 Are you sure you want to exit 3 validators with indexes: 513571, 513572, 513861? [y/N]: y
@@ -450,7 +452,7 @@ keys.**
 ./operator recover
 ```
 
-```
+```text
 Enter the mnemonic for generating the validator keys: [Your Mnemonic Here]
 Enter your vault address: 0x3320ad928c20187602a2b2c04eeaa813fa899468
 Enter comma separated list of API endpoints for execution nodes: https://example.com
