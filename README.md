@@ -238,8 +238,8 @@ Deposit data saved to /home/user/.stakewise/0x3320a...68/keystores/deposit_data.
 
 You may not want the operator service to have direct access to the validator keys. Validator keystores do not need to be
 present directly in the operator. You can check
-the [remote signer](https://docs.stakewise.io/for-operators/v3-operator-with-remote-signer)
-or [Hashicorp Vault](https://docs.stakewise.io/for-operators/v3-operator-with-hashi-vault) guides on how to run Operator
+the [remote signer](https://docs.stakewise.io/for-operators/operator-service/running-with-remote-signer)
+or [Hashicorp Vault](https://docs.stakewise.io/for-operators/operator-service/running-with-hashi-vault) guides on how to run Operator
 Service with them.
 
 **Remember to upload the newly generated validator keys to the validator(s). For that, please follow a guide for your
