@@ -189,8 +189,11 @@ The below steps walk you through this set-up using Operator Service:
 Run the `init` command and follow the steps to set up your mnemonic used to derive validator keys. For example, if
 running Operator Service from binary, you would use:
 
-```sh
+```bash
 ./operator init
+```
+
+```
 Enter the network name (mainnet, holesky) [mainnet]:
 Enter your vault address: 0x3320a...68
 Choose your mnemonic language (chinese_simplified, chinese_traditional, czech, english, italian, korean, portuguese, spanish) [english]:
@@ -214,8 +217,11 @@ Successfully initialized configuration for vault 0x3320a...68
 Next, run the `create-keys` command to kickstart the deposit data and validator keystores creation process, making sure
 you have your newly created mnemonic to hand:
 
-```sh
+```bash
 ./operator create-keys
+```
+
+```
 Enter the vault address: 0x3320a...68
 Enter the number of the validator keys to generate: 10
 Enter the mnemonic for generating the validator keys: pumpkin anxiety private salon inquiry ....
@@ -228,6 +234,12 @@ Keystores saved to /home/user/.stakewise/0x3320a...68/keystores file
 Deposit data saved to /home/user/.stakewise/0x3320a...68/keystores/deposit_data.json file
 ```
 
+You may not want the operator service to have direct access to the validator keys. Validator keystores do not need to be
+present directly in the operator. You can check
+the [remote signer](https://docs.stakewise.io/for-operators/v3-operator-with-remote-signer)
+or [Hashicorp Vault](https://docs.stakewise.io/for-operators/v3-operator-with-hashi-vault) guides on how to run Operator
+Service with them.
+
 **Remember to upload the newly generated validator keys to the validator(s). For that, please follow a guide for your
 consensus client. The password for your keystores is located in the `password.txt` file in the keystores folder.**
 
@@ -236,8 +248,11 @@ consensus client. The password for your keystores is located in the `password.tx
 Run the `create-wallet` command to create your hot wallet using your mnemonic (note, this mnemonic can be the same as
 the one used to generate the validator keys, or a new mnemonic if you desire).
 
-```sh
+```bash
 ./operator create-wallet
+```
+
+```
 Enter the vault address: 0x3320a...68
 Enter the mnemonic for generating the wallet: pumpkin anxiety private salon inquiry ...
 Done. The wallet and password saved to /home/user/.stakewise/0x3320a...68/wallet directory. The wallet address is: 0x239B...e3Cc
@@ -274,8 +289,11 @@ If for some reason uploading deposit data using UI is not an option. You can cal
 with the
 following command:
 
-```sh
+```bash
 ./operator get-validators-root
+```
+
+```
 Enter the vault address: 0xeEFFFD4C23D2E8c845870e273861e7d60Df49663
 The validator deposit data Merkle tree root: 0x50437ed72066c1a09ee85978f168ac7c58fbc9cd4beb7962c13e68e7faac26d7
 ```
@@ -301,8 +319,7 @@ You are all set! Now it's time to run the Operator Service.
 You are ready to run the Operator Service using the `start` command, optionally passing your Vault address and consensus
 and execution endpoints as flags.
 
-If you **did not** use Operator Service to generate hot wallet, you will need
-to add the following flags:
+If you **did not** use Operator Service to generate hot wallet, you will need to add the following flags:
 
 - `--hot-wallet-file` - path to the password-protected *.txt* file containing your hot wallet private key.
 - `--hot-wallet-password-file` - path to a *.txt* file containing the password to open the protected hot wallet private
@@ -323,7 +340,7 @@ multiple operators, you will need to add the following flag:
 
 You can start the operator service using binary with the following command:
 
-```sh
+```bash
 ./operator start --vault=0x000... --consensus-endpoints=http://localhost:5052 --execution-endpoints=http://localhost:8545
 ```
 
@@ -333,7 +350,7 @@ For docker, you first need to mount the folder containing validator keystores an
 into the docker container. You then need to also include the `--data-dir` flag alongside the `start` command as per the
 below:
 
-```sh
+```bash
 docker run --restart on-failure:10 \
 -v ~/.stakewise/:/data \
 europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.0.5 \
@@ -348,7 +365,7 @@ You can also run docker containers with `docker-compose`. For that, you need to 
 to `.env` file
 and fill it with correct values. Run docker compose with the following command:
 
-```sh
+```bash
 docker-compose up
 ```
 
@@ -387,7 +404,7 @@ validator keys. It can be done at any point, but only by the Vault Admin or Keys
 The validator exits are handled by oracles, but in case you want to force trigger exit your
 validators, you can run the following command:
 
-```sh
+```bash
 ./operator validators-exit
 ```
 
@@ -418,7 +435,7 @@ for example, the Vault does not need to sync rewards before calling deposit when
 
 You can use the following command to merge deposit data file:
 
-```sh
+```bash
 ./operator merge-deposit-data
 ```
 
@@ -429,8 +446,11 @@ You can recover validator keystores that are active.
 can get slashed. For security purposes, make sure to protect your mnemonic as it can be used to generate your validator
 keys.**
 
-```sh
+```bash
 ./operator recover
+```
+
+```
 Enter the mnemonic for generating the validator keys: [Your Mnemonic Here]
 Enter your vault address: 0x3320ad928c20187602a2b2c04eeaa813fa899468
 Enter comma separated list of API endpoints for execution nodes: https://example.com
@@ -440,6 +460,20 @@ Found 24 validators, recovering...
 Generating keystores [####################################] 100%
 Keystores for vault {vault} successfully recovered to {keystores_dir}
 ```
+
+### Max gas fee
+
+To mitigate excessive gas costs, operators can pass the `--max-fee-per-gas-wei` flag when starting Operator Service (or
+configure this variable via Environment Variables) to set the maximum base fee they are happy to pay for both validator
+registrations and Vault harvests (if Operator is started using the `--harvest-vault` flag).
+
+### Reduce Operator Service CPU load
+
+`--pool-size` can be passed as a flag with both start and create-keys commands. This flag defines the number of CPU
+cores that are used to both load keystores and create keystores. By default, Operator Service will use 100% of the CPU
+cores.
+Setting `--pool-size` to (number of CPU cores) / 2 is a safe way to ensure that Operator Service does not take up too
+much CPU load and impact node performance during the creation and loading of keystores.
 
 ## Contacts
 
