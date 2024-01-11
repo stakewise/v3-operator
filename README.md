@@ -1,6 +1,32 @@
 # StakeWise V3 Operator
 
-## Introduction
+1. [What is V3 Operator?](#what-is-v3-operator)
+2. [Prerequisites](#prerequisites)
+    1. [Execution client](#execution-client)
+    2. [Consensus client](#consensus-client)
+    3. [Vault](#vault)
+3. [Installation](#installation)
+    1. [Binary](#binary)
+    2. [Docker Image](#docker-image)
+    3. [Source Files](#source-files)
+    4. [Kubernetes (advanced)](#kubernetes-advanced)
+4. [Usage](#usage)
+    1. [Step 1. Create mnemonic](#step-1-create-mnemonic)
+    2. [Step 2. Create validator keys](#step-2-create-validator-keys)
+    3. [Step 3. Create hot wallet](#step-3-create-hot-wallet)
+    4. [Step 4. Upload deposit data file to Vault](#step-4-upload-deposit-data-file-to-vault)
+    5. [Step 5. Start Operator Service](#step-5-start-operator-service)
+5. [Extra commands](#extra-commands)
+    1. [Add validator keys to Vault](#add-validator-keys-to-vault)
+    2. [Validators voluntary exit](#validators-voluntary-exit)
+    3. [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
+    4. [Merge deposit data files from multiple operators](#merge-deposit-data-files-from-multiple-operators)
+    5. [Recover validator keystores](#recover-validator-keystores)
+    6. [Max gas fee](#max-gas-fee)
+    7. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
+6. [Contacts](#contacts)
+
+## What is V3 Operator?
 
 StakeWise Operator is a service that StakeWise Vault operators must run. It is responsible for performing the following
 tasks:
@@ -37,40 +63,140 @@ By default, every vault pulls these updates on the user interaction with the vau
 also can be done by the vault operator by passing the `--harvest-vault` flag to the `start` command. Harvesting vault
 rewards simplifies calls to the vault contracts, e.g., you don't need to sync rewards before calling deposit.
 
+## Prerequisites
+
+### Execution client
+
+Ensure your execution node is fully synced and running. Any execution client that
+supports [ETH Execution API specification](https://ethereum.github.io/execution-apis/api-documentation/) can be used:
+[Nethermind](https://launchpad.ethereum.org/en/nethermind), [Besu](https://launchpad.ethereum.org/en/besu), [Erigon](https://launchpad.ethereum.org/en/erigon),
+or [Geth](https://launchpad.ethereum.org/en/geth).
+
+### Consensus client
+
+Ensure your consensus node is fully synced and running. Any consensus client that
+supports [ETH Beacon Node API specification](https://ethereum.github.io/beacon-APIs/#/) can be used:
+[Lighthouse](https://launchpad.ethereum.org/en/lighthouse), [Nimbus](https://launchpad.ethereum.org/en/nimbus), [Prysm](https://launchpad.ethereum.org/en/prysm),
+or [Teku](https://launchpad.ethereum.org/en/teku).
+
+### Vault
+
+You must have a deployed Vault. You can create a new Vault or use an existing one.
+To create a new Vault:
+
+1. Go to [Operate page](https://app.stakewise.io/operate).
+2. Connect with your wallet in upper right corner, then click on "Create Vault".
+3. Process vault setup step by step.
+4. Once vault is deployed go to its page.
+
+**You can find the vault address either in the URL bar or in the "Contract address" field by scrolling to the "Details"
+at
+the bottom of the page. The vault address is used in the following sections.**
+
+## Installation
+
+Operator Service can be run via a binary, docker image, deployed on a Kubernetes cluster using the
+Operator Helm Chart, or built from source. Decide on your preferred method and follow the respective instructions below.
+
+### Binary
+
+Head to the [releases page](https://github.com/stakewise/v3-operator/releases) to find the latest version of Operator
+Service. Identify the binary file specific to your
+node hardware, download and decompress it.
+
+You will execute Operator Service commands from within the `v3-operator` folder using the below format (note that the
+use of flags is optional):
+
+```bash
+./operator COMMAND --flagA=123 --flagB=xyz
+```
+
+Head to [Usage](#usage) to launch your operator service.
+
+### Docker Image
+
+Pull the latest docker operator docker image:
+
+```bash
+docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.0.5
+```
+
+You can also build the docker image from source by cloning this repo and executing the following command from within
+the `v3-operator` folder:
+
+```bash
+docker build --pull -t europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.0.5 .
+```
+
+You will execute Operator Service commands using the format below (note the use of flags are optional):
+
+```bash
+docker run --rm -ti \
+-v ~/.stakewise/:/data \
+europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.0.5 \
+src/main.py COMMAND \
+--flagA=123 \
+--flagB=xyz
+```
+
+Head to [Usage](#usage) to launch your operator service.
+
+### Source Files
+
+Build requirements:
+
+- [Python 3.10+](https://www.python.org/downloads/)
+- [Poetry](https://python-poetry.org/docs/)
+
+Clone this repo and install dependencies by executing the following command from within the `v3-operator` folder:
+
+```bash
+poetry install --only main
+```
+
+You will execute Operator Service commands from within the `v3-operator` folder using the below format (note that the
+use of flags is optional):
+
+```bash
+PYTHONPATH=. poetry run python src/main.py COMMAND --flagA=123 --flagB=xyz
+```
+
+Head to [Usage](#usage) to launch your operator service.
+
+### Kubernetes (advanced)
+
+A separate guide runs through the set-up of Operator Service via Kubernetes, designed to run large numbers of
+validators (up to 10,000). Visit
+the [Kubernetes setup](https://docs.stakewise.io/for-operators/kubernetes-staking-setup) for more details.
+
 ## Usage
 
-## Step 0. Download operator binary
+In order to run Operator Service, you must first create keystores and deposit data file for your Vault's validators, and
+set up a hot wallet for Operator Service to handle validator registrations.
 
-Download and decompress the binary file from [releases page](https://github.com/stakewise/v3-operator/releases).
+Operator Service has in-built functionality to generate all of the above, or you are free to use your preferred methods
+of generating keystores and deposit data file, such as via [Wagyu Keygen](https://github.com/stake-house/wagyu-key-gen),
+and your preferred tool for generating the hot
+wallet, such as [MetaMask](https://metamask.io/)
+or [MyEtherWallet](https://help.myetherwallet.com/en/articles/6512619-using-mew-offline-current-mew-version-6).
 
-## Step 1. Generate keystores & deposit data
+**Note, the deposit data file must be created using the Vault contract as the withdrawal address. You can find the Vault
+address either via the URL bar of your Vault page or in the "Contract address" field by scrolling to the "Details"
+section at the bottom of the Vault page.**
 
-Operator generates mnemonic, keystores, deposit data for the validators. It also generates hot wallet used to submit
-validator registration transactions.
+The below steps walk you through this set-up using Operator Service:
 
-### How can I find the Vault address?
+### Step 1. Create mnemonic
 
-If you are creating a new Vault:
-
-1. Go to [Operate page](https://app.stakewise.io/operate)
-2. Connect with your wallet
-   Click on "Create Vault"
-3. Process vault setup step by step
-4. Once vault is deployed go to its page
-
-You can find the vault address either in the URL bar or in the "Contract address" field by scrolling to the "Details" at
-the bottom of the page.
-
-### 1. Init vault config
-
-Create the vault config and mnemonic used to derive validator keys.
+Run the `init` command and follow the steps to set up your mnemonic used to derive validator keys. For example, if
+running Operator Service from binary, you would use:
 
 ```bash
 ./operator init
 ```
 
-```sh
-Enter the network name (mainnet, goerli, holesky) [mainnet]:
+```text
+Enter the network name (mainnet, holesky) [mainnet]:
 Enter your vault address: 0x3320a...68
 Choose your mnemonic language (chinese_simplified, chinese_traditional, czech, english, italian, korean, portuguese, spanish) [english]:
 This is your seed phrase. Write it down and store it safely, it is the ONLY way to recover your validator keys.
@@ -88,26 +214,16 @@ done.
 Successfully initialized configuration for vault 0x3320a...68
 ```
 
-#### Options
+### Step 2. Create validator keys
 
-- `--network` - The network of your vault.
-- `--vault` - The vault address.
-- `--language` - The mnemonic language.
-- `--no-verify` - Skips mnemonic verification when provided.
-- `--data-dir` - Path where the vault data will be placed. Default is ~/.stakewise.
-
-**NB! You must store the generated mnemonic in a secure cold storage.
-It will allow you to restore the keys in case the Vault will get corrupted or lost.**
-
-### 2. Create keys
-
-Creates deposit data and validator keystores for operator service:
+Next, run the `create-keys` command to kickstart the deposit data and validator keystores creation process, making sure
+you have your newly created mnemonic to hand:
 
 ```bash
 ./operator create-keys
 ```
 
-```sh
+```text
 Enter the vault address: 0x3320a...68
 Enter the number of the validator keys to generate: 10
 Enter the mnemonic for generating the validator keys: pumpkin anxiety private salon inquiry ....
@@ -120,519 +236,246 @@ Keystores saved to /home/user/.stakewise/0x3320a...68/keystores file
 Deposit data saved to /home/user/.stakewise/0x3320a...68/keystores/deposit_data.json file
 ```
 
-#### `create-keys` options
+You may not want the operator service to have direct access to the validator keys. Validator keystores do not need to be
+present directly in the operator. You can check
+the [remote signer](https://docs.stakewise.io/for-operators/operator-service/running-with-remote-signer)
+or [Hashicorp Vault](https://docs.stakewise.io/for-operators/operator-service/running-with-hashi-vault) guides on how to run Operator
+Service with them.
 
-- `--mnemonic` - The mnemonic for generating the validator keys.
-- `--count` - The number of the validator keys to generate.
-- `--vault` - The vault to generate the keystores and deposit data for.
-- `--per-keystore-password` - Creates separate password file for each keystore.
-- `--data-dir` - Path where the vault data is stored. Default is ~/.stakewise.
+**Remember to upload the newly generated validator keys to the validator(s). For that, please follow a guide for your
+consensus client. The password for your keystores is located in the `password.txt` file in the keystores folder.**
 
-**NB! You must upload the deposit data to your vault:**
+### Step 3. Create hot wallet
 
-1. Go to [Operate page](https://app.stakewise.io/operate)
-2. Connect with your wallet
-3. Go to your vault page
-4. In the upper right corner, click on "Settings", open the "Deposit data" tab
-5. Upload generated deposit data file and click "Save"
-
-### Create wallet
-
-Creates the encrypted hot wallet from the mnemonic.
-The hot wallet is used to submit validator registration transaction. You must send some ETH (DAI for Gnosis) to the
-wallet for the gas expenses. The validator registration costs around 0.01 ETH with 30 Gwei gas price. You must keep an
-eye on your wallet balance, otherwise validators will stop registering.
+Run the `create-wallet` command to create your hot wallet using your mnemonic (note, this mnemonic can be the same as
+the one used to generate the validator keys, or a new mnemonic if you desire).
 
 ```bash
 ./operator create-wallet
 ```
 
-```sh
+```text
 Enter the vault address: 0x3320a...68
 Enter the mnemonic for generating the wallet: pumpkin anxiety private salon inquiry ...
 Done. The wallet and password saved to /home/user/.stakewise/0x3320a...68/wallet directory. The wallet address is: 0x239B...e3Cc
 ```
 
-#### `create-wallet` options
+**Note, you must send some ETH to the wallet for gas expenses. Each validator registration costs around
+0.01 ETH with 30 Gwei gas price. You must keep an eye on your wallet balance, otherwise validators will stop registering
+if the balance falls too low.**
 
-- `--vault` - The vault to generate the wallet for.
-- `--mnemonic` - The mnemonic for generating the wallet.
-- `--data-dir` - Path where the vault data is stored. Default is ~/.stakewise.
+### Step 4. Upload deposit data file to Vault
 
-Or you can use any of the tools available for generating the hot wallet. For example,
+Once you have created your validator keys, deposit data file, and hot wallet, you need to upload the deposit data
+file to the Vault. This process connects your node to the Vault. Note, if there is more than one node operator in a
+Vault, you first need to merge all operator deposit data files into a single file (use
+the [merge-deposit-data](#merge-deposit-data-files-from-multiple-operators) command).
+Uploading the deposit data file can be achieved either through the StakeWise UI or via Operator Service and can only be
+done by
+the [Vault Admin or Keys Manager](https://docs-v3.stakewise.io/protocol-overview-in-depth/vaults#governance-and-management).
 
-- [Metamask](https://metamask.io/)
-    1. [Generate wallet](https://metamask.zendesk.com/hc/en-us/articles/360015289452-How-to-create-an-additional-account-in-your-wallet)
-    2. [Export wallet](https://metamask.zendesk.com/hc/en-us/articles/360015289632-How-to-export-an-account-s-private-key)
-- [MyEtherWallet Offline](https://help.myetherwallet.com/en/articles/6512619-using-mew-offline-current-mew-version-6)
+#### StakeWise UI
 
-## Step 2. Install execution node
+1. Connect with your wallet and head to the Operate page.
+2. Select the Vault you want to upload the deposit data file to.
+3. In the upper right corner, click on "Settings" and open the "Deposit Data" tab. The "Settings" button is only visible
+   to the Vault Admin or Keys Manager.
+4. Upload the deposit data file either by dragging and dropping the file, or clicking to choose the file via your file
+   browser.
+5. Click Save and a transaction will be created to sign using your wallet. The Vault's deposit data file will be
+   uploaded when the transaction is confirmed on the network.
 
-The execution node is used to fetch data from the Vault contract and to submit transactions. Any execution client that
-supports [ETH Execution API specification](https://ethereum.github.io/execution-apis/api-documentation/) can be used:
+#### Operator Service
 
-- [Nethermind](https://launchpad.ethereum.org/en/nethermind) (Ethereum, Gnosis)
-- [Besu](https://launchpad.ethereum.org/en/besu) (Ethereum)
-- [Erigon](https://launchpad.ethereum.org/en/erigon) (Ethereum)
-- [Geth](https://launchpad.ethereum.org/en/geth) (Ethereum)
+If for some reason uploading deposit data using UI is not an option. You can calculate deposit data Merkle tree root
+with the
+following command:
 
-## Step  Install consensus node
-
-The consensus node is used to fetch consensus fork data required for generating exit signatures. Any consensus client
-that
-supports [ETH Beacon Node API specification](https://ethereum.github.io/beacon-APIs/#/) can be used:
-
-- [Lighthouse](https://launchpad.ethereum.org/en/lighthouse) (Ethereum, Gnosis)
-- [Nimbus](https://launchpad.ethereum.org/en/nimbus) (Ethereum)
-- [Prysm](https://launchpad.ethereum.org/en/prysm) (Ethereum)
-- [Teku](https://launchpad.ethereum.org/en/teku) (Ethereum, Gnosis)
-
-## Step 4. Run operator service
-
-### Option 1. From binary executable file
-
-See [releases page](https://github.com/stakewise/v3-operator/releases) to download and decompress the corresponding
-binary file. Start the binary with the following command:
-
-```sh
-./operator start --vault=0x3320a...68  --consensus-endpoints=https://consensus.com --execution-endpoints=https://execution.com
+```bash
+./operator get-validators-root
 ```
 
-Or you can use environment variables. Check [.env.example](.env.example) file for details
-
-#### Option 2. Use Docker image
-
-Build Docker image:
-
-```sh
-docker build --pull -t stakewiselabs/v3-operator .
+```text
+Enter the vault address: 0xeEFFFD4C23D2E8c845870e273861e7d60Df49663
+The validator deposit data Merkle tree root: 0x50437ed72066c1a09ee85978f168ac7c58fbc9cd4beb7962c13e68e7faac26d7
 ```
 
-or pull existing one:
+Finally, upload the Merkle tree root to your Vault contract by calling `setValidatorsRoot`. Below shows the steps to do
+this via Etherscan, but the same can be achieved via CLI if you prefer (
+using [eth-cli](https://github.com/protofire/eth-cli) and `eth contract:send` for example). Note, the ABI of the
+contract can be found [here](https://github.com/stakewise/v3-core/blob/v1.0.0/abi/IVaultValidators.json).
 
-```sh
-docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.0.5
+1. Head to your Vault's contract address page on Etherscan in your browser (e.g. replacing 0x000 with your Vault
+   contract address: `https://etherscan.io/address/0x000...`).
+2. Select the Contract tab and then Write as Proxy. If you don't have Write As Proxy option, click on the Code tab, then
+   More Options, Is this a Proxy?, Verify, Save. Now you should have Write As Proxy option.
+3. Connect your wallet to Etherscan (note this must be either the Vault Admin or Keys Manager).
+4. Find the `setValidatorsRoot` function and click to reveal the drop-down.
+5. Enter your Merkle tree root returned from the command and click Write.
+6. Confirm the transaction in your wallet to finalize the deposit data upload to your Vault.
+
+You are all set! Now it's time to run the Operator Service.
+
+### Step 5. Start Operator Service
+
+You are ready to run the Operator Service using the `start` command, optionally passing your Vault address and consensus
+and execution endpoints as flags.
+
+If you **did not** use Operator Service to generate hot wallet, you will need to add the following flags:
+
+- `--hot-wallet-file` - path to the password-protected *.txt* file containing your hot wallet private key.
+- `--hot-wallet-password-file` - path to a *.txt* file containing the password to open the protected hot wallet private
+  key file.
+
+If you **did not** use Operator Service to generate validator keys, you will need to add the following flag:
+
+- `--keystores-dir` - The directory with validator keys in the EIP-2335 standard. The folder must contain either a
+  single `password.txt` password file for all the keystores or separate password files for each keystore with the same
+  name as keystore, but ending with `.txt`. For example, `keystore1.json`, `keystore1.txt`, etc.
+
+If you **did not** use Operator Service to generate deposit data file, or you use combined deposit data file from
+multiple operators, you will need to add the following flag:
+
+- `--deposit-data-file` - Path to the deposit data file (Vault directory is default).
+
+#### Using binary
+
+You can start the operator service using binary with the following command:
+
+```bash
+./operator start --vault=0x000... --consensus-endpoints=http://localhost:5052 --execution-endpoints=http://localhost:8545
 ```
 
-You have to mount keystores and deposit data folders into docker container.
+#### Using docker
 
-Start the container with the following command:
+For docker, you first need to mount the folder containing validator keystores and deposit data file generated
+into the docker container. You then need to also include the `--data-dir` flag alongside the `start` command as per the
+below:
 
-```sh
+```bash
 docker run --restart on-failure:10 \
-  -v ~/.stakewise/:/data \
-  europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.0.5 \
-  src/main.py start \
-  --vault=0x3320a...68 \
-  --data-dir=/data \
-  --consensus-endpoints=https://example.com \
-  --execution-endpoints=https://example.com
+-v ~/.stakewise/:/data \
+europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.0.5 \
+src/main.py start \
+--vault=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
+--data-dir=/data \
+--consensus-endpoints=http://localhost:5052 \
+--execution-endpoints=http://localhost:8545
 ```
 
-Docker compose is an option if you prefer a declarative style instead of long one-liners.
-Example `docker-compose.yml` included. Adjust it for yourself and run:
+You can also run docker containers with `docker-compose`. For that, you need to copy [.env.example](.env.example) file
+to `.env` file
+and fill it with correct values. Run docker compose with the following command:
 
-```sh
+```bash
 docker-compose up
 ```
 
-#### Option  Use Kubernetes helm chart
+#### Using Source Files
 
-You can use [Operator V3 helm chart](https://github.com/stakewise/helm-charts/tree/main/charts/v3-operator) to host
-operator in Kubernetes
-
-#### Option 4. Build from source
-
-Build requirements:
-
-- [Python 10+](https://www.python.org/downloads/)
-- [Poetry](https://python-poetry.org/docs/)
-
-Install dependencies and start operator:
-
-```sh
-poetry install --only main
+```bash
 PYTHONPATH=. poetry run python src/main.py start \
---vault=0x3320a...68 \
---consensus-endpoints=https://example.com \
---execution-endpoints=https://example.com
+--vault=0x000... \
+--consensus-endpoints=http://localhost:5052 \
+--execution-endpoints=http://localhost:8545
 ```
 
-### Environment variables
+**Congratulations, you should now have Operator Service up and running and ready to trigger validator registrations
+within your Vault!**
 
-Operator service also can be configured via environment variables instead of cli flags.
-Copy [.env.example](.env.example) file to `.env` file and fill it with correct values.
-Make sure that file paths in .env file represent vault data and client endpoints. You must load environment variables
-before running the operator.
+## Extra commands
 
-```sh
-export $(grep -v '^#' .env | xargs)
-./operator start
-```
+Operator Service has many different commands that are not mandatory but might come in handy:
 
-## Remote signer
+- [Validators voluntary exit](#validators-voluntary-exit)
+- [Update Vault state (Harvest Vault)](#vault-state-update-optional)
+- [Add validator keys to Vault](#add-validator-keys-to-vault)
+- [Merge deposit data files from multiple operators](#merge-deposit-data-files-from-multiple-operators)
+- [Recover validator keystores](#recover-validator-keystores)
 
-You may not want the operator service to have direct access to the validator
-keys. Validator keystores do not need to be present directly in the operator.
-The operator can query a remote signer to get signatures for validator
-exit messages. Because the validator exit signatures are split up and
-shared among oracles, the validator exit message needs to be signed by
-specific shares of the validator private key.
+### Add validator keys to Vault
 
-These key shares therefore need to be present in your remote signer.
-
-### Remote signer setup
-
-This command will split up the private keys in the keystores directory
-into private key shares. The resulting private key shares are
-then imported to the remote signer. Local keystores are removed
-as a result of this command since they no longer need to be present.
-
-Notes:
-
-- You will need to run this command every time the oracle set
-  changes, or the threshold needed to recover exit signatures
-  (`exit_signature_recover_threshold`) changes.
-- In order to regenerate key shares, make sure to
-  adjust the `mnemonic_next_index` value in the vault config.json
-  to 0, then run the `create-keys` command, generating the full keystores
-  for all your validators. Next, run the `remote-signer-setup` command
-  to regenerate and import the new key shares for all your validators
-  into the remote signer.
-  You can remove the previously generated private key shares from the
-  remote signer, they will not be used anymore. This can optionally be
-  done by the setup command automatically by using the
-  `--remove-existing-keys` flag.
-
-```bash
-./operator remote-signer-setup \
- --vault=0x3320a...68 \
- --remote-signer-url=http://signer:9000
-```
-
-``` text
-Successfully generated 11 key shares for 1 private key(s)!
-Successfully imported 11 key shares into remote signer.
-Removed keystores from local filesystem.
-Done. Successfully configured operator to use remote signer for 1 public key(s)!
-```
-
-#### `remote-signer-setup` options
-
-- `--vault` - The vault address.
-- `--remote-signer-url` - The base URL of the remote signer, e.g. <http://signer:9000>
-- `--remove-existing-keys` - Include this flag to remove any keys present in the signer that are not needed by the
-  operator.
-  Can be used to remove outdated keyshares from the remote signer when the set of oracles changes,
-  see note above.
-- `--data-dir` - Path where the vault data is stored. Default is ~/.stakewise.
-- `--keystores-dir` - The directory with validator keys in the EIP-2335 standard.
-- `--execution-endpoints` - Comma separated list of API endpoints for execution nodes.
-- `--verbose` - Enable debug mode. Default is false.
-
-### Running the operator
-
-Provide the operator with the URL to your remote signer instance
-using the `--remote-signer-url` flag:
-
-```bash
-./operator start --remote-signer-url=http://remote-signer:9000 ...
-```
-
-You should see a message similar to this one after starting the operator:
-
-``` text
-Using remote signer at http://remote-signer:9000 for 10 public keys
-```
-
-## Hashi Vault
-
-Operator supports loading signing keys from remote [Hashi Vault](https://github.com/hashicorp/vault)
-instance, avoiding storage of keystores on the filesystem. This approach is best suited for
-node operators who already have most of Stakewise Operator functionality implemented
-in their systems, and only need integration for validator registration or pooling support.
-Regular users should only employ this functionality on their own risk, if they already
-manage a deployment of hashi vault.
-
-Currently there are two commands that support loading signing keys: `start` and `vaidators-exit`,
-user must provide hashi vault instance URL, authentication token, and secret path
-in K/V engine. Internal structure of the secret must resemble following json:
-
-```json
-{
-  "pubkey1": "privkey1",
-  "pubkey2": "privkey2",
-  ...
-}
-```
-
-Note that public and private signing keys must be stored in hex form, with or
-without 0x prefix.
-
-After loading keys from hashi vault, operator behaves in the same way as if it
-had loaded them from keystores, no additional operations needed to support
-the integration.
-
-## `start` options for hashi vault
-
-Passing following options to `start` command will enable loading validator signing
-keys from remote [Hashi Vault](https://github.com/hashicorp/vault). Make sure
-keystores directory is empty before running this command, otherwise operator
-will prefer local keystores.
-
-- `--hashi-vault-url` - URL to the remote hashi vault instance
-- `--hashi-vault-token` - Token for use when authenticating with hashi vault
-- `--hashi-vault-key-path` - Key path in hashi vault K/V engine holding signing secrets
-
-## Misc commands
+You can always add more validator keys to your Vault. For that, you need to generate new validator keys and deposit data
+as described in [Step 2. Create validator keys](#step-2-create-validator-keys) and upload the deposit data file to your
+Vault as described in [Step 3. Upload deposit data file to Vault](#step-4-upload-deposit-data-file-to-vault). Note,
+uploading a new deposit data file will overwrite the existing file and consequently overwrite previously un-used
+validator keys. It can be done at any point, but only by the Vault Admin or Keys Manager.
 
 ### Validators voluntary exit
 
-Performs a voluntary exit for active vault validators.
+The validator exits are handled by oracles, but in case you want to force trigger exit your
+validators, you can run the following command:
 
 ```bash
 ./operator validators-exit
 ```
 
-```sh
+Follow the steps, confirming your consensus node endpoint, Vault address, and the validator indexes to exit.
+
+```text
 Enter the comma separated list of API endpoints for consensus nodes: https://example.com
-Enter your vault address: 0x3320a...68
+Enter your vault address: 0x3320ad928c20187602a2b2c04eeaa813fa899468
 Are you sure you want to exit 3 validators with indexes: 513571, 513572, 513861? [y/N]: y
 Validators 513571, 513572, 513861 exits successfully initiated
 ```
 
-#### `validators-exit` options
+### Update Vault state (Harvest Vault)
 
-- `--network` - The network of your vault.
-- `--vault` - The vault address.
-- `--consensus-endpoints` - Comma separated list of API endpoints for consensus nodes.
-- `--count` - The number of validators to exit. By default, command will force exit all active vault validators.
-- `--data-dir` - Path where the vault data is stored. Default is ~/.stakewise.
-- `--remote-signer-url` - URL to the remote signer instance.
-- `--hashi-vault-url` - URL to the remote hashi vault instance
-- `--hashi-vault-token` - Token for use when authenticating with hashi vault
-- `--hashi-vault-key-path` - Key path in hashi vault K/V engine holding signing secrets
-- `--verbose` - Enable debug mode. Default is false.
+Updating the *Vault state* distributes the Vault fee to the Vault fee address and updates each staker's position. If an
+ERC-20 token was chosen during Vault creation, the Vault specific ERC-20 reprices based on the rewards/penalties since
+the previous update and the Vault fees are distributed in newly minted ERC-20 tokens.
 
-### Update vault deposit data
+By default, each *Vault state* gets updated whenever a user interacts with the Vault (deposit, withdraw, etc.), with a
+12 hours cooldown. Vault state can also be updated by the Vault operator(s) by passing the `--harvest-vault` flag to the
+Operator Service `start` command. Harvest occurs every 12 hours and the gas fees are paid by the hot wallet linked to
+the Operator Service.
 
-You can do that from the StakeWise web app by going to the settings on the vault page and uploading the deposit data or
-by using the following command:
+Harvesting the Vault rewards simplifies the contract calls to the Vault contract and reduces the gas fees for stakers,
+for example, the Vault does not need to sync rewards before calling deposit when a user stakes.
 
-1. Generate deposit data validators root for your vault.
+### Merge deposit data files from multiple operators
 
-    ```bash
-    ./operator get-validators-root
-    ```
+You can use the following command to merge deposit data file:
 
-    ```sh
-    Enter the vault address: 0xeEFFFD4C23D2E8c845870e273861e7d60Df49663
-    The validator deposit data Merkle tree root: 0x50437ed72066c1a09ee85978f168ac7c58fbc9cd4beb7962c13e68e7faac26d7
-    ```
+```bash
+./operator merge-deposit-data
+```
 
-   `get-validators-root` options
+### Recover validator keystores
 
-    - `--data-dir` - Path where the vault data is stored. Default is ~/.stakewise.
-    - `--deposit-data-file` - Path to the file with deposit data. Default is deposit data file located in the vault
-      directory.
-    - `--vault` - The vault address.
-
-2. Set deposit data root by calling `setValidatorsRoot` function on your vault. You must pass the Merkle tree root
-   generated from the previous command. The ABI of the contract can be
-   found [here](https://github.com/stakewise/v3-core/blob/main/abi/IVaultValidators.json).
-
-**NB! The function must be called from the keys manager address (vault admin address by default).**
-
-### Recover vault data directory and keystores
+You can recover validator keystores that are active.
+**Make sure there are no validators running with recovered validator keystores and 2 epochs have passed, otherwise you
+can get slashed. For security purposes, make sure to protect your mnemonic as it can be used to generate your validator
+keys.**
 
 ```bash
 ./operator recover
 ```
 
-```sh
+```text
 Enter the mnemonic for generating the validator keys: [Your Mnemonic Here]
-Enter your vault address: 0x3320a...68
+Enter your vault address: 0x3320ad928c20187602a2b2c04eeaa813fa899468
 Enter comma separated list of API endpoints for execution nodes: https://example.com
 Enter comma separated list of API endpoints for consensus nodes: https://example.com
 Enter the network name: goerli
 Found 24 validators, recovering...
-Generating keystores  [####################################]  100%
+Generating keystores [####################################] 100%
 Keystores for vault {vault} successfully recovered to {keystores_dir}
 ```
 
-#### `recover` options
+### Max gas fee
 
-- `--data-dir` - Path where the vault data will be placed. Default is ~/.stakewise.
-- `--per-keystore-password` - Creates separate password file for each keystore.
-- `--mnemonic` - The mnemonic for generating the validator keys.
-- `--vault` - The vault address.
-- `--execution-endpoints` - Comma separated list of API endpoints for execution nodes.
-- `--consensus-endpoints` - Comma separated list of API endpoints for consensus nodes.
-- `--network` - The network of your vault. Default is Goerli.
+To mitigate excessive gas costs, operators can pass the `--max-fee-per-gas-wei` flag when starting Operator Service (or
+configure this variable via Environment Variables) to set the maximum base fee they are happy to pay for both validator
+registrations and Vault harvests (if Operator is started using the `--harvest-vault` flag).
 
-> Note: For security purposes, make sure to protect your mnemonic as it can be used to generate your validator keys.
-> Always verify the network and endpoints before running the command.
+### Reduce Operator Service CPU load
 
-### Remote Postgres database
-
-This feature is used in conjunction with the [StakeWise Helm charts](https://github.com/stakewise/helm-charts). It
-stores encrypted validator keys and shares in the remote database.
-The [web3signer helm chart](https://github.com/stakewise/helm-charts/tree/main/charts/web3signer) pulls the private keys
-and decrypts
-them on
-start. The [validator pods](https://github.com/stakewise/helm-charts/tree/main/charts/validators) use the web3signer
-service to sign blocks and fetch the public keys they're validating for
-from the DB. The [operator chart](https://github.com/stakewise/helm-charts/tree/main/charts/v3-operator) pulls the
-config from the DB and uses
-web3signer to sign exit messages.
-
-#### 1. Setup Postgres DB
-
-The command creates tables and generates encryption key for the database:
-
-```bash
-./v3-operator remote-db \
-  --db-url=postgresql://postgres:postgres@localhost/operator \
-  --vault=0x8189aF89A7718C1baB5628399FC0ba50C6949bCc \
-  setup
-Successfully configured remote database.
-Encryption key: D/6CbpJen3J0ue0tWcd+d4KKHpT4kaSz3IzG5jz5LFI=
-NB! You must store your encryption in a secure cold storage!
-```
-
-**NB! You must store the generated encryption key in a secure cold storage. You would have to re-do the setup if you
-lose it.**
-
-#### 2. Load keystores to the remote DB
-
-The command loads encrypted keystores and operator config to the remote DB:
-
-```bash
-./v3-operator remote-db \
-  --db-url=postgresql://postgres:postgres@localhost/operator \
-  --vault=0x8189aF89A7718C1baB5628399FC0ba50C6949bCc \
-  upload-keypairs \
-  --encrypt-key=D/6CbpJen3J0ue0tWcd+d4KKHpT4kaSz3IzG5jz5LFI= \
-  --execution-endpoints=http://localhost:8545
-Loading keystores from /Users/user/.stakewise/0x8189af89a7718c1bab5628399fc0ba50c6949bcc/keystores...
-Fetching oracles config...
-Calculating and encrypting shares for 10000 keystores...
-Uploading updates to the remote db...
-Successfully uploaded keypairs and shares for the 0x8189aF89A7718C1baB5628399FC0ba50C6949bCc vault.
-```
-
-#### 3. Sync keystores to the web3signer
-
-The command syncs encrypted keystores to the web3signer:
-
-```bash
-./v3-operator remote-db \
-  --db-url=postgresql://postgres:postgres@localhost/operator \
-  --vault=0x8189aF89A7718C1baB5628399FC0ba50C6949bCc \
-  --network=mainnet \
-  setup-web3signer \
-  --encrypt-key=D/6CbpJen3J0ue0tWcd+d4KKHpT4kaSz3IzG5jz5LFI= \
-  --output-dir=./web3signer
-Fetching keypairs from the remote db...
-Decrypting 120000 keystores...
-Saving 120000 private keys to web3signer...
-Successfully retrieved web3signer private keys from the database.
-```
-
-#### 4. Sync web3signer configs for the validators
-
-The command syncs web3signer config for every validator:
-
-```bash
-./v3-operator remote-db \
-  --db-url=postgresql://postgres:postgres@localhost/operator \
-  --vault=0x8189aF89A7718C1baB5628399FC0ba50C6949bCc \
-  --network=mainnet \
-  setup-validator \
-  --validator-index=0 \
-  --total-validators=10 \
-  --web3signer-endpoint=http://localhost:9000 \
-  --fee-recipient=0xb793c3D2Cec1d0F35fF88BCA7655B88A44669e4B \
-  --output-dir=./validator0
-Generated configs with 1000 keys for validator with index 0.
-Validator definitions for Lighthouse saved to validator0/validator_definitions.yml file.
-Signer keys for Teku\Prysm saved to validator0/signer_keys.yml file.
-Proposer config for Teku\Prysm saved to validator0/proposer_config.json file.
-
-Successfully created validator configuration files.
-```
-
-#### 5. Sync configs for the operator
-
-The command syncs web3signer config and deposit data for the operator:
-
-```bash
-./v3-operator remote-db \
-  --db-url=postgresql://postgres:postgres@localhost/operator \
-  --vault=0x8189aF89A7718C1baB5628399FC0ba50C6949bCc \
-  --network=mainnet \
-  setup-operator
-Operator remote signer configuration saved to /Users/user/.stakewise/0x8189af89a7718c1bab5628399fc0ba50c6949bcc/remote_signer_config.json file.
-Operator deposit data saved to /Users/user/.stakewise/0x8189af89a7718c1bab5628399fc0ba50c6949bcc/deposit_data.json file.
-Successfully created operator configuration file.
-```
-
-By default, the config will be created in the vault directory, but
-you can override it by providing `--output-dir`.
-
-## Monitoring Operator with Prometheus
-
-Operator supports monitoring using Prometheus by providing a `/metrics` endpoint that Prometheus can scrape to gather
-various metrics.
-
-### Prerequisites
-
-1. Operator application running and accessible.
-2. Prometheus server installed and running.
-3. Basic knowledge of how to configure Prometheus targets.
-4. [Grafana Dashboard](https://grafana.com/grafana/dashboards/19060-v3-operator/) for `v3-operator` installed
-
-Setup Operator for Monitoring:
-
-Operator provides the flexibility to define the host and port for the metrics endpoint via environment variables:
-
-- `ENABLE_METRICS`: This defines whether the metrics endpoint should be enabled or not. By default, it is set
-  to `false`.
-- `METRICS_HOST`: This defines the hostname or IP on which the metrics endpoint will be available.
-- `METRICS_PORT`: This defines the port on which the metrics endpoint will be available.
-
-Ensure that these environment variables are set as per your requirements.
-
-For example:
-
-```bash
-export ENABLE_METRICS=true
-export METRICS_HOST=0.0.0.0
-export METRICS_PORT=9100
-```
-
-You can also specify them by providing `--enable-metrics`, `--metrics-port` and `--metrics-host` flags to the `start`
-command.
-
-Now, Operators's metrics will be available at <http://[METRICS_HOST]:[METRICS_PORT]/metrics>.
-
-Configure Prometheus:
-
-To monitor Operator, you will need to configure Prometheus to scrape metrics from the exposed `/metrics` endpoint.
-
-Add the following job configuration in your Prometheus configuration file (`prometheus.yml`):
-
-```yaml
-scrape_configs:
-  - job_name: 'operator'
-    scrape_interval: 30s
-    static_configs:
-      - targets: [ '<METRICS_HOST>:<METRICS_PORT>' ]
-```
-
-Replace `<METRICS_HOST>` and `<METRICS_PORT>` with the values you've set in Operator.
-
-This configuration tells Prometheus to scrape metrics from Operator every 30 seconds.
+`--pool-size` can be passed as a flag with both start and create-keys commands. This flag defines the number of CPU
+cores that are used to both load keystores and create keystores. By default, Operator Service will use 100% of the CPU
+cores.
+Setting `--pool-size` to (number of CPU cores) / 2 is a safe way to ensure that Operator Service does not take up too
+much CPU load and impact node performance during the creation and loading of keystores.
 
 ## Contacts
 
