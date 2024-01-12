@@ -122,7 +122,7 @@ NETWORKS = {
         GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x01017000')),
         IS_POA=False,
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
-        SHAPELLA_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x01017000')),
+        SHAPELLA_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x04017000')),
         SHAPELLA_EPOCH=256,
         MULTICALL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xcA11bde05977b3631167028862bE2a173976CA11'
