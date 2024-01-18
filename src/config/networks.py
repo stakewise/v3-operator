@@ -37,6 +37,7 @@ class NetworkConfig:
     SHAPELLA_FORK_VERSION: bytes
     SHAPELLA_EPOCH: int
     MULTICALL_CONTRACT_ADDRESS: ChecksumAddress
+    SHARED_MEV_ESCROW_CONTRACT_ADDRESS: ChecksumAddress
 
     @property
     def SHAPELLA_FORK(self) -> ConsensusFork:
@@ -92,6 +93,9 @@ NETWORKS = {
         MULTICALL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xcA11bde05977b3631167028862bE2a173976CA11'
         ),
+        SHARED_MEV_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x48319f97E5Da1233c21c48b80097c0FB7a20Ff86'
+        ),
     ),
     HOLESKY: NetworkConfig(
         SYMBOL='HolETH',
@@ -118,10 +122,13 @@ NETWORKS = {
         GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x01017000')),
         IS_POA=False,
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
-        SHAPELLA_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x01017000')),
+        SHAPELLA_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x04017000')),
         SHAPELLA_EPOCH=256,
         MULTICALL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xcA11bde05977b3631167028862bE2a173976CA11'
+        ),
+        SHARED_MEV_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0xc98F25BcAA6B812a07460f18da77AF8385be7b56'
         ),
     ),
     GNOSIS: NetworkConfig(
@@ -155,5 +162,6 @@ NETWORKS = {
         MULTICALL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xcA11bde05977b3631167028862bE2a173976CA11'
         ),
+        SHARED_MEV_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
     ),
 }

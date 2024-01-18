@@ -105,6 +105,9 @@ class VaultContract(ContractWrapper):
         )
         return [Web3.to_hex(event['args']['publicKey']) for event in events]
 
+    async def mev_escrow(self) -> ChecksumAddress:
+        return await self.contract.functions.mevEscrow().call()
+
 
 class V2PoolContract(ContractWrapper):
     abi_path = 'abi/IV2Pool.json'

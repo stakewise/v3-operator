@@ -2275,17 +2275,6 @@ files = [
 ]
 
 [[package]]
-name = "python-json-logger"
-version = "2.0.7"
-description = "A python library adding a json log formatter"
-optional = false
-python-versions = ">=3.6"
-files = [
-    {file = "python-json-logger-2.0.7.tar.gz", hash = "sha256:23e7ec02d34237c5aa1e29a070193a4ea87583bb4e7f8fd06d3de8264c4b2e1c"},
-    {file = "python_json_logger-2.0.7-py3-none-any.whl", hash = "sha256:f380b826a991ebbe3de4d897aeec42760035ac760345e57b812938dc8b35e2bd"},
-]
-
-[[package]]
 name = "pyunormalize"
 version = "15.1.0"
 description = "Unicode normalization forms (NFC, NFKC, NFD, NFKD). A library independent from the Python core Unicode database."
@@ -2776,7 +2765,7 @@ pbr = ">=2.0.0,<2.1.0 || >2.1.0"
 
 [[package]]
 name = "sw-utils"
-version = "0.3.33"
+version = "0.3.31"
 description = "StakeWise Python utils"
 optional = false
 python-versions = "^3.10"
@@ -2795,8 +2784,8 @@ web3 = "==6.11.1"
 [package.source]
 type = "git"
 url = "https://github.com/stakewise/sw-utils.git"
-reference = "v0.3.33"
-resolved_reference = "3b62e6c5222b7256749a3bce0bdd7b3dd6f3afcd"
+reference = "v0.3.31"
+resolved_reference = "1f9ac9b13afa8285203283e0c2f6bbe0e7685c3e"
 
 [[package]]
 name = "tenacity"
@@ -3149,4 +3138,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.11"
-content-hash = "7df954a4909e9097e1ce64696729cc9ba11e97c32aaa6b354cf18e3602384014"
+content-hash = "7b93789a5e86c2e91740f9f049fa3793d73b65a591f1014f466824a473ce8c15"
