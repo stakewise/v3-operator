@@ -34,21 +34,26 @@ async def send_signature_rotation_requests(
     approvals: dict[ChecksumAddress, OracleApproval] = {}
     failed_endpoints: list[str] = []
     async with aiohttp.ClientSession() as session:
-        for address, replicas in endpoints:
-            try:
-                response = await send_signature_rotation_request_to_replicas(
+        results = await asyncio.gather(
+            *[
+                send_signature_rotation_request_to_replicas(
                     session=session, replicas=replicas, payload=payload
                 )
-            except Exception as e:
+                for address, replicas in endpoints
+            ],
+            return_exceptions=True,
+        )
+        for (address, replicas), result in zip(endpoints, results):
+            if isinstance(result, Exception):
                 warning_verbose(
                     'All endpoints for oracle %s failed to sign signature rotation request. '
                     'Last error: %s',
                     address,
-                    format_error(e),
+                    format_error(result),
                 )
                 failed_endpoints.extend(replicas)
                 continue
-            approvals[address] = response
+            approvals[address] = result
 
     logger.info(
         'Fetched oracle approvals for signatures update of %d validators. '
