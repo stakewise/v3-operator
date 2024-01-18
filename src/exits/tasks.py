@@ -4,9 +4,8 @@ import time
 from random import shuffle
 
 from aiohttp import ClientError
-from eth_typing import BlockNumber, BLSPubkey
+from eth_typing import BlockNumber
 from tenacity import RetryError
-from web3 import Web3
 from web3.types import HexStr
 
 from src.common.contracts import keeper_contract
