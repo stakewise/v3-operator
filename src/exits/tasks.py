@@ -5,6 +5,7 @@ from random import shuffle
 
 from aiohttp import ClientError
 from eth_typing import BlockNumber, BLSPubkey
+from tenacity import RetryError
 from web3 import Web3
 from web3.types import HexStr
 
@@ -111,7 +112,7 @@ async def _fetch_outdated_indexes(oracles: Oracles, update_block: BlockNumber | 
     for oracle_endpoint in endpoints:
         try:
             response = await get_oracle_outdated_signatures_response(oracle_endpoint)
-        except ClientError as e:
+        except (ClientError, RetryError) as e:
             warning_verbose(str(e))
             continue
         if not update_block or response['exit_signature_block_number'] >= update_block:
