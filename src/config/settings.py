@@ -33,6 +33,7 @@ class Settings(metaclass=Singleton):
     consensus_retry_timeout: int
     execution_endpoints: list[str]
     execution_timeout: int
+    execution_transaction_timeout: int
     execution_retry_timeout: int
 
     harvest_vault: bool
@@ -162,6 +163,9 @@ class Settings(metaclass=Singleton):
             'POOL_SIZE', default=None, cast=lambda x: int(x) if x else None
         )
         self.execution_timeout = decouple_config('EXECUTION_TIMEOUT', default=30, cast=int)
+        self.execution_transaction_timeout = decouple_config(
+            'EXECUTION_TRANSACTION_TIMEOUT', default=300, cast=int
+        )
         self.execution_retry_timeout = decouple_config(
             'EXECUTION_RETRY_TIMEOUT', default=60, cast=int
         )
