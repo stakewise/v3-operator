@@ -35,8 +35,8 @@ bandit = { version = "==1.7.5", extras = ["toml"] }
 black = { version = "==23.10.0", extras = ["d"] }
 pyinstaller = "==5.13.2"
 faker = "==19.11.0"
-flake8-datetime-utcnow-plugin = "==0.1.2"
 flake8-print = "==5.0.0"
+flake8-datetimez = "==20.10.0"
 types-pyyaml = "==6.0.12.12"
 coverage = "==7.3.2"
 aioresponses = "^0.7.4"
