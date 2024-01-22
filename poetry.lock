@@ -1131,14 +1131,14 @@ pycodestyle = ">=2.11.0,<2.12.0"
 pyflakes = ">=3.2.0,<3.3.0"
 
 [[package]]
-name = "flake8-datetime-utcnow-plugin"
-version = "0.1.2"
-description = "Plugin to check that utcnow() is not used in favour of now(UTC)"
+name = "flake8-datetimez"
+version = "20.10.0"
+description = "A plugin for flake8 to ban the usage of unsafe naive datetime class."
 optional = false
-python-versions = ">=3.7,<4"
+python-versions = ">=3.6"
 files = [
-    {file = "flake8-datetime-utcnow-plugin-0.1.2.tar.gz", hash = "sha256:724733581a7b4e08a089a738ee69f4ef0fa7450a6ba0e2d01e3367fcfa6b8a82"},
-    {file = "flake8_datetime_utcnow_plugin-0.1.2-py3-none-any.whl", hash = "sha256:91b60598643ec2d616949d60913a273b1e963b9eeaf46579bee442a2539640be"},
+    {file = "flake8-datetimez-20.10.0.tar.gz", hash = "sha256:78939f3bcbe2b7fe48235998545c869c27cdfac3f45685099a3f7366c1ffebc6"},
+    {file = "flake8_datetimez-20.10.0-py3-none-any.whl", hash = "sha256:57aa2f55eb88797e2d8c06bd536ff8049b9f1ba877d81dc06ff8d9bdc195c1fc"},
 ]
 
 [package.dependencies]
@@ -3147,4 +3147,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.11"
-content-hash = "7599a2f4cfd2d4a4fe939218ddbe52295d0997e97d398a159b7555a28dcc9563"
+content-hash = "281d98b7a78d263bdeeefae84287008462193a0e2bb09a74b6ef7c6724e8c592"
