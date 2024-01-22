@@ -8,7 +8,11 @@ from aiohttp import ClientSession, ClientTimeout
 from sw_utils import IpfsFetchClient, get_consensus_client, get_execution_client
 
 from src.common.clients import db_client
-from src.common.execution import check_hot_wallet_balance, get_oracles
+from src.common.execution import (
+    check_hot_wallet_balance,
+    check_vault_address,
+    get_oracles,
+)
 from src.common.utils import format_error, warning_verbose
 from src.common.wallet import hot_wallet
 from src.config.settings import settings
@@ -182,6 +186,9 @@ async def startup_checks():
 
     logger.info('Checking connection to execution nodes...')
     await wait_for_execution_node()
+
+    logger.info('Checking vault address %s...', settings.vault)
+    await check_vault_address()
 
     logger.info('Checking hot wallet balance %s...', hot_wallet.address)
     await check_hot_wallet_balance()

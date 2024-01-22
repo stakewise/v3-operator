@@ -3,7 +3,9 @@ import logging
 import time
 from random import shuffle
 
+from aiohttp import ClientError
 from eth_typing import BlockNumber
+from tenacity import RetryError
 from web3.types import HexStr
 
 from src.common.contracts import keeper_contract
@@ -12,7 +14,7 @@ from src.common.execution import get_oracles
 from src.common.metrics import metrics
 from src.common.tasks import BaseTask
 from src.common.typings import Oracles
-from src.common.utils import get_current_timestamp, is_block_finalized
+from src.common.utils import get_current_timestamp, is_block_finalized, warning_verbose
 from src.config.settings import settings
 from src.exits.consensus import get_validator_public_keys
 from src.exits.execution import submit_exit_signatures
@@ -97,12 +99,16 @@ async def _fetch_outdated_indexes(oracles: Oracles, update_block: BlockNumber | 
     shuffle(endpoints)
 
     for oracle_endpoint in endpoints:
-        response = await get_oracle_outdated_signatures_response(oracle_endpoint)
+        try:
+            response = await get_oracle_outdated_signatures_response(oracle_endpoint)
+        except (ClientError, RetryError) as e:
+            warning_verbose(str(e))
+            continue
         if not update_block or response['exit_signature_block_number'] >= update_block:
             outdated_indexes = [val['index'] for val in response['validators']]
             metrics.outdated_signatures.set(len(outdated_indexes))
             return outdated_indexes
-    raise RuntimeError('Oracles have not synced exit signatures yet')
+    raise RuntimeError('Oracles are down or have not synced exit signatures yet')
 
 
 async def _update_exit_signatures(
