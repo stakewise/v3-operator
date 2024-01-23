@@ -1,6 +1,6 @@
 name: Docker
 
-on: [ push ]
+on: [push]
 
 jobs:
   docker:
@@ -21,6 +21,7 @@ jobs:
             type=ref,event=branch
             type=ref,event=tag
             type=sha
+            type=raw,value=latest,event=tag
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to GAR
@@ -50,9 +51,9 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:sha-${{ steps.commit-hash.outputs.short }}'
-          format: 'table'
-          exit-code: '1'
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
+          image-ref: "europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:sha-${{ steps.commit-hash.outputs.short }}"
+          format: "table"
+          exit-code: "1"
+          vuln-type: "os,library"
+          severity: "CRITICAL,HIGH"
           ignore-unfixed: true
