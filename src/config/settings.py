@@ -6,12 +6,17 @@ from web3 import Web3
 from web3.types import ChecksumAddress
 
 from src.config.networks import HOLESKY, MAINNET, NETWORKS, NetworkConfig
+from src.validators.typings import ValidatorsRegistrationMode
 
 DATA_DIR = Path.home() / '.stakewise'
 
 DEFAULT_MAX_FEE_PER_GAS_GWEI = 100
+
 DEFAULT_METRICS_HOST = '127.0.0.1'
 DEFAULT_METRICS_PORT = 9100
+
+DEFAULT_API_HOST = '127.0.0.1'
+DEFAULT_API_PORT = 5000
 
 
 class Singleton(type):
@@ -41,6 +46,7 @@ class Settings(metaclass=Singleton):
     metrics_host: str
     metrics_port: int
     deposit_data_file: Path
+    no_keystores: bool
     keystores_dir: Path
     keystores_password_dir: Path
     keystores_password_file: Path
@@ -64,6 +70,13 @@ class Settings(metaclass=Singleton):
     sentry_dsn: str
     pool_size: int | None
 
+    enable_api: bool
+    api_host: str
+    api_port: int
+    validators_registration_mode: ValidatorsRegistrationMode
+    skip_validator_registration_tx: bool
+    skip_startup_checks: bool
+
     # pylint: disable-next=too-many-arguments,too-many-locals
     def set(
         self,
@@ -79,6 +92,7 @@ class Settings(metaclass=Singleton):
         metrics_host: str = DEFAULT_METRICS_HOST,
         max_fee_per_gas_gwei: int = DEFAULT_MAX_FEE_PER_GAS_GWEI,
         deposit_data_file: str | None = None,
+        no_keystores: bool = False,
         keystores_dir: str | None = None,
         keystores_password_file: str | None = None,
         remote_signer_config_file: str | None = None,
@@ -91,6 +105,10 @@ class Settings(metaclass=Singleton):
         database_dir: str | None = None,
         log_level: str | None = None,
         log_format: str | None = None,
+        enable_api: bool = False,
+        api_host: str = DEFAULT_API_HOST,
+        api_port: int = DEFAULT_API_PORT,
+        validators_registration_mode: ValidatorsRegistrationMode = ValidatorsRegistrationMode.AUTO,
     ) -> None:
         self.vault = Web3.to_checksum_address(vault)
         vault_dir.mkdir(parents=True, exist_ok=True)
@@ -111,6 +129,7 @@ class Settings(metaclass=Singleton):
         )
 
         # keystores
+        self.no_keystores = no_keystores
         self.keystores_dir = Path(keystores_dir) if keystores_dir else vault_dir / 'keystores'
         self.keystores_password_dir = decouple_config(
             'KEYSTORES_PASSWORD_DIR',
@@ -185,6 +204,16 @@ class Settings(metaclass=Singleton):
         self.consensus_retry_timeout = decouple_config(
             'CONSENSUS_RETRY_TIMEOUT', default=120, cast=int
         )
+        self.enable_api = enable_api
+        self.api_host = api_host
+        self.api_port = api_port
+        self.validators_registration_mode = validators_registration_mode
+
+        # Use to debug requests to oracles without spending Eth
+        self.skip_validator_registration_tx = decouple_config(
+            'SKIP_VALIDATOR_REGISTRATION_TX', default=False, cast=bool
+        )
+        self.skip_startup_checks = decouple_config('SKIP_STARTUP_CHECKS', default=False, cast=bool)
 
     @property
     def network_config(self) -> NetworkConfig:

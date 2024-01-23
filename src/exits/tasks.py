@@ -29,12 +29,13 @@ logger = logging.getLogger(__name__)
 
 
 class ExitSignatureTask(BaseTask):
-    keystore: BaseKeystore
-
-    def __init__(self, keystore: BaseKeystore):
+    def __init__(self, keystore: BaseKeystore | None):
         self.keystore = keystore
 
     async def process_block(self) -> None:
+        if self.keystore is None:
+            return
+
         oracles = await get_oracles()
         update_block = await _fetch_last_update_block()
         if update_block and not await is_block_finalized(update_block):

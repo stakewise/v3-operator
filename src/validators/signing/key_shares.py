@@ -1,11 +1,17 @@
 from random import randint
+from typing import TypeAlias
 
 from eth_typing import BLSPubkey, BLSSignature
+from py_ecc.bls import G2ProofOfPossession
 from py_ecc.bls.g2_primitives import (
     G1_to_pubkey,
     G2_to_signature,
     pubkey_to_G1,
     signature_to_G2,
+)
+from py_ecc.bls.hash_to_curve import hash_to_G2
+from py_ecc.optimized_bls12_381.optimized_curve import (
+    G1 as P1,  # don't mess group name (G1) and primitive element name (P1)
 )
 from py_ecc.optimized_bls12_381.optimized_curve import (
     Z1,
@@ -14,9 +20,13 @@ from py_ecc.optimized_bls12_381.optimized_curve import (
     curve_order,
     multiply,
 )
+from py_ecc.typing import Optimized_Field, Optimized_Point3D
 from py_ecc.utils import prime_field_inv
 
 from src.validators.typings import BLSPrivkey
+
+# element of G1 or G2
+G12: TypeAlias = Optimized_Point3D[Optimized_Field]
 
 
 def get_polynomial_points(coefficients: list[int], num_points: int) -> list[int]:
@@ -35,6 +45,23 @@ def get_polynomial_points(coefficients: list[int], num_points: int) -> list[int]
     return points
 
 
+def get_G12_polynomial_points(coefficients: list, num_points: int) -> list:
+    """Calculates polynomial points in G1 or G2."""
+    points = []
+    for x in range(1, num_points + 1):
+        # start with x=1 and calculate the value of y
+        y = coefficients[0]
+        # calculate each term and add it to y, using modular math
+        for i in range(1, len(coefficients)):
+            exponentiation = (x**i) % curve_order
+            term = multiply(coefficients[i], exponentiation)
+            y = add(y, term)
+
+        # add the point to the list of points
+        points.append(y)
+    return points
+
+
 def private_key_to_private_key_shares(
     private_key: BLSPrivkey,
     threshold: int,
@@ -48,6 +75,47 @@ def private_key_to_private_key_shares(
     points = get_polynomial_points(coefficients, total)
 
     return [BLSPrivkey(p.to_bytes(32, 'big')) for p in points]
+
+
+def bls_signature_to_shares(
+    bls_signature: BLSSignature,
+    coefficients_G2: list[G12],
+    total: int,
+) -> list[BLSSignature]:
+    coefficients_G2 = [signature_to_G2(bls_signature)] + coefficients_G2
+
+    points = get_G12_polynomial_points(coefficients_G2, total)
+
+    return [BLSSignature(G2_to_signature(p)) for p in points]
+
+
+def public_key_to_shares(
+    public_key: BLSPubkey,
+    coefficients_G1: list,
+    total: int,
+) -> list[BLSPubkey]:
+    coefficients_G1 = [pubkey_to_G1(public_key)] + coefficients_G1
+
+    points = get_G12_polynomial_points(coefficients_G1, total)
+
+    return [BLSPubkey(G1_to_pubkey(p)) for p in points]
+
+
+def bls_signature_and_public_key_to_shares(
+    message: bytes, bls_signature: BLSSignature, public_key: BLSPubkey, threshold: int, total: int
+) -> tuple[list[BLSSignature], list[BLSPubkey]]:
+    message_g2 = hash_to_G2(
+        message, G2ProofOfPossession.DST, G2ProofOfPossession.xmd_hash_function
+    )  # todo dst ?
+
+    coefficients_int = [randint(0, curve_order - 1) for _ in range(threshold - 1)]  # nosec
+    coefficients_G1 = [multiply(P1, coef) for coef in coefficients_int]
+    coefficients_G2 = [multiply(message_g2, coef) for coef in coefficients_int]
+
+    exit_signature_shards = bls_signature_to_shares(bls_signature, coefficients_G2, total)
+    public_key_shards = public_key_to_shares(public_key, coefficients_G1, total)
+
+    return exit_signature_shards, public_key_shards
 
 
 def reconstruct_shared_bls_signature(signatures: dict[int, BLSSignature]) -> BLSSignature:

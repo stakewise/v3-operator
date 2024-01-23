@@ -9,7 +9,9 @@ from src.validators.keystores.remote import RemoteSignerKeystore
 logger = logging.getLogger(__name__)
 
 
-async def load_keystore() -> BaseKeystore:
+async def load_keystore() -> BaseKeystore | None:
+    if settings.no_keystores:
+        return None
     if settings.remote_signer_url:
         remote_keystore = await RemoteSignerKeystore.load()
         logger.info(

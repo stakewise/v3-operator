@@ -1,7 +1,9 @@
 import asyncio
+import dataclasses
 import logging
 import time
 
+from eth_typing import HexStr
 from multiproof.standard import MultiProof
 from sw_utils import EventScanner, IpfsFetchClient
 from sw_utils.typings import Bytes32
@@ -29,25 +31,27 @@ from src.validators.execution import (
     update_unused_validator_keys_metric,
 )
 from src.validators.keystores.base import BaseKeystore
+from src.validators.keystores.local import LocalKeystore
 from src.validators.signing.common import get_validators_proof
 from src.validators.typings import (
     ApprovalRequest,
     DepositData,
     NetworkValidator,
     Validator,
+    ValidatorsRegistrationMode,
 )
 from src.validators.utils import send_approval_requests
 
 logger = logging.getLogger(__name__)
 
 
-class ValidatorsTask(BaseTask):
-    keystore: BaseKeystore
-    deposit_data: DepositData
+pending_validator_registrations: list[HexStr] = []
 
+
+class ValidatorsTask(BaseTask):
     def __init__(
         self,
-        keystore: BaseKeystore,
+        keystore: BaseKeystore | None,
         deposit_data: DepositData,
     ):
         self.keystore = keystore
@@ -60,22 +64,28 @@ class ValidatorsTask(BaseTask):
 
         # process new network validators
         await self.network_validators_scanner.process_new_events(chain_state.execution_block)
-        # check and register new validators
+
+        if self.keystore is None:
+            return
+
         await update_unused_validator_keys_metric(
             keystore=self.keystore,
             deposit_data=self.deposit_data,
         )
-        await register_validators(
-            keystore=self.keystore,
-            deposit_data=self.deposit_data,
-        )
+        if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
+            # check and register new validators
+            await register_validators(
+                keystore=self.keystore,
+                deposit_data=self.deposit_data,
+            )
 
 
-# pylint: disable-next=too-many-locals,too-many-branches
+# pylint: disable-next=too-many-locals,too-many-branches,too-many-return-statements,too-many-statements
 async def register_validators(
-    keystore: BaseKeystore,
+    keystore: BaseKeystore | None,
     deposit_data: DepositData,
-) -> None:
+    validators: list[Validator] | None = None,
+) -> HexStr | None:
     """Registers vault validators."""
     if (
         settings.network_config.IS_SUPPORT_V2_MIGRATION
@@ -85,41 +95,28 @@ async def register_validators(
         logger.info(
             'Waiting for vault to become owner of v2 pool escrow to start registering validators...'
         )
-        return
+        return None
 
-    vault_balance, update_state_call = await get_withdrawable_assets()
-    if settings.network == GNOSIS:
-        # apply GNO -> mGNO exchange rate
-        vault_balance = Wei(int(vault_balance * MGNO_RATE // WAD))
+    _, update_state_call = await get_withdrawable_assets()
 
-    metrics.stakeable_assets.set(int(vault_balance))
+    if validators is None and keystore is None:
+        raise RuntimeError('validators or keystore must be set')
 
-    # calculate number of validators that can be registered
-    validators_count = vault_balance // DEPOSIT_AMOUNT
-    if not validators_count:
-        # not enough balance to register validators
-        return
+    if validators is None:
+        validators = await get_available_validators_for_registration(
+            keystore=keystore, deposit_data=deposit_data
+        )
 
-    # get latest oracles
-    oracles = await get_oracles()
-
-    validators_count = min(oracles.validators_approval_batch_limit, validators_count)
-
-    if not await check_gas_price():
-        return
-
-    validators: list[Validator] = await get_available_validators(
-        keystore=keystore,
-        deposit_data=deposit_data,
-        count=validators_count,
-    )
     if not validators:
         logger.warning(
             'There are no available validators in the current deposit data '
             'to proceed with registration. '
             'To register additional validators, you must upload new deposit data.'
         )
-        return
+        return None
+
+    if not await check_gas_price():
+        return None
 
     logger.info('Started registration of %d validator(s)', len(validators))
 
@@ -129,6 +126,7 @@ async def register_validators(
     )
     registry_root = None
     oracles_request = None
+    oracles = await get_oracles()
     deadline = get_current_timestamp() + oracles.signature_validity_period
     approvals_min_interval = 1
 
@@ -172,7 +170,18 @@ async def register_validators(
         logger.info(
             'Registry root has changed during validators registration. Retrying...',
         )
-        return
+        return None
+
+    if settings.skip_validator_registration_tx:
+        logger.info('DO NOT SEND TRANSACTION')
+
+        if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
+            for validator in validators:
+                pending_validator_registrations.remove(validator.public_key)
+
+        return None
+
+    tx_hash: HexStr | None = None
 
     if len(validators) == 1:
         validator = validators[0]
@@ -187,8 +196,7 @@ async def register_validators(
             logger.info(
                 'Successfully registered validator with public key %s', validator.public_key
             )
-
-    if len(validators) > 1:
+    elif len(validators) > 1:
         tx_hash = await register_multiple_validator(
             approval=oracles_approval,
             multi_proof=multi_proof,
@@ -200,11 +208,52 @@ async def register_validators(
             pub_keys = ', '.join([val.public_key for val in validators])
             logger.info('Successfully registered validators with public keys %s', pub_keys)
 
+    if tx_hash and settings.validators_registration_mode == ValidatorsRegistrationMode.API:
+        for validator in validators:
+            pending_validator_registrations.remove(validator.public_key)
+
+    return tx_hash
+
+
+async def get_available_validators_for_registration(
+    keystore: BaseKeystore | None, deposit_data: DepositData
+) -> list[Validator]:
+    validators_count = await get_validators_count_from_vault_assets()
+
+    if not validators_count:
+        # not enough balance to register validators
+        return []
+
+    # get latest oracles
+    oracles = await get_oracles()
+
+    validators_count = min(oracles.validators_approval_batch_limit, validators_count)
+
+    validators = await get_available_validators(
+        keystore=keystore,
+        deposit_data=deposit_data,
+        count=validators_count,
+    )
+    return validators
+
+
+async def get_validators_count_from_vault_assets() -> int:
+    vault_balance, _ = await get_withdrawable_assets()
+    if settings.network == GNOSIS:
+        # apply GNO -> mGNO exchange rate
+        vault_balance = Wei(int(vault_balance * MGNO_RATE // WAD))
+
+    metrics.stakeable_assets.set(int(vault_balance))
+
+    # calculate number of validators that can be registered
+    validators_count = vault_balance // DEPOSIT_AMOUNT
+    return validators_count
+
 
 # pylint: disable-next=too-many-arguments
 async def create_approval_request(
     oracles: Oracles,
-    keystore: BaseKeystore,
+    keystore: BaseKeystore | None,
     validators: list[Validator],
     registry_root: Bytes32,
     multi_proof: MultiProof,
@@ -232,12 +281,24 @@ async def create_approval_request(
         deadline=deadline,
     )
     for validator in validators:
-        shards = await keystore.get_exit_signature_shards(
-            validator_index=validator_index,
-            public_key=validator.public_key,
-            oracles=oracles,
-            fork=settings.network_config.SHAPELLA_FORK,
-        )
+        if keystore is None:
+            if validator.exit_signature is None:
+                raise RuntimeError('validator.exit_signature must be set')
+
+            shards = await LocalKeystore.get_exit_signature_shards_without_keystore(
+                validator_index=validator_index,
+                public_key=validator.public_key,
+                oracles=oracles,
+                fork=settings.network_config.SHAPELLA_FORK,
+                exit_signature=validator.exit_signature,
+            )
+        else:
+            shards = await keystore.get_exit_signature_shards(
+                validator_index=validator_index,
+                public_key=validator.public_key,
+                oracles=oracles,
+                fork=settings.network_config.SHAPELLA_FORK,
+            )
 
         if not shards:
             logger.warning(
