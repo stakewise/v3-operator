@@ -173,7 +173,7 @@ async def register_validators(
         return None
 
     if settings.skip_validator_registration_tx:
-        logger.info('DO NOT SEND TRANSACTION')
+        logger.info('Validator registration transaction is skipped')
 
         if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
             for validator in validators:
