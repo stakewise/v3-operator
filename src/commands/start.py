@@ -357,9 +357,9 @@ async def main() -> None:
             api_app,
             host=settings.api_host,
             port=settings.api_port,
-            log_level=settings.log_level.lower(),
+            log_config=None,
         )
-        server = uvicorn.Server(config)
+        server = UvicornServerWithoutSignals(config)
         asyncio.create_task(server.serve())
 
     if settings.enable_metrics:
@@ -382,6 +382,12 @@ async def main() -> None:
             tasks.append(HarvestTask().run(interrupt_handler))
 
         await asyncio.gather(*tasks)
+
+
+class UvicornServerWithoutSignals(uvicorn.Server):
+    def install_signal_handlers(self) -> None:
+        # Manage signals in command, not in Uvicorn
+        pass
 
 
 def log_start() -> None:
