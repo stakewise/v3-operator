@@ -1,7 +1,10 @@
 from typing import Callable
 
+import milagro_bls_binding as bls
 import pytest
+from eth_typing import BLSSignature
 from eth_typing.bls import BLSPubkey
+from sw_utils import get_exit_message_signing_root
 from sw_utils.typings import ConsensusFork
 from web3 import Web3
 
@@ -25,12 +28,14 @@ class TestSigning:
         validator_pubkey: BLSPubkey,
         validator_index: int,
         fork: ConsensusFork,
+        exit_signature: BLSSignature | None = None,
     ):
         committee.verify_signature_shards(
             validator_pubkey=validator_pubkey,
             validator_index=validator_index,
             fork=fork,
             exit_signature_shards=shards,
+            exit_signature=exit_signature,
         )
 
         # If less than exit_signature_recover_threshold signatures are used,
@@ -103,11 +108,7 @@ class TestSigning:
     ):
         validator_index = 123
         settings.remote_signer_url = remote_signer_url
-        '''
-        validator_pubkey_shares=[
-                    BLSPubkey(Web3.to_bytes(hexstr=share)) for share in pubkey_shares
-                ],
-        '''
+
         for pubkey, pubkey_shares in remote_signer_keystore.pubkeys_to_shares.items():
             shards = await remote_signer_keystore.get_exit_signature_shards(
                 validator_index=validator_index,
@@ -123,6 +124,50 @@ class TestSigning:
                 validator_index=validator_index,
                 fork=fork,
             )
+
+    @pytest.mark.usefixtures('fake_settings')
+    @pytest.mark.parametrize(
+        ['_mocked_oracle_committee'],
+        [
+            pytest.param((1, 1), id='Single oracle'),
+            pytest.param((10, 5), id='10 oracles with recovery threshold of 5'),
+            pytest.param((10, 10), id='10 oracles with recovery threshold of 10'),
+        ],
+        indirect=True,
+    )
+    async def test_exit_signature_shards_without_keystore(
+        self,
+        create_validator_keypair: Callable,
+        fork: ConsensusFork,
+        mocked_oracles: Oracles,
+        _mocked_oracle_committee: OracleCommittee,
+    ):
+        validator_privkey, validator_pubkey = create_validator_keypair()
+        validator_index = 123
+
+        message = get_exit_message_signing_root(
+            validator_index=validator_index,
+            genesis_validators_root=settings.network_config.GENESIS_VALIDATORS_ROOT,
+            fork=fork,
+        )
+        exit_signature = bls.Sign(validator_privkey, message)
+
+        shards = await LocalKeystore.get_exit_signature_shards_without_keystore(
+            validator_index=validator_index,
+            public_key=validator_pubkey,
+            oracles=mocked_oracles,
+            fork=fork,
+            exit_signature=exit_signature,
+        )
+
+        TestSigning.check_signature_shards(
+            shards=shards,
+            committee=_mocked_oracle_committee,
+            validator_pubkey=BLSPubkey(Web3.to_bytes(hexstr=validator_pubkey)),
+            validator_index=validator_index,
+            fork=fork,
+            exit_signature=exit_signature,
+        )
 
     @pytest.mark.usefixtures('mocked_remote_signer')
     async def test_remote_signer_pubkey_not_present(

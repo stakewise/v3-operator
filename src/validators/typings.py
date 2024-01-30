@@ -32,7 +32,7 @@ class DepositData:
 @dataclass
 class ExitSignatureShards:
     public_keys: list[HexStr]
-    exit_signatures: list[HexStr]
+    exit_signatures: list[HexStr]  # encrypted exit signature shards
 
 
 @dataclass
