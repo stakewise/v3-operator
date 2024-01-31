@@ -9,7 +9,7 @@ from eth_typing import ChecksumAddress
 from sw_utils import EventScanner, InterruptHandler
 
 import src
-import src.validators.endpoints  # noqa
+import src.validators.api.endpoints  # noqa
 from src.api import app as api_app
 from src.common.consensus import get_chain_finalized_head
 from src.common.execution import WalletTask
