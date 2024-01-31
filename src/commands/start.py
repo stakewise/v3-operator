@@ -12,7 +12,7 @@ import src
 import src.validators.api.endpoints  # noqa
 from src.api import app as api_app
 from src.common.consensus import get_chain_finalized_head
-from src.common.execution import WalletTask
+from src.common.execution import WalletTask, get_oracles
 from src.common.metrics import MetricsTask, metrics_server
 from src.common.startup_check import startup_checks
 from src.common.utils import JsonFormatter, get_build_version, log_verbose
@@ -348,6 +348,9 @@ async def main() -> None:
     logger.info('Syncing network validator events...')
     chain_state = await get_chain_finalized_head()
     await network_validators_scanner.process_new_events(chain_state.execution_block)
+
+    logger.info('Warming up oracles cache...')
+    await get_oracles()
 
     if settings.enable_api:
         logger.info('Starting api server')
