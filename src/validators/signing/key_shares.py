@@ -89,7 +89,7 @@ def bls_signature_to_shares(
     return [BLSSignature(G2_to_signature(p)) for p in points]
 
 
-def public_key_to_shares(
+def bls_public_key_to_shares(
     public_key: BLSPubkey,
     coefficients_G1: list,
     total: int,
@@ -102,8 +102,18 @@ def public_key_to_shares(
 
 
 def bls_signature_and_public_key_to_shares(
-    message: bytes, bls_signature: BLSSignature, public_key: BLSPubkey, threshold: int, total: int
+    message: bytes, signature: BLSSignature, public_key: BLSPubkey, threshold: int, total: int
 ) -> tuple[list[BLSSignature], list[BLSPubkey]]:
+    """
+    Given `message`, `signature` and `public_key` so that
+    `signature` for `message` can be verified with `public_key`.
+
+    The function splits `signature` and `public_key` to shares so that
+    each signature share can be verified with corresponding public key share.
+
+    The most straight forward way to do this is to use private key shares.
+    But this function does not require private key.
+    """
     message_g2 = hash_to_G2(
         message, G2ProofOfPossession.DST, G2ProofOfPossession.xmd_hash_function
     )  # todo dst ?
@@ -112,10 +122,10 @@ def bls_signature_and_public_key_to_shares(
     coefficients_G1 = [multiply(P1, coef) for coef in coefficients_int]
     coefficients_G2 = [multiply(message_g2, coef) for coef in coefficients_int]
 
-    exit_signature_shards = bls_signature_to_shares(bls_signature, coefficients_G2, total)
-    public_key_shards = public_key_to_shares(public_key, coefficients_G1, total)
+    bls_signature_shards = bls_signature_to_shares(signature, coefficients_G2, total)
+    public_key_shards = bls_public_key_to_shares(public_key, coefficients_G1, total)
 
-    return exit_signature_shards, public_key_shards
+    return bls_signature_shards, public_key_shards
 
 
 def reconstruct_shared_bls_signature(signatures: dict[int, BLSSignature]) -> BLSSignature:
