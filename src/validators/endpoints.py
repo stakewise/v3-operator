@@ -25,7 +25,7 @@ async def get_validators(request: Request) -> Response:
     deposit_data = request.app.state.deposit_data
 
     validators = await get_available_validators_for_registration(
-        keystore=None, deposit_data=deposit_data
+        keystore=None, deposit_data=deposit_data, run_check_deposit_data_root=False
     )
     validators = [v for v in validators if v.public_key not in pending_validator_registrations]
 

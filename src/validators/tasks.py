@@ -215,7 +215,9 @@ async def register_validators(
 
 
 async def get_available_validators_for_registration(
-    keystore: BaseKeystore | None, deposit_data: DepositData
+    keystore: BaseKeystore | None,
+    deposit_data: DepositData,
+    run_check_deposit_data_root: bool = True,
 ) -> list[Validator]:
     validators_count = await get_validators_count_from_vault_assets()
 
@@ -232,6 +234,7 @@ async def get_available_validators_for_registration(
         keystore=keystore,
         deposit_data=deposit_data,
         count=validators_count,
+        run_check_deposit_data_root=run_check_deposit_data_root,
     )
     return validators
 

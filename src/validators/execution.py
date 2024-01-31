@@ -165,9 +165,11 @@ async def get_available_validators(
     keystore: BaseKeystore | None,
     deposit_data: DepositData,
     count: int,
+    run_check_deposit_data_root: bool = True,
 ) -> list[Validator]:
     """Fetches vault's available validators."""
-    await check_deposit_data_root(deposit_data.tree.root)
+    if run_check_deposit_data_root:
+        await check_deposit_data_root(deposit_data.tree.root)
 
     start_index = await vault_contract.get_validators_index()
     validators: list[Validator] = []
