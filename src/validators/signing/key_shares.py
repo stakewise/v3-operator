@@ -1,4 +1,4 @@
-from random import randint
+import secrets
 from typing import TypeAlias
 
 from eth_typing import BLSPubkey, BLSSignature
@@ -70,7 +70,7 @@ def private_key_to_private_key_shares(
     coefficients: list[int] = [int.from_bytes(private_key, 'big')]
 
     for _ in range(threshold - 1):
-        coefficients.append(randint(0, curve_order - 1))  # nosec
+        coefficients.append(secrets.randbelow(curve_order))
 
     points = get_polynomial_points(coefficients, total)
 
@@ -118,7 +118,7 @@ def bls_signature_and_public_key_to_shares(
         message, G2ProofOfPossession.DST, G2ProofOfPossession.xmd_hash_function
     )  # todo dst ?
 
-    coefficients_int = [randint(0, curve_order - 1) for _ in range(threshold - 1)]  # nosec
+    coefficients_int = [secrets.randbelow(curve_order) for _ in range(threshold - 1)]
     coefficients_G1 = [multiply(P1, coef) for coef in coefficients_int]
     coefficients_G2 = [multiply(message_g2, coef) for coef in coefficients_int]
 
