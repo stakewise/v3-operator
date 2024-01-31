@@ -74,7 +74,6 @@ class Settings(metaclass=Singleton):
     api_host: str
     api_port: int
     validators_registration_mode: ValidatorsRegistrationMode
-    skip_validator_registration_tx: bool
     skip_startup_checks: bool
 
     # pylint: disable-next=too-many-arguments,too-many-locals
@@ -209,10 +208,6 @@ class Settings(metaclass=Singleton):
         self.api_port = api_port
         self.validators_registration_mode = validators_registration_mode
 
-        # Use to debug requests to oracles without spending Eth
-        self.skip_validator_registration_tx = decouple_config(
-            'SKIP_VALIDATOR_REGISTRATION_TX', default=False, cast=bool
-        )
         self.skip_startup_checks = decouple_config('SKIP_STARTUP_CHECKS', default=False, cast=bool)
 
     @property

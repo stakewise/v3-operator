@@ -171,15 +171,6 @@ async def register_validators(
         )
         return None
 
-    if settings.skip_validator_registration_tx:
-        logger.info('Validator registration transaction is skipped')
-
-        if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
-            for validator in validators:
-                pending_validator_registrations.remove(validator.public_key)
-
-        return None
-
     tx_hash: HexStr | None = None
 
     if len(validators) == 1:
