@@ -114,9 +114,7 @@ def bls_signature_and_public_key_to_shares(
     The most straight forward way to do this is to use private key shares.
     But this function does not require private key.
     """
-    message_g2 = hash_to_G2(
-        message, G2ProofOfPossession.DST, G2ProofOfPossession.xmd_hash_function
-    )  # todo dst ?
+    message_g2 = hash_to_G2(message, G2ProofOfPossession.DST, G2ProofOfPossession.xmd_hash_function)
 
     coefficients_int = [secrets.randbelow(curve_order) for _ in range(threshold - 1)]
     coefficients_G1 = [multiply(P1, coef) for coef in coefficients_int]
