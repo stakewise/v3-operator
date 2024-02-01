@@ -16,7 +16,7 @@ from src.common.execution import check_gas_price, get_oracles
 from src.common.metrics import metrics
 from src.common.tasks import BaseTask
 from src.common.typings import Oracles
-from src.common.utils import MGNO_RATE, WAD, get_current_timestamp
+from src.common.utils import MGNO_RATE, WAD, get_current_timestamp, log_verbose
 from src.config.networks import GNOSIS
 from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.validators.database import NetworkValidatorCrud
@@ -77,6 +77,23 @@ class ValidatorsTask(BaseTask):
                 keystore=self.keystore,
                 deposit_data=self.deposit_data,
             )
+
+
+async def register_and_remove_pending_validators(
+    keystore: BaseKeystore | None,
+    deposit_data: DepositData,
+    validators: list[Validator],
+) -> HexStr | None:
+    try:
+        return await register_validators(
+            keystore=keystore, deposit_data=deposit_data, validators=validators
+        )
+    except Exception as e:
+        log_verbose(e)
+        return None
+    finally:
+        for validator in validators:
+            pending_validator_registrations.remove(validator.public_key)
 
 
 # pylint: disable-next=too-many-locals,too-many-branches,too-many-return-statements,too-many-statements
@@ -197,10 +214,6 @@ async def register_validators(
         if tx_hash:
             pub_keys = ', '.join([val.public_key for val in validators])
             logger.info('Successfully registered validators with public keys %s', pub_keys)
-
-    if tx_hash and settings.validators_registration_mode == ValidatorsRegistrationMode.API:
-        for validator in validators:
-            pending_validator_registrations.remove(validator.public_key)
 
     return tx_hash
 

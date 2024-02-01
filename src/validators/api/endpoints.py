@@ -16,7 +16,7 @@ from src.validators.execution import get_latest_network_validator_public_keys
 from src.validators.tasks import (
     get_available_validators_for_registration,
     pending_validator_registrations,
-    register_validators,
+    register_and_remove_pending_validators,
 )
 from src.validators.typings import Validator, ValidatorsRegistrationMode
 
@@ -83,7 +83,9 @@ async def approve_validators(request: Request) -> Response:
 
     pending_validator_registrations.extend([v.public_key for v in validators])
     asyncio.create_task(
-        register_validators(keystore=None, deposit_data=deposit_data, validators=validators)
+        register_and_remove_pending_validators(
+            keystore=None, deposit_data=deposit_data, validators=validators
+        )
     )
 
     return JSONResponse('ok')
