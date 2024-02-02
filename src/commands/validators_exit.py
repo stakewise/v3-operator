@@ -10,6 +10,7 @@ from sw_utils.consensus import EXITED_STATUSES
 from web3 import Web3
 
 from src.common.clients import consensus_client
+from src.common.logging import setup_logging
 from src.common.utils import format_error, log_verbose
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
@@ -128,6 +129,7 @@ def validators_exit(
 
 
 async def main(count: int | None) -> None:
+    setup_logging()
     keystore = await load_keystore()
     validators_exits = await _get_validators_exits(keystore=keystore)
     if not validators_exits:
