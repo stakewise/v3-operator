@@ -1,15 +1,25 @@
 import logging
 import warnings
 
-from src.config.settings import settings
+from src.common.utils import JsonFormatter
+from src.config.settings import LOG_DATE_FORMAT, LOG_JSON, settings
 
 
 def setup_logging():
-    logging.basicConfig(
-        format='%(asctime)s %(levelname)-8s %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S',
-        level=settings.log_level,
-    )
+    if settings.log_format == LOG_JSON:
+        formatter = JsonFormatter('%(timestamp)s %(level)s %(name)s %(message)s')
+        logHandler = logging.StreamHandler()
+        logHandler.setFormatter(formatter)
+        logging.basicConfig(
+            level=settings.log_level,
+            handlers=[logHandler],
+        )
+    else:
+        logging.basicConfig(
+            format='%(asctime)s %(levelname)-8s %(message)s',
+            datefmt=LOG_DATE_FORMAT,
+            level=settings.log_level,
+        )
     if not settings.verbose:
         logging.getLogger('sw_utils.execution').setLevel(logging.ERROR)
         logging.getLogger('sw_utils.consensus').setLevel(logging.ERROR)

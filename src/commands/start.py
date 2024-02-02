@@ -12,7 +12,7 @@ from src.common.execution import WalletTask
 from src.common.logging import setup_logging
 from src.common.metrics import MetricsTask, metrics_server
 from src.common.startup_check import startup_checks
-from src.common.utils import JsonFormatter, get_build_version, log_verbose
+from src.common.utils import get_build_version, log_verbose
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
 from src.config.settings import (
@@ -20,9 +20,7 @@ from src.config.settings import (
     DEFAULT_MAX_FEE_PER_GAS_GWEI,
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
-    LOG_DATE_FORMAT,
     LOG_FORMATS,
-    LOG_JSON,
     LOG_PLAIN,
     settings,
 )
