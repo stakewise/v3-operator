@@ -13,6 +13,7 @@ from sw_utils.typings import ConsensusFork
 from web3 import Web3
 
 from src.common.clients import consensus_client
+from src.common.logging import setup_logging
 from src.common.utils import format_error, log_verbose
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
@@ -138,6 +139,7 @@ def validators_exit(
 
 
 async def main(count: int | None) -> None:
+    setup_logging()
     keystores = load_keystores()
     remote_signer_config = None
 
