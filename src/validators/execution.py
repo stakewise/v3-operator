@@ -144,12 +144,10 @@ async def get_withdrawable_assets() -> tuple[Wei, HexStr | None]:
 
     before_update_validators = before_update_assets // DEPOSIT_AMOUNT
     after_update_validators = after_update_assets // DEPOSIT_AMOUNT
-    if before_update_validators != after_update_validators or await keeper_contract.can_harvest(
-        vault_contract.contract_address
-    ):
+    if before_update_validators != after_update_validators:
         return Wei(after_update_assets), update_state_call
 
-    return Wei(before_update_assets), None
+    return Wei(before_update_assets), update_state_call
 
 
 async def check_deposit_data_root(deposit_data_root: str) -> None:
