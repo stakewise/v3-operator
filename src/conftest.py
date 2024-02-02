@@ -11,16 +11,17 @@ from click.testing import CliRunner
 from Cryptodome.Protocol.KDF import scrypt as raw_scrypt
 from eth_typing import HexAddress, HexStr
 from sw_utils.tests import faker
+from sw_utils.tests.factories import create_protocol_config
+from sw_utils.typings import Oracle, ProtocolConfig
 
 from src.commands.create_keys import create_keys
 from src.commands.create_wallet import create_wallet
 from src.commands.remote_signer_setup import remote_signer_setup
 from src.common.credentials import CredentialManager, ScryptKeystore
-from src.common.typings import Oracles
 from src.common.vault_config import VaultConfig
 from src.config.networks import HOLESKY
 from src.config.settings import settings
-from src.test_fixtures.hashi_vault import hashi_vault_url, mocked_hashi_vault
+from src.test_fixtures.hashi_vault import hashi_vault_url, mocked_hashi_vault  # noqa
 from src.test_fixtures.remote_signer import mocked_remote_signer, remote_signer_url
 from src.validators.keystores.remote import RemoteSignerKeystore
 from src.validators.signing.tests.oracle_functions import OracleCommittee
@@ -156,11 +157,13 @@ def _remote_signer_setup(
     remote_signer_url: str,
     execution_endpoints: str,
     runner: CliRunner,
-    mocked_oracles: Oracles,
+    mocked_protocol_config: ProtocolConfig,
     mocked_remote_signer,
     _create_keys,
 ) -> None:
-    with mock.patch('src.commands.remote_signer_setup.get_oracles', return_value=mocked_oracles):
+    with mock.patch(
+        'src.commands.remote_signer_setup.get_protocol_config', return_value=mocked_protocol_config
+    ):
         result = runner.invoke(
             remote_signer_setup,
             [
@@ -250,24 +253,20 @@ def _mocked_oracle_committee(request: SubRequest) -> OracleCommittee:
 
 
 @pytest.fixture
-def mocked_oracles(
+def mocked_protocol_config(
     _mocked_oracle_committee: OracleCommittee,
-) -> Oracles:
+) -> ProtocolConfig:
     exit_signature_recover_threshold = _mocked_oracle_committee.exit_signature_recover_threshold
-
-    return Oracles(
-        rewards_threshold=1,
-        validators_threshold=1,
+    oracles = []
+    for index, pub_key in enumerate(_mocked_oracle_committee.oracle_pubkeys):
+        oracle = Oracle(
+            public_key=HexStr(pub_key.format(compressed=False)[1:].hex()),
+            endpoints=[f'http://oracle-endpoint-{index}'],
+        )
+        oracles.append(oracle)
+    return create_protocol_config(
+        oracles=oracles,
         exit_signature_recover_threshold=exit_signature_recover_threshold,
-        # Strip first byte (04 prefix) from pubkey
-        public_keys=[
-            HexStr(pubkey.format(compressed=False)[1:].hex())
-            for pubkey in _mocked_oracle_committee.oracle_pubkeys
-        ],
-        endpoints=[
-            [f'http://oracle-endpoint-{i}']
-            for i in range(len(_mocked_oracle_committee.oracle_pubkeys))
-        ],
         validators_approval_batch_limit=1,
         validators_exit_rotation_batch_limit=2,
         signature_validity_period=60,

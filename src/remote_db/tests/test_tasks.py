@@ -10,9 +10,9 @@ import pytest
 from click.testing import CliRunner
 from eth_typing import ChecksumAddress, HexAddress
 from py_ecc.bls import G2ProofOfPossession
+from sw_utils.typings import ProtocolConfig
 from web3 import Web3
 
-from src.common.typings import Oracles
 from src.remote_db.commands import remote_db_group
 from src.remote_db.database import ConfigsCrud, KeyPairsCrud
 from src.remote_db.tasks import _encrypt_private_key, _get_key_indexes
@@ -42,16 +42,16 @@ def _patch_check_deposit_data_root() -> Generator:
 
 
 @pytest.fixture
-def _patch_get_oracles(mocked_oracles: Oracles) -> Generator:
-    with mock.patch('src.remote_db.tasks.get_oracles', return_value=mocked_oracles):
+def _patch_protocol_config(mocked_protocol_config: ProtocolConfig) -> Generator:
+    with mock.patch('src.remote_db.tasks.get_protocol_config', return_value=mocked_protocol_config):
         yield
 
 
 def _get_remote_db_keypairs(
-    mocked_oracles: Oracles, encryption_key: bytes, vault_address: HexAddress
+    mocked_protocol_config: ProtocolConfig, encryption_key: bytes, vault_address: HexAddress
 ) -> list[RemoteDatabaseKeyPair]:
-    oracles = mocked_oracles
-    total_oracles = len(oracles.public_keys)
+    protocol_config = mocked_protocol_config
+    total_oracles = len(protocol_config.oracles)
     keystores = {}
     for _ in range(3):
         seed = randbits(256).to_bytes(32, 'big')
@@ -73,7 +73,7 @@ def _get_remote_db_keypairs(
         # calculate shares for keystore private key
         private_key_shares = private_key_to_private_key_shares(
             private_key=private_key,
-            threshold=oracles.exit_signature_recover_threshold,
+            threshold=protocol_config.exit_signature_recover_threshold,
             total=total_oracles,
         )
 
@@ -197,7 +197,7 @@ class TestRemoteDbSetup:
 
 
 @pytest.mark.usefixtures(
-    '_patch_get_oracles',
+    '_patch_protocol_config',
     '_patch_check_db_connection',
     '_patch_get_db_connection',
     '_patch_check_deposit_data_root',
@@ -208,7 +208,7 @@ class TestRemoteDbUploadKeypairs:
         self,
         data_dir: Path,
         vault_address: HexAddress,
-        mocked_oracles: Oracles,
+        mocked_protocol_config: ProtocolConfig,
         runner: CliRunner,
         execution_endpoints: str,
     ):
@@ -238,7 +238,7 @@ class TestRemoteDbUploadKeypairs:
 
 
 @pytest.mark.usefixtures(
-    '_patch_get_oracles',
+    '_patch_protocol_config',
     '_patch_check_db_connection',
     '_patch_get_db_connection',
 )
@@ -248,7 +248,7 @@ class TestRemoteDbSetupWeb3Signer:
         self,
         data_dir: Path,
         vault_address: HexAddress,
-        mocked_oracles: Oracles,
+        mocked_protocol_config: ProtocolConfig,
         runner: CliRunner,
         execution_endpoints: str,
     ):
@@ -269,7 +269,7 @@ class TestRemoteDbSetupWeb3Signer:
             encryption_key,
         ]
         keypairs = _get_remote_db_keypairs(
-            mocked_oracles, base64.b64decode(encryption_key), vault_address
+            mocked_protocol_config, base64.b64decode(encryption_key), vault_address
         )
 
         with runner.isolated_filesystem(), mock.patch.object(
@@ -285,7 +285,7 @@ class TestRemoteDbSetupWeb3Signer:
 
 
 @pytest.mark.usefixtures(
-    '_patch_get_oracles',
+    '_patch_protocol_config',
     '_patch_check_db_connection',
     '_patch_get_db_connection',
 )
@@ -295,7 +295,7 @@ class TestRemoteDbSetupValidator:
         self,
         data_dir: Path,
         vault_address: HexAddress,
-        mocked_oracles: Oracles,
+        mocked_protocol_config: ProtocolConfig,
         runner: CliRunner,
     ):
         db_url = 'postgresql://user:password@localhost:5432/dbname'
@@ -321,7 +321,7 @@ class TestRemoteDbSetupValidator:
             vault_address,
         ]
         keypairs = _get_remote_db_keypairs(
-            mocked_oracles, base64.b64decode(encryption_key), vault_address
+            mocked_protocol_config, base64.b64decode(encryption_key), vault_address
         )
 
         with runner.isolated_filesystem(), mock.patch.object(
@@ -346,7 +346,7 @@ class TestRemoteDbSetupValidator:
 
 
 @pytest.mark.usefixtures(
-    '_patch_get_oracles',
+    '_patch_protocol_config',
     '_patch_check_db_connection',
     '_patch_get_db_connection',
 )
@@ -356,7 +356,7 @@ class TestRemoteDbSetupOperator:
         self,
         data_dir: Path,
         vault_address: HexAddress,
-        mocked_oracles: Oracles,
+        mocked_protocol_config: ProtocolConfig,
         runner: CliRunner,
     ):
         db_url = 'postgresql://user:password@localhost:5432/dbname'
@@ -374,7 +374,7 @@ class TestRemoteDbSetupOperator:
             './operator',
         ]
         keypairs = _get_remote_db_keypairs(
-            mocked_oracles, base64.b64decode(encryption_key), vault_address
+            mocked_protocol_config, base64.b64decode(encryption_key), vault_address
         )
         remote_config: dict[str, list[str]] = defaultdict(list)
         for keypair in keypairs:

@@ -4,6 +4,7 @@ from typing import cast
 
 import click
 from eth_typing import BlockNumber
+from sw_utils import ProtocolConfig, build_protocol_config
 from web3 import Web3
 from web3.exceptions import BadFunctionCallOutput, MethodUnavailable
 from web3.types import BlockIdentifier, Wei
@@ -12,7 +13,7 @@ from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.contracts import keeper_contract, multicall_contract, vault_contract
 from src.common.metrics import metrics
 from src.common.tasks import BaseTask
-from src.common.typings import Oracles, OraclesCache
+from src.common.typings import OraclesCache
 from src.common.wallet import hot_wallet
 from src.config.settings import settings
 
@@ -100,53 +101,17 @@ async def update_oracles_cache() -> None:
     )
 
 
-async def get_oracles() -> Oracles:
+async def get_protocol_config() -> ProtocolConfig:
     await update_oracles_cache()
 
     oracles_cache = cast(OraclesCache, _oracles_cache)
-
-    config = oracles_cache.config
-    rewards_threshold = oracles_cache.rewards_threshold
-    validators_threshold = oracles_cache.validators_threshold
-
-    endpoints = []
-    public_keys = []
-    for oracle in config['oracles']:
-        endpoints.append(oracle['endpoints'])
-        public_keys.append(oracle['public_key'])
-
-    if not 1 <= rewards_threshold <= len(config['oracles']):
-        raise ValueError('Invalid rewards threshold')
-
-    if not 1 <= validators_threshold <= len(config['oracles']):
-        raise ValueError('Invalid validators threshold')
-
-    exit_signature_recover_threshold = config['exit_signature_recover_threshold']
-
-    if exit_signature_recover_threshold > validators_threshold:
-        raise ValueError('Invalid exit signature threshold')
-
-    signature_validity_period = config['signature_validity_period']
-
-    if signature_validity_period < 0:
-        raise ValueError('Invalid signature validity period')
-
-    if len(public_keys) != len(set(public_keys)):
-        raise ValueError('Duplicate public keys in oracles config')
-
-    validators_approval_batch_limit = config['validators_approval_batch_limit']
-    validators_exit_rotation_batch_limit = config['validators_exit_rotation_batch_limit']
-
-    return Oracles(
-        rewards_threshold=rewards_threshold,
-        validators_threshold=validators_threshold,
-        exit_signature_recover_threshold=exit_signature_recover_threshold,
-        signature_validity_period=signature_validity_period,
-        public_keys=public_keys,
-        endpoints=endpoints,
-        validators_approval_batch_limit=validators_approval_batch_limit,
-        validators_exit_rotation_batch_limit=validators_exit_rotation_batch_limit,
+    pc = await build_protocol_config(
+        config_data=oracles_cache.config,
+        rewards_threshold=oracles_cache.rewards_threshold,
+        validators_threshold=oracles_cache.validators_threshold,
     )
+    pc.rewards_threshold = cast(int, pc.rewards_threshold)
+    return pc
 
 
 async def check_gas_price() -> bool:

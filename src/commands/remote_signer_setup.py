@@ -12,7 +12,7 @@ from eth_typing import BLSPrivateKey, HexAddress
 from web3 import Web3
 
 from src.common.credentials import Credential
-from src.common.execution import get_oracles
+from src.common.execution import get_protocol_config
 from src.common.password import get_or_create_password_file
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_address
@@ -130,7 +130,7 @@ async def main(remove_existing_keys: bool) -> None:
         if resp.status != 200:
             raise RuntimeError(f'Failed to connect to remote signer, returned {await resp.text()}')
 
-    oracles = await get_oracles()
+    protocol_config = await get_protocol_config()
 
     try:
         remote_signer_keystore = RemoteSignerKeystore.load_from_file(
@@ -143,8 +143,8 @@ async def main(remove_existing_keys: bool) -> None:
     for pubkey, private_key in keystores.keys.items():  # pylint: disable=no-member
         private_key_shares = private_key_to_private_key_shares(
             private_key=private_key,
-            threshold=oracles.exit_signature_recover_threshold,
-            total=len(oracles.public_keys),
+            threshold=protocol_config.exit_signature_recover_threshold,
+            total=len(protocol_config.oracles),
         )
 
         for idx, private_key_share in enumerate(private_key_shares):

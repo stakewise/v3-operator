@@ -9,12 +9,12 @@ from aiohttp import ClientError, ClientSession, ClientTimeout
 from eth_typing import ChecksumAddress, HexAddress
 from eth_utils import add_0x_prefix
 from multiproof import StandardMerkleTree
-from sw_utils import get_eth1_withdrawal_credentials
+from sw_utils import ProtocolConfig, get_eth1_withdrawal_credentials
 from sw_utils.decorators import retry_aiohttp_errors
 from web3 import Web3
 
 from src.common.contracts import validators_registry_contract
-from src.common.typings import OracleApproval, Oracles, OraclesApproval
+from src.common.typings import OracleApproval, OraclesApproval
 from src.common.utils import format_error, process_oracles_approvals, warning_verbose
 from src.config.settings import DEFAULT_RETRY_TIME, ORACLES_VALIDATORS_TIMEOUT
 from src.validators.database import NetworkValidatorCrud
@@ -29,10 +29,12 @@ from src.validators.typings import ApprovalRequest, DepositData, Validator
 logger = logging.getLogger(__name__)
 
 
-async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> OraclesApproval:
+async def send_approval_requests(
+    protocol_config: ProtocolConfig, request: ApprovalRequest
+) -> OraclesApproval:
     """Requests approval from all oracles."""
     payload = dataclasses.asdict(request)
-    endpoints = list(zip(oracles.addresses, oracles.endpoints))
+    endpoints = [(oracle.address, oracle.endpoints) for oracle in protocol_config.oracles]
 
     async with ClientSession(timeout=ClientTimeout(ORACLES_VALIDATORS_TIMEOUT)) as session:
         results = await asyncio.gather(
@@ -48,7 +50,7 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
     approvals: dict[ChecksumAddress, OracleApproval] = {}
     failed_endpoints: list[str] = []
 
-    for address, replicas, result in zip(oracles.addresses, oracles.endpoints, results):
+    for (address, replicas), result in zip(endpoints, results):
         if isinstance(result, Exception):
             warning_verbose(
                 'All endpoints for oracle %s failed to sign validators approval request. '
@@ -67,7 +69,7 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
         request.deadline,
         request.validator_index,
         len(approvals),
-        len(oracles.endpoints),
+        len(protocol_config.oracles),
     )
 
     if failed_endpoints:
@@ -75,7 +77,7 @@ async def send_approval_requests(oracles: Oracles, request: ApprovalRequest) -> 
             'The oracles with endpoints %s have failed to respond.', ', '.join(failed_endpoints)
         )
 
-    return process_oracles_approvals(approvals, oracles.validators_threshold)
+    return process_oracles_approvals(approvals, protocol_config.validators_threshold)
 
 
 # pylint: disable=duplicate-code

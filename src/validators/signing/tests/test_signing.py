@@ -2,10 +2,9 @@ from typing import Callable
 
 import pytest
 from eth_typing.bls import BLSPubkey
-from sw_utils.typings import ConsensusFork
+from sw_utils.typings import ConsensusFork, ProtocolConfig
 from web3 import Web3
 
-from src.common.typings import Oracles
 from src.config.settings import settings
 from src.validators.keystores.hashi_vault import (
     HashiVaultConfiguration,
@@ -60,7 +59,7 @@ class TestSigning:
         self,
         create_validator_keypair: Callable,
         fork: ConsensusFork,
-        mocked_oracles: Oracles,
+        mocked_protocol_config: ProtocolConfig,
         _mocked_oracle_committee: OracleCommittee,
     ):
         validator_privkey, validator_pubkey = create_validator_keypair()
@@ -71,7 +70,7 @@ class TestSigning:
         ).get_exit_signature_shards(
             validator_index=validator_index,
             public_key=validator_pubkey,
-            oracles=mocked_oracles,
+            protocol_config=mocked_protocol_config,
             fork=fork,
         )
 
@@ -97,7 +96,7 @@ class TestSigning:
         create_validator_keypair: Callable,
         fork: ConsensusFork,
         remote_signer_url: str,
-        mocked_oracles: Oracles,
+        mocked_protocol_config: ProtocolConfig,
         remote_signer_keystore: RemoteSignerKeystore,
         _mocked_oracle_committee: OracleCommittee,
     ):
@@ -112,7 +111,7 @@ class TestSigning:
             shards = await remote_signer_keystore.get_exit_signature_shards(
                 validator_index=validator_index,
                 public_key=pubkey,
-                oracles=mocked_oracles,
+                protocol_config=mocked_protocol_config,
                 fork=fork,
             )
 
@@ -129,7 +128,7 @@ class TestSigning:
         self,
         create_validator_keypair: Callable,
         fork: ConsensusFork,
-        mocked_oracles: Oracles,
+        mocked_protocol_config: ProtocolConfig,
         remote_signer_url: str,
         fake_settings: None,
     ):
@@ -143,7 +142,7 @@ class TestSigning:
             _ = await RemoteSignerKeystore({}).get_exit_signature_shards(
                 validator_index=validator_index,
                 public_key=bls_pubkey,
-                oracles=mocked_oracles,
+                protocol_config=mocked_protocol_config,
                 fork=fork,
             )
 

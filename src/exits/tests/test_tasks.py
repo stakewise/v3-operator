@@ -5,9 +5,8 @@ from unittest import mock
 
 import pytest
 from eth_typing import ChecksumAddress
-from sw_utils.typings import ConsensusFork
+from sw_utils.typings import ConsensusFork, ProtocolConfig
 
-from src.common.typings import Oracles
 from src.common.utils import get_current_timestamp
 from src.config.settings import settings
 from src.exits.tasks import _get_oracles_request
@@ -20,13 +19,13 @@ from src.validators.typings import ExitSignatureShards
 class TestGetOraclesRequest:
     async def test_local_keystores(
         self,
-        mocked_oracles: Oracles,
+        mocked_protocol_config: ProtocolConfig,
         vault_address: ChecksumAddress,
         create_validator_keypair: Callable,
     ):
-        oracles = mocked_oracles
+        protocol_config = mocked_protocol_config
         test_validator_privkey, test_validator_pubkey = create_validator_keypair()
-        deadline = get_current_timestamp() + oracles.signature_validity_period
+        deadline = get_current_timestamp() + protocol_config.signature_validity_period
         with (
             mock.patch(
                 'sw_utils.consensus.ExtendedAsyncBeacon.get_consensus_fork',
@@ -37,7 +36,7 @@ class TestGetOraclesRequest:
             ),
         ):
             request = await _get_oracles_request(
-                oracles=oracles,
+                protocol_config=protocol_config,
                 keystore=LocalKeystore(Keys({test_validator_pubkey: test_validator_privkey})),
                 validators={123: test_validator_pubkey},
             )
@@ -49,13 +48,13 @@ class TestGetOraclesRequest:
         self,
         vault_dir: Path,
         vault_address: ChecksumAddress,
-        mocked_oracles: Oracles,
+        mocked_protocol_config: ProtocolConfig,
         remote_signer_keystore: RemoteSignerKeystore,
         remote_signer_url: str,
     ):
-        oracles = mocked_oracles
+        protocol_config = mocked_protocol_config
         settings.remote_signer_url = remote_signer_url
-        deadline = get_current_timestamp() + oracles.signature_validity_period
+        deadline = get_current_timestamp() + protocol_config.signature_validity_period
 
         with (
             mock.patch(
@@ -78,7 +77,7 @@ class TestGetOraclesRequest:
                 for pubkey in remote_signer_keystore.pubkeys_to_shares.keys()
             }
             request = await _get_oracles_request(
-                oracles=oracles,
+                protocol_config=protocol_config,
                 keystore=remote_signer_keystore,
                 validators=validators,
             )
@@ -86,6 +85,6 @@ class TestGetOraclesRequest:
             assert request.vault_address == vault_address
             assert (
                 request.public_keys
-                == list(validators.values())[: oracles.validators_exit_rotation_batch_limit]
+                == list(validators.values())[: protocol_config.validators_exit_rotation_batch_limit]
             )
             assert request.deadline == deadline

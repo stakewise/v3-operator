@@ -4,17 +4,16 @@ import time
 
 from multiproof.standard import MultiProof
 from sw_utils import EventScanner, IpfsFetchClient
-from sw_utils.typings import Bytes32
+from sw_utils.typings import Bytes32, ProtocolConfig
 from web3 import Web3
 from web3.types import BlockNumber, Wei
 
 from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import v2_pool_escrow_contract, validators_registry_contract
 from src.common.exceptions import NotEnoughOracleApprovalsError
-from src.common.execution import check_gas_price, get_oracles
+from src.common.execution import check_gas_price, get_protocol_config
 from src.common.metrics import metrics
 from src.common.tasks import BaseTask
-from src.common.typings import Oracles
 from src.common.utils import MGNO_RATE, WAD, get_current_timestamp
 from src.config.networks import GNOSIS
 from src.config.settings import DEPOSIT_AMOUNT, settings
@@ -100,10 +99,10 @@ async def register_validators(
         # not enough balance to register validators
         return
 
-    # get latest oracles
-    oracles = await get_oracles()
+    # get latest config
+    protocol_config = await get_protocol_config()
 
-    validators_count = min(oracles.validators_approval_batch_limit, validators_count)
+    validators_count = min(protocol_config.validators_approval_batch_limit, validators_count)
 
     if not await check_gas_price():
         return
@@ -129,7 +128,7 @@ async def register_validators(
     )
     registry_root = None
     oracles_request = None
-    deadline = get_current_timestamp() + oracles.signature_validity_period
+    deadline = get_current_timestamp() + protocol_config.signature_validity_period
     approvals_min_interval = 1
 
     while True:
@@ -143,11 +142,11 @@ async def register_validators(
             or deadline <= current_timestamp
         ):
             registry_root = latest_registry_root
-            deadline = current_timestamp + oracles.signature_validity_period
+            deadline = current_timestamp + protocol_config.signature_validity_period
             logger.debug('Fetched latest validators registry root: %s', registry_root)
 
             oracles_request = await create_approval_request(
-                oracles=oracles,
+                protocol_config=protocol_config,
                 keystore=keystore,
                 validators=validators,
                 registry_root=registry_root,
@@ -156,7 +155,7 @@ async def register_validators(
             )
 
         try:
-            oracles_approval = await send_approval_requests(oracles, oracles_request)
+            oracles_approval = await send_approval_requests(protocol_config, oracles_request)
             break
         except NotEnoughOracleApprovalsError as e:
             logger.error(
@@ -203,7 +202,7 @@ async def register_validators(
 
 # pylint: disable-next=too-many-arguments
 async def create_approval_request(
-    oracles: Oracles,
+    protocol_config: ProtocolConfig,
     keystore: BaseKeystore,
     validators: list[Validator],
     registry_root: Bytes32,
@@ -235,7 +234,7 @@ async def create_approval_request(
         shards = await keystore.get_exit_signature_shards(
             validator_index=validator_index,
             public_key=validator.public_key,
-            oracles=oracles,
+            protocol_config=protocol_config,
             fork=settings.network_config.SHAPELLA_FORK,
         )
 
@@ -264,7 +263,7 @@ async def load_genesis_validators() -> None:
         return
 
     ipfs_fetch_client = IpfsFetchClient(
-        endpoints=settings.ipfs_fetch_endpoints,
+        ipfs_endpoints=settings.ipfs_fetch_endpoints,
         timeout=settings.genesis_validators_ipfs_timeout,
         retry_timeout=settings.genesis_validators_ipfs_retry_timeout,
     )

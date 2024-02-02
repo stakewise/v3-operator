@@ -10,10 +10,9 @@ import milagro_bls_binding as bls
 from eth_typing import BLSSignature, HexStr
 from staking_deposit.key_handling.keystore import ScryptKeystore
 from sw_utils.signing import get_exit_message_signing_root
-from sw_utils.typings import ConsensusFork
+from sw_utils.typings import ConsensusFork, ProtocolConfig
 from web3 import Web3
 
-from src.common.typings import Oracles
 from src.config.settings import NETWORKS, settings
 from src.validators.exceptions import KeystoreException
 from src.validators.keystores.base import BaseKeystore
@@ -80,9 +79,14 @@ class LocalKeystore(BaseKeystore):
         return len(self.keys)
 
     async def get_exit_signature_shards(
-        self, validator_index: int, public_key: HexStr, oracles: Oracles, fork: ConsensusFork
+        self,
+        validator_index: int,
+        public_key: HexStr,
+        protocol_config: ProtocolConfig,
+        fork: ConsensusFork,
     ) -> ExitSignatureShards:
         """Generates exit signature shards and encrypts them with oracles' public keys."""
+        oracle_public_keys = [oracle.public_key for oracle in protocol_config.oracles]
         message = get_exit_message_signing_root(
             validator_index=validator_index,
             genesis_validators_root=settings.network_config.GENESIS_VALIDATORS_ROOT,
@@ -91,11 +95,11 @@ class LocalKeystore(BaseKeystore):
 
         private_key_shares = private_key_to_private_key_shares(
             private_key=self.keys[public_key],
-            threshold=oracles.exit_signature_recover_threshold,
-            total=len(oracles.public_keys),
+            threshold=protocol_config.exit_signature_recover_threshold,
+            total=len(oracle_public_keys),
         )
         exit_signature_shards: list[HexStr] = []
-        for bls_priv_key, oracle_pubkey in zip(private_key_shares, oracles.public_keys):
+        for bls_priv_key, oracle_pubkey in zip(private_key_shares, oracle_public_keys):
             exit_signature_shards.append(
                 encrypt_signature(oracle_pubkey, bls.Sign(bls_priv_key, message))
             )

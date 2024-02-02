@@ -7,10 +7,10 @@ import aiohttp
 import pytest
 from click.testing import CliRunner
 from eth_typing import HexAddress
+from sw_utils import ProtocolConfig
 
 from src.commands.create_keys import create_keys
 from src.commands.remote_signer_setup import remote_signer_setup
-from src.common.typings import Oracles
 from src.common.vault_config import VaultConfig
 from src.config.networks import HOLESKY
 from src.config.settings import settings
@@ -19,12 +19,14 @@ from src.validators.signing.tests.oracle_functions import OracleCommittee
 
 
 @pytest.fixture
-def _patch_get_oracles(mocked_oracles: Oracles) -> Generator:
-    with mock.patch('src.commands.remote_signer_setup.get_oracles', return_value=mocked_oracles):
+def _patch_get_protocol_config(mocked_protocol_config: ProtocolConfig) -> Generator:
+    with mock.patch(
+        'src.commands.remote_signer_setup.get_protocol_config', return_value=mocked_protocol_config
+    ):
         yield
 
 
-@pytest.mark.usefixtures('_patch_get_oracles')
+@pytest.mark.usefixtures('_patch_get_protocol_config')
 class TestOperatorRemoteSignerSetup:
     @pytest.mark.usefixtures('_init_vault')
     def test_invalid_input(
@@ -172,7 +174,7 @@ class TestOperatorRemoteSignerSetup:
         execution_endpoints: str,
         test_mnemonic: str,
         runner: CliRunner,
-        mocked_oracles: Oracles,
+        mocked_protocol_config: ProtocolConfig,
         _mocked_oracle_committee: OracleCommittee,
     ):
         """
@@ -186,8 +188,11 @@ class TestOperatorRemoteSignerSetup:
         prev_oracle_count = len(_mocked_oracle_committee.oracle_pubkeys)
 
         # We remove 1 oracle and run the `remote-signer-setup` command again.
-        mocked_oracles.public_keys.pop()
-        assert len(mocked_oracles.public_keys) >= mocked_oracles.exit_signature_recover_threshold
+        mocked_protocol_config.oracles.pop()
+        assert (
+            len(mocked_protocol_config.oracles)
+            >= mocked_protocol_config.exit_signature_recover_threshold
+        )
 
         # We also need to reset the mnemonic_next_index value so the keys are generated from
         # the 0th index again.
@@ -217,7 +222,8 @@ class TestOperatorRemoteSignerSetup:
         # Run the remote-signer-setup command - it should generate and import
         # a lower amount of key shares - there are fewer oracles now
         with mock.patch(
-            'src.commands.remote_signer_setup.get_oracles', return_value=mocked_oracles
+            'src.commands.remote_signer_setup.get_protocol_config',
+            return_value=mocked_protocol_config,
         ):
             args = [
                 '--vault',

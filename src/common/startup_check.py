@@ -11,7 +11,7 @@ from src.common.clients import db_client
 from src.common.execution import (
     check_hot_wallet_balance,
     check_vault_address,
-    get_oracles,
+    get_protocol_config,
 )
 from src.common.utils import format_error, warning_verbose
 from src.common.wallet import hot_wallet
@@ -108,7 +108,8 @@ async def wait_for_execution_node() -> None:
 
 
 async def collect_healthy_oracles() -> list:
-    endpoints = (await get_oracles()).endpoints
+    oracles = (await get_protocol_config()).oracles
+    endpoints = [oracle.endpoints for oracle in oracles]
 
     async with ClientSession(timeout=ClientTimeout(60)) as session:
         results = await asyncio.gather(

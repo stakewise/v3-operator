@@ -8,10 +8,9 @@ import milagro_bls_binding as bls
 from aiohttp import ClientSession, ClientTimeout
 from eth_typing import BLSPubkey, BLSSignature, HexStr
 from sw_utils import get_exit_message_signing_root
-from sw_utils.typings import ConsensusFork
+from sw_utils.typings import ConsensusFork, ProtocolConfig
 from web3 import Web3
 
-from src.common.typings import Oracles
 from src.config.settings import NETWORKS, REMOTE_SIGNER_TIMEOUT, settings
 from src.validators.keystores.base import BaseKeystore
 from src.validators.signing.common import encrypt_signature
@@ -85,9 +84,10 @@ class RemoteSignerKeystore(BaseKeystore):
         self,
         validator_index: int,
         public_key: HexStr,
-        oracles: Oracles,
+        protocol_config: ProtocolConfig,
         fork: ConsensusFork,
     ) -> ExitSignatureShards:
+        oracle_public_keys = [oracle.public_key for oracle in protocol_config.oracles]
         message = get_exit_message_signing_root(
             validator_index=validator_index,
             genesis_validators_root=settings.network_config.GENESIS_VALIDATORS_ROOT,
@@ -101,7 +101,7 @@ class RemoteSignerKeystore(BaseKeystore):
 
         signature_shards = []
         for validator_pubkey_share, oracle_pubkey in zip(
-            validator_pubkey_shares, oracles.public_keys
+            validator_pubkey_shares, oracle_public_keys
         ):
             shard = await self._fetch_signature_shard(
                 pubkey_share=validator_pubkey_share,

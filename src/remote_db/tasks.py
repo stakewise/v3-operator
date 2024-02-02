@@ -10,7 +10,7 @@ from Cryptodome.Random import get_random_bytes
 from eth_typing import ChecksumAddress, HexStr
 from web3 import Web3
 
-from src.common.execution import get_oracles
+from src.common.execution import get_protocol_config
 from src.common.utils import greenify
 from src.config.settings import settings
 from src.remote_db.database import ConfigsCrud, KeyPairsCrud, get_db_connection
@@ -84,7 +84,7 @@ async def upload_keypairs(db_url: str, b64_encrypt_key: str) -> None:
 
     # get oracles for calculating key shares
     click.echo('Fetching oracles config...')
-    oracles = await get_oracles()
+    protocol_config = await get_protocol_config()
 
     # fetch remote signer configuration file
     remote_signer_config_data = ConfigsCrud(db_url=db_url).get_remote_signer_config() or {}
@@ -92,7 +92,7 @@ async def upload_keypairs(db_url: str, b64_encrypt_key: str) -> None:
     existing_pub_keys = set(remote_signer_keystore.public_keys)
     pubkeys_to_shares = remote_signer_keystore.pubkeys_to_shares
     click.echo(f'Calculating and encrypting shares for {len(keystore)} keystores...')
-    total_oracles = len(oracles.public_keys)
+    total_oracles = len(protocol_config.oracles)
     key_records: list[RemoteDatabaseKeyPair] = []
     for public_key, private_key in keystore.keys.items():  # pylint: disable=no-member
         encrypted_priv_key, nonce = _encrypt_private_key(private_key, encryption_key)
@@ -107,7 +107,7 @@ async def upload_keypairs(db_url: str, b64_encrypt_key: str) -> None:
         # calculate shares for keystore private key
         private_key_shares = private_key_to_private_key_shares(
             private_key=private_key,
-            threshold=oracles.exit_signature_recover_threshold,
+            threshold=protocol_config.exit_signature_recover_threshold,
             total=total_oracles,
         )
 

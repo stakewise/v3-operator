@@ -5,18 +5,19 @@ from unittest import mock
 import pytest
 from click.testing import CliRunner
 from eth_typing import HexAddress
-from sw_utils.typings import ConsensusFork
+from sw_utils.typings import ConsensusFork, ProtocolConfig
 
 from src.commands.validators_exit import validators_exit
-from src.common.typings import Oracles
 from src.config.settings import settings
 from src.validators.keystores.local import LocalKeystore
 from src.validators.keystores.remote import RemoteSignerKeystore
 
 
 @pytest.fixture
-def _patch_get_oracles(mocked_oracles: Oracles) -> Generator:
-    with mock.patch('src.commands.remote_signer_setup.get_oracles', return_value=mocked_oracles):
+def _patch_get_protocol_config(mocked_protocol_config: ProtocolConfig) -> Generator:
+    with mock.patch(
+        'src.commands.remote_signer_setup.get_protocol_config', return_value=mocked_protocol_config
+    ):
         yield
 
 
@@ -42,7 +43,7 @@ def _patch_submit_voluntary_exit() -> Generator:
 
 
 @pytest.mark.usefixtures(
-    '_patch_get_oracles', '_patch_get_consensus_fork', '_patch_submit_voluntary_exit'
+    '_patch_get_protocol_config', '_patch_get_consensus_fork', '_patch_submit_voluntary_exit'
 )
 @pytest.mark.usefixtures('_init_vault', '_create_keys')
 class TestValidatorsExit:
