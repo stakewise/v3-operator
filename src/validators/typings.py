@@ -26,6 +26,10 @@ class DepositData:
     validators: list[Validator]
     tree: StandardMerkleTree
 
+    @property
+    def public_keys(self) -> list[HexStr]:
+        return [v.public_key for v in self.validators]
+
 
 @dataclass
 class ExitSignatureShards:

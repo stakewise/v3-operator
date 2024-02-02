@@ -1,8 +1,6 @@
 import dataclasses
-import json
 import logging
 from dataclasses import dataclass
-from pathlib import Path
 
 import milagro_bls_binding as bls
 from aiohttp import ClientSession, ClientTimeout
@@ -18,6 +16,7 @@ from src.validators.keystores.base import BaseKeystore
 from src.validators.signing.common import encrypt_signature
 from src.validators.signing.key_shares import bls_signature_and_public_key_to_shares
 from src.validators.typings import ExitSignatureShards
+from src.validators.utils import load_deposit_data
 
 logger = logging.getLogger(__name__)
 
@@ -50,37 +49,26 @@ class VoluntaryExitRequestModel:
 
 
 class RemoteSignerKeystore(BaseKeystore):
-    pubkeys_to_shares: dict[HexStr, list[HexStr]]
+    def __init__(self, public_keys: list[HexStr]):
+        self._public_keys = public_keys
 
-    def __init__(self, pubkeys_to_shares: dict[HexStr, list[HexStr]]):
-        self.pubkeys_to_shares = pubkeys_to_shares
+    @staticmethod
+    async def load() -> 'BaseKeystore':
+        deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
+        return RemoteSignerKeystore(deposit_data.public_keys)
 
     def __bool__(self) -> bool:
-        return len(self.pubkeys_to_shares) > 0
+        return bool(self._public_keys)
 
     def __len__(self) -> int:
-        return len(self.pubkeys_to_shares)
+        return len(self._public_keys)
 
     def __contains__(self, public_key):
-        return public_key in self.pubkeys_to_shares
+        return public_key in self._public_keys
 
-    @classmethod
-    def load_from_data(cls, data: dict) -> 'RemoteSignerKeystore':
-        return cls._load_data(data)
-
-    @classmethod
-    def load_from_file(cls, path: str | Path) -> 'RemoteSignerKeystore':
-        with open(path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        return cls._load_data(data['pubkeys_to_shares'])
-
-    @classmethod
-    async def load(cls) -> 'RemoteSignerKeystore':
-        return cls.load_from_file(settings.remote_signer_config_file)
-
-    def save(self, path: str | Path) -> None:
-        with open(path, 'w', encoding='utf-8') as f:
-            json.dump({'pubkeys_to_shares': self.pubkeys_to_shares}, f)
+    @property
+    def public_keys(self) -> list[HexStr]:
+        return self._public_keys
 
     async def get_exit_signature_shards(
         self,
@@ -131,21 +119,6 @@ class RemoteSignerKeystore(BaseKeystore):
 
         bls.Verify(BLSPubkey(Web3.to_bytes(hexstr=public_key)), message, exit_signature)
         return exit_signature
-
-    @property
-    def public_keys(self) -> list[HexStr]:
-        return list(self.pubkeys_to_shares.keys())
-
-    @classmethod
-    def _load_data(cls, data: dict) -> 'RemoteSignerKeystore':
-        pubkeys_to_shares = {}
-        for full_pubkey, pubkey_shares in data.items():
-            pubkeys_to_shares[full_pubkey] = [HexStr(s) for s in pubkey_shares]
-
-        if len(pubkeys_to_shares.keys()) == 0:
-            raise RuntimeError('Remote signer config does not contain any pubkeys')
-
-        return RemoteSignerKeystore(pubkeys_to_shares=pubkeys_to_shares)
 
     async def _sign(
         self,
