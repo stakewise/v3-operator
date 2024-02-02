@@ -12,10 +12,11 @@ from sw_utils.typings import ConsensusFork
 from web3 import Web3
 
 from src.common.typings import Oracles
-from src.config.settings import NETWORKS, REMOTE_SIGNER_TIMEOUT, settings
+from src.config.networks import NETWORKS
+from src.config.settings import REMOTE_SIGNER_TIMEOUT, settings
 from src.validators.keystores.base import BaseKeystore
 from src.validators.signing.common import encrypt_signature
-from src.validators.signing.key_shares import reconstruct_shared_bls_signature
+from src.validators.signing.key_shares import bls_signature_and_public_key_to_shares
 from src.validators.typings import ExitSignatureShards
 
 logger = logging.getLogger(__name__)
@@ -93,29 +94,27 @@ class RemoteSignerKeystore(BaseKeystore):
             genesis_validators_root=settings.network_config.GENESIS_VALIDATORS_ROOT,
             fork=fork,
         )
-        pubkey_shares = self.pubkeys_to_shares.get(public_key)
-        if not pubkey_shares:
-            raise RuntimeError(f'Failed to get signature for {public_key}.')
 
-        validator_pubkey_shares = [BLSPubkey(Web3.to_bytes(hexstr=s)) for s in pubkey_shares]
+        public_key_bytes = BLSPubkey(Web3.to_bytes(hexstr=public_key))
+        threshold = oracles.exit_signature_recover_threshold
+        total = len(oracles.public_keys)
 
-        signature_shards = []
-        for validator_pubkey_share, oracle_pubkey in zip(
-            validator_pubkey_shares, oracles.public_keys
-        ):
-            shard = await self._fetch_signature_shard(
-                pubkey_share=validator_pubkey_share,
-                validator_index=validator_index,
-                fork=fork,
-                message=message,
+        exit_signature = await self._sign(public_key_bytes, validator_index, fork, message)
+
+        exit_signature_shares, public_key_shares = bls_signature_and_public_key_to_shares(
+            message, exit_signature, public_key_bytes, threshold, total
+        )
+
+        encrypted_exit_signature_shares: list[HexStr] = []
+
+        for exit_signature_share, oracle_pubkey in zip(exit_signature_shares, oracles.public_keys):
+            encrypted_exit_signature_shares.append(
+                encrypt_signature(oracle_pubkey, exit_signature_share)
             )
 
-            # Encrypt it with the oracle's pubkey
-            signature_shards.append(encrypt_signature(oracle_pubkey, shard))
-
         return ExitSignatureShards(
-            public_keys=[Web3.to_hex(pubkey) for pubkey in validator_pubkey_shares],
-            exit_signatures=signature_shards,
+            public_keys=[Web3.to_hex(p) for p in public_key_shares],
+            exit_signatures=encrypted_exit_signature_shares,
         )
 
     async def get_exit_signature(
@@ -126,19 +125,10 @@ class RemoteSignerKeystore(BaseKeystore):
             genesis_validators_root=NETWORKS[network].GENESIS_VALIDATORS_ROOT,
             fork=fork,
         )
-        signature_shards = []
-        for pubkey_share in self.pubkeys_to_shares[public_key]:
-            signature_shards.append(
-                await self._fetch_signature_shard(
-                    pubkey_share=BLSPubkey(Web3.to_bytes(hexstr=pubkey_share)),
-                    validator_index=validator_index,
-                    fork=fork,
-                    message=message,
-                )
-            )
-        exit_signature = reconstruct_shared_bls_signature(
-            signatures=dict(enumerate(signature_shards))
-        )
+        public_key_bytes = BLSPubkey(Web3.to_bytes(hexstr=public_key))
+
+        exit_signature = await self._sign(public_key_bytes, validator_index, fork, message)
+
         bls.Verify(BLSPubkey(Web3.to_bytes(hexstr=public_key)), message, exit_signature)
         return exit_signature
 
@@ -157,9 +147,9 @@ class RemoteSignerKeystore(BaseKeystore):
 
         return RemoteSignerKeystore(pubkeys_to_shares=pubkeys_to_shares)
 
-    async def _fetch_signature_shard(
+    async def _sign(
         self,
-        pubkey_share: BLSPubkey,
+        public_key: BLSPubkey,
         validator_index: int,
         fork: ConsensusFork,
         message: bytes,
@@ -181,17 +171,15 @@ class RemoteSignerKeystore(BaseKeystore):
         )
 
         async with ClientSession(timeout=ClientTimeout(REMOTE_SIGNER_TIMEOUT)) as session:
-            signer_url = f'{settings.remote_signer_url}/api/v1/eth2/sign/0x{pubkey_share.hex()}'
+            signer_url = f'{settings.remote_signer_url}/api/v1/eth2/sign/0x{public_key.hex()}'
 
             response = await session.post(signer_url, json=dataclasses.asdict(data))
 
             if response.status == 404:
                 # Pubkey not present on remote signer side
                 raise RuntimeError(
-                    f'Failed to get signature for {pubkey_share.hex()}.'
-                    f' Is this keyshare present in the remote signer?'
-                    f' If the oracle set changed, you may need to regenerate'
-                    f' and reimport the new key shares!'
+                    f'Failed to get signature for {public_key.hex()}.'
+                    f' Is this public key present in the remote signer?'
                 )
 
             response.raise_for_status()
