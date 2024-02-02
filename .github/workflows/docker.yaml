@@ -1,6 +1,6 @@
 name: Docker
 
-on: [ push ]
+on: [push]
 
 jobs:
   docker:
@@ -16,7 +16,7 @@ jobs:
           images: |
             europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator
           flavor: |
-            latest=false
+            latest=auto
           tags: |
             type=ref,event=branch
             type=ref,event=tag
@@ -50,9 +50,9 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:sha-${{ steps.commit-hash.outputs.short }}'
-          format: 'table'
-          exit-code: '1'
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
+          image-ref: "europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:sha-${{ steps.commit-hash.outputs.short }}"
+          format: "table"
+          exit-code: "1"
+          vuln-type: "os,library"
+          severity: "CRITICAL,HIGH"
           ignore-unfixed: true

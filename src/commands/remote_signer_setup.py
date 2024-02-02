@@ -13,6 +13,7 @@ from web3 import Web3
 
 from src.common.credentials import Credential
 from src.common.execution import get_oracles
+from src.common.logging import setup_logging
 from src.common.password import get_or_create_password_file
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_address
@@ -28,6 +29,7 @@ from src.validators.signing.key_shares import private_key_to_private_key_shares
     prompt='Enter your vault address',
     help='Vault address',
     type=str,
+    envvar='VAULT',
     callback=validate_eth_address,
 )
 @click.option(
@@ -118,6 +120,7 @@ def remote_signer_setup(
 
 # pylint: disable-next=too-many-locals
 async def main(remove_existing_keys: bool) -> None:
+    setup_logging()
     keystores = await LocalKeystore.load()
     if len(keystores) == 0:
         raise click.ClickException('Keystores not found.')

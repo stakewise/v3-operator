@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import warnings
 from pathlib import Path
 
 import click
@@ -10,6 +9,7 @@ from sw_utils import EventScanner, InterruptHandler
 import src
 from src.common.consensus import get_chain_finalized_head
 from src.common.execution import WalletTask
+from src.common.logging import setup_logging
 from src.common.metrics import MetricsTask, metrics_server
 from src.common.startup_check import startup_checks
 from src.common.utils import JsonFormatter, get_build_version, log_verbose
@@ -337,28 +337,3 @@ def setup_sentry():
         sentry_sdk.init(settings.sentry_dsn, traces_sample_rate=0.1)
         sentry_sdk.set_tag('network', settings.network)
         sentry_sdk.set_tag('vault', settings.vault)
-
-
-def setup_logging():
-    if settings.log_format == LOG_JSON:
-        formatter = JsonFormatter('%(timestamp)s %(level)s %(name)s %(message)s')
-        logHandler = logging.StreamHandler()
-        logHandler.setFormatter(formatter)
-        logging.basicConfig(
-            level=settings.log_level,
-            handlers=[logHandler],
-        )
-    else:
-        logging.basicConfig(
-            format='%(asctime)s %(levelname)-8s %(message)s',
-            datefmt=LOG_DATE_FORMAT,
-            level=settings.log_level,
-        )
-    if not settings.verbose:
-        logging.getLogger('sw_utils.execution').setLevel(logging.ERROR)
-        logging.getLogger('sw_utils.consensus').setLevel(logging.ERROR)
-        logging.getLogger('sw_utils.ipfs').setLevel(logging.ERROR)
-        logging.getLogger('sw_utils.decorators').setLevel(logging.ERROR)
-
-        # Logging config does not affect messages issued by `warnings` module
-        warnings.simplefilter('ignore')

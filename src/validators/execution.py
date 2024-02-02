@@ -265,7 +265,9 @@ async def register_single_validator(
 
     tx_hash = Web3.to_hex(tx)
     logger.info('Waiting for transaction %s confirmation', tx_hash)
-    await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)
+    await execution_client.eth.wait_for_transaction_receipt(
+        tx, timeout=settings.execution_transaction_timeout
+    )
     return tx_hash
 
 
@@ -315,5 +317,7 @@ async def register_multiple_validator(
 
     tx_hash = Web3.to_hex(tx)
     logger.info('Waiting for transaction %s confirmation', tx_hash)
-    await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)
+    await execution_client.eth.wait_for_transaction_receipt(
+        tx, timeout=settings.execution_transaction_timeout
+    )
     return tx_hash
