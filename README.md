@@ -114,7 +114,7 @@ To add the binary to your path, run:
 export PATH=$PATH:~/bin
 ```
 
-**Installing in a custom location**
+#### Installing in a custom location
 
 To download the binary in a custom location, run:
 
@@ -122,7 +122,7 @@ To download the binary in a custom location, run:
 curl -sSfL https://raw.githubusercontent.com/stakewise/v3-operator/master/scripts/install.sh | sh -s -- -b <custom_location>
 ```
 
-**Installing a custom version**
+#### Installing a custom version
 
 To download the non default binary version, run:
 
