@@ -384,4 +384,3 @@ sed_in_place() {
     sed -i "$expr" "$file"
   fi
 }
-
