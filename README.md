@@ -2,28 +2,28 @@
 
 1. [What is V3 Operator?](#what-is-v3-operator)
 2. [Prerequisites](#prerequisites)
-    1. [Execution client](#execution-client)
-    2. [Consensus client](#consensus-client)
-    3. [Vault](#vault)
+   1. [Execution client](#execution-client)
+   2. [Consensus client](#consensus-client)
+   3. [Vault](#vault)
 3. [Installation](#installation)
-    1. [Binary](#binary)
-    2. [Docker Image](#docker-image)
-    3. [Source Files](#source-files)
-    4. [Kubernetes (advanced)](#kubernetes-advanced)
+   1. [Binary](#binary)
+   2. [Docker Image](#docker-image)
+   3. [Source Files](#source-files)
+   4. [Kubernetes (advanced)](#kubernetes-advanced)
 4. [Usage](#usage)
-    1. [Step 1. Create mnemonic](#step-1-create-mnemonic)
-    2. [Step 2. Create validator keys](#step-2-create-validator-keys)
-    3. [Step 3. Create hot wallet](#step-3-create-hot-wallet)
-    4. [Step 4. Upload deposit data file to Vault](#step-4-upload-deposit-data-file-to-vault)
-    5. [Step 5. Start Operator Service](#step-5-start-operator-service)
+   1. [Step 1. Create mnemonic](#step-1-create-mnemonic)
+   2. [Step 2. Create validator keys](#step-2-create-validator-keys)
+   3. [Step 3. Create hot wallet](#step-3-create-hot-wallet)
+   4. [Step 4. Upload deposit data file to Vault](#step-4-upload-deposit-data-file-to-vault)
+   5. [Step 5. Start Operator Service](#step-5-start-operator-service)
 5. [Extra commands](#extra-commands)
-    1. [Add validator keys to Vault](#add-validator-keys-to-vault)
-    2. [Validators voluntary exit](#validators-voluntary-exit)
-    3. [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
-    4. [Merge deposit data files from multiple operators](#merge-deposit-data-files-from-multiple-operators)
-    5. [Recover validator keystores](#recover-validator-keystores)
-    6. [Max gas fee](#max-gas-fee)
-    7. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
+   1. [Add validator keys to Vault](#add-validator-keys-to-vault)
+   2. [Validators voluntary exit](#validators-voluntary-exit)
+   3. [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
+   4. [Merge deposit data files from multiple operators](#merge-deposit-data-files-from-multiple-operators)
+   5. [Recover validator keystores](#recover-validator-keystores)
+   6. [Max gas fee](#max-gas-fee)
+   7. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
 6. [Contacts](#contacts)
 
 ## What is V3 Operator?
@@ -42,10 +42,10 @@ The validator registration process consists of the following steps:
 2. Get the next free validator public key from the deposit data file attached to the operator. The validators are
    registered in the same order as specified in the deposit data file.
 3. Share the exit signature of the validator with StakeWise Oracles:
-    1. Using [Shamir's secret sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing), generate shares for the
-       validator's BLS private key. The number of shares is equal to the number of oracles.
-    2. Sign the exit message with every private key share and encrypt exit signatures with oracles' public keys.
-    3. Send encrypted exit signatures to all the oracles and receive registration signatures from them.
+   1. Using [Shamir's secret sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing), generate shares for the
+      validator's BLS private key. The number of shares is equal to the number of oracles.
+   2. Sign the exit message with every private key share and encrypt exit signatures with oracles' public keys.
+   3. Send encrypted exit signatures to all the oracles and receive registration signatures from them.
 4. Send transaction to Vault contract to register the validator.
 
 ### Exit signatures rotation
@@ -99,6 +99,36 @@ Operator Service can be run via a binary, docker image, deployed on a Kubernetes
 Operator Helm Chart, or built from source. Decide on your preferred method and follow the respective instructions below.
 
 ### Binary
+
+To download a binary for the latest release, run:
+
+```bash
+curl -sSfL https://raw.githubusercontent.com/stakewise/v3-operator/master/scripts/install.sh | sh -s
+```
+
+The binary will be installed inside the ~/bin directory.
+
+To add the binary to your path, run:
+
+```bash
+export PATH=$PATH:~/bin
+```
+
+**Installing in a custom location**
+
+To download the binary in a custom location, run:
+
+```bash
+curl -sSfL https://raw.githubusercontent.com/stakewise/v3-operator/master/scripts/install.sh | sh -s -- -b <custom_location>
+```
+
+**Installing a custom version**
+
+To download the non default binary version, run:
+
+```bash
+curl -sSfL https://raw.githubusercontent.com/stakewise/v3-operator/master/scripts/install.sh | sh -s -- -b <custom_location> vX.X.X
+```
 
 Head to the [releases page](https://github.com/stakewise/v3-operator/releases) to find the latest version of Operator
 Service. Identify the binary file specific to your
@@ -323,8 +353,8 @@ and execution endpoints as flags.
 
 If you **did not** use Operator Service to generate hot wallet, you will need to add the following flags:
 
-- `--hot-wallet-file` - path to the password-protected *.txt* file containing your hot wallet private key.
-- `--hot-wallet-password-file` - path to a *.txt* file containing the password to open the protected hot wallet private
+- `--hot-wallet-file` - path to the password-protected _.txt_ file containing your hot wallet private key.
+- `--hot-wallet-password-file` - path to a _.txt_ file containing the password to open the protected hot wallet private
   key file.
 
 If you **did not** use Operator Service to generate validator keys, you will need to add the following flag:
@@ -421,11 +451,11 @@ Validators 513571, 513572, 513861 exits successfully initiated
 
 ### Update Vault state (Harvest Vault)
 
-Updating the *Vault state* distributes the Vault fee to the Vault fee address and updates each staker's position. If an
+Updating the _Vault state_ distributes the Vault fee to the Vault fee address and updates each staker's position. If an
 ERC-20 token was chosen during Vault creation, the Vault specific ERC-20 reprices based on the rewards/penalties since
 the previous update and the Vault fees are distributed in newly minted ERC-20 tokens.
 
-By default, each *Vault state* gets updated whenever a user interacts with the Vault (deposit, withdraw, etc.), with a
+By default, each _Vault state_ gets updated whenever a user interacts with the Vault (deposit, withdraw, etc.), with a
 12 hours cooldown. Vault state can also be updated by the Vault operator(s) by passing the `--harvest-vault` flag to the
 Operator Service `start` command. Harvest occurs every 12 hours and the gas fees are paid by the hot wallet linked to
 the Operator Service.
