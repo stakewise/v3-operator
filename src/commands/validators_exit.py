@@ -91,6 +91,22 @@ EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
     envvar='VERBOSE',
     is_flag=True,
 )
+@click.option(
+    '--log-level',
+    type=click.Choice(
+        [
+            'FATAL',
+            'ERROR',
+            'WARNING',
+            'INFO',
+            'DEBUG',
+        ],
+        case_sensitive=False,
+    ),
+    default='INFO',
+    envvar='LOG_LEVEL',
+    help='The log level.',
+)
 @click.command(help='Performs a voluntary exit for active vault validators.')
 # pylint: disable-next=too-many-arguments
 def validators_exit(
@@ -104,6 +120,7 @@ def validators_exit(
     hashi_vault_url: str | None,
     data_dir: str,
     verbose: bool,
+    log_level: str,
 ) -> None:
     # pylint: disable=duplicate-code
     vault_config = VaultConfig(vault, Path(data_dir))
@@ -121,6 +138,7 @@ def validators_exit(
         hashi_vault_key_path=hashi_vault_key_path,
         hashi_vault_url=hashi_vault_url,
         verbose=verbose,
+        log_level=log_level,
     )
     try:
         asyncio.run(main(count))

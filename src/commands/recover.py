@@ -76,6 +76,22 @@ from src.config.settings import AVAILABLE_NETWORKS, DEFAULT_NETWORK, settings
         case_sensitive=False,
     ),
 )
+@click.option(
+    '--log-level',
+    type=click.Choice(
+        [
+            'FATAL',
+            'ERROR',
+            'WARNING',
+            'INFO',
+            'DEBUG',
+        ],
+        case_sensitive=False,
+    ),
+    default='INFO',
+    envvar='LOG_LEVEL',
+    help='The log level.',
+)
 # pylint: disable-next=too-many-arguments
 def recover(
     data_dir: str,
@@ -86,6 +102,7 @@ def recover(
     execution_endpoints: str,
     per_keystore_password: bool,
     no_confirm: bool,
+    log_level: str,
 ) -> None:
     # pylint: disable=duplicate-code
     config = VaultConfig(
@@ -106,6 +123,7 @@ def recover(
         vault=vault,
         network=network,
         vault_dir=config.vault_dir,
+        log_level=log_level,
     )
 
     try:

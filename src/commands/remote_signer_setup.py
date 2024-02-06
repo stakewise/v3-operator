@@ -62,6 +62,22 @@ logger = logging.getLogger(__name__)
     envvar='VERBOSE',
     is_flag=True,
 )
+@click.option(
+    '--log-level',
+    type=click.Choice(
+        [
+            'FATAL',
+            'ERROR',
+            'WARNING',
+            'INFO',
+            'DEBUG',
+        ],
+        case_sensitive=False,
+    ),
+    default='INFO',
+    envvar='LOG_LEVEL',
+    help='The log level.',
+)
 @click.command(help='Generates and uploads private key shares to a remote signer.')
 # pylint: disable-next=too-many-arguments
 def remote_signer_setup(
@@ -71,6 +87,7 @@ def remote_signer_setup(
     keystores_dir: str | None,
     execution_endpoints: str,
     verbose: bool,
+    log_level: str,
 ) -> None:
     config = VaultConfig(vault, Path(data_dir))
     config.load()
@@ -82,7 +99,7 @@ def remote_signer_setup(
         keystores_dir=keystores_dir,
         remote_signer_url=remote_signer_url,
         verbose=verbose,
-        log_level='DEBUG',
+        log_level=log_level,
     )
 
     try:
