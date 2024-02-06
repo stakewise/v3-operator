@@ -41,12 +41,6 @@ def _patch_check_deposit_data_root() -> Generator:
         yield
 
 
-@pytest.fixture
-def _patch_get_oracles(mocked_oracles: Oracles) -> Generator:
-    with mock.patch('src.remote_db.tasks.get_oracles', return_value=mocked_oracles):
-        yield
-
-
 def _get_remote_db_keypairs(
     mocked_oracles: Oracles, encryption_key: bytes, vault_address: HexAddress
 ) -> list[RemoteDatabaseKeyPair]:
@@ -197,7 +191,6 @@ class TestRemoteDbSetup:
 
 
 @pytest.mark.usefixtures(
-    '_patch_get_oracles',
     '_patch_check_db_connection',
     '_patch_get_db_connection',
     '_patch_check_deposit_data_root',
@@ -238,7 +231,6 @@ class TestRemoteDbUploadKeypairs:
 
 
 @pytest.mark.usefixtures(
-    '_patch_get_oracles',
     '_patch_check_db_connection',
     '_patch_get_db_connection',
 )
@@ -285,7 +277,6 @@ class TestRemoteDbSetupWeb3Signer:
 
 
 @pytest.mark.usefixtures(
-    '_patch_get_oracles',
     '_patch_check_db_connection',
     '_patch_get_db_connection',
 )
@@ -346,7 +337,6 @@ class TestRemoteDbSetupValidator:
 
 
 @pytest.mark.usefixtures(
-    '_patch_get_oracles',
     '_patch_check_db_connection',
     '_patch_get_db_connection',
 )
