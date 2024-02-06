@@ -1,4 +1,5 @@
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -141,7 +142,19 @@ def validators_exit(
         log_level=log_level,
     )
     try:
-        asyncio.run(main(count))
+        # Try-catch to enable async calls in test - an event loop
+        #  will already be running in that case
+        try:
+            asyncio.get_running_loop()
+            # we need to create a separate thread so we can block before returning
+            with ThreadPoolExecutor(1) as pool:
+                pool.submit(lambda: asyncio.run(main(count))).result()
+        except RuntimeError as e:
+            if 'no running event loop' == e.args[0]:
+                # no event loop running
+                asyncio.run(main(count))
+            else:
+                raise e
     except Exception as e:
         log_verbose(e)
 

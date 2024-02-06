@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 class KeystoreFile:
     name: str
     password: str
+    password_file: Path
 
 
 Keys = NewType('Keys', dict[HexStr, BLSPrivkey])
@@ -138,7 +139,7 @@ class LocalKeystore(BaseKeystore):
                 password_file = keystores_password_file
 
             password = LocalKeystore._load_keystores_password(password_file)
-            res.append(KeystoreFile(name=f, password=password))
+            res.append(KeystoreFile(name=f, password=password, password_file=password_file))
 
         return res
 

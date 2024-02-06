@@ -82,7 +82,7 @@ logger = logging.getLogger(__name__)
     envvar='LOG_LEVEL',
     help='The log level.',
 )
-@click.command(help='Generates and uploads private key shares to a remote signer.')
+@click.command(help='Uploads private keys to a remote signer.')
 # pylint: disable-next=too-many-arguments
 def remote_signer_setup(
     vault: HexAddress,
@@ -172,6 +172,8 @@ async def main() -> None:
     if click.confirm('Remove local keystores?'):
         for keystore_file in keystore_files:
             os.remove(settings.keystores_dir / keystore_file.name)
+            if keystore_file.password_file.exists():
+                os.remove(keystore_file.password_file)
 
         click.echo('Removed keystores from local filesystem.')
 
