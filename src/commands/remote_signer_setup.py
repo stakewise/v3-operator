@@ -13,7 +13,11 @@ from src.common.logging import setup_logging
 from src.common.utils import chunkify, log_verbose
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
-from src.config.settings import REMOTE_SIGNER_TIMEOUT, settings
+from src.config.settings import (
+    REMOTE_SIGNER_TIMEOUT,
+    REMOTE_SIGNER_UPLOAD_CHUNK_SIZE,
+    settings,
+)
 from src.validators.keystores.local import LocalKeystore
 
 logger = logging.getLogger(__name__)
@@ -141,7 +145,8 @@ async def main() -> None:
             keystores_json.append(f.read())
 
     # Import keystores to remote signer
-    chunk_size = 10
+    chunk_size = REMOTE_SIGNER_UPLOAD_CHUNK_SIZE
+
     async with aiohttp.ClientSession(timeout=ClientTimeout(REMOTE_SIGNER_TIMEOUT)) as session:
         for keystores_json_chunk, keystore_files_chunk in zip(
             chunkify(keystores_json, chunk_size), chunkify(keystore_files, chunk_size)
@@ -163,12 +168,12 @@ async def main() -> None:
         f'Successfully imported {len(keystore_files)} keys into remote signer.',
     )
 
-    # Remove local keystores - keys are loaded in remote signer and are not
-    # needed locally anymore
-    for keystore_file in keystore_files:
-        os.remove(settings.keystores_dir / keystore_file.name)
+    # Keys are loaded in remote signer and are not needed locally anymore
+    if click.confirm('Remove local keystores?'):
+        for keystore_file in keystore_files:
+            os.remove(settings.keystores_dir / keystore_file.name)
 
-    click.echo('Removed keystores from local filesystem.')
+        click.echo('Removed keystores from local filesystem.')
 
     click.echo(
         f'Done.'

@@ -218,8 +218,11 @@ DEPOSIT_AMOUNT_GWEI = int(Web3.from_wei(DEPOSIT_AMOUNT, 'gwei'))
 # Backoff retries
 DEFAULT_RETRY_TIME = 60
 
-# Remote signer timeout
-REMOTE_SIGNER_TIMEOUT = 10
+# Remote signer
+REMOTE_SIGNER_UPLOAD_CHUNK_SIZE = decouple_config(
+    'REMOTE_SIGNER_UPLOAD_CHUNK_SIZE', cast=int, default=5
+)
+REMOTE_SIGNER_TIMEOUT = decouple_config('REMOTE_SIGNER_TIMEOUT', cast=int, default=10)
 
 # Hashi vault timeout
 HASHI_VAULT_TIMEOUT = 10
