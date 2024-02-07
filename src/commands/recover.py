@@ -10,7 +10,7 @@ from src.common.clients import consensus_client, execution_client
 from src.common.contracts import v2_pool_contract, vault_contract
 from src.common.credentials import CredentialManager
 from src.common.execution import SECONDS_PER_MONTH
-from src.common.logging import setup_logging
+from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.password import generate_password, get_or_create_password_file
 from src.common.utils import greenify, log_verbose
 from src.common.validators import validate_eth_address, validate_mnemonic
@@ -79,13 +79,7 @@ from src.config.settings import AVAILABLE_NETWORKS, DEFAULT_NETWORK, settings
 @click.option(
     '--log-level',
     type=click.Choice(
-        [
-            'FATAL',
-            'ERROR',
-            'WARNING',
-            'INFO',
-            'DEBUG',
-        ],
+        LOG_LEVELS,
         case_sensitive=False,
     ),
     default='INFO',

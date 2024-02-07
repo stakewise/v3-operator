@@ -10,7 +10,7 @@ import click
 from aiohttp import ClientTimeout
 from eth_typing import HexAddress
 
-from src.common.logging import setup_logging
+from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import chunkify, log_verbose
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
@@ -63,13 +63,7 @@ logger = logging.getLogger(__name__)
 @click.option(
     '--log-level',
     type=click.Choice(
-        [
-            'FATAL',
-            'ERROR',
-            'WARNING',
-            'INFO',
-            'DEBUG',
-        ],
+        LOG_LEVELS,
         case_sensitive=False,
     ),
     default='INFO',
@@ -125,9 +119,12 @@ async def main() -> None:
     # Check if remote signer's keymanager API is reachable before taking further steps
     async with aiohttp.ClientSession(timeout=ClientTimeout(REMOTE_SIGNER_TIMEOUT)) as session:
         resp = await session.get(f'{settings.remote_signer_url}/eth/v1/keystores')
+        if resp.status == 404:
+            logger.warning(
+                'make sure that you run remote signer with '
+                '`--enable-key-manager-api=true` option'
+            )
         if resp.status != 200:
-            # In case of 404 make sure that you run remote signer with
-            # `--enable-key-manager-api=true` option
             raise RuntimeError(f'Failed to connect to remote signer, returned {await resp.text()}')
 
     # Read keystores without decrypting

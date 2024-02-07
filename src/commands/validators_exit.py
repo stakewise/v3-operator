@@ -11,7 +11,7 @@ from sw_utils.consensus import EXITED_STATUSES
 from web3 import Web3
 
 from src.common.clients import consensus_client
-from src.common.logging import setup_logging
+from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import format_error, log_verbose
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
@@ -95,13 +95,7 @@ EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
 @click.option(
     '--log-level',
     type=click.Choice(
-        [
-            'FATAL',
-            'ERROR',
-            'WARNING',
-            'INFO',
-            'DEBUG',
-        ],
+        LOG_LEVELS,
         case_sensitive=False,
     ),
     default='INFO',
