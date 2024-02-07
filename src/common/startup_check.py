@@ -6,6 +6,7 @@ from os import path
 
 from aiohttp import ClientSession, ClientTimeout
 from sw_utils import IpfsFetchClient, get_consensus_client, get_execution_client
+from web3 import Web3
 
 from src.common.clients import db_client
 from src.common.execution import (
@@ -16,7 +17,7 @@ from src.common.execution import (
 from src.common.utils import format_error, warning_verbose
 from src.common.wallet import hot_wallet
 from src.config.settings import settings
-from src.validators.execution import check_deposit_data_root
+from src.validators.execution import check_deposit_data_root, get_withdrawable_assets
 from src.validators.keystores.local import LocalKeystore
 from src.validators.utils import load_deposit_data
 
@@ -190,6 +191,13 @@ async def startup_checks():
 
     logger.info('Checking vault address %s...', settings.vault)
     await check_vault_address()
+
+    withdrawable_assets, _ = await get_withdrawable_assets()
+    logger.info(
+        'Vault withdrawable assets: %s %s',
+        round(Web3.from_wei(withdrawable_assets, 'ether'), 2),
+        settings.network_config.SYMBOL,
+    )
 
     logger.info('Checking hot wallet balance %s...', hot_wallet.address)
     await check_hot_wallet_balance()
