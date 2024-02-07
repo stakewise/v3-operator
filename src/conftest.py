@@ -169,8 +169,6 @@ def _remote_signer_setup(
             remote_signer_url,
             '--data-dir',
             str(data_dir),
-            '--execution-endpoints',
-            execution_endpoints,
         ],
     )
     assert result.exit_code == 0

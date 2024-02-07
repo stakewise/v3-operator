@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import aiohttp
@@ -12,33 +11,12 @@ from src.config.settings import settings
 
 
 class TestOperatorRemoteSignerSetup:
-    @pytest.mark.usefixtures('_init_vault')
-    def test_invalid_input(
-        self,
-        vault_address: HexAddress,
-        data_dir: Path,
-        execution_endpoints: str,
-        runner: CliRunner,
-    ):
-        result = runner.invoke(
-            remote_signer_setup,
-            [
-                '--vault',
-                vault_address,
-                '--execution-endpoints',
-                execution_endpoints,
-            ],
-        )
-        assert result.exit_code == 2
-        assert "Error: Missing option '--remote-signer-url'" in result.output
-
     @pytest.mark.usefixtures(
         '_init_vault', '_create_keys', 'mocked_remote_signer', 'mock_scrypt_keystore'
     )
     async def test_basic(
         self,
         vault_address: HexAddress,
-        execution_endpoints: str,
         data_dir: Path,
         vault_dir: Path,
         keystores_dir: Path,
@@ -54,8 +32,6 @@ class TestOperatorRemoteSignerSetup:
             remote_signer_url,
             '--data-dir',
             str(data_dir),
-            '--execution-endpoints',
-            execution_endpoints,
         ]
 
         result = runner.invoke(remote_signer_setup, args, input='y')
@@ -68,7 +44,7 @@ class TestOperatorRemoteSignerSetup:
         ]:
             assert expected_output_message in result.output
 
-        assert len(os.listdir(keystores_dir)) == 0
+        assert keystores_dir.exists() is False
 
         async with aiohttp.ClientSession() as session:
             resp = await session.get(f'{settings.remote_signer_url}/eth/v1/keystores')
@@ -81,7 +57,6 @@ class TestOperatorRemoteSignerSetup:
         self,
         vault_address: HexAddress,
         test_mnemonic: str,
-        execution_endpoints: str,
         data_dir: Path,
         vault_dir: Path,
         remote_signer_url: str,
@@ -114,8 +89,6 @@ class TestOperatorRemoteSignerSetup:
                 remote_signer_url,
                 '--data-dir',
                 str(data_dir),
-                '--execution-endpoints',
-                execution_endpoints,
             ]
 
             result = runner.invoke(remote_signer_setup, args, input='y')
