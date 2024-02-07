@@ -17,6 +17,7 @@ from src.common.utils import format_error, warning_verbose
 from src.common.wallet import hot_wallet
 from src.config.settings import settings
 from src.validators.execution import check_deposit_data_root
+from src.validators.keystores.local import LocalKeystore
 from src.validators.utils import load_deposit_data
 
 logger = logging.getLogger(__name__)
@@ -216,9 +217,10 @@ async def startup_checks():
     logger.info('Checking deposit data file...')
     await wait_for_deposit_data_file()
 
-    logger.info('Checking keystores dir...')
-    wait_for_keystores_dir()
-    logger.info('Found keystores dir')
+    if settings.keystore_cls_str == LocalKeystore.__name__:
+        logger.info('Checking keystores dir...')
+        wait_for_keystores_dir()
+        logger.info('Found keystores dir')
 
 
 async def _aiohttp_fetch(session: ClientSession, url: str) -> str:

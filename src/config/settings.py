@@ -45,7 +45,6 @@ class Settings(metaclass=Singleton):
     keystores_dir: Path
     keystores_password_dir: Path
     keystores_password_file: Path
-    remote_signer_config_file: Path
     remote_signer_url: str | None
     hashi_vault_key_path: str | None
     hashi_vault_url: str | None
@@ -82,7 +81,6 @@ class Settings(metaclass=Singleton):
         deposit_data_file: str | None = None,
         keystores_dir: str | None = None,
         keystores_password_file: str | None = None,
-        remote_signer_config_file: str | None = None,
         remote_signer_url: str | None = None,
         hashi_vault_key_path: str | None = None,
         hashi_vault_url: str | None = None,
@@ -125,11 +123,6 @@ class Settings(metaclass=Singleton):
         )
 
         # remote signer configuration
-        self.remote_signer_config_file = (
-            Path(remote_signer_config_file)
-            if remote_signer_config_file
-            else vault_dir / 'remote_signer_config.json'
-        )
         self.remote_signer_url = remote_signer_url
 
         # hashi vault configuration
@@ -191,6 +184,14 @@ class Settings(metaclass=Singleton):
         )
 
     @property
+    def keystore_cls_str(self) -> str:
+        if self.remote_signer_url:
+            return 'RemoteSignerKeystore'
+        if self.hashi_vault_url:
+            return 'HashiVaultKeystore'
+        return 'LocalKeystore'
+
+    @property
     def network_config(self) -> NetworkConfig:
         return NETWORKS[self.network]
 
@@ -222,7 +223,7 @@ DEFAULT_RETRY_TIME = 60
 REMOTE_SIGNER_UPLOAD_CHUNK_SIZE = decouple_config(
     'REMOTE_SIGNER_UPLOAD_CHUNK_SIZE', cast=int, default=5
 )
-REMOTE_SIGNER_TIMEOUT = decouple_config('REMOTE_SIGNER_TIMEOUT', cast=int, default=10)
+REMOTE_SIGNER_TIMEOUT = decouple_config('REMOTE_SIGNER_TIMEOUT', cast=int, default=30)
 
 # Hashi vault timeout
 HASHI_VAULT_TIMEOUT = 10

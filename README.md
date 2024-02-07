@@ -1,3 +1,4 @@
+
 # StakeWise V3 Operator
 
 1. [What is V3 Operator?](#what-is-v3-operator)
@@ -41,12 +42,13 @@ The validator registration process consists of the following steps:
 1. Check whether Vault has accumulated enough assets to register a validator (e.g., 32 ETH for Ethereum)
 2. Get the next free validator public key from the deposit data file attached to the operator. The validators are
    registered in the same order as specified in the deposit data file.
-3. Share the exit signature of the validator with StakeWise Oracles:
-    1. Using [Shamir's secret sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing), generate shares for the
-       validator's BLS private key. The number of shares is equal to the number of oracles.
-    2. Sign the exit message with every private key share and encrypt exit signatures with oracles' public keys.
+3. Obtain BLS signature for exit message using local keystores or remote signer.
+4. Share the exit signature of the validator with StakeWise Oracles:
+    1. Using [Shamir's secret sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing), split
+       validator's BLS signature. The number of shares is equal to the number of oracles.
+    2. Encrypt exit signatures with oracles' public keys.
     3. Send encrypted exit signatures to all the oracles and receive registration signatures from them.
-4. Send transaction to Vault contract to register the validator.
+5. Send transaction to Vault contract to register the validator.
 
 ### Exit signatures rotation
 

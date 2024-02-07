@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import shutil
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -53,13 +54,6 @@ logger = logging.getLogger(__name__)
     'Default is the directory generated with "create-keys" command.',
 )
 @click.option(
-    '--execution-endpoints',
-    type=str,
-    envvar='EXECUTION_ENDPOINTS',
-    prompt='Enter comma separated list of API endpoints for execution nodes',
-    help='Comma separated list of API endpoints for execution nodes.',
-)
-@click.option(
     '-v',
     '--verbose',
     help='Enable debug mode. Default is false.',
@@ -89,7 +83,6 @@ def remote_signer_setup(
     remote_signer_url: str,
     data_dir: str,
     keystores_dir: str | None,
-    execution_endpoints: str,
     verbose: bool,
     log_level: str,
 ) -> None:
@@ -99,7 +92,6 @@ def remote_signer_setup(
         vault=vault,
         vault_dir=config.vault_dir,
         network=config.network,
-        execution_endpoints=execution_endpoints,
         keystores_dir=keystores_dir,
         remote_signer_url=remote_signer_url,
         verbose=verbose,
@@ -170,10 +162,13 @@ async def main() -> None:
 
     # Keys are loaded in remote signer and are not needed locally anymore
     if click.confirm('Remove local keystores?'):
-        for keystore_file in keystore_files:
-            os.remove(settings.keystores_dir / keystore_file.name)
-            if keystore_file.password_file.exists():
-                os.remove(keystore_file.password_file)
+        shutil.rmtree(settings.keystores_dir)
+
+        if settings.keystores_password_dir.exists():
+            shutil.rmtree(settings.keystores_password_dir)
+
+        if settings.keystores_password_file.exists():
+            os.remove(settings.keystores_password_file)
 
         click.echo('Removed keystores from local filesystem.')
 
