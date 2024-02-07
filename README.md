@@ -2,28 +2,28 @@
 
 1. [What is V3 Operator?](#what-is-v3-operator)
 2. [Prerequisites](#prerequisites)
-   1. [Execution client](#execution-client)
-   2. [Consensus client](#consensus-client)
-   3. [Vault](#vault)
+    1. [Execution client](#execution-client)
+    2. [Consensus client](#consensus-client)
+    3. [Vault](#vault)
 3. [Installation](#installation)
-   1. [Binary](#binary)
-   2. [Docker Image](#docker-image)
-   3. [Source Files](#source-files)
-   4. [Kubernetes (advanced)](#kubernetes-advanced)
+    1. [Binary](#binary)
+    2. [Docker Image](#docker-image)
+    3. [Source Files](#source-files)
+    4. [Kubernetes (advanced)](#kubernetes-advanced)
 4. [Usage](#usage)
-   1. [Step 1. Create mnemonic](#step-1-create-mnemonic)
-   2. [Step 2. Create validator keys](#step-2-create-validator-keys)
-   3. [Step 3. Create hot wallet](#step-3-create-hot-wallet)
-   4. [Step 4. Upload deposit data file to Vault](#step-4-upload-deposit-data-file-to-vault)
-   5. [Step 5. Start Operator Service](#step-5-start-operator-service)
+    1. [Step 1. Create mnemonic](#step-1-create-mnemonic)
+    2. [Step 2. Create validator keys](#step-2-create-validator-keys)
+    3. [Step 3. Create hot wallet](#step-3-create-hot-wallet)
+    4. [Step 4. Upload deposit data file to Vault](#step-4-upload-deposit-data-file-to-vault)
+    5. [Step 5. Start Operator Service](#step-5-start-operator-service)
 5. [Extra commands](#extra-commands)
-   1. [Add validator keys to Vault](#add-validator-keys-to-vault)
-   2. [Validators voluntary exit](#validators-voluntary-exit)
-   3. [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
-   4. [Merge deposit data files from multiple operators](#merge-deposit-data-files-from-multiple-operators)
-   5. [Recover validator keystores](#recover-validator-keystores)
-   6. [Max gas fee](#max-gas-fee)
-   7. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
+    1. [Add validator keys to Vault](#add-validator-keys-to-vault)
+    2. [Validators voluntary exit](#validators-voluntary-exit)
+    3. [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
+    4. [Merge deposit data files from multiple operators](#merge-deposit-data-files-from-multiple-operators)
+    5. [Recover validator keystores](#recover-validator-keystores)
+    6. [Max gas fee](#max-gas-fee)
+    7. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
 6. [Contacts](#contacts)
 
 ## What is V3 Operator?
@@ -42,10 +42,10 @@ The validator registration process consists of the following steps:
 2. Get the next free validator public key from the deposit data file attached to the operator. The validators are
    registered in the same order as specified in the deposit data file.
 3. Share the exit signature of the validator with StakeWise Oracles:
-   1. Using [Shamir's secret sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing), generate shares for the
-      validator's BLS private key. The number of shares is equal to the number of oracles.
-   2. Sign the exit message with every private key share and encrypt exit signatures with oracles' public keys.
-   3. Send encrypted exit signatures to all the oracles and receive registration signatures from them.
+    1. Using [Shamir's secret sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing), generate shares for the
+       validator's BLS private key. The number of shares is equal to the number of oracles.
+    2. Sign the exit message with every private key share and encrypt exit signatures with oracles' public keys.
+    3. Send encrypted exit signatures to all the oracles and receive registration signatures from them.
 4. Send transaction to Vault contract to register the validator.
 
 ### Exit signatures rotation
@@ -100,36 +100,6 @@ Operator Helm Chart, or built from source. Decide on your preferred method and f
 
 ### Binary
 
-To download a binary for the latest release, run:
-
-```bash
-curl -sSfL https://raw.githubusercontent.com/stakewise/v3-operator/master/scripts/install.sh | sh -s
-```
-
-The binary will be installed inside the ~/bin directory.
-
-To add the binary to your path, run:
-
-```bash
-export PATH=$PATH:~/bin
-```
-
-#### Installing in a custom location
-
-To download the binary in a custom location, run:
-
-```bash
-curl -sSfL https://raw.githubusercontent.com/stakewise/v3-operator/master/scripts/install.sh | sh -s -- -b <custom_location>
-```
-
-#### Installing a custom version
-
-To download the non default binary version, run:
-
-```bash
-curl -sSfL https://raw.githubusercontent.com/stakewise/v3-operator/master/scripts/install.sh | sh -s -- -b <custom_location> vX.X.X
-```
-
 Head to the [releases page](https://github.com/stakewise/v3-operator/releases) to find the latest version of Operator
 Service. Identify the binary file specific to your
 node hardware, download and decompress it.
@@ -139,6 +109,34 @@ use of flags is optional):
 
 ```bash
 ./operator COMMAND --flagA=123 --flagB=xyz
+```
+
+Head to [Usage](#usage) to launch your operator service.
+
+### Install script (Linux and macOS)
+
+To install a binary for the latest release, run:
+
+```bash
+curl -sSfL https://raw.githubusercontent.com/stakewise/v3-operator/master/scripts/install.sh | sh -s
+```
+
+The binary will be installed inside the ~/bin directory. Add the binary to your path:
+
+```bash
+export PATH=$PATH:~/bin
+```
+
+If you want to install a specific version to a custom location, run:
+
+```bash
+curl -sSfL https://raw.githubusercontent.com/stakewise/v3-operator/master/scripts/install.sh | sh -s -- -b <custom_location> vX.X.X
+```
+
+You will execute Operator Service commands using the below format (note that the use of flags is optional):
+
+```bash
+operator COMMAND --flagA=123 --flagB=xyz
 ```
 
 Head to [Usage](#usage) to launch your operator service.
@@ -269,8 +267,8 @@ Deposit data saved to /home/user/.stakewise/0x3320a...68/keystores/deposit_data.
 You may not want the operator service to have direct access to the validator keys. Validator keystores do not need to be
 present directly in the operator. You can check
 the [remote signer](https://docs.stakewise.io/for-operators/operator-service/running-with-remote-signer)
-or [Hashicorp Vault](https://docs.stakewise.io/for-operators/operator-service/running-with-hashi-vault) guides on how to run Operator
-Service with them.
+or [Hashicorp Vault](https://docs.stakewise.io/for-operators/operator-service/running-with-hashi-vault) guides on how to
+run Operator Service with them.
 
 **Remember to upload the newly generated validator keys to the validator(s). For that, please follow a guide for your
 consensus client. The password for your keystores is located in the `password.txt` file in the keystores folder.**
