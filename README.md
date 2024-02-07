@@ -7,9 +7,10 @@
     3. [Vault](#vault)
 3. [Installation](#installation)
     1. [Binary](#binary)
-    2. [Docker Image](#docker-image)
-    3. [Source Files](#source-files)
-    4. [Kubernetes (advanced)](#kubernetes-advanced)
+    2. [Install Script](#install-script-linux-and-macos)
+    3. [Docker Image](#docker-image)
+    4. [Source Files](#source-files)
+    5. [Kubernetes (advanced)](#kubernetes-advanced)
 4. [Usage](#usage)
     1. [Step 1. Create mnemonic](#step-1-create-mnemonic)
     2. [Step 2. Create validator keys](#step-2-create-validator-keys)
@@ -109,6 +110,34 @@ use of flags is optional):
 
 ```bash
 ./operator COMMAND --flagA=123 --flagB=xyz
+```
+
+Head to [Usage](#usage) to launch your operator service.
+
+### Install script (Linux and macOS)
+
+To install a binary for the latest release, run:
+
+```bash
+curl -sSfL https://raw.githubusercontent.com/stakewise/v3-operator/master/scripts/install.sh | sh -s
+```
+
+The binary will be installed inside the ~/bin directory. Add the binary to your path:
+
+```bash
+export PATH=$PATH:~/bin
+```
+
+If you want to install a specific version to a custom location, run:
+
+```bash
+curl -sSfL https://raw.githubusercontent.com/stakewise/v3-operator/master/scripts/install.sh | sh -s -- -b <custom_location> vX.X.X
+```
+
+You will execute Operator Service commands using the below format (note that the use of flags is optional):
+
+```bash
+operator COMMAND --flagA=123 --flagB=xyz
 ```
 
 Head to [Usage](#usage) to launch your operator service.
@@ -239,8 +268,8 @@ Deposit data saved to /home/user/.stakewise/0x3320a...68/keystores/deposit_data.
 You may not want the operator service to have direct access to the validator keys. Validator keystores do not need to be
 present directly in the operator. You can check
 the [remote signer](https://docs.stakewise.io/for-operators/operator-service/running-with-remote-signer)
-or [Hashicorp Vault](https://docs.stakewise.io/for-operators/operator-service/running-with-hashi-vault) guides on how to run Operator
-Service with them.
+or [Hashicorp Vault](https://docs.stakewise.io/for-operators/operator-service/running-with-hashi-vault) guides on how to
+run Operator Service with them.
 
 **Remember to upload the newly generated validator keys to the validator(s). For that, please follow a guide for your
 consensus client. The password for your keystores is located in the `password.txt` file in the keystores folder.**
@@ -323,8 +352,8 @@ and execution endpoints as flags.
 
 If you **did not** use Operator Service to generate hot wallet, you will need to add the following flags:
 
-- `--hot-wallet-file` - path to the password-protected *.txt* file containing your hot wallet private key.
-- `--hot-wallet-password-file` - path to a *.txt* file containing the password to open the protected hot wallet private
+- `--hot-wallet-file` - path to the password-protected _.txt_ file containing your hot wallet private key.
+- `--hot-wallet-password-file` - path to a _.txt_ file containing the password to open the protected hot wallet private
   key file.
 
 If you **did not** use Operator Service to generate validator keys, you will need to add the following flag:
@@ -421,11 +450,11 @@ Validators 513571, 513572, 513861 exits successfully initiated
 
 ### Update Vault state (Harvest Vault)
 
-Updating the *Vault state* distributes the Vault fee to the Vault fee address and updates each staker's position. If an
+Updating the _Vault state_ distributes the Vault fee to the Vault fee address and updates each staker's position. If an
 ERC-20 token was chosen during Vault creation, the Vault specific ERC-20 reprices based on the rewards/penalties since
 the previous update and the Vault fees are distributed in newly minted ERC-20 tokens.
 
-By default, each *Vault state* gets updated whenever a user interacts with the Vault (deposit, withdraw, etc.), with a
+By default, each _Vault state_ gets updated whenever a user interacts with the Vault (deposit, withdraw, etc.), with a
 12 hours cooldown. Vault state can also be updated by the Vault operator(s) by passing the `--harvest-vault` flag to the
 Operator Service `start` command. Harvest occurs every 12 hours and the gas fees are paid by the hot wallet linked to
 the Operator Service.
