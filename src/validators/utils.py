@@ -123,7 +123,7 @@ async def send_approval_request(
             raise ValidatorIndexChangedError from e
 
         raise e
-    logger.debug('Received response from oracle %s: %s', endpoint, response)
+    logger.debug('Received response from oracle %s: %s', endpoint, data)
     return OracleApproval(
         ipfs_hash=data['ipfs_hash'],
         signature=Web3.to_bytes(hexstr=data['signature']),

@@ -4,6 +4,14 @@ import warnings
 from src.common.utils import JsonFormatter
 from src.config.settings import LOG_DATE_FORMAT, LOG_JSON, settings
 
+LOG_LEVELS = [
+    'FATAL',
+    'ERROR',
+    'WARNING',
+    'INFO',
+    'DEBUG',
+]
+
 
 def setup_logging():
     if settings.log_format == LOG_JSON:

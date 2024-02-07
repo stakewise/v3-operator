@@ -8,16 +8,8 @@ from eth_typing import HexAddress
 from sw_utils.typings import ConsensusFork
 
 from src.commands.validators_exit import validators_exit
-from src.common.typings import Oracles
-from src.config.settings import settings
 from src.validators.keystores.local import LocalKeystore
 from src.validators.keystores.remote import RemoteSignerKeystore
-
-
-@pytest.fixture
-def _patch_get_oracles(mocked_oracles: Oracles) -> Generator:
-    with mock.patch('src.commands.remote_signer_setup.get_oracles', return_value=mocked_oracles):
-        yield
 
 
 @pytest.fixture
@@ -41,9 +33,7 @@ def _patch_submit_voluntary_exit() -> Generator:
         yield
 
 
-@pytest.mark.usefixtures(
-    '_patch_get_oracles', '_patch_get_consensus_fork', '_patch_submit_voluntary_exit'
-)
+@pytest.mark.usefixtures('_patch_get_consensus_fork', '_patch_submit_voluntary_exit')
 @pytest.mark.usefixtures('_init_vault', '_create_keys')
 class TestValidatorsExit:
     @pytest.mark.usefixtures('fake_settings')
@@ -94,7 +84,7 @@ class TestValidatorsExit:
         assert 'Validators 0, 1, 2 (3 of 3) exits successfully initiated\n' in result.output
 
     @pytest.mark.usefixtures('_remote_signer_setup')
-    def test_remote_signer(
+    async def test_remote_signer(
         self,
         vault_address: HexAddress,
         consensus_endpoints: str,
@@ -105,8 +95,8 @@ class TestValidatorsExit:
         remote_signer_url: str,
     ):
         # Get pubkey(s) to exit
-        config = RemoteSignerKeystore.load_from_file(settings.remote_signer_config_file)
-        pubkeys = list(config.pubkeys_to_shares.keys())
+        keystore = await RemoteSignerKeystore.load()
+        pubkeys = keystore.public_keys
 
         args = [
             '--vault',

@@ -9,7 +9,7 @@ from sw_utils import EventScanner, InterruptHandler
 import src
 from src.common.consensus import get_chain_finalized_head
 from src.common.execution import WalletTask
-from src.common.logging import setup_logging
+from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.metrics import MetricsTask, metrics_server
 from src.common.startup_check import startup_checks
 from src.common.utils import get_build_version, log_verbose
@@ -190,13 +190,7 @@ logger = logging.getLogger(__name__)
 @click.option(
     '--log-level',
     type=click.Choice(
-        [
-            'FATAL',
-            'ERROR',
-            'WARNING',
-            'INFO',
-            'DEBUG',
-        ],
+        LOG_LEVELS,
         case_sensitive=False,
     ),
     default='INFO',
