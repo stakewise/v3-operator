@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import time
 
@@ -26,4 +25,4 @@ class BaseTask:
             sleep_time = max(
                 float(settings.network_config.SECONDS_PER_BLOCK) - block_processing_time, 0
             )
-            await asyncio.sleep(sleep_time)
+            await interrupt_handler.sleep(sleep_time)
