@@ -105,7 +105,7 @@ async def get_protocol_config() -> ProtocolConfig:
     await update_oracles_cache()
 
     oracles_cache = cast(OraclesCache, _oracles_cache)
-    pc = await build_protocol_config(
+    pc = build_protocol_config(
         config_data=oracles_cache.config,
         rewards_threshold=oracles_cache.rewards_threshold,
         validators_threshold=oracles_cache.validators_threshold,

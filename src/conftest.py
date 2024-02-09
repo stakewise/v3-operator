@@ -11,7 +11,7 @@ from click.testing import CliRunner
 from Cryptodome.Protocol.KDF import scrypt as raw_scrypt
 from eth_typing import HexAddress, HexStr
 from sw_utils.tests import faker
-from sw_utils.tests.factories import create_protocol_config
+from sw_utils.tests.factories import get_mocked_protocol_config
 from sw_utils.typings import Oracle, ProtocolConfig
 
 from src.commands.create_keys import create_keys
@@ -264,7 +264,7 @@ def mocked_protocol_config(
             endpoints=[f'http://oracle-endpoint-{index}'],
         )
         oracles.append(oracle)
-    return create_protocol_config(
+    return get_mocked_protocol_config(
         oracles=oracles,
         exit_signature_recover_threshold=exit_signature_recover_threshold,
         validators_approval_batch_limit=1,
