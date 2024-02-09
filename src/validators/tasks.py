@@ -264,7 +264,7 @@ async def load_genesis_validators() -> None:
         return
 
     ipfs_fetch_client = IpfsFetchClient(
-        endpoints=settings.ipfs_fetch_endpoints,
+        ipfs_endpoints=settings.ipfs_fetch_endpoints,
         timeout=settings.genesis_validators_ipfs_timeout,
         retry_timeout=settings.genesis_validators_ipfs_retry_timeout,
     )
