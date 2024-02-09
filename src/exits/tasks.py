@@ -29,8 +29,6 @@ logger = logging.getLogger(__name__)
 
 
 class ExitSignatureTask(BaseTask):
-    keystore: BaseKeystore
-
     def __init__(self, keystore: BaseKeystore):
         self.keystore = keystore
 
