@@ -42,9 +42,6 @@ logger = logging.getLogger(__name__)
 
 
 class ValidatorsTask(BaseTask):
-    keystore: BaseKeystore
-    deposit_data: DepositData
-
     def __init__(
         self,
         keystore: BaseKeystore,
