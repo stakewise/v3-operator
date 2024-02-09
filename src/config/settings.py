@@ -90,6 +90,7 @@ class Settings(metaclass=Singleton):
         database_dir: str | None = None,
         log_level: str | None = None,
         log_format: str | None = None,
+        pool_size: int | None = None,
     ) -> None:
         self.vault = Web3.to_checksum_address(vault)
         vault_dir.mkdir(parents=True, exist_ok=True)
@@ -168,9 +169,7 @@ class Settings(metaclass=Singleton):
         self.validators_fetch_chunk_size = decouple_config(
             'VALIDATORS_FETCH_CHUNK_SIZE', default=100, cast=int
         )
-        self.pool_size = decouple_config(
-            'POOL_SIZE', default=None, cast=lambda x: int(x) if x else None
-        )
+        self.pool_size = pool_size
         self.execution_timeout = decouple_config('EXECUTION_TIMEOUT', default=30, cast=int)
         self.execution_transaction_timeout = decouple_config(
             'EXECUTION_TRANSACTION_TIMEOUT', default=300, cast=int

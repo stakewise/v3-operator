@@ -197,6 +197,12 @@ logger = logging.getLogger(__name__)
     envvar='LOG_LEVEL',
     help='The log level.',
 )
+@click.option(
+    '--pool-size',
+    help='Number of processes in a pool.',
+    envvar='POOL_SIZE',
+    type=int,
+)
 @click.command(help='Start operator service')
 # pylint: disable-next=too-many-arguments,too-many-locals
 def start(
@@ -223,6 +229,7 @@ def start(
     hot_wallet_password_file: str | None,
     max_fee_per_gas_gwei: int,
     database_dir: str | None,
+    pool_size: int | None,
 ) -> None:
     vault_config = VaultConfig(vault, Path(data_dir))
     if network is None:
@@ -253,6 +260,7 @@ def start(
         database_dir=database_dir,
         log_level=log_level,
         log_format=log_format,
+        pool_size=pool_size,
     )
 
     try:
