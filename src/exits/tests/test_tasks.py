@@ -74,8 +74,7 @@ class TestGetOraclesRequest:
             ),
         ):
             validators = {
-                randint(0, int(1e6)): pubkey
-                for pubkey in remote_signer_keystore.pubkeys_to_shares.keys()
+                randint(0, int(1e6)): pubkey for pubkey in remote_signer_keystore.public_keys
             }
             request = await _get_oracles_request(
                 oracles=oracles,

@@ -74,5 +74,6 @@ class OracleCommittee:
             bls.Verify(aggregate_key, message, reconstructed_full_signature) is True
         ), 'Unable to reconstruct full signature'
 
+        # The case when we split signature created by third party service
         if exit_signature is not None:
             assert reconstructed_full_signature == exit_signature

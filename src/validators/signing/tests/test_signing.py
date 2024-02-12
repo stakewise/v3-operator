@@ -1,3 +1,4 @@
+import random
 from typing import Callable
 
 import milagro_bls_binding as bls
@@ -106,24 +107,29 @@ class TestSigning:
         remote_signer_keystore: RemoteSignerKeystore,
         _mocked_oracle_committee: OracleCommittee,
     ):
-        validator_index = 123
-        settings.remote_signer_url = remote_signer_url
+        keystore = remote_signer_keystore
+        validator_pubkey = keystore.public_keys[0]
+        validator_index = random.randint(1, 10000)
 
-        for pubkey, pubkey_shares in remote_signer_keystore.pubkeys_to_shares.items():
-            shards = await remote_signer_keystore.get_exit_signature_shards(
-                validator_index=validator_index,
-                public_key=pubkey,
-                oracles=mocked_oracles,
-                fork=fork,
-            )
+        exit_signature = await keystore.get_exit_signature(
+            validator_index, validator_pubkey, settings.network, fork
+        )
 
-            TestSigning.check_signature_shards(
-                shards=shards,
-                committee=_mocked_oracle_committee,
-                validator_pubkey=BLSPubkey(Web3.to_bytes(hexstr=pubkey)),
-                validator_index=validator_index,
-                fork=fork,
-            )
+        shards = await keystore.get_exit_signature_shards(
+            validator_index=validator_index,
+            public_key=validator_pubkey,
+            oracles=mocked_oracles,
+            fork=fork,
+        )
+
+        TestSigning.check_signature_shards(
+            shards=shards,
+            committee=_mocked_oracle_committee,
+            validator_pubkey=BLSPubkey(Web3.to_bytes(hexstr=validator_pubkey)),
+            validator_index=validator_index,
+            fork=fork,
+            exit_signature=exit_signature,
+        )
 
     @pytest.mark.usefixtures('fake_settings')
     @pytest.mark.parametrize(

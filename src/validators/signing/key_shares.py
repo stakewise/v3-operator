@@ -11,7 +11,7 @@ from py_ecc.bls.g2_primitives import (
 )
 from py_ecc.bls.hash_to_curve import hash_to_G2
 from py_ecc.optimized_bls12_381.optimized_curve import (
-    G1 as P1,  # don't mess group name (G1) and primitive element name (P1)
+    G1 as P1,  # don't confuse group name (G1) with primitive element name (P1)
 )
 from py_ecc.optimized_bls12_381.optimized_curve import (
     Z1,
@@ -110,9 +110,6 @@ def bls_signature_and_public_key_to_shares(
 
     The function splits `signature` and `public_key` to shares so that
     each signature share can be verified with corresponding public key share.
-
-    The most straight forward way to do this is to use private key shares.
-    But this function does not require private key.
     """
     message_g2 = hash_to_G2(message, G2ProofOfPossession.DST, G2ProofOfPossession.xmd_hash_function)
 

@@ -158,7 +158,7 @@ async def register_validators(
         ):
             registry_root = latest_registry_root
             deadline = current_timestamp + oracles.signature_validity_period
-            logger.debug('Fetched latest validators registry root: %s', registry_root)
+            logger.debug('Fetched latest validators registry root: %s', Web3.to_hex(registry_root))
 
             oracles_request = await create_approval_request(
                 oracles=oracles,
@@ -331,7 +331,7 @@ async def load_genesis_validators() -> None:
         return
 
     ipfs_fetch_client = IpfsFetchClient(
-        endpoints=settings.ipfs_fetch_endpoints,
+        ipfs_endpoints=settings.ipfs_fetch_endpoints,
         timeout=settings.genesis_validators_ipfs_timeout,
         retry_timeout=settings.genesis_validators_ipfs_retry_timeout,
     )

@@ -65,7 +65,7 @@ class IpfsLazyFetchClient:
     @cached_property
     def client(self) -> IpfsFetchClient:
         return IpfsFetchClient(
-            endpoints=settings.ipfs_fetch_endpoints,
+            ipfs_endpoints=settings.ipfs_fetch_endpoints,
             timeout=settings.ipfs_timeout,
             retry_timeout=settings.ipfs_retry_timeout,
         )
