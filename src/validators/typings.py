@@ -64,5 +64,10 @@ class KeeperApprovalParams:
 
 
 class ValidatorsRegistrationMode(Enum):
+    """
+    AUTO mode: validators are registered automatically when vault assets are enough.
+    API mode: validators registration is triggered by API request.
+    """
+
     AUTO = 'AUTO'
     API = 'API'
