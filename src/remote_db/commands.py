@@ -109,9 +109,7 @@ def cleanup(ctx: Context) -> None:
     click.echo(f'Successfully removed all the entries for the {greenify(settings.vault)} vault.')
 
 
-@remote_db_group.command(
-    help='Generates shares for the local keypairs, updates configs in the remote DB.'
-)
+@remote_db_group.command(help='Updates configs in the remote DB.')
 @click.option(
     '--encrypt-key',
     envvar='REMOTE_DB_ENCRYPT_KEY',
@@ -133,12 +131,19 @@ def cleanup(ctx: Context) -> None:
     help='Path to the deposit_data.json file. '
     'Default is the file generated with "create-keys" command.',
 )
+@click.option(
+    '--pool-size',
+    help='Number of processes in a pool.',
+    envvar='POOL_SIZE',
+    type=int,
+)
 @click.pass_context
 def upload_keypairs(
     ctx: Context,
     encrypt_key: str,
     execution_endpoints: str,
     deposit_data_file: str | None,
+    pool_size: int | None,
 ) -> None:
     settings.set(
         vault=settings.vault,
@@ -148,12 +153,11 @@ def upload_keypairs(
         deposit_data_file=deposit_data_file,
         verbose=settings.verbose,
         execution_endpoints=execution_endpoints,
+        pool_size=pool_size,
     )
     try:
         asyncio.run(tasks.upload_keypairs(ctx.obj['db_url'], encrypt_key))
-        click.echo(
-            f'Successfully uploaded keypairs and shares for the {greenify(settings.vault)} vault.'
-        )
+        click.echo(f'Successfully uploaded keypairs for the {greenify(settings.vault)} vault.')
     except Exception as e:
         log_verbose(e)
 

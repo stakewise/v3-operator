@@ -12,12 +12,10 @@ from eth_typing import ChecksumAddress, HexAddress
 from py_ecc.bls import G2ProofOfPossession
 from web3 import Web3
 
-from src.common.typings import Oracles
 from src.remote_db.commands import remote_db_group
 from src.remote_db.database import ConfigsCrud, KeyPairsCrud
 from src.remote_db.tasks import _encrypt_private_key, _get_key_indexes
 from src.remote_db.typings import RemoteDatabaseKeyPair
-from src.validators.signing.key_shares import private_key_to_private_key_shares
 from src.validators.typings import BLSPrivkey
 
 
@@ -42,12 +40,10 @@ def _patch_check_deposit_data_root() -> Generator:
 
 
 def _get_remote_db_keypairs(
-    mocked_oracles: Oracles, encryption_key: bytes, vault_address: HexAddress
+    encryption_key: bytes, vault_address: HexAddress, total_validators: int
 ) -> list[RemoteDatabaseKeyPair]:
-    oracles = mocked_oracles
-    total_oracles = len(oracles.public_keys)
     keystores = {}
-    for _ in range(3):
+    for _ in range(total_validators):
         seed = randbits(256).to_bytes(32, 'big')
         private_key = BLSPrivkey(G2ProofOfPossession.KeyGen(seed).to_bytes(32, 'big'))
         public_key = Web3.to_hex(bls.SkToPk(private_key))
@@ -64,26 +60,6 @@ def _get_remote_db_keypairs(
                 nonce=Web3.to_hex(nonce),
             )
         )
-        # calculate shares for keystore private key
-        private_key_shares = private_key_to_private_key_shares(
-            private_key=private_key,
-            threshold=oracles.exit_signature_recover_threshold,
-            total=total_oracles,
-        )
-
-        # update remote signer config and shares keystores
-        for share_private_key in private_key_shares:
-            share_public_key = Web3.to_hex(bls.SkToPk(share_private_key))
-            encrypted_priv_key, nonce = _encrypt_private_key(share_private_key, encryption_key)
-            key_records.append(
-                RemoteDatabaseKeyPair(
-                    vault=ChecksumAddress(vault_address),
-                    parent_public_key=public_key,
-                    public_key=share_public_key,
-                    private_key=Web3.to_hex(encrypted_priv_key),
-                    nonce=Web3.to_hex(nonce),
-                )
-            )
     return key_records
 
 
@@ -201,7 +177,6 @@ class TestRemoteDbUploadKeypairs:
         self,
         data_dir: Path,
         vault_address: HexAddress,
-        mocked_oracles: Oracles,
         runner: CliRunner,
         execution_endpoints: str,
     ):
@@ -222,11 +197,9 @@ class TestRemoteDbUploadKeypairs:
             encryption_key,
         ]
 
-        with mock.patch.object(
-            KeyPairsCrud, 'get_first_keypair', return_value=None
-        ), mock.patch.object(ConfigsCrud, 'get_remote_signer_config', return_value=None):
+        with mock.patch.object(KeyPairsCrud, 'get_first_keypair', return_value=None):
             result = runner.invoke(remote_db_group, args)
-            output = f'Successfully uploaded keypairs and shares for the {vault_address} vault.'
+            output = f'Successfully uploaded keypairs for the {vault_address} vault.'
             assert output.strip() in result.output.strip()
 
 
@@ -240,7 +213,6 @@ class TestRemoteDbSetupWeb3Signer:
         self,
         data_dir: Path,
         vault_address: HexAddress,
-        mocked_oracles: Oracles,
         runner: CliRunner,
         execution_endpoints: str,
     ):
@@ -261,16 +233,12 @@ class TestRemoteDbSetupWeb3Signer:
             encryption_key,
         ]
         keypairs = _get_remote_db_keypairs(
-            mocked_oracles, base64.b64decode(encryption_key), vault_address
+            base64.b64decode(encryption_key), vault_address, total_validators=3
         )
 
         with runner.isolated_filesystem(), mock.patch.object(
             KeyPairsCrud, 'get_first_keypair', return_value=keypairs[0]
-        ), mock.patch.object(
-            KeyPairsCrud, 'get_keypairs', return_value=keypairs
-        ), mock.patch.object(
-            ConfigsCrud, 'get_remote_signer_config', return_value=None
-        ):
+        ), mock.patch.object(KeyPairsCrud, 'get_keypairs', return_value=keypairs):
             result = runner.invoke(remote_db_group, args)
             output = 'Successfully retrieved web3signer private keys from the database.\n'
             assert output.strip() in result.output.strip()
@@ -286,7 +254,6 @@ class TestRemoteDbSetupValidator:
         self,
         data_dir: Path,
         vault_address: HexAddress,
-        mocked_oracles: Oracles,
         runner: CliRunner,
     ):
         db_url = 'postgresql://user:password@localhost:5432/dbname'
@@ -312,19 +279,15 @@ class TestRemoteDbSetupValidator:
             vault_address,
         ]
         keypairs = _get_remote_db_keypairs(
-            mocked_oracles, base64.b64decode(encryption_key), vault_address
+            base64.b64decode(encryption_key), vault_address, total_validators=3
         )
 
         with runner.isolated_filesystem(), mock.patch.object(
             KeyPairsCrud, 'get_first_keypair', return_value=keypairs[0]
-        ), mock.patch.object(
-            KeyPairsCrud, 'get_keypairs', return_value=keypairs
-        ), mock.patch.object(
-            ConfigsCrud, 'get_remote_signer_config', return_value=None
-        ):
+        ), mock.patch.object(KeyPairsCrud, 'get_keypairs', return_value=keypairs):
             result = runner.invoke(remote_db_group, args)
             output = (
-                'Generated configs with 12 keys '
+                'Generated configs with 3 keys '
                 'for validator with index 0.\n'
                 'Validator definitions for Lighthouse saved to '
                 'validator/validator_definitions.yml file.\n'
@@ -346,7 +309,6 @@ class TestRemoteDbSetupOperator:
         self,
         data_dir: Path,
         vault_address: HexAddress,
-        mocked_oracles: Oracles,
         runner: CliRunner,
     ):
         db_url = 'postgresql://user:password@localhost:5432/dbname'
@@ -364,21 +326,16 @@ class TestRemoteDbSetupOperator:
             './operator',
         ]
         keypairs = _get_remote_db_keypairs(
-            mocked_oracles, base64.b64decode(encryption_key), vault_address
+            base64.b64decode(encryption_key), vault_address, total_validators=3
         )
         remote_config: dict[str, list[str]] = defaultdict(list)
         for keypair in keypairs:
-            if keypair.parent_public_key is None:
-                remote_config['public_key'] = []
-            else:
-                remote_config['public_key'].append(keypair.public_key)
+            remote_config['public_key'].append(keypair.public_key)
 
         with runner.isolated_filesystem(), mock.patch.object(
             KeyPairsCrud, 'get_first_keypair', return_value=keypairs[0]
         ), mock.patch.object(
             KeyPairsCrud, 'get_keypairs', return_value=keypairs
-        ), mock.patch.object(
-            ConfigsCrud, 'get_remote_signer_config', return_value=remote_config
         ), mock.patch.object(
             ConfigsCrud, 'get_deposit_data', return_value=[]
         ):

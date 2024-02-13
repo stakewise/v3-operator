@@ -50,7 +50,7 @@ class KeyPairsCrud:
         with self.db_connection.cursor() as cur:
             cur.execute(
                 f'''
-                    SELECT parent_public_key, public_key, private_key, nonce
+                    SELECT public_key, private_key, nonce
                     FROM {self.table}
                     WHERE vault = %s
                     ORDER BY public_key
@@ -63,31 +63,19 @@ class KeyPairsCrud:
                 return None
             return RemoteDatabaseKeyPair(
                 vault=settings.vault,
-                parent_public_key=row[0],
-                public_key=row[1],
-                private_key=row[2],
-                nonce=row[3],
+                public_key=row[0],
+                private_key=row[1],
+                nonce=row[2],
             )
 
-    def get_keypairs(
-        self, has_parent_public_key: bool | None = None
-    ) -> list[RemoteDatabaseKeyPair]:
+    def get_keypairs(self) -> list[RemoteDatabaseKeyPair]:
         """Returns keypairs from the database."""
-        where_list = []
         params: dict = {}
 
-        if has_parent_public_key is True:
-            where_list.append('parent_public_key IS NOT NULL')
-        elif has_parent_public_key is False:
-            where_list.append('parent_public_key IS NULL')
-
         query = f'''
-                SELECT parent_public_key, public_key, private_key, nonce
+                SELECT public_key, private_key, nonce
                 FROM {self.table}
         '''
-
-        if where_list:
-            query += f'WHERE {" AND ".join(where_list)}\n'
 
         query += 'ORDER BY public_key'
 
@@ -98,22 +86,21 @@ class KeyPairsCrud:
         return [
             RemoteDatabaseKeyPair(
                 vault=settings.vault,
-                parent_public_key=row[0],
-                public_key=row[1],
-                private_key=row[2],
-                nonce=row[3],
+                public_key=row[0],
+                private_key=row[1],
+                nonce=row[2],
             )
             for row in res
         ]
 
-    def remove_keypairs(self, in_parent_public_keys: set[HexStr] | None = None) -> None:
+    def remove_keypairs(self, in_public_keys: set[HexStr] | None = None) -> None:
         """Removes keypairs from the database."""
         where_list = ['vault = %(vault)s']
         params: dict = {'vault': settings.vault}
 
-        if in_parent_public_keys is not None:
-            where_list.append('parent_public_key IN %(in_parent_public_keys)s')
-            params['in_parent_public_keys'] = tuple(in_parent_public_keys)
+        if in_public_keys is not None:
+            where_list.append('public_key IN %(in_public_keys)s')
+            params['in_public_keys'] = tuple(in_public_keys)
 
         query = f'''
                 DELETE FROM {self.table}
@@ -130,18 +117,16 @@ class KeyPairsCrud:
                 f'''
                     INSERT INTO {self.table} (
                         vault,
-                        parent_public_key,
                         public_key,
                         private_key,
                         nonce
                     )
-                    VALUES (%s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s)
                     ON CONFLICT DO NOTHING
                 ''',
                 [
                     (
                         keypair.vault,
-                        keypair.parent_public_key,
                         keypair.public_key,
                         keypair.private_key,
                         keypair.nonce,
@@ -157,7 +142,6 @@ class KeyPairsCrud:
                 f'''
                     CREATE TABLE IF NOT EXISTS {self.table} (
                         vault VARCHAR(42) NOT NULL,
-                        parent_public_key VARCHAR(98),
                         public_key VARCHAR(98) UNIQUE NOT NULL,
                         private_key VARCHAR(66) UNIQUE NOT NULL,
                         nonce VARCHAR(34) UNIQUE NOT NULL
@@ -167,7 +151,6 @@ class KeyPairsCrud:
 
 
 class ConfigsCrud:
-    remote_signer_config_name = 'remote_signer_config.json'
     deposit_data_name = 'deposit_data.json'
 
     def __init__(self, db_connection: Any | None = None, db_url: str | None = None):
@@ -187,18 +170,6 @@ class ConfigsCrud:
             row = cur.fetchone()
             return row[0]
 
-    def get_remote_signer_config(self) -> dict | None:
-        """Returns the remote signer config from the database."""
-        with self.db_connection.cursor() as cur:
-            cur.execute(
-                f'SELECT data FROM {self.table} WHERE vault = %s AND name = %s',
-                (settings.vault, self.remote_signer_config_name),
-            )
-            row = cur.fetchone()
-            if row is None:
-                return None
-            return json.loads(row[0])
-
     def get_deposit_data(self) -> list | None:
         """Returns the deposit data from the database."""
         with self.db_connection.cursor() as cur:
@@ -210,19 +181,6 @@ class ConfigsCrud:
             if row is None:
                 return None
             return json.loads(row[0])
-
-    def update_remote_signer_config(self, data: dict) -> None:
-        """Updates the remote signer config in the database."""
-        data_string = json.dumps(data)
-        with self.db_connection.cursor() as cur:
-            cur.execute(
-                f'''
-                    INSERT INTO {self.table} (vault, name, data)
-                    VALUES (%s, %s, %s)
-                    ON CONFLICT (vault, name) DO UPDATE SET data = %s
-                ''',
-                (settings.vault, self.remote_signer_config_name, data_string, data_string),
-            )
 
     def update_deposit_data(self, deposit_data: list[dict]) -> None:
         """Updates the deposit data in the database."""

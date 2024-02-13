@@ -64,7 +64,7 @@ def cleanup(db_url: str) -> None:
 
 # pylint: disable=too-many-locals
 async def upload_keypairs(db_url: str, b64_encrypt_key: str) -> None:
-    """Generates shares for the local keypairs, updates configs in the remote DB."""
+    """Updates configs in the remote DB."""
     encryption_key = _check_encryption_key(db_url, b64_encrypt_key)
 
     # load and check deposit data file
@@ -79,7 +79,7 @@ async def upload_keypairs(db_url: str, b64_encrypt_key: str) -> None:
     if len(keystore) == 0:
         raise click.ClickException('Keystore not found.')
 
-    click.echo(f'Calculating and encrypting shares for {len(keystore)} keystores...')
+    click.echo(f'Encrypting {len(keystore)} keystores...')
     key_records: list[RemoteDatabaseKeyPair] = []
     for public_key, private_key in keystore.keys.items():  # pylint: disable=no-member
         encrypted_priv_key, nonce = _encrypt_private_key(private_key, encryption_key)
@@ -149,7 +149,7 @@ def setup_validator(
     output_dir: Path,
 ) -> None:
     """Generate validator configs for Lighthouse, Teku and Prysm clients."""
-    keypairs = KeyPairsCrud(db_url=db_url).get_keypairs(has_parent_public_key=False)
+    keypairs = KeyPairsCrud(db_url=db_url).get_keypairs()
     if not keypairs:
         raise click.ClickException('No keypairs found in the remote db.')
 
@@ -234,20 +234,20 @@ def _check_encryption_key(db_url: str, b64_encrypt_key: str) -> bytes:
         encryption_key = base64.b64decode(b64_encrypt_key)
         if len(encryption_key) != CIPHER_KEY_LENGTH:
             raise click.ClickException('Invalid encryption key length.')
-
-        keypair = KeyPairsCrud(db_url=db_url).get_first_keypair()
-        if keypair is None:
-            return encryption_key
-
-        decrypted_private_key = _decrypt_private_key(
-            private_key=Web3.to_bytes(hexstr=keypair.private_key),
-            encryption_key=encryption_key,
-            nonce=Web3.to_bytes(hexstr=keypair.nonce),
-        )
-        if bls.SkToPk(decrypted_private_key) != Web3.to_bytes(hexstr=keypair.public_key):
-            raise click.ClickException('Failed to decrypt first private key.')
     except Exception as exc:
         raise click.ClickException('Invalid encryption key.') from exc
+
+    keypair = KeyPairsCrud(db_url=db_url).get_first_keypair()
+    if keypair is None:
+        return encryption_key
+
+    decrypted_private_key = _decrypt_private_key(
+        private_key=Web3.to_bytes(hexstr=keypair.private_key),
+        encryption_key=encryption_key,
+        nonce=Web3.to_bytes(hexstr=keypair.nonce),
+    )
+    if bls.SkToPk(decrypted_private_key) != Web3.to_bytes(hexstr=keypair.public_key):
+        raise click.ClickException('Failed to decrypt first private key.')
 
     return encryption_key
 
