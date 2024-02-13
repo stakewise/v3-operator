@@ -109,7 +109,7 @@ def cleanup(ctx: Context) -> None:
     click.echo(f'Successfully removed all the entries for the {greenify(settings.vault)} vault.')
 
 
-@remote_db_group.command(help='Updates configs in the remote DB.')
+@remote_db_group.command(help='Uploads key-pairs to remote DB. Updates configs in the remote DB.')
 @click.option(
     '--encrypt-key',
     envvar='REMOTE_DB_ENCRYPT_KEY',

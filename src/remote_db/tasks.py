@@ -64,7 +64,7 @@ def cleanup(db_url: str) -> None:
 
 # pylint: disable=too-many-locals
 async def upload_keypairs(db_url: str, b64_encrypt_key: str) -> None:
-    """Updates configs in the remote DB."""
+    """Uploads key-pairs to remote DB. Updates configs in the remote DB."""
     encryption_key = _check_encryption_key(db_url, b64_encrypt_key)
 
     # load and check deposit data file
@@ -241,11 +241,15 @@ def _check_encryption_key(db_url: str, b64_encrypt_key: str) -> bytes:
     if keypair is None:
         return encryption_key
 
-    decrypted_private_key = _decrypt_private_key(
-        private_key=Web3.to_bytes(hexstr=keypair.private_key),
-        encryption_key=encryption_key,
-        nonce=Web3.to_bytes(hexstr=keypair.nonce),
-    )
+    try:
+        decrypted_private_key = _decrypt_private_key(
+            private_key=Web3.to_bytes(hexstr=keypair.private_key),
+            encryption_key=encryption_key,
+            nonce=Web3.to_bytes(hexstr=keypair.nonce),
+        )
+    except Exception as e:
+        raise click.ClickException('Failed to decrypt first private key.') from e
+
     if bls.SkToPk(decrypted_private_key) != Web3.to_bytes(hexstr=keypair.public_key):
         raise click.ClickException('Failed to decrypt first private key.')
 
