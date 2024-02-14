@@ -17,7 +17,6 @@ from src.common.typings import Oracles
 from src.config.settings import NETWORKS, settings
 from src.validators.exceptions import KeystoreException
 from src.validators.keystores.base import BaseKeystore
-from src.validators.signing.common import encrypt_signature
 from src.validators.signing.key_shares import (
     bls_signature_and_public_key_to_shares,
     private_key_to_private_key_shares,
@@ -102,11 +101,9 @@ class LocalKeystore(BaseKeystore):
             threshold=oracles.exit_signature_recover_threshold,
             total=len(oracles.public_keys),
         )
-        exit_signature_shards: list[HexStr] = []
-        for bls_priv_key, oracle_pubkey in zip(private_key_shares, oracles.public_keys):
-            exit_signature_shards.append(
-                encrypt_signature(oracle_pubkey, bls.Sign(bls_priv_key, message))
-            )
+        exit_signature_shards: list[BLSSignature] = []
+        for bls_priv_key in private_key_shares:
+            exit_signature_shards.append(bls.Sign(bls_priv_key, message))
 
         return ExitSignatureShards(
             public_keys=[Web3.to_hex(bls.SkToPk(priv_key)) for priv_key in private_key_shares],
@@ -143,16 +140,9 @@ class LocalKeystore(BaseKeystore):
             message, exit_signature, public_key_bytes, threshold, total
         )
 
-        encrypted_exit_signature_shares: list[HexStr] = []
-
-        for exit_signature_share, oracle_pubkey in zip(exit_signature_shares, oracles.public_keys):
-            encrypted_exit_signature_shares.append(
-                encrypt_signature(oracle_pubkey, exit_signature_share)
-            )
-
         return ExitSignatureShards(
             public_keys=[Web3.to_hex(p) for p in public_key_shares],
-            exit_signatures=encrypted_exit_signature_shares,
+            exit_signatures=exit_signature_shares,
         )
 
     async def get_exit_signature(

@@ -14,6 +14,15 @@ def encrypt_signature(oracle_pubkey: HexStr, signature: BLSSignature) -> HexStr:
     return Web3.to_hex(ecies.encrypt(oracle_pubkey, signature))
 
 
+def encrypt_signatures_list(
+    oracle_pubkeys: list[HexStr], signatures: list[BLSSignature]
+) -> list[HexStr]:
+    res: list[HexStr] = []
+    for signature, oracle_pubkey in zip(signatures, oracle_pubkeys):
+        res.append(encrypt_signature(oracle_pubkey, signature))
+    return res
+
+
 def get_validators_proof(
     tree: StandardMerkleTree,
     validators: list[Validator],

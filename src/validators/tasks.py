@@ -31,7 +31,7 @@ from src.validators.execution import (
 )
 from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.local import LocalKeystore
-from src.validators.signing.common import get_validators_proof
+from src.validators.signing.common import encrypt_signatures_list, get_validators_proof
 from src.validators.typings import (
     ApprovalRequest,
     DepositData,
@@ -305,6 +305,9 @@ async def create_approval_request(
                 oracles=oracles,
                 fork=settings.network_config.SHAPELLA_FORK,
             )
+        encrypted_exit_signature_shards = encrypt_signatures_list(
+            oracles.public_keys, shards.exit_signatures
+        )
 
         if not shards:
             logger.warning(
@@ -315,7 +318,7 @@ async def create_approval_request(
         request.public_keys.append(validator.public_key)
         request.deposit_signatures.append(validator.signature)
         request.public_key_shards.append(shards.public_keys)
-        request.exit_signature_shards.append(shards.exit_signatures)
+        request.exit_signature_shards.append(encrypted_exit_signature_shards)
 
         validator_index += 1
     return request

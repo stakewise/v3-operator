@@ -13,7 +13,6 @@ from src.common.typings import Oracles
 from src.config.networks import NETWORKS
 from src.config.settings import REMOTE_SIGNER_TIMEOUT, settings
 from src.validators.keystores.base import BaseKeystore
-from src.validators.signing.common import encrypt_signature
 from src.validators.signing.key_shares import bls_signature_and_public_key_to_shares
 from src.validators.typings import ExitSignatureShards
 from src.validators.utils import load_deposit_data
@@ -93,16 +92,9 @@ class RemoteSignerKeystore(BaseKeystore):
             message, exit_signature, public_key_bytes, threshold, total
         )
 
-        encrypted_exit_signature_shares: list[HexStr] = []
-
-        for exit_signature_share, oracle_pubkey in zip(exit_signature_shares, oracles.public_keys):
-            encrypted_exit_signature_shares.append(
-                encrypt_signature(oracle_pubkey, exit_signature_share)
-            )
-
         return ExitSignatureShards(
             public_keys=[Web3.to_hex(p) for p in public_key_shares],
-            exit_signatures=encrypted_exit_signature_shares,
+            exit_signatures=exit_signature_shares,
         )
 
     async def get_exit_signature(

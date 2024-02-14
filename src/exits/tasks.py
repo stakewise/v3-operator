@@ -24,6 +24,7 @@ from src.exits.utils import (
     send_signature_rotation_requests,
 )
 from src.validators.keystores.base import BaseKeystore
+from src.validators.signing.common import encrypt_signatures_list
 
 logger = logging.getLogger(__name__)
 
@@ -203,9 +204,13 @@ async def _get_oracles_request(
             failed_indexes.append(validator_index)
             continue
 
+        encrypted_exit_signature_shards = encrypt_signatures_list(
+            oracles.public_keys, shards.exit_signatures
+        )
+
         request.public_keys.append(public_key)
         request.public_key_shards.append(shards.public_keys)
-        request.exit_signature_shards.append(shards.exit_signatures)
+        request.exit_signature_shards.append(encrypted_exit_signature_shards)
 
     if failed_indexes:
         logger.warning(
