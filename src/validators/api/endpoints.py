@@ -74,7 +74,7 @@ async def approve_validators(request: Request) -> Response:
 
     # There may be lag between GET and POST requests.
     # During this time new assets may be staked into the vault.
-    # In this case validators list will be longer then approvals list.
+    # In this case validators list will be longer than approvals list.
     # Filter validators by requested public keys.
     validators = validators[: len(approvals)]
 
