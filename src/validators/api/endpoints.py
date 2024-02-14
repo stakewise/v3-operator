@@ -88,7 +88,7 @@ async def approve_validators(request: Request) -> Response:
         )
     )
 
-    return JSONResponse('ok')
+    return JSONResponse({})
 
 
 async def _validate_approvals(

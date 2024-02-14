@@ -10,9 +10,7 @@ from src.validators.utils import load_deposit_data
 logger = logging.getLogger(__name__)
 
 
-async def load_keystore() -> BaseKeystore | None:
-    if settings.no_keystores:
-        return None
+async def load_keystore() -> BaseKeystore:
     if settings.remote_signer_url:
         deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
         remote_keystore = RemoteSignerKeystore(deposit_data.public_keys)

@@ -17,14 +17,16 @@ from src.exits.tasks import ExitSignatureTask
 from src.harvest.tasks import HarvestTask
 from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import NetworkValidatorsProcessor
+from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
 from src.validators.tasks import ValidatorsTask, load_genesis_validators
+from src.validators.typings import ValidatorsRegistrationMode
 from src.validators.utils import load_deposit_data
 
 logger = logging.getLogger(__name__)
 
 
-async def main() -> None:
+async def start_base() -> None:
     setup_logging()
     setup_sentry()
     log_start()
@@ -38,7 +40,9 @@ async def main() -> None:
     await load_genesis_validators()
 
     # load keystore
-    keystore = await load_keystore()
+    keystore: BaseKeystore | None = None
+    if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
+        keystore = await load_keystore()
 
     # load deposit data
     deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)

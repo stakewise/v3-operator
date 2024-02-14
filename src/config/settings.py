@@ -47,7 +47,6 @@ class Settings(metaclass=Singleton):
     metrics_host: str
     metrics_port: int
     deposit_data_file: Path
-    no_keystores: bool
     keystores_dir: Path
     keystores_password_dir: Path
     keystores_password_file: Path
@@ -91,7 +90,6 @@ class Settings(metaclass=Singleton):
         metrics_host: str = DEFAULT_METRICS_HOST,
         max_fee_per_gas_gwei: int = DEFAULT_MAX_FEE_PER_GAS_GWEI,
         deposit_data_file: str | None = None,
-        no_keystores: bool = False,
         keystores_dir: str | None = None,
         keystores_password_file: str | None = None,
         remote_signer_url: str | None = None,
@@ -128,7 +126,6 @@ class Settings(metaclass=Singleton):
         )
 
         # keystores
-        self.no_keystores = no_keystores
         self.keystores_dir = Path(keystores_dir) if keystores_dir else vault_dir / 'keystores'
         self.keystores_password_dir = decouple_config(
             'KEYSTORES_PASSWORD_DIR',

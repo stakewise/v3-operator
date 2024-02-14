@@ -5,7 +5,7 @@ from pathlib import Path
 import click
 from eth_typing import ChecksumAddress
 
-from src.commands.start_base import main
+from src.commands.start_base import start_base
 from src.common.logging import LOG_LEVELS
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_address
@@ -252,6 +252,6 @@ def start(
     )
 
     try:
-        asyncio.run(main())
+        asyncio.run(start_base())
     except Exception as e:
         log_verbose(e)

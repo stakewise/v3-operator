@@ -157,9 +157,6 @@ async def main(count: int | None) -> None:
     setup_logging()
     keystore = await load_keystore()
 
-    if keystore is None:
-        raise click.ClickException('Keystore must be set')
-
     validators_exits = await _get_validators_exits(keystore=keystore)
     if not validators_exits:
         raise click.ClickException('There are no active validators.')
