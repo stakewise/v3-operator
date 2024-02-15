@@ -36,3 +36,5 @@ def setup_logging():
 
         # Logging config does not affect messages issued by `warnings` module
         warnings.simplefilter('ignore')
+
+    logging.getLogger('web3').setLevel(settings.web3_log_level)
