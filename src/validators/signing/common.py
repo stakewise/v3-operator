@@ -2,7 +2,11 @@ import ecies
 from eth_typing import BLSPubkey, BLSSignature, HexStr
 from multiproof import StandardMerkleTree
 from multiproof.standard import MultiProof
-from sw_utils import get_eth1_withdrawal_credentials, get_exit_message_signing_root
+from sw_utils import (
+    ConsensusFork,
+    get_eth1_withdrawal_credentials,
+    get_exit_message_signing_root,
+)
 from sw_utils.signing import compute_deposit_data
 from web3 import Web3
 
@@ -54,22 +58,26 @@ def encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) -> 
     return public_key + signature + deposit_root
 
 
+# pylint: disable-next=too-many-arguments
 async def get_encrypted_exit_signature_shards(
     keystore: BaseKeystore | None,
     public_key: HexStr,
     validator_index: int,
     oracles: Oracles,
     exit_signature: BLSSignature | None = None,
+    fork: ConsensusFork | None = None,
 ) -> ExitSignatureShards:
     """
     * generates exit signature shards,
     * generates public key shards
     * encrypts exit signature shards with oracles' public keys.
     """
+    fork = fork or settings.network_config.SHAPELLA_FORK
+
     message = get_exit_message_signing_root(
         validator_index=validator_index,
         genesis_validators_root=settings.network_config.GENESIS_VALIDATORS_ROOT,
-        fork=settings.network_config.SHAPELLA_FORK,
+        fork=fork,
     )
 
     if exit_signature is None:
@@ -79,6 +87,7 @@ async def get_encrypted_exit_signature_shards(
         exit_signature = await keystore.get_exit_signature(
             validator_index=validator_index,
             public_key=public_key,
+            fork=fork,
         )
     public_key_bytes = BLSPubkey(Web3.to_bytes(hexstr=public_key))
     threshold = oracles.exit_signature_recover_threshold

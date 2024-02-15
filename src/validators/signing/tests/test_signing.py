@@ -17,6 +17,7 @@ from src.validators.keystores.hashi_vault import (
 )
 from src.validators.keystores.local import LocalKeystore
 from src.validators.keystores.remote import RemoteSignerKeystore
+from src.validators.signing.common import get_encrypted_exit_signature_shards
 from src.validators.signing.tests.oracle_functions import OracleCommittee
 from src.validators.typings import ExitSignatureShards
 
@@ -72,9 +73,9 @@ class TestSigning:
         validator_privkey, validator_pubkey = create_validator_keypair()
         validator_index = 123
 
-        shards = await LocalKeystore(
-            {validator_pubkey: validator_privkey}
-        ).get_exit_signature_shards(
+        keystore = LocalKeystore({validator_pubkey: validator_privkey})
+        shards = await get_encrypted_exit_signature_shards(
+            keystore=keystore,
             validator_index=validator_index,
             public_key=validator_pubkey,
             oracles=mocked_oracles,
@@ -111,11 +112,10 @@ class TestSigning:
         validator_pubkey = keystore.public_keys[0]
         validator_index = random.randint(1, 10000)
 
-        exit_signature = await keystore.get_exit_signature(
-            validator_index, validator_pubkey, settings.network, fork
-        )
+        exit_signature = await keystore.get_exit_signature(validator_index, validator_pubkey, fork)
 
-        shards = await keystore.get_exit_signature_shards(
+        shards = await get_encrypted_exit_signature_shards(
+            keystore=keystore,
             validator_index=validator_index,
             public_key=validator_pubkey,
             oracles=mocked_oracles,
@@ -158,7 +158,8 @@ class TestSigning:
         )
         exit_signature = bls.Sign(validator_privkey, message)
 
-        shards = await LocalKeystore.get_exit_signature_shards_without_keystore(
+        shards = await get_encrypted_exit_signature_shards(
+            keystore=None,
             validator_index=validator_index,
             public_key=validator_pubkey,
             oracles=mocked_oracles,
@@ -187,11 +188,11 @@ class TestSigning:
         _, bls_pubkey = create_validator_keypair()
         validator_index = 123
         settings.remote_signer_url = remote_signer_url
-        '''
-        [BLSPubkey(Web3.to_bytes(hexstr=bls_pubkey))]
-        '''
+        keystore = RemoteSignerKeystore([])
+
         with pytest.raises(RuntimeError, match='Failed to get signature'):
-            _ = await RemoteSignerKeystore({}).get_exit_signature_shards(
+            _ = await get_encrypted_exit_signature_shards(
+                keystore=keystore,
                 validator_index=validator_index,
                 public_key=bls_pubkey,
                 oracles=mocked_oracles,
