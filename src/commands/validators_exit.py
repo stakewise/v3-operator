@@ -178,8 +178,6 @@ async def main(count: int | None) -> None:
         exit_signature = await keystore.get_exit_signature(
             validator_index=validator_exit.index,
             public_key=validator_exit.public_key,
-            network=settings.network,
-            fork=settings.network_config.SHAPELLA_FORK,
         )
         try:
             await consensus_client.submit_voluntary_exit(

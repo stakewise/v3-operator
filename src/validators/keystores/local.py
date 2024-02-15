@@ -7,21 +7,16 @@ from pathlib import Path
 from typing import NewType
 
 import milagro_bls_binding as bls
-from eth_typing import BLSPubkey, BLSSignature, HexStr
+from eth_typing import BLSSignature, HexStr
 from staking_deposit.key_handling.keystore import ScryptKeystore
 from sw_utils.signing import get_exit_message_signing_root
 from sw_utils.typings import ConsensusFork
 from web3 import Web3
 
-from src.common.typings import Oracles
-from src.config.settings import NETWORKS, settings
+from src.config.settings import settings
 from src.validators.exceptions import KeystoreException
 from src.validators.keystores.base import BaseKeystore
-from src.validators.signing.key_shares import (
-    bls_signature_and_public_key_to_shares,
-    private_key_to_private_key_shares,
-)
-from src.validators.typings import BLSPrivkey, ExitSignatureShards
+from src.validators.typings import BLSPrivkey
 
 logger = logging.getLogger(__name__)
 
@@ -82,77 +77,16 @@ class LocalKeystore(BaseKeystore):
     def __len__(self) -> int:
         return len(self.keys)
 
-    async def get_exit_signature_shards(
-        self, validator_index: int, public_key: HexStr, oracles: Oracles, fork: ConsensusFork
-    ) -> ExitSignatureShards:
-        """
-        * generates exit signature shards,
-        * generates public key shards
-        * encrypts exit signature shards with oracles' public keys.
-        """
-        message = get_exit_message_signing_root(
-            validator_index=validator_index,
-            genesis_validators_root=settings.network_config.GENESIS_VALIDATORS_ROOT,
-            fork=fork,
-        )
-
-        private_key_shares = private_key_to_private_key_shares(
-            private_key=self.keys[public_key],
-            threshold=oracles.exit_signature_recover_threshold,
-            total=len(oracles.public_keys),
-        )
-        exit_signature_shards: list[BLSSignature] = []
-        for bls_priv_key in private_key_shares:
-            exit_signature_shards.append(bls.Sign(bls_priv_key, message))
-
-        return ExitSignatureShards(
-            public_keys=[Web3.to_hex(bls.SkToPk(priv_key)) for priv_key in private_key_shares],
-            exit_signatures=exit_signature_shards,
-        )
-
-    @staticmethod
-    async def get_exit_signature_shards_without_keystore(
-        validator_index: int,
-        public_key: HexStr,
-        oracles: Oracles,
-        fork: ConsensusFork,
-        exit_signature: BLSSignature,
-    ) -> ExitSignatureShards:
-        """
-        Similar to `get_exit_signature_shards`, but keystores (private keys) are not used.
-        The function requires `exit_signature` is generated before and passed as argument.
-
-        * generates exit signature shards,
-        * generates public key shards
-        * encrypts exit signature shards with oracles' public keys.
-        """
-        message = get_exit_message_signing_root(
-            validator_index=validator_index,
-            genesis_validators_root=settings.network_config.GENESIS_VALIDATORS_ROOT,
-            fork=fork,
-        )
-
-        public_key_bytes = BLSPubkey(Web3.to_bytes(hexstr=public_key))
-        threshold = oracles.exit_signature_recover_threshold
-        total = len(oracles.public_keys)
-
-        exit_signature_shares, public_key_shares = bls_signature_and_public_key_to_shares(
-            message, exit_signature, public_key_bytes, threshold, total
-        )
-
-        return ExitSignatureShards(
-            public_keys=[Web3.to_hex(p) for p in public_key_shares],
-            exit_signatures=exit_signature_shares,
-        )
-
     async def get_exit_signature(
-        self, validator_index: int, public_key: HexStr, network: str, fork: ConsensusFork
+        self, validator_index: int, public_key: HexStr, fork: ConsensusFork | None = None
     ) -> BLSSignature:
+        fork = fork or settings.network_config.SHAPELLA_FORK
+
         private_key = self.keys[public_key]
 
         message = get_exit_message_signing_root(
             validator_index=validator_index,
-            genesis_validators_root=NETWORKS[network].GENESIS_VALIDATORS_ROOT,
+            genesis_validators_root=settings.network_config.GENESIS_VALIDATORS_ROOT,
             fork=fork,
         )
 

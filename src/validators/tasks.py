@@ -30,8 +30,10 @@ from src.validators.execution import (
     update_unused_validator_keys_metric,
 )
 from src.validators.keystores.base import BaseKeystore
-from src.validators.keystores.local import LocalKeystore
-from src.validators.signing.common import encrypt_signatures_list, get_validators_proof
+from src.validators.signing.common import (
+    get_encrypted_exit_signature_shards,
+    get_validators_proof,
+)
 from src.validators.typings import (
     ApprovalRequest,
     DepositData,
@@ -269,12 +271,14 @@ async def create_approval_request(
 
     # get next validator index for exit signature
     latest_public_keys = await get_latest_network_validator_public_keys()
-    validator_index = NetworkValidatorCrud().get_next_validator_index(list(latest_public_keys))
-    logger.debug('Next validator index for exit signature: %d', validator_index)
+    start_validator_index = NetworkValidatorCrud().get_next_validator_index(
+        list(latest_public_keys)
+    )
+    logger.debug('Next validator index for exit signature: %d', start_validator_index)
 
     # get exit signature shards
     request = ApprovalRequest(
-        validator_index=validator_index,
+        validator_index=start_validator_index,
         vault_address=settings.vault,
         validators_root=Web3.to_hex(registry_root),
         public_keys=[],
@@ -286,27 +290,13 @@ async def create_approval_request(
         proof_indexes=[val[1] for val in multi_proof.leaves],
         deadline=deadline,
     )
-    for validator in validators:
-        if keystore is None:
-            if validator.exit_signature is None:
-                raise RuntimeError('validator.exit_signature must be set')
-
-            shards = await LocalKeystore.get_exit_signature_shards_without_keystore(
-                validator_index=validator_index,
-                public_key=validator.public_key,
-                oracles=oracles,
-                fork=settings.network_config.SHAPELLA_FORK,
-                exit_signature=validator.exit_signature,
-            )
-        else:
-            shards = await keystore.get_exit_signature_shards(
-                validator_index=validator_index,
-                public_key=validator.public_key,
-                oracles=oracles,
-                fork=settings.network_config.SHAPELLA_FORK,
-            )
-        encrypted_exit_signature_shards = encrypt_signatures_list(
-            oracles.public_keys, shards.exit_signatures
+    for validator_index, validator in enumerate(validators, start_validator_index):
+        shards = await get_encrypted_exit_signature_shards(
+            keystore=keystore,
+            public_key=validator.public_key,
+            validator_index=validator_index,
+            oracles=oracles,
+            exit_signature=validator.exit_signature,
         )
 
         if not shards:
@@ -318,9 +308,8 @@ async def create_approval_request(
         request.public_keys.append(validator.public_key)
         request.deposit_signatures.append(validator.signature)
         request.public_key_shards.append(shards.public_keys)
-        request.exit_signature_shards.append(encrypted_exit_signature_shards)
+        request.exit_signature_shards.append(shards.exit_signatures)
 
-        validator_index += 1
     return request
 
 
