@@ -22,7 +22,7 @@ from src.validators.signing.tests.oracle_functions import OracleCommittee
 from src.validators.typings import ExitSignatureShards
 
 
-class TestSigning:
+class TestGetEncryptedExitSignatureShards:
     @staticmethod
     def check_signature_shards(
         shards: ExitSignatureShards,
@@ -63,7 +63,7 @@ class TestSigning:
         ],
         indirect=True,
     )
-    async def test_get_exit_signature_shards_local(
+    async def test_local(
         self,
         create_validator_keypair: Callable,
         fork: ConsensusFork,
@@ -82,7 +82,7 @@ class TestSigning:
             fork=fork,
         )
 
-        TestSigning.check_signature_shards(
+        self.check_signature_shards(
             shards=shards,
             committee=_mocked_oracle_committee,
             validator_pubkey=BLSPubkey(Web3.to_bytes(hexstr=validator_pubkey)),
@@ -99,7 +99,7 @@ class TestSigning:
         ],
         indirect=True,
     )
-    async def test_get_exit_signature_shards_remote_signer(
+    async def test_remote_signer(
         self,
         create_validator_keypair: Callable,
         fork: ConsensusFork,
@@ -122,7 +122,7 @@ class TestSigning:
             fork=fork,
         )
 
-        TestSigning.check_signature_shards(
+        self.check_signature_shards(
             shards=shards,
             committee=_mocked_oracle_committee,
             validator_pubkey=BLSPubkey(Web3.to_bytes(hexstr=validator_pubkey)),
@@ -141,13 +141,17 @@ class TestSigning:
         ],
         indirect=True,
     )
-    async def test_exit_signature_shards_without_keystore(
+    async def test_api(
         self,
         create_validator_keypair: Callable,
         fork: ConsensusFork,
         mocked_oracles: Oracles,
         _mocked_oracle_committee: OracleCommittee,
     ):
+        """
+        The case when settings.validators_registration_mode == ValidatorsRegistrationMode.API.
+        Exit signature is created by third party.
+        """
         validator_privkey, validator_pubkey = create_validator_keypair()
         validator_index = 123
 
@@ -167,7 +171,7 @@ class TestSigning:
             exit_signature=exit_signature,
         )
 
-        TestSigning.check_signature_shards(
+        self.check_signature_shards(
             shards=shards,
             committee=_mocked_oracle_committee,
             validator_pubkey=BLSPubkey(Web3.to_bytes(hexstr=validator_pubkey)),
@@ -199,6 +203,8 @@ class TestSigning:
                 fork=fork,
             )
 
+
+class TestHashiVault:
     @pytest.mark.usefixtures('mocked_hashi_vault')
     async def test_hashi_vault_keystores_loading(
         self,
