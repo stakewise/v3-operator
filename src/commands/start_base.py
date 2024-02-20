@@ -7,7 +7,7 @@ from sw_utils import EventScanner, InterruptHandler
 import src
 from src.api import app as api_app
 from src.common.consensus import get_chain_finalized_head
-from src.common.execution import WalletTask, get_oracles
+from src.common.execution import WalletTask, update_oracles_cache
 from src.common.logging import setup_logging
 from src.common.metrics import MetricsTask, metrics_server
 from src.common.startup_check import startup_checks
@@ -57,8 +57,8 @@ async def start_base() -> None:
     chain_state = await get_chain_finalized_head()
     await network_validators_scanner.process_new_events(chain_state.execution_block)
 
-    logger.info('Warming up oracles cache...')
-    await get_oracles()
+    logger.info('Updating oracles cache...')
+    await update_oracles_cache()
 
     if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
         logger.info('Starting api server')
