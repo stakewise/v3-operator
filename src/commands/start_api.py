@@ -196,7 +196,6 @@ def start_api(
         vault_config.load()
         network = vault_config.network
 
-    enable_api = True
     validators_registration_mode = ValidatorsRegistrationMode.API
 
     settings.set(
@@ -217,7 +216,6 @@ def start_api(
         database_dir=database_dir,
         log_level=log_level,
         log_format=log_format,
-        enable_api=enable_api,
         api_host=api_host,
         api_port=api_port,
         validators_registration_mode=validators_registration_mode,

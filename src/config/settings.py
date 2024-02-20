@@ -72,7 +72,6 @@ class Settings(metaclass=Singleton):
     sentry_dsn: str
     pool_size: int | None
 
-    enable_api: bool
     api_host: str
     api_port: int
     validators_registration_mode: ValidatorsRegistrationMode
@@ -105,7 +104,6 @@ class Settings(metaclass=Singleton):
         log_level: str | None = None,
         log_format: str | None = None,
         pool_size: int | None = None,
-        enable_api: bool = False,
         api_host: str = DEFAULT_API_HOST,
         api_port: int = DEFAULT_API_PORT,
         validators_registration_mode: ValidatorsRegistrationMode = ValidatorsRegistrationMode.AUTO,
@@ -201,7 +199,6 @@ class Settings(metaclass=Singleton):
         self.consensus_retry_timeout = decouple_config(
             'CONSENSUS_RETRY_TIMEOUT', default=120, cast=int
         )
-        self.enable_api = enable_api
         self.api_host = api_host
         self.api_port = api_port
         self.validators_registration_mode = validators_registration_mode

@@ -60,7 +60,7 @@ async def start_base() -> None:
     logger.info('Warming up oracles cache...')
     await get_oracles()
 
-    if settings.enable_api:
+    if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
         logger.info('Starting api server')
         api_app.state.deposit_data = deposit_data
 
