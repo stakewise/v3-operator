@@ -10,7 +10,7 @@ from sw_utils import is_valid_exit_signature
 from web3 import Web3
 
 from src.config.settings import settings
-from src.validators.api.schemas import ValidatorApproval
+from src.validators.api.schemas import ValidatorRegistrationRequest
 from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import get_latest_network_validator_public_keys
 from src.validators.tasks import (
@@ -41,7 +41,7 @@ async def get_validators(request: Request) -> Response:
     )
 
 
-async def approve_validators(request: Request) -> Response:
+async def submit_validators(request: Request) -> Response:
     if settings.validators_registration_mode != ValidatorsRegistrationMode.API:
         return JSONResponse(
             {'error': 'validators registration mode must be "API"'},
@@ -53,13 +53,13 @@ async def approve_validators(request: Request) -> Response:
     except json.JSONDecodeError:
         return JSONResponse({'error': 'invalid json'}, status_code=HTTP_400_BAD_REQUEST)
 
-    adapter = TypeAdapter(list[ValidatorApproval])
+    adapter = TypeAdapter(list[ValidatorRegistrationRequest])
     try:
-        approvals: list[ValidatorApproval] = adapter.validate_python(payload)
+        registration_requests: list[ValidatorRegistrationRequest] = adapter.validate_python(payload)
     except ValidationError as e:
         return JSONResponse({'error': json.loads(e.json())}, status_code=HTTP_400_BAD_REQUEST)
 
-    if not approvals:
+    if not registration_requests:
         return JSONResponse({'error': 'invalid validators'}, status_code=HTTP_400_BAD_REQUEST)
 
     deposit_data = request.app.state.deposit_data
@@ -68,18 +68,18 @@ async def approve_validators(request: Request) -> Response:
         keystore=None, deposit_data=deposit_data
     )
 
-    error = await _validate_approvals(approvals, validators)
+    error = await _validate_registration_requests(registration_requests, validators)
     if error is not None:
         return JSONResponse({'error': error}, status_code=HTTP_400_BAD_REQUEST)
 
     # There may be lag between GET and POST requests.
     # During this time new assets may be staked into the vault.
-    # In this case validators list will be longer than approvals list.
+    # In this case validators list will be longer than requests list.
     # Filter validators by requested public keys.
-    validators = validators[: len(approvals)]
+    validators = validators[: len(registration_requests)]
 
-    for validator, approval in zip(validators, approvals):
-        validator.exit_signature = approval.exit_signature
+    for validator, registration_request in zip(validators, registration_requests):
+        validator.exit_signature = registration_request.exit_signature
 
     pending_validator_registrations.extend([v.public_key for v in validators])
     asyncio.create_task(
@@ -91,14 +91,14 @@ async def approve_validators(request: Request) -> Response:
     return JSONResponse({})
 
 
-async def _validate_approvals(
-    approvals: list[ValidatorApproval], validators: list[Validator]
+async def _validate_registration_requests(
+    registration_requests: list[ValidatorRegistrationRequest], validators: list[Validator]
 ) -> Any:
     """
     Business logic validation
     :return: error
     """
-    if len(validators) < len(approvals):
+    if len(validators) < len(registration_requests):
         return 'invalid validators length'
 
     # get next validator index for exit signature
@@ -106,16 +106,16 @@ async def _validate_approvals(
     next_validator_index = NetworkValidatorCrud().get_next_validator_index(list(latest_public_keys))
 
     # validate public keys and exit signatures
-    for approval, (validator_index, validator) in zip(
-        approvals, enumerate(validators, next_validator_index)
+    for registration_request, (validator_index, validator) in zip(
+        registration_requests, enumerate(validators, next_validator_index)
     ):
-        if validator.public_key != Web3.to_hex(approval.public_key):
+        if validator.public_key != Web3.to_hex(registration_request.public_key):
             return 'invalid validators public_key'
 
         if not is_valid_exit_signature(
             validator_index,
-            approval.public_key,
-            approval.exit_signature,
+            registration_request.public_key,
+            registration_request.exit_signature,
             settings.network_config.GENESIS_VALIDATORS_ROOT,
             settings.network_config.SHAPELLA_FORK,
         ):
