@@ -24,15 +24,19 @@ from src.exits.utils import (
     send_signature_rotation_requests,
 )
 from src.validators.keystores.base import BaseKeystore
+from src.validators.signing.common import get_encrypted_exit_signature_shards
 
 logger = logging.getLogger(__name__)
 
 
 class ExitSignatureTask(BaseTask):
-    def __init__(self, keystore: BaseKeystore):
+    def __init__(self, keystore: BaseKeystore | None):
         self.keystore = keystore
 
     async def process_block(self) -> None:
+        if self.keystore is None:
+            return
+
         oracles = await get_oracles()
         update_block = await _fetch_last_update_block()
         if update_block and not await is_block_finalized(update_block):
@@ -190,11 +194,11 @@ async def _get_oracles_request(
             break
 
         if public_key in keystore:
-            shards = await keystore.get_exit_signature_shards(
-                validator_index=validator_index,
+            shards = await get_encrypted_exit_signature_shards(
+                keystore=keystore,
                 public_key=public_key,
+                validator_index=validator_index,
                 oracles=oracles,
-                fork=settings.network_config.SHAPELLA_FORK,
             )
         else:
             failed_indexes.append(validator_index)

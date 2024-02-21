@@ -1,3 +1,5 @@
+import logging
+
 from prometheus_client import Gauge, Info, start_http_server
 
 import src
@@ -27,8 +29,11 @@ class Metrics:
 metrics = Metrics()
 metrics.set_app_version()
 
+logger = logging.getLogger(__name__)
+
 
 async def metrics_server() -> None:
+    logger.info('Starting metrics server')
     start_http_server(settings.metrics_port, settings.metrics_host)
 
 

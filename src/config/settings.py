@@ -6,12 +6,17 @@ from web3 import Web3
 from web3.types import ChecksumAddress
 
 from src.config.networks import HOLESKY, MAINNET, NETWORKS, NetworkConfig
+from src.validators.typings import ValidatorsRegistrationMode
 
 DATA_DIR = Path.home() / '.stakewise'
 
 DEFAULT_MAX_FEE_PER_GAS_GWEI = 100
+
 DEFAULT_METRICS_HOST = '127.0.0.1'
 DEFAULT_METRICS_PORT = 9100
+
+DEFAULT_API_HOST = '127.0.0.1'
+DEFAULT_API_PORT = 8000
 
 
 class Singleton(type):
@@ -67,6 +72,11 @@ class Settings(metaclass=Singleton):
     sentry_dsn: str
     pool_size: int | None
 
+    api_host: str
+    api_port: int
+    validators_registration_mode: ValidatorsRegistrationMode
+    skip_startup_checks: bool
+
     # pylint: disable-next=too-many-arguments,too-many-locals
     def set(
         self,
@@ -94,6 +104,9 @@ class Settings(metaclass=Singleton):
         log_level: str | None = None,
         log_format: str | None = None,
         pool_size: int | None = None,
+        api_host: str = DEFAULT_API_HOST,
+        api_port: int = DEFAULT_API_PORT,
+        validators_registration_mode: ValidatorsRegistrationMode = ValidatorsRegistrationMode.AUTO,
     ) -> None:
         self.vault = Web3.to_checksum_address(vault)
         vault_dir.mkdir(parents=True, exist_ok=True)
@@ -186,6 +199,11 @@ class Settings(metaclass=Singleton):
         self.consensus_retry_timeout = decouple_config(
             'CONSENSUS_RETRY_TIMEOUT', default=120, cast=int
         )
+        self.api_host = api_host
+        self.api_port = api_port
+        self.validators_registration_mode = validators_registration_mode
+
+        self.skip_startup_checks = decouple_config('SKIP_STARTUP_CHECKS', default=False, cast=bool)
 
     @property
     def keystore_cls_str(self) -> str:

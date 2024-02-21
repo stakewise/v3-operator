@@ -5,6 +5,7 @@ from pathlib import Path
 import click
 from eth_typing import ChecksumAddress
 
+import src.validators.api.endpoints  # noqa  # pylint:disable=unused-import
 from src.commands.start_base import start_base
 from src.common.logging import LOG_LEVELS
 from src.common.utils import log_verbose
@@ -12,6 +13,8 @@ from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
 from src.config.settings import (
     AVAILABLE_NETWORKS,
+    DEFAULT_API_HOST,
+    DEFAULT_API_PORT,
     DEFAULT_MAX_FEE_PER_GAS_GWEI,
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
@@ -19,6 +22,7 @@ from src.config.settings import (
     LOG_PLAIN,
     settings,
 )
+from src.validators.typings import ValidatorsRegistrationMode
 
 logger = logging.getLogger(__name__)
 
@@ -58,20 +62,6 @@ logger = logging.getLogger(__name__)
     envvar='HOT_WALLET_FILE',
     help='Absolute path to the hot wallet. '
     'Default is the file generated with "create-wallet" command.',
-)
-@click.option(
-    '--keystores-password-file',
-    type=click.Path(exists=True, file_okay=True, dir_okay=False),
-    envvar='KEYSTORES_PASSWORD_FILE',
-    help='Absolute path to the password file for decrypting keystores. '
-    'Default is the file generated with "create-keys" command.',
-)
-@click.option(
-    '--keystores-dir',
-    type=click.Path(exists=True, file_okay=False, dir_okay=True),
-    envvar='KEYSTORES_DIR',
-    help='Absolute path to the directory with all the encrypted keystores. '
-    'Default is the directory generated with "create-keys" command.',
 )
 @click.option(
     '--deposit-data-file',
@@ -145,27 +135,6 @@ logger = logging.getLogger(__name__)
     help='Address of the vault to register validators for.',
 )
 @click.option(
-    '--remote-signer-url',
-    type=str,
-    envvar='REMOTE_SIGNER_URL',
-    help='The base URL of the remote signer, e.g. http://signer:9000',
-)
-@click.option(
-    '--hashi-vault-url',
-    envvar='HASHI_VAULT_URL',
-    help='The base URL of the vault service, e.g. http://vault:8200.',
-)
-@click.option(
-    '--hashi-vault-token',
-    envvar='HASHI_VAULT_TOKEN',
-    help='Authentication token for accessing Hashi vault.',
-)
-@click.option(
-    '--hashi-vault-key-path',
-    envvar='HASHI_VAULT_KEY_PATH',
-    help='Key path in the K/V secret engine where validator signing keys are stored.',
-)
-@click.option(
     '--log-format',
     type=click.Choice(
         LOG_FORMATS,
@@ -186,14 +155,22 @@ logger = logging.getLogger(__name__)
     help='The log level.',
 )
 @click.option(
-    '--pool-size',
-    help='Number of processes in a pool.',
-    envvar='POOL_SIZE',
+    '--api-host',
+    type=str,
+    help=f'API host. Default is {DEFAULT_API_HOST}.',
+    envvar='API_HOST',
+    default=DEFAULT_API_HOST,
+)
+@click.option(
+    '--api-port',
     type=int,
+    help=f'API port. Default is {DEFAULT_API_PORT}.',
+    envvar='API_PORT',
+    default=DEFAULT_API_PORT,
 )
 @click.command(help='Start operator service')
 # pylint: disable-next=too-many-arguments,too-many-locals
-def start(
+def start_api(
     vault: ChecksumAddress,
     consensus_endpoints: str,
     execution_endpoints: str,
@@ -207,22 +184,19 @@ def start(
     log_format: str,
     network: str | None,
     deposit_data_file: str | None,
-    keystores_dir: str | None,
-    keystores_password_file: str | None,
-    remote_signer_url: str | None,
-    hashi_vault_key_path: str | None,
-    hashi_vault_token: str | None,
-    hashi_vault_url: str | None,
     hot_wallet_file: str | None,
     hot_wallet_password_file: str | None,
     max_fee_per_gas_gwei: int,
     database_dir: str | None,
-    pool_size: int | None,
+    api_host: str,
+    api_port: int,
 ) -> None:
     vault_config = VaultConfig(vault, Path(data_dir))
     if network is None:
         vault_config.load()
         network = vault_config.network
+
+    validators_registration_mode = ValidatorsRegistrationMode.API
 
     settings.set(
         vault=vault,
@@ -236,19 +210,15 @@ def start(
         metrics_port=metrics_port,
         network=network,
         deposit_data_file=deposit_data_file,
-        keystores_dir=keystores_dir,
-        keystores_password_file=keystores_password_file,
-        remote_signer_url=remote_signer_url,
-        hashi_vault_token=hashi_vault_token,
-        hashi_vault_key_path=hashi_vault_key_path,
-        hashi_vault_url=hashi_vault_url,
         hot_wallet_file=hot_wallet_file,
         hot_wallet_password_file=hot_wallet_password_file,
         max_fee_per_gas_gwei=max_fee_per_gas_gwei,
         database_dir=database_dir,
         log_level=log_level,
         log_format=log_format,
-        pool_size=pool_size,
+        api_host=api_host,
+        api_port=api_port,
+        validators_registration_mode=validators_registration_mode,
     )
 
     try:

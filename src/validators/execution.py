@@ -160,12 +160,14 @@ async def check_deposit_data_root(deposit_data_root: str) -> None:
 
 
 async def get_available_validators(
-    keystore: BaseKeystore,
+    keystore: BaseKeystore | None,
     deposit_data: DepositData,
     count: int,
+    run_check_deposit_data_root: bool = True,
 ) -> list[Validator]:
     """Fetches vault's available validators."""
-    await check_deposit_data_root(deposit_data.tree.root)
+    if run_check_deposit_data_root:
+        await check_deposit_data_root(deposit_data.tree.root)
 
     start_index = await vault_contract.get_validators_index()
     validators: list[Validator] = []
@@ -176,7 +178,7 @@ async def get_available_validators(
             validator = deposit_data.validators[i]
         except IndexError:
             break
-        if validator.public_key not in keystore:
+        if keystore and validator.public_key not in keystore:
             logger.warning(
                 'Cannot find validator with public key %s in keystores.',
                 validator.public_key,
