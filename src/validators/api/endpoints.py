@@ -68,15 +68,19 @@ async def submit_validators(request: Request) -> Response:
         keystore=None, deposit_data=deposit_data
     )
 
-    error = await _validate_registration_requests(registration_requests, validators)
-    if error is not None:
-        return JSONResponse({'error': error}, status_code=HTTP_400_BAD_REQUEST)
-
     # There may be lag between GET and POST requests.
     # During this time new assets may be staked into the vault.
     # In this case validators list will be longer than requests list.
-    # Filter validators by requested public keys.
-    validators = validators[: len(registration_requests)]
+    #
+    # If someone unstakes funds then validators list may become shorter
+    # than requests list
+    #
+    common_length = min(len(validators), len(registration_requests))
+    registration_requests = registration_requests[:common_length]
+
+    error = await _validate_registration_requests(registration_requests, validators)
+    if error is not None:
+        return JSONResponse({'error': error}, status_code=HTTP_400_BAD_REQUEST)
 
     for validator, registration_request in zip(validators, registration_requests):
         validator.exit_signature = registration_request.exit_signature
