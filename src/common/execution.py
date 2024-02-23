@@ -103,11 +103,12 @@ async def update_oracles_cache() -> None:
 async def get_oracles() -> Oracles:
     await update_oracles_cache()
 
-    oracles_cache = cast(OraclesCache, _oracles_cache)
+    if _oracles_cache is None:
+        raise RuntimeError('Can not fetch oracles config. Is your execution node fully synced?')
 
-    config = oracles_cache.config
-    rewards_threshold = oracles_cache.rewards_threshold
-    validators_threshold = oracles_cache.validators_threshold
+    config = _oracles_cache.config
+    rewards_threshold = _oracles_cache.rewards_threshold
+    validators_threshold = _oracles_cache.validators_threshold
 
     endpoints = []
     public_keys = []
