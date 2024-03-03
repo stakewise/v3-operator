@@ -36,7 +36,10 @@ async def submit_exit_signatures(
         return None
 
     logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
-    await execution_client.eth.wait_for_transaction_receipt(
+    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
         tx, timeout=settings.execution_transaction_timeout
     )
+    if not tx_receipt['status']:
+        logger.error('UpdateExitSignatures transaction failed')
+        return None
     return Web3.to_hex(tx)
