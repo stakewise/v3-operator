@@ -5,8 +5,9 @@ from typing import cast
 import click
 from eth_typing import BlockNumber
 from web3 import Web3
-from web3.exceptions import BadFunctionCallOutput, MethodUnavailable
-from web3.types import BlockIdentifier, Wei
+from web3._utils.async_transactions import _max_fee_per_gas
+from web3.exceptions import BadFunctionCallOutput
+from web3.types import BlockIdentifier, TxParams, Wei
 
 from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.contracts import keeper_contract, multicall_contract, vault_contract
@@ -149,8 +150,32 @@ async def get_oracles() -> Oracles:
     )
 
 
+async def get_tx_params() -> TxParams:
+    tx_params: TxParams = {}
+
+    if settings.max_priority_fee_per_gas_gwei:
+        max_priority_fee_per_gas = Web3.to_wei(settings.max_priority_fee_per_gas_gwei, 'gwei')
+
+        # Reference: `_max_fee_per_gas` in web3/_utils/async_transactions.py
+        block = await execution_client.eth.get_block('latest')
+        max_fee_per_gas = Wei(max_priority_fee_per_gas + (2 * block['baseFeePerGas']))
+
+        tx_params['maxPriorityFeePerGas'] = max_priority_fee_per_gas
+        tx_params['maxFeePerGas'] = max_fee_per_gas
+        logger.debug('tx_params %s', tx_params)
+
+    return tx_params
+
+
 async def check_gas_price() -> bool:
-    max_fee_per_gas = await _get_max_fee_per_gas()
+    if settings.max_priority_fee_per_gas_gwei:
+        # custom gas-price logic
+        tx_params = await get_tx_params()
+        max_fee_per_gas = Wei(int(tx_params['maxFeePerGas']))
+    else:
+        # fallback to logic from web3
+        max_fee_per_gas = await _max_fee_per_gas(execution_client, {})
+
     if max_fee_per_gas >= Web3.to_wei(settings.max_fee_per_gas_gwei, 'gwei'):
         logging.warning(
             'Current gas price (%s gwei) is too high. '
@@ -161,17 +186,6 @@ async def check_gas_price() -> bool:
         return False
 
     return True
-
-
-async def _get_max_fee_per_gas() -> Wei:
-    try:
-        priority_fee = await execution_client.eth.max_priority_fee
-    except MethodUnavailable:
-        priority_fee = await _calculate_median_priority_fee()
-    latest_block = await execution_client.eth.get_block('latest')
-    base_fee = latest_block['baseFeePerGas']
-    max_fee_per_gas = priority_fee + base_fee
-    return Wei(max_fee_per_gas)
 
 
 async def _calculate_median_priority_fee(block_id: BlockIdentifier = 'latest') -> Wei:

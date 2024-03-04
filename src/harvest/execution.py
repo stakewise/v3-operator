@@ -5,6 +5,7 @@ from web3 import Web3
 
 from src.common.clients import execution_client
 from src.common.contracts import vault_contract
+from src.common.execution import get_tx_params
 from src.common.typings import HarvestParams
 from src.common.utils import format_error
 from src.config.networks import ETH_NETWORKS
@@ -19,6 +20,7 @@ async def submit_harvest_transaction(harvest_params: HarvestParams) -> HexStr | 
 
     logger.info('Submitting harvest transaction...')
     try:
+        tx_params = await get_tx_params()
         tx = await vault_contract.functions.updateState(
             (
                 harvest_params.rewards_root,
@@ -26,7 +28,7 @@ async def submit_harvest_transaction(harvest_params: HarvestParams) -> HexStr | 
                 harvest_params.unlocked_mev_reward,
                 harvest_params.proof,
             )
-        ).transact()
+        ).transact(tx_params)
     except Exception as e:
         logger.error('Failed to harvest: %s', format_error(e))
         if settings.verbose:

@@ -41,9 +41,15 @@ logger = logging.getLogger(__name__)
     '--max-fee-per-gas-gwei',
     type=int,
     envvar='MAX_FEE_PER_GAS_GWEI',
-    help=f'Maximum fee per gas limit for transactions. '
+    help=f'Maximum fee per gas for transactions. '
     f'Default is {DEFAULT_MAX_FEE_PER_GAS_GWEI} Gwei.',
     default=DEFAULT_MAX_FEE_PER_GAS_GWEI,
+)
+@click.option(
+    '--max-priority-fee-per-gas-gwei',
+    type=int,
+    envvar='MAX_PRIORITY_FEE_PER_GAS_GWEI',
+    help='Maximum priority fee per gas for transactions.',
 )
 @click.option(
     '--hot-wallet-password-file',
@@ -216,6 +222,7 @@ def start(
     hot_wallet_file: str | None,
     hot_wallet_password_file: str | None,
     max_fee_per_gas_gwei: int,
+    max_priority_fee_per_gas_gwei: int | None,
     database_dir: str | None,
     pool_size: int | None,
 ) -> None:
@@ -245,6 +252,7 @@ def start(
         hot_wallet_file=hot_wallet_file,
         hot_wallet_password_file=hot_wallet_password_file,
         max_fee_per_gas_gwei=max_fee_per_gas_gwei,
+        max_priority_fee_per_gas_gwei=max_priority_fee_per_gas_gwei,
         database_dir=database_dir,
         log_level=log_level,
         log_format=log_format,
