@@ -167,8 +167,8 @@ async def get_tx_params() -> TxParams:
     return tx_params
 
 
-async def check_gas_price() -> bool:
-    if settings.max_priority_fee_per_gas_gwei:
+async def check_gas_price(custom_priority_fee: bool = False) -> bool:
+    if custom_priority_fee:
         # custom gas-price logic
         tx_params = await get_tx_params()
         max_fee_per_gas = Wei(int(tx_params['maxFeePerGas']))
