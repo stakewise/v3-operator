@@ -106,6 +106,8 @@ async def _fetch_outdated_indexes(oracles: Oracles, update_block: BlockNumber | 
         except (ClientError, RetryError) as e:
             warning_verbose(str(e))
             continue
+        if response['exit_signature_block_number'] is None:
+            continue
         if not update_block or response['exit_signature_block_number'] >= update_block:
             outdated_indexes = [val['index'] for val in response['validators']]
             metrics.outdated_signatures.set(len(outdated_indexes))
