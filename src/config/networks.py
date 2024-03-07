@@ -38,6 +38,7 @@ class NetworkConfig:
     SHAPELLA_EPOCH: int
     MULTICALL_CONTRACT_ADDRESS: ChecksumAddress
     SHARED_MEV_ESCROW_CONTRACT_ADDRESS: ChecksumAddress
+    MAX_PRIORITY_FEE_PER_GAS_GWEI: int
 
     @property
     def SHAPELLA_FORK(self) -> ConsensusFork:
@@ -96,6 +97,7 @@ NETWORKS = {
         SHARED_MEV_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x48319f97E5Da1233c21c48b80097c0FB7a20Ff86'
         ),
+        MAX_PRIORITY_FEE_PER_GAS_GWEI=5,
     ),
     HOLESKY: NetworkConfig(
         SYMBOL='HolETH',
@@ -130,6 +132,7 @@ NETWORKS = {
         SHARED_MEV_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xc98F25BcAA6B812a07460f18da77AF8385be7b56'
         ),
+        MAX_PRIORITY_FEE_PER_GAS_GWEI=1,
     ),
     GNOSIS: NetworkConfig(
         SYMBOL='xDAI',
@@ -163,5 +166,6 @@ NETWORKS = {
             '0xcA11bde05977b3631167028862bE2a173976CA11'
         ),
         SHARED_MEV_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        MAX_PRIORITY_FEE_PER_GAS_GWEI=1,
     ),
 }
