@@ -153,18 +153,32 @@ async def get_oracles() -> Oracles:
 async def get_tx_params() -> TxParams:
     tx_params: TxParams = {}
 
-    if settings.max_priority_fee_per_gas_gwei:
-        max_priority_fee_per_gas = Web3.to_wei(settings.max_priority_fee_per_gas_gwei, 'gwei')
+    max_priority_fee_per_gas = await _calc_priority_fee()
 
-        # Reference: `_max_fee_per_gas` in web3/_utils/async_transactions.py
-        block = await execution_client.eth.get_block('latest')
-        max_fee_per_gas = Wei(max_priority_fee_per_gas + (2 * block['baseFeePerGas']))
+    # Reference: `_max_fee_per_gas` in web3/_utils/async_transactions.py
+    block = await execution_client.eth.get_block('latest')
+    max_fee_per_gas = Wei(max_priority_fee_per_gas + (2 * block['baseFeePerGas']))
 
-        tx_params['maxPriorityFeePerGas'] = max_priority_fee_per_gas
-        tx_params['maxFeePerGas'] = max_fee_per_gas
-        logger.debug('tx_params %s', tx_params)
+    tx_params['maxPriorityFeePerGas'] = max_priority_fee_per_gas
+    tx_params['maxFeePerGas'] = max_fee_per_gas
+    logger.debug('tx_params %s', tx_params)
 
     return tx_params
+
+
+async def _calc_priority_fee() -> Wei:
+    """
+    reference: "high" priority value from https://etherscan.io/gastracker
+    """
+    num_blocks = 10
+    percentile = 80.0
+    history = await execution_client.eth.fee_history(num_blocks, 'pending', [percentile])
+    validator_rewards = [r[0] for r in history['reward']]
+    logger.info(
+        'validator_rewards %s', sorted([round(Web3.from_wei(r, 'gwei')) for r in validator_rewards])
+    )
+    mean_reward = int(sum(validator_rewards) / len(validator_rewards))
+    return Wei(mean_reward)
 
 
 async def check_gas_price(custom_priority_fee: bool = False) -> bool:

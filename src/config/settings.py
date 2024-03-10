@@ -57,7 +57,6 @@ class Settings(metaclass=Singleton):
     hot_wallet_file: Path
     hot_wallet_password_file: Path
     max_fee_per_gas_gwei: int
-    max_priority_fee_per_gas_gwei: int | None
     database: Path
 
     log_level: str
@@ -92,7 +91,6 @@ class Settings(metaclass=Singleton):
         metrics_port: int = DEFAULT_METRICS_PORT,
         metrics_host: str = DEFAULT_METRICS_HOST,
         max_fee_per_gas_gwei: int = DEFAULT_MAX_FEE_PER_GAS_GWEI,
-        max_priority_fee_per_gas_gwei: int | None = None,
         deposit_data_file: str | None = None,
         keystores_dir: str | None = None,
         keystores_password_file: str | None = None,
@@ -123,7 +121,6 @@ class Settings(metaclass=Singleton):
         self.metrics_host = metrics_host
         self.metrics_port = metrics_port
         self.max_fee_per_gas_gwei = max_fee_per_gas_gwei
-        self.max_priority_fee_per_gas_gwei = max_priority_fee_per_gas_gwei
 
         self.deposit_data_file = (
             Path(deposit_data_file) if deposit_data_file else vault_dir / 'deposit_data.json'
