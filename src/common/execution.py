@@ -1,5 +1,4 @@
 import logging
-import statistics
 from typing import cast
 
 import click
@@ -7,7 +6,7 @@ from eth_typing import BlockNumber
 from web3 import Web3
 from web3._utils.async_transactions import _max_fee_per_gas
 from web3.exceptions import BadFunctionCallOutput
-from web3.types import BlockIdentifier, TxParams, Wei
+from web3.types import TxParams, Wei
 
 from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.contracts import keeper_contract, multicall_contract, vault_contract
@@ -200,22 +199,6 @@ async def check_gas_price(custom_priority_fee: bool = False) -> bool:
         return False
 
     return True
-
-
-async def _calculate_median_priority_fee(block_id: BlockIdentifier = 'latest') -> Wei:
-    block = await execution_client.eth.get_block(block_id)
-
-    # collect maxPriorityFeePerGas for all transactions in the block
-    priority_fees = []
-    for tx_hash in block.transactions:  # type: ignore[attr-defined]
-        tx = await execution_client.eth.get_transaction(tx_hash)
-        if 'maxPriorityFeePerGas' in tx:
-            priority_fees.append(tx.maxPriorityFeePerGas)  # type: ignore[attr-defined]
-
-    if not priority_fees:
-        return await _calculate_median_priority_fee(block['number'] - 1)
-
-    return Wei(statistics.median(priority_fees))
 
 
 class WalletTask(BaseTask):
