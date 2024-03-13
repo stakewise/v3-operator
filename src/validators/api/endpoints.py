@@ -29,6 +29,9 @@ async def get_validators(request: Request) -> Response:
     )
     validators = [v for v in validators if v.public_key not in pending_validator_registrations]
 
+    if not validators:
+        return JSONResponse([])
+
     # get next validator index for exit signature
     latest_public_keys = await get_latest_network_validator_public_keys()
     next_validator_index = NetworkValidatorCrud().get_next_validator_index(list(latest_public_keys))
