@@ -115,15 +115,25 @@ async def register_validators(
         )
         return None
 
-    _, update_state_call = await get_withdrawable_assets()
-
     if validators is None and keystore is None:
         raise RuntimeError('validators or keystore must be set')
 
-    if validators is None:
-        validators = await get_available_validators_for_registration(
-            keystore=keystore, deposit_data=deposit_data
-        )
+    validators_count, update_state_call = await get_validators_count_from_vault_assets()
+
+    if not validators_count:
+        # not enough balance to register validators
+        return None
+
+    # get latest oracles
+    oracles = await get_oracles()
+
+    validators_count = min(oracles.validators_approval_batch_limit, validators_count)
+
+    validators = await get_available_validators(
+        keystore=keystore,
+        deposit_data=deposit_data,
+        count=validators_count,
+    )
 
     if not validators:
         logger.warning(
@@ -225,7 +235,7 @@ async def get_available_validators_for_registration(
     deposit_data: DepositData,
     run_check_deposit_data_root: bool = True,
 ) -> list[Validator]:
-    validators_count = await get_validators_count_from_vault_assets()
+    validators_count, _ = await get_validators_count_from_vault_assets()
 
     if not validators_count:
         # not enough balance to register validators
@@ -245,8 +255,8 @@ async def get_available_validators_for_registration(
     return validators
 
 
-async def get_validators_count_from_vault_assets() -> int:
-    vault_balance, _ = await get_withdrawable_assets()
+async def get_validators_count_from_vault_assets() -> tuple[int, HexStr | None]:
+    vault_balance, update_state_call = await get_withdrawable_assets()
     if settings.network == GNOSIS:
         # apply GNO -> mGNO exchange rate
         vault_balance = Wei(int(vault_balance * MGNO_RATE // WAD))
@@ -255,7 +265,7 @@ async def get_validators_count_from_vault_assets() -> int:
 
     # calculate number of validators that can be registered
     validators_count = vault_balance // DEPOSIT_AMOUNT
-    return validators_count
+    return validators_count, update_state_call
 
 
 # pylint: disable-next=too-many-arguments
