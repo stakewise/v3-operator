@@ -15,7 +15,7 @@ from src.common.contracts import (
     validators_registry_contract,
     vault_contract,
 )
-from src.common.execution import get_tx_params
+from src.common.execution import get_high_priority_tx_params
 from src.common.ipfs import fetch_harvest_params
 from src.common.metrics import metrics
 from src.common.typings import OraclesApproval
@@ -250,7 +250,7 @@ async def register_single_validator(
         multi_proof.proof,
     ]
     try:
-        tx_params = await get_tx_params()
+        tx_params = await get_high_priority_tx_params()
 
         if update_state_call is not None:
             register_call = vault_contract.encode_abi(
@@ -309,7 +309,7 @@ async def register_multiple_validator(
         multi_proof.proof,
     ]
     try:
-        tx_params = await get_tx_params()
+        tx_params = await get_high_priority_tx_params()
 
         if update_state_call is not None:
             register_call = vault_contract.encode_abi(

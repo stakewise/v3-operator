@@ -149,10 +149,15 @@ async def get_oracles() -> Oracles:
     )
 
 
-async def get_tx_params() -> TxParams:
+async def get_high_priority_tx_params() -> TxParams:
+    """
+    `maxPriorityFeePerGas <= maxFeePerGas` must be fulfilled
+    Because of that when increasing `maxPriorityFeePerGas` I have to adjust `maxFeePerGas`.
+    See https://eips.ethereum.org/EIPS/eip-1559 for details.
+    """
     tx_params: TxParams = {}
 
-    max_priority_fee_per_gas = await _calc_priority_fee()
+    max_priority_fee_per_gas = await _calc_high_priority_fee()
 
     # Reference: `_max_fee_per_gas` in web3/_utils/async_transactions.py
     block = await execution_client.eth.get_block('latest')
@@ -165,7 +170,7 @@ async def get_tx_params() -> TxParams:
     return tx_params
 
 
-async def _calc_priority_fee() -> Wei:
+async def _calc_high_priority_fee() -> Wei:
     """
     reference: "high" priority value from https://etherscan.io/gastracker
     """
@@ -173,17 +178,13 @@ async def _calc_priority_fee() -> Wei:
     percentile = 80.0
     history = await execution_client.eth.fee_history(num_blocks, 'pending', [percentile])
     validator_rewards = [r[0] for r in history['reward']]
-    logger.info(
-        'validator_rewards %s', sorted([round(Web3.from_wei(r, 'gwei')) for r in validator_rewards])
-    )
     mean_reward = int(sum(validator_rewards) / len(validator_rewards))
     return Wei(mean_reward)
 
 
-async def check_gas_price(custom_priority_fee: bool = False) -> bool:
-    if custom_priority_fee:
-        # custom gas-price logic
-        tx_params = await get_tx_params()
+async def check_gas_price(high_priority: bool = False) -> bool:
+    if high_priority:
+        tx_params = await get_high_priority_tx_params()
         max_fee_per_gas = Wei(int(tx_params['maxFeePerGas']))
     else:
         # fallback to logic from web3
