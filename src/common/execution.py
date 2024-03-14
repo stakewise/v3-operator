@@ -179,6 +179,11 @@ async def _calc_high_priority_fee() -> Wei:
     history = await execution_client.eth.fee_history(num_blocks, 'pending', [percentile])
     validator_rewards = [r[0] for r in history['reward']]
     mean_reward = int(sum(validator_rewards) / len(validator_rewards))
+
+    # prettify `mean_reward`
+    # same as `round(value, 1)` if value was in gwei
+    mean_reward = round(mean_reward, -8)
+
     return Wei(mean_reward)
 
 
