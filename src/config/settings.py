@@ -77,6 +77,12 @@ class Settings(metaclass=Singleton):
     validators_registration_mode: ValidatorsRegistrationMode
     skip_startup_checks: bool
 
+    # high priority fee
+    priority_fee_num_blocks: int = decouple_config('PRIORITY_FEE_NUM_BLOCKS', default=10, cast=int)
+    priority_fee_percentile: float = decouple_config(
+        'PRIORITY_FEE_PERCENTILE', default=80.0, cast=float
+    )
+
     # pylint: disable-next=too-many-arguments,too-many-locals
     def set(
         self,

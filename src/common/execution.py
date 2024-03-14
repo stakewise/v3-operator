@@ -174,8 +174,8 @@ async def _calc_high_priority_fee() -> Wei:
     """
     reference: "high" priority value from https://etherscan.io/gastracker
     """
-    num_blocks = 10
-    percentile = 80.0
+    num_blocks = settings.priority_fee_num_blocks
+    percentile = settings.priority_fee_percentile
     history = await execution_client.eth.fee_history(num_blocks, 'pending', [percentile])
     validator_rewards = [r[0] for r in history['reward']]
     mean_reward = int(sum(validator_rewards) / len(validator_rewards))
