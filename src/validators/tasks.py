@@ -143,7 +143,7 @@ async def register_validators(
         )
         return None
 
-    if not await check_gas_price():
+    if not await check_gas_price(high_priority=True):
         return None
 
     logger.info('Started registration of %d validator(s)', len(validators))

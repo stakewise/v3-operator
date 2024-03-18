@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
     '--max-fee-per-gas-gwei',
     type=int,
     envvar='MAX_FEE_PER_GAS_GWEI',
-    help=f'Maximum fee per gas limit for transactions. '
+    help=f'Maximum fee per gas for transactions. '
     f'Default is {DEFAULT_MAX_FEE_PER_GAS_GWEI} Gwei.',
     default=DEFAULT_MAX_FEE_PER_GAS_GWEI,
 )

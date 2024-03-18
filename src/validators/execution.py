@@ -15,6 +15,7 @@ from src.common.contracts import (
     validators_registry_contract,
     vault_contract,
 )
+from src.common.execution import get_high_priority_tx_params
 from src.common.ipfs import fetch_harvest_params
 from src.common.metrics import metrics
 from src.common.typings import OraclesApproval
@@ -249,6 +250,8 @@ async def register_single_validator(
         multi_proof.proof,
     ]
     try:
+        tx_params = await get_high_priority_tx_params()
+
         if update_state_call is not None:
             register_call = vault_contract.encode_abi(
                 fn_name='registerValidator',
@@ -256,9 +259,10 @@ async def register_single_validator(
             )
             tx = await vault_contract.functions.multicall(
                 [update_state_call, register_call]
-            ).transact()
+            ).transact(tx_params)
         else:
-            tx = await vault_contract.functions.registerValidator(*register_call_args).transact()
+            register_func = vault_contract.functions.registerValidator
+            tx = await register_func(*register_call_args).transact(tx_params)
     except Exception as e:
         logger.error('Failed to register validator: %s', format_error(e))
         if settings.verbose:
@@ -305,6 +309,8 @@ async def register_multiple_validator(
         multi_proof.proof,
     ]
     try:
+        tx_params = await get_high_priority_tx_params()
+
         if update_state_call is not None:
             register_call = vault_contract.encode_abi(
                 fn_name='registerValidators',
@@ -312,9 +318,10 @@ async def register_multiple_validator(
             )
             tx = await vault_contract.functions.multicall(
                 [update_state_call, register_call]
-            ).transact()
+            ).transact(tx_params)
         else:
-            tx = await vault_contract.functions.registerValidators(*register_call_args).transact()
+            register_func = vault_contract.functions.registerValidators
+            tx = await register_func(*register_call_args).transact(tx_params)
     except Exception as e:
         logger.error('Failed to register validators: %s', format_error(e))
         if settings.verbose:

@@ -1,12 +1,12 @@
 import logging
-import statistics
 from typing import cast
 
 import click
 from eth_typing import BlockNumber
 from web3 import Web3
-from web3.exceptions import BadFunctionCallOutput, MethodUnavailable
-from web3.types import BlockIdentifier, Wei
+from web3._utils.async_transactions import _max_fee_per_gas
+from web3.exceptions import BadFunctionCallOutput
+from web3.types import TxParams, Wei
 
 from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.contracts import keeper_contract, multicall_contract, vault_contract
@@ -149,8 +149,52 @@ async def get_oracles() -> Oracles:
     )
 
 
-async def check_gas_price() -> bool:
-    max_fee_per_gas = await _get_max_fee_per_gas()
+async def get_high_priority_tx_params() -> TxParams:
+    """
+    `maxPriorityFeePerGas <= maxFeePerGas` must be fulfilled
+    Because of that when increasing `maxPriorityFeePerGas` I have to adjust `maxFeePerGas`.
+    See https://eips.ethereum.org/EIPS/eip-1559 for details.
+    """
+    tx_params: TxParams = {}
+
+    max_priority_fee_per_gas = await _calc_high_priority_fee()
+
+    # Reference: `_max_fee_per_gas` in web3/_utils/async_transactions.py
+    block = await execution_client.eth.get_block('latest')
+    max_fee_per_gas = Wei(max_priority_fee_per_gas + (2 * block['baseFeePerGas']))
+
+    tx_params['maxPriorityFeePerGas'] = max_priority_fee_per_gas
+    tx_params['maxFeePerGas'] = max_fee_per_gas
+    logger.debug('tx_params %s', tx_params)
+
+    return tx_params
+
+
+async def _calc_high_priority_fee() -> Wei:
+    """
+    reference: "high" priority value from https://etherscan.io/gastracker
+    """
+    num_blocks = settings.priority_fee_num_blocks
+    percentile = settings.priority_fee_percentile
+    history = await execution_client.eth.fee_history(num_blocks, 'pending', [percentile])
+    validator_rewards = [r[0] for r in history['reward']]
+    mean_reward = int(sum(validator_rewards) / len(validator_rewards))
+
+    # prettify `mean_reward`
+    # same as `round(value, 1)` if value was in gwei
+    mean_reward = round(mean_reward, -8)
+
+    return Wei(mean_reward)
+
+
+async def check_gas_price(high_priority: bool = False) -> bool:
+    if high_priority:
+        tx_params = await get_high_priority_tx_params()
+        max_fee_per_gas = Wei(int(tx_params['maxFeePerGas']))
+    else:
+        # fallback to logic from web3
+        max_fee_per_gas = await _max_fee_per_gas(execution_client, {})
+
     if max_fee_per_gas >= Web3.to_wei(settings.max_fee_per_gas_gwei, 'gwei'):
         logging.warning(
             'Current gas price (%s gwei) is too high. '
@@ -161,33 +205,6 @@ async def check_gas_price() -> bool:
         return False
 
     return True
-
-
-async def _get_max_fee_per_gas() -> Wei:
-    try:
-        priority_fee = await execution_client.eth.max_priority_fee
-    except MethodUnavailable:
-        priority_fee = await _calculate_median_priority_fee()
-    latest_block = await execution_client.eth.get_block('latest')
-    base_fee = latest_block['baseFeePerGas']
-    max_fee_per_gas = priority_fee + base_fee
-    return Wei(max_fee_per_gas)
-
-
-async def _calculate_median_priority_fee(block_id: BlockIdentifier = 'latest') -> Wei:
-    block = await execution_client.eth.get_block(block_id)
-
-    # collect maxPriorityFeePerGas for all transactions in the block
-    priority_fees = []
-    for tx_hash in block.transactions:  # type: ignore[attr-defined]
-        tx = await execution_client.eth.get_transaction(tx_hash)
-        if 'maxPriorityFeePerGas' in tx:
-            priority_fees.append(tx.maxPriorityFeePerGas)  # type: ignore[attr-defined]
-
-    if not priority_fees:
-        return await _calculate_median_priority_fee(block['number'] - 1)
-
-    return Wei(statistics.median(priority_fees))
 
 
 class WalletTask(BaseTask):
