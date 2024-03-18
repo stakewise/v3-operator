@@ -1,5 +1,7 @@
 import logging
 
+from sw_utils import InterruptHandler
+
 from src.common.contracts import keeper_contract
 from src.common.execution import check_gas_price
 from src.common.ipfs import fetch_harvest_params
@@ -11,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class HarvestTask(BaseTask):
-    async def process_block(self) -> None:
+    async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         """Check vault state and send harvest transaction if needed."""
         if not await keeper_contract.can_harvest(settings.vault):
             return
