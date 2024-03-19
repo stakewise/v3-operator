@@ -1,6 +1,7 @@
 import logging
 
 from prometheus_client import Gauge, Info, start_http_server
+from sw_utils import InterruptHandler
 
 import src
 from src.common.clients import execution_client
@@ -38,7 +39,7 @@ async def metrics_server() -> None:
 
 
 class MetricsTask(BaseTask):
-    async def process_block(self) -> None:
+    async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         chain_state = await get_chain_finalized_head()
         metrics.block_number.set(await execution_client.eth.get_block_number())
         metrics.slot_number.set(chain_state.consensus_block)

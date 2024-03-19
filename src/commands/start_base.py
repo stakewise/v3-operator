@@ -6,6 +6,7 @@ from sw_utils import EventScanner, InterruptHandler
 
 import src
 from src.api import app as api_app
+from src.common.checks import wait_execution_catch_up_consensus
 from src.common.consensus import get_chain_finalized_head
 from src.common.execution import WalletTask, update_oracles_cache
 from src.common.logging import setup_logging
@@ -55,6 +56,7 @@ async def start_base() -> None:
 
     logger.info('Syncing network validator events...')
     chain_state = await get_chain_finalized_head()
+    await wait_execution_catch_up_consensus(chain_state)
     await network_validators_scanner.process_new_events(chain_state.execution_block)
 
     logger.info('Updating oracles cache...')

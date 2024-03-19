@@ -3,6 +3,7 @@ from typing import cast
 
 import click
 from eth_typing import BlockNumber
+from sw_utils import InterruptHandler
 from web3 import Web3
 from web3._utils.async_transactions import _max_fee_per_gas
 from web3.exceptions import BadFunctionCallOutput
@@ -208,5 +209,5 @@ async def check_gas_price(high_priority: bool = False) -> bool:
 
 
 class WalletTask(BaseTask):
-    async def process_block(self) -> None:
+    async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         await check_hot_wallet_balance()

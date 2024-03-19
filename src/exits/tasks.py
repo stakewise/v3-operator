@@ -5,6 +5,7 @@ from random import shuffle
 
 from aiohttp import ClientError
 from eth_typing import BlockNumber
+from sw_utils import InterruptHandler
 from tenacity import RetryError
 from web3.types import HexStr
 
@@ -33,7 +34,7 @@ class ExitSignatureTask(BaseTask):
     def __init__(self, keystore: BaseKeystore | None):
         self.keystore = keystore
 
-    async def process_block(self) -> None:
+    async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         if self.keystore is None:
             return
 

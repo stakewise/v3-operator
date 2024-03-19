@@ -4,11 +4,12 @@ import time
 
 from eth_typing import HexStr
 from multiproof.standard import MultiProof
-from sw_utils import EventScanner, IpfsFetchClient
+from sw_utils import EventScanner, InterruptHandler, IpfsFetchClient
 from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.types import BlockNumber, Wei
 
+from src.common.checks import wait_execution_catch_up_consensus
 from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import v2_pool_escrow_contract, validators_registry_contract
 from src.common.exceptions import NotEnoughOracleApprovalsError
@@ -60,8 +61,11 @@ class ValidatorsTask(BaseTask):
         network_validators_processor = NetworkValidatorsProcessor()
         self.network_validators_scanner = EventScanner(network_validators_processor)
 
-    async def process_block(self) -> None:
+    async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         chain_state = await get_chain_finalized_head()
+        await wait_execution_catch_up_consensus(
+            chain_state=chain_state, interrupt_handler=interrupt_handler
+        )
 
         # process new network validators
         await self.network_validators_scanner.process_new_events(chain_state.execution_block)
