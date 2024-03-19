@@ -10,7 +10,6 @@ from sw_utils import (
     get_consensus_client,
     get_execution_client,
 )
-from sw_utils.decorators import retry_ipfs_exception
 from web3 import AsyncWeb3
 
 from src.common.wallet import hot_wallet
@@ -62,23 +61,23 @@ class ConsensusClient:
         return getattr(self.client, item)
 
 
-class IpfsFetchRetryClient:
+class IpfsLazyFetchClient:
     @cached_property
     def client(self) -> IpfsFetchClient:
         return IpfsFetchClient(
-            endpoints=settings.ipfs_fetch_endpoints, timeout=settings.ipfs_timeout
+            ipfs_endpoints=settings.ipfs_fetch_endpoints,
+            timeout=settings.ipfs_timeout,
+            retry_timeout=settings.ipfs_retry_timeout,
         )
 
     async def fetch_bytes(self, ipfs_hash: str) -> bytes:
-        decorator = retry_ipfs_exception(delay=settings.ipfs_retry_timeout)
-        return await decorator(self.client.fetch_bytes)(ipfs_hash)
+        return await self.client.fetch_bytes(ipfs_hash)
 
     async def fetch_json(self, ipfs_hash: str) -> dict | list:
-        decorator = retry_ipfs_exception(delay=settings.ipfs_retry_timeout)
-        return await decorator(self.client.fetch_json)(ipfs_hash)
+        return await self.client.fetch_json(ipfs_hash)
 
 
 db_client = Database()
 execution_client = cast(AsyncWeb3, ExecutionClient())
 consensus_client = cast(ExtendedAsyncBeacon, ConsensusClient())
-ipfs_fetch_client = IpfsFetchRetryClient()
+ipfs_fetch_client = IpfsLazyFetchClient()

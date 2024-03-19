@@ -16,6 +16,7 @@ from src.commands.merge_deposit_data import merge_deposit_data
 from src.commands.recover import recover
 from src.commands.remote_signer_setup import remote_signer_setup
 from src.commands.start import start
+from src.commands.start_api import start_api
 from src.commands.validators_exit import validators_exit
 from src.common.utils import get_build_version
 from src.remote_db.commands import remote_db_group
@@ -39,6 +40,7 @@ cli.add_command(create_wallet)
 cli.add_command(merge_deposit_data)
 cli.add_command(validators_exit)
 cli.add_command(start)
+cli.add_command(start_api)
 cli.add_command(recover)
 cli.add_command(get_validators_root)
 cli.add_command(import_genesis_keys)

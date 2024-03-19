@@ -22,7 +22,7 @@ from src.config.networks import HOLESKY
 from src.config.settings import settings
 from src.test_fixtures.hashi_vault import hashi_vault_url, mocked_hashi_vault
 from src.test_fixtures.remote_signer import mocked_remote_signer, remote_signer_url
-from src.validators.signing.remote import RemoteSignerConfiguration
+from src.validators.keystores.remote import RemoteSignerKeystore
 from src.validators.signing.tests.oracle_functions import OracleCommittee
 from src.validators.typings import BLSPrivkey
 
@@ -160,26 +160,23 @@ def _remote_signer_setup(
     mocked_remote_signer,
     _create_keys,
 ) -> None:
-    with mock.patch('src.commands.remote_signer_setup.get_oracles', return_value=mocked_oracles):
-        result = runner.invoke(
-            remote_signer_setup,
-            [
-                '--vault',
-                str(vault_address),
-                '--remote-signer-url',
-                remote_signer_url,
-                '--data-dir',
-                str(data_dir),
-                '--execution-endpoints',
-                execution_endpoints,
-            ],
-        )
-        assert result.exit_code == 0
+    result = runner.invoke(
+        remote_signer_setup,
+        [
+            '--vault',
+            str(vault_address),
+            '--remote-signer-url',
+            remote_signer_url,
+            '--data-dir',
+            str(data_dir),
+        ],
+    )
+    assert result.exit_code == 0
 
 
 @pytest.fixture
-def remote_signer_config(_remote_signer_setup) -> RemoteSignerConfiguration:
-    return RemoteSignerConfiguration.from_file(settings.remote_signer_config_file)
+async def remote_signer_keystore(_remote_signer_setup) -> RemoteSignerKeystore:
+    return await RemoteSignerKeystore.load()
 
 
 @pytest.fixture

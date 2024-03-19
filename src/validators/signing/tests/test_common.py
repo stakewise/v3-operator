@@ -1,26 +1,24 @@
+import random
 from typing import Callable
 
+import milagro_bls_binding as bls
 import pytest
+from eth_typing import BLSSignature
 from eth_typing.bls import BLSPubkey
+from sw_utils import get_exit_message_signing_root
 from sw_utils.typings import ConsensusFork
 from web3 import Web3
 
 from src.common.typings import Oracles
 from src.config.settings import settings
-from src.validators.signing.hashi_vault import (
-    HashiVaultConfiguration,
-    load_hashi_vault_keys,
-)
-from src.validators.signing.local import get_exit_signature_shards
-from src.validators.signing.remote import (
-    RemoteSignerConfiguration,
-    get_exit_signature_shards_remote_signer,
-)
+from src.validators.keystores.local import LocalKeystore
+from src.validators.keystores.remote import RemoteSignerKeystore
+from src.validators.signing.common import get_encrypted_exit_signature_shards
 from src.validators.signing.tests.oracle_functions import OracleCommittee
 from src.validators.typings import ExitSignatureShards
 
 
-class TestSigning:
+class TestGetEncryptedExitSignatureShards:
     @staticmethod
     def check_signature_shards(
         shards: ExitSignatureShards,
@@ -28,12 +26,14 @@ class TestSigning:
         validator_pubkey: BLSPubkey,
         validator_index: int,
         fork: ConsensusFork,
+        exit_signature: BLSSignature | None = None,
     ):
         committee.verify_signature_shards(
             validator_pubkey=validator_pubkey,
             validator_index=validator_index,
             fork=fork,
             exit_signature_shards=shards,
+            exit_signature=exit_signature,
         )
 
         # If less than exit_signature_recover_threshold signatures are used,
@@ -59,7 +59,7 @@ class TestSigning:
         ],
         indirect=True,
     )
-    async def test_get_exit_signature_shards_local(
+    async def test_local(
         self,
         create_validator_keypair: Callable,
         fork: ConsensusFork,
@@ -69,14 +69,16 @@ class TestSigning:
         validator_privkey, validator_pubkey = create_validator_keypair()
         validator_index = 123
 
-        shards = get_exit_signature_shards(
+        keystore = LocalKeystore({validator_pubkey: validator_privkey})
+        shards = await get_encrypted_exit_signature_shards(
+            keystore=keystore,
             validator_index=validator_index,
-            private_key=validator_privkey,
+            public_key=validator_pubkey,
             oracles=mocked_oracles,
             fork=fork,
         )
 
-        TestSigning.check_signature_shards(
+        self.check_signature_shards(
             shards=shards,
             committee=_mocked_oracle_committee,
             validator_pubkey=BLSPubkey(Web3.to_bytes(hexstr=validator_pubkey)),
@@ -93,35 +95,86 @@ class TestSigning:
         ],
         indirect=True,
     )
-    async def test_get_exit_signature_shards_remote_signer(
+    async def test_remote_signer(
         self,
         create_validator_keypair: Callable,
         fork: ConsensusFork,
         remote_signer_url: str,
         mocked_oracles: Oracles,
-        remote_signer_config: RemoteSignerConfiguration,
+        remote_signer_keystore: RemoteSignerKeystore,
         _mocked_oracle_committee: OracleCommittee,
     ):
+        keystore = remote_signer_keystore
+        validator_pubkey = keystore.public_keys[0]
+        validator_index = random.randint(1, 10000)
+
+        exit_signature = await keystore.get_exit_signature(validator_index, validator_pubkey, fork)
+
+        shards = await get_encrypted_exit_signature_shards(
+            keystore=keystore,
+            validator_index=validator_index,
+            public_key=validator_pubkey,
+            oracles=mocked_oracles,
+            fork=fork,
+        )
+
+        self.check_signature_shards(
+            shards=shards,
+            committee=_mocked_oracle_committee,
+            validator_pubkey=BLSPubkey(Web3.to_bytes(hexstr=validator_pubkey)),
+            validator_index=validator_index,
+            fork=fork,
+            exit_signature=exit_signature,
+        )
+
+    @pytest.mark.usefixtures('fake_settings')
+    @pytest.mark.parametrize(
+        ['_mocked_oracle_committee'],
+        [
+            pytest.param((1, 1), id='Single oracle'),
+            pytest.param((10, 5), id='10 oracles with recovery threshold of 5'),
+            pytest.param((10, 10), id='10 oracles with recovery threshold of 10'),
+        ],
+        indirect=True,
+    )
+    async def test_api(
+        self,
+        create_validator_keypair: Callable,
+        fork: ConsensusFork,
+        mocked_oracles: Oracles,
+        _mocked_oracle_committee: OracleCommittee,
+    ):
+        """
+        The case when settings.validators_registration_mode == ValidatorsRegistrationMode.API.
+        Exit signature is created by third party.
+        """
+        validator_privkey, validator_pubkey = create_validator_keypair()
         validator_index = 123
-        settings.remote_signer_url = remote_signer_url
 
-        for pubkey, pubkey_shares in remote_signer_config.pubkeys_to_shares.items():
-            shards = await get_exit_signature_shards_remote_signer(
-                validator_index=validator_index,
-                validator_pubkey_shares=[
-                    BLSPubkey(Web3.to_bytes(hexstr=share)) for share in pubkey_shares
-                ],
-                oracles=mocked_oracles,
-                fork=fork,
-            )
+        message = get_exit_message_signing_root(
+            validator_index=validator_index,
+            genesis_validators_root=settings.network_config.GENESIS_VALIDATORS_ROOT,
+            fork=fork,
+        )
+        exit_signature = bls.Sign(validator_privkey, message)
 
-            TestSigning.check_signature_shards(
-                shards=shards,
-                committee=_mocked_oracle_committee,
-                validator_pubkey=BLSPubkey(Web3.to_bytes(hexstr=pubkey)),
-                validator_index=validator_index,
-                fork=fork,
-            )
+        shards = await get_encrypted_exit_signature_shards(
+            keystore=None,
+            validator_index=validator_index,
+            public_key=validator_pubkey,
+            oracles=mocked_oracles,
+            fork=fork,
+            exit_signature=exit_signature,
+        )
+
+        self.check_signature_shards(
+            shards=shards,
+            committee=_mocked_oracle_committee,
+            validator_pubkey=BLSPubkey(Web3.to_bytes(hexstr=validator_pubkey)),
+            validator_index=validator_index,
+            fork=fork,
+            exit_signature=exit_signature,
+        )
 
     @pytest.mark.usefixtures('mocked_remote_signer')
     async def test_remote_signer_pubkey_not_present(
@@ -130,57 +183,18 @@ class TestSigning:
         fork: ConsensusFork,
         mocked_oracles: Oracles,
         remote_signer_url: str,
+        fake_settings: None,
     ):
         _, bls_pubkey = create_validator_keypair()
         validator_index = 123
         settings.remote_signer_url = remote_signer_url
+        keystore = RemoteSignerKeystore([])
 
         with pytest.raises(RuntimeError, match='Failed to get signature'):
-            _ = await get_exit_signature_shards_remote_signer(
+            _ = await get_encrypted_exit_signature_shards(
+                keystore=keystore,
                 validator_index=validator_index,
-                validator_pubkey_shares=[BLSPubkey(Web3.to_bytes(hexstr=bls_pubkey))],
+                public_key=bls_pubkey,
                 oracles=mocked_oracles,
                 fork=fork,
             )
-
-    @pytest.mark.usefixtures('mocked_hashi_vault')
-    async def test_hashi_vault_keystores_loading(
-        self,
-        hashi_vault_url: str,
-    ):
-        settings.hashi_vault_url = hashi_vault_url
-        settings.hashi_vault_token = 'Secret'
-        settings.hashi_vault_key_path = 'ethereum/signing/keystores'
-
-        config = HashiVaultConfiguration.from_settings()
-
-        keystores = await load_hashi_vault_keys(config)
-
-        assert len(keystores) == 2
-
-    @pytest.mark.usefixtures('mocked_hashi_vault')
-    async def test_hashi_vault_keystores_not_configured(
-        self,
-        hashi_vault_url: str,
-    ):
-        settings.hashi_vault_url = hashi_vault_url
-        settings.hashi_vault_token = None
-        settings.hashi_vault_key_path = None
-
-        with pytest.raises(RuntimeError, match='URL, token and key path must be specified'):
-            await HashiVaultConfiguration.from_settings()
-
-    @pytest.mark.usefixtures('mocked_hashi_vault')
-    async def test_hashi_vault_keystores_inaccessible(
-        self,
-        hashi_vault_url: str,
-    ):
-        settings.hashi_vault_url = hashi_vault_url
-        settings.hashi_vault_token = 'Secret'
-        settings.hashi_vault_key_path = 'ethereum/inaccessible/keystores'
-
-        with pytest.raises(
-            RuntimeError, match='Can not retrieve validator signing keys from hashi vault'
-        ):
-            config = HashiVaultConfiguration.from_settings()
-            await load_hashi_vault_keys(config)

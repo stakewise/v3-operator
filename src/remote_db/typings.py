@@ -9,4 +9,3 @@ class RemoteDatabaseKeyPair:
     public_key: HexStr
     private_key: HexStr
     nonce: HexStr
-    parent_public_key: HexStr | None = None

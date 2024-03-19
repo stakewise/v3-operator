@@ -1,12 +1,12 @@
 from dataclasses import dataclass
+from enum import Enum
 from typing import NewType
 
-from eth_typing import BlockNumber, ChecksumAddress, HexStr
+from eth_typing import BlockNumber, BLSSignature, ChecksumAddress, HexStr
 from multiproof import StandardMerkleTree
 from sw_utils.typings import Bytes32
 
 BLSPrivkey = NewType('BLSPrivkey', bytes)
-Keystores = NewType('Keystores', dict[HexStr, BLSPrivkey])
 
 
 @dataclass
@@ -20,12 +20,17 @@ class Validator:
     deposit_data_index: int
     public_key: HexStr
     signature: HexStr
+    exit_signature: BLSSignature | None = None
 
 
 @dataclass
 class DepositData:
     validators: list[Validator]
     tree: StandardMerkleTree
+
+    @property
+    def public_keys(self) -> list[HexStr]:
+        return [v.public_key for v in self.validators]
 
 
 @dataclass
@@ -58,7 +63,11 @@ class KeeperApprovalParams:
     exitSignaturesIpfsHash: str
 
 
-@dataclass
-class KeystoreFile:
-    name: str
-    password: str
+class ValidatorsRegistrationMode(Enum):
+    """
+    AUTO mode: validators are registered automatically when vault assets are enough.
+    API mode: validators registration is triggered by API request.
+    """
+
+    AUTO = 'AUTO'
+    API = 'API'

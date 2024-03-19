@@ -1,36 +1,27 @@
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
 import click
-import milagro_bls_binding as bls
 from aiohttp import ClientResponseError
-from eth_typing import BLSPubkey, BLSSignature, HexAddress, HexStr
+from eth_typing import HexAddress, HexStr
 from sw_utils import ValidatorStatus
 from sw_utils.consensus import EXITED_STATUSES
-from sw_utils.signing import get_exit_message_signing_root
-from sw_utils.typings import ConsensusFork
 from web3 import Web3
 
 from src.common.clients import consensus_client
-from src.common.logging import setup_logging
+from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import format_error, log_verbose
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
-from src.config.settings import AVAILABLE_NETWORKS, NETWORKS, settings
-from src.validators.signing.hashi_vault import (
-    HashiVaultConfiguration,
-    load_hashi_vault_keys,
-)
-from src.validators.signing.key_shares import reconstruct_shared_bls_signature
-from src.validators.signing.remote import RemoteSignerConfiguration, get_signature_shard
-from src.validators.typings import BLSPrivkey, Keystores
-from src.validators.utils import load_keystores
+from src.config.settings import AVAILABLE_NETWORKS, settings
+from src.validators.keystores.base import BaseKeystore
+from src.validators.keystores.load import load_keystore
 
 
 @dataclass
-class ExitKeystore:
-    private_key: BLSPrivkey | None
+class ValidatorExit:
     public_key: HexStr
     index: int
 
@@ -101,6 +92,16 @@ EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
     envvar='VERBOSE',
     is_flag=True,
 )
+@click.option(
+    '--log-level',
+    type=click.Choice(
+        LOG_LEVELS,
+        case_sensitive=False,
+    ),
+    default='INFO',
+    envvar='LOG_LEVEL',
+    help='The log level.',
+)
 @click.command(help='Performs a voluntary exit for active vault validators.')
 # pylint: disable-next=too-many-arguments
 def validators_exit(
@@ -114,6 +115,7 @@ def validators_exit(
     hashi_vault_url: str | None,
     data_dir: str,
     verbose: bool,
+    log_level: str,
 ) -> None:
     # pylint: disable=duplicate-code
     vault_config = VaultConfig(vault, Path(data_dir))
@@ -131,68 +133,55 @@ def validators_exit(
         hashi_vault_key_path=hashi_vault_key_path,
         hashi_vault_url=hashi_vault_url,
         verbose=verbose,
+        log_level=log_level,
     )
     try:
-        asyncio.run(main(count))
+        # Try-catch to enable async calls in test - an event loop
+        #  will already be running in that case
+        try:
+            asyncio.get_running_loop()
+            # we need to create a separate thread so we can block before returning
+            with ThreadPoolExecutor(1) as pool:
+                pool.submit(lambda: asyncio.run(main(count))).result()
+        except RuntimeError as e:
+            if 'no running event loop' == e.args[0]:
+                # no event loop running
+                asyncio.run(main(count))
+            else:
+                raise e
     except Exception as e:
         log_verbose(e)
 
 
 async def main(count: int | None) -> None:
     setup_logging()
-    keystores = load_keystores()
-    remote_signer_config = None
+    keystore = await load_keystore()
 
-    if len(keystores) > 0:
-        all_validator_pubkeys = list(keystores.keys())  # pylint: disable=no-member
-    else:
-        if settings.hashi_vault_url:
-            # No keystores loaded but hashi vault configuration specified
-            hashi_vault_config = HashiVaultConfiguration.from_settings()
-            click.echo('Using hashi vault at %s for loading public keys')
-            keystores = await load_hashi_vault_keys(hashi_vault_config)
-            all_validator_pubkeys = list(keystores.keys())
-
-        elif settings.remote_signer_url:
-            # No keystores loaded but remote signer URL provided
-            remote_signer_config = RemoteSignerConfiguration.from_file(
-                settings.remote_signer_config_file
-            )
-            all_validator_pubkeys = list(remote_signer_config.pubkeys_to_shares.keys())
-            click.echo(
-                f'Using remote signer at {settings.remote_signer_url}'
-                f' for {len(all_validator_pubkeys)} public keys',
-            )
-        else:
-            raise RuntimeError('No keystores, no remote signer or hashi vault URL provided')
-
-    exit_keystores = await _get_exit_keystores(
-        keystores=keystores, public_keys=all_validator_pubkeys
-    )
-    if not exit_keystores:
+    validators_exits = await _get_validators_exits(keystore=keystore)
+    if not validators_exits:
         raise click.ClickException('There are no active validators.')
 
-    exit_keystores.sort(key=lambda x: x.index)
+    validators_exits.sort(key=lambda x: x.index)
 
     if count:
-        exit_keystores = exit_keystores[:count]
+        validators_exits = validators_exits[:count]
 
     click.confirm(
-        f'Are you sure you want to exit {len(exit_keystores)} validators '
-        f'with indexes: {", ".join(str(x.index) for x in exit_keystores)}?',
+        f'Are you sure you want to exit {len(validators_exits)} validators '
+        f'with indexes: {", ".join(str(x.index) for x in validators_exits)}?',
         abort=True,
     )
     exited_indexes = []
-    for exit_keystore in exit_keystores:
-        exit_signature = await _get_exit_signature(
-            exit_keystore=exit_keystore,
-            remote_signer_config=remote_signer_config,
-            fork=settings.network_config.SHAPELLA_FORK,
-            network=settings.network,
+    for validator_exit in validators_exits:
+        # todo: validatate that pk in keystores
+
+        exit_signature = await keystore.get_exit_signature(
+            validator_index=validator_exit.index,
+            public_key=validator_exit.public_key,
         )
         try:
             await consensus_client.submit_voluntary_exit(
-                validator_index=exit_keystore.index,
+                validator_index=validator_exit.index,
                 signature=Web3.to_hex(exit_signature),
                 epoch=settings.network_config.SHAPELLA_FORK.epoch,
             )
@@ -201,66 +190,28 @@ async def main(count: int | None) -> None:
             # Status may be active in CL although validator has started exit process.
             # CL will return status 400 for exit request in this case.
             click.secho(
-                f'{format_error(e)} for validator_index {exit_keystore.index}',
+                f'{format_error(e)} for validator_index {validator_exit.index}',
                 fg='yellow',
             )
             continue
 
-        exited_indexes.append(exit_keystore.index)
+        exited_indexes.append(validator_exit.index)
 
     if exited_indexes:
         click.secho(
             f'Validators {", ".join(str(index) for index in exited_indexes)} '
-            f'({len(exited_indexes)} of {len(exit_keystores)}) '
+            f'({len(exited_indexes)} of {len(validators_exits)}) '
             f'exits successfully initiated',
             bold=True,
             fg='green',
         )
 
 
-async def _get_exit_signature(
-    exit_keystore: ExitKeystore,
-    remote_signer_config: RemoteSignerConfiguration | None,
-    fork: ConsensusFork,
-    network: str,
-) -> BLSSignature:
-    """Generates exit signature"""
-    message = get_exit_message_signing_root(
-        validator_index=exit_keystore.index,
-        genesis_validators_root=NETWORKS[network].GENESIS_VALIDATORS_ROOT,
-        fork=fork,
-    )
-    if exit_keystore.private_key:
-        exit_signature = bls.Sign(exit_keystore.private_key, message)
-    elif remote_signer_config:
-        # Use remote signer
-        signature_shards = []
-        for pubkey_share in remote_signer_config.pubkeys_to_shares[exit_keystore.public_key]:
-            signature_shards.append(
-                await get_signature_shard(
-                    pubkey_share=BLSPubkey(Web3.to_bytes(hexstr=pubkey_share)),
-                    validator_index=exit_keystore.index,
-                    fork=fork,
-                    message=message,
-                )
-            )
-        exit_signature = reconstruct_shared_bls_signature(
-            signatures=dict(enumerate(signature_shards))
-        )
-        bls.Verify(
-            BLSPubkey(Web3.to_bytes(hexstr=exit_keystore.public_key)), message, exit_signature
-        )
-    else:
-        raise RuntimeError(
-            'Unable to sign exit message - no private key/remote signer configuration'
-        )
-    return exit_signature
-
-
-async def _get_exit_keystores(
-    keystores: Keystores, public_keys: list[HexStr]
-) -> list[ExitKeystore]:
+async def _get_validators_exits(
+    keystore: BaseKeystore,
+) -> list[ValidatorExit]:
     """Fetches validators consensus info."""
+    public_keys = keystore.public_keys
     results = []
     exited_statuses = [x.value for x in EXITING_STATUSES]
 
@@ -273,11 +224,8 @@ async def _get_exit_keystores(
                 continue
 
             results.append(
-                ExitKeystore(
+                ValidatorExit(
                     public_key=beacon_validator['validator']['pubkey'],
-                    private_key=keystores[beacon_validator['validator']['pubkey']]
-                    if len(keystores) > 0
-                    else None,
                     index=int(beacon_validator['index']),
                 )
             )

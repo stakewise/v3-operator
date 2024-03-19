@@ -4,9 +4,8 @@ import time
 from random import shuffle
 
 from aiohttp import ClientError
-from eth_typing import BlockNumber, BLSPubkey
+from eth_typing import BlockNumber
 from tenacity import RetryError
-from web3 import Web3
 from web3.types import HexStr
 
 from src.common.contracts import keeper_contract
@@ -24,27 +23,20 @@ from src.exits.utils import (
     get_oracle_outdated_signatures_response,
     send_signature_rotation_requests,
 )
-from src.validators.signing.local import get_exit_signature_shards
-from src.validators.signing.remote import (
-    RemoteSignerConfiguration,
-    get_exit_signature_shards_remote_signer,
-)
-from src.validators.typings import Keystores
+from src.validators.keystores.base import BaseKeystore
+from src.validators.signing.common import get_encrypted_exit_signature_shards
 
 logger = logging.getLogger(__name__)
 
 
 class ExitSignatureTask(BaseTask):
-    keystores: Keystores
-    remote_signer_config: RemoteSignerConfiguration | None
-
-    def __init__(
-        self, keystores: Keystores, remote_signer_config: RemoteSignerConfiguration | None
-    ):
-        self.keystores = keystores
-        self.remote_signer_config = remote_signer_config
+    def __init__(self, keystore: BaseKeystore | None):
+        self.keystore = keystore
 
     async def process_block(self) -> None:
+        if self.keystore is None:
+            return
+
         oracles = await get_oracles()
         update_block = await _fetch_last_update_block()
         if update_block and not await is_block_finalized(update_block):
@@ -58,8 +50,7 @@ class ExitSignatureTask(BaseTask):
         outdated_indexes = await _fetch_outdated_indexes(oracles, update_block)
         if outdated_indexes:
             await _update_exit_signatures(
-                keystores=self.keystores,
-                remote_signer_config=self.remote_signer_config,
+                keystore=self.keystore,
                 oracles=oracles,
                 outdated_indexes=outdated_indexes,
             )
@@ -115,6 +106,8 @@ async def _fetch_outdated_indexes(oracles: Oracles, update_block: BlockNumber | 
         except (ClientError, RetryError) as e:
             warning_verbose(str(e))
             continue
+        if response['exit_signature_block_number'] is None:
+            continue
         if not update_block or response['exit_signature_block_number'] >= update_block:
             outdated_indexes = [val['index'] for val in response['validators']]
             metrics.outdated_signatures.set(len(outdated_indexes))
@@ -123,8 +116,7 @@ async def _fetch_outdated_indexes(oracles: Oracles, update_block: BlockNumber | 
 
 
 async def _update_exit_signatures(
-    keystores: Keystores,
-    remote_signer_config: RemoteSignerConfiguration | None,
+    keystore: BaseKeystore,
     oracles: Oracles,
     outdated_indexes: list[int],
 ) -> None:
@@ -143,8 +135,7 @@ async def _update_exit_signatures(
             deadline = current_timestamp + oracles.signature_validity_period
             oracles_request = await _get_oracles_request(
                 oracles=oracles,
-                keystores=keystores,
-                remote_signer_config=remote_signer_config,
+                keystore=keystore,
                 validators=validators,
             )
 
@@ -185,8 +176,7 @@ async def _fetch_exit_signature_block(oracle_endpoint: str) -> BlockNumber | Non
 
 async def _get_oracles_request(
     oracles: Oracles,
-    keystores: Keystores,
-    remote_signer_config: RemoteSignerConfiguration | None,
+    keystore: BaseKeystore,
     validators: dict[int, HexStr],
 ) -> SignatureRotationRequest:
     """Fetches approval from oracles."""
@@ -205,21 +195,12 @@ async def _get_oracles_request(
         if len(request.public_keys) >= exit_rotation_batch_limit:
             break
 
-        if len(keystores) > 0 and public_key in keystores:
-            shards = get_exit_signature_shards(
+        if public_key in keystore:
+            shards = await get_encrypted_exit_signature_shards(
+                keystore=keystore,
+                public_key=public_key,
                 validator_index=validator_index,
-                private_key=keystores[public_key],
                 oracles=oracles,
-                fork=settings.network_config.SHAPELLA_FORK,
-            )
-        elif remote_signer_config and public_key in remote_signer_config.pubkeys_to_shares:
-            # pylint: disable=duplicate-code
-            pubkey_shares = remote_signer_config.pubkeys_to_shares[public_key]
-            shards = await get_exit_signature_shards_remote_signer(
-                validator_index=validator_index,
-                validator_pubkey_shares=[BLSPubkey(Web3.to_bytes(hexstr=s)) for s in pubkey_shares],
-                oracles=oracles,
-                fork=settings.network_config.SHAPELLA_FORK,
             )
         else:
             failed_indexes.append(validator_index)
