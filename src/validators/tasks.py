@@ -4,10 +4,10 @@ import time
 
 from eth_typing import HexStr
 from multiproof.standard import MultiProof
-from sw_utils import EventScanner, InterruptHandler, IpfsFetchClient
+from sw_utils import EventScanner, InterruptHandler, IpfsFetchClient, convert_to_mgno
 from sw_utils.typings import Bytes32
 from web3 import Web3
-from web3.types import BlockNumber, Wei
+from web3.types import BlockNumber
 
 from src.common.checks import wait_execution_catch_up_consensus
 from src.common.consensus import get_chain_finalized_head
@@ -17,7 +17,7 @@ from src.common.execution import check_gas_price, get_oracles
 from src.common.metrics import metrics
 from src.common.tasks import BaseTask
 from src.common.typings import Oracles
-from src.common.utils import MGNO_RATE, WAD, get_current_timestamp, log_verbose
+from src.common.utils import get_current_timestamp, log_verbose
 from src.config.networks import GNOSIS
 from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.validators.database import NetworkValidatorCrud
@@ -263,7 +263,7 @@ async def get_validators_count_from_vault_assets() -> tuple[int, HexStr | None]:
     vault_balance, update_state_call = await get_withdrawable_assets()
     if settings.network == GNOSIS:
         # apply GNO -> mGNO exchange rate
-        vault_balance = Wei(int(vault_balance * MGNO_RATE // WAD))
+        vault_balance = convert_to_mgno(vault_balance)
 
     metrics.stakeable_assets.set(int(vault_balance))
 
