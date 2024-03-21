@@ -1,4 +1,5 @@
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -10,6 +11,7 @@ from sw_utils.consensus import EXITED_STATUSES
 from web3 import Web3
 
 from src.common.clients import consensus_client
+from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import format_error, log_verbose
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
@@ -90,6 +92,16 @@ EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
     envvar='VERBOSE',
     is_flag=True,
 )
+@click.option(
+    '--log-level',
+    type=click.Choice(
+        LOG_LEVELS,
+        case_sensitive=False,
+    ),
+    default='INFO',
+    envvar='LOG_LEVEL',
+    help='The log level.',
+)
 @click.command(help='Performs a voluntary exit for active vault validators.')
 # pylint: disable-next=too-many-arguments
 def validators_exit(
@@ -103,6 +115,7 @@ def validators_exit(
     hashi_vault_url: str | None,
     data_dir: str,
     verbose: bool,
+    log_level: str,
 ) -> None:
     # pylint: disable=duplicate-code
     vault_config = VaultConfig(vault, Path(data_dir))
@@ -120,15 +133,30 @@ def validators_exit(
         hashi_vault_key_path=hashi_vault_key_path,
         hashi_vault_url=hashi_vault_url,
         verbose=verbose,
+        log_level=log_level,
     )
     try:
-        asyncio.run(main(count))
+        # Try-catch to enable async calls in test - an event loop
+        #  will already be running in that case
+        try:
+            asyncio.get_running_loop()
+            # we need to create a separate thread so we can block before returning
+            with ThreadPoolExecutor(1) as pool:
+                pool.submit(lambda: asyncio.run(main(count))).result()
+        except RuntimeError as e:
+            if 'no running event loop' == e.args[0]:
+                # no event loop running
+                asyncio.run(main(count))
+            else:
+                raise e
     except Exception as e:
         log_verbose(e)
 
 
 async def main(count: int | None) -> None:
+    setup_logging()
     keystore = await load_keystore()
+
     validators_exits = await _get_validators_exits(keystore=keystore)
     if not validators_exits:
         raise click.ClickException('There are no active validators.')
@@ -150,7 +178,6 @@ async def main(count: int | None) -> None:
         exit_signature = await keystore.get_exit_signature(
             validator_index=validator_exit.index,
             public_key=validator_exit.public_key,
-            network=settings.network,
             fork=settings.network_config.SHAPELLA_FORK,
         )
         try:

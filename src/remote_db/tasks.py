@@ -10,15 +10,12 @@ from Cryptodome.Random import get_random_bytes
 from eth_typing import ChecksumAddress, HexStr
 from web3 import Web3
 
-from src.common.execution import get_protocol_config
 from src.common.utils import greenify
 from src.config.settings import settings
 from src.remote_db.database import ConfigsCrud, KeyPairsCrud, get_db_connection
 from src.remote_db.typings import RemoteDatabaseKeyPair
 from src.validators.execution import check_deposit_data_root
 from src.validators.keystores.local import LocalKeystore
-from src.validators.keystores.remote import RemoteSignerKeystore
-from src.validators.signing.key_shares import private_key_to_private_key_shares
 from src.validators.typings import BLSPrivkey
 from src.validators.utils import generate_validators_tree
 
@@ -67,7 +64,7 @@ def cleanup(db_url: str) -> None:
 
 # pylint: disable=too-many-locals
 async def upload_keypairs(db_url: str, b64_encrypt_key: str) -> None:
-    """Generates shares for the local keypairs, updates configs in the remote DB."""
+    """Uploads key-pairs to remote DB. Updates configs in the remote DB."""
     encryption_key = _check_encryption_key(db_url, b64_encrypt_key)
 
     # load and check deposit data file
@@ -82,17 +79,7 @@ async def upload_keypairs(db_url: str, b64_encrypt_key: str) -> None:
     if len(keystore) == 0:
         raise click.ClickException('Keystore not found.')
 
-    # get oracles for calculating key shares
-    click.echo('Fetching oracles config...')
-    protocol_config = await get_protocol_config()
-
-    # fetch remote signer configuration file
-    remote_signer_config_data = ConfigsCrud(db_url=db_url).get_remote_signer_config() or {}
-    remote_signer_keystore = RemoteSignerKeystore(remote_signer_config_data)
-    existing_pub_keys = set(remote_signer_keystore.public_keys)
-    pubkeys_to_shares = remote_signer_keystore.pubkeys_to_shares
-    click.echo(f'Calculating and encrypting shares for {len(keystore)} keystores...')
-    total_oracles = len(protocol_config.oracles)
+    click.echo(f'Encrypting {len(keystore)} keystores...')
     key_records: list[RemoteDatabaseKeyPair] = []
     for public_key, private_key in keystore.keys.items():  # pylint: disable=no-member
         encrypted_priv_key, nonce = _encrypt_private_key(private_key, encryption_key)
@@ -104,41 +91,15 @@ async def upload_keypairs(db_url: str, b64_encrypt_key: str) -> None:
                 nonce=Web3.to_hex(nonce),
             )
         )
-        # calculate shares for keystore private key
-        private_key_shares = private_key_to_private_key_shares(
-            private_key=private_key,
-            threshold=protocol_config.exit_signature_recover_threshold,
-            total=total_oracles,
-        )
-
-        # update remote signer config and shares keystores
-        pubkeys_to_shares[public_key] = []
-        for share_private_key in private_key_shares:
-            share_public_key = Web3.to_hex(bls.SkToPk(share_private_key))
-            encrypted_priv_key, nonce = _encrypt_private_key(share_private_key, encryption_key)
-            key_records.append(
-                RemoteDatabaseKeyPair(
-                    vault=settings.vault,
-                    parent_public_key=public_key,
-                    public_key=share_public_key,
-                    private_key=Web3.to_hex(encrypted_priv_key),
-                    nonce=Web3.to_hex(nonce),
-                )
-            )
-            pubkeys_to_shares[public_key].append(share_public_key)
 
     click.echo('Uploading updates to the remote db...')
     with get_db_connection(db_url) as conn:
         keypairs_crud = KeyPairsCrud(db_connection=conn)
-        if existing_pub_keys:
-            # clean up shares for existing keys
-            keypairs_crud.remove_keypairs(in_parent_public_keys=existing_pub_keys)
         # upload keypairs to remote db
         keypairs_crud.upload_keypairs(key_records)
 
         # upload remote signer config to remote db
         configs_crud = ConfigsCrud(db_connection=conn)
-        configs_crud.update_remote_signer_config(pubkeys_to_shares)
         configs_crud.update_deposit_data(deposit_data)
 
 
@@ -188,7 +149,7 @@ def setup_validator(
     output_dir: Path,
 ) -> None:
     """Generate validator configs for Lighthouse, Teku and Prysm clients."""
-    keypairs = KeyPairsCrud(db_url=db_url).get_keypairs(has_parent_public_key=False)
+    keypairs = KeyPairsCrud(db_url=db_url).get_keypairs()
     if not keypairs:
         raise click.ClickException('No keypairs found in the remote db.')
 
@@ -244,9 +205,6 @@ def setup_validator(
 def setup_operator(db_url: str, output_dir: Path) -> None:
     """Create operator remote signer configuration."""
     config_crud = ConfigsCrud(db_url=db_url)
-    config_data = config_crud.get_remote_signer_config()
-    if config_data is None:
-        raise click.ClickException('No remote signer configuration found in the remote db.')
 
     deposit_data = config_crud.get_deposit_data()
     if deposit_data is None:
@@ -254,10 +212,6 @@ def setup_operator(db_url: str, output_dir: Path) -> None:
 
     if not output_dir.exists():
         output_dir.mkdir(parents=True, exist_ok=True)
-
-    output_file = output_dir / ConfigsCrud.remote_signer_config_name
-    RemoteSignerKeystore.load_from_data(config_data).save(output_file)
-    click.secho(f'Operator remote signer configuration saved to {greenify(output_file)} file.')
 
     output_file = output_dir / ConfigsCrud.deposit_data_name
     with open(output_file, 'w', encoding='utf-8') as f:
@@ -280,20 +234,24 @@ def _check_encryption_key(db_url: str, b64_encrypt_key: str) -> bytes:
         encryption_key = base64.b64decode(b64_encrypt_key)
         if len(encryption_key) != CIPHER_KEY_LENGTH:
             raise click.ClickException('Invalid encryption key length.')
+    except Exception as exc:
+        raise click.ClickException('Invalid encryption key.') from exc
 
-        keypair = KeyPairsCrud(db_url=db_url).get_first_keypair()
-        if keypair is None:
-            return encryption_key
+    keypair = KeyPairsCrud(db_url=db_url).get_first_keypair()
+    if keypair is None:
+        return encryption_key
 
+    try:
         decrypted_private_key = _decrypt_private_key(
             private_key=Web3.to_bytes(hexstr=keypair.private_key),
             encryption_key=encryption_key,
             nonce=Web3.to_bytes(hexstr=keypair.nonce),
         )
-        if bls.SkToPk(decrypted_private_key) != Web3.to_bytes(hexstr=keypair.public_key):
-            raise click.ClickException('Failed to decrypt first private key.')
-    except Exception as exc:
-        raise click.ClickException('Invalid encryption key.') from exc
+    except Exception as e:
+        raise click.ClickException('Failed to decrypt first private key.') from e
+
+    if bls.SkToPk(decrypted_private_key) != Web3.to_bytes(hexstr=keypair.public_key):
+        raise click.ClickException('Failed to decrypt first private key.')
 
     return encryption_key
 

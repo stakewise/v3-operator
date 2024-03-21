@@ -6,6 +6,7 @@ from random import shuffle
 
 from aiohttp import ClientError
 from eth_typing import BlockNumber
+from sw_utils import InterruptHandler
 from sw_utils.typings import Oracle, ProtocolConfig
 from tenacity import RetryError
 from web3.types import HexStr
@@ -25,17 +26,19 @@ from src.exits.utils import (
     send_signature_rotation_requests,
 )
 from src.validators.keystores.base import BaseKeystore
+from src.validators.signing.common import get_encrypted_exit_signature_shards
 
 logger = logging.getLogger(__name__)
 
 
 class ExitSignatureTask(BaseTask):
-    keystore: BaseKeystore
-
-    def __init__(self, keystore: BaseKeystore):
+    def __init__(self, keystore: BaseKeystore | None):
         self.keystore = keystore
 
-    async def process_block(self) -> None:
+    async def process_block(self, interrupt_handler: InterruptHandler) -> None:
+        if self.keystore is None:
+            return
+
         protocol_config = await get_protocol_config()
         update_block = await _fetch_last_update_block()
         if update_block and not await is_block_finalized(update_block):
@@ -109,6 +112,8 @@ async def _fetch_outdated_indexes(
             response = await get_oracle_outdated_signatures_response(oracle_endpoint)
         except (ClientError, RetryError) as e:
             warning_verbose(str(e))
+            continue
+        if response['exit_signature_block_number'] is None:
             continue
         if not update_block or response['exit_signature_block_number'] >= update_block:
             outdated_indexes = [val['index'] for val in response['validators']]
@@ -200,11 +205,11 @@ async def _get_oracles_request(
             break
 
         if public_key in keystore:
-            shards = await keystore.get_exit_signature_shards(
-                validator_index=validator_index,
+            shards = await get_encrypted_exit_signature_shards(
+                keystore=keystore,
                 public_key=public_key,
+                validator_index=validator_index,
                 protocol_config=protocol_config,
-                fork=settings.network_config.SHAPELLA_FORK,
             )
         else:
             failed_indexes.append(validator_index)

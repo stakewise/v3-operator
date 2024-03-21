@@ -12,7 +12,6 @@ from src.config.settings import settings
 from src.exits.tasks import _get_oracles_request
 from src.validators.keystores.local import Keys, LocalKeystore
 from src.validators.keystores.remote import RemoteSignerKeystore
-from src.validators.typings import ExitSignatureShards
 
 
 @pytest.mark.usefixtures('fake_settings')
@@ -64,17 +63,9 @@ class TestGetOraclesRequest:
                     epoch=1,
                 ),
             ),
-            mock.patch(
-                'src.exits.tasks.BaseKeystore.get_exit_signature_shards',
-                return_value=ExitSignatureShards(
-                    public_keys=[],
-                    exit_signatures=[],
-                ),
-            ),
         ):
             validators = {
-                randint(0, int(1e6)): pubkey
-                for pubkey in remote_signer_keystore.pubkeys_to_shares.keys()
+                randint(0, int(1e6)): pubkey for pubkey in remote_signer_keystore.public_keys
             }
             request = await _get_oracles_request(
                 protocol_config=protocol_config,

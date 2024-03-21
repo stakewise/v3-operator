@@ -15,6 +15,7 @@ from src.common.contracts import (
     validators_registry_contract,
     vault_contract,
 )
+from src.common.execution import get_high_priority_tx_params
 from src.common.ipfs import fetch_harvest_params
 from src.common.metrics import metrics
 from src.common.typings import OraclesApproval
@@ -144,12 +145,10 @@ async def get_withdrawable_assets() -> tuple[Wei, HexStr | None]:
 
     before_update_validators = before_update_assets // DEPOSIT_AMOUNT
     after_update_validators = after_update_assets // DEPOSIT_AMOUNT
-    if before_update_validators != after_update_validators or await keeper_contract.can_harvest(
-        vault_contract.contract_address
-    ):
+    if before_update_validators != after_update_validators:
         return Wei(after_update_assets), update_state_call
 
-    return Wei(before_update_assets), None
+    return Wei(before_update_assets), update_state_call
 
 
 async def check_deposit_data_root(deposit_data_root: str) -> None:
@@ -162,12 +161,14 @@ async def check_deposit_data_root(deposit_data_root: str) -> None:
 
 
 async def get_available_validators(
-    keystore: BaseKeystore,
+    keystore: BaseKeystore | None,
     deposit_data: DepositData,
     count: int,
+    run_check_deposit_data_root: bool = True,
 ) -> list[Validator]:
     """Fetches vault's available validators."""
-    await check_deposit_data_root(deposit_data.tree.root)
+    if run_check_deposit_data_root:
+        await check_deposit_data_root(deposit_data.tree.root)
 
     start_index = await vault_contract.get_validators_index()
     validators: list[Validator] = []
@@ -178,7 +179,7 @@ async def get_available_validators(
             validator = deposit_data.validators[i]
         except IndexError:
             break
-        if validator.public_key not in keystore:
+        if keystore and validator.public_key not in keystore:
             logger.warning(
                 'Cannot find validator with public key %s in keystores.',
                 validator.public_key,
@@ -249,6 +250,8 @@ async def register_single_validator(
         multi_proof.proof,
     ]
     try:
+        tx_params = await get_high_priority_tx_params()
+
         if update_state_call is not None:
             register_call = vault_contract.encode_abi(
                 fn_name='registerValidator',
@@ -256,9 +259,10 @@ async def register_single_validator(
             )
             tx = await vault_contract.functions.multicall(
                 [update_state_call, register_call]
-            ).transact()
+            ).transact(tx_params)
         else:
-            tx = await vault_contract.functions.registerValidator(*register_call_args).transact()
+            register_func = vault_contract.functions.registerValidator
+            tx = await register_func(*register_call_args).transact(tx_params)
     except Exception as e:
         logger.error('Failed to register validator: %s', format_error(e))
         if settings.verbose:
@@ -267,7 +271,13 @@ async def register_single_validator(
 
     tx_hash = Web3.to_hex(tx)
     logger.info('Waiting for transaction %s confirmation', tx_hash)
-    await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)
+    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
+        tx, timeout=settings.execution_transaction_timeout
+    )
+    if not tx_receipt['status']:
+        logger.error('Registration transaction failed')
+        return None
+
     return tx_hash
 
 
@@ -299,6 +309,8 @@ async def register_multiple_validator(
         multi_proof.proof,
     ]
     try:
+        tx_params = await get_high_priority_tx_params()
+
         if update_state_call is not None:
             register_call = vault_contract.encode_abi(
                 fn_name='registerValidators',
@@ -306,9 +318,10 @@ async def register_multiple_validator(
             )
             tx = await vault_contract.functions.multicall(
                 [update_state_call, register_call]
-            ).transact()
+            ).transact(tx_params)
         else:
-            tx = await vault_contract.functions.registerValidators(*register_call_args).transact()
+            register_func = vault_contract.functions.registerValidators
+            tx = await register_func(*register_call_args).transact(tx_params)
     except Exception as e:
         logger.error('Failed to register validators: %s', format_error(e))
         if settings.verbose:
@@ -317,5 +330,10 @@ async def register_multiple_validator(
 
     tx_hash = Web3.to_hex(tx)
     logger.info('Waiting for transaction %s confirmation', tx_hash)
-    await execution_client.eth.wait_for_transaction_receipt(tx, timeout=300)
+    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
+        tx, timeout=settings.execution_transaction_timeout
+    )
+    if not tx_receipt['status']:
+        logger.error('Registration transaction failed')
+        return None
     return tx_hash

@@ -1,3 +1,4 @@
+
 # StakeWise V3 Operator
 
 1. [What is V3 Operator?](#what-is-v3-operator)
@@ -7,9 +8,10 @@
     3. [Vault](#vault)
 3. [Installation](#installation)
     1. [Binary](#binary)
-    2. [Docker Image](#docker-image)
-    3. [Source Files](#source-files)
-    4. [Kubernetes (advanced)](#kubernetes-advanced)
+    2. [Install Script](#install-script-linux-and-macos)
+    3. [Docker Image](#docker-image)
+    4. [Source Files](#source-files)
+    5. [Kubernetes (advanced)](#kubernetes-advanced)
 4. [Usage](#usage)
     1. [Step 1. Create mnemonic](#step-1-create-mnemonic)
     2. [Step 2. Create validator keys](#step-2-create-validator-keys)
@@ -41,16 +43,17 @@ The validator registration process consists of the following steps:
 1. Check whether Vault has accumulated enough assets to register a validator (e.g., 32 ETH for Ethereum)
 2. Get the next free validator public key from the deposit data file attached to the operator. The validators are
    registered in the same order as specified in the deposit data file.
-3. Share the exit signature of the validator with StakeWise Oracles:
-    1. Using [Shamir's secret sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing), generate shares for the
-       validator's BLS private key. The number of shares is equal to the number of oracles.
-    2. Sign the exit message with every private key share and encrypt exit signatures with oracles' public keys.
+3. Obtain BLS signature for exit message using local keystores or remote signer.
+4. Share the exit signature of the validator with StakeWise Oracles:
+    1. Using [Shamir's secret sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing), split
+       validator's BLS signature. The number of shares is equal to the number of oracles.
+    2. Encrypt exit signatures with oracles' public keys.
     3. Send encrypted exit signatures to all the oracles and receive registration signatures from them.
-4. Send transaction to Vault contract to register the validator.
+5. Send transaction to Vault contract to register the validator.
 
 ### Exit signatures rotation
 
-Exit signatures from the previous section can become invalid if the oracles set changes. For example, if oracle's
+Exit signatures from the previous section can become invalid if the oracles' set changes. For example, if oracles'
 private key gets compromised, the DAO will have to propose an update of the oracles set that will trigger exit signature
 rotation.
 The operator periodically checks active validators of the Vault and if some exit signatures become outdated, the
@@ -113,19 +116,47 @@ use of flags is optional):
 
 Head to [Usage](#usage) to launch your operator service.
 
+### Install script (Linux and macOS)
+
+To install a binary for the latest release, run:
+
+```bash
+curl -sSfL https://raw.githubusercontent.com/stakewise/v3-operator/master/scripts/install.sh | sh -s
+```
+
+The binary will be installed inside the ~/bin directory. Add the binary to your path:
+
+```bash
+export PATH=$PATH:~/bin
+```
+
+If you want to install a specific version to a custom location, run:
+
+```bash
+curl -sSfL https://raw.githubusercontent.com/stakewise/v3-operator/master/scripts/install.sh | sh -s -- -b <custom_location> vX.X.X
+```
+
+You will execute Operator Service commands using the below format (note that the use of flags is optional):
+
+```bash
+operator COMMAND --flagA=123 --flagB=xyz
+```
+
+Head to [Usage](#usage) to launch your operator service.
+
 ### Docker Image
 
 Pull the latest docker operator docker image:
 
 ```bash
-docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.0.6
+docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.1.0
 ```
 
 You can also build the docker image from source by cloning this repo and executing the following command from within
 the `v3-operator` folder:
 
 ```bash
-docker build --pull -t europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.0.6 .
+docker build --pull -t europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.1.0 .
 ```
 
 You will execute Operator Service commands using the format below (note the use of flags are optional):
@@ -133,7 +164,7 @@ You will execute Operator Service commands using the format below (note the use 
 ```bash
 docker run --rm -ti \
 -v ~/.stakewise/:/data \
-europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.0.6 \
+europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.1.0 \
 src/main.py COMMAND \
 --flagA=123 \
 --flagB=xyz
@@ -239,8 +270,8 @@ Deposit data saved to /home/user/.stakewise/0x3320a...68/keystores/deposit_data.
 You may not want the operator service to have direct access to the validator keys. Validator keystores do not need to be
 present directly in the operator. You can check
 the [remote signer](https://docs.stakewise.io/for-operators/operator-service/running-with-remote-signer)
-or [Hashicorp Vault](https://docs.stakewise.io/for-operators/operator-service/running-with-hashi-vault) guides on how to run Operator
-Service with them.
+or [Hashicorp Vault](https://docs.stakewise.io/for-operators/operator-service/running-with-hashi-vault) guides on how to
+run Operator Service with them.
 
 **Remember to upload the newly generated validator keys to the validator(s). For that, please follow a guide for your
 consensus client. The password for your keystores is located in the `password.txt` file in the keystores folder.**
@@ -323,8 +354,8 @@ and execution endpoints as flags.
 
 If you **did not** use Operator Service to generate hot wallet, you will need to add the following flags:
 
-- `--hot-wallet-file` - path to the password-protected *.txt* file containing your hot wallet private key.
-- `--hot-wallet-password-file` - path to a *.txt* file containing the password to open the protected hot wallet private
+- `--hot-wallet-file` - path to the password-protected _.txt_ file containing your hot wallet private key.
+- `--hot-wallet-password-file` - path to a _.txt_ file containing the password to open the protected hot wallet private
   key file.
 
 If you **did not** use Operator Service to generate validator keys, you will need to add the following flag:
@@ -355,7 +386,7 @@ below:
 ```bash
 docker run --restart on-failure:10 \
 -v ~/.stakewise/:/data \
-europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.0.6 \
+europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.1.0 \
 src/main.py start \
 --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
 --data-dir=/data \
@@ -421,11 +452,11 @@ Validators 513571, 513572, 513861 exits successfully initiated
 
 ### Update Vault state (Harvest Vault)
 
-Updating the *Vault state* distributes the Vault fee to the Vault fee address and updates each staker's position. If an
+Updating the _Vault state_ distributes the Vault fee to the Vault fee address and updates each staker's position. If an
 ERC-20 token was chosen during Vault creation, the Vault specific ERC-20 reprices based on the rewards/penalties since
 the previous update and the Vault fees are distributed in newly minted ERC-20 tokens.
 
-By default, each *Vault state* gets updated whenever a user interacts with the Vault (deposit, withdraw, etc.), with a
+By default, each _Vault state_ gets updated whenever a user interacts with the Vault (deposit, withdraw, etc.), with a
 12 hours cooldown. Vault state can also be updated by the Vault operator(s) by passing the `--harvest-vault` flag to the
 Operator Service `start` command. Harvest occurs every 12 hours and the gas fees are paid by the hot wallet linked to
 the Operator Service.

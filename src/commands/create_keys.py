@@ -49,7 +49,7 @@ from src.common.vault_config import VaultConfig
 @click.option(
     '--pool-size',
     help='Number of processes in a pool.',
-    # do not prompt
+    envvar='POOL_SIZE',
     type=int,
 )
 @click.command(help='Creates the validator keys from the mnemonic.')

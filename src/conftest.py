@@ -161,28 +161,23 @@ def _remote_signer_setup(
     mocked_remote_signer,
     _create_keys,
 ) -> None:
-    with mock.patch(
-        'src.commands.remote_signer_setup.get_protocol_config', return_value=mocked_protocol_config
-    ):
-        result = runner.invoke(
-            remote_signer_setup,
-            [
-                '--vault',
-                str(vault_address),
-                '--remote-signer-url',
-                remote_signer_url,
-                '--data-dir',
-                str(data_dir),
-                '--execution-endpoints',
-                execution_endpoints,
-            ],
-        )
-        assert result.exit_code == 0
+    result = runner.invoke(
+        remote_signer_setup,
+        [
+            '--vault',
+            str(vault_address),
+            '--remote-signer-url',
+            remote_signer_url,
+            '--data-dir',
+            str(data_dir),
+        ],
+    )
+    assert result.exit_code == 0
 
 
 @pytest.fixture
-def remote_signer_keystore(_remote_signer_setup) -> RemoteSignerKeystore:
-    return RemoteSignerKeystore.load_from_file(settings.remote_signer_config_file)
+async def remote_signer_keystore(_remote_signer_setup) -> RemoteSignerKeystore:
+    return await RemoteSignerKeystore.load()
 
 
 @pytest.fixture

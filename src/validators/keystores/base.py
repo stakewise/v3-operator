@@ -1,9 +1,7 @@
 import abc
 
 from eth_typing import BLSSignature, HexStr
-from sw_utils.typings import ConsensusFork, ProtocolConfig
-
-from src.validators.typings import ExitSignatureShards
+from sw_utils.typings import ConsensusFork
 
 
 class BaseKeystore(abc.ABC):
@@ -25,18 +23,8 @@ class BaseKeystore(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def get_exit_signature_shards(
-        self,
-        validator_index: int,
-        public_key: HexStr,
-        protocol_config: ProtocolConfig,
-        fork: ConsensusFork,
-    ) -> ExitSignatureShards:
-        raise NotImplementedError
-
-    @abc.abstractmethod
     async def get_exit_signature(
-        self, validator_index: int, public_key: HexStr, network: str, fork: ConsensusFork
+        self, validator_index: int, public_key: HexStr, fork: ConsensusFork
     ) -> BLSSignature:
         raise NotImplementedError
 

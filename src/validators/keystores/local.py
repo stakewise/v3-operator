@@ -10,15 +10,13 @@ import milagro_bls_binding as bls
 from eth_typing import BLSSignature, HexStr
 from staking_deposit.key_handling.keystore import ScryptKeystore
 from sw_utils.signing import get_exit_message_signing_root
-from sw_utils.typings import ConsensusFork, ProtocolConfig
+from sw_utils.typings import ConsensusFork
 from web3 import Web3
 
-from src.config.settings import NETWORKS, settings
+from src.config.settings import settings
 from src.validators.exceptions import KeystoreException
 from src.validators.keystores.base import BaseKeystore
-from src.validators.signing.common import encrypt_signature
-from src.validators.signing.key_shares import private_key_to_private_key_shares
-from src.validators.typings import BLSPrivkey, ExitSignatureShards
+from src.validators.typings import BLSPrivkey
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +25,7 @@ logger = logging.getLogger(__name__)
 class KeystoreFile:
     name: str
     password: str
+    password_file: Path
 
 
 Keys = NewType('Keys', dict[HexStr, BLSPrivkey])
@@ -78,45 +77,16 @@ class LocalKeystore(BaseKeystore):
     def __len__(self) -> int:
         return len(self.keys)
 
-    async def get_exit_signature_shards(
-        self,
-        validator_index: int,
-        public_key: HexStr,
-        protocol_config: ProtocolConfig,
-        fork: ConsensusFork,
-    ) -> ExitSignatureShards:
-        """Generates exit signature shards and encrypts them with oracles' public keys."""
-        oracle_public_keys = [oracle.public_key for oracle in protocol_config.oracles]
-        message = get_exit_message_signing_root(
-            validator_index=validator_index,
-            genesis_validators_root=settings.network_config.GENESIS_VALIDATORS_ROOT,
-            fork=fork,
-        )
-
-        private_key_shares = private_key_to_private_key_shares(
-            private_key=self.keys[public_key],
-            threshold=protocol_config.exit_signature_recover_threshold,
-            total=len(oracle_public_keys),
-        )
-        exit_signature_shards: list[HexStr] = []
-        for bls_priv_key, oracle_pubkey in zip(private_key_shares, oracle_public_keys):
-            exit_signature_shards.append(
-                encrypt_signature(oracle_pubkey, bls.Sign(bls_priv_key, message))
-            )
-
-        return ExitSignatureShards(
-            public_keys=[Web3.to_hex(bls.SkToPk(priv_key)) for priv_key in private_key_shares],
-            exit_signatures=exit_signature_shards,
-        )
-
     async def get_exit_signature(
-        self, validator_index: int, public_key: HexStr, network: str, fork: ConsensusFork
+        self, validator_index: int, public_key: HexStr, fork: ConsensusFork | None = None
     ) -> BLSSignature:
+        fork = fork or settings.network_config.SHAPELLA_FORK
+
         private_key = self.keys[public_key]
 
         message = get_exit_message_signing_root(
             validator_index=validator_index,
-            genesis_validators_root=NETWORKS[network].GENESIS_VALIDATORS_ROOT,
+            genesis_validators_root=settings.network_config.GENESIS_VALIDATORS_ROOT,
             fork=fork,
         )
 
@@ -142,7 +112,7 @@ class LocalKeystore(BaseKeystore):
                 password_file = keystores_password_file
 
             password = LocalKeystore._load_keystores_password(password_file)
-            res.append(KeystoreFile(name=f, password=password))
+            res.append(KeystoreFile(name=f, password=password, password_file=password_file))
 
         return res
 
