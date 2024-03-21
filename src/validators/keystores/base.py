@@ -24,7 +24,7 @@ class BaseKeystore(abc.ABC):
 
     @abc.abstractmethod
     async def get_exit_signature(
-        self, validator_index: int, public_key: HexStr, fork: ConsensusFork
+        self, validator_index: int, public_key: HexStr, fork: ConsensusFork | None = None
     ) -> BLSSignature:
         raise NotImplementedError
 
