@@ -5,7 +5,7 @@ import time
 from eth_typing import HexStr
 from multiproof.standard import MultiProof
 from sw_utils import EventScanner, InterruptHandler, IpfsFetchClient
-from sw_utils.typings import Bytes32
+from sw_utils.typings import Bytes32, ProtocolConfig
 from web3 import Web3
 from web3.types import BlockNumber, Wei
 
@@ -13,10 +13,9 @@ from src.common.checks import wait_execution_catch_up_consensus
 from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import v2_pool_escrow_contract, validators_registry_contract
 from src.common.exceptions import NotEnoughOracleApprovalsError
-from src.common.execution import check_gas_price, get_oracles
+from src.common.execution import check_gas_price, get_protocol_config
 from src.common.metrics import metrics
 from src.common.tasks import BaseTask
-from src.common.typings import Oracles
 from src.common.utils import MGNO_RATE, WAD, get_current_timestamp, log_verbose
 from src.config.networks import GNOSIS
 from src.config.settings import DEPOSIT_AMOUNT, settings
@@ -128,10 +127,10 @@ async def register_validators(
         # not enough balance to register validators
         return None
 
-    # get latest oracles
-    oracles = await get_oracles()
+    # get latest config
+    protocol_config = await get_protocol_config()
 
-    validators_count = min(oracles.validators_approval_batch_limit, validators_count)
+    validators_count = min(protocol_config.validators_approval_batch_limit, validators_count)
 
     validators = await get_available_validators(
         keystore=keystore,
@@ -158,8 +157,8 @@ async def register_validators(
     )
     registry_root = None
     oracles_request = None
-    oracles = await get_oracles()
-    deadline = get_current_timestamp() + oracles.signature_validity_period
+    protocol_config = await get_protocol_config()
+    deadline = get_current_timestamp() + protocol_config.signature_validity_period
     approvals_min_interval = 1
 
     while True:
@@ -173,11 +172,11 @@ async def register_validators(
             or deadline <= current_timestamp
         ):
             registry_root = latest_registry_root
-            deadline = current_timestamp + oracles.signature_validity_period
+            deadline = current_timestamp + protocol_config.signature_validity_period
             logger.debug('Fetched latest validators registry root: %s', Web3.to_hex(registry_root))
 
             oracles_request = await create_approval_request(
-                oracles=oracles,
+                protocol_config=protocol_config,
                 keystore=keystore,
                 validators=validators,
                 registry_root=registry_root,
@@ -186,7 +185,7 @@ async def register_validators(
             )
 
         try:
-            oracles_approval = await send_approval_requests(oracles, oracles_request)
+            oracles_approval = await send_approval_requests(protocol_config, oracles_request)
             break
         except NotEnoughOracleApprovalsError as e:
             logger.error(
@@ -245,10 +244,10 @@ async def get_available_validators_for_registration(
         # not enough balance to register validators
         return []
 
-    # get latest oracles
-    oracles = await get_oracles()
+    # get latest protocol config
+    protocol_config = await get_protocol_config()
 
-    validators_count = min(oracles.validators_approval_batch_limit, validators_count)
+    validators_count = min(protocol_config.validators_approval_batch_limit, validators_count)
 
     validators = await get_available_validators(
         keystore=keystore,
@@ -274,7 +273,7 @@ async def get_validators_count_from_vault_assets() -> tuple[int, HexStr | None]:
 
 # pylint: disable-next=too-many-arguments
 async def create_approval_request(
-    oracles: Oracles,
+    protocol_config: ProtocolConfig,
     keystore: BaseKeystore | None,
     validators: list[Validator],
     registry_root: Bytes32,
@@ -309,7 +308,7 @@ async def create_approval_request(
             keystore=keystore,
             public_key=validator.public_key,
             validator_index=validator_index,
-            oracles=oracles,
+            protocol_config=protocol_config,
             exit_signature=validator.exit_signature,
         )
 

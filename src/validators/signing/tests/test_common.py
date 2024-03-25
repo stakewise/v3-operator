@@ -6,10 +6,9 @@ import pytest
 from eth_typing import BLSSignature
 from eth_typing.bls import BLSPubkey
 from sw_utils import get_exit_message_signing_root
-from sw_utils.typings import ConsensusFork
+from sw_utils.typings import ConsensusFork, ProtocolConfig
 from web3 import Web3
 
-from src.common.typings import Oracles
 from src.config.settings import settings
 from src.validators.keystores.local import LocalKeystore
 from src.validators.keystores.remote import RemoteSignerKeystore
@@ -63,7 +62,7 @@ class TestGetEncryptedExitSignatureShards:
         self,
         create_validator_keypair: Callable,
         fork: ConsensusFork,
-        mocked_oracles: Oracles,
+        mocked_protocol_config: ProtocolConfig,
         _mocked_oracle_committee: OracleCommittee,
     ):
         validator_privkey, validator_pubkey = create_validator_keypair()
@@ -74,7 +73,7 @@ class TestGetEncryptedExitSignatureShards:
             keystore=keystore,
             validator_index=validator_index,
             public_key=validator_pubkey,
-            oracles=mocked_oracles,
+            protocol_config=mocked_protocol_config,
             fork=fork,
         )
 
@@ -100,7 +99,7 @@ class TestGetEncryptedExitSignatureShards:
         create_validator_keypair: Callable,
         fork: ConsensusFork,
         remote_signer_url: str,
-        mocked_oracles: Oracles,
+        mocked_protocol_config: ProtocolConfig,
         remote_signer_keystore: RemoteSignerKeystore,
         _mocked_oracle_committee: OracleCommittee,
     ):
@@ -114,7 +113,7 @@ class TestGetEncryptedExitSignatureShards:
             keystore=keystore,
             validator_index=validator_index,
             public_key=validator_pubkey,
-            oracles=mocked_oracles,
+            protocol_config=mocked_protocol_config,
             fork=fork,
         )
 
@@ -141,7 +140,7 @@ class TestGetEncryptedExitSignatureShards:
         self,
         create_validator_keypair: Callable,
         fork: ConsensusFork,
-        mocked_oracles: Oracles,
+        mocked_protocol_config: ProtocolConfig,
         _mocked_oracle_committee: OracleCommittee,
     ):
         """
@@ -162,7 +161,7 @@ class TestGetEncryptedExitSignatureShards:
             keystore=None,
             validator_index=validator_index,
             public_key=validator_pubkey,
-            oracles=mocked_oracles,
+            protocol_config=mocked_protocol_config,
             fork=fork,
             exit_signature=exit_signature,
         )
@@ -181,7 +180,7 @@ class TestGetEncryptedExitSignatureShards:
         self,
         create_validator_keypair: Callable,
         fork: ConsensusFork,
-        mocked_oracles: Oracles,
+        mocked_protocol_config: ProtocolConfig,
         remote_signer_url: str,
         fake_settings: None,
     ):
@@ -195,6 +194,6 @@ class TestGetEncryptedExitSignatureShards:
                 keystore=keystore,
                 validator_index=validator_index,
                 public_key=bls_pubkey,
-                oracles=mocked_oracles,
+                protocol_config=mocked_protocol_config,
                 fork=fork,
             )

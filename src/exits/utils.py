@@ -8,9 +8,10 @@ import aiohttp
 from aiohttp import ClientError
 from eth_typing import ChecksumAddress
 from sw_utils.decorators import retry_aiohttp_errors
+from sw_utils.typings import ProtocolConfig
 from web3 import Web3
 
-from src.common.typings import OracleApproval, Oracles, OraclesApproval
+from src.common.typings import OracleApproval, OraclesApproval
 from src.common.utils import format_error, process_oracles_approvals, warning_verbose
 from src.config.settings import (
     DEFAULT_RETRY_TIME,
@@ -24,11 +25,11 @@ logger = logging.getLogger(__name__)
 
 
 async def send_signature_rotation_requests(
-    oracles: Oracles, request: SignatureRotationRequest
+    protocol_config: ProtocolConfig, request: SignatureRotationRequest
 ) -> OraclesApproval:
     """Requests exit signature rotation from all oracles."""
     payload = dataclasses.asdict(request)
-    endpoints = list(zip(oracles.addresses, oracles.endpoints))
+    endpoints = [(oracle.address, oracle.endpoints) for oracle in protocol_config.oracles]
     random.shuffle(endpoints)
 
     approvals: dict[ChecksumAddress, OracleApproval] = {}
@@ -60,7 +61,7 @@ async def send_signature_rotation_requests(
         'Received approvals: %d out of %d',
         len(request.public_keys),
         len(approvals),
-        len(oracles.endpoints),
+        len(protocol_config.oracles),
     )
 
     if failed_endpoints:
@@ -68,7 +69,7 @@ async def send_signature_rotation_requests(
             'The oracles with endpoints %s have failed to respond.', ', '.join(failed_endpoints)
         )
 
-    return process_oracles_approvals(approvals, oracles.validators_threshold)
+    return process_oracles_approvals(approvals, protocol_config.validators_threshold)
 
 
 # pylint: disable=duplicate-code
