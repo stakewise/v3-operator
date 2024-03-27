@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from decimal import Decimal
 
 from ens.constants import EMPTY_ADDR_HEX
 from eth_typing import BlockNumber, ChecksumAddress, HexStr
@@ -10,9 +9,10 @@ from web3.types import Wei
 MAINNET = 'mainnet'
 GNOSIS = 'gnosis'
 HOLESKY = 'holesky'
+CHIADO = 'chiado'
 
 ETH_NETWORKS = [MAINNET, HOLESKY]
-GNO_NETWORKS = [GNOSIS]
+GNO_NETWORKS = [GNOSIS, CHIADO]
 
 
 @dataclass
@@ -30,7 +30,7 @@ class NetworkConfig:
     GENESIS_VALIDATORS_ROOT: Bytes32
     GENESIS_VALIDATORS_IPFS_HASH: str
     SLOTS_PER_EPOCH: int
-    SECONDS_PER_BLOCK: Decimal
+    SECONDS_PER_BLOCK: int
     GENESIS_FORK_VERSION: bytes
     IS_POA: bool
     HOT_WALLET_MIN_BALANCE: Wei
@@ -84,7 +84,7 @@ NETWORKS = {
         ),
         GENESIS_VALIDATORS_IPFS_HASH='bafybeidcgs5ijtdjm4y2m2p4oh6us3gcb7rjv4n75ub6ugv4tku44dgy3y',
         SLOTS_PER_EPOCH=32,
-        SECONDS_PER_BLOCK=Decimal(12),
+        SECONDS_PER_BLOCK=12,
         GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x00000000')),
         IS_POA=False,
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
@@ -118,7 +118,7 @@ NETWORKS = {
         ),
         GENESIS_VALIDATORS_IPFS_HASH='bafybeih2zhayrd6t5nnvzwmechcrxeejphr45lv4q7byxjqlapizghdtde',
         SLOTS_PER_EPOCH=32,
-        SECONDS_PER_BLOCK=Decimal(12),
+        SECONDS_PER_BLOCK=12,
         GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x01017000')),
         IS_POA=False,
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
@@ -153,7 +153,7 @@ NETWORKS = {
         ),
         GENESIS_VALIDATORS_IPFS_HASH='',
         SLOTS_PER_EPOCH=32,
-        SECONDS_PER_BLOCK=Decimal('6.8'),
+        SECONDS_PER_BLOCK=5,
         GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x00000064')),
         IS_POA=False,
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
@@ -163,5 +163,41 @@ NETWORKS = {
             '0xcA11bde05977b3631167028862bE2a173976CA11'
         ),
         SHARED_MEV_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+    ),
+    CHIADO: NetworkConfig(
+        SYMBOL='xDAI',
+        VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x0C0E819fD16dE36DCDeCf8D43BA7518b2E6E25e7'
+        ),
+        VALIDATORS_REGISTRY_GENESIS_BLOCK=BlockNumber(8308095),
+        KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x96Bd48CD98D2CC602b93A2BBbF05d7eEB21CdE8E'
+        ),
+        KEEPER_GENESIS_BLOCK=BlockNumber(8630451),
+        V2_POOL_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        V2_POOL_GENESIS_BLOCK=BlockNumber(0),
+        V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        GENESIS_VAULT_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0xA2600eB0A0cd1DD80b090Fc2D319516CDBF5d721'
+        ),
+        GENESIS_VALIDATORS_ROOT=Bytes32(
+            Web3.to_bytes(
+                hexstr=HexStr('0x9d642dac73058fbf39c0ae41ab1e34e4d889043cb199851ded7095bc99eb4c1e')
+            )
+        ),
+        GENESIS_VALIDATORS_IPFS_HASH='',
+        SLOTS_PER_EPOCH=16,
+        SECONDS_PER_BLOCK=5,
+        GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x00000064')),
+        IS_POA=False,
+        HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
+        SHAPELLA_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x0')),
+        SHAPELLA_EPOCH=244224,
+        MULTICALL_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0xcA11bde05977b3631167028862bE2a173976CA11'
+        ),
+        SHARED_MEV_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0xc7Eb19FcB20291A959ba90D11d2c6Fe8Db1F66b9'
+        ),
     ),
 }
