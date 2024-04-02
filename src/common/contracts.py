@@ -1,14 +1,13 @@
 import json
 import os
 from functools import cached_property
-from typing import cast
 
 from eth_typing import HexStr
 from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.contract import AsyncContract
 from web3.contract.contract import ContractEvent
-from web3.types import BlockIdentifier, BlockNumber, ChecksumAddress, EventData
+from web3.types import BlockNumber, ChecksumAddress, EventData
 
 from src.common.clients import execution_client
 from src.common.typings import RewardVoteInfo
@@ -205,9 +204,7 @@ class MulticallContract(ContractWrapper):
         data: list[tuple[ChecksumAddress, bool, HexStr]],
         block_number: BlockNumber | None = None,
     ) -> list:
-        return await self.contract.functions.aggregate3(data).call(
-            block_identifier=cast(BlockIdentifier, block_number)
-        )
+        return await self.contract.functions.aggregate3(data).call(block_identifier=block_number)
 
 
 vault_contract = VaultContract()

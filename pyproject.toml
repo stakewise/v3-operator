@@ -71,6 +71,10 @@ ignore_missing_imports = true
 python_version = "3.10"
 disallow_incomplete_defs = true
 
+[[tool.mypy.overrides]]
+module = 'web3.*'
+no_implicit_optional = false
+
 [tool.isort]
 profile = "black"
 
