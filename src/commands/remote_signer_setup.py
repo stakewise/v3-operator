@@ -175,7 +175,7 @@ async def main() -> None:
             # Only add tags and fee_recipient if --dappnode is set
             if settings.dappnode:
                 tags_array = ["stakewise"] * len(keystores_json_chunk)  # "stakewise" tag for each key
-                fee_recipient_array = [settings.fee_recipient] * len(keystores_json_chunk)  # Same FR for each key
+                fee_recipient_array = [fee_recipient] * len(keystores_json_chunk)  # Same FR for each key
                 data.update({
                     'tags': tags_array,
                     'feeRecipients': fee_recipient_array,
