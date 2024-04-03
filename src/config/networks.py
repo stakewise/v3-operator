@@ -11,9 +11,6 @@ GNOSIS = 'gnosis'
 HOLESKY = 'holesky'
 CHIADO = 'chiado'
 
-ETH_NETWORKS = [MAINNET, HOLESKY]
-GNO_NETWORKS = [GNOSIS, CHIADO]
-
 
 @dataclass
 # pylint: disable-next=too-many-instance-attributes
@@ -188,7 +185,7 @@ NETWORKS = {
         GENESIS_VALIDATORS_IPFS_HASH='',
         SLOTS_PER_EPOCH=16,
         SECONDS_PER_BLOCK=5,
-        GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x00000064')),
+        GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x0000006f')),
         IS_POA=False,
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
         SHAPELLA_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x0')),
