@@ -10,9 +10,11 @@ import click
 from aiohttp import ClientTimeout
 from eth_typing import HexAddress
 
+from src.common.contracts import vault_contract
 from src.common.logging import LOG_LEVELS, setup_logging
+from src.common.startup_check import wait_for_execution_node
 from src.common.utils import chunkify, log_verbose
-from src.common.validators import validate_eth_address
+from src.common.validators import validate_dappnode_execution_endpoints, validate_eth_address
 from src.common.vault_config import VaultConfig
 from src.config.settings import (
     REMOTE_SIGNER_TIMEOUT,
@@ -22,20 +24,6 @@ from src.config.settings import (
 from src.validators.keystores.local import LocalKeystore
 
 logger = logging.getLogger(__name__)
-
-# Callback function to ensure --fee-recipient is provided when --dappnode is set and validate its value
-def validate_fee_recipient(ctx, param, value):
-    dappnode = ctx.params.get('dappnode')
-
-    if value:
-        value = validate_eth_address(ctx, param, value)
-
-    # Require the fee recipient if --dappnode is set and no value is provided
-    if dappnode and not value:
-        raise click.MissingParameter(ctx=ctx, param=param)
-
-    return value
-
 
 @click.option(
     '--vault',
@@ -90,13 +78,13 @@ def validate_fee_recipient(ctx, param, value):
     is_flag=True,
 )
 @click.option(
-    '--fee-recipient',
-    help='Address of the fee recipient to import keys to Dappnode Staking Brain. Required if --dappnode is set.',
+    '--execution-endpoints',
     type=str,
-    envvar='FEE_RECIPIENT',
-    required=False,  # We check the requirement conditionally in the callback
-    expose_value=True,
-    callback=validate_fee_recipient,
+    envvar='EXECUTION_ENDPOINTS',
+    prompt='Enter comma separated list of API endpoints for execution nodes. Used to retrieve vault validator fee recipient (only needed if flag --dappnode is set).',
+    help='Comma separated list of API endpoints for execution nodes.',
+    required=False,
+    callback=validate_dappnode_execution_endpoints
 )
 @click.command(help='Uploads private keys to a remote signer.')
 
@@ -109,7 +97,7 @@ def remote_signer_setup(
     verbose: bool,
     log_level: str,
     dappnode: bool,
-    fee_recipient: HexAddress | None,
+    execution_endpoints: str | None,
 ) -> None:
     config = VaultConfig(vault, Path(data_dir))
     config.load()
@@ -122,7 +110,7 @@ def remote_signer_setup(
         verbose=verbose,
         log_level=log_level,
         dappnode=dappnode,
-        fee_recipient=fee_recipient,
+        execution_endpoints=execution_endpoints
     )
 
     try:
@@ -166,6 +154,12 @@ async def main() -> None:
         with open(settings.keystores_dir / keystore_file.name, encoding='ascii') as f:
             keystores_json.append(f.read())
 
+    if settings.dappnode:
+        await wait_for_execution_node()
+    
+        fee_recipient = await vault_contract.mev_escrow()
+        logger.info('Validator fee recipient retrieved from vault contract: %s', fee_recipient)
+
     # Import keystores to remote signer
     chunk_size = REMOTE_SIGNER_UPLOAD_CHUNK_SIZE
 
@@ -201,7 +195,9 @@ async def main() -> None:
     )
 
     # Command should not be interactive for dappnode
-    if not settings.dappnode:
+    if settings.dappnode:
+        logger.info('Dappnode mode enabled. Skipping keystores removal.')
+    else:
         # Keys are loaded in remote signer and are not needed locally anymore
         if click.confirm('Remove local keystores?'):
             shutil.rmtree(settings.keystores_dir)

@@ -31,3 +31,9 @@ def validate_db_uri(ctx, param, value):
     if not pattern.match(value):
         raise click.BadParameter('Invalid database connection string')
     return value
+
+def validate_dappnode_execution_endpoints(ctx, param, value):
+    dappnode = ctx.params.get('dappnode')
+    if dappnode and not value:
+        raise click.MissingParameter(ctx=ctx, param=param, message="Execution endpoints are required when --dappnode is set.")
+    return value
