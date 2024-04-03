@@ -51,6 +51,8 @@ class Settings(metaclass=Singleton):
     keystores_password_dir: Path
     keystores_password_file: Path
     remote_signer_url: str | None
+    dappnode: bool = False
+    fee_recipient: ChecksumAddress | None = None
     hashi_vault_key_path: str | None
     hashi_vault_url: str | None
     hashi_vault_token: str | None
@@ -101,6 +103,8 @@ class Settings(metaclass=Singleton):
         keystores_dir: str | None = None,
         keystores_password_file: str | None = None,
         remote_signer_url: str | None = None,
+        dappnode: bool = False,
+        fee_recipient: str | None = None,
         hashi_vault_key_path: str | None = None,
         hashi_vault_url: str | None = None,
         hashi_vault_token: str | None = None,
@@ -147,6 +151,8 @@ class Settings(metaclass=Singleton):
 
         # remote signer configuration
         self.remote_signer_url = remote_signer_url
+        self.dappnode = dappnode
+        self.fee_recipient = Web3.to_checksum_address(fee_recipient) if fee_recipient else None
 
         # hashi vault configuration
         self.hashi_vault_url = hashi_vault_url

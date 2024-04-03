@@ -23,6 +23,19 @@ from src.validators.keystores.local import LocalKeystore
 
 logger = logging.getLogger(__name__)
 
+# Callback function to ensure --fee-recipient is provided when --dappnode is set and validate its value
+def validate_fee_recipient(ctx, param, value):
+    dappnode = ctx.params.get('dappnode')
+
+    if value:
+        value = validate_eth_address(ctx, param, value)
+
+    # Require the fee recipient if --dappnode is set and no value is provided
+    if dappnode and not value:
+        raise click.MissingParameter(ctx=ctx, param=param)
+
+    return value
+
 
 @click.option(
     '--vault',
@@ -70,7 +83,23 @@ logger = logging.getLogger(__name__)
     envvar='LOG_LEVEL',
     help='The log level.',
 )
+@click.option(
+    '--dappnode',
+    help='Add fields required by Dappnode Staking Brain to the import request (tags and fee recipients)',
+    envvar='DAPPNODE',
+    is_flag=True,
+)
+@click.option(
+    '--fee-recipient',
+    help='Address of the fee recipient to import keys to Dappnode Staking Brain. Required if --dappnode is set.',
+    type=str,
+    envvar='FEE_RECIPIENT',
+    required=False,  # We check the requirement conditionally in the callback
+    expose_value=True,
+    callback=validate_fee_recipient,
+)
 @click.command(help='Uploads private keys to a remote signer.')
+
 # pylint: disable-next=too-many-arguments
 def remote_signer_setup(
     vault: HexAddress,
@@ -79,6 +108,8 @@ def remote_signer_setup(
     keystores_dir: str | None,
     verbose: bool,
     log_level: str,
+    dappnode: bool,
+    fee_recipient: HexAddress | None,
 ) -> None:
     config = VaultConfig(vault, Path(data_dir))
     config.load()
@@ -90,6 +121,8 @@ def remote_signer_setup(
         remote_signer_url=remote_signer_url,
         verbose=verbose,
         log_level=log_level,
+        dappnode=dappnode,
+        fee_recipient=fee_recipient,
     )
 
     try:
@@ -144,6 +177,16 @@ async def main() -> None:
                 'keystores': keystores_json_chunk,
                 'passwords': [kf.password for kf in keystore_files_chunk],
             }
+
+            # Only add tags and fee_recipient if --dappnode is set
+            if settings.dappnode:
+                tags_array = ["stakewise"] * len(keystores_json_chunk)  # "stakewise" tag for each key
+                fee_recipient_array = [settings.fee_recipient] * len(keystores_json_chunk)  # Same FR for each key
+                data.update({
+                    'tags': tags_array,
+                    'feeRecipients': fee_recipient_array,
+                })
+
             upload_url = f'{settings.remote_signer_url}/eth/v1/keystores'
             logger.debug('POST %s', upload_url)
             resp = await session.post(upload_url, json=data)
@@ -157,17 +200,19 @@ async def main() -> None:
         f'Successfully imported {len(keystore_files)} keys into remote signer.',
     )
 
-    # Keys are loaded in remote signer and are not needed locally anymore
-    if click.confirm('Remove local keystores?'):
-        shutil.rmtree(settings.keystores_dir)
+    # Command should not be interactive for dappnode
+    if not settings.dappnode:
+        # Keys are loaded in remote signer and are not needed locally anymore
+        if click.confirm('Remove local keystores?'):
+            shutil.rmtree(settings.keystores_dir)
 
-        if settings.keystores_password_dir.exists():
-            shutil.rmtree(settings.keystores_password_dir)
+            if settings.keystores_password_dir.exists():
+                shutil.rmtree(settings.keystores_password_dir)
 
-        if settings.keystores_password_file.exists():
-            os.remove(settings.keystores_password_file)
+            if settings.keystores_password_file.exists():
+                os.remove(settings.keystores_password_file)
 
-        click.echo('Removed keystores from local filesystem.')
+            click.echo('Removed keystores from local filesystem.')
 
     click.echo(
         f'Done.'
