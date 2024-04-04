@@ -81,8 +81,7 @@ logger = logging.getLogger(__name__)
     '--execution-endpoints',
     type=str,
     envvar='EXECUTION_ENDPOINTS',
-    prompt='Enter comma separated list of API endpoints for execution nodes. Used to retrieve vault validator fee recipient (only needed if flag --dappnode is set).',
-    help='Comma separated list of API endpoints for execution nodes.',
+    help='Comma separated list of API endpoints for execution nodes. Used to retrieve vault validator fee recipient (only needed if flag --dappnode is set).',
     required=False,
     callback=validate_dappnode_execution_endpoints
 )
