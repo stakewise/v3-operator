@@ -14,7 +14,10 @@ from src.common.contracts import vault_contract
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.startup_check import wait_for_execution_node
 from src.common.utils import chunkify, log_verbose
-from src.common.validators import validate_dappnode_execution_endpoints, validate_eth_address
+from src.common.validators import (
+    validate_dappnode_execution_endpoints,
+    validate_eth_address,
+)
 from src.common.vault_config import VaultConfig
 from src.config.settings import (
     REMOTE_SIGNER_TIMEOUT,
@@ -24,6 +27,7 @@ from src.config.settings import (
 from src.validators.keystores.local import LocalKeystore
 
 logger = logging.getLogger(__name__)
+
 
 @click.option(
     '--vault',
@@ -82,8 +86,8 @@ logger = logging.getLogger(__name__)
     type=str,
     envvar='EXECUTION_ENDPOINTS',
     help='Comma separated list of API endpoints for execution nodes. Used to retrieve vault validator fee recipient (only needed if flag --dappnode is set).',
-    required=False,
-    callback=validate_dappnode_execution_endpoints
+    callback=validate_dappnode_execution_endpoints,
+    default='',
 )
 @click.command(help='Uploads private keys to a remote signer.')
 
@@ -96,7 +100,7 @@ def remote_signer_setup(
     verbose: bool,
     log_level: str,
     dappnode: bool,
-    execution_endpoints: str | None,
+    execution_endpoints: str,
 ) -> None:
     config = VaultConfig(vault, Path(data_dir))
     config.load()
@@ -109,7 +113,7 @@ def remote_signer_setup(
         verbose=verbose,
         log_level=log_level,
         dappnode=dappnode,
-        execution_endpoints=execution_endpoints
+        execution_endpoints=execution_endpoints,
     )
 
     try:
@@ -155,7 +159,7 @@ async def main() -> None:
 
     if settings.dappnode:
         await wait_for_execution_node()
-    
+
         fee_recipient = await vault_contract.mev_escrow()
         logger.info('Validator fee recipient retrieved from vault contract: %s', fee_recipient)
 
@@ -173,12 +177,18 @@ async def main() -> None:
 
             # Only add tags and fee_recipient if --dappnode is set
             if settings.dappnode:
-                tags_array = ["stakewise"] * len(keystores_json_chunk)  # "stakewise" tag for each key
-                fee_recipient_array = [fee_recipient] * len(keystores_json_chunk)  # Same FR for each key
-                data.update({
-                    'tags': tags_array,
-                    'feeRecipients': fee_recipient_array,
-                })
+                tags_array = ['stakewise'] * len(
+                    keystores_json_chunk
+                )  # "stakewise" tag for each key
+                fee_recipient_array = [fee_recipient] * len(
+                    keystores_json_chunk
+                )  # Same FR for each key
+                data.update(
+                    {
+                        'tags': tags_array,
+                        'feeRecipients': fee_recipient_array,
+                    }
+                )
 
             upload_url = f'{settings.remote_signer_url}/eth/v1/keystores'
             logger.debug('POST %s', upload_url)
