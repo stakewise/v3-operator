@@ -77,7 +77,7 @@ logger = logging.getLogger(__name__)
 )
 @click.option(
     '--dappnode',
-    help='Add fields required by Dappnode Staking Brain to the import request (tags and fee recipients)',
+    help='Add fields required by Dappnode Staking Brain to the keystore import request',
     envvar='DAPPNODE',
     is_flag=True,
 )
@@ -85,12 +85,12 @@ logger = logging.getLogger(__name__)
     '--execution-endpoints',
     type=str,
     envvar='EXECUTION_ENDPOINTS',
-    help='Comma separated list of API endpoints for execution nodes. Used to retrieve vault validator fee recipient (only needed if flag --dappnode is set).',
+    help="""Comma separated list of API endpoints for execution nodes.
+Used to retrieve vault validator fee recipient (only needed if flag --dappnode is set).""",
     callback=validate_dappnode_execution_endpoints,
     default='',
 )
 @click.command(help='Uploads private keys to a remote signer.')
-
 # pylint: disable-next=too-many-arguments
 def remote_signer_setup(
     vault: HexAddress,
