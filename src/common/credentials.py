@@ -17,7 +17,7 @@ from staking_deposit.key_handling.key_derivation.tree import (
 )
 from staking_deposit.key_handling.keystore import Keystore, ScryptKeystore
 from staking_deposit.settings import DEPOSIT_CLI_VERSION
-from sw_utils import get_eth1_withdrawal_credentials
+from sw_utils import convert_to_gno, get_eth1_withdrawal_credentials
 from sw_utils.signing import (
     DepositData,
     DepositMessage,
@@ -30,7 +30,7 @@ from web3._utils import request
 
 from src.common.utils import chunkify
 from src.config.networks import NETWORKS
-from src.config.settings import DEPOSIT_AMOUNT_GWEI
+from src.config.settings import DEPOSIT_AMOUNT_GWEI, GNOSIS_NETWORKS
 
 # Set path as EIP-2334 format
 # https://eips.ethereum.org/EIPS/eip-2334
@@ -55,7 +55,10 @@ class Credential:
 
     @cached_property
     def amount(self) -> int:
-        return DEPOSIT_AMOUNT_GWEI
+        amount = DEPOSIT_AMOUNT_GWEI
+        if self.network in GNOSIS_NETWORKS:
+            amount = convert_to_gno(amount)
+        return amount
 
     @cached_property
     def withdrawal_credentials(self) -> Bytes32:
