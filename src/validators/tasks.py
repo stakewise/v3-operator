@@ -17,8 +17,7 @@ from src.common.execution import check_gas_price, get_protocol_config
 from src.common.metrics import metrics
 from src.common.tasks import BaseTask
 from src.common.utils import get_current_timestamp, log_verbose
-from src.config.networks import GNOSIS
-from src.config.settings import DEPOSIT_AMOUNT, settings
+from src.config.settings import DEPOSIT_AMOUNT, GNOSIS_NETWORKS, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import (
     NetworkValidatorsProcessor,
@@ -260,7 +259,7 @@ async def get_available_validators_for_registration(
 
 async def get_validators_count_from_vault_assets() -> tuple[int, HexStr | None]:
     vault_balance, update_state_call = await get_withdrawable_assets()
-    if settings.network == GNOSIS:
+    if settings.network in GNOSIS_NETWORKS:
         # apply GNO -> mGNO exchange rate
         vault_balance = convert_to_mgno(vault_balance)
 

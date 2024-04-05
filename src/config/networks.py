@@ -15,7 +15,8 @@ CHIADO = 'chiado'
 @dataclass
 # pylint: disable-next=too-many-instance-attributes
 class NetworkConfig:
-    SYMBOL: str
+    WALLET_BALANCE_SYMBOL: str
+    VAULT_BALANCE_SYMBOL: str
     VALIDATORS_REGISTRY_CONTRACT_ADDRESS: ChecksumAddress  # consensus deposit contract
     VALIDATORS_REGISTRY_GENESIS_BLOCK: BlockNumber  # consensus deposit contract genesis
     KEEPER_CONTRACT_ADDRESS: ChecksumAddress
@@ -55,7 +56,8 @@ class NetworkConfig:
 
 NETWORKS = {
     MAINNET: NetworkConfig(
-        SYMBOL='ETH',
+        WALLET_BALANCE_SYMBOL='ETH',
+        VAULT_BALANCE_SYMBOL='ETH',
         VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x00000000219ab540356cBB839Cbe05303d7705Fa'
         ),
@@ -95,7 +97,8 @@ NETWORKS = {
         ),
     ),
     HOLESKY: NetworkConfig(
-        SYMBOL='HolETH',
+        WALLET_BALANCE_SYMBOL='HolETH',
+        VAULT_BALANCE_SYMBOL='HolETH',
         VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x4242424242424242424242424242424242424242'
         ),
@@ -129,7 +132,8 @@ NETWORKS = {
         ),
     ),
     GNOSIS: NetworkConfig(
-        SYMBOL='xDAI',
+        WALLET_BALANCE_SYMBOL='xDAI',
+        VAULT_BALANCE_SYMBOL='GNO',
         VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0B98057eA310F4d31F2a452B414647007d1645d9'
         ),
@@ -162,11 +166,12 @@ NETWORKS = {
         SHARED_MEV_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
     ),
     CHIADO: NetworkConfig(
-        SYMBOL='xDAI',
+        WALLET_BALANCE_SYMBOL='xDAI',
+        VAULT_BALANCE_SYMBOL='GNO',
         VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x0C0E819fD16dE36DCDeCf8D43BA7518b2E6E25e7'
+            '0xb97036A26259B7147018913bD58a774cf91acf25'
         ),
-        VALIDATORS_REGISTRY_GENESIS_BLOCK=BlockNumber(8308095),
+        VALIDATORS_REGISTRY_GENESIS_BLOCK=BlockNumber(155434),
         KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x96Bd48CD98D2CC602b93A2BBbF05d7eEB21CdE8E'
         ),
@@ -182,13 +187,13 @@ NETWORKS = {
                 hexstr=HexStr('0x9d642dac73058fbf39c0ae41ab1e34e4d889043cb199851ded7095bc99eb4c1e')
             )
         ),
-        GENESIS_VALIDATORS_IPFS_HASH='',
+        GENESIS_VALIDATORS_IPFS_HASH='bafybeia5ekk3lsrwdfpez54zd6xmi6k45q76n3oulen7r2bocxshhf6rfq',
         SLOTS_PER_EPOCH=16,
         SECONDS_PER_BLOCK=5,
         GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x0000006f')),
         IS_POA=False,
-        HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
-        SHAPELLA_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x0')),
+        HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),  # todo
+        SHAPELLA_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x0300006f')),
         SHAPELLA_EPOCH=244224,
         MULTICALL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xcA11bde05977b3631167028862bE2a173976CA11'

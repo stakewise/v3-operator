@@ -154,6 +154,7 @@ def generate_validators_tree(
             deposit_data_index=i,
             public_key=add_0x_prefix(data['pubkey']),
             signature=add_0x_prefix(data['signature']),
+            amount_gwei=int(data['amount']),
         )
         leaves.append((encode_tx_validator(credentials, validator), i))
         validators.append(validator)

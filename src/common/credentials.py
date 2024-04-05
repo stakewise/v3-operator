@@ -57,7 +57,7 @@ class Credential:
     def amount(self) -> int:
         amount = DEPOSIT_AMOUNT_GWEI
         if self.network in GNOSIS_NETWORKS:
-            amount = convert_to_gno(amount)
+            amount = convert_to_gno(amount)  # type: ignore
         return amount
 
     @cached_property
