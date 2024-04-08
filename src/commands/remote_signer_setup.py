@@ -10,9 +10,14 @@ import click
 from aiohttp import ClientTimeout
 from eth_typing import HexAddress
 
+from src.common.contracts import vault_contract
 from src.common.logging import LOG_LEVELS, setup_logging
+from src.common.startup_check import wait_for_execution_node
 from src.common.utils import chunkify, log_verbose
-from src.common.validators import validate_eth_address
+from src.common.validators import (
+    validate_dappnode_execution_endpoints,
+    validate_eth_address,
+)
 from src.common.vault_config import VaultConfig
 from src.config.settings import (
     REMOTE_SIGNER_TIMEOUT,
@@ -70,6 +75,21 @@ logger = logging.getLogger(__name__)
     envvar='LOG_LEVEL',
     help='The log level.',
 )
+@click.option(
+    '--dappnode',
+    help='Add fields required by Dappnode Staking Brain to the keystore import request',
+    envvar='DAPPNODE',
+    is_flag=True,
+)
+@click.option(
+    '--execution-endpoints',
+    type=str,
+    envvar='EXECUTION_ENDPOINTS',
+    help="""Comma separated list of API endpoints for execution nodes.
+Used to retrieve vault validator fee recipient (only needed if flag --dappnode is set).""",
+    callback=validate_dappnode_execution_endpoints,
+    default='',
+)
 @click.command(help='Uploads private keys to a remote signer.')
 # pylint: disable-next=too-many-arguments
 def remote_signer_setup(
@@ -79,6 +99,8 @@ def remote_signer_setup(
     keystores_dir: str | None,
     verbose: bool,
     log_level: str,
+    dappnode: bool,
+    execution_endpoints: str,
 ) -> None:
     config = VaultConfig(vault, Path(data_dir))
     config.load()
@@ -90,6 +112,8 @@ def remote_signer_setup(
         remote_signer_url=remote_signer_url,
         verbose=verbose,
         log_level=log_level,
+        dappnode=dappnode,
+        execution_endpoints=execution_endpoints,
     )
 
     try:
@@ -133,6 +157,12 @@ async def main() -> None:
         with open(settings.keystores_dir / keystore_file.name, encoding='ascii') as f:
             keystores_json.append(f.read())
 
+    if settings.dappnode:
+        await wait_for_execution_node()
+
+        fee_recipient = await vault_contract.mev_escrow()
+        logger.info('Validator fee recipient retrieved from vault contract: %s', fee_recipient)
+
     # Import keystores to remote signer
     chunk_size = REMOTE_SIGNER_UPLOAD_CHUNK_SIZE
 
@@ -144,6 +174,22 @@ async def main() -> None:
                 'keystores': keystores_json_chunk,
                 'passwords': [kf.password for kf in keystore_files_chunk],
             }
+
+            # Only add tags and fee_recipient if --dappnode is set
+            if settings.dappnode:
+                tags_array = ['stakewise'] * len(
+                    keystores_json_chunk
+                )  # "stakewise" tag for each key
+                fee_recipient_array = [fee_recipient] * len(
+                    keystores_json_chunk
+                )  # Same FR for each key
+                data.update(
+                    {
+                        'tags': tags_array,
+                        'feeRecipients': fee_recipient_array,
+                    }
+                )
+
             upload_url = f'{settings.remote_signer_url}/eth/v1/keystores'
             logger.debug('POST %s', upload_url)
             resp = await session.post(upload_url, json=data)
@@ -157,17 +203,21 @@ async def main() -> None:
         f'Successfully imported {len(keystore_files)} keys into remote signer.',
     )
 
-    # Keys are loaded in remote signer and are not needed locally anymore
-    if click.confirm('Remove local keystores?'):
-        shutil.rmtree(settings.keystores_dir)
+    # Command should not be interactive for dappnode
+    if settings.dappnode:
+        logger.info('Dappnode mode enabled. Skipping keystores removal.')
+    else:
+        # Keys are loaded in remote signer and are not needed locally anymore
+        if click.confirm('Remove local keystores?'):
+            shutil.rmtree(settings.keystores_dir)
 
-        if settings.keystores_password_dir.exists():
-            shutil.rmtree(settings.keystores_password_dir)
+            if settings.keystores_password_dir.exists():
+                shutil.rmtree(settings.keystores_password_dir)
 
-        if settings.keystores_password_file.exists():
-            os.remove(settings.keystores_password_file)
+            if settings.keystores_password_file.exists():
+                os.remove(settings.keystores_password_file)
 
-        click.echo('Removed keystores from local filesystem.')
+            click.echo('Removed keystores from local filesystem.')
 
     click.echo(
         f'Done.'
