@@ -18,6 +18,7 @@ from src.config.settings import (
     DEFAULT_MAX_FEE_PER_GAS_GWEI,
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
+    DEFAULT_METRICS_PREFIX,
     LOG_FORMATS,
     LOG_PLAIN,
     settings,
@@ -100,6 +101,13 @@ logger = logging.getLogger(__name__)
     default=DEFAULT_METRICS_PORT,
 )
 @click.option(
+    '--metrics-prefix',
+    type=str,
+    help=f'The prometheus metrics prefix. Default is {DEFAULT_METRICS_PREFIX}.',
+    envvar='METRICS_PREFIX',
+    default=DEFAULT_METRICS_PREFIX,
+)
+@click.option(
     '-v',
     '--verbose',
     help='Enable debug mode. Default is false.',
@@ -179,6 +187,7 @@ def start_api(
     enable_metrics: bool,
     metrics_host: str,
     metrics_port: int,
+    metrics_prefix: str,
     data_dir: str,
     log_level: str,
     log_format: str,
@@ -208,6 +217,7 @@ def start_api(
         enable_metrics=enable_metrics,
         metrics_host=metrics_host,
         metrics_port=metrics_port,
+        metrics_prefix=metrics_prefix,
         network=network,
         deposit_data_file=deposit_data_file,
         hot_wallet_file=hot_wallet_file,
