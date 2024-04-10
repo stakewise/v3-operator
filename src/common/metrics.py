@@ -13,14 +13,14 @@ from src.config.settings import settings
 # pylint: disable-next=too-few-public-methods
 class Metrics:
     def __init__(self):
-        self.app_version = Info('app_version', 'V3 Operator version')
-        self.block_number = Gauge('block_number', 'Current block number')
-        self.slot_number = Gauge('slot_number', 'Current slot number')
-        self.wallet_balance = Gauge('wallet_balance', 'Current wallet balance')
-        self.outdated_signatures = Gauge('outdated_signatures', 'The number of outdated signatures')
-        self.stakeable_assets = Gauge('stakeable_assets', 'The amount of stakeable assets')
+        self.app_version = Info('app_version', 'V3 Operator version', namespace='stakewise')
+        self.block_number = Gauge('block_number', 'Current block number', namespace='stakewise')
+        self.slot_number = Gauge('slot_number', 'Current slot number', namespace='stakewise')
+        self.wallet_balance = Gauge('wallet_balance', 'Current wallet balance', namespace='stakewise')
+        self.outdated_signatures = Gauge('outdated_signatures', 'The number of outdated signatures', namespace='stakewise')
+        self.stakeable_assets = Gauge('stakeable_assets', 'The amount of stakeable assets', namespace='stakewise')
         self.unused_validator_keys = Gauge(
-            'unused_validator_keys', 'The number of unused validator keys in deposit data file'
+            'unused_validator_keys', 'The number of unused validator keys in deposit data file', namespace='stakewise'
         )
 
     def set_app_version(self):
