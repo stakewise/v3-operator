@@ -14,6 +14,7 @@ DEFAULT_MAX_FEE_PER_GAS_GWEI = 100
 
 DEFAULT_METRICS_HOST = '127.0.0.1'
 DEFAULT_METRICS_PORT = 9100
+DEFAULT_METRICS_PREFIX = 'sw_operator'
 
 DEFAULT_API_HOST = '127.0.0.1'
 DEFAULT_API_PORT = 8000
@@ -46,6 +47,7 @@ class Settings(metaclass=Singleton):
     enable_metrics: bool
     metrics_host: str
     metrics_port: int
+    metrics_prefix: str
     deposit_data_file: Path
     keystores_dir: Path
     keystores_password_dir: Path
@@ -97,6 +99,7 @@ class Settings(metaclass=Singleton):
         enable_metrics: bool = False,
         metrics_port: int = DEFAULT_METRICS_PORT,
         metrics_host: str = DEFAULT_METRICS_HOST,
+        metrics_prefix: str = DEFAULT_METRICS_PREFIX,
         max_fee_per_gas_gwei: int = DEFAULT_MAX_FEE_PER_GAS_GWEI,
         deposit_data_file: str | None = None,
         keystores_dir: str | None = None,
@@ -128,6 +131,7 @@ class Settings(metaclass=Singleton):
         self.enable_metrics = enable_metrics
         self.metrics_host = metrics_host
         self.metrics_port = metrics_port
+        self.metrics_prefix = metrics_prefix
         self.max_fee_per_gas_gwei = max_fee_per_gas_gwei
 
         self.deposit_data_file = (
