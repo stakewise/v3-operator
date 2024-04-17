@@ -33,6 +33,7 @@ class ExecutionClient:
             settings.execution_endpoints,
             timeout=settings.execution_timeout,
             retry_timeout=settings.execution_retry_timeout,
+            jwt_secret=settings.jwt_secret,
         )
         # Account is required when emitting transactions.
         # For read-only queries account may be omitted.

@@ -145,6 +145,14 @@ logger = logging.getLogger(__name__)
     help='Comma separated list of API endpoints for consensus nodes.',
 )
 @click.option(
+    '--jwt-secret',
+    type=str,
+    default=None,
+    envvar='JWT_SECRET',
+    help='JWT secret key used for signing and verifying JSON Web Tokens'
+    'when connecting to execution nodes.',
+)
+@click.option(
     '--vault',
     type=ChecksumAddress,
     callback=validate_eth_address,
@@ -205,6 +213,7 @@ def start(
     vault: ChecksumAddress,
     consensus_endpoints: str,
     execution_endpoints: str,
+    jwt_secret: str,
     harvest_vault: bool,
     verbose: bool,
     enable_metrics: bool,
@@ -238,6 +247,7 @@ def start(
         vault_dir=vault_config.vault_dir,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
+        jwt_secret=jwt_secret,
         harvest_vault=harvest_vault,
         verbose=verbose,
         enable_metrics=enable_metrics,
