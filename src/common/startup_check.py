@@ -75,7 +75,7 @@ async def wait_for_execution_node() -> None:
             try:
                 execution_client = get_execution_client(
                     [execution_endpoint],
-                    jwt_secret=settings.jwt_secret,
+                    jwt_secret=settings.execution_jwt_secret,
                 )
 
                 syncing = await execution_client.eth.syncing

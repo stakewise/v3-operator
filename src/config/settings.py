@@ -41,7 +41,7 @@ class Settings(metaclass=Singleton):
     execution_timeout: int
     execution_transaction_timeout: int
     execution_retry_timeout: int
-    jwt_secret: str | None
+    execution_jwt_secret: str | None
 
     harvest_vault: bool
     verbose: bool
@@ -95,7 +95,7 @@ class Settings(metaclass=Singleton):
         network: str,
         consensus_endpoints: str = '',
         execution_endpoints: str = '',
-        jwt_secret: str | None = None,
+        execution_jwt_secret: str | None = None,
         harvest_vault: bool = False,
         verbose: bool = False,
         enable_metrics: bool = False,
@@ -128,7 +128,7 @@ class Settings(metaclass=Singleton):
 
         self.consensus_endpoints = [node.strip() for node in consensus_endpoints.split(',')]
         self.execution_endpoints = [node.strip() for node in execution_endpoints.split(',')]
-        self.jwt_secret = jwt_secret
+        self.execution_jwt_secret = execution_jwt_secret
         self.harvest_vault = harvest_vault
         self.verbose = verbose
         self.enable_metrics = enable_metrics
