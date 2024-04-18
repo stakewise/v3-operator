@@ -221,7 +221,7 @@ def start_api(
         vault_dir=vault_config.vault_dir,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
-        jwt_secret=execution_jwt_secret,
+        execution_jwt_secret=execution_jwt_secret,
         harvest_vault=harvest_vault,
         verbose=verbose,
         enable_metrics=enable_metrics,
