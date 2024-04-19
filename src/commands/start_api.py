@@ -130,7 +130,6 @@ logger = logging.getLogger(__name__)
 @click.option(
     '--execution-jwt-secret',
     type=str,
-    default=None,
     envvar='EXECUTION_JWT_SECRET',
     help='JWT secret key used for signing and verifying JSON Web Tokens'
     'when connecting to execution nodes.',
@@ -190,7 +189,7 @@ def start_api(
     vault: ChecksumAddress,
     consensus_endpoints: str,
     execution_endpoints: str,
-    execution_jwt_secret: str,
+    execution_jwt_secret: str | None,
     harvest_vault: bool,
     verbose: bool,
     enable_metrics: bool,
