@@ -230,7 +230,10 @@ async def _get_oracles_request(
 
 
 def _format_indexes(indexes: list[int], max_len: int = 10) -> str:
-    if len(indexes) <= max_len:
-        return ', '.join(str(i) for i in indexes)
+    trim_indexes = indexes[:max_len]
+    res = ', '.join(str(i) for i in trim_indexes)
 
-    return f"{', '.join(str(i) for i in indexes)}..."
+    if len(indexes) <= max_len:
+        return res
+
+    return res + '...'
