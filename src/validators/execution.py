@@ -175,11 +175,10 @@ async def get_available_validators(
 
     for validator in deposit_data.validators[start_index : start_index + count]:
         if keystore and validator.public_key not in keystore:
-            if not settings.skip_keystores_not_found_warnings:
-                logger.warning(
-                    'Cannot find validator with public key %s in keystores.',
-                    validator.public_key,
-                )
+            logger.warning(
+                'Cannot find validator with public key %s in keystores.',
+                validator.public_key,
+            )
             break
 
         if NetworkValidatorCrud().is_validator_registered(validator.public_key):
@@ -208,11 +207,10 @@ async def update_unused_validator_keys_metric(
     validators: int = 0
     for validator in deposit_data.validators:
         if validator.public_key not in keystore:
-            if not settings.skip_keystores_not_found_warnings:
-                logger.warning(
-                    'Cannot find validator with public key %s in keystores.',
-                    validator.public_key,
-                )
+            logger.warning(
+                'Cannot find validator with public key %s in keystores.',
+                validator.public_key,
+            )
             continue
 
         if NetworkValidatorCrud().is_validator_registered(validator.public_key):

@@ -87,8 +87,6 @@ class Settings(metaclass=Singleton):
         'PRIORITY_FEE_PERCENTILE', default=80.0, cast=float
     )
 
-    skip_keystores_not_found_warnings: bool
-
     # pylint: disable-next=too-many-arguments,too-many-locals
     def set(
         self,
@@ -122,7 +120,6 @@ class Settings(metaclass=Singleton):
         api_host: str = DEFAULT_API_HOST,
         api_port: int = DEFAULT_API_PORT,
         validators_registration_mode: ValidatorsRegistrationMode = ValidatorsRegistrationMode.AUTO,
-        skip_keystores_not_found_warnings: bool = False,
     ) -> None:
         self.vault = Web3.to_checksum_address(vault)
         vault_dir.mkdir(parents=True, exist_ok=True)
@@ -223,7 +220,6 @@ class Settings(metaclass=Singleton):
         self.validators_registration_mode = validators_registration_mode
 
         self.skip_startup_checks = decouple_config('SKIP_STARTUP_CHECKS', default=False, cast=bool)
-        self.skip_keystores_not_found_warnings = skip_keystores_not_found_warnings
 
     @property
     def keystore_cls_str(self) -> str:
