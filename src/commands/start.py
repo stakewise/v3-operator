@@ -206,6 +206,13 @@ logger = logging.getLogger(__name__)
     envvar='POOL_SIZE',
     type=int,
 )
+@click.option(
+    '--skip-keystores-not-found-warnings',
+    help='Skip keystores-not-found warnings. '
+    'Useful when keystores are splitted between multiple operators.',
+    envvar='SKIP_KEYSTORES_NOT_FOUND_WARNINGS',
+    type=bool,
+)
 @click.command(help='Start operator service')
 # pylint: disable-next=too-many-arguments,too-many-locals
 def start(
@@ -235,6 +242,7 @@ def start(
     max_fee_per_gas_gwei: int,
     database_dir: str | None,
     pool_size: int | None,
+    skip_keystores_not_found_warnings: bool,
 ) -> None:
     vault_config = VaultConfig(vault, Path(data_dir))
     if network is None:
@@ -268,6 +276,7 @@ def start(
         log_level=log_level,
         log_format=log_format,
         pool_size=pool_size,
+        skip_keystores_not_found_warnings=skip_keystores_not_found_warnings,
     )
 
     try:
