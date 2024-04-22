@@ -172,13 +172,8 @@ async def get_available_validators(
 
     start_index = await vault_contract.get_validators_index()
     validators: list[Validator] = []
-    count = min(count, len(deposit_data.validators) - start_index)
 
-    for i in range(start_index, start_index + count):
-        try:
-            validator = deposit_data.validators[i]
-        except IndexError:
-            break
+    for validator in deposit_data.validators[start_index : start_index + count]:
         if keystore and validator.public_key not in keystore:
             logger.warning(
                 'Cannot find validator with public key %s in keystores.',
@@ -212,10 +207,6 @@ async def update_unused_validator_keys_metric(
     validators: int = 0
     for validator in deposit_data.validators:
         if validator.public_key not in keystore:
-            logger.warning(
-                'Cannot find validator with public key %s in keystores.',
-                validator.public_key,
-            )
             continue
 
         if NetworkValidatorCrud().is_validator_registered(validator.public_key):
