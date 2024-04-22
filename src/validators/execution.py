@@ -172,13 +172,8 @@ async def get_available_validators(
 
     start_index = await vault_contract.get_validators_index()
     validators: list[Validator] = []
-    count = min(count, len(deposit_data.validators) - start_index)
 
-    for i in range(start_index, start_index + count):
-        try:
-            validator = deposit_data.validators[i]
-        except IndexError:
-            break
+    for validator in deposit_data.validators[start_index : start_index + count]:
         if keystore and validator.public_key not in keystore:
             if not settings.skip_keystores_not_found_warnings:
                 logger.warning(
