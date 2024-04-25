@@ -10,17 +10,15 @@ python-decouple = "==3.8"
 sentry-sdk = "==1.32.0"
 py-ecc = "==6.0.0"
 multiproof = { git = "https://github.com/stakewise/multiproof.git", rev = "v0.1.7" }
-sw-utils = { git = "https://github.com/stakewise/sw-utils.git", rev = "v0.6.8" }
+sw-utils = { git = "https://github.com/stakewise/sw-utils.git", rev = "v0.6.10" }
 staking-deposit = { git = "https://github.com/ethereum/staking-deposit-cli.git", rev = "v2.4.0" }
 pycryptodomex = "3.19.1"
-milagro-bls-binding = "==1.9.0"
 click = "==8.1.7"
 tomli = "~2"
 eciespy = "==0.4.0"
 prometheus-client = "==0.17.1"
 psycopg2 = "==2.9.9"
 pyyaml = "==6.0.1"
-aiohttp = "==3.9.4"
 python-json-logger = "==2.0.7"
 starlette = "==0.36.2"
 uvicorn = "==0.27.0"
