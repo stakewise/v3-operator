@@ -55,7 +55,8 @@ RUN poetry install --only main
 FROM python-base as production
 
 RUN apt-get update && apt-get upgrade -y; \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    mkdir -p /nonexistent && chown -R 65534:65534 /nonexistent
 
 USER nobody
 
