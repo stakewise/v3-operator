@@ -5,6 +5,7 @@ from decouple import config as decouple_config
 from web3 import Web3
 from web3.types import ChecksumAddress
 
+from src.common.base import Singleton
 from src.config.networks import HOLESKY, MAINNET, NETWORKS, NetworkConfig
 from src.validators.typings import ValidatorsRegistrationMode
 
@@ -18,15 +19,6 @@ DEFAULT_METRICS_PREFIX = 'sw_operator'
 
 DEFAULT_API_HOST = '127.0.0.1'
 DEFAULT_API_PORT = 8000
-
-
-class Singleton(type):
-    _instances: dict = {}
-
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
-        return cls._instances[cls]
 
 
 # pylint: disable-next=too-many-public-methods,too-many-instance-attributes
