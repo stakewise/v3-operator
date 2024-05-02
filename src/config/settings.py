@@ -5,7 +5,7 @@ from decouple import config as decouple_config
 from web3 import Web3
 from web3.types import ChecksumAddress
 
-from src.common.base import Singleton
+from src.common.typings import Singleton
 from src.config.networks import HOLESKY, MAINNET, NETWORKS, NetworkConfig
 from src.validators.typings import ValidatorsRegistrationMode
 

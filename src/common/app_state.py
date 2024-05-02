@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from eth_typing import BlockNumber
 
-from src.common.base import Singleton
+from src.common.typings import OraclesCache, Singleton
 
 
 @dataclass
@@ -13,4 +13,6 @@ class ExitSignatureUpdateCache:
 
 # pylint: disable-next=too-few-public-methods
 class AppState(metaclass=Singleton):
-    exit_signature_update_cache = ExitSignatureUpdateCache()
+    def __init__(self):
+        self.exit_signature_update_cache = ExitSignatureUpdateCache()
+        self.oracles_cache: OraclesCache | None = None
