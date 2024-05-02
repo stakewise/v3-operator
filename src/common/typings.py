@@ -1,15 +1,6 @@
 from dataclasses import dataclass
 
-from eth_typing import BlockNumber
 from web3.types import Wei
-
-
-@dataclass
-class OraclesCache:
-    checkpoint_block: BlockNumber
-    config: dict
-    validators_threshold: int
-    rewards_threshold: int
 
 
 @dataclass

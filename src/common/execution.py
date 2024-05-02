@@ -9,12 +9,11 @@ from web3._utils.async_transactions import _max_fee_per_gas
 from web3.exceptions import BadFunctionCallOutput
 from web3.types import TxParams, Wei
 
-from src.common.app_state import AppState
+from src.common.app_state import AppState, OraclesCache
 from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.contracts import keeper_contract, multicall_contract, vault_contract
 from src.common.metrics import metrics
 from src.common.tasks import BaseTask
-from src.common.typings import OraclesCache
 from src.common.wallet import hot_wallet
 from src.config.settings import settings
 
