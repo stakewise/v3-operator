@@ -54,8 +54,10 @@ RUN poetry install --only main
 # `production` image used for runtime
 FROM python-base as production
 
+# Update all packages and add home folder for nobody user
 RUN apt-get update && apt-get upgrade -y; \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    mkdir -p /nonexistent && chown -R 65534:65534 /nonexistent
 
 USER nobody
 

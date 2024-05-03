@@ -1,7 +1,9 @@
+import contextlib
 from pathlib import Path
 from random import randint
 from typing import Callable
 from unittest import mock
+from unittest.mock import AsyncMock
 
 import pytest
 from eth_typing import ChecksumAddress
@@ -9,7 +11,7 @@ from sw_utils.typings import ConsensusFork, ProtocolConfig
 
 from src.common.utils import get_current_timestamp
 from src.config.settings import settings
-from src.exits.tasks import _get_oracles_request
+from src.exits.tasks import _fetch_last_update_block, _get_oracles_request
 from src.validators.keystores.local import Keys, LocalKeystore
 from src.validators.keystores.remote import RemoteSignerKeystore
 
@@ -79,3 +81,56 @@ class TestGetOraclesRequest:
                 == list(validators.values())[: protocol_config.validators_exit_rotation_batch_limit]
             )
             assert request.deadline == deadline
+
+
+@contextlib.contextmanager
+def patch_latest_block(block_number):
+    with mock.patch('src.exits.tasks.execution_client', new=AsyncMock()) as execution_client_mock:
+        execution_client_mock.eth.get_block_number.return_value = block_number
+        yield
+
+
+@pytest.mark.usefixtures('fake_settings')
+class TestFetchLastExitSignatureUpdateBlock:
+    async def test_normal(self):
+        get_event_func = 'src.exits.tasks.keeper_contract.get_exit_signatures_updated_event'
+
+        # no events, checkpoint moved from None to 8
+        with (
+            mock.patch(get_event_func, return_value=None) as get_event_mock,
+            patch_latest_block(8),
+        ):
+            last_update_block = await _fetch_last_update_block()
+
+        assert last_update_block is None
+        get_event_mock.assert_called_once_with(vault=settings.vault, from_block=None, to_block=8)
+
+        # no events, checkpoint moved to 9
+        with (
+            mock.patch(get_event_func, return_value=None) as get_event_mock,
+            patch_latest_block(9),
+        ):
+            last_update_block = await _fetch_last_update_block()
+
+        assert last_update_block is None
+        get_event_mock.assert_called_once_with(vault=settings.vault, from_block=9, to_block=9)
+
+        # event is found, checkpoint moved to 15
+        with (
+            mock.patch(get_event_func, return_value=dict(blockNumber=11)) as get_event_mock,
+            patch_latest_block(15),
+        ):
+            last_update_block = await _fetch_last_update_block()
+
+        assert last_update_block == 11
+        get_event_mock.assert_called_once_with(vault=settings.vault, from_block=10, to_block=15)
+
+        # no events, checkpoint moved to 20
+        with (
+            mock.patch(get_event_func, return_value=None) as get_event_mock,
+            patch_latest_block(20),
+        ):
+            last_update_block = await _fetch_last_update_block()
+
+        assert last_update_block == 11
+        get_event_mock.assert_called_once_with(vault=settings.vault, from_block=16, to_block=20)

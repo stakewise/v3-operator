@@ -11,6 +11,8 @@ from sw_utils.typings import Oracle, ProtocolConfig
 from tenacity import RetryError
 from web3.types import HexStr
 
+from src.common.app_state import AppState
+from src.common.clients import execution_client
 from src.common.contracts import keeper_contract
 from src.common.exceptions import NotEnoughOracleApprovalsError
 from src.common.execution import get_protocol_config
@@ -41,6 +43,9 @@ class ExitSignatureTask(BaseTask):
 
         protocol_config = await get_protocol_config()
         update_block = await _fetch_last_update_block()
+
+        logger.debug('last exit signature update block %s', update_block)
+
         if update_block and not await is_block_finalized(update_block):
             logger.info('Waiting for signatures update block %d to finalize...', update_block)
             return
@@ -95,10 +100,27 @@ async def _fetch_last_update_block_replicas(replicas: list[str]) -> BlockNumber 
 
 
 async def _fetch_last_update_block() -> BlockNumber | None:
-    last_event = await keeper_contract.get_exit_signatures_updated_event(vault=settings.vault)
+    app_state = AppState()
+    update_cache = app_state.exit_signature_update_cache
+
+    from_block: BlockNumber | None = None
+    if (checkpoint_block := update_cache.checkpoint_block) is not None:
+        from_block = BlockNumber(checkpoint_block + 1)
+
+    to_block = await execution_client.eth.get_block_number()
+
+    if from_block is not None and from_block > to_block:
+        return update_cache.last_event_block
+
+    last_event = await keeper_contract.get_exit_signatures_updated_event(
+        vault=settings.vault, from_block=from_block, to_block=to_block
+    )
+    update_cache.checkpoint_block = to_block
+
     if last_event:
-        return BlockNumber(last_event['blockNumber'])
-    return None
+        update_cache.last_event_block = BlockNumber(last_event['blockNumber'])
+
+    return update_cache.last_event_block
 
 
 async def _fetch_outdated_indexes(
@@ -230,7 +252,10 @@ async def _get_oracles_request(
 
 
 def _format_indexes(indexes: list[int], max_len: int = 10) -> str:
-    if len(indexes) <= max_len:
-        return ', '.join(str(i) for i in indexes)
+    trim_indexes = indexes[:max_len]
+    res = ', '.join(str(i) for i in trim_indexes)
 
-    return f"{', '.join(str(i) for i in indexes)}..."
+    if len(indexes) <= max_len:
+        return res
+
+    return res + '...'

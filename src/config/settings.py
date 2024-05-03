@@ -5,6 +5,7 @@ from decouple import config as decouple_config
 from web3 import Web3
 from web3.types import ChecksumAddress
 
+from src.common.typings import Singleton
 from src.config.networks import (
     CHIADO,
     GNOSIS,
@@ -21,18 +22,10 @@ DEFAULT_MAX_FEE_PER_GAS_GWEI = 100
 
 DEFAULT_METRICS_HOST = '127.0.0.1'
 DEFAULT_METRICS_PORT = 9100
+DEFAULT_METRICS_PREFIX = 'sw_operator'
 
 DEFAULT_API_HOST = '127.0.0.1'
 DEFAULT_API_PORT = 8000
-
-
-class Singleton(type):
-    _instances: dict = {}
-
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
-        return cls._instances[cls]
 
 
 # pylint: disable-next=too-many-public-methods,too-many-instance-attributes
@@ -47,17 +40,20 @@ class Settings(metaclass=Singleton):
     execution_timeout: int
     execution_transaction_timeout: int
     execution_retry_timeout: int
+    execution_jwt_secret: str | None
 
     harvest_vault: bool
     verbose: bool
     enable_metrics: bool
     metrics_host: str
     metrics_port: int
+    metrics_prefix: str
     deposit_data_file: Path
     keystores_dir: Path
     keystores_password_dir: Path
     keystores_password_file: Path
     remote_signer_url: str | None
+    dappnode: bool = False
     hashi_vault_key_path: str | None
     hashi_vault_url: str | None
     hashi_vault_token: str | None
@@ -98,16 +94,19 @@ class Settings(metaclass=Singleton):
         network: str,
         consensus_endpoints: str = '',
         execution_endpoints: str = '',
+        execution_jwt_secret: str | None = None,
         harvest_vault: bool = False,
         verbose: bool = False,
         enable_metrics: bool = False,
         metrics_port: int = DEFAULT_METRICS_PORT,
         metrics_host: str = DEFAULT_METRICS_HOST,
+        metrics_prefix: str = DEFAULT_METRICS_PREFIX,
         max_fee_per_gas_gwei: int = DEFAULT_MAX_FEE_PER_GAS_GWEI,
         deposit_data_file: str | None = None,
         keystores_dir: str | None = None,
         keystores_password_file: str | None = None,
         remote_signer_url: str | None = None,
+        dappnode: bool = False,
         hashi_vault_key_path: str | None = None,
         hashi_vault_url: str | None = None,
         hashi_vault_token: str | None = None,
@@ -128,11 +127,13 @@ class Settings(metaclass=Singleton):
 
         self.consensus_endpoints = [node.strip() for node in consensus_endpoints.split(',')]
         self.execution_endpoints = [node.strip() for node in execution_endpoints.split(',')]
+        self.execution_jwt_secret = execution_jwt_secret
         self.harvest_vault = harvest_vault
         self.verbose = verbose
         self.enable_metrics = enable_metrics
         self.metrics_host = metrics_host
         self.metrics_port = metrics_port
+        self.metrics_prefix = metrics_prefix
         self.max_fee_per_gas_gwei = max_fee_per_gas_gwei
 
         self.deposit_data_file = (
@@ -154,6 +155,7 @@ class Settings(metaclass=Singleton):
 
         # remote signer configuration
         self.remote_signer_url = remote_signer_url
+        self.dappnode = dappnode
 
         # hashi vault configuration
         self.hashi_vault_url = hashi_vault_url

@@ -15,6 +15,7 @@ from src.config.settings import (
     DEFAULT_MAX_FEE_PER_GAS_GWEI,
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
+    DEFAULT_METRICS_PREFIX,
     LOG_FORMATS,
     LOG_PLAIN,
     settings,
@@ -103,6 +104,13 @@ logger = logging.getLogger(__name__)
     default=DEFAULT_METRICS_HOST,
 )
 @click.option(
+    '--metrics-prefix',
+    type=str,
+    help=f'The prometheus metrics prefix. Default is {DEFAULT_METRICS_PREFIX}.',
+    envvar='METRICS_PREFIX',
+    default=DEFAULT_METRICS_PREFIX,
+)
+@click.option(
     '--metrics-port',
     type=int,
     help=f'The prometheus metrics port. Default is {DEFAULT_METRICS_PORT}.',
@@ -128,6 +136,13 @@ logger = logging.getLogger(__name__)
     envvar='EXECUTION_ENDPOINTS',
     prompt='Enter comma separated list of API endpoints for execution nodes',
     help='Comma separated list of API endpoints for execution nodes.',
+)
+@click.option(
+    '--execution-jwt-secret',
+    type=str,
+    envvar='EXECUTION_JWT_SECRET',
+    help='JWT secret key used for signing and verifying JSON Web Tokens'
+    'when connecting to execution nodes.',
 )
 @click.option(
     '--consensus-endpoints',
@@ -197,11 +212,13 @@ def start(
     vault: ChecksumAddress,
     consensus_endpoints: str,
     execution_endpoints: str,
+    execution_jwt_secret: str | None,
     harvest_vault: bool,
     verbose: bool,
     enable_metrics: bool,
     metrics_host: str,
     metrics_port: int,
+    metrics_prefix: str,
     data_dir: str,
     log_level: str,
     log_format: str,
@@ -229,11 +246,13 @@ def start(
         vault_dir=vault_config.vault_dir,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
+        execution_jwt_secret=execution_jwt_secret,
         harvest_vault=harvest_vault,
         verbose=verbose,
         enable_metrics=enable_metrics,
         metrics_host=metrics_host,
         metrics_port=metrics_port,
+        metrics_prefix=metrics_prefix,
         network=network,
         deposit_data_file=deposit_data_file,
         keystores_dir=keystores_dir,
