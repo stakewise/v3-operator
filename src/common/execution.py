@@ -9,11 +9,11 @@ from web3._utils.async_transactions import _max_fee_per_gas
 from web3.exceptions import BadFunctionCallOutput
 from web3.types import TxParams, Wei
 
+from src.common.app_state import AppState, OraclesCache
 from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.contracts import keeper_contract, multicall_contract, vault_contract
 from src.common.metrics import metrics
 from src.common.tasks import BaseTask
-from src.common.typings import OraclesCache
 from src.common.wallet import hot_wallet
 from src.config.settings import settings
 
@@ -53,18 +53,16 @@ async def check_hot_wallet_balance() -> None:
         )
 
 
-_oracles_cache: OraclesCache | None = None
-
-
 async def update_oracles_cache() -> None:
     """
     Fetches latest oracle config from IPFS. Uses cache if possible.
     """
-    global _oracles_cache  # pylint: disable=global-statement
+    app_state = AppState()
+    oracles_cache = app_state.oracles_cache
 
     # Find the latest block for which oracle config is cached
-    if _oracles_cache:
-        from_block = BlockNumber(_oracles_cache.checkpoint_block + 1)
+    if oracles_cache:
+        from_block = BlockNumber(oracles_cache.checkpoint_block + 1)
     else:
         from_block = settings.network_config.KEEPER_GENESIS_BLOCK
 
@@ -73,13 +71,13 @@ async def update_oracles_cache() -> None:
     if from_block > to_block:
         return
 
-    logger.debug('update_oracles_cache: get logs from_block %s, to_block %s', from_block, to_block)
+    logger.debug('update_oracles_cache: get logs from block %s to block %s', from_block, to_block)
     event = await keeper_contract.get_config_updated_event(from_block=from_block, to_block=to_block)
     if event:
         ipfs_hash = event['args']['configIpfsHash']
         config = cast(dict, await ipfs_fetch_client.fetch_json(ipfs_hash))
     else:
-        config = _oracles_cache.config  # type: ignore
+        config = oracles_cache.config  # type: ignore
 
     rewards_threshold_call = keeper_contract.encode_abi(fn_name='rewardsMinOracles', args=[])
     validators_threshold_call = keeper_contract.encode_abi(fn_name='validatorsMinOracles', args=[])
@@ -93,7 +91,7 @@ async def update_oracles_cache() -> None:
     rewards_threshold = Web3.to_int(multicall_response[0][1])
     validators_threshold = Web3.to_int(multicall_response[1][1])
 
-    _oracles_cache = OraclesCache(
+    app_state.oracles_cache = OraclesCache(
         config=config,
         validators_threshold=validators_threshold,
         rewards_threshold=rewards_threshold,
@@ -103,8 +101,9 @@ async def update_oracles_cache() -> None:
 
 async def get_protocol_config() -> ProtocolConfig:
     await update_oracles_cache()
+    app_state = AppState()
 
-    oracles_cache = cast(OraclesCache, _oracles_cache)
+    oracles_cache = cast(OraclesCache, app_state.oracles_cache)
     pc = build_protocol_config(
         config_data=oracles_cache.config,
         rewards_threshold=oracles_cache.rewards_threshold,

@@ -170,9 +170,14 @@ class KeeperContract(ContractWrapper):
         )
         return voting_info
 
-    async def get_exit_signatures_updated_event(self, vault: ChecksumAddress) -> EventData | None:
-        from_block = settings.network_config.KEEPER_GENESIS_BLOCK
-        to_block = await execution_client.eth.get_block_number()
+    async def get_exit_signatures_updated_event(
+        self,
+        vault: ChecksumAddress,
+        from_block: BlockNumber | None = None,
+        to_block: BlockNumber | None = None,
+    ) -> EventData | None:
+        from_block = from_block or settings.network_config.KEEPER_GENESIS_BLOCK
+        to_block = to_block or await execution_client.eth.get_block_number()
 
         last_event = await self._get_last_event(
             self.events.ExitSignaturesUpdated,
