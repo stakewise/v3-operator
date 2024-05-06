@@ -66,6 +66,7 @@ class Settings(metaclass=Singleton):
     genesis_validators_ipfs_retry_timeout: int
     validators_fetch_chunk_size: int
     sentry_dsn: str
+    sentry_environment: str
     pool_size: int | None
 
     api_host: str
@@ -173,6 +174,7 @@ class Settings(metaclass=Singleton):
         self.web3_log_level = decouple_config('WEB3_LOG_LEVEL', default='INFO')
 
         self.sentry_dsn = decouple_config('SENTRY_DSN', default='')
+        self.sentry_environment = decouple_config('SENTRY_ENVIRONMENT', default='')
 
         self.ipfs_fetch_endpoints = decouple_config(
             'IPFS_FETCH_ENDPOINTS',
