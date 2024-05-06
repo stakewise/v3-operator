@@ -118,6 +118,10 @@ def setup_sentry():
         # pylint: disable-next=import-outside-toplevel
         import sentry_sdk
 
-        sentry_sdk.init(settings.sentry_dsn, traces_sample_rate=0.1)
+        sentry_sdk.init(
+            settings.sentry_dsn,
+            traces_sample_rate=0.1,
+            environment=settings.sentry_environment or settings.network,
+        )
         sentry_sdk.set_tag('network', settings.network)
         sentry_sdk.set_tag('vault', settings.vault)
