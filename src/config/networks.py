@@ -173,14 +173,14 @@ NETWORKS = {
         ),
         VALIDATORS_REGISTRY_GENESIS_BLOCK=BlockNumber(155434),
         KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x96Bd48CD98D2CC602b93A2BBbF05d7eEB21CdE8E'
+            '0x6DfF9E878a83A2d84ef5AC242705E08BF0F33fdD'
         ),
-        KEEPER_GENESIS_BLOCK=BlockNumber(8630451),
+        KEEPER_GENESIS_BLOCK=BlockNumber(9652014),
         V2_POOL_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         V2_POOL_GENESIS_BLOCK=BlockNumber(0),
         V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         GENESIS_VAULT_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xA2600eB0A0cd1DD80b090Fc2D319516CDBF5d721'
+            '0xF3d3071905A6495a4D2f8650E8b3baaAE827DD13'
         ),
         GENESIS_VALIDATORS_ROOT=Bytes32(
             Web3.to_bytes(
@@ -199,7 +199,7 @@ NETWORKS = {
             '0xcA11bde05977b3631167028862bE2a173976CA11'
         ),
         SHARED_MEV_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xc7Eb19FcB20291A959ba90D11d2c6Fe8Db1F66b9'
+            '0xb7c8c515317490dbB0FF1809B09EABa6432B6A83'
         ),
     ),
 }
