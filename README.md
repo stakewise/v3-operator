@@ -1,31 +1,30 @@
-
 # StakeWise V3 Operator
 
 1. [What is V3 Operator?](#what-is-v3-operator)
 2. [Prerequisites](#prerequisites)
-    1. [Execution client](#execution-client)
-    2. [Consensus client](#consensus-client)
-    3. [Vault](#vault)
+   1. [Execution client](#execution-client)
+   2. [Consensus client](#consensus-client)
+   3. [Vault](#vault)
 3. [Installation](#installation)
-    1. [Binary](#binary)
-    2. [Install Script](#install-script-linux-and-macos)
-    3. [Docker Image](#docker-image)
-    4. [Source Files](#source-files)
-    5. [Kubernetes (advanced)](#kubernetes-advanced)
+   1. [Binary](#binary)
+   2. [Install Script](#install-script-linux-and-macos)
+   3. [Docker Image](#docker-image)
+   4. [Source Files](#source-files)
+   5. [Kubernetes (advanced)](#kubernetes-advanced)
 4. [Usage](#usage)
-    1. [Step 1. Create mnemonic](#step-1-create-mnemonic)
-    2. [Step 2. Create validator keys](#step-2-create-validator-keys)
-    3. [Step 3. Create hot wallet](#step-3-create-hot-wallet)
-    4. [Step 4. Upload deposit data file to Vault](#step-4-upload-deposit-data-file-to-vault)
-    5. [Step 5. Start Operator Service](#step-5-start-operator-service)
+   1. [Step 1. Create mnemonic](#step-1-create-mnemonic)
+   2. [Step 2. Create validator keys](#step-2-create-validator-keys)
+   3. [Step 3. Create hot wallet](#step-3-create-hot-wallet)
+   4. [Step 4. Upload deposit data file to Vault](#step-4-upload-deposit-data-file-to-vault)
+   5. [Step 5. Start Operator Service](#step-5-start-operator-service)
 5. [Extra commands](#extra-commands)
-    1. [Add validator keys to Vault](#add-validator-keys-to-vault)
-    2. [Validators voluntary exit](#validators-voluntary-exit)
-    3. [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
-    4. [Merge deposit data files from multiple operators](#merge-deposit-data-files-from-multiple-operators)
-    5. [Recover validator keystores](#recover-validator-keystores)
-    6. [Max gas fee](#max-gas-fee)
-    7. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
+   1. [Add validator keys to Vault](#add-validator-keys-to-vault)
+   2. [Validators voluntary exit](#validators-voluntary-exit)
+   3. [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
+   4. [Merge deposit data files from multiple operators](#merge-deposit-data-files-from-multiple-operators)
+   5. [Recover validator keystores](#recover-validator-keystores)
+   6. [Max gas fee](#max-gas-fee)
+   7. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
 6. [Contacts](#contacts)
 
 ## What is V3 Operator?
@@ -45,10 +44,10 @@ The validator registration process consists of the following steps:
    registered in the same order as specified in the deposit data file.
 3. Obtain BLS signature for exit message using local keystores or remote signer.
 4. Share the exit signature of the validator with StakeWise Oracles:
-    1. Using [Shamir's secret sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing), split
-       validator's BLS signature. The number of shares is equal to the number of oracles.
-    2. Encrypt exit signatures with oracles' public keys.
-    3. Send encrypted exit signatures to all the oracles and receive registration signatures from them.
+   1. Using [Shamir's secret sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing), split
+      validator's BLS signature. The number of shares is equal to the number of oracles.
+   2. Encrypt exit signatures with oracles' public keys.
+   3. Send encrypted exit signatures to all the oracles and receive registration signatures from them.
 5. Send transaction to Vault contract to register the validator.
 
 ### Exit signatures rotation
@@ -81,6 +80,36 @@ Ensure your consensus node is fully synced and running. Any consensus client tha
 supports [ETH Beacon Node API specification](https://ethereum.github.io/beacon-APIs/#/) can be used:
 [Lighthouse](https://launchpad.ethereum.org/en/lighthouse), [Nimbus](https://launchpad.ethereum.org/en/nimbus), [Prysm](https://launchpad.ethereum.org/en/prysm),
 or [Teku](https://launchpad.ethereum.org/en/teku).
+
+To ensure optimal performance and eligibility for rewards, consensus nodes must maintain semi-archive functionality, retaining state data for at least the past 24 hours. Here's how you can configure this requirement for each supported client:
+
+**Lighthouse**
+
+```bash
+lighthouse bn \
+  ...
+  --slots-per-restore-point=2048
+  --reconstruct-historic-states
+  --historic-state-cache-size=16
+```
+
+**Teku**
+
+```bash
+teku \
+  ...
+  --data-storage-archive-frequency=2048
+  --reconstruct-historic-states
+  --data-storage-mode=prune
+```
+
+**Prysm**
+
+```bash
+./prysm.sh beacon-chain \
+  ...
+  --slots-per-archive-point=2048
+```
 
 ### Vault
 
