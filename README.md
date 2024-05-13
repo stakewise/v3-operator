@@ -83,7 +83,7 @@ or [Teku](https://launchpad.ethereum.org/en/teku).
 
 To ensure optimal performance and eligibility for rewards, consensus nodes must maintain semi-archive functionality, retaining state data for at least the past 24 hours. Here's how you can configure this requirement for each supported client:
 
-**Lighthouse**
+#### Lighthouse
 
 ```bash
 lighthouse bn \
@@ -93,7 +93,7 @@ lighthouse bn \
   --historic-state-cache-size=16
 ```
 
-**Teku**
+#### Teku
 
 ```bash
 teku \
@@ -103,7 +103,7 @@ teku \
   --data-storage-mode=prune
 ```
 
-**Prysm**
+#### Prysm
 
 ```bash
 ./prysm.sh beacon-chain \
