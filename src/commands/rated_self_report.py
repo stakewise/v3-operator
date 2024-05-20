@@ -100,7 +100,10 @@ def rated_self_report(
         click.secho(f'{response.json}')
     else:
         click.secho(
-            f'Failed to report validators. Status code: {response.status_code}, Response: {response.text}',
+            (
+                f'Failed to report validators. Status code: {response.status_code}, '
+                f'Response: {response.text}'
+            ),
             bold=True,
             fg='red',
         )
@@ -134,10 +137,13 @@ def fetch_validators(vault_address: str, api_url: str) -> list:
         return [
             validator['publicKey'] for validator in data.get('data', {}).get('vaultValidators', [])
         ]
-    else:
-        click.secho(
-            f'Failed to fetch validators. Status code: {response.status_code}, Response: {response.text}',
-            bold=True,
-            fg='red',
-        )
-        return []
+
+    click.secho(
+        (
+            f'Failed to fetch validators. Status code: {response.status_code}, '
+            f'Response: {response.text}'
+        ),
+        bold=True,
+        fg='red',
+    )
+    return []
