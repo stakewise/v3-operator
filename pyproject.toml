@@ -41,6 +41,7 @@ flake8-datetimez = "==20.10.0"
 types-pyyaml = "==6.0.12.12"
 coverage = "==7.3.2"
 aioresponses = "^0.7.4"
+types-requests = "==2.31.0.20240406"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
