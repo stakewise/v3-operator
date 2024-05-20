@@ -80,7 +80,10 @@ class Settings(metaclass=Singleton):
         'PRIORITY_FEE_PERCENTILE', default=80.0, cast=float
     )
 
-    # pylint: disable-next=too-many-arguments,too-many-locals
+    rated_api_url: str
+    stakewise_api_url: str
+
+    # pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements
     def set(
         self,
         vault: str,
@@ -214,6 +217,16 @@ class Settings(metaclass=Singleton):
         self.validators_registration_mode = validators_registration_mode
 
         self.skip_startup_checks = decouple_config('SKIP_STARTUP_CHECKS', default=False, cast=bool)
+
+        # Rated API
+        self.rated_api_url = decouple_config('RATED_API_URL', default='https://api.rated.network')
+
+        # StakeWise API URL
+        self.stakewise_api_url = (
+            'https://mainnet-api.stakewise.io/graphql'
+            if self.network == MAINNET
+            else 'https://holesky-api.stakewise.io/graphql'
+        )
 
     @property
     def keystore_cls_str(self) -> str:
