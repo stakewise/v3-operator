@@ -8,9 +8,7 @@ from tenacity import retry, retry_if_exception_type, stop_after_delay, wait_expo
 from src.config.settings import DEFAULT_RETRY_TIME
 
 
-def retry_gql_errors(
-    delay: int = DEFAULT_RETRY_TIME, before: Optional[Callable] = None
-) -> Any:
+def retry_gql_errors(delay: int = DEFAULT_RETRY_TIME, before: Optional[Callable] = None) -> Any:
     return retry(
         retry=retry_if_exception_type((TransportError, asyncio.TimeoutError)),
         wait=wait_exponential(multiplier=1, min=1, max=delay // 2),
