@@ -1,3 +1,5 @@
+from typing import Any
+
 from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
 from graphql import DocumentNode
@@ -26,10 +28,12 @@ class GraphClient:
     async def get_vault_validators(self, vault: str) -> list[str]:
         query = gql(
             """
-            query Validators($vaultAddress: String!) {
+            query Validators($vaultAddress: String!, $first: Int, $skip: Int) {
               vaultValidators(
                 vaultAddress: $vaultAddress
-                statusIn: ["active_ongoing"]
+                statusIn: "active_ongoing"
+                first: $first
+                skip: $skip
               ) {
                 publicKey
               }
@@ -37,7 +41,17 @@ class GraphClient:
             """
         )
 
-        variables = {'vaultAddress': vault}
+        variables: dict[str, Any] = {'vaultAddress': vault, 'first': GRAPH_PAGE_SIZE, 'skip': 0}
 
-        res = await self.run_query(query, variables)
-        return [validator['publicKey'] for validator in res['vaultValidators']]
+        all_validators: list[str] = []
+        while True:
+            res = await self.run_query(query, variables)
+            validators_page = res['vaultValidators']
+            all_validators.extend(validator['publicKey'] for validator in validators_page)
+
+            if len(validators_page) < GRAPH_PAGE_SIZE:
+                break
+
+            variables['skip'] += GRAPH_PAGE_SIZE
+
+        return all_validators
