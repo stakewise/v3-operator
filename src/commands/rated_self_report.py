@@ -1,3 +1,4 @@
+import asyncio
 import json
 from pathlib import Path
 
@@ -5,6 +6,7 @@ import click
 import requests
 from eth_typing import HexAddress
 
+from src.common.graph import GraphClient
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
 from src.config.settings import AVAILABLE_NETWORKS, DEFAULT_NETWORK, settings
@@ -67,83 +69,49 @@ def rated_self_report(
     )
     click.secho('Rated self report')
 
-    validators = fetch_validators(vault, settings.stakewise_api_url)
+    graph_client = GraphClient()
+    asyncio.run(_report_validators(graph_client, vault, pool_tag, token, network))
+
+
+async def _report_validators(
+    graph_client: GraphClient,
+    vault: str,
+    pool_tag: str,
+    token: str,
+    network: str,
+) -> None:
+    validators = await graph_client.get_vault_validators(vault)
     if not validators:
         click.secho('No validators found or failed to fetch validators.', bold=True, fg='red')
         return
 
-    if len(validators) > 1000:
-        click.secho(
-            'You have more than 1,000 validators. Please split them into multiple requests.',
-            bold=True,
-            fg='red',
-        )
-        return
+    chunk_size = 1000
+    for i in range(0, len(validators), chunk_size):
+        chunk = validators[i : i + chunk_size]
 
-    payload = {'validators': validators, 'poolTag': pool_tag}
+        payload = {'validators': chunk, 'poolTag': pool_tag}
 
-    headers = {
-        'Content-Type': 'application/json',
-        'Authorization': f'Bearer {token}',
-        'X-Rated-Network': network,
-    }
-
-    response = requests.post(
-        f'{settings.rated_api_url}/v0/selfReports/validators',
-        headers=headers,
-        data=json.dumps(payload),
-        timeout=15,
-    )
-
-    if response.status_code == 201:
-        click.secho('Successfully reported validators.', bold=True, fg='green')
-        click.secho(f'{response.json}')
-    else:
-        click.secho(
-            (
-                f'Failed to report validators. Status code: {response.status_code}, '
-                f'Response: {response.text}'
-            ),
-            bold=True,
-            fg='red',
-        )
-
-
-def fetch_validators(vault_address: str, api_url: str) -> list:
-    url = api_url
-    query = {
-        'query': """
-        query Validators {
-          vaultValidators(
-            vaultAddress: "%s"
-            statusIn: "active_ongoing"
-          ) {
-            publicKey
-          }
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {token}',
+            'X-Rated-Network': network,
         }
-        """
-        % vault_address
-    }
 
-    response = requests.post(
-        url,
-        json=query,
-        headers={'Content-Type': 'application/json'},
-        timeout=15,
-    )
+        response = requests.post(
+            f'{settings.network_config.RATED_API_URL}/v0/selfReports/validators',
+            headers=headers,
+            data=json.dumps(payload),
+            timeout=15,
+        )
 
-    if response.status_code == 200:
-        data = response.json()
-        return [
-            validator['publicKey'] for validator in data.get('data', {}).get('vaultValidators', [])
-        ]
-
-    click.secho(
-        (
-            f'Failed to fetch validators. Status code: {response.status_code}, '
-            f'Response: {response.text}'
-        ),
-        bold=True,
-        fg='red',
-    )
-    return []
+        if response.status_code == 201:
+            click.secho(f'Successfully reported {len(chunk)} validators.', bold=True, fg='green')
+        else:
+            click.secho(
+                (
+                    f'Failed to report validators. Status code: {response.status_code}, '
+                    f'Response: {response.text}'
+                ),
+                bold=True,
+                fg='red',
+            )
