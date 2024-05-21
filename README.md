@@ -513,7 +513,7 @@ much CPU load and impact node performance during the creation and loading of key
 
 This command allows you to self-report your validator keys to the Rated Network, ensuring that your validator set is tracked and updated on the Rated Explorer.
 
-To use the rated_self_report command, you will need to provide the following parameters:
+To use the `rated-self-report` command, you will need to provide the following parameters:
 
 - `--data-dir`: Path where the vault data will be placed. Default is ~/.stakewise.
 - `--vault`: The vault address.
