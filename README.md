@@ -524,7 +524,7 @@ To use the rated_self_report command, you will need to provide the following par
 Here's an example of how to use the command:
 
 ```bash
-python main.py rated_self_report --vault <your-vault-address> --network <network-name> --pool-tag <pool-tag> --token <your-oauth-token> --data-dir <path-to-data-dir>
+python src/main.py rated-self-report --vault <your-vault-address> --network <network-name> --pool-tag <pool-tag> --token <your-oauth-token> --data-dir <path-to-data-dir>
 ```
 
 ## Contacts
