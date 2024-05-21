@@ -29,7 +29,7 @@ class GraphClient:
             query Validators($vaultAddress: String!) {
               vaultValidators(
                 vaultAddress: $vaultAddress
-                statusIn: "active_ongoing"
+                statusIn: ["active_ongoing"]
               ) {
                 publicKey
               }
