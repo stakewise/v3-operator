@@ -31,7 +31,7 @@ class GraphClient:
             query Validators($vaultAddress: String!, $first: Int, $skip: Int) {
               vaultValidators(
                 vaultAddress: $vaultAddress
-                statusIn: "active_ongoing"
+                statusIn: ["active_ongoing"]
                 first: $first
                 skip: $skip
               ) {
