@@ -382,6 +382,43 @@
     "anonymous": false,
     "inputs": [
       {
+        "indexed": true,
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "receiver",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "positionTicket",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "shares",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "assets",
+        "type": "uint256"
+      }
+    ],
+    "name": "V2ExitQueueEntered",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
         "indexed": false,
         "internalType": "bytes",
         "name": "publicKey",
@@ -389,6 +426,25 @@
       }
     ],
     "name": "ValidatorRegistered",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "caller",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "validatorsManager",
+        "type": "address"
+      }
+    ],
+    "name": "ValidatorsManagerUpdated",
     "type": "event"
   },
   {
@@ -469,17 +525,17 @@
     "outputs": [
       {
         "internalType": "uint256",
-        "name": "leftShares",
+        "name": "leftTickets",
         "type": "uint256"
       },
       {
         "internalType": "uint256",
-        "name": "claimedShares",
+        "name": "exitedTickets",
         "type": "uint256"
       },
       {
         "internalType": "uint256",
-        "name": "claimedAssets",
+        "name": "exitedAssets",
         "type": "uint256"
       }
     ],
@@ -518,23 +574,7 @@
       }
     ],
     "name": "claimExitedAssets",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "newPositionTicket",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "claimedShares",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "claimedAssets",
-        "type": "uint256"
-      }
-    ],
+    "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },
@@ -728,19 +768,6 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "keysManager",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
         "internalType": "uint256",
@@ -880,30 +907,6 @@
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "shares",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "receiver",
-        "type": "address"
-      }
-    ],
-    "name": "redeem",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "assets",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
         "name": "osTokenShares",
         "type": "uint256"
       },
@@ -956,66 +959,6 @@
         "internalType": "struct IKeeperValidators.ApprovalParams",
         "name": "keeperParams",
         "type": "tuple"
-      },
-      {
-        "internalType": "bytes32[]",
-        "name": "proof",
-        "type": "bytes32[]"
-      }
-    ],
-    "name": "registerValidator",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "components": [
-          {
-            "internalType": "bytes32",
-            "name": "validatorsRegistryRoot",
-            "type": "bytes32"
-          },
-          {
-            "internalType": "uint256",
-            "name": "deadline",
-            "type": "uint256"
-          },
-          {
-            "internalType": "bytes",
-            "name": "validators",
-            "type": "bytes"
-          },
-          {
-            "internalType": "bytes",
-            "name": "signatures",
-            "type": "bytes"
-          },
-          {
-            "internalType": "string",
-            "name": "exitSignaturesIpfsHash",
-            "type": "string"
-          }
-        ],
-        "internalType": "struct IKeeperValidators.ApprovalParams",
-        "name": "keeperParams",
-        "type": "tuple"
-      },
-      {
-        "internalType": "uint256[]",
-        "name": "indexes",
-        "type": "uint256[]"
-      },
-      {
-        "internalType": "bool[]",
-        "name": "proofFlags",
-        "type": "bool[]"
-      },
-      {
-        "internalType": "bytes32[]",
-        "name": "proof",
-        "type": "bytes32[]"
       }
     ],
     "name": "registerValidators",
@@ -1039,19 +982,6 @@
   {
     "inputs": [
       {
-        "internalType": "address",
-        "name": "_keysManager",
-        "type": "address"
-      }
-    ],
-    "name": "setKeysManager",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
         "internalType": "string",
         "name": "metadataIpfsHash",
         "type": "string"
@@ -1065,12 +995,12 @@
   {
     "inputs": [
       {
-        "internalType": "bytes32",
-        "name": "_validatorsRoot",
-        "type": "bytes32"
+        "internalType": "address",
+        "name": "_validatorsManager",
+        "type": "address"
       }
     ],
-    "name": "setValidatorsRoot",
+    "name": "setValidatorsManager",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1083,6 +1013,19 @@
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "totalExitingAssets",
+    "outputs": [
+      {
+        "internalType": "uint128",
+        "name": "",
+        "type": "uint128"
       }
     ],
     "stateMutability": "view",
@@ -1189,25 +1132,12 @@
   },
   {
     "inputs": [],
-    "name": "validatorIndex",
+    "name": "validatorsManager",
     "outputs": [
       {
-        "internalType": "uint256",
+        "internalType": "address",
         "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "validatorsRoot",
-    "outputs": [
-      {
-        "internalType": "bytes32",
-        "name": "",
-        "type": "bytes32"
+        "type": "address"
       }
     ],
     "stateMutability": "view",

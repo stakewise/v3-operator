@@ -11,9 +11,10 @@ from web3.types import TxParams, Wei
 
 from src.common.app_state import AppState, OraclesCache
 from src.common.clients import execution_client, ipfs_fetch_client
-from src.common.contracts import keeper_contract, multicall_contract, vault_contract
+from src.common.contracts import keeper_contract, multicall_contract
 from src.common.metrics import metrics
 from src.common.tasks import BaseTask
+from src.common.vault import Vault
 from src.common.wallet import hot_wallet
 from src.config.settings import settings
 
@@ -28,7 +29,7 @@ async def get_hot_wallet_balance() -> Wei:
 
 async def check_vault_address() -> None:
     try:
-        await vault_contract.get_validators_root()
+        await Vault().get_validators_root()
     except BadFunctionCallOutput as e:
         raise click.ClickException('Invalid vault contract address') from e
 
