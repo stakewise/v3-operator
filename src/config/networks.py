@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from decimal import Decimal
 
 from ens.constants import EMPTY_ADDR_HEX
 from eth_typing import BlockNumber, ChecksumAddress, HexStr
@@ -10,6 +9,7 @@ from web3.types import Wei
 MAINNET = 'mainnet'
 GNOSIS = 'gnosis'
 HOLESKY = 'holesky'
+CHIADO = 'chiado'
 
 ETH_NETWORKS = [MAINNET, HOLESKY]
 GNO_NETWORKS = [GNOSIS]
@@ -19,7 +19,8 @@ RATED_NETWORKS = [MAINNET, HOLESKY]
 @dataclass
 # pylint: disable-next=too-many-instance-attributes
 class NetworkConfig:
-    SYMBOL: str
+    WALLET_BALANCE_SYMBOL: str
+    VAULT_BALANCE_SYMBOL: str
     VALIDATORS_REGISTRY_CONTRACT_ADDRESS: ChecksumAddress  # consensus deposit contract
     VALIDATORS_REGISTRY_GENESIS_BLOCK: BlockNumber  # consensus deposit contract genesis
     KEEPER_CONTRACT_ADDRESS: ChecksumAddress
@@ -31,7 +32,7 @@ class NetworkConfig:
     GENESIS_VALIDATORS_ROOT: Bytes32
     GENESIS_VALIDATORS_IPFS_HASH: str
     SLOTS_PER_EPOCH: int
-    SECONDS_PER_BLOCK: Decimal
+    SECONDS_PER_BLOCK: int
     GENESIS_FORK_VERSION: bytes
     IS_POA: bool
     HOT_WALLET_MIN_BALANCE: Wei
@@ -61,7 +62,8 @@ class NetworkConfig:
 
 NETWORKS = {
     MAINNET: NetworkConfig(
-        SYMBOL='ETH',
+        WALLET_BALANCE_SYMBOL='ETH',
+        VAULT_BALANCE_SYMBOL='ETH',
         VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x00000000219ab540356cBB839Cbe05303d7705Fa'
         ),
@@ -87,7 +89,7 @@ NETWORKS = {
         ),
         GENESIS_VALIDATORS_IPFS_HASH='bafybeidcgs5ijtdjm4y2m2p4oh6us3gcb7rjv4n75ub6ugv4tku44dgy3y',
         SLOTS_PER_EPOCH=32,
-        SECONDS_PER_BLOCK=Decimal(12),
+        SECONDS_PER_BLOCK=12,
         GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x00000000')),
         IS_POA=False,
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
@@ -103,7 +105,8 @@ NETWORKS = {
         RATED_API_URL='https://api.rated.network',
     ),
     HOLESKY: NetworkConfig(
-        SYMBOL='HolETH',
+        WALLET_BALANCE_SYMBOL='HolETH',
+        VAULT_BALANCE_SYMBOL='HolETH',
         VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x4242424242424242424242424242424242424242'
         ),
@@ -123,7 +126,7 @@ NETWORKS = {
         ),
         GENESIS_VALIDATORS_IPFS_HASH='bafybeih2zhayrd6t5nnvzwmechcrxeejphr45lv4q7byxjqlapizghdtde',
         SLOTS_PER_EPOCH=32,
-        SECONDS_PER_BLOCK=Decimal(12),
+        SECONDS_PER_BLOCK=12,
         GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x01017000')),
         IS_POA=False,
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
@@ -139,7 +142,8 @@ NETWORKS = {
         RATED_API_URL='https://api.rated.network',
     ),
     GNOSIS: NetworkConfig(
-        SYMBOL='xDAI',
+        WALLET_BALANCE_SYMBOL='xDAI',
+        VAULT_BALANCE_SYMBOL='GNO',
         VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0B98057eA310F4d31F2a452B414647007d1645d9'
         ),
@@ -160,7 +164,7 @@ NETWORKS = {
         ),
         GENESIS_VALIDATORS_IPFS_HASH='',
         SLOTS_PER_EPOCH=32,
-        SECONDS_PER_BLOCK=Decimal('6.8'),
+        SECONDS_PER_BLOCK=5,
         GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x00000064')),
         IS_POA=False,
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
@@ -171,6 +175,45 @@ NETWORKS = {
         ),
         SHARED_MEV_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         STAKEWISE_API_URL='https://gnosis-api.stakewise.io/graphql',
-        RATED_API_URL='https://api.rated.network',
+        RATED_API_URL='',
+    ),
+    CHIADO: NetworkConfig(
+        WALLET_BALANCE_SYMBOL='xDAI',
+        VAULT_BALANCE_SYMBOL='GNO',
+        VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0xb97036A26259B7147018913bD58a774cf91acf25'
+        ),
+        VALIDATORS_REGISTRY_GENESIS_BLOCK=BlockNumber(155434),
+        KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x6DfF9E878a83A2d84ef5AC242705E08BF0F33fdD'
+        ),
+        KEEPER_GENESIS_BLOCK=BlockNumber(9652014),
+        V2_POOL_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        V2_POOL_GENESIS_BLOCK=BlockNumber(0),
+        V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        GENESIS_VAULT_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0xF3d3071905A6495a4D2f8650E8b3baaAE827DD13'
+        ),
+        GENESIS_VALIDATORS_ROOT=Bytes32(
+            Web3.to_bytes(
+                hexstr=HexStr('0x9d642dac73058fbf39c0ae41ab1e34e4d889043cb199851ded7095bc99eb4c1e')
+            )
+        ),
+        GENESIS_VALIDATORS_IPFS_HASH='bafybeia5ekk3lsrwdfpez54zd6xmi6k45q76n3oulen7r2bocxshhf6rfq',
+        SLOTS_PER_EPOCH=16,
+        SECONDS_PER_BLOCK=5,
+        GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x0000006f')),
+        IS_POA=False,
+        HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),  # todo
+        SHAPELLA_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x0300006f')),
+        SHAPELLA_EPOCH=244224,
+        MULTICALL_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0xcA11bde05977b3631167028862bE2a173976CA11'
+        ),
+        SHARED_MEV_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0xb7c8c515317490dbB0FF1809B09EABa6432B6A83'
+        ),
+        STAKEWISE_API_URL='https://chiado-api.stakewise.io/graphql',
+        RATED_API_URL='',
     ),
 }

@@ -20,6 +20,7 @@ class Validator:
     deposit_data_index: int
     public_key: HexStr
     signature: HexStr
+    amount_gwei: int
     exit_signature: BLSSignature | None = None
 
 
