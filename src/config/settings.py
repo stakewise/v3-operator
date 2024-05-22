@@ -6,7 +6,14 @@ from web3 import Web3
 from web3.types import ChecksumAddress
 
 from src.common.typings import Singleton
-from src.config.networks import HOLESKY, MAINNET, NETWORKS, NetworkConfig
+from src.config.networks import (
+    CHIADO,
+    GNOSIS,
+    HOLESKY,
+    MAINNET,
+    NETWORKS,
+    NetworkConfig,
+)
 from src.validators.typings import ValidatorsRegistrationMode
 
 DATA_DIR = Path.home() / '.stakewise'
@@ -234,7 +241,7 @@ class Settings(metaclass=Singleton):
 
 settings = Settings()
 
-AVAILABLE_NETWORKS = [MAINNET, HOLESKY]
+AVAILABLE_NETWORKS = [MAINNET, HOLESKY, GNOSIS, CHIADO]
 DEFAULT_NETWORK = MAINNET
 
 # oracles
@@ -247,6 +254,7 @@ ORACLES_VALIDATORS_TIMEOUT: int = decouple_config(
 # common
 DEPOSIT_AMOUNT = Web3.to_wei(32, 'ether')
 DEPOSIT_AMOUNT_GWEI = int(Web3.from_wei(DEPOSIT_AMOUNT, 'gwei'))
+GNOSIS_NETWORKS = [GNOSIS, CHIADO]
 
 # Backoff retries
 DEFAULT_RETRY_TIME = 60

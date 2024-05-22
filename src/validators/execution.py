@@ -20,7 +20,6 @@ from src.common.ipfs import fetch_harvest_params
 from src.common.metrics import metrics
 from src.common.typings import OraclesApproval
 from src.common.utils import format_error
-from src.config.networks import ETH_NETWORKS
 from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.keystores.base import BaseKeystore
@@ -226,9 +225,6 @@ async def register_single_validator(
     validators_registry_root: Bytes32,
 ) -> HexStr | None:
     """Registers single validator."""
-    if settings.network not in ETH_NETWORKS:
-        raise NotImplementedError('networks other than Ethereum not supported')
-
     logger.info('Submitting registration transaction')
     register_call_args = [
         (
@@ -280,9 +276,6 @@ async def register_multiple_validator(
     validators_registry_root: Bytes32,
 ) -> HexStr | None:
     """Registers multiple validators."""
-    if settings.network not in ETH_NETWORKS:
-        raise NotImplementedError('networks other than Ethereum not supported')
-
     sorted_tx_validators: list[bytes] = [v[0] for v in multi_proof.leaves]
     indexes = [sorted_tx_validators.index(v) for v in tx_validators]
     logger.info('Submitting registration transaction')

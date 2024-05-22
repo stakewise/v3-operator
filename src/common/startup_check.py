@@ -200,7 +200,7 @@ async def startup_checks():
     logger.info(
         'Vault withdrawable assets: %s %s',
         round(Web3.from_wei(withdrawable_assets, 'ether'), 2),
-        settings.network_config.SYMBOL,
+        settings.network_config.VAULT_BALANCE_SYMBOL,
     )
 
     logger.info('Checking hot wallet balance %s...', hot_wallet.address)

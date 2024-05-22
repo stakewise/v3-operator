@@ -35,7 +35,7 @@ async def check_vault_address() -> None:
 
 async def check_hot_wallet_balance() -> None:
     hot_wallet_min_balance = settings.network_config.HOT_WALLET_MIN_BALANCE
-    symbol = settings.network_config.SYMBOL
+    symbol = settings.network_config.WALLET_BALANCE_SYMBOL
 
     if hot_wallet_min_balance <= 0:
         return

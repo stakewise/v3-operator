@@ -22,7 +22,7 @@ class ContractWrapper:
 
     @property
     def events_blocks_range_interval(self) -> int:
-        return int(43200 / float(settings.network_config.SECONDS_PER_BLOCK))  # 12 hrs
+        return 43200 // settings.network_config.SECONDS_PER_BLOCK  # 12 hrs
 
     @property
     def contract_address(self) -> ChecksumAddress:
