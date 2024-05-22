@@ -10,13 +10,8 @@ from web3 import Web3
 from web3.types import EventData, Wei
 
 from src.common.clients import execution_client
-from src.common.contracts import (
-    keeper_contract,
-    validators_registry_contract,
-    vault_contract,
-)
+from src.common.contracts import validators_registry_contract, vault_contract
 from src.common.execution import get_high_priority_tx_params
-from src.common.ipfs import fetch_harvest_params
 from src.common.metrics import metrics
 from src.common.typings import HarvestParams, OraclesApproval
 from src.common.utils import format_error
@@ -105,23 +100,6 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
             new_public_keys.add(public_key)
 
     return new_public_keys
-
-
-async def get_harvest_params() -> HarvestParams | None:
-    """Fetches vault's available assets for staking."""
-    last_rewards = await keeper_contract.get_last_rewards_update()
-    if last_rewards is None:
-        return None
-
-    if not await keeper_contract.can_harvest(vault_contract.contract_address):
-        return None
-
-    harvest_params = await fetch_harvest_params(
-        vault_address=settings.vault,
-        ipfs_hash=last_rewards.ipfs_hash,
-        rewards_root=last_rewards.rewards_root,
-    )
-    return harvest_params
 
 
 async def get_withdrawable_assets(harvest_params: HarvestParams | None) -> Wei:

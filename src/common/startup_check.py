@@ -14,14 +14,11 @@ from src.common.execution import (
     check_vault_address,
     get_protocol_config,
 )
+from src.common.harvest import get_harvest_params
 from src.common.utils import format_error, warning_verbose
 from src.common.wallet import hot_wallet
 from src.config.settings import settings
-from src.validators.execution import (
-    check_deposit_data_root,
-    get_harvest_params,
-    get_withdrawable_assets,
-)
+from src.validators.execution import check_deposit_data_root, get_withdrawable_assets
 from src.validators.keystores.local import LocalKeystore
 from src.validators.utils import load_deposit_data
 

@@ -109,7 +109,9 @@ NETWORKS = {
             '0xB580799Bf7d62721D1a523f0FDF2f5Ed7BA4e259'
         ),
         KEEPER_GENESIS_BLOCK=BlockNumber(215379),
-        DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x1Dfb40a149940300f183d21E5B200c5DaaF3A842'
+        ),
         V2_POOL_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         V2_POOL_GENESIS_BLOCK=BlockNumber(0),
         V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),

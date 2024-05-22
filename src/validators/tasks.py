@@ -14,6 +14,7 @@ from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import v2_pool_escrow_contract, validators_registry_contract
 from src.common.exceptions import NotEnoughOracleApprovalsError
 from src.common.execution import check_gas_price, get_protocol_config
+from src.common.harvest import get_harvest_params
 from src.common.metrics import metrics
 from src.common.tasks import BaseTask
 from src.common.typings import HarvestParams
@@ -23,7 +24,6 @@ from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import (
     NetworkValidatorsProcessor,
     get_available_validators,
-    get_harvest_params,
     get_latest_network_validator_public_keys,
     get_withdrawable_assets,
     register_multiple_validator,
