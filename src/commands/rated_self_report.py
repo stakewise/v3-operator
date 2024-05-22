@@ -100,7 +100,7 @@ async def _report_validators(
         response = requests.post(
             f'{settings.network_config.RATED_API_URL}/v0/selfReports/validators',
             headers=headers,
-            data=json.dumps(payload),
+            json=payload,
             timeout=15,
         )
 
