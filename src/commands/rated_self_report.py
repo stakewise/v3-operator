@@ -1,5 +1,4 @@
 import asyncio
-import json
 from pathlib import Path
 
 import click
@@ -69,17 +68,16 @@ def rated_self_report(
     )
     click.secho('Rated self report')
 
-    graph_client = GraphClient()
-    asyncio.run(_report_validators(graph_client, vault, pool_tag, token, network))
+    asyncio.run(_report_validators(vault, pool_tag, token, network))
 
 
 async def _report_validators(
-    graph_client: GraphClient,
     vault: str,
     pool_tag: str,
     token: str,
     network: str,
 ) -> None:
+    graph_client = GraphClient()
     validators = await graph_client.get_vault_validators(vault)
     if not validators:
         click.secho('No validators found or failed to fetch validators.', bold=True, fg='red')
