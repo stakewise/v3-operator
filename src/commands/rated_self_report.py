@@ -56,6 +56,10 @@ def rated_self_report(
     token: str,
     data_dir: str,
 ) -> None:
+    if network == "gnosis":
+        click.secho("Gnosis network is not yet rated supported")
+        return
+
     vault_config = VaultConfig(vault, Path(data_dir))
     vault_config.load()
 
