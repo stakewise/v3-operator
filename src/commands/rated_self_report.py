@@ -8,6 +8,7 @@ from eth_typing import HexAddress
 from src.common.graph import GraphClient
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
+from src.config.networks import RATED_NETWORKS
 from src.config.settings import AVAILABLE_NETWORKS, DEFAULT_NETWORK, settings
 
 
@@ -56,8 +57,8 @@ def rated_self_report(
     token: str,
     data_dir: str,
 ) -> None:
-    if network == 'gnosis':
-        click.secho('Gnosis network is not yet rated supported')
+    if network not in RATED_NETWORKS:
+        click.secho(f'{network} network is not yet rated supported')
         return
 
     vault_config = VaultConfig(vault, Path(data_dir))
