@@ -21,6 +21,7 @@ class NetworkConfig:
     VALIDATORS_REGISTRY_GENESIS_BLOCK: BlockNumber  # consensus deposit contract genesis
     KEEPER_CONTRACT_ADDRESS: ChecksumAddress
     KEEPER_GENESIS_BLOCK: BlockNumber
+    DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS: ChecksumAddress
     V2_POOL_CONTRACT_ADDRESS: ChecksumAddress
     V2_POOL_GENESIS_BLOCK: BlockNumber
     V2_POOL_ESCROW_CONTRACT_ADDRESS: ChecksumAddress
@@ -66,6 +67,7 @@ NETWORKS = {
             '0x6B5815467da09DaA7DC83Db21c9239d98Bb487b5'
         ),
         KEEPER_GENESIS_BLOCK=BlockNumber(18470089),
+        DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         V2_POOL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xC874b064f465bdD6411D45734b56fac750Cda29A'
         ),
@@ -107,6 +109,9 @@ NETWORKS = {
             '0xB580799Bf7d62721D1a523f0FDF2f5Ed7BA4e259'
         ),
         KEEPER_GENESIS_BLOCK=BlockNumber(215379),
+        DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x1Dfb40a149940300f183d21E5B200c5DaaF3A842'
+        ),
         V2_POOL_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         V2_POOL_GENESIS_BLOCK=BlockNumber(0),
         V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
@@ -141,6 +146,7 @@ NETWORKS = {
         # TODO: replace with real values once contracts deployed
         KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         KEEPER_GENESIS_BLOCK=BlockNumber(0),
+        DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         V2_POOL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x2f99472b727e15EECf9B9eFF9F7481B85d3b4444'
         ),
@@ -176,6 +182,9 @@ NETWORKS = {
             '0x6DfF9E878a83A2d84ef5AC242705E08BF0F33fdD'
         ),
         KEEPER_GENESIS_BLOCK=BlockNumber(9652014),
+        DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x197292Fb9893Bc06329ee8E3Fd07d8ceF29E4d13'
+        ),
         V2_POOL_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         V2_POOL_GENESIS_BLOCK=BlockNumber(0),
         V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
@@ -192,7 +201,7 @@ NETWORKS = {
         SECONDS_PER_BLOCK=5,
         GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x0000006f')),
         IS_POA=False,
-        HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),  # todo
+        HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.001', 'ether'),  # todo
         SHAPELLA_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x0300006f')),
         SHAPELLA_EPOCH=244224,
         MULTICALL_CONTRACT_ADDRESS=Web3.to_checksum_address(

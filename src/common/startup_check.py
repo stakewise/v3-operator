@@ -14,6 +14,7 @@ from src.common.execution import (
     check_vault_address,
     get_protocol_config,
 )
+from src.common.harvest import get_harvest_params
 from src.common.utils import format_error, warning_verbose
 from src.common.wallet import hot_wallet
 from src.config.settings import settings
@@ -196,7 +197,8 @@ async def startup_checks():
     logger.info('Checking vault address %s...', settings.vault)
     await check_vault_address()
 
-    withdrawable_assets, _ = await get_withdrawable_assets()
+    harvest_params = await get_harvest_params()
+    withdrawable_assets = await get_withdrawable_assets(harvest_params)
     logger.info(
         'Vault withdrawable assets: %s %s',
         round(Web3.from_wei(withdrawable_assets, 'ether'), 2),

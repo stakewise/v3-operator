@@ -14,8 +14,10 @@ from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import v2_pool_escrow_contract, validators_registry_contract
 from src.common.exceptions import NotEnoughOracleApprovalsError
 from src.common.execution import check_gas_price, get_protocol_config
+from src.common.harvest import get_harvest_params
 from src.common.metrics import metrics
 from src.common.tasks import BaseTask
+from src.common.typings import HarvestParams
 from src.common.utils import get_current_timestamp, log_verbose
 from src.config.settings import DEPOSIT_AMOUNT, GNOSIS_NETWORKS, settings
 from src.validators.database import NetworkValidatorCrud
@@ -120,7 +122,8 @@ async def register_validators(
     if validators is None and keystore is None:
         raise RuntimeError('validators or keystore must be set')
 
-    validators_count, update_state_call = await get_validators_count_from_vault_assets()
+    harvest_params = await get_harvest_params()
+    validators_count = await get_validators_count_from_vault_assets(harvest_params)
 
     if not validators_count:
         # not enough balance to register validators
@@ -210,7 +213,7 @@ async def register_validators(
             approval=oracles_approval,
             multi_proof=multi_proof,
             tx_validators=tx_validators,
-            update_state_call=update_state_call,
+            harvest_params=harvest_params,
             validators_registry_root=registry_root,
         )
         if tx_hash:
@@ -222,7 +225,7 @@ async def register_validators(
             approval=oracles_approval,
             multi_proof=multi_proof,
             tx_validators=tx_validators,
-            update_state_call=update_state_call,
+            harvest_params=harvest_params,
             validators_registry_root=registry_root,
         )
         if tx_hash:
@@ -237,7 +240,8 @@ async def get_available_validators_for_registration(
     deposit_data: DepositData,
     run_check_deposit_data_root: bool = True,
 ) -> list[Validator]:
-    validators_count, _ = await get_validators_count_from_vault_assets()
+    harvest_params = await get_harvest_params()
+    validators_count = await get_validators_count_from_vault_assets(harvest_params)
 
     if not validators_count:
         # not enough balance to register validators
@@ -257,8 +261,8 @@ async def get_available_validators_for_registration(
     return validators
 
 
-async def get_validators_count_from_vault_assets() -> tuple[int, HexStr | None]:
-    vault_balance, update_state_call = await get_withdrawable_assets()
+async def get_validators_count_from_vault_assets(harvest_params: HarvestParams | None) -> int:
+    vault_balance = await get_withdrawable_assets(harvest_params)
     if settings.network in GNOSIS_NETWORKS:
         # apply GNO -> mGNO exchange rate
         vault_balance = convert_to_mgno(vault_balance)
@@ -267,7 +271,7 @@ async def get_validators_count_from_vault_assets() -> tuple[int, HexStr | None]:
 
     # calculate number of validators that can be registered
     validators_count = vault_balance // DEPOSIT_AMOUNT
-    return validators_count, update_state_call
+    return validators_count
 
 
 # pylint: disable-next=too-many-arguments

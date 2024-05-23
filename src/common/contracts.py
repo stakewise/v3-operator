@@ -107,6 +107,9 @@ class VaultContract(ContractWrapper):
     async def mev_escrow(self) -> ChecksumAddress:
         return await self.contract.functions.mevEscrow().call()
 
+    async def version(self) -> int:
+        return await self.contract.functions.version().call()
+
 
 class V2PoolContract(ContractWrapper):
     abi_path = 'abi/IV2Pool.json'
@@ -200,6 +203,23 @@ class KeeperContract(ContractWrapper):
         return await self.contract.functions.canHarvest(vault_address).call()
 
 
+class DepositDataRegistryContract(ContractWrapper):
+    abi_path = 'abi/IDepositDataRegistry.json'
+    settings_key = 'DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS'
+
+    async def get_deposit_data_manager(self) -> ChecksumAddress:
+        """Fetches the vault deposit data manager address."""
+        return await self.contract.functions.getDepositDataManager(settings.vault).call()
+
+    async def get_validators_root(self) -> Bytes32:
+        """Fetches vault's validators root."""
+        return await self.contract.functions.depositDataRoots(settings.vault).call()
+
+    async def get_validators_index(self) -> int:
+        """Fetches vault's current validators index."""
+        return await self.contract.functions.depositDataIndexes(settings.vault).call()
+
+
 class MulticallContract(ContractWrapper):
     abi_path = 'abi/Multicall.json'
     settings_key = 'MULTICALL_CONTRACT_ADDRESS'
@@ -218,3 +238,4 @@ keeper_contract = KeeperContract()
 v2_pool_contract = V2PoolContract()
 v2_pool_escrow_contract = V2PoolEscrowContract()
 multicall_contract = MulticallContract()
+deposit_data_registry_contract = DepositDataRegistryContract()
