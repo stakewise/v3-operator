@@ -1,31 +1,31 @@
-
 # StakeWise V3 Operator
 
 1. [What is V3 Operator?](#what-is-v3-operator)
 2. [Prerequisites](#prerequisites)
-    1. [Execution client](#execution-client)
-    2. [Consensus client](#consensus-client)
-    3. [Vault](#vault)
+   1. [Execution client](#execution-client)
+   2. [Consensus client](#consensus-client)
+   3. [Vault](#vault)
 3. [Installation](#installation)
-    1. [Binary](#binary)
-    2. [Install Script](#install-script-linux-and-macos)
-    3. [Docker Image](#docker-image)
-    4. [Source Files](#source-files)
-    5. [Kubernetes (advanced)](#kubernetes-advanced)
+   1. [Binary](#binary)
+   2. [Install Script](#install-script-linux-and-macos)
+   3. [Docker Image](#docker-image)
+   4. [Source Files](#source-files)
+   5. [Kubernetes (advanced)](#kubernetes-advanced)
 4. [Usage](#usage)
-    1. [Step 1. Create mnemonic](#step-1-create-mnemonic)
-    2. [Step 2. Create validator keys](#step-2-create-validator-keys)
-    3. [Step 3. Create hot wallet](#step-3-create-hot-wallet)
-    4. [Step 4. Upload deposit data file to Vault](#step-4-upload-deposit-data-file-to-vault)
-    5. [Step 5. Start Operator Service](#step-5-start-operator-service)
+   1. [Step 1. Create mnemonic](#step-1-create-mnemonic)
+   2. [Step 2. Create validator keys](#step-2-create-validator-keys)
+   3. [Step 3. Create hot wallet](#step-3-create-hot-wallet)
+   4. [Step 4. Upload deposit data file to Vault](#step-4-upload-deposit-data-file-to-vault)
+   5. [Step 5. Start Operator Service](#step-5-start-operator-service)
 5. [Extra commands](#extra-commands)
-    1. [Add validator keys to Vault](#add-validator-keys-to-vault)
-    2. [Validators voluntary exit](#validators-voluntary-exit)
-    3. [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
-    4. [Merge deposit data files from multiple operators](#merge-deposit-data-files-from-multiple-operators)
-    5. [Recover validator keystores](#recover-validator-keystores)
-    6. [Max gas fee](#max-gas-fee)
-    7. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
+   1. [Add validator keys to Vault](#add-validator-keys-to-vault)
+   2. [Validators voluntary exit](#validators-voluntary-exit)
+   3. [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
+   4. [Merge deposit data files from multiple operators](#merge-deposit-data-files-from-multiple-operators)
+   5. [Recover validator keystores](#recover-validator-keystores)
+   6. [Max gas fee](#max-gas-fee)
+   7. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
+   8. [Self report to Rated](#rated-self-report)
 6. [Contacts](#contacts)
 
 ## What is V3 Operator?
@@ -45,10 +45,10 @@ The validator registration process consists of the following steps:
    registered in the same order as specified in the deposit data file.
 3. Obtain BLS signature for exit message using local keystores or remote signer.
 4. Share the exit signature of the validator with StakeWise Oracles:
-    1. Using [Shamir's secret sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing), split
-       validator's BLS signature. The number of shares is equal to the number of oracles.
-    2. Encrypt exit signatures with oracles' public keys.
-    3. Send encrypted exit signatures to all the oracles and receive registration signatures from them.
+   1. Using [Shamir's secret sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing), split
+      validator's BLS signature. The number of shares is equal to the number of oracles.
+   2. Encrypt exit signatures with oracles' public keys.
+   3. Send encrypted exit signatures to all the oracles and receive registration signatures from them.
 5. Send transaction to Vault contract to register the validator.
 
 ### Exit signatures rotation
@@ -423,6 +423,7 @@ Operator Service has many different commands that are not mandatory but might co
 - [Add validator keys to Vault](#add-validator-keys-to-vault)
 - [Merge deposit data files from multiple operators](#merge-deposit-data-files-from-multiple-operators)
 - [Recover validator keystores](#recover-validator-keystores)
+- [Self report to Rated](#rated-self-report)
 
 ### Add validator keys to Vault
 
@@ -507,6 +508,24 @@ cores that are used to both load keystores and create keystores. By default, Ope
 cores.
 Setting `--pool-size` to (number of CPU cores) / 2 is a safe way to ensure that Operator Service does not take up too
 much CPU load and impact node performance during the creation and loading of keystores.
+
+### Rated self report
+
+This command allows you to self-report your validator keys to the Rated Network, ensuring that your validator set is tracked and updated on the Rated Explorer.
+
+To use the `rated-self-report` command, you will need to provide the following parameters:
+
+- `--data-dir`: Path where the vault data will be placed. Default is ~/.stakewise.
+- `--vault`: The vault address.
+- `--network`: The network of your vault (e.g., mainnet, holesky).
+- `--pool-tag`: The pool name listed on the Explorer (optional).
+- `--token`: OAuth token for authorization.
+
+Here's an example of how to use the command:
+
+```bash
+python src/main.py rated-self-report --vault <your-vault-address> --network <network-name> --pool-tag <pool-tag> --token <your-oauth-token> --data-dir <path-to-data-dir>
+```
 
 ## Contacts
 
