@@ -70,7 +70,7 @@ def rated_self_report(
         execution_endpoints='',
         consensus_endpoints='',
     )
-    click.secho('Rated self report')
+    click.secho('Starting rated self report...')
 
     asyncio.run(_report_validators(vault, pool_tag, token, network))
 
