@@ -11,6 +11,8 @@ GNOSIS = 'gnosis'
 HOLESKY = 'holesky'
 CHIADO = 'chiado'
 
+RATED_NETWORKS = [MAINNET, HOLESKY]
+
 
 @dataclass
 # pylint: disable-next=too-many-instance-attributes
@@ -37,6 +39,8 @@ class NetworkConfig:
     SHAPELLA_EPOCH: int
     MULTICALL_CONTRACT_ADDRESS: ChecksumAddress
     SHARED_MEV_ESCROW_CONTRACT_ADDRESS: ChecksumAddress
+    STAKEWISE_API_URL: str
+    RATED_API_URL: str
 
     @property
     def SHAPELLA_FORK(self) -> ConsensusFork:
@@ -97,6 +101,8 @@ NETWORKS = {
         SHARED_MEV_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x48319f97E5Da1233c21c48b80097c0FB7a20Ff86'
         ),
+        STAKEWISE_API_URL='https://mainnet-api.stakewise.io/graphql',
+        RATED_API_URL='https://api.rated.network',
     ),
     HOLESKY: NetworkConfig(
         WALLET_BALANCE_SYMBOL='HolETH',
@@ -135,6 +141,8 @@ NETWORKS = {
         SHARED_MEV_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xc98F25BcAA6B812a07460f18da77AF8385be7b56'
         ),
+        STAKEWISE_API_URL='https://holesky-api.stakewise.io/graphql',
+        RATED_API_URL='https://api.rated.network',
     ),
     GNOSIS: NetworkConfig(
         WALLET_BALANCE_SYMBOL='xDAI',
@@ -170,6 +178,8 @@ NETWORKS = {
             '0xcA11bde05977b3631167028862bE2a173976CA11'
         ),
         SHARED_MEV_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        STAKEWISE_API_URL='https://gnosis-api.stakewise.io/graphql',
+        RATED_API_URL='https://api.rated.network',
     ),
     CHIADO: NetworkConfig(
         WALLET_BALANCE_SYMBOL='xDAI',

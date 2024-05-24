@@ -87,7 +87,7 @@ class Settings(metaclass=Singleton):
         'PRIORITY_FEE_PERCENTILE', default=80.0, cast=float
     )
 
-    # pylint: disable-next=too-many-arguments,too-many-locals
+    # pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements
     def set(
         self,
         vault: str,
@@ -267,6 +267,9 @@ REMOTE_SIGNER_TIMEOUT = decouple_config('REMOTE_SIGNER_TIMEOUT', cast=int, defau
 
 # Hashi vault timeout
 HASHI_VAULT_TIMEOUT = 10
+
+# Graphql timeout
+GRAPH_API_TIMEOUT = 10
 
 # logging
 LOG_PLAIN = 'plain'

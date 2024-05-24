@@ -13,6 +13,7 @@ from src.commands.get_validators_root import get_validators_root
 from src.commands.import_genesis_keys import import_genesis_keys
 from src.commands.init import init
 from src.commands.merge_deposit_data import merge_deposit_data
+from src.commands.rated_self_report import rated_self_report
 from src.commands.recover import recover
 from src.commands.remote_signer_setup import remote_signer_setup
 from src.commands.start import start
@@ -45,6 +46,7 @@ cli.add_command(recover)
 cli.add_command(get_validators_root)
 cli.add_command(import_genesis_keys)
 cli.add_command(remote_db_group)
+cli.add_command(rated_self_report)
 
 if __name__ == '__main__':
     # Pyinstaller hacks
