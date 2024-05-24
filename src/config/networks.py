@@ -220,5 +220,7 @@ NETWORKS = {
         SHARED_MEV_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xb7c8c515317490dbB0FF1809B09EABa6432B6A83'
         ),
+        STAKEWISE_API_URL='https://chiado-api.stakewise.io/graphql',
+        RATED_API_URL='https://api.rated.network',
     ),
 }
