@@ -1,11 +1,9 @@
 import asyncio
 import logging
 
-import uvicorn
 from sw_utils import EventScanner, InterruptHandler
 
 import src
-from src.api import app as api_app
 from src.common.checks import wait_execution_catch_up_consensus
 from src.common.consensus import get_chain_finalized_head
 from src.common.execution import WalletTask, update_oracles_cache
@@ -63,17 +61,7 @@ async def start_base() -> None:
     await update_oracles_cache()
 
     if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
-        logger.info('Starting api server')
-        api_app.state.deposit_data = deposit_data
-
-        config = uvicorn.Config(
-            api_app,
-            host=settings.api_host,
-            port=settings.api_port,
-            log_config=None,
-        )
-        server = UvicornServerWithoutSignals(config)
-        asyncio.create_task(server.serve())
+        logger.info('Starting api mode')
 
     if settings.enable_metrics:
         await metrics_server()
@@ -95,12 +83,6 @@ async def start_base() -> None:
             tasks.append(HarvestTask().run(interrupt_handler))
 
         await asyncio.gather(*tasks)
-
-
-class UvicornServerWithoutSignals(uvicorn.Server):
-    def install_signal_handlers(self) -> None:
-        # Manage signals in command, not in Uvicorn
-        pass
 
 
 def log_start() -> None:

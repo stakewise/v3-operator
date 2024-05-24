@@ -5,7 +5,6 @@ from pathlib import Path
 import click
 from eth_typing import ChecksumAddress
 
-import src.validators.api.endpoints  # noqa  # pylint:disable=unused-import
 from src.commands.start_base import start_base
 from src.common.logging import LOG_LEVELS
 from src.common.utils import log_verbose
