@@ -18,7 +18,7 @@ from src.common.harvest import get_harvest_params
 from src.common.metrics import metrics
 from src.common.tasks import BaseTask
 from src.common.typings import HarvestParams
-from src.common.utils import get_current_timestamp, log_verbose
+from src.common.utils import get_current_timestamp
 from src.config.settings import DEPOSIT_AMOUNT, GNOSIS_NETWORKS, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import (
@@ -45,9 +45,6 @@ from src.validators.typings import (
 from src.validators.utils import send_approval_requests
 
 logger = logging.getLogger(__name__)
-
-
-pending_validator_registrations: list[HexStr] = []
 
 
 class ValidatorsTask(BaseTask):
@@ -83,23 +80,6 @@ class ValidatorsTask(BaseTask):
                 keystore=self.keystore,
                 deposit_data=self.deposit_data,
             )
-
-
-async def register_and_remove_pending_validators(
-    keystore: BaseKeystore | None,
-    deposit_data: DepositData,
-    validators: list[Validator],
-) -> HexStr | None:
-    try:
-        return await register_validators(
-            keystore=keystore, deposit_data=deposit_data, validators=validators
-        )
-    except Exception as e:
-        log_verbose(e)
-        return None
-    finally:
-        for validator in validators:
-            pending_validator_registrations.remove(validator.public_key)
 
 
 # pylint: disable-next=too-many-locals,too-many-branches,too-many-return-statements,too-many-statements
