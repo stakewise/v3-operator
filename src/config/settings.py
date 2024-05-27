@@ -75,6 +75,7 @@ class Settings(metaclass=Singleton):
 
     relayer_host: str | None
     relayer_port: int | None
+    relayer_timeout: int
     validators_registration_mode: ValidatorsRegistrationMode
     skip_startup_checks: bool
 
@@ -215,6 +216,8 @@ class Settings(metaclass=Singleton):
         )
         self.relayer_host = relayer_host
         self.relayer_port = relayer_port
+        self.relayer_timeout = decouple_config('RELAYER_TIMEOUT', default=10, cast=int)
+
         self.validators_registration_mode = validators_registration_mode
 
         self.skip_startup_checks = decouple_config('SKIP_STARTUP_CHECKS', default=False, cast=bool)

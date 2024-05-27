@@ -18,8 +18,10 @@ from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import NetworkValidatorsProcessor
 from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
+from src.validators.relayer import BaseRelayer
 from src.validators.tasks import ValidatorsTask, load_genesis_validators
-from src.validators.typings import ValidatorsRegistrationMode
+from src.validators.tests.local_relayer import create_local_relayer
+from src.validators.typings import DepositData, ValidatorsRegistrationMode
 from src.validators.utils import load_deposit_data
 
 logger = logging.getLogger(__name__)
@@ -38,14 +40,20 @@ async def start_base() -> None:
     # load network validators from ipfs dump
     await load_genesis_validators()
 
-    # load keystore
     keystore: BaseKeystore | None = None
+    deposit_data: DepositData | None = None
+    relayer: BaseRelayer | None = None
+
+    # load keystore and deposit data
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
         keystore = await load_keystore()
 
-    # load deposit data
-    deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
-    logger.info('Loaded deposit data file %s', settings.deposit_data_file)
+        deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
+        logger.info('Loaded deposit data file %s', settings.deposit_data_file)
+    else:
+        settings.pool_size = 2
+        relayer = await create_local_relayer()
+
     # start operator tasks
 
     # periodically scan network validator updates
@@ -72,6 +80,7 @@ async def start_base() -> None:
             ValidatorsTask(
                 keystore=keystore,
                 deposit_data=deposit_data,
+                relayer=relayer,
             ).run(interrupt_handler),
             ExitSignatureTask(
                 keystore=keystore,
