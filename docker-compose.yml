@@ -4,7 +4,7 @@ services:
   operator:
     build:
       context: .
-      dockerfile: europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.2.2
+      dockerfile: europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.3.0
     image: v3-operator
     container_name: v3-operator
     command: ["src/main.py", "start"]
