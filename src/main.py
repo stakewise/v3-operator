@@ -50,7 +50,10 @@ cli.add_command(rated_self_report)
 
 if __name__ == '__main__':
     # Pyinstaller hacks
+    import pkg_resources.extern  # noqa # pylint: disable=unused-import
+
     eth_typing_metadata = metadata('eth-typing')
+    ssz_metadata = metadata('ssz')
     multiprocessing.set_start_method('spawn')
     multiprocessing.freeze_support()
     # Use certificate from certifi only if cafile could not find by ssl.
