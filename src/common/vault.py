@@ -4,7 +4,11 @@ from hexbytes import HexBytes
 from sw_utils.typings import Bytes32
 from web3.types import TxParams
 
-from src.common.contracts import deposit_data_registry_contract, vault_contract
+from src.common.contracts import (
+    deposit_data_registry_contract,
+    vault_contract,
+    vault_v1_contract,
+)
 from src.common.typings import HarvestParams
 from src.config.settings import settings
 
@@ -18,13 +22,13 @@ class Vault:
     async def get_validators_root(self) -> Bytes32:
         """Fetches vault's validators root."""
         if await self.version() == 1:
-            return await vault_contract.get_validators_root()
+            return await vault_v1_contract.get_validators_root()
         return await deposit_data_registry_contract.get_validators_root()
 
     async def get_validators_index(self) -> int:
         """Fetches vault's current validators index."""
         if await self.version() == 1:
-            return await vault_contract.get_validators_index()
+            return await vault_v1_contract.get_validators_index()
         return await deposit_data_registry_contract.get_validators_index()
 
     async def register_single_validator(
