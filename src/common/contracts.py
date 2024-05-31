@@ -118,6 +118,9 @@ class VaultContract(ContractWrapper):
     async def version(self) -> int:
         return await self.contract.functions.version().call()
 
+    async def validators_manager(self):
+        return await self.contract.functions.validatorsManager().call()
+
 
 class V2PoolContract(ContractWrapper):
     abi_path = 'abi/IV2Pool.json'
