@@ -2,6 +2,7 @@ import multiprocessing
 import os
 import ssl
 import sys
+import warnings
 from importlib.metadata import metadata
 
 import click
@@ -50,6 +51,7 @@ cli.add_command(rated_self_report)
 
 if __name__ == '__main__':
     # Pyinstaller hacks
+    warnings.filterwarnings('ignore', category=DeprecationWarning)
     import pkg_resources.extern  # noqa # pylint: disable=unused-import
 
     eth_typing_metadata = metadata('eth-typing')
