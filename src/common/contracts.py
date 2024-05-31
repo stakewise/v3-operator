@@ -80,8 +80,8 @@ class ContractWrapper:
         return events
 
 
-class VaultContract(ContractWrapper):
-    abi_path = 'abi/IEthVault.json'
+class VaultV1Contract(ContractWrapper):
+    abi_path = 'abi/IEthVaultV1.json'
 
     @property
     def contract_address(self) -> ChecksumAddress:
@@ -94,6 +94,14 @@ class VaultContract(ContractWrapper):
     async def get_validators_index(self) -> int:
         """Fetches vault's current validators index."""
         return await self.contract.functions.validatorIndex().call()
+
+
+class VaultContract(ContractWrapper):
+    abi_path = 'abi/IEthVault.json'
+
+    @property
+    def contract_address(self) -> ChecksumAddress:
+        return settings.vault
 
     async def get_registered_validators_public_keys(
         self, from_block: BlockNumber, to_block: BlockNumber
@@ -233,6 +241,7 @@ class MulticallContract(ContractWrapper):
 
 
 vault_contract = VaultContract()
+vault_v1_contract = VaultV1Contract()
 validators_registry_contract = ValidatorsRegistryContract()
 keeper_contract = KeeperContract()
 v2_pool_contract = V2PoolContract()
