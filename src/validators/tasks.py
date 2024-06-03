@@ -24,6 +24,7 @@ from src.config.settings import DEPOSIT_AMOUNT, GNOSIS_NETWORKS, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import (
     NetworkValidatorsProcessor,
+    calc_proof_indexes,
     get_latest_network_validator_public_keys,
     get_validators_from_deposit_data,
     get_validators_from_relayer,
@@ -152,11 +153,14 @@ async def register_validators(
             tree=cast(DepositData, deposit_data).tree,
             validators=cast(list[DepositDataValidator], validators),
         )
+        proof_indexes = calc_proof_indexes(multi_proof, tx_validators)
+
     else:
         tx_validators = [
             Web3.to_bytes(tx_validator) for tx_validator in encode_tx_validator_list(validators)
         ]
         multi_proof = None
+        proof_indexes = None
 
     registry_root = None
     oracles_request = None
@@ -184,6 +188,7 @@ async def register_validators(
                 validators=validators,
                 registry_root=registry_root,
                 multi_proof=multi_proof,
+                proof_indexes=proof_indexes,
                 deadline=deadline,
                 validators_manager_signature=validators_manager_signature,
             )
@@ -257,6 +262,7 @@ async def create_approval_request(
     validators: Sequence[Validator],
     registry_root: Bytes32,
     multi_proof: MultiProof | None,
+    proof_indexes: list[int] | None,
     deadline: int,
     validators_manager_signature: HexStr | None,
 ) -> ApprovalRequest:
@@ -266,12 +272,11 @@ async def create_approval_request(
     start_validator_index = await get_start_validator_index()
     logger.debug('Next validator index for exit signature: %d', start_validator_index)
 
-    proof, proof_flags, proof_indexes = None, None, None
+    proof, proof_flags = None, None
 
     if multi_proof:
         proof = multi_proof.proof
         proof_flags = multi_proof.proof_flags
-        proof_indexes = [val[1] for val in multi_proof.leaves]
 
     # get exit signature shards
     request = ApprovalRequest(
