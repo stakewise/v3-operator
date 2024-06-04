@@ -150,7 +150,7 @@ NETWORKS = {
         STAKEWISE_API_URL='https://holesky-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
         VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x711E3CEc4E0F86BCc5BA5E16638747f0AF053CFa'
+            '0xFB19A8Efc622FE5806d93D4cd54B3bBaac543d04'
         ),
     ),
     GNOSIS: NetworkConfig(
@@ -235,7 +235,7 @@ NETWORKS = {
         STAKEWISE_API_URL='https://chiado-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
         VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x21cb7b55F1583D61Ba77C478CaeFeA6BdcDD4c6a'
+            '0x0867da2BBd166cB453165e32dcB83281c96D1bA7'
         ),
     ),
 }
