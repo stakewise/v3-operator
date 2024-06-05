@@ -139,11 +139,12 @@ async def register_validators(
     )
 
     if not validators:
-        logger.warning(
-            'There are no available validators in the current deposit data '
-            'to proceed with registration. '
-            'To register additional validators, you must upload new deposit data.'
-        )
+        if not settings.disable_deposit_data_warnings:
+            logger.warning(
+                'There are no available validators in the current deposit data '
+                'to proceed with registration. '
+                'To register additional validators, you must upload new deposit data.'
+            )
         return None
 
     if not await check_gas_price(high_priority=True):
