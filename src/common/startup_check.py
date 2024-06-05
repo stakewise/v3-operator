@@ -238,6 +238,16 @@ async def startup_checks():
         wait_for_keystores_dir()
         logger.info('Found keystores dir')
 
+    await _check_validators_manager()
+
+
+async def _aiohttp_fetch(session: ClientSession, url: str) -> str:
+    async with session.get(url=url) as response:
+        response.raise_for_status()
+    return url
+
+
+async def _check_validators_manager() -> None:
     if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
         if await vault_contract.version() == 1:
             raise RuntimeError('Vault version must be 2')
@@ -245,8 +255,10 @@ async def startup_checks():
         if validators_manager != hot_wallet.address:
             raise RuntimeError('validators manager address must equal to hot wallet address')
 
-
-async def _aiohttp_fetch(session: ClientSession, url: str) -> str:
-    async with session.get(url=url) as response:
-        response.raise_for_status()
-    return url
+    if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
+        if await vault_contract.version() > 1:
+            validators_manager = await vault_contract.validators_manager()
+            if validators_manager != settings.network_config.DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS:
+                raise RuntimeError(
+                    'validators manager address must equal to deposit data registry address'
+                )
