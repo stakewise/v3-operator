@@ -167,15 +167,16 @@ async def wait_for_deposit_data_file() -> None:
         logger.warning("Can't find deposit data file (%s)", settings.deposit_data_file)
         time.sleep(15)
     deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
-
-    while True:
-        try:
-            await check_deposit_data_root(deposit_data.tree.root)
-            break
-        except RuntimeError as e:
-            logger.warning(e)
-            time.sleep(15)
     logger.info('Found deposit data file %s', settings.deposit_data_file)
+
+    if not settings.disable_deposit_data_warnings:
+        while True:
+            try:
+                await check_deposit_data_root(deposit_data.tree.root)
+                break
+            except RuntimeError as e:
+                logger.warning(e)
+                time.sleep(15)
 
 
 async def startup_checks():
