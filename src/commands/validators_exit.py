@@ -102,6 +102,12 @@ EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
     envvar='LOG_LEVEL',
     help='The log level.',
 )
+@click.option(
+    '--pool-size',
+    help='Number of processes in a pool.',
+    envvar='POOL_SIZE',
+    type=int,
+)
 @click.command(help='Performs a voluntary exit for active vault validators.')
 # pylint: disable-next=too-many-arguments
 def validators_exit(
@@ -116,6 +122,7 @@ def validators_exit(
     data_dir: str,
     verbose: bool,
     log_level: str,
+    pool_size: int | None,
 ) -> None:
     # pylint: disable=duplicate-code
     vault_config = VaultConfig(vault, Path(data_dir))
@@ -134,6 +141,7 @@ def validators_exit(
         hashi_vault_url=hashi_vault_url,
         verbose=verbose,
         log_level=log_level,
+        pool_size=pool_size,
     )
     try:
         # Try-catch to enable async calls in test - an event loop
