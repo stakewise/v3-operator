@@ -87,6 +87,10 @@ class Settings(metaclass=Singleton):
         'PRIORITY_FEE_PERCENTILE', default=80.0, cast=float
     )
 
+    disable_deposit_data_warnings: bool = decouple_config(
+        'DISABLE_DEPOSIT_DATA_WARNINGS', default=False, cast=bool
+    )
+
     # pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements
     def set(
         self,
