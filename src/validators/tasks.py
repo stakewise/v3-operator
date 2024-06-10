@@ -128,11 +128,12 @@ async def register_validators(
             count=validators_count,
         )
         if not validators:
-            logger.warning(
-                'There are no available validators in the current deposit data '
-                'to proceed with registration. '
-                'To register additional validators, you must upload new deposit data.'
-            )
+            if not settings.disable_deposit_data_warnings:
+                logger.warning(
+                    'There are no available validators in the current deposit data '
+                    'to proceed with registration. '
+                    'To register additional validators, you must upload new deposit data.'
+                )
             return None
     else:
         start_validator_index = await get_start_validator_index()

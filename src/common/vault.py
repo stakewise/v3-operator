@@ -85,7 +85,7 @@ class Vault:
         self, register_call_args: list, tx_params: TxParams, harvest_params: HarvestParams | None
     ) -> HexBytes:
         if harvest_params is not None:
-            update_state_call = vault_contract.encode_abi(
+            update_state_call = vault_v1_contract.encode_abi(
                 fn_name='updateState',
                 args=[
                     (
@@ -96,15 +96,15 @@ class Vault:
                     )
                 ],
             )
-            register_call = vault_contract.encode_abi(
+            register_call = vault_v1_contract.encode_abi(
                 fn_name='registerValidator',
                 args=register_call_args,
             )
-            tx = await vault_contract.functions.multicall(
+            tx = await vault_v1_contract.functions.multicall(
                 [update_state_call, register_call]
             ).transact(tx_params)
         else:
-            register_func = vault_contract.functions.registerValidator
+            register_func = vault_v1_contract.functions.registerValidator
             tx = await register_func(*register_call_args).transact(tx_params)
         return tx
 

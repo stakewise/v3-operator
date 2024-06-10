@@ -160,17 +160,23 @@ async def get_validators_from_deposit_data(
 ) -> Sequence[DepositDataValidator]:
     """Fetches vault's available validators."""
     if run_check_deposit_data_root:
-        await check_deposit_data_root(deposit_data.tree.root)
+        try:
+            await check_deposit_data_root(deposit_data.tree.root)
+        except RuntimeError:
+            if settings.disable_deposit_data_warnings:
+                return []
+            raise
 
     start_index = await Vault().get_validators_index()
     validators: list[DepositDataValidator] = []
 
     for validator in deposit_data.validators[start_index : start_index + count]:
         if keystore and validator.public_key not in keystore:
-            logger.warning(
-                'Cannot find validator with public key %s in keystores.',
-                validator.public_key,
-            )
+            if not settings.disable_deposit_data_warnings:
+                logger.warning(
+                    'Cannot find validator with public key %s in keystores.',
+                    validator.public_key,
+                )
             break
 
         if NetworkValidatorCrud().is_validator_registered(validator.public_key):
