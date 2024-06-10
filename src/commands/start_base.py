@@ -18,7 +18,7 @@ from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import NetworkValidatorsProcessor
 from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
-from src.validators.relayer import BaseRelayer
+from src.validators.relayer import BaseRelayerClient
 from src.validators.tasks import ValidatorsTask, load_genesis_validators
 from src.validators.tests.local_relayer import create_local_relayer
 from src.validators.typings import DepositData, ValidatorsRegistrationMode
@@ -42,7 +42,7 @@ async def start_base() -> None:
 
     keystore: BaseKeystore | None = None
     deposit_data: DepositData | None = None
-    relayer: BaseRelayer | None = None
+    relayer: BaseRelayerClient | None = None
 
     # load keystore and deposit data
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
@@ -51,6 +51,7 @@ async def start_base() -> None:
         deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
         logger.info('Loaded deposit data file %s', settings.deposit_data_file)
     else:
+        # todo: replace with actual RelayerClient once Relayer service is ready
         settings.pool_size = 2
         relayer = await create_local_relayer()
 

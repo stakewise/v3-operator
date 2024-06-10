@@ -19,7 +19,7 @@ from src.common.vault import Vault
 from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.keystores.base import BaseKeystore
-from src.validators.relayer import Relayer
+from src.validators.relayer import RelayerClient
 from src.validators.typings import (
     DepositData,
     DepositDataValidator,
@@ -193,7 +193,7 @@ async def get_validators_from_deposit_data(
 
 
 async def get_validators_from_relayer(
-    relayer: Relayer, start_validator_index: int, count: int
+    relayer: RelayerClient, start_validator_index: int, count: int
 ) -> Sequence[Validator]:
     validators: list[Validator] = []
     relayer_validators = await relayer.get_validators(start_validator_index, count)

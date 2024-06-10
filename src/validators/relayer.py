@@ -10,7 +10,7 @@ from src.validators.typings import RelayerValidator
 
 
 # pylint:disable-next=too-few-public-methods
-class BaseRelayer(abc.ABC):
+class BaseRelayerClient(abc.ABC):
     def __init__(self):
         self.host = settings.relayer_host
         self.port = settings.relayer_port
@@ -21,16 +21,16 @@ class BaseRelayer(abc.ABC):
 
 
 # pylint:disable-next=too-few-public-methods
-class Relayer(BaseRelayer):
+class RelayerClient(BaseRelayerClient):
     async def get_validators(self, start_index: int, count: int) -> list[RelayerValidator]:
-        params = {
+        jsn = {
             'start_index': start_index,
             'count': count,
         }
         async with aiohttp.ClientSession(
             timeout=ClientTimeout(settings.relayer_timeout)
         ) as session:
-            resp = await session.get(f'{self.host}:{self.port}/validators', params=params)
+            resp = await session.post(f'{self.host}:{self.port}/validators', json=jsn)
             resp.raise_for_status()
             return [
                 RelayerValidator(

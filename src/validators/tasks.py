@@ -34,7 +34,7 @@ from src.validators.execution import (
     update_unused_validator_keys_metric,
 )
 from src.validators.keystores.base import BaseKeystore
-from src.validators.relayer import BaseRelayer, Relayer
+from src.validators.relayer import BaseRelayerClient, RelayerClient
 from src.validators.signing.common import (
     encode_tx_validator_list,
     get_encrypted_exit_signature_shards,
@@ -60,7 +60,7 @@ class ValidatorsTask(BaseTask):
         self,
         keystore: BaseKeystore | None,
         deposit_data: DepositData | None,
-        relayer: BaseRelayer | None,
+        relayer: BaseRelayerClient | None,
     ):
         self.keystore = keystore
         self.deposit_data = deposit_data
@@ -94,7 +94,7 @@ class ValidatorsTask(BaseTask):
 async def register_validators(
     keystore: BaseKeystore | None,
     deposit_data: DepositData | None,
-    relayer: BaseRelayer | None = None,
+    relayer: BaseRelayerClient | None = None,
 ) -> HexStr | None:
     """Registers vault validators."""
     if (
@@ -138,7 +138,7 @@ async def register_validators(
     else:
         start_validator_index = await get_start_validator_index()
         validators = await get_validators_from_relayer(
-            relayer=cast(Relayer, relayer),
+            relayer=cast(RelayerClient, relayer),
             start_validator_index=start_validator_index,
             count=validators_count,
         )

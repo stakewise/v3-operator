@@ -1,12 +1,12 @@
 from src.config.settings import settings
 from src.validators.execution import get_validators_from_deposit_data
 from src.validators.keystores.local import LocalKeystore
-from src.validators.relayer import BaseRelayer
+from src.validators.relayer import BaseRelayerClient
 from src.validators.typings import DepositData, RelayerValidator
 from src.validators.utils import load_deposit_data
 
 
-class LocalRelayer(BaseRelayer):
+class LocalRelayerClient(BaseRelayerClient):
     def __init__(self, keystore: LocalKeystore, deposit_data: DepositData):
         super().__init__()
         self._keystore = keystore
@@ -39,7 +39,7 @@ class LocalRelayer(BaseRelayer):
         return relayer_validators
 
 
-async def create_local_relayer() -> LocalRelayer:
+async def create_local_relayer() -> LocalRelayerClient:
     keystore = await LocalKeystore.load()
     deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
-    return LocalRelayer(keystore, deposit_data)
+    return LocalRelayerClient(keystore, deposit_data)
