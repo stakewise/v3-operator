@@ -170,6 +170,18 @@ src/main.py COMMAND \
 --flagB=xyz
 ```
 
+Docker runs under user "nobody". So make sure to set permissions on data-dir for "nobody" user on host machine. For example:
+
+```bash
+chown -R nobody:nogroup ~/.stakewise
+```
+
+If you prefer UIDs the following command also works:
+
+```bash
+chown -R 65534:65534 ~/.stakewise
+```
+
 Head to [Usage](#usage) to launch your operator service.
 
 ### Source Files
