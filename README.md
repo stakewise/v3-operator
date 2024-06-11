@@ -70,10 +70,7 @@ rewards simplifies calls to the vault contracts, e.g., you don't need to sync re
 
 ### Execution node
 
-The execution node is used to fetch previous reward data from the Keeper contract and oracles configuration from
-Oracle's contract.
-Any execution client that
-supports [ETH Execution API specification](https://ethereum.github.io/execution-apis/api-documentation/) can be used:
+Any execution client that supports [ETH Execution API specification](https://ethereum.github.io/execution-apis/api-documentation/) can be used:
 
 - [Nethermind](https://launchpad.ethereum.org/en/nethermind) (Ethereum, Gnosis)
 - [Besu](https://launchpad.ethereum.org/en/besu) (Ethereum)
@@ -82,10 +79,7 @@ supports [ETH Execution API specification](https://ethereum.github.io/execution-
 
 ### Consensus node
 
-The consensus node is used to fetch validator balances and consensus fork data required for validating exit signatures.
-Any consensus client
-that
-supports [ETH Beacon Node API specification](https://ethereum.github.io/beacon-APIs/#/) can be used:
+Any consensus client that supports [ETH Beacon Node API specification](https://ethereum.github.io/beacon-APIs/#/) can be used:
 
 - [Lighthouse](https://launchpad.ethereum.org/en/lighthouse) (Ethereum, Gnosis)
 - [Nimbus](https://launchpad.ethereum.org/en/nimbus) (Ethereum, Gnosis)
