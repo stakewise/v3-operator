@@ -2,8 +2,8 @@
 
 1. [What is V3 Operator?](#what-is-v3-operator)
 2. [Prerequisites](#prerequisites)
-   1. [Execution client](#execution-client)
-   2. [Consensus client](#consensus-client)
+   1. [Execution client](#execution-node)
+   2. [Consensus client](#consensus-node)
    3. [Vault](#vault)
 3. [Installation](#installation)
    1. [Binary](#binary)
