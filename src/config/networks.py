@@ -122,7 +122,7 @@ NETWORKS = {
         ),
         KEEPER_GENESIS_BLOCK=BlockNumber(215379),
         DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x1Dfb40a149940300f183d21E5B200c5DaaF3A842'
+            '0xf25f9A254F38aF10Dc352bF8F446Dc09a820ca76'
         ),
         V2_POOL_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         V2_POOL_GENESIS_BLOCK=BlockNumber(0),
@@ -150,7 +150,7 @@ NETWORKS = {
         STAKEWISE_API_URL='https://holesky-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
         VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xFB19A8Efc622FE5806d93D4cd54B3bBaac543d04'
+            '0x23FCd08f2e85f765d329027AB6D4323a0BC057A7'
         ),
     ),
     GNOSIS: NetworkConfig(
@@ -201,11 +201,11 @@ NETWORKS = {
         ),
         VALIDATORS_REGISTRY_GENESIS_BLOCK=BlockNumber(155434),
         KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x6DfF9E878a83A2d84ef5AC242705E08BF0F33fdD'
+            '0x13Af1266d8664aF3da4c711E7C86725D4779EA72'
         ),
-        KEEPER_GENESIS_BLOCK=BlockNumber(9652014),
+        KEEPER_GENESIS_BLOCK=BlockNumber(10258082),
         DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x197292Fb9893Bc06329ee8E3Fd07d8ceF29E4d13'
+            '0xf9eB9EAd3d71516bF5206F702B8BD0c183045474'
         ),
         V2_POOL_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         V2_POOL_GENESIS_BLOCK=BlockNumber(0),
@@ -230,12 +230,12 @@ NETWORKS = {
             '0xcA11bde05977b3631167028862bE2a173976CA11'
         ),
         SHARED_MEV_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xb7c8c515317490dbB0FF1809B09EABa6432B6A83'
+            '0x069a8fF3cD84B2F861F9554E4b2c3FFA3F89b6bD'
         ),
         STAKEWISE_API_URL='https://chiado-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
         VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x0867da2BBd166cB453165e32dcB83281c96D1bA7'
+            '0x5Fa9600FF682FA65Fff6085df06CCBB7dC01DF08'
         ),
     ),
 }
