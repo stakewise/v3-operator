@@ -11,14 +11,15 @@ GNOSIS = 'gnosis'
 HOLESKY = 'holesky'
 CHIADO = 'chiado'
 
+GNO_NETWORKS = [GNOSIS, CHIADO]
 ETH_NETWORKS = [MAINNET, HOLESKY]
-GNO_NETWORKS = [GNOSIS]
 RATED_NETWORKS = [MAINNET, HOLESKY]
 
 
 @dataclass
 # pylint: disable-next=too-many-instance-attributes
 class NetworkConfig:
+    CHAIN_ID: int
     WALLET_BALANCE_SYMBOL: str
     VAULT_BALANCE_SYMBOL: str
     VALIDATORS_REGISTRY_CONTRACT_ADDRESS: ChecksumAddress  # consensus deposit contract
@@ -43,6 +44,7 @@ class NetworkConfig:
     SHARED_MEV_ESCROW_CONTRACT_ADDRESS: ChecksumAddress
     STAKEWISE_API_URL: str
     RATED_API_URL: str
+    VALIDATORS_CHECKER_CONTRACT_ADDRESS: ChecksumAddress
 
     @property
     def SHAPELLA_FORK(self) -> ConsensusFork:
@@ -63,6 +65,7 @@ class NetworkConfig:
 
 NETWORKS = {
     MAINNET: NetworkConfig(
+        CHAIN_ID=1,
         WALLET_BALANCE_SYMBOL='ETH',
         VAULT_BALANCE_SYMBOL='ETH',
         VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
@@ -105,8 +108,10 @@ NETWORKS = {
         ),
         STAKEWISE_API_URL='https://mainnet-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
+        VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
     ),
     HOLESKY: NetworkConfig(
+        CHAIN_ID=17000,
         WALLET_BALANCE_SYMBOL='HolETH',
         VAULT_BALANCE_SYMBOL='HolETH',
         VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
@@ -145,8 +150,12 @@ NETWORKS = {
         ),
         STAKEWISE_API_URL='https://holesky-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
+        VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0xFB19A8Efc622FE5806d93D4cd54B3bBaac543d04'
+        ),
     ),
     GNOSIS: NetworkConfig(
+        CHAIN_ID=100,
         WALLET_BALANCE_SYMBOL='xDAI',
         VAULT_BALANCE_SYMBOL='GNO',
         VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
@@ -181,9 +190,11 @@ NETWORKS = {
         ),
         SHARED_MEV_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         STAKEWISE_API_URL='https://gnosis-api.stakewise.io/graphql',
-        RATED_API_URL='',
+        RATED_API_URL='https://api.rated.network',
+        VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
     ),
     CHIADO: NetworkConfig(
+        CHAIN_ID=10200,
         WALLET_BALANCE_SYMBOL='xDAI',
         VAULT_BALANCE_SYMBOL='GNO',
         VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
@@ -223,6 +234,9 @@ NETWORKS = {
             '0xb7c8c515317490dbB0FF1809B09EABa6432B6A83'
         ),
         STAKEWISE_API_URL='https://chiado-api.stakewise.io/graphql',
-        RATED_API_URL='',
+        RATED_API_URL='https://api.rated.network',
+        VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x0867da2BBd166cB453165e32dcB83281c96D1bA7'
+        ),
     ),
 }

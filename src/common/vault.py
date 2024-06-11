@@ -32,36 +32,56 @@ class Vault:
         return await deposit_data_registry_contract.get_validators_index()
 
     async def register_single_validator(
-        self, register_call_args: list, tx_params: TxParams, harvest_params: HarvestParams | None
+        self,
+        register_call_args: list,
+        tx_params: TxParams,
+        harvest_params: HarvestParams | None,
+        register_via_vault_v2: bool = False,
     ) -> HexBytes:
-        if await self.version() == 1:
-            return await self._register_single_validator_v1(
+        version = await self.version()
+
+        if version == 1:
+            return await self._vault_register_single(
                 register_call_args,
                 tx_params,
                 harvest_params,
             )
-        return await self._register_single_validator_v2(
+
+        if register_via_vault_v2:
+            return await self._vault_register_multiple(
+                register_call_args,
+                tx_params,
+                harvest_params,
+            )
+
+        return await self._deposit_registry_register_single(
             register_call_args,
             tx_params,
             harvest_params,
         )
 
     async def register_multiple_validators(
-        self, register_call_args: list, tx_params: TxParams, harvest_params: HarvestParams | None
+        self,
+        register_call_args: list,
+        tx_params: TxParams,
+        harvest_params: HarvestParams | None,
+        register_via_vault_v2: bool = False,
     ) -> HexBytes:
-        if await self.version() == 1:
-            return await self._register_multiple_validators_v1(
+        version = await self.version()
+
+        if version == 1 or register_via_vault_v2:
+            return await self._vault_register_multiple(
                 register_call_args,
                 tx_params,
                 harvest_params,
             )
-        return await self._register_multiple_validators_v2(
+        return await self._deposit_registry_register_multiple(
             register_call_args,
             tx_params,
             harvest_params,
         )
 
-    async def _register_single_validator_v1(
+    async def _vault_register_single(
         self, register_call_args: list, tx_params: TxParams, harvest_params: HarvestParams | None
     ) -> HexBytes:
         if harvest_params is not None:
@@ -88,7 +108,7 @@ class Vault:
             tx = await register_func(*register_call_args).transact(tx_params)
         return tx
 
-    async def _register_single_validator_v2(
+    async def _deposit_registry_register_single(
         self, register_call_args: list, tx_params: TxParams, harvest_params: HarvestParams | None
     ) -> HexBytes:
         register_call_args.insert(0, settings.vault)
@@ -117,7 +137,7 @@ class Vault:
             tx = await register_func(*register_call_args).transact(tx_params)
         return tx
 
-    async def _register_multiple_validators_v1(
+    async def _vault_register_multiple(
         self, register_call_args: list, tx_params: TxParams, harvest_params: HarvestParams | None
     ) -> HexBytes:
         if harvest_params is not None:
@@ -144,10 +164,9 @@ class Vault:
             tx = await register_func(*register_call_args).transact(tx_params)
         return tx
 
-    async def _register_multiple_validators_v2(
+    async def _deposit_registry_register_multiple(
         self, register_call_args: list, tx_params: TxParams, harvest_params: HarvestParams | None
     ) -> HexBytes:
-        register_call_args.insert(0, settings.vault)
         if harvest_params is not None:
             update_state_call = deposit_data_registry_contract.encode_abi(
                 fn_name='updateVaultState',

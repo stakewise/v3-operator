@@ -24,9 +24,6 @@ DEFAULT_METRICS_HOST = '127.0.0.1'
 DEFAULT_METRICS_PORT = 9100
 DEFAULT_METRICS_PREFIX = 'sw_operator'
 
-DEFAULT_API_HOST = '127.0.0.1'
-DEFAULT_API_PORT = 8000
-
 DEFAULT_MIN_VALIDATORS_REGISTRATION = 1
 
 
@@ -78,8 +75,9 @@ class Settings(metaclass=Singleton):
     sentry_environment: str
     pool_size: int | None
 
-    api_host: str
-    api_port: int
+    relayer_host: str | None
+    relayer_port: int | None
+    relayer_timeout: int
     validators_registration_mode: ValidatorsRegistrationMode
     skip_startup_checks: bool
 
@@ -125,8 +123,8 @@ class Settings(metaclass=Singleton):
         log_level: str | None = None,
         log_format: str | None = None,
         pool_size: int | None = None,
-        api_host: str = DEFAULT_API_HOST,
-        api_port: int = DEFAULT_API_PORT,
+        relayer_host: str | None = None,
+        relayer_port: int | None = None,
         validators_registration_mode: ValidatorsRegistrationMode = ValidatorsRegistrationMode.AUTO,
         min_validators_registration: int = DEFAULT_MIN_VALIDATORS_REGISTRATION,
     ) -> None:
@@ -226,8 +224,10 @@ class Settings(metaclass=Singleton):
         self.consensus_retry_timeout = decouple_config(
             'CONSENSUS_RETRY_TIMEOUT', default=120, cast=int
         )
-        self.api_host = api_host
-        self.api_port = api_port
+        self.relayer_host = relayer_host
+        self.relayer_port = relayer_port
+        self.relayer_timeout = decouple_config('RELAYER_TIMEOUT', default=10, cast=int)
+
         self.validators_registration_mode = validators_registration_mode
 
         self.skip_startup_checks = decouple_config('SKIP_STARTUP_CHECKS', default=False, cast=bool)

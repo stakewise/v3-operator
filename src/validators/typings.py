@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import NewType
+from typing import NewType, Sequence
 
 from eth_typing import BlockNumber, BLSSignature, ChecksumAddress, HexStr
 from multiproof import StandardMerkleTree
@@ -17,16 +17,24 @@ class NetworkValidator:
 
 @dataclass
 class Validator:
-    deposit_data_index: int
     public_key: HexStr
     signature: HexStr
     amount_gwei: int
-    exit_signature: BLSSignature | None = None
+
+
+@dataclass
+class DepositDataValidator(Validator):
+    deposit_data_index: int
+
+
+@dataclass
+class RelayerValidator(Validator):
+    exit_signature: BLSSignature
 
 
 @dataclass
 class DepositData:
-    validators: list[Validator]
+    validators: Sequence[DepositDataValidator]
     tree: StandardMerkleTree
 
     @property
@@ -51,9 +59,10 @@ class ApprovalRequest:
     public_key_shards: list[list[HexStr]]
     exit_signature_shards: list[list[HexStr]]
     deadline: int
-    proof: list[HexStr]
-    proof_flags: list[bool]
-    proof_indexes: list[int]
+    proof: list[HexStr] | None
+    proof_flags: list[bool] | None
+    proof_indexes: list[int] | None
+    validators_manager_signature: HexStr | None = None
 
 
 @dataclass

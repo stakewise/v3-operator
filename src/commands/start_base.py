@@ -1,11 +1,9 @@
 import asyncio
 import logging
 
-import uvicorn
 from sw_utils import EventScanner, InterruptHandler
 
 import src
-from src.api import app as api_app
 from src.common.checks import wait_execution_catch_up_consensus
 from src.common.consensus import get_chain_finalized_head
 from src.common.execution import WalletTask, update_oracles_cache
@@ -20,8 +18,10 @@ from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import NetworkValidatorsProcessor
 from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
+from src.validators.relayer import BaseRelayerClient
 from src.validators.tasks import ValidatorsTask, load_genesis_validators
-from src.validators.typings import ValidatorsRegistrationMode
+from src.validators.tests.local_relayer import create_local_relayer
+from src.validators.typings import DepositData, ValidatorsRegistrationMode
 from src.validators.utils import load_deposit_data
 
 logger = logging.getLogger(__name__)
@@ -40,14 +40,21 @@ async def start_base() -> None:
     # load network validators from ipfs dump
     await load_genesis_validators()
 
-    # load keystore
     keystore: BaseKeystore | None = None
+    deposit_data: DepositData | None = None
+    relayer: BaseRelayerClient | None = None
+
+    # load keystore and deposit data
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
         keystore = await load_keystore()
 
-    # load deposit data
-    deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
-    logger.info('Loaded deposit data file %s', settings.deposit_data_file)
+        deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
+        logger.info('Loaded deposit data file %s', settings.deposit_data_file)
+    else:
+        # todo: replace with actual RelayerClient once Relayer service is ready
+        settings.pool_size = 2
+        relayer = await create_local_relayer()
+
     # start operator tasks
 
     # periodically scan network validator updates
@@ -63,17 +70,7 @@ async def start_base() -> None:
     await update_oracles_cache()
 
     if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
-        logger.info('Starting api server')
-        api_app.state.deposit_data = deposit_data
-
-        config = uvicorn.Config(
-            api_app,
-            host=settings.api_host,
-            port=settings.api_port,
-            log_config=None,
-        )
-        server = UvicornServerWithoutSignals(config)
-        asyncio.create_task(server.serve())
+        logger.info('Starting api mode')
 
     if settings.enable_metrics:
         await metrics_server()
@@ -84,6 +81,7 @@ async def start_base() -> None:
             ValidatorsTask(
                 keystore=keystore,
                 deposit_data=deposit_data,
+                relayer=relayer,
             ).run(interrupt_handler),
             ExitSignatureTask(
                 keystore=keystore,
@@ -95,12 +93,6 @@ async def start_base() -> None:
             tasks.append(HarvestTask().run(interrupt_handler))
 
         await asyncio.gather(*tasks)
-
-
-class UvicornServerWithoutSignals(uvicorn.Server):
-    def install_signal_handlers(self) -> None:
-        # Manage signals in command, not in Uvicorn
-        pass
 
 
 def log_start() -> None:

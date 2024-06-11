@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import time
+from typing import Sequence, cast
 
 from eth_typing import HexStr
 from multiproof.standard import MultiProof
@@ -18,27 +19,34 @@ from src.common.harvest import get_harvest_params
 from src.common.metrics import metrics
 from src.common.tasks import BaseTask
 from src.common.typings import HarvestParams
-from src.common.utils import get_current_timestamp, log_verbose
+from src.common.utils import get_current_timestamp
 from src.config.settings import DEPOSIT_AMOUNT, GNOSIS_NETWORKS, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import (
     NetworkValidatorsProcessor,
-    get_available_validators,
+    calc_proof_indexes,
     get_latest_network_validator_public_keys,
+    get_validators_from_deposit_data,
+    get_validators_from_relayer,
     get_withdrawable_assets,
     register_multiple_validator,
     register_single_validator,
     update_unused_validator_keys_metric,
 )
 from src.validators.keystores.base import BaseKeystore
+from src.validators.relayer import BaseRelayerClient, RelayerClient
 from src.validators.signing.common import (
+    encode_tx_validator_list,
     get_encrypted_exit_signature_shards,
     get_validators_proof,
 )
+from src.validators.signing.validators_manager import get_validators_manager_signature
 from src.validators.typings import (
     ApprovalRequest,
     DepositData,
+    DepositDataValidator,
     NetworkValidator,
+    RelayerValidator,
     Validator,
     ValidatorsRegistrationMode,
 )
@@ -47,19 +55,18 @@ from src.validators.utils import send_approval_requests
 logger = logging.getLogger(__name__)
 
 
-pending_validator_registrations: list[HexStr] = []
-
-
 class ValidatorsTask(BaseTask):
     def __init__(
         self,
         keystore: BaseKeystore | None,
-        deposit_data: DepositData,
+        deposit_data: DepositData | None,
+        relayer: BaseRelayerClient | None,
     ):
         self.keystore = keystore
         self.deposit_data = deposit_data
         network_validators_processor = NetworkValidatorsProcessor()
         self.network_validators_scanner = EventScanner(network_validators_processor)
+        self.relayer = relayer
 
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         chain_state = await get_chain_finalized_head()
@@ -70,43 +77,24 @@ class ValidatorsTask(BaseTask):
         # process new network validators
         await self.network_validators_scanner.process_new_events(chain_state.execution_block)
 
-        if self.keystore is None:
-            return
-
-        await update_unused_validator_keys_metric(
-            keystore=self.keystore,
-            deposit_data=self.deposit_data,
-        )
-        if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
-            # check and register new validators
-            await register_validators(
+        if self.keystore and self.deposit_data:
+            await update_unused_validator_keys_metric(
                 keystore=self.keystore,
                 deposit_data=self.deposit_data,
             )
-
-
-async def register_and_remove_pending_validators(
-    keystore: BaseKeystore | None,
-    deposit_data: DepositData,
-    validators: list[Validator],
-) -> HexStr | None:
-    try:
-        return await register_validators(
-            keystore=keystore, deposit_data=deposit_data, validators=validators
+        # check and register new validators
+        await register_validators(
+            keystore=self.keystore,
+            deposit_data=self.deposit_data,
+            relayer=self.relayer,
         )
-    except Exception as e:
-        log_verbose(e)
-        return None
-    finally:
-        for validator in validators:
-            pending_validator_registrations.remove(validator.public_key)
 
 
 # pylint: disable-next=too-many-locals,too-many-branches,too-many-return-statements,too-many-statements
 async def register_validators(
     keystore: BaseKeystore | None,
-    deposit_data: DepositData,
-    validators: list[Validator] | None = None,
+    deposit_data: DepositData | None,
+    relayer: BaseRelayerClient | None = None,
 ) -> HexStr | None:
     """Registers vault validators."""
     if (
@@ -118,9 +106,6 @@ async def register_validators(
             'Waiting for vault to become owner of v2 pool escrow to start registering validators...'
         )
         return None
-
-    if validators is None and keystore is None:
-        raise RuntimeError('validators or keystore must be set')
 
     harvest_params = await get_harvest_params()
     validators_count = await get_validators_count_from_vault_assets(harvest_params)
@@ -142,31 +127,51 @@ async def register_validators(
     protocol_config = await get_protocol_config()
 
     validators_count = min(protocol_config.validators_approval_batch_limit, validators_count)
+    validators_manager_signature: HexStr | None = None
+    validators: Sequence[Validator]
 
-    validators = await get_available_validators(
-        keystore=keystore,
-        deposit_data=deposit_data,
-        count=validators_count,
-    )
-
-    if not validators:
-        if not settings.disable_deposit_data_warnings:
-            logger.warning(
-                'There are no available validators in the current deposit data '
-                'to proceed with registration. '
-                'To register additional validators, you must upload new deposit data.'
-            )
-        return None
+    if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
+        validators = await get_validators_from_deposit_data(
+            keystore=keystore,
+            deposit_data=cast(DepositData, deposit_data),
+            count=validators_count,
+        )
+        if not validators:
+            if not settings.disable_deposit_data_warnings:
+                logger.warning(
+                    'There are no available validators in the current deposit data '
+                    'to proceed with registration. '
+                    'To register additional validators, you must upload new deposit data.'
+                )
+            return None
+    else:
+        start_validator_index = await get_start_validator_index()
+        validators = await get_validators_from_relayer(
+            relayer=cast(RelayerClient, relayer),
+            start_validator_index=start_validator_index,
+            count=validators_count,
+        )
+        validators_manager_signature = await get_validators_manager_signature(validators)
 
     if not await check_gas_price(high_priority=True):
         return None
 
     logger.info('Started registration of %d validator(s)', len(validators))
 
-    tx_validators, multi_proof = get_validators_proof(
-        tree=deposit_data.tree,
-        validators=validators,
-    )
+    if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
+        tx_validators, multi_proof = get_validators_proof(
+            tree=cast(DepositData, deposit_data).tree,
+            validators=cast(list[DepositDataValidator], validators),
+        )
+        proof_indexes = calc_proof_indexes(multi_proof, tx_validators)
+
+    else:
+        tx_validators = [
+            Web3.to_bytes(tx_validator) for tx_validator in encode_tx_validator_list(validators)
+        ]
+        multi_proof = None
+        proof_indexes = None
+
     registry_root = None
     oracles_request = None
     protocol_config = await get_protocol_config()
@@ -193,7 +198,9 @@ async def register_validators(
                 validators=validators,
                 registry_root=registry_root,
                 multi_proof=multi_proof,
+                proof_indexes=proof_indexes,
                 deadline=deadline,
+                validators_manager_signature=validators_manager_signature,
             )
 
         try:
@@ -245,32 +252,6 @@ async def register_validators(
     return tx_hash
 
 
-async def get_available_validators_for_registration(
-    keystore: BaseKeystore | None,
-    deposit_data: DepositData,
-    run_check_deposit_data_root: bool = True,
-) -> list[Validator]:
-    harvest_params = await get_harvest_params()
-    validators_count = await get_validators_count_from_vault_assets(harvest_params)
-
-    if not validators_count:
-        # not enough balance to register validators
-        return []
-
-    # get latest protocol config
-    protocol_config = await get_protocol_config()
-
-    validators_count = min(protocol_config.validators_approval_batch_limit, validators_count)
-
-    validators = await get_available_validators(
-        keystore=keystore,
-        deposit_data=deposit_data,
-        count=validators_count,
-        run_check_deposit_data_root=run_check_deposit_data_root,
-    )
-    return validators
-
-
 async def get_validators_count_from_vault_assets(harvest_params: HarvestParams | None) -> int:
     vault_balance = await get_withdrawable_assets(harvest_params)
     if settings.network in GNOSIS_NETWORKS:
@@ -284,23 +265,28 @@ async def get_validators_count_from_vault_assets(harvest_params: HarvestParams |
     return validators_count
 
 
-# pylint: disable-next=too-many-arguments
+# pylint: disable-next=too-many-arguments,too-many-locals
 async def create_approval_request(
     protocol_config: ProtocolConfig,
     keystore: BaseKeystore | None,
-    validators: list[Validator],
+    validators: Sequence[Validator],
     registry_root: Bytes32,
-    multi_proof: MultiProof,
+    multi_proof: MultiProof | None,
+    proof_indexes: list[int] | None,
     deadline: int,
+    validators_manager_signature: HexStr | None,
 ) -> ApprovalRequest:
     """Generate validator registration request data"""
 
     # get next validator index for exit signature
-    latest_public_keys = await get_latest_network_validator_public_keys()
-    start_validator_index = NetworkValidatorCrud().get_next_validator_index(
-        list(latest_public_keys)
-    )
+    start_validator_index = await get_start_validator_index()
     logger.debug('Next validator index for exit signature: %d', start_validator_index)
+
+    proof, proof_flags = None, None
+
+    if multi_proof:
+        proof = multi_proof.proof
+        proof_flags = multi_proof.proof_flags
 
     # get exit signature shards
     request = ApprovalRequest(
@@ -311,18 +297,25 @@ async def create_approval_request(
         deposit_signatures=[],
         public_key_shards=[],
         exit_signature_shards=[],
-        proof=multi_proof.proof,
-        proof_flags=multi_proof.proof_flags,
-        proof_indexes=[val[1] for val in multi_proof.leaves],
+        proof=proof,
+        proof_flags=proof_flags,
+        proof_indexes=proof_indexes,
         deadline=deadline,
+        validators_manager_signature=validators_manager_signature,
     )
+
     for validator_index, validator in enumerate(validators, start_validator_index):
+        if isinstance(validator, RelayerValidator):
+            exit_signature = validator.exit_signature
+        else:
+            exit_signature = None
+
         shards = await get_encrypted_exit_signature_shards(
             keystore=keystore,
             public_key=validator.public_key,
             validator_index=validator_index,
             protocol_config=protocol_config,
-            exit_signature=validator.exit_signature,
+            exit_signature=exit_signature,
         )
 
         if not shards:
@@ -337,6 +330,14 @@ async def create_approval_request(
         request.exit_signature_shards.append(shards.exit_signatures)
 
     return request
+
+
+async def get_start_validator_index():
+    latest_public_keys = await get_latest_network_validator_public_keys()
+    start_validator_index = NetworkValidatorCrud().get_next_validator_index(
+        list(latest_public_keys)
+    )
+    return start_validator_index
 
 
 async def load_genesis_validators() -> None:
