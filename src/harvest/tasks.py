@@ -12,7 +12,10 @@ logger = logging.getLogger(__name__)
 
 class HarvestTask(BaseTask):
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
-        """Check vault state and send harvest transaction if needed."""
+        """
+        Check vault state and send harvest transaction if needed.
+        For Gnosis vaults: swap xDAI to GNO.
+        """
 
         # check current gas prices
         if not await check_gas_price():
@@ -23,7 +26,9 @@ class HarvestTask(BaseTask):
             return
 
         logger.info('Starting vault harvest')
+
         tx_hash = await submit_harvest_transaction(harvest_params)
+
         if not tx_hash:
             return
         logger.info('Successfully harvested vault')

@@ -10,12 +10,19 @@ from web3 import Web3
 from web3.types import EventData, Wei
 
 from src.common.clients import execution_client
-from src.common.contracts import validators_registry_contract, vault_contract
+from src.common.contracts import (
+    GnoVaultContract,
+    VaultContract,
+    get_gno_vault_contract,
+    validators_registry_contract,
+)
+from src.common.contracts import vault_contract as eth_vault_contract
 from src.common.execution import get_high_priority_tx_params
 from src.common.metrics import metrics
 from src.common.typings import HarvestParams, OraclesApproval
 from src.common.utils import format_error
 from src.common.vault import Vault
+from src.config.networks import GNO_NETWORKS
 from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.keystores.base import BaseKeystore
@@ -110,11 +117,18 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
 
 async def get_withdrawable_assets(harvest_params: HarvestParams | None) -> Wei:
     """Fetches vault's available assets for staking."""
+    vault_contract: VaultContract | GnoVaultContract
+    if settings.network in GNO_NETWORKS:
+        vault_contract = get_gno_vault_contract()
+    else:
+        vault_contract = eth_vault_contract
+
     before_update_assets = await vault_contract.functions.withdrawableAssets().call()
 
     if harvest_params is None:
         return before_update_assets
 
+    calls = []
     update_state_call = vault_contract.encode_abi(
         fn_name='updateState',
         args=[
@@ -126,12 +140,17 @@ async def get_withdrawable_assets(harvest_params: HarvestParams | None) -> Wei:
             )
         ],
     )
-    withdrawable_assets_call = vault_contract.encode_abi(fn_name='withdrawableAssets', args=[])
+    calls.append(update_state_call)
 
-    multicall = await vault_contract.functions.multicall(
-        [update_state_call, withdrawable_assets_call]
-    ).call()
-    after_update_assets = Web3.to_int(multicall[1])
+    if settings.network in GNO_NETWORKS:
+        swap_xdai_call = vault_contract.encode_abi(fn_name='swapXdaiToGno', args=[])
+        calls.append(swap_xdai_call)
+
+    withdrawable_assets_call = vault_contract.encode_abi(fn_name='withdrawableAssets', args=[])
+    calls.append(withdrawable_assets_call)
+
+    multicall = await vault_contract.functions.multicall(calls).call()
+    after_update_assets = Web3.to_int(multicall[-1])
 
     before_update_validators = before_update_assets // DEPOSIT_AMOUNT
     after_update_validators = after_update_assets // DEPOSIT_AMOUNT

@@ -1,3 +1,4 @@
+import functools
 import json
 import os
 from functools import cached_property
@@ -122,6 +123,14 @@ class VaultContract(ContractWrapper):
         return await self.contract.functions.validatorsManager().call()
 
 
+class GnoVaultContract(ContractWrapper):
+    abi_path = 'abi/IGnoVault.json'
+
+    @property
+    def contract_address(self) -> ChecksumAddress:
+        return settings.vault
+
+
 class V2PoolContract(ContractWrapper):
     abi_path = 'abi/IV2Pool.json'
     settings_key = 'V2_POOL_CONTRACT_ADDRESS'
@@ -241,6 +250,11 @@ class MulticallContract(ContractWrapper):
         block_number: BlockNumber | None = None,
     ) -> list:
         return await self.contract.functions.aggregate3(data).call(block_identifier=block_number)
+
+
+@functools.cache
+def get_gno_vault_contract() -> GnoVaultContract:
+    return GnoVaultContract()
 
 
 vault_contract = VaultContract()
