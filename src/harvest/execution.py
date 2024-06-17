@@ -60,23 +60,10 @@ async def _eth_submit_harvest_transaction(harvest_params: HarvestParams) -> HexS
 
 async def _gno_submit_harvest_transaction(harvest_params: HarvestParams) -> HexStr | None:
     gno_vault_contract = get_gno_vault_contract()
-
-    update_state_args = [
-        (
-            harvest_params.rewards_root,
-            harvest_params.reward,
-            harvest_params.unlocked_mev_reward,
-            harvest_params.proof,
-        )
-    ]
-
-    update_state_call = gno_vault_contract.encode_abi(fn_name='updateState', args=update_state_args)
-    swap_xdai_call = gno_vault_contract.encode_abi(fn_name='swapXdaiToGno', args=[])
+    update_state_calls = gno_vault_contract.get_update_state_calls(harvest_params)
 
     try:
-        tx = await gno_vault_contract.functions.multicall(
-            [update_state_call, swap_xdai_call]
-        ).transact()
+        tx = await gno_vault_contract.functions.multicall(update_state_calls).transact()
     except Exception as e:
         logger.error('Failed to harvest and swap: %s', format_error(e))
         if settings.verbose:
