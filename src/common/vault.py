@@ -118,7 +118,7 @@ class Vault:
     ) -> HexBytes:
         if settings.network in GNO_NETWORKS:
             try:
-                return await self._eth_deposit_registry_register_single(
+                return await self._gno_deposit_registry_register_single(
                     register_call_args, tx_params, harvest_params
                 )
             except Exception as e:
