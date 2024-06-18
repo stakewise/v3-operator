@@ -90,13 +90,13 @@ class Vault:
         self, register_call_args: list, tx_params: TxParams, harvest_params: HarvestParams | None
     ) -> HexBytes:
         if harvest_params is not None:
-            update_state_call = vault_v1_contract.get_update_state_call(harvest_params)
+            update_state_calls = vault_v1_contract.get_update_state_calls(harvest_params)
             register_call = vault_v1_contract.encode_abi(
                 fn_name='registerValidator',
                 args=register_call_args,
             )
             tx = await vault_v1_contract.functions.multicall(
-                [update_state_call, register_call]
+                [*update_state_calls, register_call]
             ).transact(tx_params)
         else:
             register_func = vault_v1_contract.functions.registerValidator
@@ -124,13 +124,15 @@ class Vault:
     ) -> HexBytes:
         register_call_args.insert(0, settings.vault)
         if harvest_params is not None:
-            update_state_call = deposit_data_registry_contract.get_update_state_call(harvest_params)
+            update_state_calls = deposit_data_registry_contract.get_update_state_calls(
+                harvest_params
+            )
             register_call = deposit_data_registry_contract.encode_abi(
                 fn_name='registerValidator',
                 args=register_call_args,
             )
             tx = await deposit_data_registry_contract.functions.multicall(
-                [update_state_call, register_call]
+                [*update_state_calls, register_call]
             ).transact(tx_params)
         else:
             register_func = deposit_data_registry_contract.functions.registerValidator
@@ -184,13 +186,13 @@ class Vault:
         self, register_call_args: list, tx_params: TxParams, harvest_params: HarvestParams | None
     ) -> HexBytes:
         if harvest_params is not None:
-            update_state_call = vault_contract.get_update_state_call(harvest_params)
+            update_state_calls = vault_contract.get_update_state_calls(harvest_params)
             register_call = vault_contract.encode_abi(
                 fn_name='registerValidators',
                 args=register_call_args,
             )
             tx = await vault_contract.functions.multicall(
-                [update_state_call, register_call]
+                [*update_state_calls, register_call]
             ).transact(tx_params)
         else:
             register_func = vault_contract.functions.registerValidators
@@ -240,13 +242,15 @@ class Vault:
         self, register_call_args: list, tx_params: TxParams, harvest_params: HarvestParams | None
     ) -> HexBytes:
         if harvest_params is not None:
-            update_state_call = deposit_data_registry_contract.get_update_state_call(harvest_params)
+            update_state_calls = deposit_data_registry_contract.get_update_state_calls(
+                harvest_params
+            )
             register_call = deposit_data_registry_contract.encode_abi(
                 fn_name='registerValidators',
                 args=register_call_args,
             )
             tx = await deposit_data_registry_contract.functions.multicall(
-                [update_state_call, register_call]
+                [*update_state_calls, register_call]
             ).transact(tx_params)
         else:
             register_func = deposit_data_registry_contract.functions.registerValidators

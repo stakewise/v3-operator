@@ -152,10 +152,10 @@ async def _gno_get_withdrawable_assets(harvest_params: HarvestParams) -> int | N
 
 
 async def _eth_get_withdrawable_assets(harvest_params: HarvestParams) -> int:
-    update_state_call = vault_contract.get_update_state_call(harvest_params)
+    update_state_calls = vault_contract.get_update_state_calls(harvest_params)
     withdrawable_assets_call = vault_contract.encode_abi(fn_name='withdrawableAssets', args=[])
     multicall = await vault_contract.functions.multicall(
-        [update_state_call, withdrawable_assets_call]
+        [*update_state_calls, withdrawable_assets_call]
     ).call()
 
     assets = Web3.to_int(multicall[-1])
