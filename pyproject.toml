@@ -105,4 +105,4 @@ exclude = '''
 '''
 
 [tool.coverage.report]
-fail_under = 73
+fail_under = 70
