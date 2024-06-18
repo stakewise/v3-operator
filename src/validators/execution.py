@@ -308,7 +308,7 @@ async def register_multiple_validator(
     register_via_vault_v2 = False
 
     if multi_proof:
-        proof_indexes = calc_proof_indexes(multi_proof, tx_validators)
+        proof_indexes = [leaf[1] for leaf in multi_proof.leaves]
 
         # DepositDataRegistry args
         register_call_args = [
@@ -344,8 +344,3 @@ async def register_multiple_validator(
         logger.error('Registration transaction failed')
         return None
     return tx_hash
-
-
-def calc_proof_indexes(multi_proof: MultiProof, tx_validators: list[bytes]) -> list[int]:
-    sorted_tx_validators: list[bytes] = [v[0] for v in multi_proof.leaves]
-    return [sorted_tx_validators.index(v) for v in tx_validators]
