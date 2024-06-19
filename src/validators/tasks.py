@@ -24,7 +24,6 @@ from src.config.settings import DEPOSIT_AMOUNT, GNOSIS_NETWORKS, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import (
     NetworkValidatorsProcessor,
-    calc_proof_indexes,
     get_latest_network_validator_public_keys,
     get_validators_from_deposit_data,
     get_validators_from_relayer,
@@ -163,7 +162,7 @@ async def register_validators(
             tree=cast(DepositData, deposit_data).tree,
             validators=cast(list[DepositDataValidator], validators),
         )
-        proof_indexes = calc_proof_indexes(multi_proof, tx_validators)
+        proof_indexes = [leaf[1] for leaf in multi_proof.leaves]
 
     else:
         tx_validators = [
