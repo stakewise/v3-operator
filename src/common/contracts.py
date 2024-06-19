@@ -1,6 +1,8 @@
+import functools
 import json
 import os
 from functools import cached_property
+from typing import Callable
 
 from eth_typing import HexStr
 from sw_utils.typings import Bytes32
@@ -10,7 +12,7 @@ from web3.contract.contract import ContractEvent
 from web3.types import BlockNumber, ChecksumAddress, EventData
 
 from src.common.clients import execution_client
-from src.common.typings import RewardVoteInfo
+from src.common.typings import HarvestParams, RewardVoteInfo
 from src.config.settings import settings
 
 SECONDS_PER_MONTH: int = 2628000
@@ -80,7 +82,25 @@ class ContractWrapper:
         return events
 
 
-class VaultV1Contract(ContractWrapper):
+class VaultStateMixin:
+    encode_abi: Callable
+
+    def get_update_state_calls(self, harvest_params: HarvestParams) -> list[HexStr]:
+        update_state_call = self.encode_abi(
+            fn_name='updateState',
+            args=[
+                (
+                    harvest_params.rewards_root,
+                    harvest_params.reward,
+                    harvest_params.unlocked_mev_reward,
+                    harvest_params.proof,
+                )
+            ],
+        )
+        return [update_state_call]
+
+
+class VaultV1Contract(ContractWrapper, VaultStateMixin):
     abi_path = 'abi/IEthVaultV1.json'
 
     @property
@@ -96,7 +116,7 @@ class VaultV1Contract(ContractWrapper):
         return await self.contract.functions.validatorIndex().call()
 
 
-class VaultContract(ContractWrapper):
+class VaultContract(ContractWrapper, VaultStateMixin):
     abi_path = 'abi/IEthVault.json'
 
     @property
@@ -120,6 +140,19 @@ class VaultContract(ContractWrapper):
 
     async def validators_manager(self):
         return await self.contract.functions.validatorsManager().call()
+
+
+class GnoVaultContract(ContractWrapper, VaultStateMixin):
+    abi_path = 'abi/IGnoVault.json'
+
+    @property
+    def contract_address(self) -> ChecksumAddress:
+        return settings.vault
+
+    def get_update_state_calls(self, harvest_params: HarvestParams) -> list[HexStr]:
+        update_state_calls = super().get_update_state_calls(harvest_params)
+        swap_xdai_call = self.encode_abi(fn_name='swapXdaiToGno', args=[])
+        return [*update_state_calls, swap_xdai_call]
 
 
 class V2PoolContract(ContractWrapper):
@@ -230,6 +263,21 @@ class DepositDataRegistryContract(ContractWrapper):
         """Fetches vault's current validators index."""
         return await self.contract.functions.depositDataIndexes(settings.vault).call()
 
+    def get_update_state_calls(self, harvest_params: HarvestParams) -> list[HexStr]:
+        update_state_call = self.encode_abi(
+            fn_name='updateVaultState',
+            args=[
+                settings.vault,
+                (
+                    harvest_params.rewards_root,
+                    harvest_params.reward,
+                    harvest_params.unlocked_mev_reward,
+                    harvest_params.proof,
+                ),
+            ],
+        )
+        return [update_state_call]
+
 
 class MulticallContract(ContractWrapper):
     abi_path = 'abi/Multicall.json'
@@ -241,6 +289,11 @@ class MulticallContract(ContractWrapper):
         block_number: BlockNumber | None = None,
     ) -> list:
         return await self.contract.functions.aggregate3(data).call(block_identifier=block_number)
+
+
+@functools.cache
+def get_gno_vault_contract() -> GnoVaultContract:
+    return GnoVaultContract()
 
 
 vault_contract = VaultContract()

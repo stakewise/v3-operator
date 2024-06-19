@@ -10,12 +10,17 @@ from web3 import Web3
 from web3.types import EventData, Wei
 
 from src.common.clients import execution_client
-from src.common.contracts import validators_registry_contract, vault_contract
+from src.common.contracts import (
+    get_gno_vault_contract,
+    validators_registry_contract,
+    vault_contract,
+)
 from src.common.execution import get_high_priority_tx_params
 from src.common.metrics import metrics
 from src.common.typings import HarvestParams, OraclesApproval
 from src.common.utils import format_error
 from src.common.vault import Vault
+from src.config.networks import GNO_NETWORKS
 from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.keystores.base import BaseKeystore
@@ -115,23 +120,13 @@ async def get_withdrawable_assets(harvest_params: HarvestParams | None) -> Wei:
     if harvest_params is None:
         return before_update_assets
 
-    update_state_call = vault_contract.encode_abi(
-        fn_name='updateState',
-        args=[
-            (
-                harvest_params.rewards_root,
-                harvest_params.reward,
-                harvest_params.unlocked_mev_reward,
-                harvest_params.proof,
-            )
-        ],
-    )
-    withdrawable_assets_call = vault_contract.encode_abi(fn_name='withdrawableAssets', args=[])
+    after_update_assets = None
 
-    multicall = await vault_contract.functions.multicall(
-        [update_state_call, withdrawable_assets_call]
-    ).call()
-    after_update_assets = Web3.to_int(multicall[1])
+    if settings.network in GNO_NETWORKS:
+        after_update_assets = await _gno_get_withdrawable_assets(harvest_params)
+
+    if after_update_assets is None:
+        after_update_assets = await _eth_get_withdrawable_assets(harvest_params)
 
     before_update_validators = before_update_assets // DEPOSIT_AMOUNT
     after_update_validators = after_update_assets // DEPOSIT_AMOUNT
@@ -139,6 +134,32 @@ async def get_withdrawable_assets(harvest_params: HarvestParams | None) -> Wei:
         return Wei(after_update_assets)
 
     return Wei(before_update_assets)
+
+
+async def _gno_get_withdrawable_assets(harvest_params: HarvestParams) -> int | None:
+    gno_vault_contract = get_gno_vault_contract()
+    update_state_calls = gno_vault_contract.get_update_state_calls(harvest_params)
+    withdrawable_assets_call = gno_vault_contract.encode_abi(fn_name='withdrawableAssets', args=[])
+    try:
+        multicall = await gno_vault_contract.functions.multicall(
+            [*update_state_calls, withdrawable_assets_call]
+        ).call()
+    except Exception:
+        return None
+
+    assets = Web3.to_int(multicall[-1])
+    return assets
+
+
+async def _eth_get_withdrawable_assets(harvest_params: HarvestParams) -> int:
+    update_state_calls = vault_contract.get_update_state_calls(harvest_params)
+    withdrawable_assets_call = vault_contract.encode_abi(fn_name='withdrawableAssets', args=[])
+    multicall = await vault_contract.functions.multicall(
+        [*update_state_calls, withdrawable_assets_call]
+    ).call()
+
+    assets = Web3.to_int(multicall[-1])
+    return assets
 
 
 async def check_deposit_data_root(deposit_data_root: str) -> None:
