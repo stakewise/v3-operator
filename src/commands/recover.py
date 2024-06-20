@@ -1,4 +1,5 @@
 import asyncio
+import sys
 from pathlib import Path
 
 import click
@@ -133,6 +134,7 @@ def recover(
         )
     except Exception as e:
         log_verbose(e)
+        sys.exit(1)
 
 
 # pylint: disable-next=too-many-arguments

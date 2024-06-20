@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import sys
 from pathlib import Path
 
 import click
@@ -274,3 +275,4 @@ def start(
         asyncio.run(start_base())
     except Exception as e:
         log_verbose(e)
+        sys.exit(1)

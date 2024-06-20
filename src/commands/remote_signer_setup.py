@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import shutil
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -132,6 +133,7 @@ def remote_signer_setup(
                 raise e
     except Exception as e:
         log_verbose(e)
+        sys.exit(1)
 
 
 async def main() -> None:
