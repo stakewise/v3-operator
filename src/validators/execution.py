@@ -24,13 +24,7 @@ from src.config.networks import GNO_NETWORKS
 from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.keystores.base import BaseKeystore
-from src.validators.relayer import RelayerClient
-from src.validators.typings import (
-    DepositData,
-    DepositDataValidator,
-    NetworkValidator,
-    Validator,
-)
+from src.validators.typings import DepositData, DepositDataValidator, NetworkValidator
 
 logger = logging.getLogger(__name__)
 
@@ -213,25 +207,6 @@ async def get_validators_from_deposit_data(
     return validators
 
 
-async def get_validators_from_relayer(
-    relayer: RelayerClient, start_validator_index: int, count: int
-) -> Sequence[Validator]:
-    validators: list[Validator] = []
-    relayer_validators = await relayer.get_validators(start_validator_index, count)
-
-    for validator in relayer_validators[:count]:
-        if NetworkValidatorCrud().is_validator_registered(validator.public_key):
-            logger.warning(
-                'Validator with public key %s is already registered.',
-                validator.public_key,
-            )
-            break
-
-        validators.append(validator)
-
-    return validators
-
-
 async def update_unused_validator_keys_metric(
     keystore: BaseKeystore,
     deposit_data: DepositData,
@@ -256,12 +231,14 @@ async def update_unused_validator_keys_metric(
     return validators
 
 
+# pylint: disable=too-many-arguments
 async def register_single_validator(
     approval: OraclesApproval,
     multi_proof: MultiProof | None,
     tx_validators: list[bytes],
     harvest_params: HarvestParams | None,
     validators_registry_root: Bytes32,
+    validators_manager_signature: HexStr | None,
 ) -> HexStr | None:
     """Registers single validator."""
     logger.info('Submitting registration transaction')
@@ -280,6 +257,7 @@ async def register_single_validator(
         register_call_args.append(multi_proof.proof)
     else:
         register_via_vault_v2 = True
+        register_call_args.append(validators_manager_signature)
 
     try:
         tx_params = await get_high_priority_tx_params()
@@ -308,12 +286,14 @@ async def register_single_validator(
     return tx_hash
 
 
+# pylint: disable=too-many-arguments
 async def register_multiple_validator(
     multi_proof: MultiProof | None,
     tx_validators: list[bytes],
     approval: OraclesApproval,
     harvest_params: HarvestParams | None,
     validators_registry_root: Bytes32,
+    validators_manager_signature: HexStr | None,
 ) -> HexStr | None:
     """Registers multiple validators."""
     logger.info('Submitting registration transaction')
@@ -341,6 +321,7 @@ async def register_multiple_validator(
         ]
     else:
         register_via_vault_v2 = True
+        register_call_args.append(validators_manager_signature)
 
     try:
         tx_params = await get_high_priority_tx_params()
