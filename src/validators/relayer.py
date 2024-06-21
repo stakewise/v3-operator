@@ -24,8 +24,9 @@ class BaseRelayerClient(abc.ABC):
 class RelayerClient(BaseRelayerClient):
     async def get_validators(self, start_index: int, count: int) -> RelayerValidatorsResponse:
         jsn = {
-            'start_index': start_index,
-            'count': count,
+            'vault': settings.vault,
+            'validator_index': start_index,
+            'validators_count': count,
         }
         async with aiohttp.ClientSession(
             timeout=ClientTimeout(settings.relayer_timeout)
@@ -37,7 +38,7 @@ class RelayerClient(BaseRelayerClient):
                 RelayerValidator(
                     public_key=v['public_key'],
                     amount_gwei=v['amount_gwei'],
-                    signature=v['signature'],
+                    signature=v['deposit_signature'],
                     exit_signature=BLSSignature(Web3.to_bytes(hexstr=v['exit_signature'])),
                 )
                 for v in resp_json['validators']
