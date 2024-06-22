@@ -11,10 +11,6 @@ from src.validators.typings import RelayerValidator, RelayerValidatorsResponse
 
 # pylint:disable-next=too-few-public-methods
 class BaseRelayerClient(abc.ABC):
-    def __init__(self):
-        self.host = settings.relayer_host
-        self.port = settings.relayer_port
-
     @abc.abstractmethod
     async def get_validators(self, start_index: int, count: int) -> RelayerValidatorsResponse:
         raise NotImplementedError()
@@ -31,7 +27,7 @@ class RelayerClient(BaseRelayerClient):
         async with aiohttp.ClientSession(
             timeout=ClientTimeout(settings.relayer_timeout)
         ) as session:
-            resp = await session.post(f'{self.host}:{self.port}/validators', json=jsn)
+            resp = await session.post(f'{settings.relayer_endpoint}/validators', json=jsn)
             resp.raise_for_status()
             resp_json = await resp.json()
             validators = [
