@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 
 
 async def submit_harvest_transaction(harvest_params: HarvestParams) -> HexStr | None:
-    logger.info('Submitting harvest transaction...')
     tx_hash = None
 
     if settings.network in GNO_NETWORKS:
@@ -59,6 +58,7 @@ async def _eth_submit_harvest_transaction(harvest_params: HarvestParams) -> HexS
 
 
 async def _gno_submit_harvest_transaction(harvest_params: HarvestParams) -> HexStr | None:
+    logger.info('Submitting harvest transaction...')
     gno_vault_contract = get_gno_vault_contract()
     update_state_calls = gno_vault_contract.get_update_state_calls(harvest_params)
 
