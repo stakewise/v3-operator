@@ -6,43 +6,46 @@ from web3 import Web3
 
 from src.common.contracts import validators_registry_contract
 from src.common.wallet import hot_wallet
-from src.config.networks import GNO_NETWORKS
 from src.config.settings import settings
-from src.validators.typings import Validator
+from src.validators.typings import DepositDataValidator
 
 
-async def get_validators_manager_signature(validators: Sequence[Validator]) -> HexStr:
+async def get_validators_manager_signature(validators: Sequence[DepositDataValidator]) -> HexStr:
     validators_registry_root = await validators_registry_contract.get_registry_root()
 
-    validators_checker_type_name = 'EthValidatorsChecker'
-    if settings.network in GNO_NETWORKS:
-        validators_checker_type_name = 'GnoValidatorsChecker'
-
-    concat_pubkeys = b''.join(Web3.to_bytes(hexstr=v.public_key) for v in validators)
+    encoded_validators = [_encode_validator(v) for v in validators]
 
     full_message = {
-        'primaryType': validators_checker_type_name,
+        'primaryType': 'VaultValidators',
         'types': {
-            validators_checker_type_name: [
+            'VaultValidators': [
                 {'name': 'validatorsRegistryRoot', 'type': 'bytes32'},
-                {'name': 'vault', 'type': 'address'},
                 {'name': 'validators', 'type': 'bytes'},
             ],
         },
         'domain': {
-            'name': validators_checker_type_name,
+            'name': 'VaultValidators',
             'version': '1',
             'chainId': settings.network_config.CHAIN_ID,
-            'verifyingContract': settings.network_config.VALIDATORS_CHECKER_CONTRACT_ADDRESS,
+            'verifyingContract': settings.vault,
         },
         'message': {
             'validatorsRegistryRoot': validators_registry_root,
-            'vault': settings.vault,
-            'validators': concat_pubkeys,
+            'validators': b''.join(encoded_validators),
         },
     }
 
     encoded_message = encode_typed_data(full_message=full_message)
     signed_msg = hot_wallet.sign_message(encoded_message)
 
-    return signed_msg.signature.hex()
+    return HexStr(signed_msg.signature.hex())
+
+
+def _encode_validator(v: DepositDataValidator) -> bytes:
+    return b''.join(
+        [
+            Web3.to_bytes(hexstr=v.public_key),
+            Web3.to_bytes(hexstr=v.signature),
+            Web3.to_bytes(hexstr=v.deposit_data_root),
+        ]
+    )
