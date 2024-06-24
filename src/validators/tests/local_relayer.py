@@ -1,8 +1,14 @@
 from src.config.settings import settings
-from src.validators.execution import get_validators_from_deposit_data
+from src.validators.database import NetworkValidatorCrud
 from src.validators.keystores.local import LocalKeystore
 from src.validators.relayer import BaseRelayerClient
-from src.validators.typings import DepositData, RelayerValidator
+from src.validators.signing.validators_manager import get_validators_manager_signature
+from src.validators.typings import (
+    DepositData,
+    DepositDataValidator,
+    RelayerValidator,
+    RelayerValidatorsResponse,
+)
 from src.validators.utils import load_deposit_data
 
 
@@ -12,12 +18,15 @@ class LocalRelayerClient(BaseRelayerClient):
         self._keystore = keystore
         self._deposit_data = deposit_data
 
-    async def get_validators(self, start_index: int, count: int) -> list[RelayerValidator]:
-        deposit_data_validators = await get_validators_from_deposit_data(
-            keystore=self._keystore,
-            deposit_data=self._deposit_data,
-            count=count,
-        )
+    async def get_validators(self, start_index: int, count: int) -> RelayerValidatorsResponse:
+        deposit_data_validators: list[DepositDataValidator] = []
+
+        for dv in self._deposit_data.validators:
+            if len(deposit_data_validators) == count:
+                break
+            if not NetworkValidatorCrud().is_validator_registered(dv.public_key):
+                deposit_data_validators.append(dv)
+
         fork = settings.network_config.SHAPELLA_FORK
 
         relayer_validators = []
@@ -36,7 +45,14 @@ class LocalRelayerClient(BaseRelayerClient):
                     exit_signature=exit_signature,
                 )
             )
-        return relayer_validators
+
+        validators_manager_signature = await get_validators_manager_signature(
+            deposit_data_validators
+        )
+        return RelayerValidatorsResponse(
+            validators=relayer_validators,
+            validators_manager_signature=validators_manager_signature,
+        )
 
 
 async def create_local_relayer() -> LocalRelayerClient:

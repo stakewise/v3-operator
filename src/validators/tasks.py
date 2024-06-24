@@ -26,7 +26,6 @@ from src.validators.execution import (
     NetworkValidatorsProcessor,
     get_latest_network_validator_public_keys,
     get_validators_from_deposit_data,
-    get_validators_from_relayer,
     get_withdrawable_assets,
     register_multiple_validator,
     register_single_validator,
@@ -39,7 +38,6 @@ from src.validators.signing.common import (
     get_encrypted_exit_signature_shards,
     get_validators_proof,
 )
-from src.validators.signing.validators_manager import get_validators_manager_signature
 from src.validators.typings import (
     ApprovalRequest,
     DepositData,
@@ -145,12 +143,10 @@ async def register_validators(
             return None
     else:
         start_validator_index = await get_start_validator_index()
-        validators = await get_validators_from_relayer(
-            relayer=cast(RelayerClient, relayer),
-            start_validator_index=start_validator_index,
-            count=validators_count,
-        )
-        validators_manager_signature = await get_validators_manager_signature(validators)
+        relayer = cast(RelayerClient, relayer)
+        validators_response = await relayer.get_validators(start_validator_index, validators_count)
+        validators = validators_response.validators
+        validators_manager_signature = validators_response.validators_manager_signature
 
     if not await check_gas_price(high_priority=True):
         return None
@@ -231,6 +227,7 @@ async def register_validators(
             tx_validators=tx_validators,
             harvest_params=harvest_params,
             validators_registry_root=registry_root,
+            validators_manager_signature=validators_manager_signature,
         )
         if tx_hash:
             logger.info(
@@ -243,6 +240,7 @@ async def register_validators(
             tx_validators=tx_validators,
             harvest_params=harvest_params,
             validators_registry_root=registry_root,
+            validators_manager_signature=validators_manager_signature,
         )
         if tx_hash:
             pub_keys = ', '.join([val.public_key for val in validators])

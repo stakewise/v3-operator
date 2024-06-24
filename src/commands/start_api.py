@@ -168,18 +168,11 @@ logger = logging.getLogger(__name__)
     help='The log level.',
 )
 @click.option(
-    '--relayer-host',
+    '--relayer-endpoint',
     type=str,
-    help='Relayer host.',
-    prompt='Enter the relayer host',
-    envvar='RELAYER_HOST',
-)
-@click.option(
-    '--relayer-port',
-    type=int,
-    help='Relayer port',
-    prompt='Enter the relayer port',
-    envvar='RELAYER_PORT',
+    help='Relayer endpoint.',
+    prompt='Enter the relayer endpoint',
+    envvar='RELAYER_ENDPOINT',
 )
 @click.command(help='Start operator service')
 # pylint: disable-next=too-many-arguments,too-many-locals
@@ -203,8 +196,7 @@ def start_api(
     hot_wallet_password_file: str | None,
     max_fee_per_gas_gwei: int,
     database_dir: str | None,
-    relayer_host: str,
-    relayer_port: int,
+    relayer_endpoint: str,
 ) -> None:
     vault_config = VaultConfig(vault, Path(data_dir))
     if network is None:
@@ -233,8 +225,7 @@ def start_api(
         database_dir=database_dir,
         log_level=log_level,
         log_format=log_format,
-        relayer_host=relayer_host,
-        relayer_port=relayer_port,
+        relayer_endpoint=relayer_endpoint,
         validators_registration_mode=validators_registration_mode,
     )
 
