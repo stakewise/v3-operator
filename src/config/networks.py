@@ -91,7 +91,7 @@ NETWORKS = {
                 hexstr=HexStr('0x4b363db94e286120d76eb905340fdd4e54bfe9f06bf33ff6cf5ad27f511bfe95')
             )
         ),
-        GENESIS_VALIDATORS_IPFS_HASH='bafybeidcgs5ijtdjm4y2m2p4oh6us3gcb7rjv4n75ub6ugv4tku44dgy3y',
+        GENESIS_VALIDATORS_IPFS_HASH='bafybeigzq2ntq5zw4tdym5vckbf66mla5q3ge2fzdgqslhckdytlmm7k7y',
         SLOTS_PER_EPOCH=32,
         SECONDS_PER_BLOCK=12,
         GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x00000000')),
@@ -133,7 +133,7 @@ NETWORKS = {
                 hexstr=HexStr('0x9143aa7c615a7f7115e2b6aac319c03529df8242ae705fba9df39b79c59fa8b1')
             )
         ),
-        GENESIS_VALIDATORS_IPFS_HASH='bafybeih2zhayrd6t5nnvzwmechcrxeejphr45lv4q7byxjqlapizghdtde',
+        GENESIS_VALIDATORS_IPFS_HASH='bafybeihhaxvlkbvwda6jy3ucawb4cdmgbaumbvoi337gdyp6hdtlrfnb64',
         SLOTS_PER_EPOCH=32,
         SECONDS_PER_BLOCK=12,
         GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x01017000')),
@@ -218,7 +218,7 @@ NETWORKS = {
                 hexstr=HexStr('0x9d642dac73058fbf39c0ae41ab1e34e4d889043cb199851ded7095bc99eb4c1e')
             )
         ),
-        GENESIS_VALIDATORS_IPFS_HASH='bafybeia5ekk3lsrwdfpez54zd6xmi6k45q76n3oulen7r2bocxshhf6rfq',
+        GENESIS_VALIDATORS_IPFS_HASH='bafybeih2he7opyg4e7ontq4cvh42tou4ekizpbn4emg6u5lhfziyxcm3zq',
         SLOTS_PER_EPOCH=16,
         SECONDS_PER_BLOCK=5,
         GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x0000006f')),
