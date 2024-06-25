@@ -177,7 +177,7 @@ NETWORKS = {
             )
         ),
         GENESIS_VALIDATORS_IPFS_HASH='',
-        SLOTS_PER_EPOCH=32,
+        SLOTS_PER_EPOCH=16,
         SECONDS_PER_BLOCK=5,
         GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x00000064')),
         IS_POA=False,
