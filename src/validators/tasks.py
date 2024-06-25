@@ -17,6 +17,7 @@ from src.common.exceptions import NotEnoughOracleApprovalsError
 from src.common.execution import check_gas_price, get_protocol_config
 from src.common.harvest import get_harvest_params
 from src.common.metrics import metrics
+from src.common.register_validators import register_validators
 from src.common.tasks import BaseTask
 from src.common.typings import HarvestParams
 from src.common.utils import get_current_timestamp
@@ -27,8 +28,6 @@ from src.validators.execution import (
     get_latest_network_validator_public_keys,
     get_validators_from_deposit_data,
     get_withdrawable_assets,
-    register_multiple_validator,
-    register_single_validator,
     update_unused_validator_keys_metric,
 )
 from src.validators.keystores.base import BaseKeystore
@@ -80,7 +79,7 @@ class ValidatorsTask(BaseTask):
                 deposit_data=self.deposit_data,
             )
         # check and register new validators
-        await register_validators(
+        await calc_assets_build_tx_and_register_validators(
             keystore=self.keystore,
             deposit_data=self.deposit_data,
             relayer=self.relayer,
@@ -88,7 +87,7 @@ class ValidatorsTask(BaseTask):
 
 
 # pylint: disable-next=too-many-locals,too-many-branches,too-many-return-statements,too-many-statements
-async def register_validators(
+async def calc_assets_build_tx_and_register_validators(
     keystore: BaseKeystore | None,
     deposit_data: DepositData | None,
     relayer: BaseRelayerClient | None = None,
@@ -208,34 +207,17 @@ async def register_validators(
         )
         return None
 
-    tx_hash: HexStr | None = None
-
-    if len(validators) == 1:
-        validator = validators[0]
-        tx_hash = await register_single_validator(
-            approval=oracles_approval,
-            multi_proof=multi_proof,
-            tx_validators=tx_validators,
-            harvest_params=harvest_params,
-            validators_registry_root=registry_root,
-            validators_manager_signature=validators_manager_signature,
-        )
-        if tx_hash:
-            logger.info(
-                'Successfully registered validator with public key %s', validator.public_key
-            )
-    elif len(validators) > 1:
-        tx_hash = await register_multiple_validator(
-            approval=oracles_approval,
-            multi_proof=multi_proof,
-            tx_validators=tx_validators,
-            harvest_params=harvest_params,
-            validators_registry_root=registry_root,
-            validators_manager_signature=validators_manager_signature,
-        )
-        if tx_hash:
-            pub_keys = ', '.join([val.public_key for val in validators])
-            logger.info('Successfully registered validators with public keys %s', pub_keys)
+    tx_hash = await register_validators(
+        approval=oracles_approval,
+        multi_proof=multi_proof,
+        tx_validators=tx_validators,
+        harvest_params=harvest_params,
+        validators_registry_root=registry_root,
+        validators_manager_signature=validators_manager_signature,
+    )
+    if tx_hash:
+        pub_keys = ', '.join([val.public_key for val in validators])
+        logger.info('Successfully registered validators with public keys %s', pub_keys)
 
     return tx_hash
 

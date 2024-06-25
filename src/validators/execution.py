@@ -3,22 +3,17 @@ import struct
 from typing import Sequence, Set
 
 from eth_typing import BlockNumber, HexStr
-from multiproof.standard import MultiProof
 from sw_utils import EventProcessor, is_valid_deposit_data_signature
-from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.types import EventData, Wei
 
-from src.common.clients import execution_client
 from src.common.contracts import (
     get_gno_vault_contract,
     validators_registry_contract,
     vault_contract,
 )
-from src.common.execution import get_high_priority_tx_params
 from src.common.metrics import metrics
-from src.common.typings import HarvestParams, OraclesApproval
-from src.common.utils import format_error
+from src.common.typings import HarvestParams
 from src.common.vault import Vault
 from src.config.networks import GNO_NETWORKS
 from src.config.settings import DEPOSIT_AMOUNT, settings
@@ -229,120 +224,3 @@ async def update_unused_validator_keys_metric(
     metrics.unused_validator_keys.set(validators)
 
     return validators
-
-
-# pylint: disable=too-many-arguments
-async def register_single_validator(
-    approval: OraclesApproval,
-    multi_proof: MultiProof | None,
-    tx_validators: list[bytes],
-    harvest_params: HarvestParams | None,
-    validators_registry_root: Bytes32,
-    validators_manager_signature: HexStr | None,
-) -> HexStr | None:
-    """Registers single validator."""
-    logger.info('Submitting registration transaction')
-
-    keeper_approval_params = (
-        validators_registry_root,
-        approval.deadline,
-        tx_validators[0],
-        approval.signatures,
-        approval.ipfs_hash,
-    )
-    register_via_vault_v2: bool = False
-
-    register_call_args: list = [keeper_approval_params]
-    if multi_proof:
-        register_call_args.append(multi_proof.proof)
-    else:
-        register_via_vault_v2 = True
-        register_call_args.append(validators_manager_signature)
-
-    try:
-        tx_params = await get_high_priority_tx_params()
-
-        tx = await Vault().register_single_validator(
-            tx_params=tx_params,
-            harvest_params=harvest_params,
-            register_call_args=register_call_args,
-            register_via_vault_v2=register_via_vault_v2,
-        )
-    except Exception as e:
-        logger.error('Failed to register validator: %s', format_error(e))
-        if settings.verbose:
-            logger.exception(e)
-        return None
-
-    tx_hash = Web3.to_hex(tx)
-    logger.info('Waiting for transaction %s confirmation', tx_hash)
-    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
-        tx, timeout=settings.execution_transaction_timeout
-    )
-    if not tx_receipt['status']:
-        logger.error('Registration transaction failed')
-        return None
-
-    return tx_hash
-
-
-# pylint: disable=too-many-arguments
-async def register_multiple_validator(
-    multi_proof: MultiProof | None,
-    tx_validators: list[bytes],
-    approval: OraclesApproval,
-    harvest_params: HarvestParams | None,
-    validators_registry_root: Bytes32,
-    validators_manager_signature: HexStr | None,
-) -> HexStr | None:
-    """Registers multiple validators."""
-    logger.info('Submitting registration transaction')
-    keeper_approval_params = (
-        validators_registry_root,
-        approval.deadline,
-        b''.join(tx_validators),
-        approval.signatures,
-        approval.ipfs_hash,
-    )
-    # Vault args
-    register_call_args: list = [keeper_approval_params]
-    register_via_vault_v2 = False
-
-    if multi_proof:
-        proof_indexes = [leaf[1] for leaf in multi_proof.leaves]
-
-        # DepositDataRegistry args
-        register_call_args = [
-            settings.vault,
-            keeper_approval_params,
-            proof_indexes,
-            multi_proof.proof_flags,
-            multi_proof.proof,
-        ]
-    else:
-        register_via_vault_v2 = True
-        register_call_args.append(validators_manager_signature)
-
-    try:
-        tx_params = await get_high_priority_tx_params()
-        tx = await Vault().register_multiple_validators(
-            tx_params=tx_params,
-            harvest_params=harvest_params,
-            register_call_args=register_call_args,
-            register_via_vault_v2=register_via_vault_v2,
-        )
-    except Exception as e:
-        logger.error('Failed to register validators: %s', format_error(e))
-        if settings.verbose:
-            logger.exception(e)
-        return None
-
-    tx_hash = Web3.to_hex(tx)
-    logger.info('Waiting for transaction %s confirmation', tx_hash)
-    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
-        tx, timeout=settings.execution_transaction_timeout
-    )
-    if not tx_receipt['status']:
-        logger.error('Registration transaction failed')
-        return None
-    return tx_hash
