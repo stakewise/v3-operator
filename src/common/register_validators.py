@@ -137,7 +137,7 @@ async def register_validators(
     )
 
     # add validators registration call
-    vault_version = await vault_contract.get_version()
+    vault_version = await vault_contract.version()
     if len(tx_validators) == 1:
         validators_registration_call = _get_single_validator_registration_call(
             vault_version=vault_version,

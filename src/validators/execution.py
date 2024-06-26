@@ -90,7 +90,7 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
     else:
         from_block = settings.network_config.VALIDATORS_REGISTRY_GENESIS_BLOCK
 
-    new_events = await validators_registry_contract.events.DepositEvent.get_logs(
+    new_events = await validators_registry_contract.events.DepositEvent.get_logs(  # type: ignore
         fromBlock=from_block
     )
     new_public_keys: Set[HexStr] = set()
