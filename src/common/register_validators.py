@@ -21,6 +21,73 @@ from src.config.settings import settings
 logger = logging.getLogger(__name__)
 
 
+# pylint: disable=too-many-arguments
+async def register_validators(
+    approval: OraclesApproval,
+    multi_proof: MultiProof | None,
+    tx_validators: list[bytes],
+    harvest_params: HarvestParams | None,
+    validators_registry_root: Bytes32,
+    validators_manager_signature: HexStr | None,
+) -> HexStr | None:
+    """Registers validators."""
+    logger.info('Submitting registration transaction')
+
+    if harvest_params is not None:
+        # add update state calls before validator registration
+        calls = await _get_update_state_calls(harvest_params)
+    else:
+        # aggregate all the calls into one multicall
+        calls = []
+
+    keeper_approval_params = (
+        validators_registry_root,
+        approval.deadline,
+        b''.join(tx_validators),
+        approval.signatures,
+        approval.ipfs_hash,
+    )
+
+    # add validators registration call
+    vault_version = await vault_contract.version()
+    if len(tx_validators) == 1:
+        validators_registration_call = _get_single_validator_registration_call(
+            vault_version=vault_version,
+            keeper_approval_params=keeper_approval_params,
+            multi_proof=multi_proof,
+            validators_manager_signature=validators_manager_signature,
+        )
+    else:
+        validators_registration_call = _get_multiple_validators_registration_call(
+            vault_version=vault_version,
+            keeper_approval_params=keeper_approval_params,
+            multi_proof=multi_proof,
+            validators_manager_signature=validators_manager_signature,
+        )
+
+    calls.append(validators_registration_call)
+
+    try:
+        tx_params = await get_high_priority_tx_params()
+        tx = await multicall_contract.functions.aggregate(calls).transact(tx_params)
+    except Exception as e:
+        logger.error('Failed to register validator(s): %s', format_error(e))
+        if settings.verbose:
+            logger.exception(e)
+        return None
+
+    tx_hash = Web3.to_hex(tx)
+    logger.info('Waiting for transaction %s confirmation', tx_hash)
+    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
+        tx, timeout=settings.execution_transaction_timeout
+    )
+    if not tx_receipt['status']:
+        logger.error('Registration transaction failed')
+        return None
+
+    return tx_hash
+
+
 async def _get_update_state_calls(
     harvest_params: HarvestParams,
 ) -> list[tuple[ChecksumAddress, HexStr]]:
@@ -113,73 +180,6 @@ def _get_multiple_validators_registration_call(
             multi_proof.proof,
         ],
     )
-
-
-# pylint: disable=too-many-arguments
-async def register_validators(
-    approval: OraclesApproval,
-    multi_proof: MultiProof | None,
-    tx_validators: list[bytes],
-    harvest_params: HarvestParams | None,
-    validators_registry_root: Bytes32,
-    validators_manager_signature: HexStr | None,
-) -> HexStr | None:
-    """Registers validators."""
-    logger.info('Submitting registration transaction')
-
-    if harvest_params is not None:
-        # add update state calls before validator registration
-        calls = await _get_update_state_calls(harvest_params)
-    else:
-        # aggregate all the calls into one multicall
-        calls = []
-
-    keeper_approval_params = (
-        validators_registry_root,
-        approval.deadline,
-        b''.join(tx_validators),
-        approval.signatures,
-        approval.ipfs_hash,
-    )
-
-    # add validators registration call
-    vault_version = await vault_contract.version()
-    if len(tx_validators) == 1:
-        validators_registration_call = _get_single_validator_registration_call(
-            vault_version=vault_version,
-            keeper_approval_params=keeper_approval_params,
-            multi_proof=multi_proof,
-            validators_manager_signature=validators_manager_signature,
-        )
-    else:
-        validators_registration_call = _get_multiple_validators_registration_call(
-            vault_version=vault_version,
-            keeper_approval_params=keeper_approval_params,
-            multi_proof=multi_proof,
-            validators_manager_signature=validators_manager_signature,
-        )
-
-    calls.append(validators_registration_call)
-
-    try:
-        tx_params = await get_high_priority_tx_params()
-        tx = await multicall_contract.functions.aggregate(calls).transact(tx_params)
-    except Exception as e:
-        logger.error('Failed to register validator(s): %s', format_error(e))
-        if settings.verbose:
-            logger.exception(e)
-        return None
-
-    tx_hash = Web3.to_hex(tx)
-    logger.info('Waiting for transaction %s confirmation', tx_hash)
-    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
-        tx, timeout=settings.execution_transaction_timeout
-    )
-    if not tx_receipt['status']:
-        logger.error('Registration transaction failed')
-        return None
-
-    return tx_hash
 
 
 def _calc_leaf_indexes(deposit_data_indexes: list[int]) -> list[int]:
