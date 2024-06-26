@@ -89,14 +89,15 @@ def _get_multiple_validators_registration_call(
     if multi_proof is None:
         raise RuntimeError('multi_proof required')
 
-    proof_indexes = [leaf[1] for leaf in multi_proof.leaves]
+    deposit_data_indexes = [leaf[1] for leaf in multi_proof.leaves]
+    leaf_indexes = _calc_leaf_indexes(deposit_data_indexes)
 
     if vault_version == 1:
         return vault_v1_contract.address, vault_v1_contract.encode_abi(
             fn_name='registerValidators',
             args=[
                 keeper_approval_params,
-                proof_indexes,
+                leaf_indexes,
                 multi_proof.proof_flags,
                 multi_proof.proof,
             ],
@@ -107,7 +108,7 @@ def _get_multiple_validators_registration_call(
         args=[
             settings.vault,
             keeper_approval_params,
-            proof_indexes,
+            leaf_indexes,
             multi_proof.proof_flags,
             multi_proof.proof,
         ],
@@ -179,3 +180,11 @@ async def register_validators(
         return None
 
     return tx_hash
+
+
+def _calc_leaf_indexes(deposit_data_indexes: list[int]) -> list[int]:
+    if not deposit_data_indexes:
+        return []
+
+    sorted_indexes = sorted(deposit_data_indexes)
+    return [deposit_data_indexes.index(index) for index in sorted_indexes]
