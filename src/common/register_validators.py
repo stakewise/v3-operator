@@ -1,6 +1,6 @@
 import logging
 
-from eth_typing import HexStr
+from eth_typing import ChecksumAddress, HexStr
 from multiproof import MultiProof
 from sw_utils.typings import Bytes32
 from web3 import Web3
@@ -21,23 +21,28 @@ from src.config.settings import settings
 logger = logging.getLogger(__name__)
 
 
-async def _get_update_state_calls(harvest_params: HarvestParams) -> list[HexStr]:
+async def _get_update_state_calls(
+    harvest_params: HarvestParams,
+) -> list[tuple[ChecksumAddress, HexStr]]:
     calls = []
     if settings.network in GNO_NETWORKS:
         # TODO: add swap xDAI to GNO to calls if it passes static call
         pass
 
     calls.append(
-        vault_contract.encode_abi(
-            fn_name='updateState',
-            args=[
-                (
-                    harvest_params.rewards_root,
-                    harvest_params.reward,
-                    harvest_params.unlocked_mev_reward,
-                    harvest_params.proof,
-                )
-            ],
+        (
+            vault_contract.address,
+            vault_contract.encode_abi(
+                fn_name='updateState',
+                args=[
+                    (
+                        harvest_params.rewards_root,
+                        harvest_params.reward,
+                        harvest_params.unlocked_mev_reward,
+                        harvest_params.proof,
+                    )
+                ],
+            ),
         )
     )
     return calls
@@ -48,9 +53,9 @@ def _get_single_validator_registration_call(
     keeper_approval_params: tuple,
     multi_proof: MultiProof | None,
     validators_manager_signature: HexStr | None,
-) -> HexStr:
+) -> tuple[ChecksumAddress, HexStr]:
     if validators_manager_signature:
-        return vault_contract.encode_abi(
+        return vault_contract.address, vault_contract.encode_abi(
             fn_name='registerValidators',
             args=[keeper_approval_params, validators_manager_signature],
         )
@@ -59,11 +64,11 @@ def _get_single_validator_registration_call(
         raise RuntimeError('multi_proof required')
 
     if vault_version == 1:
-        return vault_v1_contract.encode_abi(
+        return vault_v1_contract.address, vault_v1_contract.encode_abi(
             fn_name='registerValidator', args=[keeper_approval_params, multi_proof.proof]
         )
 
-    return deposit_data_registry_contract.encode_abi(
+    return deposit_data_registry_contract.address, deposit_data_registry_contract.encode_abi(
         fn_name='registerValidator',
         args=[settings.vault, keeper_approval_params, multi_proof.proof],
     )
@@ -74,9 +79,9 @@ def _get_multiple_validators_registration_call(
     keeper_approval_params: tuple,
     multi_proof: MultiProof | None,
     validators_manager_signature: HexStr | None,
-) -> HexStr:
+) -> tuple[ChecksumAddress, HexStr]:
     if validators_manager_signature:
-        return vault_contract.encode_abi(
+        return vault_contract.address, vault_contract.encode_abi(
             fn_name='registerValidators',
             args=[keeper_approval_params, validators_manager_signature],
         )
@@ -87,7 +92,7 @@ def _get_multiple_validators_registration_call(
     proof_indexes = [leaf[1] for leaf in multi_proof.leaves]
 
     if vault_version == 1:
-        return vault_v1_contract.encode_abi(
+        return vault_v1_contract.address, vault_v1_contract.encode_abi(
             fn_name='registerValidators',
             args=[
                 keeper_approval_params,
@@ -97,7 +102,7 @@ def _get_multiple_validators_registration_call(
             ],
         )
 
-    return deposit_data_registry_contract.encode_abi(
+    return deposit_data_registry_contract.address, deposit_data_registry_contract.encode_abi(
         fn_name='registerValidators',
         args=[
             settings.vault,
