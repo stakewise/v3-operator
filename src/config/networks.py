@@ -176,7 +176,7 @@ NETWORKS = {
                 hexstr=HexStr('0xf5dcb5564e829aab27264b9becd5dfaa017085611224cb3036f573368dbb9d47')
             )
         ),
-        GENESIS_VALIDATORS_IPFS_HASH='',
+        GENESIS_VALIDATORS_IPFS_HASH='bafybeid4xnpjblh4izjb32qygdubyugotivm5rscx6b3jpsez4vxlyig44',
         SLOTS_PER_EPOCH=16,
         SECONDS_PER_BLOCK=5,
         GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x00000064')),
