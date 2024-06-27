@@ -1,10 +1,15 @@
 import logging
 
-from eth_typing import HexStr
+from eth_typing import ChecksumAddress, HexStr
 from web3 import Web3
+from web3.exceptions import ContractLogicError
 
 from src.common.clients import execution_client
-from src.common.contracts import get_gno_vault_contract, vault_contract
+from src.common.contracts import (
+    get_gno_vault_contract,
+    multicall_contract,
+    vault_contract,
+)
 from src.common.typings import HarvestParams
 from src.common.utils import format_error
 from src.config.networks import GNO_NETWORKS
@@ -14,17 +19,16 @@ logger = logging.getLogger(__name__)
 
 
 async def submit_harvest_transaction(harvest_params: HarvestParams) -> HexStr | None:
-    tx_hash = None
-
-    if settings.network in GNO_NETWORKS:
-        tx_hash = await _gno_submit_harvest_transaction(harvest_params)
-
-    if not tx_hash:
-        tx_hash = await _eth_submit_harvest_transaction(harvest_params)
-
-    if not tx_hash:
+    calls = await get_update_state_calls(harvest_params)
+    try:
+        tx = await multicall_contract.functions.aggregate(calls).transact()
+    except (ValueError, ContractLogicError) as e:
+        logger.error('Failed to harvest: %s', format_error(e))
+        if settings.verbose:
+            logger.exception(e)
         return None
 
+    tx_hash = Web3.to_hex(tx)
     logger.info('Waiting for transaction %s confirmation', tx_hash)
     tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
         tx_hash, timeout=settings.execution_transaction_timeout
@@ -36,39 +40,22 @@ async def submit_harvest_transaction(harvest_params: HarvestParams) -> HexStr | 
     return tx_hash
 
 
-async def _eth_submit_harvest_transaction(harvest_params: HarvestParams) -> HexStr | None:
-    logger.info('Submitting harvest transaction...')
-    try:
-        tx = await vault_contract.functions.updateState(
-            (
-                harvest_params.rewards_root,
-                harvest_params.reward,
-                harvest_params.unlocked_mev_reward,
-                harvest_params.proof,
-            )
-        ).transact()
-    except Exception as e:
-        logger.error('Failed to harvest: %s', format_error(e))
-        if settings.verbose:
-            logger.exception(e)
-        return None
+async def get_update_state_calls(
+    harvest_params: HarvestParams,
+) -> list[tuple[ChecksumAddress, HexStr]]:
+    update_state_call = vault_contract.get_update_state_call(harvest_params)
+    calls = [update_state_call]
 
-    tx_hash = Web3.to_hex(tx)
-    return tx_hash
+    if settings.network in GNO_NETWORKS:
+        gno_vault_contract = get_gno_vault_contract()
+        swap_xdai_call = gno_vault_contract.get_swap_xdai_call()
+        calls.insert(0, swap_xdai_call)
 
+        # check whether xDAI swap works
+        try:
+            await gno_vault_contract.functions.multicall(calls).call()
+        except (ValueError, ContractLogicError):
+            logger.warning('xDAI swap failed, excluding from the call.')
+            calls.pop(0)
 
-async def _gno_submit_harvest_transaction(harvest_params: HarvestParams) -> HexStr | None:
-    logger.info('Submitting harvest transaction...')
-    gno_vault_contract = get_gno_vault_contract()
-    update_state_calls = gno_vault_contract.get_update_state_calls(harvest_params)
-
-    try:
-        tx = await gno_vault_contract.functions.multicall(update_state_calls).transact()
-    except Exception as e:
-        logger.error('Failed to harvest and swap: %s', format_error(e))
-        if settings.verbose:
-            logger.exception(e)
-        return None
-
-    tx_hash = Web3.to_hex(tx)
-    return tx_hash
+    return [(vault_contract.address, call) for call in calls]
