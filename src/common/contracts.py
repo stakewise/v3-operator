@@ -98,7 +98,7 @@ class ContractWrapper:
 class VaultStateMixin:
     encode_abi: Callable
 
-    def get_update_state_calls(self, harvest_params: HarvestParams) -> list[HexStr]:
+    def get_update_state_call(self, harvest_params: HarvestParams) -> HexStr:
         update_state_call = self.encode_abi(
             fn_name='updateState',
             args=[
@@ -110,7 +110,7 @@ class VaultStateMixin:
                 )
             ],
         )
-        return [update_state_call]
+        return update_state_call
 
 
 class VaultV1Contract(ContractWrapper, VaultStateMixin):
@@ -164,10 +164,8 @@ class GnoVaultContract(ContractWrapper, VaultStateMixin):
     def contract_address(self) -> ChecksumAddress:
         return settings.vault
 
-    def get_update_state_calls(self, harvest_params: HarvestParams) -> list[HexStr]:
-        update_state_calls = super().get_update_state_calls(harvest_params)
-        swap_xdai_call = self.encode_abi(fn_name='swapXdaiToGno', args=[])
-        return [*update_state_calls, swap_xdai_call]
+    def get_swap_xdai_call(self) -> HexStr:
+        return self.encode_abi(fn_name='swapXdaiToGno', args=[])
 
 
 class V2PoolContract(ContractWrapper):
@@ -279,21 +277,6 @@ class DepositDataRegistryContract(ContractWrapper):
     async def get_validators_index(self) -> int:
         """Fetches vault's current validators index."""
         return await self.contract.functions.depositDataIndexes(settings.vault).call()
-
-    def get_update_state_calls(self, harvest_params: HarvestParams) -> list[HexStr]:
-        update_state_call = self.encode_abi(
-            fn_name='updateVaultState',
-            args=[
-                settings.vault,
-                (
-                    harvest_params.rewards_root,
-                    harvest_params.reward,
-                    harvest_params.unlocked_mev_reward,
-                    harvest_params.proof,
-                ),
-            ],
-        )
-        return [update_state_call]
 
 
 class MulticallContract(ContractWrapper):

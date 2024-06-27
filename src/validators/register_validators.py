@@ -4,12 +4,10 @@ from eth_typing import ChecksumAddress, HexStr
 from multiproof import MultiProof
 from sw_utils.typings import Bytes32
 from web3 import Web3
-from web3.exceptions import ContractLogicError
 
 from src.common.clients import execution_client
 from src.common.contracts import (
     deposit_data_registry_contract,
-    get_gno_vault_contract,
     multicall_contract,
     vault_contract,
     vault_v1_contract,
@@ -17,8 +15,8 @@ from src.common.contracts import (
 from src.common.execution import get_high_priority_tx_params
 from src.common.typings import HarvestParams, OraclesApproval
 from src.common.utils import format_error
-from src.config.networks import GNO_NETWORKS
 from src.config.settings import settings
+from src.harvest.execution import get_update_state_calls
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +35,7 @@ async def register_validators(
 
     if harvest_params is not None:
         # add update state calls before validator registration
-        calls = await _get_update_state_calls(harvest_params)
+        calls = await get_update_state_calls(harvest_params)
     else:
         # aggregate all the calls into one multicall
         calls = []
@@ -88,52 +86,6 @@ async def register_validators(
         return None
 
     return tx_hash
-
-
-async def _get_update_state_calls(
-    harvest_params: HarvestParams,
-) -> list[tuple[ChecksumAddress, HexStr]]:
-    update_state_call = (
-        vault_contract.address,
-        vault_contract.encode_abi(
-            fn_name='updateState',
-            args=[
-                (
-                    harvest_params.rewards_root,
-                    harvest_params.reward,
-                    harvest_params.unlocked_mev_reward,
-                    harvest_params.proof,
-                )
-            ],
-        ),
-    )
-    calls = [update_state_call]
-
-    if settings.network in GNO_NETWORKS:
-        gno_vault_contract = get_gno_vault_contract()
-
-        if _check_swap_xdai(harvest_params):
-            calls.append(
-                (
-                    gno_vault_contract.address,
-                    gno_vault_contract.encode_abi(fn_name='swapXdaiToGno', args=[]),
-                )
-            )
-        else:
-            logger.warning('Swap xdai failed. Falling back to eth flow.')
-
-    return calls
-
-
-async def _check_swap_xdai(harvest_params: HarvestParams) -> bool:
-    gno_vault_contract = get_gno_vault_contract()
-    update_state_calls = gno_vault_contract.get_update_state_calls(harvest_params)
-
-    try:
-        await gno_vault_contract.functions.multicall(update_state_calls).call()
-    except (ValueError, ContractLogicError):
-        return False
-    return True
 
 
 def _get_single_validator_registration_call(
