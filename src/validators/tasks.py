@@ -17,7 +17,6 @@ from src.common.exceptions import NotEnoughOracleApprovalsError
 from src.common.execution import check_gas_price, get_protocol_config
 from src.common.harvest import get_harvest_params
 from src.common.metrics import metrics
-from src.common.register_validators import register_validators
 from src.common.tasks import BaseTask
 from src.common.typings import HarvestParams
 from src.common.utils import get_current_timestamp
@@ -31,6 +30,7 @@ from src.validators.execution import (
     update_unused_validator_keys_metric,
 )
 from src.validators.keystores.base import BaseKeystore
+from src.validators.register_validators import register_validators
 from src.validators.relayer import BaseRelayerClient, RelayerClient
 from src.validators.signing.common import (
     encode_tx_validator_list,
