@@ -12,7 +12,7 @@ from web3 import Web3
 from web3.exceptions import Web3Exception
 from web3.types import Timestamp
 
-from src.common.clients import consensus_client
+from src.common.clients import consensus_client, execution_client
 from src.common.exceptions import (
     InvalidOraclesRequestError,
     NotEnoughOracleApprovalsError,
@@ -102,6 +102,17 @@ def chunkify(items, size):
 
 def greenify(value):
     return click.style(value, bold=True, fg='green')
+
+
+def calc_slot_by_block_timestamp(ts: Timestamp) -> int:
+    return int(
+        (ts - settings.network_config.GENESIS_TIMESTAMP) / settings.network_config.SECONDS_PER_SLOT
+    )
+
+
+async def calc_slot_by_block_number(block_number: BlockNumber) -> int:
+    execution_block = await execution_client.eth.get_block(block_number)
+    return calc_slot_by_block_timestamp(execution_block['timestamp'])
 
 
 class JsonFormatter(jsonlogger.JsonFormatter):

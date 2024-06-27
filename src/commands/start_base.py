@@ -11,7 +11,9 @@ from src.common.logging import setup_logging
 from src.common.metrics import MetricsTask, metrics_server
 from src.common.startup_check import startup_checks
 from src.common.utils import get_build_version
+from src.common.vault import Vault
 from src.config.settings import settings
+from src.eigenlayer.tasks import EigenlayerValidatorsTask, EigenlayerWithdrawalsTask
 from src.exits.tasks import ExitSignatureTask
 from src.harvest.tasks import HarvestTask
 from src.validators.database import NetworkValidatorCrud
@@ -91,6 +93,10 @@ async def start_base() -> None:
         ]
         if settings.harvest_vault:
             tasks.append(HarvestTask().run(interrupt_handler))
+        if await Vault().is_restaking():
+            tasks.append(EigenlayerValidatorsTask().run(interrupt_handler))
+            if settings.process_withdrawals:
+                tasks.append(EigenlayerWithdrawalsTask().run(interrupt_handler))
 
         await asyncio.gather(*tasks)
 

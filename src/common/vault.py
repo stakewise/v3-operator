@@ -9,6 +9,7 @@ from src.common.contracts import (
     get_gno_vault_contract,
     multicall_contract,
     vault_contract,
+    vault_restaking_contract,
     vault_v1_contract,
 )
 from src.common.typings import HarvestParams
@@ -22,6 +23,14 @@ logger = logging.getLogger(__name__)
 class Vault:
     async def version(self):
         return await vault_contract.version()
+
+    async def is_restaking(self) -> bool:
+        try:
+            await vault_restaking_contract.restake_withdrawals_manager()
+            return True
+        except BaseException as e:
+            logger.debug(e)
+        return False
 
     async def get_validators_root(self) -> Bytes32:
         """Fetches vault's validators root."""

@@ -27,6 +27,7 @@ from sw_utils.signing import (
 from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3._utils import request
+from web3.types import ChecksumAddress
 
 from src.common.utils import chunkify
 from src.config.networks import NETWORKS
@@ -44,6 +45,7 @@ class Credential:
     path: str
     network: str
     vault: HexAddress
+    withdrawal_address: ChecksumAddress | None = None
 
     @cached_property
     def public_key(self) -> HexStr:
@@ -59,7 +61,7 @@ class Credential:
 
     @cached_property
     def withdrawal_credentials(self) -> Bytes32:
-        return get_eth1_withdrawal_credentials(self.vault)
+        return get_eth1_withdrawal_credentials(self.withdrawal_address or self.vault)
 
     def encrypt_signing_keystore(self, password: str) -> Keystore:
         return ScryptKeystore.encrypt(
@@ -109,6 +111,7 @@ class Credential:
         datum_dict.update({'deposit_data_root': signed_deposit_datum.hash_tree_root})
         datum_dict.update({'fork_version': fork_version})
         datum_dict.update({'network_name': self.network})
+        datum_dict.update({'withdrawal_address': self.withdrawal_address})
         datum_dict.update({'deposit_cli_version': DEPOSIT_CLI_VERSION})
         return datum_dict
 
@@ -122,6 +125,7 @@ class CredentialManager:
         mnemonic: str,
         count: int,
         start_index: int,
+        withdrawal_address: str | None = None,
         pool_size: int | None = None,
     ) -> list[Credential]:
         credentials: list[Credential] = []
@@ -141,12 +145,7 @@ class CredentialManager:
                 results.append(
                     pool.apply_async(
                         CredentialManager._generate_credentials_chunk,
-                        [
-                            chunk_indexes,
-                            network,
-                            vault,
-                            mnemonic,
-                        ],
+                        [chunk_indexes, network, vault, mnemonic, withdrawal_address],
                         callback=bar_updated,
                     )
                 )
@@ -164,6 +163,7 @@ class CredentialManager:
         network: str,
         vault: HexAddress,
         mnemonic: str,
+        withdrawal_address: str | None = None,
     ) -> list[Credential]:
         # Hack to run web3 sessions in multiprocessing mode
         # pylint: disable-next=protected-access
@@ -171,13 +171,19 @@ class CredentialManager:
 
         credentials: list[Credential] = []
         for index in indexes:
-            credential = CredentialManager.generate_credential(network, vault, mnemonic, index)
+            credential = CredentialManager.generate_credential(
+                network, vault, mnemonic, index, withdrawal_address
+            )
             credentials.append(credential)
         return credentials
 
     @staticmethod
     def generate_credential(
-        network: str, vault: HexAddress, mnemonic: str, index: int
+        network: str,
+        vault: HexAddress,
+        mnemonic: str,
+        index: int,
+        withdrawal_address: str | None = None,
     ) -> Credential:
         """Returns the signing key of the mnemonic at a specific index."""
         seed = get_seed(mnemonic=mnemonic, password='')  # nosec
@@ -189,7 +195,11 @@ class CredentialManager:
             private_key = BLSPrivateKey(derive_child_SK(parent_SK=private_key, index=node))
 
         return Credential(
-            private_key=private_key, path=signing_key_path, network=network, vault=vault
+            private_key=private_key,
+            path=signing_key_path,
+            network=network,
+            vault=vault,
+            withdrawal_address=withdrawal_address,
         )
 
     @staticmethod

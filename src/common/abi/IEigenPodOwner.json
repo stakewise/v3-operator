@@ -1,0 +1,394 @@
+[
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "maxNumberOfDelayedWithdrawalsToClaim",
+        "type": "uint256"
+      }
+    ],
+    "name": "claimDelayedWithdrawals",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "delegatedTo",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "nonce",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "shares",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint32",
+        "name": "startBlock",
+        "type": "uint32"
+      },
+      {
+        "internalType": "uint256",
+        "name": "middlewareTimesIndex",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "receiveAsTokens",
+        "type": "bool"
+      }
+    ],
+    "name": "completeQueuedWithdrawal",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "operator",
+        "type": "address"
+      },
+      {
+        "components": [
+          {
+            "internalType": "bytes",
+            "name": "signature",
+            "type": "bytes"
+          },
+          {
+            "internalType": "uint256",
+            "name": "expiry",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct IEigenDelegationManager.SignatureWithExpiry",
+        "name": "approverSignatureAndExpiry",
+        "type": "tuple"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "approverSalt",
+        "type": "bytes32"
+      }
+    ],
+    "name": "delegateTo",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "eigenPod",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "implementation",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes",
+        "name": "params",
+        "type": "bytes"
+      }
+    ],
+    "name": "initialize",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes[]",
+        "name": "data",
+        "type": "bytes[]"
+      }
+    ],
+    "name": "multicall",
+    "outputs": [
+      {
+        "internalType": "bytes[]",
+        "name": "results",
+        "type": "bytes[]"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "proxiableUUID",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "shares",
+        "type": "uint256"
+      }
+    ],
+    "name": "queueWithdrawal",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "undelegate",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "vault",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "oracleTimestamp",
+        "type": "uint64"
+      },
+      {
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "beaconStateRoot",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "bytes",
+            "name": "proof",
+            "type": "bytes"
+          }
+        ],
+        "internalType": "struct IEigenPod.StateRootProof",
+        "name": "stateRootProof",
+        "type": "tuple"
+      },
+      {
+        "components": [
+          {
+            "internalType": "bytes",
+            "name": "withdrawalProof",
+            "type": "bytes"
+          },
+          {
+            "internalType": "bytes",
+            "name": "slotProof",
+            "type": "bytes"
+          },
+          {
+            "internalType": "bytes",
+            "name": "executionPayloadProof",
+            "type": "bytes"
+          },
+          {
+            "internalType": "bytes",
+            "name": "timestampProof",
+            "type": "bytes"
+          },
+          {
+            "internalType": "bytes",
+            "name": "historicalSummaryBlockRootProof",
+            "type": "bytes"
+          },
+          {
+            "internalType": "uint64",
+            "name": "blockRootIndex",
+            "type": "uint64"
+          },
+          {
+            "internalType": "uint64",
+            "name": "historicalSummaryIndex",
+            "type": "uint64"
+          },
+          {
+            "internalType": "uint64",
+            "name": "withdrawalIndex",
+            "type": "uint64"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "blockRoot",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "slotRoot",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "timestampRoot",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "executionPayloadRoot",
+            "type": "bytes32"
+          }
+        ],
+        "internalType": "struct IEigenPod.WithdrawalProof[]",
+        "name": "withdrawalProofs",
+        "type": "tuple[]"
+      },
+      {
+        "internalType": "bytes[]",
+        "name": "validatorFieldsProofs",
+        "type": "bytes[]"
+      },
+      {
+        "internalType": "bytes32[][]",
+        "name": "validatorFields",
+        "type": "bytes32[][]"
+      },
+      {
+        "internalType": "bytes32[][]",
+        "name": "withdrawalFields",
+        "type": "bytes32[][]"
+      }
+    ],
+    "name": "verifyAndProcessWithdrawals",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "oracleTimestamp",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint40[]",
+        "name": "validatorIndices",
+        "type": "uint40[]"
+      },
+      {
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "beaconStateRoot",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "bytes",
+            "name": "proof",
+            "type": "bytes"
+          }
+        ],
+        "internalType": "struct IEigenPod.StateRootProof",
+        "name": "stateRootProof",
+        "type": "tuple"
+      },
+      {
+        "internalType": "bytes[]",
+        "name": "validatorFieldsProofs",
+        "type": "bytes[]"
+      },
+      {
+        "internalType": "bytes32[][]",
+        "name": "validatorFields",
+        "type": "bytes32[][]"
+      }
+    ],
+    "name": "verifyBalanceUpdates",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "oracleTimestamp",
+        "type": "uint64"
+      },
+      {
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "beaconStateRoot",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "bytes",
+            "name": "proof",
+            "type": "bytes"
+          }
+        ],
+        "internalType": "struct IEigenPod.StateRootProof",
+        "name": "stateRootProof",
+        "type": "tuple"
+      },
+      {
+        "internalType": "uint40[]",
+        "name": "validatorIndices",
+        "type": "uint40[]"
+      },
+      {
+        "internalType": "bytes[]",
+        "name": "validatorFieldsProofs",
+        "type": "bytes[]"
+      },
+      {
+        "internalType": "bytes32[][]",
+        "name": "validatorFields",
+        "type": "bytes32[][]"
+      }
+    ],
+    "name": "verifyWithdrawalCredentials",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]

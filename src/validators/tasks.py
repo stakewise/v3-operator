@@ -285,6 +285,7 @@ async def create_approval_request(
         validators_root=Web3.to_hex(registry_root),
         public_keys=[],
         deposit_signatures=[],
+        withdrawal_addresses=[],
         public_key_shards=[],
         exit_signature_shards=[],
         proof=proof,
@@ -316,6 +317,7 @@ async def create_approval_request(
 
         request.public_keys.append(validator.public_key)
         request.deposit_signatures.append(validator.signature)
+        request.withdrawal_addresses.append(validator.withdrawal_address)
         request.public_key_shards.append(shards.public_keys)
         request.exit_signature_shards.append(shards.exit_signatures)
 

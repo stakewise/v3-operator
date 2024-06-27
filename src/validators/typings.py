@@ -20,6 +20,7 @@ class Validator:
     public_key: HexStr
     signature: HexStr
     amount_gwei: int
+    withdrawal_address: ChecksumAddress | None
 
 
 @dataclass
@@ -40,6 +41,10 @@ class DepositData:
     @property
     def public_keys(self) -> list[HexStr]:
         return [v.public_key for v in self.validators]
+
+    @property
+    def withdrawal_address(self) -> ChecksumAddress:
+        return self.validators[0].withdrawal_address
 
 
 @dataclass
@@ -63,6 +68,7 @@ class ApprovalRequest:
     proof_flags: list[bool] | None
     proof_indexes: list[int] | None
     validators_manager_signature: HexStr | None = None
+    withdrawal_addresses: list[ChecksumAddress] | None = None
 
 
 @dataclass

@@ -146,15 +146,17 @@ def generate_validators_tree(
     vault: HexAddress, deposit_data: list[dict]
 ) -> tuple[StandardMerkleTree, list[DepositDataValidator]]:
     """Generates validators tree."""
-    credentials = get_eth1_withdrawal_credentials(vault)
     leaves: list[tuple[bytes, int]] = []
     validators: list[DepositDataValidator] = []
     for i, data in enumerate(deposit_data):
+        credentials = get_eth1_withdrawal_credentials(data.get('withdrawal_address') or vault)
+
         validator = DepositDataValidator(
             deposit_data_index=i,
             public_key=add_0x_prefix(data['pubkey']),
             signature=add_0x_prefix(data['signature']),
             amount_gwei=int(data['amount']),
+            withdrawal_address=data.get('withdrawal_address'),
         )
         leaves.append((encode_tx_validator(credentials, validator), i))
         validators.append(validator)

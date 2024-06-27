@@ -9,7 +9,7 @@ from sw_utils import IpfsFetchClient, get_consensus_client, get_execution_client
 from web3 import Web3
 
 from src.common.clients import db_client
-from src.common.contracts import vault_contract
+from src.common.contracts import vault_contract, vault_restaking_contract
 from src.common.execution import (
     check_hot_wallet_balance,
     check_vault_address,
@@ -17,6 +17,7 @@ from src.common.execution import (
 )
 from src.common.harvest import get_harvest_params
 from src.common.utils import format_error, warning_verbose
+from src.common.vault import Vault
 from src.common.wallet import hot_wallet
 from src.config.settings import settings
 from src.validators.execution import check_deposit_data_root, get_withdrawable_assets
@@ -182,6 +183,22 @@ async def wait_for_deposit_data_file() -> None:
                 time.sleep(15)
 
 
+async def check_restaking() -> None:
+    withdrawals_manager = await vault_restaking_contract.restake_withdrawals_manager()
+    if withdrawals_manager != hot_wallet.address:
+        raise ValueError('withdrawals manager address must equal to the wallet addresss')
+
+
+async def check_withdrawal_address() -> None:
+    #  Add startup check for AUTO mode that
+    #  withdrawal address is presented in deposit data file and is one of the eigen pods.
+    deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
+
+    vault_pods = await vault_restaking_contract.get_eigen_pods()
+    if deposit_data.withdrawal_address not in vault_pods:
+        raise ValueError('Invalid withdrawal address in deposit data')
+
+
 async def startup_checks():
     validate_settings()
 
@@ -210,6 +227,9 @@ async def startup_checks():
 
     logger.info('Checking hot wallet balance %s...', hot_wallet.address)
     await check_hot_wallet_balance()
+
+    logger.info('Checking restake withdrawals manager...')
+    await check_restaking()
 
     logger.info('Checking connection to ipfs nodes...')
     healthy_ipfs_endpoint = []
@@ -240,6 +260,10 @@ async def startup_checks():
         logger.info('Found keystores dir')
 
     await _check_validators_manager()
+
+    if await Vault().is_restaking() and settings.is_auto_registration_mode:
+        logger.info('Checking eigenlayer withdrawal address...')
+        await check_withdrawal_address()
 
 
 async def _aiohttp_fetch(session: ClientSession, url: str) -> str:

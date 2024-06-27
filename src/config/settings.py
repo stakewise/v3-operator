@@ -40,6 +40,7 @@ class Settings(metaclass=Singleton):
     execution_jwt_secret: str | None
 
     harvest_vault: bool
+    process_withdrawals: bool
     verbose: bool
     enable_metrics: bool
     metrics_host: str
@@ -99,6 +100,7 @@ class Settings(metaclass=Singleton):
         execution_endpoints: str = '',
         execution_jwt_secret: str | None = None,
         harvest_vault: bool = False,
+        process_withdrawals: bool = False,
         verbose: bool = False,
         enable_metrics: bool = False,
         metrics_port: int = DEFAULT_METRICS_PORT,
@@ -132,6 +134,7 @@ class Settings(metaclass=Singleton):
         self.execution_endpoints = [node.strip() for node in execution_endpoints.split(',')]
         self.execution_jwt_secret = execution_jwt_secret
         self.harvest_vault = harvest_vault
+        self.process_withdrawals = process_withdrawals
         self.verbose = verbose
         self.enable_metrics = enable_metrics
         self.metrics_host = metrics_host
@@ -242,6 +245,14 @@ class Settings(metaclass=Singleton):
     def is_genesis_vault(self) -> bool:
         return self.vault == settings.network_config.GENESIS_VAULT_CONTRACT_ADDRESS
 
+    @property
+    def is_auto_registration_mode(self):
+        return settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO
+
+    @property
+    def is_api_registration_mode(self):
+        return settings.validators_registration_mode == ValidatorsRegistrationMode.API
+
 
 settings = Settings()
 
@@ -275,6 +286,12 @@ HASHI_VAULT_TIMEOUT = 10
 # Graphql timeout
 GRAPH_API_TIMEOUT = 10
 
+VALIDATORS_WITHDRAWALS_CHUNK_SIZE: int = decouple_config(
+    'VALIDATORS_WITHDRAWALS_CHUNK_SIZE', default=86400, cast=int
+)  # seconds
+VALIDATORS_WITHDRAWALS_CONCURRENCY: int = decouple_config(
+    'VALIDATORS_WITHDRAWALS_CONCURRENCY', default=200, cast=int
+)
 # logging
 LOG_PLAIN = 'plain'
 LOG_JSON = 'json'

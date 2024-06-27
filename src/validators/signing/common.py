@@ -46,9 +46,11 @@ def get_validators_proof(
 
 
 def encode_tx_validator_list(validators: Sequence[Validator]) -> list[bytes]:
-    credentials = get_eth1_withdrawal_credentials(settings.vault)
     tx_validators: list[bytes] = []
     for validator in validators:
+        credentials = get_eth1_withdrawal_credentials(
+            validator.withdrawal_address or settings.vault
+        )
         tx_validator = encode_tx_validator(credentials, validator)
         tx_validators.append(tx_validator)
     return tx_validators
@@ -59,11 +61,17 @@ def encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) -> 
     signature = Web3.to_bytes(hexstr=validator.signature)
     deposit_root = compute_deposit_data(
         public_key=public_key,
-        withdrawal_credentials=withdrawal_credentials,
+        withdrawal_credentials=withdrawal_credentials or validator.withdrawal_address,
         amount_gwei=validator.amount_gwei,
         signature=signature,
     ).hash_tree_root
-    return public_key + signature + deposit_root
+
+    result = public_key + signature + deposit_root
+
+    if validator.withdrawal_address:
+        result += Web3.to_bytes(hexstr=validator.withdrawal_address)
+
+    return result
 
 
 # pylint: disable-next=too-many-arguments

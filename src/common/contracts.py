@@ -68,6 +68,7 @@ class ContractWrapper:
         event: ContractEvent,
         from_block: BlockNumber,
         to_block: BlockNumber,
+        argument_filters: dict | None = None,
     ) -> list[EventData]:
         events: list[EventData] = []
         blocks_range = self.events_blocks_range_interval
@@ -75,6 +76,7 @@ class ContractWrapper:
             range_events = await event.get_logs(
                 fromBlock=from_block,
                 toBlock=BlockNumber(min(from_block + blocks_range, to_block)),
+                argument_filters=argument_filters,
             )
             if range_events:
                 events.extend(range_events)
@@ -153,6 +155,35 @@ class GnoVaultContract(ContractWrapper, VaultStateMixin):
         update_state_calls = super().get_update_state_calls(harvest_params)
         swap_xdai_call = self.encode_abi(fn_name='swapXdaiToGno', args=[])
         return [*update_state_calls, swap_xdai_call]
+
+
+class VaultRestakingContract(VaultContract):
+    abi_path = 'abi/IEthRestakeVault.json'
+
+    async def restake_withdrawals_manager(self) -> ChecksumAddress:
+        return await self.contract.functions.restakeWithdrawalsManager().call()
+
+    async def get_eigen_pods(self) -> list[ChecksumAddress]:
+        pods = await self.contract.functions.getEigenPods().call()
+        return [Web3.to_checksum_address(pod) for pod in pods]
+
+    async def get_eigen_pod_owners(
+        self,
+        from_block: BlockNumber | None = None,
+        to_block: BlockNumber | None = None,
+    ) -> dict[ChecksumAddress, ChecksumAddress]:
+        """Fetches the validator registered events."""
+        from_block = from_block or settings.network_config.KEEPER_GENESIS_BLOCK
+        to_block = to_block or await execution_client.eth.get_block_number()
+        events = await self._get_events(
+            event=self.events.EigenPodCreated, from_block=from_block, to_block=to_block
+        )
+        return {
+            Web3.to_checksum_address(event['args']['eigenPod']): Web3.to_checksum_address(
+                event['args']['eigenPodOwner']
+            )
+            for event in events
+        }
 
 
 class V2PoolContract(ContractWrapper):
@@ -291,6 +322,135 @@ class MulticallContract(ContractWrapper):
         return await self.contract.functions.aggregate3(data).call(block_identifier=block_number)
 
 
+class EigenPodOwnerContract(ContractWrapper):
+    abi_path = 'abi/IEigenPodOwner.json'
+
+    def __init__(self, address):
+        self._address = address
+
+    @property
+    def contract_address(self) -> ChecksumAddress:
+        return self._address
+
+    # pylint: disable-next=too-many-arguments
+    async def get_verify_withdrawal_credentials_call(
+        self,
+        oracle_timestamp: int,
+        state_root_proof: tuple[bytes, bytes],
+        validator_indices: list[int],
+        validator_fields_proofs: list[bytes],
+        validator_fields: list[list[bytes]],
+    ) -> tuple[ChecksumAddress, bool, HexStr]:
+        call = self.encode_abi(
+            fn_name='verifyWithdrawalCredentials',
+            args=[
+                oracle_timestamp,
+                state_root_proof,
+                validator_indices,
+                validator_fields_proofs,
+                validator_fields,
+            ],
+        )
+        return self.address, False, call
+
+    # pylint: disable-next=too-many-arguments
+    async def get_verify_and_process_withdrawals_call(
+        self,
+        oracle_timestamp: int,
+        state_root_proof: tuple[bytes, bytes],
+        validator_fields_proofs: list[bytes],
+        validator_fields: list[list[bytes]],
+        withdrawal_proofs: list[bytes],
+        withdrawal_fields: list[bytes],
+    ) -> tuple[ChecksumAddress, bool, HexStr]:
+        call = self.encode_abi(
+            fn_name='verifyAndProcessWithdrawals',
+            args=[
+                oracle_timestamp,
+                state_root_proof,
+                withdrawal_proofs,
+                validator_fields_proofs,
+                validator_fields,
+                withdrawal_fields,
+            ],
+        )
+
+        return self.address, False, call
+
+    # pylint: disable-next=too-many-arguments
+    async def get_verify_balance_updates_call(
+        self,
+        oracle_timestamp: int,
+        state_root_proof: tuple[bytes, bytes],
+        validator_indices: list[int],
+        validator_fields_proofs: list[bytes],
+        validator_fields: list[list[bytes]],
+    ) -> tuple[ChecksumAddress, bool, HexStr]:
+        call = self.encode_abi(
+            fn_name='verifyBalanceUpdates',
+            args=[
+                oracle_timestamp,
+                state_root_proof,
+                validator_indices,
+                validator_fields_proofs,
+                validator_fields,
+            ],
+        )
+        return self.address, False, call
+
+    async def get_queue_withdrawal_call(
+        self,
+        shares: int,
+    ) -> tuple[ChecksumAddress, bool, HexStr]:
+        call = self.encode_abi(
+            fn_name='queueWithdrawal',
+            args=[shares],
+        )
+
+        return self.address, False, call
+
+    async def get_claim_delayed_withdrawals_call(
+        self,
+        max_number: int,
+    ) -> tuple[ChecksumAddress, bool, HexStr]:
+        call = self.encode_abi(
+            fn_name='claimDelayedWithdrawals',
+            args=[max_number],
+        )
+
+        return self.address, False, call
+
+    # pylint: disable-next=too-many-arguments
+    async def get_complete_queued_withdrawal_call(
+        self,
+        # The address that the staker was delegated to at the time that the Withdrawal was created
+        delegated_to: ChecksumAddress,
+        # Nonce used to guarantee that otherwise identical withdrawals have unique hashes
+        nonce: int,
+        # amount of shares
+        shares: int,
+        # withdrawals block
+        start_block: BlockNumber,
+        receive_as_tokens: bool,
+    ) -> tuple[ChecksumAddress, bool, HexStr]:
+        middleware_times_index = (
+            0  # middlewareTimesIndex is unused, but will be used in the Slasher eventually
+        )
+        call = self.encode_abi(
+            fn_name='completeQueuedWithdrawal',
+            args=[
+                delegated_to,
+                nonce,
+                shares,
+                start_block,
+                middleware_times_index,
+                receive_as_tokens,
+            ],
+        )
+
+        return self.address, False, call
+
+
 @functools.cache
 def get_gno_vault_contract() -> GnoVaultContract:
     return GnoVaultContract()
@@ -298,6 +458,7 @@ def get_gno_vault_contract() -> GnoVaultContract:
 
 vault_contract = VaultContract()
 vault_v1_contract = VaultV1Contract()
+vault_restaking_contract = VaultRestakingContract()
 validators_registry_contract = ValidatorsRegistryContract()
 keeper_contract = KeeperContract()
 v2_pool_contract = V2PoolContract()

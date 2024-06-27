@@ -47,6 +47,12 @@ from src.common.vault_config import VaultConfig
     callback=validate_eth_address,
 )
 @click.option(
+    '--withdrawal-address',
+    help='The address of the vaultk.',
+    type=str,
+    callback=validate_eth_address,
+)
+@click.option(
     '--pool-size',
     help='Number of processes in a pool.',
     envvar='POOL_SIZE',
@@ -59,6 +65,7 @@ def create_keys(
     count: int,
     vault: HexAddress,
     data_dir: str,
+    withdrawal_address: str | None,
     per_keystore_password: bool,
     pool_size: int | None,
 ) -> None:
@@ -75,6 +82,7 @@ def create_keys(
         mnemonic=mnemonic,
         count=count,
         start_index=config.mnemonic_next_index,
+        withdrawal_address=withdrawal_address,
         pool_size=pool_size,
     )
     deposit_data = _export_deposit_data_json(
