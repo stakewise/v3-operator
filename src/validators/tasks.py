@@ -79,7 +79,7 @@ class ValidatorsTask(BaseTask):
                 deposit_data=self.deposit_data,
             )
         # check and register new validators
-        await calc_assets_build_tx_and_register_validators(
+        await process_validators(
             keystore=self.keystore,
             deposit_data=self.deposit_data,
             relayer=self.relayer,
@@ -87,12 +87,14 @@ class ValidatorsTask(BaseTask):
 
 
 # pylint: disable-next=too-many-locals,too-many-branches,too-many-return-statements,too-many-statements
-async def calc_assets_build_tx_and_register_validators(
+async def process_validators(
     keystore: BaseKeystore | None,
     deposit_data: DepositData | None,
     relayer: BaseRelayerClient | None = None,
 ) -> HexStr | None:
-    """Registers vault validators."""
+    """
+    Calculates vault assets, requests oracles approval, submits registration tx
+    """
     if (
         settings.network_config.IS_SUPPORT_V2_MIGRATION
         and settings.is_genesis_vault
@@ -217,7 +219,7 @@ async def calc_assets_build_tx_and_register_validators(
     )
     if tx_hash:
         pub_keys = ', '.join([val.public_key for val in validators])
-        logger.info('Successfully registered validators with public keys %s', pub_keys)
+        logger.info('Successfully registered validator(s) with public key(s) %s', pub_keys)
 
     return tx_hash
 

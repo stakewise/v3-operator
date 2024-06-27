@@ -30,9 +30,6 @@ async def register_validators(
     validators_registry_root: Bytes32,
     validators_manager_signature: HexStr | None,
 ) -> HexStr | None:
-    """Registers validators."""
-    logger.info('Submitting registration transaction')
-
     if harvest_params is not None:
         # add update state calls before validator registration
         calls = await get_update_state_calls(harvest_params)
@@ -67,6 +64,7 @@ async def register_validators(
 
     calls.append(validators_registration_call)
 
+    logger.info('Submitting registration transaction')
     try:
         tx_params = await get_high_priority_tx_params()
         tx = await multicall_contract.functions.aggregate(calls).transact(tx_params)
