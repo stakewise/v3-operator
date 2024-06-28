@@ -113,8 +113,7 @@ async def get_withdrawable_assets(harvest_params: HarvestParams | None) -> Wei:
     withdrawable_assets_call = vault_contract.encode_abi(fn_name='withdrawableAssets', args=[])
     calls.append((vault_contract.address, withdrawable_assets_call))
 
-    # aggregate returns (uint256 blockNumber, bytes[] memory returnData)
-    _, multicall = await multicall_contract.functions.aggregate(calls).call()
+    _, multicall = await multicall_contract.aggregate(calls)
     after_update_assets = Web3.to_int(multicall[-1])
 
     before_update_validators = before_update_assets // DEPOSIT_AMOUNT

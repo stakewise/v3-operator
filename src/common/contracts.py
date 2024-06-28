@@ -285,10 +285,10 @@ class MulticallContract(ContractWrapper):
 
     async def aggregate(
         self,
-        data: list[tuple[ChecksumAddress, bool, HexStr]],
+        data: list[tuple[ChecksumAddress, HexStr]],
         block_number: BlockNumber | None = None,
-    ) -> list:
-        return await self.contract.functions.aggregate3(data).call(block_identifier=block_number)
+    ) -> tuple[BlockNumber, list]:
+        return await self.contract.functions.aggregate(data).call(block_identifier=block_number)
 
 
 @functools.cache
