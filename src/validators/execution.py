@@ -7,7 +7,11 @@ from sw_utils import EventProcessor, is_valid_deposit_data_signature
 from web3 import Web3
 from web3.types import EventData, Wei
 
-from src.common.contracts import validators_registry_contract, vault_contract
+from src.common.contracts import (
+    multicall_contract,
+    validators_registry_contract,
+    vault_contract,
+)
 from src.common.metrics import metrics
 from src.common.typings import HarvestParams
 from src.common.vault import Vault
@@ -108,7 +112,8 @@ async def get_withdrawable_assets(harvest_params: HarvestParams | None) -> Wei:
     calls = await get_update_state_calls(harvest_params)
     withdrawable_assets_call = vault_contract.encode_abi(fn_name='withdrawableAssets', args=[])
     calls.append((vault_contract.address, withdrawable_assets_call))
-    multicall = await vault_contract.functions.multicall(calls).call()
+
+    _, multicall = await multicall_contract.aggregate(calls)
     after_update_assets = Web3.to_int(multicall[-1])
 
     before_update_validators = before_update_assets // DEPOSIT_AMOUNT
