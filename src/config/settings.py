@@ -20,6 +20,8 @@ DEFAULT_METRICS_PREFIX = 'sw_operator'
 DEFAULT_API_HOST = '127.0.0.1'
 DEFAULT_API_PORT = 8000
 
+DEFAULT_VALIDATORS_REQUIRED = 1
+
 
 # pylint: disable-next=too-many-public-methods,too-many-instance-attributes
 class Settings(metaclass=Singleton):
@@ -84,6 +86,8 @@ class Settings(metaclass=Singleton):
         'DISABLE_DEPOSIT_DATA_WARNINGS', default=False, cast=bool
     )
 
+    min_validators_required: int
+
     # pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements
     def set(
         self,
@@ -117,6 +121,7 @@ class Settings(metaclass=Singleton):
         api_host: str = DEFAULT_API_HOST,
         api_port: int = DEFAULT_API_PORT,
         validators_registration_mode: ValidatorsRegistrationMode = ValidatorsRegistrationMode.AUTO,
+        min_validators_required: int = DEFAULT_VALIDATORS_REQUIRED,
     ) -> None:
         self.vault = Web3.to_checksum_address(vault)
         vault_dir.mkdir(parents=True, exist_ok=True)
@@ -133,6 +138,7 @@ class Settings(metaclass=Singleton):
         self.metrics_port = metrics_port
         self.metrics_prefix = metrics_prefix
         self.max_fee_per_gas_gwei = max_fee_per_gas_gwei
+        self.min_validators_required = min_validators_required
 
         self.deposit_data_file = (
             Path(deposit_data_file) if deposit_data_file else vault_dir / 'deposit_data.json'
