@@ -251,13 +251,14 @@ async def startup_checks():
         logger.info('Checking metrics server...')
         check_metrics_port()
 
-    logger.info('Checking deposit data file...')
-    await wait_for_deposit_data_file()
+    if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
+        logger.info('Checking deposit data file...')
+        await wait_for_deposit_data_file()
 
-    if settings.keystore_cls_str == LocalKeystore.__name__:
-        logger.info('Checking keystores dir...')
-        wait_for_keystores_dir()
-        logger.info('Found keystores dir')
+        if settings.keystore_cls_str == LocalKeystore.__name__:
+            logger.info('Checking keystores dir...')
+            wait_for_keystores_dir()
+            logger.info('Found keystores dir')
 
     await _check_validators_manager()
 
@@ -276,9 +277,6 @@ async def _check_validators_manager() -> None:
     if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
         if await vault_contract.version() == 1:
             raise RuntimeError('Vault version must be 2')
-        validators_manager = await vault_contract.validators_manager()
-        if validators_manager != hot_wallet.address:
-            raise RuntimeError('validators manager address must equal to hot wallet address')
 
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
         if await vault_contract.version() > 1:

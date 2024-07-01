@@ -82,15 +82,15 @@ async def update_oracles_cache() -> None:
 
     rewards_threshold_call = keeper_contract.encode_abi(fn_name='rewardsMinOracles', args=[])
     validators_threshold_call = keeper_contract.encode_abi(fn_name='validatorsMinOracles', args=[])
-    multicall_response = await multicall_contract.aggregate(
+    _, multicall_response = await multicall_contract.aggregate(
         [
-            (keeper_contract.address, False, rewards_threshold_call),
-            (keeper_contract.address, False, validators_threshold_call),
+            (keeper_contract.address, rewards_threshold_call),
+            (keeper_contract.address, validators_threshold_call),
         ],
         block_number=to_block,
     )
-    rewards_threshold = Web3.to_int(multicall_response[0][1])
-    validators_threshold = Web3.to_int(multicall_response[1][1])
+    rewards_threshold = Web3.to_int(multicall_response[0])
+    validators_threshold = Web3.to_int(multicall_response[1])
 
     app_state.oracles_cache = OraclesCache(
         config=config,

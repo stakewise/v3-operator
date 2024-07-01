@@ -8,7 +8,11 @@ from eth_typing import HexStr
 from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.contract import AsyncContract
-from web3.contract.contract import ContractEvent
+from web3.contract.async_contract import (
+    AsyncContractEvent,
+    AsyncContractEvents,
+    AsyncContractFunctions,
+)
 from web3.types import BlockNumber, ChecksumAddress, EventData
 
 from src.common.clients import execution_client
@@ -37,15 +41,24 @@ class ContractWrapper:
             abi = json.load(f)
         return execution_client.eth.contract(abi=abi, address=self.contract_address)
 
+    @property
+    def address(self) -> ChecksumAddress:
+        return self.contract.address
+
+    @property
+    def functions(self) -> AsyncContractFunctions:
+        return self.contract.functions
+
+    @property
+    def events(self) -> AsyncContractEvents:
+        return self.contract.events
+
     def encode_abi(self, fn_name: str, args: list | None = None) -> HexStr:
         return self.contract.encodeABI(fn_name=fn_name, args=args)
 
-    def __getattr__(self, item):
-        return getattr(self.contract, item)
-
     async def _get_last_event(
         self,
-        event: ContractEvent,
+        event: type[AsyncContractEvent],
         from_block: BlockNumber,
         to_block: BlockNumber,
         argument_filters: dict | None = None,
@@ -65,7 +78,7 @@ class ContractWrapper:
 
     async def _get_events(
         self,
-        event: ContractEvent,
+        event: type[AsyncContractEvent],
         from_block: BlockNumber,
         to_block: BlockNumber,
         argument_filters: dict | None = None,
@@ -87,7 +100,7 @@ class ContractWrapper:
 class VaultStateMixin:
     encode_abi: Callable
 
-    def get_update_state_calls(self, harvest_params: HarvestParams) -> list[HexStr]:
+    def get_update_state_call(self, harvest_params: HarvestParams) -> HexStr:
         update_state_call = self.encode_abi(
             fn_name='updateState',
             args=[
@@ -99,7 +112,7 @@ class VaultStateMixin:
                 )
             ],
         )
-        return [update_state_call]
+        return update_state_call
 
 
 class VaultV1Contract(ContractWrapper, VaultStateMixin):
@@ -130,7 +143,9 @@ class VaultContract(ContractWrapper, VaultStateMixin):
     ) -> list[HexStr]:
         """Fetches the validator registered events."""
         events = await self._get_events(
-            event=self.events.ValidatorRegistered, from_block=from_block, to_block=to_block
+            event=self.events.ValidatorRegistered,  # type: ignore
+            from_block=from_block,
+            to_block=to_block,
         )
         return [Web3.to_hex(event['args']['publicKey']) for event in events]
 
@@ -151,10 +166,8 @@ class GnoVaultContract(ContractWrapper, VaultStateMixin):
     def contract_address(self) -> ChecksumAddress:
         return settings.vault
 
-    def get_update_state_calls(self, harvest_params: HarvestParams) -> list[HexStr]:
-        update_state_calls = super().get_update_state_calls(harvest_params)
-        swap_xdai_call = self.encode_abi(fn_name='swapXdaiToGno', args=[])
-        return [*update_state_calls, swap_xdai_call]
+    def get_swap_xdai_call(self) -> HexStr:
+        return self.encode_abi(fn_name='swapXdaiToGno', args=[])
 
 
 class VaultRestakingContract(VaultContract):
@@ -195,7 +208,9 @@ class V2PoolContract(ContractWrapper):
     ) -> list[HexStr]:
         """Fetches the validator registered events."""
         events = await self._get_events(
-            event=self.events.ValidatorRegistered, from_block=from_block, to_block=to_block
+            event=self.events.ValidatorRegistered,  # type: ignore
+            from_block=from_block,
+            to_block=to_block,
         )
         return [Web3.to_hex(event['args']['publicKey']) for event in events]
 
@@ -227,7 +242,7 @@ class KeeperContract(ContractWrapper):
     ) -> EventData | None:
         """Fetches the last oracles config updated event."""
         return await self._get_last_event(
-            self.events.ConfigUpdated,
+            self.events.ConfigUpdated,  # type: ignore
             from_block=from_block or settings.network_config.KEEPER_GENESIS_BLOCK,
             to_block=to_block or await execution_client.eth.get_block_number(),
         )
@@ -235,7 +250,7 @@ class KeeperContract(ContractWrapper):
     async def get_last_rewards_update(self) -> RewardVoteInfo | None:
         """Fetches the last rewards update."""
         last_event = await self._get_last_event(
-            self.events.RewardsUpdated,
+            self.events.RewardsUpdated,  # type: ignore
             from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
             to_block=await execution_client.eth.get_block_number(),
         )
@@ -258,7 +273,7 @@ class KeeperContract(ContractWrapper):
         to_block = to_block or await execution_client.eth.get_block_number()
 
         last_event = await self._get_last_event(
-            self.events.ExitSignaturesUpdated,
+            self.events.ExitSignaturesUpdated,  # type: ignore
             from_block=from_block,
             to_block=to_block,
             argument_filters={'vault': vault},
@@ -294,21 +309,6 @@ class DepositDataRegistryContract(ContractWrapper):
         """Fetches vault's current validators index."""
         return await self.contract.functions.depositDataIndexes(settings.vault).call()
 
-    def get_update_state_calls(self, harvest_params: HarvestParams) -> list[HexStr]:
-        update_state_call = self.encode_abi(
-            fn_name='updateVaultState',
-            args=[
-                settings.vault,
-                (
-                    harvest_params.rewards_root,
-                    harvest_params.reward,
-                    harvest_params.unlocked_mev_reward,
-                    harvest_params.proof,
-                ),
-            ],
-        )
-        return [update_state_call]
-
 
 class MulticallContract(ContractWrapper):
     abi_path = 'abi/Multicall.json'
@@ -316,10 +316,10 @@ class MulticallContract(ContractWrapper):
 
     async def aggregate(
         self,
-        data: list[tuple[ChecksumAddress, bool, HexStr]],
+        data: list[tuple[ChecksumAddress, HexStr]],
         block_number: BlockNumber | None = None,
-    ) -> list:
-        return await self.contract.functions.aggregate3(data).call(block_identifier=block_number)
+    ) -> tuple[BlockNumber, list]:
+        return await self.contract.functions.aggregate(data).call(block_identifier=block_number)
 
 
 class EigenPodOwnerContract(ContractWrapper):

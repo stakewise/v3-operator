@@ -3,34 +3,23 @@ import struct
 from typing import Sequence, Set
 
 from eth_typing import BlockNumber, HexStr
-from multiproof.standard import MultiProof
 from sw_utils import EventProcessor, is_valid_deposit_data_signature
-from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.types import EventData, Wei
 
-from src.common.clients import execution_client
 from src.common.contracts import (
-    get_gno_vault_contract,
+    multicall_contract,
     validators_registry_contract,
     vault_contract,
 )
-from src.common.execution import get_high_priority_tx_params
 from src.common.metrics import metrics
-from src.common.typings import HarvestParams, OraclesApproval
-from src.common.utils import format_error
+from src.common.typings import HarvestParams
 from src.common.vault import Vault
-from src.config.networks import GNO_NETWORKS
 from src.config.settings import DEPOSIT_AMOUNT, settings
+from src.harvest.execution import get_update_state_calls
 from src.validators.database import NetworkValidatorCrud
 from src.validators.keystores.base import BaseKeystore
-from src.validators.relayer import RelayerClient
-from src.validators.typings import (
-    DepositData,
-    DepositDataValidator,
-    NetworkValidator,
-    Validator,
-)
+from src.validators.typings import DepositData, DepositDataValidator, NetworkValidator
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +90,7 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
     else:
         from_block = settings.network_config.VALIDATORS_REGISTRY_GENESIS_BLOCK
 
-    new_events = await validators_registry_contract.events.DepositEvent.get_logs(
+    new_events = await validators_registry_contract.events.DepositEvent.get_logs(  # type: ignore
         fromBlock=from_block
     )
     new_public_keys: Set[HexStr] = set()
@@ -120,13 +109,12 @@ async def get_withdrawable_assets(harvest_params: HarvestParams | None) -> Wei:
     if harvest_params is None:
         return before_update_assets
 
-    after_update_assets = None
+    calls = await get_update_state_calls(harvest_params)
+    withdrawable_assets_call = vault_contract.encode_abi(fn_name='withdrawableAssets', args=[])
+    calls.append((vault_contract.address, withdrawable_assets_call))
 
-    if settings.network in GNO_NETWORKS:
-        after_update_assets = await _gno_get_withdrawable_assets(harvest_params)
-
-    if after_update_assets is None:
-        after_update_assets = await _eth_get_withdrawable_assets(harvest_params)
+    _, multicall = await multicall_contract.aggregate(calls)
+    after_update_assets = Web3.to_int(multicall[-1])
 
     before_update_validators = before_update_assets // DEPOSIT_AMOUNT
     after_update_validators = after_update_assets // DEPOSIT_AMOUNT
@@ -134,32 +122,6 @@ async def get_withdrawable_assets(harvest_params: HarvestParams | None) -> Wei:
         return Wei(after_update_assets)
 
     return Wei(before_update_assets)
-
-
-async def _gno_get_withdrawable_assets(harvest_params: HarvestParams) -> int | None:
-    gno_vault_contract = get_gno_vault_contract()
-    update_state_calls = gno_vault_contract.get_update_state_calls(harvest_params)
-    withdrawable_assets_call = gno_vault_contract.encode_abi(fn_name='withdrawableAssets', args=[])
-    try:
-        multicall = await gno_vault_contract.functions.multicall(
-            [*update_state_calls, withdrawable_assets_call]
-        ).call()
-    except Exception:
-        return None
-
-    assets = Web3.to_int(multicall[-1])
-    return assets
-
-
-async def _eth_get_withdrawable_assets(harvest_params: HarvestParams) -> int:
-    update_state_calls = vault_contract.get_update_state_calls(harvest_params)
-    withdrawable_assets_call = vault_contract.encode_abi(fn_name='withdrawableAssets', args=[])
-    multicall = await vault_contract.functions.multicall(
-        [*update_state_calls, withdrawable_assets_call]
-    ).call()
-
-    assets = Web3.to_int(multicall[-1])
-    return assets
 
 
 async def check_deposit_data_root(deposit_data_root: str) -> None:
@@ -213,25 +175,6 @@ async def get_validators_from_deposit_data(
     return validators
 
 
-async def get_validators_from_relayer(
-    relayer: RelayerClient, start_validator_index: int, count: int
-) -> Sequence[Validator]:
-    validators: list[Validator] = []
-    relayer_validators = await relayer.get_validators(start_validator_index, count)
-
-    for validator in relayer_validators[:count]:
-        if NetworkValidatorCrud().is_validator_registered(validator.public_key):
-            logger.warning(
-                'Validator with public key %s is already registered.',
-                validator.public_key,
-            )
-            break
-
-        validators.append(validator)
-
-    return validators
-
-
 async def update_unused_validator_keys_metric(
     keystore: BaseKeystore,
     deposit_data: DepositData,
@@ -254,114 +197,3 @@ async def update_unused_validator_keys_metric(
     metrics.unused_validator_keys.set(validators)
 
     return validators
-
-
-async def register_single_validator(
-    approval: OraclesApproval,
-    multi_proof: MultiProof | None,
-    tx_validators: list[bytes],
-    harvest_params: HarvestParams | None,
-    validators_registry_root: Bytes32,
-) -> HexStr | None:
-    """Registers single validator."""
-    logger.info('Submitting registration transaction')
-
-    keeper_approval_params = (
-        validators_registry_root,
-        approval.deadline,
-        tx_validators[0],
-        approval.signatures,
-        approval.ipfs_hash,
-    )
-    register_via_vault_v2: bool = False
-
-    register_call_args: list = [keeper_approval_params]
-    if multi_proof:
-        register_call_args.append(multi_proof.proof)
-    else:
-        register_via_vault_v2 = True
-
-    try:
-        tx_params = await get_high_priority_tx_params()
-
-        tx = await Vault().register_single_validator(
-            tx_params=tx_params,
-            harvest_params=harvest_params,
-            register_call_args=register_call_args,
-            register_via_vault_v2=register_via_vault_v2,
-        )
-    except Exception as e:
-        logger.error('Failed to register validator: %s', format_error(e))
-        if settings.verbose:
-            logger.exception(e)
-        return None
-
-    tx_hash = Web3.to_hex(tx)
-    logger.info('Waiting for transaction %s confirmation', tx_hash)
-    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
-        tx, timeout=settings.execution_transaction_timeout
-    )
-    if not tx_receipt['status']:
-        logger.error('Registration transaction failed')
-        return None
-
-    return tx_hash
-
-
-async def register_multiple_validator(
-    multi_proof: MultiProof | None,
-    tx_validators: list[bytes],
-    approval: OraclesApproval,
-    harvest_params: HarvestParams | None,
-    validators_registry_root: Bytes32,
-) -> HexStr | None:
-    """Registers multiple validators."""
-    logger.info('Submitting registration transaction')
-    keeper_approval_params = (
-        validators_registry_root,
-        approval.deadline,
-        b''.join(tx_validators),
-        approval.signatures,
-        approval.ipfs_hash,
-    )
-    # Vault args
-    register_call_args: list = [keeper_approval_params]
-    register_via_vault_v2 = False
-
-    if multi_proof:
-        proof_indexes = [leaf[1] for leaf in multi_proof.leaves]
-
-        # DepositDataRegistry args
-        register_call_args = [
-            settings.vault,
-            keeper_approval_params,
-            proof_indexes,
-            multi_proof.proof_flags,
-            multi_proof.proof,
-        ]
-    else:
-        register_via_vault_v2 = True
-
-    try:
-        tx_params = await get_high_priority_tx_params()
-        tx = await Vault().register_multiple_validators(
-            tx_params=tx_params,
-            harvest_params=harvest_params,
-            register_call_args=register_call_args,
-            register_via_vault_v2=register_via_vault_v2,
-        )
-    except Exception as e:
-        logger.error('Failed to register validators: %s', format_error(e))
-        if settings.verbose:
-            logger.exception(e)
-        return None
-
-    tx_hash = Web3.to_hex(tx)
-    logger.info('Waiting for transaction %s confirmation', tx_hash)
-    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
-        tx, timeout=settings.execution_transaction_timeout
-    )
-    if not tx_receipt['status']:
-        logger.error('Registration transaction failed')
-        return None
-    return tx_hash

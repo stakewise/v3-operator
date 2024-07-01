@@ -74,8 +74,7 @@ class Settings(metaclass=Singleton):
     sentry_environment: str
     pool_size: int | None
 
-    relayer_host: str | None
-    relayer_port: int | None
+    relayer_endpoint: str | None
     relayer_timeout: int
     validators_registration_mode: ValidatorsRegistrationMode
     skip_startup_checks: bool
@@ -121,8 +120,7 @@ class Settings(metaclass=Singleton):
         log_level: str | None = None,
         log_format: str | None = None,
         pool_size: int | None = None,
-        relayer_host: str | None = None,
-        relayer_port: int | None = None,
+        relayer_endpoint: str | None = None,
         validators_registration_mode: ValidatorsRegistrationMode = ValidatorsRegistrationMode.AUTO,
     ) -> None:
         self.vault = Web3.to_checksum_address(vault)
@@ -221,8 +219,7 @@ class Settings(metaclass=Singleton):
         self.consensus_retry_timeout = decouple_config(
             'CONSENSUS_RETRY_TIMEOUT', default=120, cast=int
         )
-        self.relayer_host = relayer_host
-        self.relayer_port = relayer_port
+        self.relayer_endpoint = relayer_endpoint
         self.relayer_timeout = decouple_config('RELAYER_TIMEOUT', default=10, cast=int)
 
         self.validators_registration_mode = validators_registration_mode

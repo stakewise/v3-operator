@@ -26,11 +26,18 @@ class Validator:
 @dataclass
 class DepositDataValidator(Validator):
     deposit_data_index: int
+    deposit_data_root: HexStr
 
 
 @dataclass
 class RelayerValidator(Validator):
     exit_signature: BLSSignature
+
+
+@dataclass
+class RelayerValidatorsResponse:
+    validators: list[RelayerValidator]
+    validators_manager_signature: HexStr
 
 
 @dataclass
