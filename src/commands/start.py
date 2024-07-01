@@ -210,7 +210,7 @@ logger = logging.getLogger(__name__)
 @click.option(
     '--min-validators-registration',
     type=int,
-    envvar='MIN_VALIDATORS_REQUIRED',
+    envvar='MIN_VALIDATORS_REGISTRATION',
     help='Minimum number of validators required to start registration.',
     default=1,
 )
