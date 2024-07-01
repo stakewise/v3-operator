@@ -128,10 +128,10 @@ async def register_validators(
         return None
 
     # Check if there is enough ETH to register the specified minimum number of validators
-    if validators_count < settings.min_validators_required:
-        logger.info(
+    if validators_count < settings.min_validators_registration:
+        logger.debug(
             'Not enough ETH to register %d validators. Current balance allows for %d validators.',
-            settings.min_validators_required,
+            settings.min_validators_registration,
             validators_count,
         )
         return None

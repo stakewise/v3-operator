@@ -243,7 +243,7 @@ def start(
     max_fee_per_gas_gwei: int,
     database_dir: str | None,
     pool_size: int | None,
-    min_validators_required: int,
+    min_validators_registration: int,
 ) -> None:
     vault_config = VaultConfig(vault, Path(data_dir))
     if network is None:
@@ -277,7 +277,7 @@ def start(
         log_level=log_level,
         log_format=log_format,
         pool_size=pool_size,
-        min_validators_required=min_validators_required,
+        min_validators_registration=min_validators_registration,
     )
 
     try:
