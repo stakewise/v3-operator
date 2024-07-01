@@ -147,7 +147,8 @@ async def _calc_high_priority_fee() -> Wei:
 
     # prettify `mean_reward`
     # same as `round(value, 1)` if value was in gwei
-    mean_reward = round(mean_reward, -8)
+    if mean_reward > Web3.to_wei(1, 'gwei'):
+        mean_reward = round(mean_reward, -8)
 
     return Wei(mean_reward)
 
