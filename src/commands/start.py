@@ -207,6 +207,13 @@ logger = logging.getLogger(__name__)
     envvar='POOL_SIZE',
     type=int,
 )
+@click.option(
+    '--min-validators-registration',
+    type=int,
+    envvar='MIN_VALIDATORS_REGISTRATION',
+    help='Minimum number of validators required to start registration.',
+    default=1,
+)
 @click.command(help='Start operator service')
 # pylint: disable-next=too-many-arguments,too-many-locals
 def start(
@@ -236,6 +243,7 @@ def start(
     max_fee_per_gas_gwei: int,
     database_dir: str | None,
     pool_size: int | None,
+    min_validators_registration: int,
 ) -> None:
     vault_config = VaultConfig(vault, Path(data_dir))
     if network is None:
@@ -269,6 +277,7 @@ def start(
         log_level=log_level,
         log_format=log_format,
         pool_size=pool_size,
+        min_validators_registration=min_validators_registration,
     )
 
     try:
