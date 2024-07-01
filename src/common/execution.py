@@ -124,6 +124,10 @@ async def get_high_priority_tx_params() -> TxParams:
 
     max_priority_fee_per_gas = await _calc_high_priority_fee()
 
+    # Edge case on chiado
+    if max_priority_fee_per_gas == Wei(0):
+        max_priority_fee_per_gas = Wei(1)
+
     # Reference: `_max_fee_per_gas` in web3/_utils/async_transactions.py
     block = await execution_client.eth.get_block('latest')
     max_fee_per_gas = Wei(max_priority_fee_per_gas + (2 * block['baseFeePerGas']))
