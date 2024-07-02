@@ -5,6 +5,7 @@ from web3.types import Wei
 from src.common.clients import ipfs_fetch_client
 from src.common.contracts import keeper_contract, vault_contract
 from src.common.typings import HarvestParams
+from src.config.networks import GNO_NETWORKS
 from src.config.settings import settings
 
 
@@ -36,12 +37,15 @@ async def _fetch_harvest_params_from_ipfs(
 
         if mev_escrow == settings.network_config.SHARED_MEV_ESCROW_CONTRACT_ADDRESS:
             # shared mev vault
+            if settings.network in GNO_NETWORKS:
+                reward = vault_data['consensus_reward']
+            else:
+                reward = Wei(
+                    vault_data['consensus_reward']
+                    + vault_data['unlocked_mev_reward']
+                    + vault_data['locked_mev_reward']
+                )
             unlocked_mev_reward = Wei(vault_data['unlocked_mev_reward'])
-            reward = Wei(
-                vault_data['consensus_reward']
-                + unlocked_mev_reward
-                + vault_data['locked_mev_reward']
-            )
         else:
             # own mev vault
             unlocked_mev_reward = Wei(0)
