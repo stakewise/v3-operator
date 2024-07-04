@@ -216,7 +216,7 @@ NETWORKS = {
         ),
         KEEPER_GENESIS_BLOCK=BlockNumber(10627588),
         DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xf9eB9EAd3d71516bF5206F702B8BD0c183045474'
+            '0xFAce8504462AEb9BB6ae7Ecb206BD7B1EdF7956D'
         ),
         V2_POOL_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         V2_POOL_GENESIS_BLOCK=BlockNumber(0),
