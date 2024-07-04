@@ -165,12 +165,16 @@ NETWORKS = {
             '0xcAC0e3E35d3BA271cd2aaBE688ac9DB1898C26aa'
         ),
         KEEPER_GENESIS_BLOCK=BlockNumber(34778552),
-        DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x58e16621B5c0786D6667D2d54E28A20940269E16'
+        ),
         V2_POOL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x2f99472b727e15EECf9B9eFF9F7481B85d3b4444'
         ),
         V2_POOL_GENESIS_BLOCK=BlockNumber(21275812),
-        V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0xfc9B67b6034F6B306EA9Bd8Ec1baf3eFA2490394'
+        ),
         GENESIS_VAULT_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x4b4406Ed8659D03423490D8b62a1639206dA0A7a'
         ),
@@ -185,8 +189,8 @@ NETWORKS = {
         GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x00000064')),
         IS_POA=False,
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
-        SHAPELLA_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x0')),
-        SHAPELLA_EPOCH=0,  # todo
+        SHAPELLA_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x03000064')),
+        SHAPELLA_EPOCH=648704,
         MULTICALL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xcA11bde05977b3631167028862bE2a173976CA11'
         ),
