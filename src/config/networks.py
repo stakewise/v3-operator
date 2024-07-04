@@ -43,7 +43,6 @@ class NetworkConfig:
     SHARED_MEV_ESCROW_CONTRACT_ADDRESS: ChecksumAddress
     STAKEWISE_API_URL: str
     RATED_API_URL: str
-    VALIDATORS_CHECKER_CONTRACT_ADDRESS: ChecksumAddress
 
     @property
     def SHAPELLA_FORK(self) -> ConsensusFork:
@@ -107,7 +106,6 @@ NETWORKS = {
         ),
         STAKEWISE_API_URL='https://mainnet-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
-        VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
     ),
     HOLESKY: NetworkConfig(
         CHAIN_ID=17000,
@@ -149,9 +147,6 @@ NETWORKS = {
         ),
         STAKEWISE_API_URL='https://holesky-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
-        VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x23FCd08f2e85f765d329027AB6D4323a0BC057A7'
-        ),
     ),
     GNOSIS: NetworkConfig(
         CHAIN_ID=100,
@@ -199,9 +194,6 @@ NETWORKS = {
         ),
         STAKEWISE_API_URL='https://gnosis-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
-        VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x3E2CC1584a2fB4FB2D4f4aF68AE47B57BE76dC65'
-        ),
     ),
     CHIADO: NetworkConfig(
         CHAIN_ID=10200,
@@ -245,8 +237,5 @@ NETWORKS = {
         ),
         STAKEWISE_API_URL='https://chiado-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
-        VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x35B119c61B3Bb97f324423Ef5D3A82243daBb1B6'
-        ),
     ),
 }
