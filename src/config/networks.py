@@ -161,16 +161,19 @@ NETWORKS = {
             '0x0B98057eA310F4d31F2a452B414647007d1645d9'
         ),
         VALIDATORS_REGISTRY_GENESIS_BLOCK=BlockNumber(19469076),
-        # TODO: replace with real values once contracts deployed
-        KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
-        KEEPER_GENESIS_BLOCK=BlockNumber(0),
+        KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0xcAC0e3E35d3BA271cd2aaBE688ac9DB1898C26aa'
+        ),
+        KEEPER_GENESIS_BLOCK=BlockNumber(34778552),
         DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         V2_POOL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x2f99472b727e15EECf9B9eFF9F7481B85d3b4444'
         ),
         V2_POOL_GENESIS_BLOCK=BlockNumber(21275812),
         V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
-        GENESIS_VAULT_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        GENESIS_VAULT_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x4b4406Ed8659D03423490D8b62a1639206dA0A7a'
+        ),
         GENESIS_VALIDATORS_ROOT=Bytes32(
             Web3.to_bytes(
                 hexstr=HexStr('0xf5dcb5564e829aab27264b9becd5dfaa017085611224cb3036f573368dbb9d47')
@@ -187,10 +190,14 @@ NETWORKS = {
         MULTICALL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xcA11bde05977b3631167028862bE2a173976CA11'
         ),
-        SHARED_MEV_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        SHARED_MEV_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x30db0d10d3774e78f8cB214b9e8B72D4B402488a'
+        ),
         STAKEWISE_API_URL='https://gnosis-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
-        VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x3E2CC1584a2fB4FB2D4f4aF68AE47B57BE76dC65'
+        ),
     ),
     CHIADO: NetworkConfig(
         CHAIN_ID=10200,
@@ -201,9 +208,9 @@ NETWORKS = {
         ),
         VALIDATORS_REGISTRY_GENESIS_BLOCK=BlockNumber(155434),
         KEEPER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x13Af1266d8664aF3da4c711E7C86725D4779EA72'
+            '0x5f31eD13eBF81B67a9f9498F3d1D2Da553058988'
         ),
-        KEEPER_GENESIS_BLOCK=BlockNumber(10258082),
+        KEEPER_GENESIS_BLOCK=BlockNumber(10627588),
         DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xf9eB9EAd3d71516bF5206F702B8BD0c183045474'
         ),
@@ -211,7 +218,7 @@ NETWORKS = {
         V2_POOL_GENESIS_BLOCK=BlockNumber(0),
         V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         GENESIS_VAULT_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xF3d3071905A6495a4D2f8650E8b3baaAE827DD13'
+            '0xF82f6E46d0d0a9536b9CA4bc480372EeaFcd9E6c'
         ),
         GENESIS_VALIDATORS_ROOT=Bytes32(
             Web3.to_bytes(
@@ -230,12 +237,12 @@ NETWORKS = {
             '0xcA11bde05977b3631167028862bE2a173976CA11'
         ),
         SHARED_MEV_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x069a8fF3cD84B2F861F9554E4b2c3FFA3F89b6bD'
+            '0x453056f0bc4631abB15eEC656139f88067668E3E'
         ),
         STAKEWISE_API_URL='https://chiado-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
         VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x5Fa9600FF682FA65Fff6085df06CCBB7dC01DF08'
+            '0x35B119c61B3Bb97f324423Ef5D3A82243daBb1B6'
         ),
     ),
 }
