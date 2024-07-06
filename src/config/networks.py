@@ -36,7 +36,6 @@ class NetworkConfig:
     SLOTS_PER_EPOCH: int
     SECONDS_PER_BLOCK: int
     GENESIS_FORK_VERSION: bytes
-    IS_POA: bool
     HOT_WALLET_MIN_BALANCE: Wei
     SHAPELLA_FORK_VERSION: bytes
     SHAPELLA_EPOCH: int
@@ -75,7 +74,9 @@ NETWORKS = {
             '0x6B5815467da09DaA7DC83Db21c9239d98Bb487b5'
         ),
         KEEPER_GENESIS_BLOCK=BlockNumber(18470089),
-        DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x75AB6DdCe07556639333d3Df1eaa684F5735223e'
+        ),
         V2_POOL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xC874b064f465bdD6411D45734b56fac750Cda29A'
         ),
@@ -95,7 +96,6 @@ NETWORKS = {
         SLOTS_PER_EPOCH=32,
         SECONDS_PER_BLOCK=12,
         GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x00000000')),
-        IS_POA=False,
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
         SHAPELLA_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x03000000')),
         SHAPELLA_EPOCH=194048,
@@ -121,12 +121,16 @@ NETWORKS = {
         ),
         KEEPER_GENESIS_BLOCK=BlockNumber(215379),
         DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xf25f9A254F38aF10Dc352bF8F446Dc09a820ca76'
+            '0xAC0F906E433d58FA868F936E8A43230473652885'
         ),
         V2_POOL_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         V2_POOL_GENESIS_BLOCK=BlockNumber(0),
-        V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
-        GENESIS_VAULT_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x1f10dB396120183Fc309d45110979879866Db0D2'
+        ),
+        GENESIS_VAULT_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x0bD7de255880d0e4DBD8cA6081a129FD56Ecb661'
+        ),
         GENESIS_VALIDATORS_ROOT=Bytes32(
             Web3.to_bytes(
                 hexstr=HexStr('0x9143aa7c615a7f7115e2b6aac319c03529df8242ae705fba9df39b79c59fa8b1')
@@ -136,7 +140,6 @@ NETWORKS = {
         SLOTS_PER_EPOCH=32,
         SECONDS_PER_BLOCK=12,
         GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x01017000')),
-        IS_POA=False,
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
         SHAPELLA_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x04017000')),
         SHAPELLA_EPOCH=256,
@@ -183,8 +186,7 @@ NETWORKS = {
         SLOTS_PER_EPOCH=16,
         SECONDS_PER_BLOCK=5,
         GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x00000064')),
-        IS_POA=False,
-        HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
+        HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
         SHAPELLA_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x03000064')),
         SHAPELLA_EPOCH=648704,
         MULTICALL_CONTRACT_ADDRESS=Web3.to_checksum_address(
@@ -213,7 +215,9 @@ NETWORKS = {
         ),
         V2_POOL_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         V2_POOL_GENESIS_BLOCK=BlockNumber(0),
-        V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x928F9a91E674C886Cae0c377670109aBeF7e19d6'
+        ),
         GENESIS_VAULT_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xF82f6E46d0d0a9536b9CA4bc480372EeaFcd9E6c'
         ),
@@ -226,8 +230,7 @@ NETWORKS = {
         SLOTS_PER_EPOCH=16,
         SECONDS_PER_BLOCK=5,
         GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x0000006f')),
-        IS_POA=False,
-        HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.001', 'ether'),  # todo
+        HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
         SHAPELLA_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x0300006f')),
         SHAPELLA_EPOCH=244224,
         MULTICALL_CONTRACT_ADDRESS=Web3.to_checksum_address(
