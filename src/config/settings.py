@@ -6,7 +6,14 @@ from web3 import Web3
 from web3.types import ChecksumAddress
 
 from src.common.typings import Singleton
-from src.config.networks import HOLESKY, MAINNET, NETWORKS, NetworkConfig
+from src.config.networks import (
+    CHIADO,
+    GNOSIS,
+    HOLESKY,
+    MAINNET,
+    NETWORKS,
+    NetworkConfig,
+)
 from src.validators.typings import ValidatorsRegistrationMode
 
 DATA_DIR = Path.home() / '.stakewise'
@@ -16,9 +23,6 @@ DEFAULT_MAX_FEE_PER_GAS_GWEI = 100
 DEFAULT_METRICS_HOST = '127.0.0.1'
 DEFAULT_METRICS_PORT = 9100
 DEFAULT_METRICS_PREFIX = 'sw_operator'
-
-DEFAULT_API_HOST = '127.0.0.1'
-DEFAULT_API_PORT = 8000
 
 DEFAULT_MIN_VALIDATORS_REGISTRATION = 1
 
@@ -71,8 +75,8 @@ class Settings(metaclass=Singleton):
     sentry_environment: str
     pool_size: int | None
 
-    api_host: str
-    api_port: int
+    relayer_endpoint: str | None
+    relayer_timeout: int
     validators_registration_mode: ValidatorsRegistrationMode
     skip_startup_checks: bool
 
@@ -118,8 +122,7 @@ class Settings(metaclass=Singleton):
         log_level: str | None = None,
         log_format: str | None = None,
         pool_size: int | None = None,
-        api_host: str = DEFAULT_API_HOST,
-        api_port: int = DEFAULT_API_PORT,
+        relayer_endpoint: str | None = None,
         validators_registration_mode: ValidatorsRegistrationMode = ValidatorsRegistrationMode.AUTO,
         min_validators_registration: int = DEFAULT_MIN_VALIDATORS_REGISTRATION,
     ) -> None:
@@ -219,8 +222,9 @@ class Settings(metaclass=Singleton):
         self.consensus_retry_timeout = decouple_config(
             'CONSENSUS_RETRY_TIMEOUT', default=120, cast=int
         )
-        self.api_host = api_host
-        self.api_port = api_port
+        self.relayer_endpoint = relayer_endpoint
+        self.relayer_timeout = decouple_config('RELAYER_TIMEOUT', default=10, cast=int)
+
         self.validators_registration_mode = validators_registration_mode
 
         self.skip_startup_checks = decouple_config('SKIP_STARTUP_CHECKS', default=False, cast=bool)
@@ -244,7 +248,7 @@ class Settings(metaclass=Singleton):
 
 settings = Settings()
 
-AVAILABLE_NETWORKS = [MAINNET, HOLESKY]
+AVAILABLE_NETWORKS = [MAINNET, HOLESKY, GNOSIS, CHIADO]
 DEFAULT_NETWORK = MAINNET
 
 # oracles
@@ -257,6 +261,7 @@ ORACLES_VALIDATORS_TIMEOUT: int = decouple_config(
 # common
 DEPOSIT_AMOUNT = Web3.to_wei(32, 'ether')
 DEPOSIT_AMOUNT_GWEI = int(Web3.from_wei(DEPOSIT_AMOUNT, 'gwei'))
+GNOSIS_NETWORKS = [GNOSIS, CHIADO]
 
 # Backoff retries
 DEFAULT_RETRY_TIME = 60

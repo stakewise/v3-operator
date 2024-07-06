@@ -1,18 +1,31 @@
-import logging
-
 from eth_typing import ChecksumAddress
 from web3 import Web3
 from web3.types import Wei
 
 from src.common.clients import ipfs_fetch_client
-from src.common.contracts import vault_contract
+from src.common.contracts import keeper_contract, vault_contract
 from src.common.typings import HarvestParams
+from src.config.networks import GNO_NETWORKS
 from src.config.settings import settings
 
-logger = logging.getLogger(__name__)
+
+async def get_harvest_params() -> HarvestParams | None:
+    last_rewards = await keeper_contract.get_last_rewards_update()
+    if last_rewards is None:
+        return None
+
+    if not await keeper_contract.can_harvest(vault_contract.contract_address):
+        return None
+
+    harvest_params = await _fetch_harvest_params_from_ipfs(
+        vault_address=settings.vault,
+        ipfs_hash=last_rewards.ipfs_hash,
+        rewards_root=last_rewards.rewards_root,
+    )
+    return harvest_params
 
 
-async def fetch_harvest_params(
+async def _fetch_harvest_params_from_ipfs(
     vault_address: ChecksumAddress, ipfs_hash: str, rewards_root: bytes
 ) -> HarvestParams | None:
     ipfs_data = await ipfs_fetch_client.fetch_json(ipfs_hash)
@@ -24,12 +37,15 @@ async def fetch_harvest_params(
 
         if mev_escrow == settings.network_config.SHARED_MEV_ESCROW_CONTRACT_ADDRESS:
             # shared mev vault
+            if settings.network in GNO_NETWORKS:
+                reward = vault_data['consensus_reward']
+            else:
+                reward = Wei(
+                    vault_data['consensus_reward']
+                    + vault_data['unlocked_mev_reward']
+                    + vault_data['locked_mev_reward']
+                )
             unlocked_mev_reward = Wei(vault_data['unlocked_mev_reward'])
-            reward = Wei(
-                vault_data['consensus_reward']
-                + unlocked_mev_reward
-                + vault_data['locked_mev_reward']
-            )
         else:
             # own mev vault
             unlocked_mev_reward = Wei(0)

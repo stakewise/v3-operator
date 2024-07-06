@@ -2,10 +2,7 @@ version: "3.9"
 
 services:
   operator:
-    build:
-      context: .
-      dockerfile: europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.3.2
-    image: v3-operator
+    image: europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.3.2
     container_name: v3-operator
     command: ["src/main.py", "start"]
     volumes:

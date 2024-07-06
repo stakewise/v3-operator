@@ -1,3 +1,5 @@
+from typing import Sequence
+
 import ecies
 from eth_typing import BLSPubkey, BLSSignature, HexStr
 from multiproof import StandardMerkleTree
@@ -11,10 +13,10 @@ from sw_utils import (
 from sw_utils.signing import compute_deposit_data
 from web3 import Web3
 
-from src.config.settings import DEPOSIT_AMOUNT_GWEI, settings
+from src.config.settings import settings
 from src.validators.keystores.base import BaseKeystore
 from src.validators.signing.key_shares import bls_signature_and_public_key_to_shares
-from src.validators.typings import ExitSignatureShards, Validator
+from src.validators.typings import DepositDataValidator, ExitSignatureShards, Validator
 
 
 def encrypt_signature(oracle_pubkey: HexStr, signature: BLSSignature) -> HexStr:
@@ -32,18 +34,24 @@ def encrypt_signatures_list(
 
 def get_validators_proof(
     tree: StandardMerkleTree,
-    validators: list[Validator],
+    validators: Sequence[DepositDataValidator],
 ) -> tuple[list[bytes], MultiProof]:
-    credentials = get_eth1_withdrawal_credentials(settings.vault)
-    tx_validators: list[bytes] = []
+    tx_validators = encode_tx_validator_list(validators)
     leaves: list[tuple[bytes, int]] = []
-    for validator in validators:
-        tx_validator = encode_tx_validator(credentials, validator)
-        tx_validators.append(tx_validator)
+    for validator, tx_validator in zip(validators, tx_validators):
         leaves.append((tx_validator, validator.deposit_data_index))
 
     multi_proof = tree.get_multi_proof(leaves)
     return tx_validators, multi_proof
+
+
+def encode_tx_validator_list(validators: Sequence[Validator]) -> list[bytes]:
+    credentials = get_eth1_withdrawal_credentials(settings.vault)
+    tx_validators: list[bytes] = []
+    for validator in validators:
+        tx_validator = encode_tx_validator(credentials, validator)
+        tx_validators.append(tx_validator)
+    return tx_validators
 
 
 def encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) -> bytes:
@@ -52,7 +60,7 @@ def encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) -> 
     deposit_root = compute_deposit_data(
         public_key=public_key,
         withdrawal_credentials=withdrawal_credentials,
-        amount_gwei=DEPOSIT_AMOUNT_GWEI,
+        amount_gwei=validator.amount_gwei,
         signature=signature,
     ).hash_tree_root
     return public_key + signature + deposit_root

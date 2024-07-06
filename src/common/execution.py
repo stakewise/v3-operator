@@ -11,9 +11,10 @@ from web3.types import TxParams, Wei
 
 from src.common.app_state import AppState, OraclesCache
 from src.common.clients import execution_client, ipfs_fetch_client
-from src.common.contracts import keeper_contract, multicall_contract, vault_contract
+from src.common.contracts import keeper_contract, multicall_contract
 from src.common.metrics import metrics
 from src.common.tasks import BaseTask
+from src.common.vault import Vault
 from src.common.wallet import hot_wallet
 from src.config.settings import settings
 
@@ -28,14 +29,14 @@ async def get_hot_wallet_balance() -> Wei:
 
 async def check_vault_address() -> None:
     try:
-        await vault_contract.get_validators_root()
+        await Vault().get_validators_root()
     except BadFunctionCallOutput as e:
         raise click.ClickException('Invalid vault contract address') from e
 
 
 async def check_hot_wallet_balance() -> None:
     hot_wallet_min_balance = settings.network_config.HOT_WALLET_MIN_BALANCE
-    symbol = settings.network_config.SYMBOL
+    symbol = settings.network_config.WALLET_BALANCE_SYMBOL
 
     if hot_wallet_min_balance <= 0:
         return
@@ -81,15 +82,15 @@ async def update_oracles_cache() -> None:
 
     rewards_threshold_call = keeper_contract.encode_abi(fn_name='rewardsMinOracles', args=[])
     validators_threshold_call = keeper_contract.encode_abi(fn_name='validatorsMinOracles', args=[])
-    multicall_response = await multicall_contract.aggregate(
+    _, multicall_response = await multicall_contract.aggregate(
         [
-            (keeper_contract.address, False, rewards_threshold_call),
-            (keeper_contract.address, False, validators_threshold_call),
+            (keeper_contract.address, rewards_threshold_call),
+            (keeper_contract.address, validators_threshold_call),
         ],
         block_number=to_block,
     )
-    rewards_threshold = Web3.to_int(multicall_response[0][1])
-    validators_threshold = Web3.to_int(multicall_response[1][1])
+    rewards_threshold = Web3.to_int(multicall_response[0])
+    validators_threshold = Web3.to_int(multicall_response[1])
 
     app_state.oracles_cache = OraclesCache(
         config=config,
@@ -146,7 +147,8 @@ async def _calc_high_priority_fee() -> Wei:
 
     # prettify `mean_reward`
     # same as `round(value, 1)` if value was in gwei
-    mean_reward = round(mean_reward, -8)
+    if mean_reward > Web3.to_wei(1, 'gwei'):
+        mean_reward = round(mean_reward, -8)
 
     return Wei(mean_reward)
 

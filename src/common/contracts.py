@@ -1,16 +1,22 @@
+import functools
 import json
 import os
 from functools import cached_property
+from typing import Callable
 
 from eth_typing import HexStr
 from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.contract import AsyncContract
-from web3.contract.contract import ContractEvent
+from web3.contract.async_contract import (
+    AsyncContractEvent,
+    AsyncContractEvents,
+    AsyncContractFunctions,
+)
 from web3.types import BlockNumber, ChecksumAddress, EventData
 
 from src.common.clients import execution_client
-from src.common.typings import RewardVoteInfo
+from src.common.typings import HarvestParams, RewardVoteInfo
 from src.config.settings import settings
 
 SECONDS_PER_MONTH: int = 2628000
@@ -22,7 +28,7 @@ class ContractWrapper:
 
     @property
     def events_blocks_range_interval(self) -> int:
-        return int(43200 / float(settings.network_config.SECONDS_PER_BLOCK))  # 12 hrs
+        return 43200 // settings.network_config.SECONDS_PER_BLOCK  # 12 hrs
 
     @property
     def contract_address(self) -> ChecksumAddress:
@@ -35,15 +41,24 @@ class ContractWrapper:
             abi = json.load(f)
         return execution_client.eth.contract(abi=abi, address=self.contract_address)
 
+    @property
+    def address(self) -> ChecksumAddress:
+        return self.contract.address
+
+    @property
+    def functions(self) -> AsyncContractFunctions:
+        return self.contract.functions
+
+    @property
+    def events(self) -> AsyncContractEvents:
+        return self.contract.events
+
     def encode_abi(self, fn_name: str, args: list | None = None) -> HexStr:
         return self.contract.encodeABI(fn_name=fn_name, args=args)
 
-    def __getattr__(self, item):
-        return getattr(self.contract, item)
-
     async def _get_last_event(
         self,
-        event: ContractEvent,
+        event: type[AsyncContractEvent],
         from_block: BlockNumber,
         to_block: BlockNumber,
         argument_filters: dict | None = None,
@@ -63,7 +78,7 @@ class ContractWrapper:
 
     async def _get_events(
         self,
-        event: ContractEvent,
+        event: type[AsyncContractEvent],
         from_block: BlockNumber,
         to_block: BlockNumber,
     ) -> list[EventData]:
@@ -80,8 +95,26 @@ class ContractWrapper:
         return events
 
 
-class VaultContract(ContractWrapper):
-    abi_path = 'abi/IEthVault.json'
+class VaultStateMixin:
+    encode_abi: Callable
+
+    def get_update_state_call(self, harvest_params: HarvestParams) -> HexStr:
+        update_state_call = self.encode_abi(
+            fn_name='updateState',
+            args=[
+                (
+                    harvest_params.rewards_root,
+                    harvest_params.reward,
+                    harvest_params.unlocked_mev_reward,
+                    harvest_params.proof,
+                )
+            ],
+        )
+        return update_state_call
+
+
+class VaultV1Contract(ContractWrapper, VaultStateMixin):
+    abi_path = 'abi/IEthVaultV1.json'
 
     @property
     def contract_address(self) -> ChecksumAddress:
@@ -95,17 +128,44 @@ class VaultContract(ContractWrapper):
         """Fetches vault's current validators index."""
         return await self.contract.functions.validatorIndex().call()
 
+
+class VaultContract(ContractWrapper, VaultStateMixin):
+    abi_path = 'abi/IEthVault.json'
+
+    @property
+    def contract_address(self) -> ChecksumAddress:
+        return settings.vault
+
     async def get_registered_validators_public_keys(
         self, from_block: BlockNumber, to_block: BlockNumber
     ) -> list[HexStr]:
         """Fetches the validator registered events."""
         events = await self._get_events(
-            event=self.events.ValidatorRegistered, from_block=from_block, to_block=to_block
+            event=self.events.ValidatorRegistered,  # type: ignore
+            from_block=from_block,
+            to_block=to_block,
         )
         return [Web3.to_hex(event['args']['publicKey']) for event in events]
 
     async def mev_escrow(self) -> ChecksumAddress:
         return await self.contract.functions.mevEscrow().call()
+
+    async def version(self) -> int:
+        return await self.contract.functions.version().call()
+
+    async def validators_manager(self):
+        return await self.contract.functions.validatorsManager().call()
+
+
+class GnoVaultContract(ContractWrapper, VaultStateMixin):
+    abi_path = 'abi/IGnoVault.json'
+
+    @property
+    def contract_address(self) -> ChecksumAddress:
+        return settings.vault
+
+    def get_swap_xdai_call(self) -> HexStr:
+        return self.encode_abi(fn_name='swapXdaiToGno', args=[])
 
 
 class V2PoolContract(ContractWrapper):
@@ -117,7 +177,9 @@ class V2PoolContract(ContractWrapper):
     ) -> list[HexStr]:
         """Fetches the validator registered events."""
         events = await self._get_events(
-            event=self.events.ValidatorRegistered, from_block=from_block, to_block=to_block
+            event=self.events.ValidatorRegistered,  # type: ignore
+            from_block=from_block,
+            to_block=to_block,
         )
         return [Web3.to_hex(event['args']['publicKey']) for event in events]
 
@@ -149,7 +211,7 @@ class KeeperContract(ContractWrapper):
     ) -> EventData | None:
         """Fetches the last oracles config updated event."""
         return await self._get_last_event(
-            self.events.ConfigUpdated,
+            self.events.ConfigUpdated,  # type: ignore
             from_block=from_block or settings.network_config.KEEPER_GENESIS_BLOCK,
             to_block=to_block or await execution_client.eth.get_block_number(),
         )
@@ -157,7 +219,7 @@ class KeeperContract(ContractWrapper):
     async def get_last_rewards_update(self) -> RewardVoteInfo | None:
         """Fetches the last rewards update."""
         last_event = await self._get_last_event(
-            self.events.RewardsUpdated,
+            self.events.RewardsUpdated,  # type: ignore
             from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
             to_block=await execution_client.eth.get_block_number(),
         )
@@ -180,7 +242,7 @@ class KeeperContract(ContractWrapper):
         to_block = to_block or await execution_client.eth.get_block_number()
 
         last_event = await self._get_last_event(
-            self.events.ExitSignaturesUpdated,
+            self.events.ExitSignaturesUpdated,  # type: ignore
             from_block=from_block,
             to_block=to_block,
             argument_filters={'vault': vault},
@@ -200,21 +262,45 @@ class KeeperContract(ContractWrapper):
         return await self.contract.functions.canHarvest(vault_address).call()
 
 
+class DepositDataRegistryContract(ContractWrapper):
+    abi_path = 'abi/IDepositDataRegistry.json'
+    settings_key = 'DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS'
+
+    async def get_deposit_data_manager(self) -> ChecksumAddress:
+        """Fetches the vault deposit data manager address."""
+        return await self.contract.functions.getDepositDataManager(settings.vault).call()
+
+    async def get_validators_root(self) -> Bytes32:
+        """Fetches vault's validators root."""
+        return await self.contract.functions.depositDataRoots(settings.vault).call()
+
+    async def get_validators_index(self) -> int:
+        """Fetches vault's current validators index."""
+        return await self.contract.functions.depositDataIndexes(settings.vault).call()
+
+
 class MulticallContract(ContractWrapper):
     abi_path = 'abi/Multicall.json'
     settings_key = 'MULTICALL_CONTRACT_ADDRESS'
 
     async def aggregate(
         self,
-        data: list[tuple[ChecksumAddress, bool, HexStr]],
+        data: list[tuple[ChecksumAddress, HexStr]],
         block_number: BlockNumber | None = None,
-    ) -> list:
-        return await self.contract.functions.aggregate3(data).call(block_identifier=block_number)
+    ) -> tuple[BlockNumber, list]:
+        return await self.contract.functions.aggregate(data).call(block_identifier=block_number)
+
+
+@functools.cache
+def get_gno_vault_contract() -> GnoVaultContract:
+    return GnoVaultContract()
 
 
 vault_contract = VaultContract()
+vault_v1_contract = VaultV1Contract()
 validators_registry_contract = ValidatorsRegistryContract()
 keeper_contract = KeeperContract()
 v2_pool_contract = V2PoolContract()
 v2_pool_escrow_contract = V2PoolEscrowContract()
 multicall_contract = MulticallContract()
+deposit_data_registry_contract = DepositDataRegistryContract()

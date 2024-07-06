@@ -9,16 +9,19 @@ from sw_utils import IpfsFetchClient, get_consensus_client, get_execution_client
 from web3 import Web3
 
 from src.common.clients import db_client
+from src.common.contracts import vault_contract
 from src.common.execution import (
     check_hot_wallet_balance,
     check_vault_address,
     get_protocol_config,
 )
+from src.common.harvest import get_harvest_params
 from src.common.utils import format_error, warning_verbose
 from src.common.wallet import hot_wallet
 from src.config.settings import settings
 from src.validators.execution import check_deposit_data_root, get_withdrawable_assets
 from src.validators.keystores.local import LocalKeystore
+from src.validators.typings import ValidatorsRegistrationMode
 from src.validators.utils import load_deposit_data
 
 logger = logging.getLogger(__name__)
@@ -197,11 +200,12 @@ async def startup_checks():
     logger.info('Checking vault address %s...', settings.vault)
     await check_vault_address()
 
-    withdrawable_assets, _ = await get_withdrawable_assets()
+    harvest_params = await get_harvest_params()
+    withdrawable_assets = await get_withdrawable_assets(harvest_params)
     logger.info(
         'Vault withdrawable assets: %s %s',
         round(Web3.from_wei(withdrawable_assets, 'ether'), 2),
-        settings.network_config.SYMBOL,
+        settings.network_config.VAULT_BALANCE_SYMBOL,
     )
 
     logger.info('Checking hot wallet balance %s...', hot_wallet.address)
@@ -227,16 +231,33 @@ async def startup_checks():
         logger.info('Checking metrics server...')
         check_metrics_port()
 
-    logger.info('Checking deposit data file...')
-    await wait_for_deposit_data_file()
+    if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
+        logger.info('Checking deposit data file...')
+        await wait_for_deposit_data_file()
 
-    if settings.keystore_cls_str == LocalKeystore.__name__:
-        logger.info('Checking keystores dir...')
-        wait_for_keystores_dir()
-        logger.info('Found keystores dir')
+        if settings.keystore_cls_str == LocalKeystore.__name__:
+            logger.info('Checking keystores dir...')
+            wait_for_keystores_dir()
+            logger.info('Found keystores dir')
+
+    await _check_validators_manager()
 
 
 async def _aiohttp_fetch(session: ClientSession, url: str) -> str:
     async with session.get(url=url) as response:
         response.raise_for_status()
     return url
+
+
+async def _check_validators_manager() -> None:
+    if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
+        if await vault_contract.version() == 1:
+            raise RuntimeError('Vault version must be 2')
+
+    if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
+        if await vault_contract.version() > 1:
+            validators_manager = await vault_contract.validators_manager()
+            if validators_manager != settings.network_config.DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS:
+                raise RuntimeError(
+                    'validators manager address must equal to deposit data registry address'
+                )

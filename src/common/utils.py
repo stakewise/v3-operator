@@ -10,7 +10,7 @@ from eth_typing import BlockNumber, ChecksumAddress
 from pythonjsonlogger import jsonlogger
 from web3 import Web3
 from web3.exceptions import Web3Exception
-from web3.types import Timestamp, Wei
+from web3.types import Timestamp
 
 from src.common.clients import consensus_client
 from src.common.exceptions import (
@@ -21,14 +21,6 @@ from src.common.typings import OracleApproval, OraclesApproval
 from src.config.settings import LOG_DATE_FORMAT, settings
 
 logger = logging.getLogger(__name__)
-
-WAD = Web3.to_wei(1, 'ether')
-MGNO_RATE = Web3.to_wei(32, 'ether')
-
-
-def convert_to_gno(mgno_amount: Wei) -> Wei:
-    """Converts mGNO to GNO."""
-    return Wei(mgno_amount * WAD // MGNO_RATE)
 
 
 def get_build_version() -> str | None:

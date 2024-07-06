@@ -168,6 +168,7 @@ You will execute Operator Service commands using the format below (note the use 
 
 ```bash
 docker run --rm -ti \
+-u $(id -u):$(id -g) \
 -v ~/.stakewise/:/data \
 europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.3.2 \
 src/main.py COMMAND \
@@ -308,7 +309,7 @@ Enter the mnemonic for generating the wallet: pumpkin anxiety private salon inqu
 Done. The wallet and password saved to /home/user/.stakewise/0x3320a...68/wallet directory. The wallet address is: 0x239B...e3Cc
 ```
 
-**Note, you must send some ETH to the wallet for gas expenses. Each validator registration costs around
+**Note, you must send some ETH (xDAI for Gnosis) to the wallet for gas expenses. Each validator registration costs around
 0.01 ETH with 30 Gwei gas price. You must keep an eye on your wallet balance, otherwise validators will stop registering
 if the balance falls too low.**
 
@@ -402,6 +403,7 @@ below:
 
 ```bash
 docker run --restart on-failure:10 \
+-u $(id -u):$(id -g) \
 -v ~/.stakewise/:/data \
 europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.3.2 \
 src/main.py start \
