@@ -168,6 +168,7 @@ You will execute Operator Service commands using the format below (note the use 
 
 ```bash
 docker run --rm -ti \
+-u $(id -u):$(id -g) \
 -v ~/.stakewise/:/data \
 europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.3.2 \
 src/main.py COMMAND \
@@ -402,6 +403,7 @@ below:
 
 ```bash
 docker run --restart on-failure:10 \
+-u $(id -u):$(id -g) \
 -v ~/.stakewise/:/data \
 europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.3.2 \
 src/main.py start \
