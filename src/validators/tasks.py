@@ -112,6 +112,15 @@ async def process_validators(
         # not enough balance to register validators
         return None
 
+    # Check if there is enough ETH to register the specified minimum number of validators
+    if validators_count < settings.min_validators_registration:
+        logger.debug(
+            'Not enough ETH to register %d validators. Current balance allows for %d validators.',
+            settings.min_validators_registration,
+            validators_count,
+        )
+        return None
+
     # get latest config
     protocol_config = await get_protocol_config()
 

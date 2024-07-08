@@ -49,13 +49,13 @@ async def get_update_state_calls(
     if settings.network in GNO_NETWORKS:
         gno_vault_contract = get_gno_vault_contract()
         swap_xdai_call = gno_vault_contract.get_swap_xdai_call()
-        calls.insert(0, swap_xdai_call)
+        calls.append(swap_xdai_call)
 
         # check whether xDAI swap works
         try:
             await gno_vault_contract.functions.multicall(calls).call()
         except (ValueError, ContractLogicError):
             logger.warning('xDAI swap failed, excluding from the call.')
-            calls.pop(0)
+            calls.pop()
 
     return [(vault_contract.address, call) for call in calls]

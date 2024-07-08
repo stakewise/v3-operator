@@ -1,4 +1,5 @@
 import asyncio
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
@@ -159,6 +160,7 @@ def validators_exit(
                 raise e
     except Exception as e:
         log_verbose(e)
+        sys.exit(1)
 
 
 async def main(count: int | None) -> None:
