@@ -377,27 +377,6 @@ class EigenPodOwnerContract(ContractWrapper):
 
         return self.address, False, call
 
-    # pylint: disable-next=too-many-arguments
-    async def get_verify_balance_updates_call(
-        self,
-        oracle_timestamp: int,
-        state_root_proof: tuple[bytes, bytes],
-        validator_indices: list[int],
-        validator_fields_proofs: list[bytes],
-        validator_fields: list[list[bytes]],
-    ) -> tuple[ChecksumAddress, bool, HexStr]:
-        call = self.encode_abi(
-            fn_name='verifyBalanceUpdates',
-            args=[
-                oracle_timestamp,
-                state_root_proof,
-                validator_indices,
-                validator_fields_proofs,
-                validator_fields,
-            ],
-        )
-        return self.address, False, call
-
     async def get_queue_withdrawal_call(
         self,
         shares: int,

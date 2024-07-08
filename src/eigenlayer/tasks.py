@@ -222,7 +222,7 @@ class EigenlayerWithdrawalsTask(BaseTask):
     ) -> list[tuple[ChecksumAddress, bool, HexStr]]:
         '''
         For every validator that is in exiting or higher state, we must call
-        https://github.com/stakewise/v3-core/blob/eigenlayer/contracts/vaults/ethereum/restake/EigenPodOwner.sol#L135.
+        https://github.com/stakewise/v3-core/blob/main/contracts/vaults/ethereum/restake/EigenPodOwner.sol#L135.
         The shares argument must be the sum of effective balances.
         The effective balances should be fetched using
         https://github.com/Layr-Labs/eigenlayer-contracts/blob/
@@ -263,7 +263,7 @@ class EigenlayerWithdrawalsTask(BaseTask):
     ) -> list[tuple[ChecksumAddress, bool, HexStr]]:
         '''
         For full and partial withdrawals of every validator, the operator must call
-        https://github.com/stakewise/v3-core/blob/eigenlayer/contracts/vaults/ethereum/restake/EigenPodOwner.sol#L211.
+        https://github.com/stakewise/v3-core/blob/main/contracts/vaults/ethereum/restake/EigenPodOwner.sol#L211.
         The inputs must be generated as in https://github.com/Layr-Labs/eigenpod-proofs-generation.
         '''
         # fetch withdrawals
@@ -329,7 +329,7 @@ class EigenlayerWithdrawalsTask(BaseTask):
     ) -> list[tuple[ChecksumAddress, bool, HexStr]]:
         '''
         If there are any delayed withdrawals completed, call
-        https://github.com/stakewise/v3-core/blob/eigenlayer/contracts/vaults/ethereum/restake/EigenPodOwner.sol#L189.
+        https://github.com/stakewise/v3-core/blob/main/contracts/vaults/ethereum/restake/EigenPodOwner.sol#L189.
         You can fetch claimable delayed withdrawals with
         https://github.com/Layr-Labs/eigenlayer-contracts/blob/mainnet-deployment/src/contracts/interfaces/IDelayedWithdrawalRouter.sol#L46
         '''

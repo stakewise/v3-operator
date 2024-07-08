@@ -162,48 +162,6 @@ class ProofsGenerationWrapper:
         self._cleanup_file(output_filename)
         return data
 
-    async def generate_balance_proof(self, validator_index: int) -> dict:
-        '''
-          - command BalanceUpdateProof \
-          -oracleBlockHeaderFile [ORACLE_BLOCK_HEADER_FILE_PATH] \
-          -stateFile [STATE_FILE_PATH] \
-          -validatorIndex [VALIDATOR_INDEX] \
-          -outputFile [OUTPUT_FILE_PATH] \
-          -chainID [CHAIN_ID]
-        '''
-
-        block_header_file = await self._prepare_block_header_file(self.slot)
-        state_data_file = await self._prepare_state_data_file(self.slot)
-        self.files.extend([block_header_file, state_data_file])
-
-        output_filename = f'tmp_withdrawal_credentials_output_{validator_index}_{self.slot}'
-        args = [
-            'bin/generation',
-            '-command',
-            'BalanceUpdateProof',
-            '-oracleBlockHeaderFile',
-            block_header_file,
-            '-stateFile',
-            state_data_file,
-            '-validatorIndex',
-            str(validator_index),
-            '-outputFile',
-            output_filename,
-            '-chainID',
-            str(self.chain_id),
-        ]
-        result = subprocess.run(args, capture_output=True, shell=False)  # nosec
-        if result.stdout:
-            logger.debug(result.stdout)
-        if result.stderr:
-            logger.warning(result.stderr)
-
-        with open(output_filename, 'r', encoding='utf-8') as file:
-            data = json.load(file)
-
-        self._cleanup_file(output_filename)
-        return data
-
     def cleanup_withdrawals_slot_files(self, slot) -> None:
         '''
 
