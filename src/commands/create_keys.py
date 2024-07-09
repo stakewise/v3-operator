@@ -4,7 +4,7 @@ from os import makedirs, path
 from pathlib import Path
 
 import click
-from eth_typing import HexAddress
+from eth_typing import ChecksumAddress, HexAddress
 
 from src.common.credentials import Credential, CredentialManager
 from src.common.password import generate_password, get_or_create_password_file
@@ -65,7 +65,7 @@ def create_keys(
     count: int,
     vault: HexAddress,
     data_dir: str,
-    withdrawal_address: str | None,
+    withdrawal_address: ChecksumAddress | None,
     per_keystore_password: bool,
     pool_size: int | None,
 ) -> None:

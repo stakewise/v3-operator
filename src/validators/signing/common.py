@@ -61,7 +61,7 @@ def encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) -> 
     signature = Web3.to_bytes(hexstr=validator.signature)
     deposit_root = compute_deposit_data(
         public_key=public_key,
-        withdrawal_credentials=withdrawal_credentials or validator.withdrawal_address,
+        withdrawal_credentials=withdrawal_credentials,
         amount_gwei=validator.amount_gwei,
         signature=signature,
     ).hash_tree_root

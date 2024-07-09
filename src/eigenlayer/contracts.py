@@ -60,7 +60,6 @@ class EigenPodContract(ContractWrapper):
         )
 
     async def get_delayed_withdrawal_router(self, block_number: BlockNumber) -> ChecksumAddress:
-        """"""
         address = await self.contract.functions.delayedWithdrawalRouter().call(
             block_identifier=block_number
         )
@@ -80,7 +79,6 @@ class DelayedWithdrawalRouterContract(ContractWrapper):
     async def get_claimable_user_delayed_withdrawals(
         self, address: ChecksumAddress, block_number: BlockNumber
     ) -> list[DelayedWithdrawal]:
-        """"""
         data = await self.contract.functions.getClaimableUserDelayedWithdrawals(address).call(
             block_identifier=block_number
         )
@@ -102,14 +100,12 @@ class EigenPodManagerContract(ContractWrapper):
         )
 
     async def get_beacon_chain_oracle(self, block_number: BlockNumber) -> ChecksumAddress:
-        """"""
         address = await self.contract.functions.beaconChainOracle().call(
             block_identifier=block_number
         )
         return Web3.to_checksum_address(address)
 
     async def get_pod_shares(self, pod_owner: ChecksumAddress, block_number: BlockNumber) -> Wei:
-        """"""
         shares = await self.contract.functions.podOwnerShares(pod_owner).call(
             block_identifier=block_number
         )
@@ -188,7 +184,6 @@ class DelegationManagerContract(ContractWrapper):
         return events
 
     async def get_min_withdrawal_delay_blocks(self, block_number: BlockNumber) -> int:
-        """"""
         return await self.contract.functions.minWithdrawalDelayBlocks().call(
             block_identifier=block_number
         )

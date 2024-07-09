@@ -35,6 +35,7 @@ class RelayerClient(BaseRelayerClient):
                     public_key=v['public_key'],
                     amount_gwei=v['amount_gwei'],
                     signature=v['deposit_signature'],
+                    withdrawal_address=v.get('withdrawal_address'),
                     exit_signature=BLSSignature(Web3.to_bytes(hexstr=v['exit_signature'])),
                 )
                 for v in resp_json['validators']

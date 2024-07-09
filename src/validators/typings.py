@@ -23,13 +23,13 @@ class Validator:
     withdrawal_address: ChecksumAddress | None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DepositDataValidator(Validator):
     deposit_data_index: int
     deposit_data_root: HexStr
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RelayerValidator(Validator):
     exit_signature: BLSSignature
 

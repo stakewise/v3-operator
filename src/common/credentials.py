@@ -125,7 +125,7 @@ class CredentialManager:
         mnemonic: str,
         count: int,
         start_index: int,
-        withdrawal_address: str | None = None,
+        withdrawal_address: ChecksumAddress | None = None,
         pool_size: int | None = None,
     ) -> list[Credential]:
         credentials: list[Credential] = []
@@ -163,7 +163,7 @@ class CredentialManager:
         network: str,
         vault: HexAddress,
         mnemonic: str,
-        withdrawal_address: str | None = None,
+        withdrawal_address: ChecksumAddress | None = None,
     ) -> list[Credential]:
         # Hack to run web3 sessions in multiprocessing mode
         # pylint: disable-next=protected-access
@@ -183,7 +183,7 @@ class CredentialManager:
         vault: HexAddress,
         mnemonic: str,
         index: int,
-        withdrawal_address: str | None = None,
+        withdrawal_address: ChecksumAddress | None = None,
     ) -> Credential:
         """Returns the signing key of the mnemonic at a specific index."""
         seed = get_seed(mnemonic=mnemonic, password='')  # nosec

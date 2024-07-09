@@ -164,7 +164,6 @@ class ProofsGenerationWrapper:
         return data
 
     def cleanup_withdrawals_slot_files(self, slot: int) -> None:
-        ''''''
         self._cleanup_file(self.get_state_data_filename(slot))
         self._cleanup_file(self.get_block_header_filename(slot))
         self._cleanup_file(self.get_block_body_filename(slot))
