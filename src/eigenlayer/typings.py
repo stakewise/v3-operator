@@ -57,6 +57,7 @@ class DelayedWithdrawal:
 
 
 @dataclass
+# pylint: disable-next=too-many-instance-attributes
 class QueuedWithdrawal:
     staker: ChecksumAddress
     delegated_to: ChecksumAddress
@@ -66,8 +67,13 @@ class QueuedWithdrawal:
     strategies: list[ChecksumAddress]
     shares: list[Wei]  # gwei?
 
+    undelegation: bool = False
     withdrawal_root: bytes | None = None
 
     @property
     def block_number(self):
         return self.start_block
+
+    @property
+    def total_shares(self) -> Wei:
+        return Wei(sum(self.shares))

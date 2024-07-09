@@ -189,7 +189,9 @@ class VaultRestakingContract(VaultContract):
         from_block = from_block or settings.network_config.KEEPER_GENESIS_BLOCK
         to_block = to_block or await execution_client.eth.get_block_number()
         events = await self._get_events(
-            event=self.events.EigenPodCreated, from_block=from_block, to_block=to_block
+            event=self.events.EigenPodCreated,  # type: ignore
+            from_block=from_block,
+            to_block=to_block,
         )
         return {
             Web3.to_checksum_address(event['args']['eigenPod']): Web3.to_checksum_address(

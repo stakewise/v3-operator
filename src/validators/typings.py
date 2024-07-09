@@ -50,7 +50,7 @@ class DepositData:
         return [v.public_key for v in self.validators]
 
     @property
-    def withdrawal_address(self) -> ChecksumAddress:
+    def withdrawal_address(self) -> ChecksumAddress | None:
         return self.validators[0].withdrawal_address
 
 

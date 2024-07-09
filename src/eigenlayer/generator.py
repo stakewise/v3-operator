@@ -57,7 +57,7 @@ class ProofsGenerationWrapper:
             '-chainID',
             str(self.chain_id),
         ]
-        result = subprocess.run(args, capture_output=True, shell=False)  # nosec
+        result = subprocess.run(args, capture_output=True, shell=False, check=False)  # nosec
         if result.stdout:
             logger.debug(result.stdout)
         if result.stderr:
@@ -74,6 +74,7 @@ class ProofsGenerationWrapper:
         self._cleanup_file(output_filename)
         return data
 
+    # pylint: disable-next=too-many-locals
     async def generate_withdrawal_fields_proof(
         self, withdrawals_slot: int, validator_index: int, withdrawal_index: int
     ) -> dict:
@@ -96,7 +97,7 @@ class ProofsGenerationWrapper:
         state_data_file = await self._prepare_state_data_file(self.slot)
 
         historical_summaries_index = (
-            withdrawals_slot - settings.network_config.FIRST_CAPELLA_SLOT
+            withdrawals_slot - settings.network_config.SHAPELLA_SLOT
         ) // SLOTS_PER_HISTORICAL_ROOT
 
         # "historicalSummaryStateFile" This is the beacon state at the slot such that:
@@ -145,7 +146,7 @@ class ProofsGenerationWrapper:
             str(withdrawal_index),
         ]
 
-        result = subprocess.run(args, capture_output=True, shell=False)  # nosec
+        result = subprocess.run(args, capture_output=True, shell=False, check=False)  # nosec
         if result.stdout:
             logger.debug(result.stdout)
         if result.stderr:
@@ -162,45 +163,41 @@ class ProofsGenerationWrapper:
         self._cleanup_file(output_filename)
         return data
 
-    def cleanup_withdrawals_slot_files(self, slot) -> None:
-        '''
-
-        :param slot:
-        :return:
-        '''
+    def cleanup_withdrawals_slot_files(self, slot: int) -> None:
+        ''''''
         self._cleanup_file(self.get_state_data_filename(slot))
         self._cleanup_file(self.get_block_header_filename(slot))
         self._cleanup_file(self.get_block_body_filename(slot))
 
-    def get_block_header_filename(self, slot) -> str:
+    def get_block_header_filename(self, slot: int) -> str:
         return f'tmp_block_header_{slot}.json'
 
-    def get_block_body_filename(self, slot) -> str:
+    def get_block_body_filename(self, slot: int) -> str:
         return f'tmp_block_body_{slot}.json'
 
-    def get_state_data_filename(self, slot) -> str:
+    def get_state_data_filename(self, slot: int) -> str:
         return f'tmp_slot_{slot}.json'
 
     async def _prepare_block_header_file(self, slot: int) -> str:
-        block_header_data = await consensus_client.get_block_header(slot)
+        block_header_data = await consensus_client.get_block_header(str(slot))
         filename = self.get_block_header_filename(slot)
         with open(filename, 'w', encoding='utf-8') as file:
             json.dump(block_header_data, file)
         return filename
 
     async def _prepare_block_body_file(self, slot: int) -> str:
-        block_data = await consensus_client.get_block(slot)
+        block_data = await consensus_client.get_block(str(slot))
         filename = self.get_block_body_filename(slot)
         with open(filename, 'w', encoding='utf-8') as file:
             json.dump(block_data, file)
         return filename
 
     async def _prepare_state_data_file(self, slot: int) -> str:
-        state_data = await consensus_client.get_beacon_state(slot)
+        state_data = await consensus_client.get_beacon_state(str(slot))
         filename = self.get_state_data_filename(slot)
         with open(filename, 'w', encoding='utf-8') as file:
             json.dump(state_data, file)
         return filename
 
-    def _cleanup_file(self, filename) -> None:
+    def _cleanup_file(self, filename: str) -> None:
         os.remove(filename)

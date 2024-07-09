@@ -2,43 +2,15 @@ import asyncio
 import logging
 
 from eth_typing import HexStr
-from sw_utils import EventProcessor
 from web3 import Web3
-from web3.types import BlockNumber, ChecksumAddress, EventData
+from web3.types import BlockNumber, ChecksumAddress
 
 from src.common.clients import execution_client
 from src.common.contracts import multicall_contract
-from src.common.eigenlayer_contracts import delegation_manager_contract
 from src.config.settings import VALIDATORS_WITHDRAWALS_CONCURRENCY, settings
 from src.eigenlayer.typings import Withdrawal
 
 logger = logging.getLogger(__name__)
-
-
-class WithdrawalQueuedProcessor(EventProcessor):
-    contract_event = 'WithdrawalQueued'
-
-    @property
-    def contract(self):
-        return delegation_manager_contract
-
-    @staticmethod
-    async def get_from_block() -> BlockNumber:
-        last_validator = NetworkValidatorCrud().get_last_network_validator()
-        if not last_validator:
-            return settings.network_config.VALIDATORS_REGISTRY_GENESIS_BLOCK
-
-        return BlockNumber(last_validator.block_number + 1)
-
-    @staticmethod
-    # pylint: disable-next=unused-argument
-    async def process_events(events: list[EventData], to_block: BlockNumber) -> None:
-        NetworkValidatorCrud().save_network_validators(validators)
-
-
-# last processed block
-# last unprocessed block
-# last scanned block
 
 
 async def submit_multicall_transaction(
@@ -84,20 +56,13 @@ async def fetch_withdrawals(
     """Fetches block withdrawals."""
     async with semaphore:
         block = await execution_client.eth.get_block(block_number)
-        '''
-      block_number: BlockNumber
-      validator_index: BlockNumber
-      amount: int  # gwei
-      index: int
-      withdrawal_address: ChecksumAddress
-      '''
         return [
             Withdrawal(
                 block_number=block_number,
-                validator_index=int(withdrawal.validatorIndex),
-                index=int(withdrawal.index),
-                amount=int(withdrawal.amount),
-                withdrawal_address=withdrawal.address,
+                validator_index=int(withdrawal.validatorIndex),  # type: ignore[attr-defined]
+                index=int(withdrawal.index),  # type: ignore[attr-defined]
+                amount=int(withdrawal.amount),  # type: ignore[attr-defined]
+                withdrawal_address=withdrawal.address,  # type: ignore[attr-defined]
             )
             for withdrawal in block.get('withdrawals', [])
         ]

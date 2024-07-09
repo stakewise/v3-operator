@@ -106,7 +106,7 @@ def greenify(value):
 
 def calc_slot_by_block_timestamp(ts: Timestamp) -> int:
     return int(
-        (ts - settings.network_config.GENESIS_TIMESTAMP) / settings.network_config.SECONDS_PER_SLOT
+        (ts - settings.network_config.GENESIS_TIMESTAMP) / settings.network_config.SECONDS_PER_BLOCK
     )
 
 

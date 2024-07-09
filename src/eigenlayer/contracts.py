@@ -1,6 +1,6 @@
 from eth_typing import HexStr
 from web3 import Web3
-from web3.types import BlockNumber, ChecksumAddress, EventData
+from web3.types import BlockNumber, ChecksumAddress, EventData, Wei
 
 from src.common.clients import execution_client
 from src.common.contracts import ContractWrapper
@@ -27,7 +27,7 @@ class EigenPodContract(ContractWrapper):
         from_block = from_block or settings.network_config.KEEPER_GENESIS_BLOCK
         to_block = to_block or await execution_client.eth.get_block_number()
         events = await self._get_events(
-            self.events.ValidatorRestaked,
+            self.events.ValidatorRestaked,  # type: ignore
             from_block=from_block or settings.network_config.KEEPER_GENESIS_BLOCK,
             to_block=to_block or await execution_client.eth.get_block_number(),
         )
@@ -45,14 +45,18 @@ class EigenPodContract(ContractWrapper):
         self, from_block: BlockNumber, to_block: BlockNumber
     ) -> EventData:
         return await self._get_last_event(
-            event=self.events.FullWithdrawalRedeemed, from_block=from_block, to_block=to_block
+            event=self.events.FullWithdrawalRedeemed,  # type: ignore
+            from_block=from_block,
+            to_block=to_block,
         )
 
     async def get_last_partial_withdrawal_redeemed_event(
         self, from_block: BlockNumber, to_block: BlockNumber
     ) -> EventData:
         return await self._get_last_event(
-            event=self.events.PartialWithdrawalRedeemed, from_block=from_block, to_block=to_block
+            event=self.events.PartialWithdrawalRedeemed,  # type: ignore
+            from_block=from_block,
+            to_block=to_block,
         )
 
     async def get_delayed_withdrawal_router(self, block_number: BlockNumber) -> ChecksumAddress:
@@ -91,7 +95,7 @@ class EigenPodManagerContract(ContractWrapper):
         self, pod_owner: ChecksumAddress, from_block: BlockNumber, to_block: BlockNumber
     ) -> EventData:
         return await self._get_last_event(
-            event=self.events.PodSharesUpdated,
+            event=self.events.PodSharesUpdated,  # type: ignore
             from_block=from_block,
             to_block=to_block,
             argument_filters={'podOwner': pod_owner},
@@ -103,6 +107,13 @@ class EigenPodManagerContract(ContractWrapper):
             block_identifier=block_number
         )
         return Web3.to_checksum_address(address)
+
+    async def get_pod_shares(self, pod_owner: ChecksumAddress, block_number: BlockNumber) -> Wei:
+        """"""
+        shares = await self.contract.functions.podOwnerShares(pod_owner).call(
+            block_identifier=block_number
+        )
+        return Wei(shares)
 
 
 class BeaconChainOracleContract(ContractWrapper):
@@ -119,7 +130,7 @@ class BeaconChainOracleContract(ContractWrapper):
         self, from_block: BlockNumber, to_block: BlockNumber
     ) -> EventData:
         return await self._get_last_event(
-            event=self.events.EigenLayerBeaconOracleUpdate,
+            event=self.events.EigenLayerBeaconOracleUpdate,  # type: ignore
             from_block=from_block,
             to_block=to_block,
         )
@@ -133,7 +144,9 @@ class DelegationManagerContract(ContractWrapper):
         self, from_block: BlockNumber, to_block: BlockNumber
     ) -> list[QueuedWithdrawal]:
         events = await self._get_events(
-            event=self.events.WithdrawalQueued, from_block=from_block, to_block=to_block
+            event=self.events.WithdrawalQueued,  # type: ignore
+            from_block=from_block,
+            to_block=to_block,
         )
         return [QueuedWithdrawal(*event['args']['withdrawal'].values()) for event in events]
 
@@ -141,7 +154,9 @@ class DelegationManagerContract(ContractWrapper):
         self, from_block: BlockNumber, to_block: BlockNumber
     ) -> list[QueuedWithdrawal]:
         events = await self._get_events(
-            event=self.events.WithdrawalCompleted, from_block=from_block, to_block=to_block
+            event=self.events.WithdrawalCompleted,  # type: ignore
+            from_block=from_block,
+            to_block=to_block,
         )
         return [QueuedWithdrawal(*event['args']['withdrawalRoot']) for event in events]
 
@@ -156,7 +171,9 @@ class DelegationManagerContract(ContractWrapper):
         self, from_block: BlockNumber, to_block: BlockNumber
     ) -> list[EventData]:
         events = await self._get_events(
-            event=self.events.StakerUndelegated, from_block=from_block, to_block=to_block
+            event=self.events.StakerUndelegated,  # type: ignore
+            from_block=from_block,
+            to_block=to_block,
         )
         return events
 
@@ -164,7 +181,9 @@ class DelegationManagerContract(ContractWrapper):
         self, from_block: BlockNumber, to_block: BlockNumber
     ) -> list[EventData]:
         events = await self._get_events(
-            event=self.events.StakerForceUndelegated, from_block=from_block, to_block=to_block
+            event=self.events.StakerForceUndelegated,  # type: ignore
+            from_block=from_block,
+            to_block=to_block,
         )
         return events
 
@@ -175,7 +194,7 @@ class DelegationManagerContract(ContractWrapper):
         )
 
     async def get_strategy_withdrawal_delay_blocks(
-        self, strategy, block_number: BlockNumber
+        self, strategy: ChecksumAddress, block_number: BlockNumber
     ) -> int:
         """
         function strategyWithdrawalDelayBlocks(IStrategy strategy)
