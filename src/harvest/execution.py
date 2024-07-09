@@ -12,8 +12,7 @@ from src.common.contracts import (
 )
 from src.common.typings import HarvestParams
 from src.common.utils import format_error
-from src.config.networks import GNO_NETWORKS
-from src.config.settings import settings
+from src.config.settings import GNOSIS_NETWORKS, settings
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +45,7 @@ async def get_update_state_calls(
     update_state_call = vault_contract.get_update_state_call(harvest_params)
     calls = [update_state_call]
 
-    if settings.network in GNO_NETWORKS:
+    if settings.network in GNOSIS_NETWORKS:
         gno_vault_contract = get_gno_vault_contract()
         swap_xdai_call = gno_vault_contract.get_swap_xdai_call()
         calls.append(swap_xdai_call)

@@ -11,10 +11,6 @@ GNOSIS = 'gnosis'
 HOLESKY = 'holesky'
 CHIADO = 'chiado'
 
-GNO_NETWORKS = [GNOSIS, CHIADO]
-ETH_NETWORKS = [MAINNET, HOLESKY]
-RATED_NETWORKS = [MAINNET, HOLESKY]
-
 
 @dataclass
 # pylint: disable-next=too-many-instance-attributes
