@@ -3,7 +3,7 @@ from enum import Enum
 from typing import NewType, Sequence
 
 from eth_typing import BlockNumber, BLSSignature, ChecksumAddress, HexStr
-from multiproof import StandardMerkleTree
+from multiproof import MultiProof, StandardMerkleTree
 from sw_utils.typings import Bytes32
 
 BLSPrivkey = NewType('BLSPrivkey', bytes)
@@ -20,28 +20,20 @@ class Validator:
     public_key: HexStr
     signature: HexStr
     amount_gwei: int
-
-
-@dataclass
-class DepositDataValidator(Validator):
-    deposit_data_index: int
-    deposit_data_root: HexStr
-
-
-@dataclass
-class RelayerValidator(Validator):
-    exit_signature: BLSSignature
+    deposit_data_index: int | None = None
+    exit_signature: BLSSignature | None = None
 
 
 @dataclass
 class RelayerValidatorsResponse:
-    validators: list[RelayerValidator]
-    validators_manager_signature: HexStr
+    validators: list[Validator]
+    validators_manager_signature: HexStr | None
+    multi_proof: MultiProof[tuple[bytes, int]] | None
 
 
 @dataclass
 class DepositData:
-    validators: Sequence[DepositDataValidator]
+    validators: Sequence[Validator]
     tree: StandardMerkleTree
 
     @property
