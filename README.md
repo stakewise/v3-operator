@@ -401,14 +401,6 @@ src/main.py start \
 --execution-endpoints=http://localhost:8545
 ```
 
-You can also run docker containers with `docker-compose`. For that, you need to copy [.env.example](.env.example) file
-to `.env` file
-and fill it with correct values. Run docker compose with the following command:
-
-```bash
-docker-compose up
-```
-
 #### Using Source Files
 
 ```bash
