@@ -176,18 +176,6 @@ src/main.py COMMAND \
 --flagB=xyz
 ```
 
-Docker runs under user "nobody". So make sure to set permissions on data-dir for "nobody" user on host machine. For example:
-
-```bash
-chown -R nobody:nogroup ~/.stakewise
-```
-
-If you prefer UIDs the following command also works:
-
-```bash
-chown -R 65534:65534 ~/.stakewise
-```
-
 Head to [Usage](#usage) to launch your operator service.
 
 ### Source Files
@@ -411,14 +399,6 @@ src/main.py start \
 --data-dir=/data \
 --consensus-endpoints=http://localhost:5052 \
 --execution-endpoints=http://localhost:8545
-```
-
-You can also run docker containers with `docker-compose`. For that, you need to copy [.env.example](.env.example) file
-to `.env` file
-and fill it with correct values. Run docker compose with the following command:
-
-```bash
-docker-compose up
 ```
 
 #### Using Source Files
