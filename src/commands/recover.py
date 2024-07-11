@@ -16,7 +16,8 @@ from src.common.password import generate_password, get_or_create_password_file
 from src.common.utils import greenify, log_verbose
 from src.common.validators import validate_eth_address, validate_mnemonic
 from src.common.vault_config import VaultConfig
-from src.config.settings import AVAILABLE_NETWORKS, DEFAULT_NETWORK, settings
+from src.config.networks import AVAILABLE_NETWORKS
+from src.config.settings import DEFAULT_NETWORK, settings
 
 
 @click.command(help='Recover vault data directory and keystores.')

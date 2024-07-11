@@ -7,7 +7,7 @@ from eth_typing import HexAddress
 from web3 import Web3
 
 from src.common.credentials import CredentialManager
-from src.config.settings import AVAILABLE_NETWORKS
+from src.config.networks import AVAILABLE_NETWORKS
 
 
 class VaultConfig:

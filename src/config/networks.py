@@ -11,6 +11,10 @@ GNOSIS = 'gnosis'
 HOLESKY = 'holesky'
 CHIADO = 'chiado'
 
+AVAILABLE_NETWORKS = [MAINNET, HOLESKY, GNOSIS, CHIADO]
+GNOSIS_NETWORKS = [GNOSIS, CHIADO]
+RATED_NETWORKS = [MAINNET, HOLESKY]
+
 
 @dataclass
 # pylint: disable-next=too-many-instance-attributes

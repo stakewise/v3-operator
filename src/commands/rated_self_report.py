@@ -8,12 +8,8 @@ from eth_typing import HexAddress
 from src.common.graph import GraphClient
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
-from src.config.settings import (
-    AVAILABLE_NETWORKS,
-    DEFAULT_NETWORK,
-    RATED_NETWORKS,
-    settings,
-)
+from src.config.networks import AVAILABLE_NETWORKS, RATED_NETWORKS
+from src.config.settings import DEFAULT_NETWORK, settings
 
 
 @click.option(

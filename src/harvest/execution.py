@@ -12,7 +12,8 @@ from src.common.contracts import (
 )
 from src.common.typings import HarvestParams
 from src.common.utils import format_error
-from src.config.settings import GNOSIS_NETWORKS, settings
+from src.config.networks import GNOSIS_NETWORKS
+from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
 

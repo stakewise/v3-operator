@@ -5,7 +5,8 @@ from web3.types import Wei
 from src.common.clients import ipfs_fetch_client
 from src.common.contracts import keeper_contract, vault_contract
 from src.common.typings import HarvestParams
-from src.config.settings import GNOSIS_NETWORKS, settings
+from src.config.networks import GNOSIS_NETWORKS
+from src.config.settings import settings
 
 
 async def get_harvest_params() -> HarvestParams | None:
