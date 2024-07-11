@@ -24,3 +24,4 @@ class AppState(metaclass=Singleton):
     def __init__(self):
         self.exit_signature_update_cache = ExitSignatureUpdateCache()
         self.oracles_cache: OraclesCache | None = None
+        self.last_withdrawals_update_timestamp: int | None = None

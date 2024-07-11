@@ -73,6 +73,7 @@ class Settings(metaclass=Singleton):
     relayer_timeout: int
     validators_registration_mode: ValidatorsRegistrationMode
     skip_startup_checks: bool
+    withdrawals_processing_interval: int
 
     # high priority fee
     priority_fee_num_blocks: int = decouple_config('PRIORITY_FEE_NUM_BLOCKS', default=10, cast=int)
@@ -224,6 +225,10 @@ class Settings(metaclass=Singleton):
         self.validators_registration_mode = validators_registration_mode
 
         self.skip_startup_checks = decouple_config('SKIP_STARTUP_CHECKS', default=False, cast=bool)
+
+        self.withdrawals_processing_interval = decouple_config(
+            'WITHDRAWALS_PROCESSING_INTERVAL', default=86400, cast=int
+        )
 
     @property
     def keystore_cls_str(self) -> str:

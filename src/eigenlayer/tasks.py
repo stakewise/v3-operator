@@ -1,9 +1,11 @@
 import logging
+from datetime import datetime, timezone
 
 from sw_utils import InterruptHandler
 from web3 import Web3
 from web3.types import BlockNumber
 
+from src.common.app_state import AppState
 from src.common.checks import wait_execution_catch_up_consensus
 from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import EigenPodOwnerContract, vault_restaking_contract
@@ -98,8 +100,17 @@ class EigenlayerValidatorsTask(BaseTask):
 
 
 class EigenlayerWithdrawalsTask(BaseTask):
+    # pylint: disable-next=too-many-locals
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         """Process restaking vault validators withdrawals if needed."""
+        app_state = AppState()
+        last_withdrawals_update_timestamp = app_state.last_withdrawals_update_timestamp
+        now = int(datetime.now(timezone.utc).timestamp())
+        if (
+            last_withdrawals_update_timestamp
+            and last_withdrawals_update_timestamp + settings.withdrawals_processing_interval > now
+        ):
+            return
 
         # check current gas prices
         if not await check_gas_price():
@@ -164,7 +175,7 @@ class EigenlayerWithdrawalsTask(BaseTask):
             WithdrawalCheckpointsCrud().save_last_completed_withdrawals_block_number(
                 completed_withdrawals_block
             )
-
+        app_state.last_withdrawals_update_timestamp = now
         logger.info('Successfully processed pod withdrawals')
 
 
