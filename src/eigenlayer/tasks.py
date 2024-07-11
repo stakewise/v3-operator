@@ -86,7 +86,7 @@ class EigenlayerValidatorsTask(BaseTask):
             )
             calls.append(call)
 
-        logger.info('Submitting harvest transaction...')
+        logger.info('Submitting eigenlayer verify withdrawal credentials transaction...')
         tx_hash = await submit_multicall_transaction(
             [
                 *calls,
@@ -94,7 +94,7 @@ class EigenlayerValidatorsTask(BaseTask):
         )
         if not tx_hash:
             return
-        logger.info('Successfully harvested vault')
+        logger.info('Successfully verified withdrawal credentials')
 
 
 class EigenlayerWithdrawalsTask(BaseTask):
@@ -109,18 +109,21 @@ class EigenlayerWithdrawalsTask(BaseTask):
         await wait_execution_catch_up_consensus(
             chain_state=chain_state, interrupt_handler=interrupt_handler
         )
+        logger.info('Starting Eigenlayer withdrawals processing...')
         current_block = chain_state.execution_block
 
         vault_validators = await get_vault_validators(current_block)
         pod_to_owner = await vault_restaking_contract.get_eigen_pod_owners(to_block=current_block)
         beacon_oracle_slot = await get_beacon_oracle_slot(current_block)
-
+        logger.info('processing exiting validators...')
         exiting_validators_calls = await ExitingValidatorsProcessor(
             pod_to_owner=pod_to_owner,
             block_number=current_block,
         ).get_contact_calls(
             vault_validators=vault_validators,
         )
+        logger.info('processing withdrawals...')
+
         withdrawals_calls = await WithdrawalsProcessor(
             pod_to_owner=pod_to_owner,
             block_number=current_block,
@@ -129,10 +132,14 @@ class EigenlayerWithdrawalsTask(BaseTask):
             beacon_oracle_slot=beacon_oracle_slot,
         )
 
+        logger.info('processing Eigenlayer delayed withdrawals...')
+
         delayed_withdrawals_calls = await DelayedWithdrawalsProcessor(
             pod_to_owner=pod_to_owner,
             block_number=current_block,
         ).get_contact_calls()
+
+        logger.info('processing Eigenlayer queued withdrawals...')
 
         (
             complete_withdrawals_calls,
@@ -142,9 +149,7 @@ class EigenlayerWithdrawalsTask(BaseTask):
             block_number=current_block,
         ).get_contact_calls()
 
-        logger.info('Starting vault harvest')
-        logger.info('Submitting harvest transaction...')
-
+        logger.info('Submitting multicall withdrawals transaction...')
         tx_hash = await submit_multicall_transaction(
             [
                 *exiting_validators_calls,
@@ -160,7 +165,7 @@ class EigenlayerWithdrawalsTask(BaseTask):
                 completed_withdrawals_block
             )
 
-        logger.info('Successfully harvested vault')
+        logger.info('Successfully processed pod withdrawals')
 
 
 async def get_beacon_oracle_slot(block_number: BlockNumber) -> int:

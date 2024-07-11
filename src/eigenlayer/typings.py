@@ -23,13 +23,8 @@ class Validator:
     status: ValidatorStatus
     withdrawal_credentials: HexStr
 
-    eigenpod: ChecksumAddress | None = None
-
     @property
     def withdrawal_address(self) -> ChecksumAddress:
-        # withdrawal_credentials = ETH1_ADDRESS_WITHDRAWAL_PREFIX
-        # withdrawal_credentials += b'\x00' * 11
-        # withdrawal_credentials += to_canonical_address(vault)
         return Web3.to_checksum_address(self.withdrawal_credentials[26:])
 
 

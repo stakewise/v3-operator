@@ -362,7 +362,22 @@ class EigenPodOwnerContract(ContractWrapper):
         state_root_proof: tuple[bytes, bytes],
         validator_fields_proofs: list[bytes],
         validator_fields: list[list[bytes]],
-        withdrawal_proofs: list[bytes],
+        withdrawal_proofs: list[
+            tuple[
+                bytes,
+                bytes,
+                bytes,
+                bytes,
+                bytes,
+                int,
+                int,
+                int,
+                bytes,
+                bytes,
+                bytes,
+                bytes,
+            ]
+        ],
         withdrawal_fields: list[bytes],
     ) -> tuple[ChecksumAddress, bool, HexStr]:
         call = self.encode_abi(

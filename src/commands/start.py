@@ -132,7 +132,7 @@ logger = logging.getLogger(__name__)
     help='Whether to submit vault harvest transactions. Default is false.',
 )
 @click.option(
-    '--process_withdrawals',
+    '--process-withdrawals',
     is_flag=True,
     envvar='PROCESS_WITHDRAWALS',
     help='Whether to process restaking vault withdrawals. Default is false.',

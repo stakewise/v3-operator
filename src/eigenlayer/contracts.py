@@ -9,7 +9,7 @@ from src.eigenlayer.typings import DelayedWithdrawal, QueuedWithdrawal, Validato
 
 
 class EigenPodContract(ContractWrapper):
-    abi_path = 'abi/IEigenPod.json'
+    abi_path = '../eigenlayer/abi/IEigenPod.json'
 
     def __init__(self, address):
         self._address = address
@@ -67,7 +67,7 @@ class EigenPodContract(ContractWrapper):
 
 
 class DelayedWithdrawalRouterContract(ContractWrapper):
-    abi_path = 'abi/IDelayedWithdrawalRouter.json'
+    abi_path = '../eigenlayer/abi/IDelayedWithdrawalRouter.json'
 
     def __init__(self, address):
         self._address = address
@@ -86,7 +86,7 @@ class DelayedWithdrawalRouterContract(ContractWrapper):
 
 
 class EigenPodManagerContract(ContractWrapper):
-    abi_path = 'abi/IEigenPodManager.json'
+    abi_path = '../eigenlayer/abi/IEigenPodManager.json'
     settings_key = 'EIGENLAYER_POD_MANAGER_CONTRACT_ADDRESS'
 
     async def get_last_pod_shares_updated_event(
@@ -113,7 +113,7 @@ class EigenPodManagerContract(ContractWrapper):
 
 
 class BeaconChainOracleContract(ContractWrapper):
-    abi_path = 'abi/IBeaconChainOracle.json'
+    abi_path = '../eigenlayer/abi/IBeaconChainOracle.json'
 
     def __init__(self, address):
         self._address = address
@@ -133,7 +133,7 @@ class BeaconChainOracleContract(ContractWrapper):
 
 
 class DelegationManagerContract(ContractWrapper):
-    abi_path = 'abi/IDelegationManager.json'
+    abi_path = '../eigenlayer/abi/IDelegationManager.json'
     settings_key = 'EIGENLAYER_DELEGATION_MANAGER_CONTRACT_ADDRESS'
 
     async def get_withdrawal_queued_events(

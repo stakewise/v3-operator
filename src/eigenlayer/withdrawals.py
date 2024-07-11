@@ -46,7 +46,7 @@ class WithdrawalsProcessor:
         The inputs must be generated as
         in https://github.com/Layr-Labs/eigenpod-proofs-generation.
         '''
-        from_block = await self._get_start_block()
+        from_block = await self._get_from_block()
         # fetch withdrawals
         validators_indexes = {val.index for val in vault_validators}
         withdrawals_chunk = int(
@@ -55,7 +55,9 @@ class WithdrawalsProcessor:
         withdrawals = []
         for block_number in range(from_block, self.block_number + 1, withdrawals_chunk):
             chunk = await get_validator_withdrawals_chunk(
-                validators_indexes, from_block, BlockNumber(block_number)
+                indexes=validators_indexes,
+                from_block=from_block,
+                to_block=BlockNumber(min(block_number + withdrawals_chunk - 1, self.block_number)),
             )
             withdrawals.extend(chunk)
 
@@ -70,7 +72,7 @@ class WithdrawalsProcessor:
             for withdrawal in withdrawals:
                 withdrawal.slot = await calc_slot_by_block_number(withdrawal.block_number)
 
-                # clean up
+                # clean up generator files
                 if last_slot and withdrawal.slot != last_slot:
                     generator.cleanup_withdrawals_slot_files(last_slot)
 
@@ -93,19 +95,18 @@ class WithdrawalsProcessor:
                             ]
                         ),
                     ),
-                    withdrawal_fields=[data['validatorIndex']],
-                    withdrawal_proofs=[data['validatorIndex']],
-                    validator_fields_proofs=[
-                        b''.join(
-                            [Web3.to_bytes(hexstr=x) for x in data['WithdrawalCredentialProof']]
-                        )
-                    ],
+                    withdrawal_fields=[data['WithdrawalFields']],
+                    withdrawal_proofs=[WithdrawalsProcessor._withdrawal_proofs(data)],
                     validator_fields=[[Web3.to_bytes(hexstr=x) for x in data['ValidatorFields']]],
+                    validator_fields_proofs=[
+                        b''.join([Web3.to_bytes(hexstr=x) for x in data['ValidatorProof']])
+                    ],
                 )
                 calls.append(call)
+                last_slot = withdrawal.slot
         return calls
 
-    async def _get_start_block(self) -> BlockNumber:
+    async def _get_from_block(self) -> BlockNumber:
         current_block = self.block_number
         events = []
         for pod in self.pod_to_owner.keys():
@@ -114,15 +115,54 @@ class WithdrawalsProcessor:
             ).get_last_partial_withdrawal_redeemed_event(
                 from_block=settings.network_config.KEEPER_GENESIS_BLOCK, to_block=current_block
             )
+            if partial_withdrawal_redeemed_event:
+                events.append(partial_withdrawal_redeemed_event)
+
             full_withdrawal_redeemed_event = await EigenPodContract(
                 pod
             ).get_last_full_withdrawal_redeemed_event(
                 from_block=settings.network_config.KEEPER_GENESIS_BLOCK, to_block=current_block
             )
-            events.append(partial_withdrawal_redeemed_event)
-            events.append(full_withdrawal_redeemed_event)
+            if full_withdrawal_redeemed_event:
+                events.append(full_withdrawal_redeemed_event)
+        if events:
+            return BlockNumber(max(event['blockNumber'] for event in events if event))
 
-        return BlockNumber(max(event['blockNumber'] for event in events if event))
+        return settings.network_config.KEEPER_GENESIS_BLOCK
+
+    @staticmethod
+    def _withdrawal_proofs(data):
+        '''
+        struct WithdrawalProof {
+        bytes withdrawalProof; +
+        bytes slotProof; +
+        bytes executionPayloadProof; +
+        bytes timestampProof; +
+        bytes historicalSummaryBlockRootProof; + HistoricalSummaryProof
+        uint64 blockRootIndex;  consensus
+        uint64 historicalSummaryIndex; +
+        uint64 withdrawalIndex; +
+        bytes32 blockRoot; consensus
+        bytes32 slotRoot; +
+        bytes32 timestampRoot; +
+        bytes32 executionPayloadRoot; +
+        }
+        '''
+
+        return (
+            _proof_to_bytes(data['WithdrawalProof']),
+            _proof_to_bytes(data['SlotProof']),
+            _proof_to_bytes(data['ExecutionPayloadProof']),
+            _proof_to_bytes(data['TimestampProof']),
+            _proof_to_bytes(data['HistoricalSummaryProof']),
+            data['blockHeaderRootIndex'],
+            data['historicalSummaryIndex'],
+            data['withdrawalIndex'],
+            Web3.to_bytes(hexstr=data['blockHeaderRoot']),
+            Web3.to_bytes(hexstr=data['slotRoot']),
+            Web3.to_bytes(hexstr=data['timestampRoot']),
+            Web3.to_bytes(hexstr=data['executionPayloadRoot']),
+        )
 
 
 class DelayedWithdrawalsProcessor:
@@ -157,7 +197,7 @@ class DelayedWithdrawalsProcessor:
             )  # pod address?
 
             call = await EigenPodOwnerContract(
-                [self.pod_to_owner[pod]]
+                self.pod_to_owner[pod]
             ).get_claim_delayed_withdrawals_call(max_number=len(delayed_withdrawals))
             calls.append(call)
 
@@ -249,7 +289,7 @@ class CompleteWithdrawalsProcessor:
     async def get_contact_calls(
         self,
     ) -> tuple[list[tuple[ChecksumAddress, bool, HexStr]], BlockNumber | None]:
-        from_block = await self._get_start_block()
+        from_block = await self._get_from_block()
 
         queued_withdrawals_events = await delegation_manager_contract.get_withdrawal_queued_events(
             from_block=from_block, to_block=self.block_number
@@ -285,7 +325,7 @@ class CompleteWithdrawalsProcessor:
             )
         )
         undelegated_blocks = {
-            e.block_number  # type: ignore[attr-defined]
+            e.blockNumber  # type: ignore[attr-defined]
             for e in [*staker_undelegated_events, *staker_force_undelegated_events]
         }
         for pod, withdrawals in queued_withdrawals_per_pod.items():
@@ -322,10 +362,14 @@ class CompleteWithdrawalsProcessor:
 
         return calls, last_block_number
 
-    async def _get_start_block(self):
+    async def _get_from_block(self):
         last_completed_withdrawals_block = (
             WithdrawalCheckpointsCrud().get_last_completed_withdrawals_block_number()
         )
         if last_completed_withdrawals_block:
             return last_completed_withdrawals_block
         return settings.network_config.KEEPER_GENESIS_BLOCK
+
+
+def _proof_to_bytes(value: list[HexStr]) -> bytes:
+    return b''.join([Web3.to_bytes(hexstr=x) for x in value])

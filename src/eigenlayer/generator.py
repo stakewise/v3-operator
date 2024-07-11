@@ -154,9 +154,11 @@ class ProofsGenerationWrapper:
 
         with open(output_filename, 'r', encoding='utf-8') as file:
             data = json.load(file)
-
-        self._cleanup_file(oracle_block_header_file)
-        self._cleanup_file(state_data_file)
+        with open(state_data_file, 'r', encoding='utf-8') as file:
+            state_data = json.load(file)
+            data['oracleTimestamp'] = (
+                state_data.get('data', {}).get('latest_execution_payload_header').get('timestamp')
+            )
         self._cleanup_file(historical_summary_state_file)
         self._cleanup_file(block_header_file)
         self._cleanup_file(block_body_file)

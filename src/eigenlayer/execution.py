@@ -35,7 +35,7 @@ async def get_validator_withdrawals_chunk(
 ) -> list[Withdrawal]:
     semaphore = asyncio.BoundedSemaphore(VALIDATORS_WITHDRAWALS_CONCURRENCY)
     pending = {
-        asyncio.create_task(fetch_withdrawals(BlockNumber(block_number), semaphore))
+        asyncio.create_task(fetch_withdrawals(BlockNumber(block_number), indexes, semaphore))
         for block_number in range(from_block, to_block + 1)
     }
     result = []
@@ -44,25 +44,29 @@ async def get_validator_withdrawals_chunk(
         for task in done:
             withdrawals = task.result()
             for withdrawal in withdrawals:
-                if withdrawal.validator_index in indexes:  # todo: check in fetch_withdrawals?
-                    result.append(withdrawal)
+                result.append(withdrawal)
 
     return result
 
 
 async def fetch_withdrawals(
-    block_number: BlockNumber, semaphore: asyncio.BoundedSemaphore
+    block_number: BlockNumber, indexes: set[int], semaphore: asyncio.BoundedSemaphore
 ) -> list[Withdrawal]:
     """Fetches block withdrawals."""
     async with semaphore:
         block = await execution_client.eth.get_block(block_number)
-        return [
-            Withdrawal(
-                block_number=block_number,
-                validator_index=int(withdrawal.validatorIndex),  # type: ignore[attr-defined]
-                index=int(withdrawal.index),  # type: ignore[attr-defined]
-                amount=int(withdrawal.amount),  # type: ignore[attr-defined]
-                withdrawal_address=withdrawal.address,  # type: ignore[attr-defined]
-            )
-            for withdrawal in block.get('withdrawals', [])
-        ]
+        withdrawals = []
+        for index, withdrawal in enumerate(block.get('withdrawals', [])):
+            if int(withdrawal.validatorIndex) in indexes:  # type: ignore[attr-defined]
+                withdrawals.append(
+                    Withdrawal(
+                        block_number=block_number,
+                        validator_index=int(
+                            withdrawal.validatorIndex  # type: ignore[attr-defined]
+                        ),
+                        index=index,
+                        amount=int(withdrawal.amount),  # type: ignore[attr-defined]
+                        withdrawal_address=withdrawal.address,  # type: ignore[attr-defined]
+                    )
+                )
+        return withdrawals

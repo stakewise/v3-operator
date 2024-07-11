@@ -31,7 +31,7 @@ class WithdrawalCheckpointsCrud:
             conn.execute(
                 f"""
                     CREATE TABLE IF NOT EXISTS {self.TABLE} (
-                        block_number INTEGER NOT NULL,
+                        block_number INTEGER NOT NULL
                     )
                 """
             )
