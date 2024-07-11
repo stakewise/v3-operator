@@ -9,7 +9,8 @@ from eth_typing import ChecksumAddress, HexAddress
 from src.common.utils import greenify, log_verbose
 from src.common.validators import validate_db_uri, validate_eth_address
 from src.common.vault_config import VaultConfig
-from src.config.settings import AVAILABLE_NETWORKS, settings
+from src.config.networks import AVAILABLE_NETWORKS
+from src.config.settings import settings
 from src.remote_db import tasks
 from src.remote_db.database import check_db_connection
 
