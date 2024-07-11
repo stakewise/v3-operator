@@ -11,8 +11,8 @@ from src.common.logging import LOG_LEVELS
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
+from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import (
-    AVAILABLE_NETWORKS,
     DEFAULT_MAX_FEE_PER_GAS_GWEI,
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
