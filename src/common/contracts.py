@@ -342,7 +342,7 @@ class EigenPodOwnerContract(ContractWrapper):
         validator_indices: list[int],
         validator_fields_proofs: list[bytes],
         validator_fields: list[list[bytes]],
-    ) -> tuple[ChecksumAddress, bool, HexStr]:
+    ) -> tuple[ChecksumAddress, HexStr]:
         call = self.encode_abi(
             fn_name='verifyWithdrawalCredentials',
             args=[
@@ -353,7 +353,7 @@ class EigenPodOwnerContract(ContractWrapper):
                 validator_fields,
             ],
         )
-        return self.address, False, call
+        return self.address, call
 
     # pylint: disable-next=too-many-arguments
     async def get_verify_and_process_withdrawals_call(
@@ -379,7 +379,7 @@ class EigenPodOwnerContract(ContractWrapper):
             ]
         ],
         withdrawal_fields: list[bytes],
-    ) -> tuple[ChecksumAddress, bool, HexStr]:
+    ) -> tuple[ChecksumAddress, HexStr]:
         call = self.encode_abi(
             fn_name='verifyAndProcessWithdrawals',
             args=[
@@ -392,29 +392,29 @@ class EigenPodOwnerContract(ContractWrapper):
             ],
         )
 
-        return self.address, False, call
+        return self.address, call
 
     async def get_queue_withdrawal_call(
         self,
         shares: int,
-    ) -> tuple[ChecksumAddress, bool, HexStr]:
+    ) -> tuple[ChecksumAddress, HexStr]:
         call = self.encode_abi(
             fn_name='queueWithdrawal',
             args=[shares],
         )
 
-        return self.address, False, call
+        return self.address, call
 
     async def get_claim_delayed_withdrawals_call(
         self,
         max_number: int,
-    ) -> tuple[ChecksumAddress, bool, HexStr]:
+    ) -> tuple[ChecksumAddress, HexStr]:
         call = self.encode_abi(
             fn_name='claimDelayedWithdrawals',
             args=[max_number],
         )
 
-        return self.address, False, call
+        return self.address, call
 
     # pylint: disable-next=too-many-arguments
     async def get_complete_queued_withdrawal_call(
@@ -428,7 +428,7 @@ class EigenPodOwnerContract(ContractWrapper):
         # withdrawals block
         start_block: BlockNumber,
         receive_as_tokens: bool,
-    ) -> tuple[ChecksumAddress, bool, HexStr]:
+    ) -> tuple[ChecksumAddress, HexStr]:
         middleware_times_index = (
             0  # middlewareTimesIndex is unused, but will be used in the Slasher eventually
         )
@@ -444,7 +444,7 @@ class EigenPodOwnerContract(ContractWrapper):
             ],
         )
 
-        return self.address, False, call
+        return self.address, call
 
 
 @functools.cache

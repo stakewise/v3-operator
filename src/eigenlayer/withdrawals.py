@@ -38,7 +38,7 @@ class WithdrawalsProcessor:
         self,
         vault_validators: list[Validator],
         beacon_oracle_slot: int,
-    ) -> list[tuple[ChecksumAddress, bool, HexStr]]:
+    ) -> list[tuple[ChecksumAddress, HexStr]]:
         '''
         For full and partial withdrawals of every validator, the operator must call
         https://github.com/stakewise/v3-core/blob/main
@@ -61,7 +61,7 @@ class WithdrawalsProcessor:
             )
             withdrawals.extend(chunk)
 
-        calls: list[tuple[ChecksumAddress, bool, HexStr]] = []
+        calls: list[tuple[ChecksumAddress, HexStr]] = []
         if not withdrawals:
             return calls
 
@@ -183,7 +183,7 @@ class DelayedWithdrawalsProcessor:
 
     async def get_contact_calls(
         self,
-    ) -> list[tuple[ChecksumAddress, bool, HexStr]]:
+    ) -> list[tuple[ChecksumAddress, HexStr]]:
         calls = []
 
         for pod in self.pod_to_owner.keys():
@@ -225,8 +225,8 @@ class ExitingValidatorsProcessor:
     async def get_contact_calls(
         self,
         vault_validators: list[Validator],
-    ) -> list[tuple[ChecksumAddress, bool, HexStr]]:
-        calls: list[tuple[ChecksumAddress, bool, HexStr]] = []
+    ) -> list[tuple[ChecksumAddress, HexStr]]:
+        calls: list[tuple[ChecksumAddress, HexStr]] = []
         active_validators = [val for val in vault_validators if val.status in ACTIVE_STATUSES]
 
         validators_per_pod: dict[ChecksumAddress, list[Validator]] = defaultdict(list)
@@ -288,7 +288,7 @@ class CompleteWithdrawalsProcessor:
     # pylint: disable-next=too-many-locals
     async def get_contact_calls(
         self,
-    ) -> tuple[list[tuple[ChecksumAddress, bool, HexStr]], BlockNumber | None]:
+    ) -> tuple[list[tuple[ChecksumAddress, HexStr]], BlockNumber | None]:
         from_block = await self._get_from_block()
 
         queued_withdrawals_events = await delegation_manager_contract.get_withdrawal_queued_events(

@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 async def submit_multicall_transaction(
-    calls: list[tuple[ChecksumAddress, bool, HexStr]]
+    calls: list[tuple[ChecksumAddress, HexStr]]
 ) -> HexStr | None:
     tx = await multicall_contract.functions.aggregate(calls).transact()
 
@@ -25,7 +25,7 @@ async def submit_multicall_transaction(
         tx, timeout=settings.execution_transaction_timeout
     )
     if not tx_receipt['status']:
-        logger.error('RRRRRR transaction failed')
+        logger.error('Multicall transaction failed')
         return None
     return tx_hash
 
