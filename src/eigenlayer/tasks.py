@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from sw_utils import InterruptHandler
 from web3 import Web3
-from web3.types import BlockNumber
+from web3.types import BlockNumber, ChecksumAddress
 
 from src.common.app_state import AppState
 from src.common.checks import wait_execution_catch_up_consensus
@@ -56,37 +56,31 @@ class EigenlayerValidatorsTask(BaseTask):
         ]
         if not unregistered_validators:
             return
+        logger.info(
+            'Verifying withdrawal credentials for %s validators...', len(unregistered_validators)
+        )
         calls = []
+        verify_data: dict[ChecksumAddress, dict] = {}
         pod_to_owner = await vault_restaking_contract.get_eigen_pod_owners(to_block=block_number)
+        beacon_oracle_slot = await get_beacon_oracle_slot(block_number=block_number)
+        with ProofsGenerationWrapper(
+            slot=beacon_oracle_slot, chain_id=settings.network_config.CHAIN_ID
+        ) as generator:
+            for validator in unregistered_validators:
+                pod = validator.withdrawal_address
+                data = await generator.generate_withdrawal_credentials(
+                    validator_index=validator.index
+                )
+                verify_data = self._update_verify_data(
+                    verify_data=verify_data, validator_data=data, pod=pod
+                )
 
-        slot = await get_beacon_oracle_slot(block_number=block_number)
-        for validator in unregistered_validators:
-            # register in eigenlayer
-            pod = validator.withdrawal_address
-            data = await ProofsGenerationWrapper(
-                slot=slot, chain_id=settings.network_config.CHAIN_ID
-            ).generate_withdrawal_credentials(validator_index=validator.index)
-            # process data
-            call = await EigenPodOwnerContract(
-                pod_to_owner[pod]
-            ).get_verify_withdrawal_credentials_call(
-                oracle_timestamp=int(data['oracleTimestamp']),
-                state_root_proof=(
-                    Web3.to_bytes(hexstr=data['beaconStateRoot']),
-                    b''.join(
-                        [
-                            Web3.to_bytes(hexstr=x)
-                            for x in data['StateRootAgainstLatestBlockHeaderProof']
-                        ]
-                    ),
-                ),
-                validator_indices=[data['validatorIndex']],
-                validator_fields_proofs=[
-                    b''.join([Web3.to_bytes(hexstr=x) for x in data['WithdrawalCredentialProof']])
-                ],
-                validator_fields=[[Web3.to_bytes(hexstr=x) for x in data['ValidatorFields']]],
-            )
-            calls.append(call)
+        for pod, owner in pod_to_owner.items():
+            if verify_data.get(pod):
+                call = await EigenPodOwnerContract(owner).get_verify_withdrawal_credentials_call(
+                    **verify_data[pod]
+                )
+                calls.append(call)
 
         logger.info('Submitting eigenlayer verify withdrawal credentials transaction...')
         tx_hash = await submit_multicall_transaction(
@@ -97,6 +91,46 @@ class EigenlayerValidatorsTask(BaseTask):
         if not tx_hash:
             return
         logger.info('Successfully verified withdrawal credentials')
+
+    def _update_verify_data(
+        self, verify_data: dict, validator_data: dict, pod: ChecksumAddress
+    ) -> dict:
+        if verify_data.get(pod):
+            verify_data[pod]['validator_indices'].append(validator_data['validatorIndex'])
+            verify_data[pod]['validator_fields_proofs'].append(
+                b''.join(
+                    [Web3.to_bytes(hexstr=x) for x in validator_data['WithdrawalCredentialProof']]
+                )
+            )
+            verify_data[pod]['validator_fields'].append(
+                [Web3.to_bytes(hexstr=x) for x in validator_data['ValidatorFields']]
+            )
+        else:
+            verify_data[pod] = {
+                'oracle_timestamp': int(validator_data['oracleTimestamp']),
+                'state_root_proof': (
+                    Web3.to_bytes(hexstr=validator_data['beaconStateRoot']),
+                    b''.join(
+                        [
+                            Web3.to_bytes(hexstr=x)
+                            for x in validator_data['StateRootAgainstLatestBlockHeaderProof']
+                        ]
+                    ),
+                ),
+                'validator_indices': [validator_data['validatorIndex']],
+                'validator_fields_proofs': [
+                    b''.join(
+                        [
+                            Web3.to_bytes(hexstr=x)
+                            for x in validator_data['WithdrawalCredentialProof']
+                        ]
+                    )
+                ],
+                'validator_fields': [
+                    [Web3.to_bytes(hexstr=x) for x in validator_data['ValidatorFields']]
+                ],
+            }
+        return verify_data
 
 
 class EigenlayerWithdrawalsTask(BaseTask):

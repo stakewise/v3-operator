@@ -18,7 +18,7 @@ class ProofsGenerationWrapper:
         self.slot = slot
         self.chain_id = chain_id
 
-        self.files: list[str] = []
+        self.files: set[str] = set()
 
     def __enter__(self):
         return self
@@ -27,7 +27,7 @@ class ProofsGenerationWrapper:
         for file in self.files:
             self._cleanup_file(file)
 
-    async def generate_withdrawal_credentials(self, validator_index):
+    async def generate_withdrawal_credentials(self, validator_index: int) -> dict:
         '''
         $ ./generation/generation \
         -command ValidatorFieldsProof \
@@ -40,7 +40,7 @@ class ProofsGenerationWrapper:
 
         block_header_file = await self._prepare_block_header_file(self.slot)
         state_data_file = await self._prepare_state_data_file(self.slot)
-        self.files.extend([block_header_file, state_data_file])
+        self.files.update([block_header_file, state_data_file])
         output_filename = f'tmp_withdrawal_credentials_output_{validator_index}_{self.slot}'
         args = [
             'bin/generation',
@@ -117,7 +117,7 @@ class ProofsGenerationWrapper:
         block_header_file = await self._prepare_block_header_file(withdrawals_slot)
         block_body_file = await self._prepare_block_body_file(withdrawals_slot)
         output_filename = f'tmp_verify_withdrawal_fields_proof_output_{validator_index}_{self.slot}'
-        self.files.extend([oracle_block_header_file, state_data_file])
+        self.files.update([oracle_block_header_file, state_data_file])
         args = [
             'bin/generation',
             '-command',
@@ -180,8 +180,11 @@ class ProofsGenerationWrapper:
         return f'tmp_slot_{slot}.json'
 
     async def _prepare_block_header_file(self, slot: int) -> str:
-        block_header_data = await consensus_client.get_block_header(str(slot))
         filename = self.get_block_header_filename(slot)
+        if os.path.isfile(filename):
+            return filename
+
+        block_header_data = await consensus_client.get_block_header(str(slot))
         with open(filename, 'w', encoding='utf-8') as file:
             json.dump(block_header_data, file)
         return filename
@@ -196,6 +199,9 @@ class ProofsGenerationWrapper:
     async def _prepare_state_data_file(self, slot: int) -> str:
         state_data = await consensus_client.get_beacon_state(str(slot))
         filename = self.get_state_data_filename(slot)
+        if os.path.isfile(filename):
+            return filename
+
         with open(filename, 'w', encoding='utf-8') as file:
             json.dump(state_data, file)
         return filename
