@@ -92,9 +92,9 @@ class ProofsGenerationWrapper:
           -blockBodyFile [BLOCK_BODY_FILE_PATH] \
           -withdrawalIndex [WITHDRAWAL_INDEX]
         '''
-
         oracle_block_header_file = await self._prepare_block_header_file(self.slot)
         state_data_file = await self._prepare_state_data_file(self.slot)
+        self.files.update([oracle_block_header_file, state_data_file])
 
         historical_summaries_index = (
             withdrawals_slot - settings.network_config.SHAPELLA_SLOT
@@ -103,9 +103,7 @@ class ProofsGenerationWrapper:
         # "historicalSummaryStateFile" This is the beacon state at the slot such that:
         # historical_summary_state_slot =
         #    SLOTS_PER_HISTORICAL_ROOT * ((withdrawal_slot // SLOTS_PER_HISTORICAL_ROOT) + 1).
-        historical_summary_state_slot = SLOTS_PER_HISTORICAL_ROOT * (
-            (withdrawals_slot // SLOTS_PER_HISTORICAL_ROOT) + 1
-        )
+        historical_summary_state_slot = self._get_historical_summary_state_slot(withdrawals_slot)
         historical_summary_state_file = await self._prepare_state_data_file(
             historical_summary_state_slot
         )
@@ -117,7 +115,6 @@ class ProofsGenerationWrapper:
         block_header_file = await self._prepare_block_header_file(withdrawals_slot)
         block_body_file = await self._prepare_block_body_file(withdrawals_slot)
         output_filename = f'tmp_verify_withdrawal_fields_proof_output_{validator_index}_{self.slot}'
-        self.files.update([oracle_block_header_file, state_data_file])
         args = [
             'bin/generation',
             '-command',
@@ -159,14 +156,12 @@ class ProofsGenerationWrapper:
             data['oracleTimestamp'] = (
                 state_data.get('data', {}).get('latest_execution_payload_header').get('timestamp')
             )
-        self._cleanup_file(historical_summary_state_file)
-        self._cleanup_file(block_header_file)
-        self._cleanup_file(block_body_file)
         self._cleanup_file(output_filename)
         return data
 
     def cleanup_withdrawals_slot_files(self, slot: int) -> None:
-        self._cleanup_file(self.get_state_data_filename(slot))
+        historical_summary_state_slot = self._get_historical_summary_state_slot(slot)
+        self._cleanup_file(self.get_state_data_filename(historical_summary_state_slot))
         self._cleanup_file(self.get_block_header_filename(slot))
         self._cleanup_file(self.get_block_body_filename(slot))
 
@@ -197,14 +192,17 @@ class ProofsGenerationWrapper:
         return filename
 
     async def _prepare_state_data_file(self, slot: int) -> str:
-        state_data = await consensus_client.get_beacon_state(str(slot))
         filename = self.get_state_data_filename(slot)
         if os.path.isfile(filename):
             return filename
 
+        state_data = await consensus_client.get_beacon_state(str(slot))
         with open(filename, 'w', encoding='utf-8') as file:
             json.dump(state_data, file)
         return filename
 
     def _cleanup_file(self, filename: str) -> None:
         os.remove(filename)
+
+    def _get_historical_summary_state_slot(self, slot: int) -> int:
+        return SLOTS_PER_HISTORICAL_ROOT * ((slot // SLOTS_PER_HISTORICAL_ROOT) + 1)
