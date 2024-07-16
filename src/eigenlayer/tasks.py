@@ -97,13 +97,13 @@ class EigenlayerValidatorsTask(BaseTask):
     ) -> dict:
         if verify_data.get(pod):
             verify_data[pod]['validator_indices'].append(validator_data['validatorIndex'])
+            verify_data[pod]['validator_fields'].append(
+                [Web3.to_bytes(hexstr=x) for x in validator_data['ValidatorFields']]
+            )
             verify_data[pod]['validator_fields_proofs'].append(
                 b''.join(
                     [Web3.to_bytes(hexstr=x) for x in validator_data['WithdrawalCredentialProof']]
                 )
-            )
-            verify_data[pod]['validator_fields'].append(
-                [Web3.to_bytes(hexstr=x) for x in validator_data['ValidatorFields']]
             )
         else:
             verify_data[pod] = {
@@ -118,6 +118,9 @@ class EigenlayerValidatorsTask(BaseTask):
                     ),
                 ),
                 'validator_indices': [validator_data['validatorIndex']],
+                'validator_fields': [
+                    [Web3.to_bytes(hexstr=x) for x in validator_data['ValidatorFields']]
+                ],
                 'validator_fields_proofs': [
                     b''.join(
                         [
@@ -125,9 +128,6 @@ class EigenlayerValidatorsTask(BaseTask):
                             for x in validator_data['WithdrawalCredentialProof']
                         ]
                     )
-                ],
-                'validator_fields': [
-                    [Web3.to_bytes(hexstr=x) for x in validator_data['ValidatorFields']]
                 ],
             }
         return verify_data

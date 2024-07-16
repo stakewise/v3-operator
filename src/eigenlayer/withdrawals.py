@@ -61,6 +61,7 @@ class WithdrawalsProcessor:
             )
             withdrawals.extend(chunk)
 
+        verify_data: dict[ChecksumAddress, dict] = {}
         calls: list[tuple[ChecksumAddress, HexStr]] = []
         if not withdrawals:
             return calls
@@ -81,29 +82,18 @@ class WithdrawalsProcessor:
                     validator_index=withdrawal.validator_index,
                     withdrawal_index=withdrawal.index,
                 )
-                pod_owner = self.pod_to_owner[withdrawal.withdrawal_address]  # ?
-                call = await EigenPodOwnerContract(
-                    pod_owner
-                ).get_verify_and_process_withdrawals_call(
-                    oracle_timestamp=int(data['oracleTimestamp']),
-                    state_root_proof=(
-                        Web3.to_bytes(hexstr=data['beaconStateRoot']),
-                        b''.join(
-                            [
-                                Web3.to_bytes(hexstr=x)
-                                for x in data['StateRootAgainstLatestBlockHeaderProof']
-                            ]
-                        ),
-                    ),
-                    withdrawal_fields=[data['WithdrawalFields']],
-                    withdrawal_proofs=[WithdrawalsProcessor._withdrawal_proofs(data)],
-                    validator_fields=[[Web3.to_bytes(hexstr=x) for x in data['ValidatorFields']]],
-                    validator_fields_proofs=[
-                        b''.join([Web3.to_bytes(hexstr=x) for x in data['ValidatorProof']])
-                    ],
+                verify_data = self._update_verify_data(
+                    verify_data=verify_data, withdrawal_data=data, pod=withdrawal.withdrawal_address
+                )
+                last_slot = withdrawal.slot
+
+        for pod, owner in self.pod_to_owner.items():
+            if verify_data.get(pod):
+                call = await EigenPodOwnerContract(owner).get_verify_and_process_withdrawals_call(
+                    **verify_data[pod]
                 )
                 calls.append(call)
-                last_slot = withdrawal.slot
+
         return calls
 
     async def _get_from_block(self) -> BlockNumber:
@@ -163,6 +153,43 @@ class WithdrawalsProcessor:
             Web3.to_bytes(hexstr=data['timestampRoot']),
             Web3.to_bytes(hexstr=data['executionPayloadRoot']),
         )
+
+    def _update_verify_data(
+        self, verify_data: dict, withdrawal_data: dict, pod: ChecksumAddress
+    ) -> dict:
+        if verify_data.get(pod):
+            verify_data[pod]['withdrawal_fields'].append(withdrawal_data['WithdrawalFields'])
+            verify_data[pod]['withdrawal_proofs'].append(
+                WithdrawalsProcessor._withdrawal_proofs(withdrawal_data)
+            )
+            verify_data[pod]['validator_fields'].append(
+                [Web3.to_bytes(hexstr=x) for x in withdrawal_data['ValidatorFields']]
+            )
+            verify_data[pod]['validator_fields_proofs'].append(
+                b''.join([Web3.to_bytes(hexstr=x) for x in withdrawal_data['ValidatorProof']])
+            )
+        else:
+            verify_data[pod] = {
+                'oracle_timestamp': int(withdrawal_data['oracleTimestamp']),
+                'state_root_proof': (
+                    Web3.to_bytes(hexstr=withdrawal_data['beaconStateRoot']),
+                    b''.join(
+                        [
+                            Web3.to_bytes(hexstr=x)
+                            for x in withdrawal_data['StateRootAgainstLatestBlockHeaderProof']
+                        ]
+                    ),
+                ),
+                'withdrawal_fields': [withdrawal_data['WithdrawalFields']],
+                'withdrawal_proofs': [WithdrawalsProcessor._withdrawal_proofs(withdrawal_data)],
+                'validator_fields': [
+                    [Web3.to_bytes(hexstr=x) for x in withdrawal_data['ValidatorFields']]
+                ],
+                'validator_fields_proofs': [
+                    b''.join([Web3.to_bytes(hexstr=x) for x in withdrawal_data['ValidatorProof']])
+                ],
+            }
+        return verify_data
 
 
 class DelayedWithdrawalsProcessor:
