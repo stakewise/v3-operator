@@ -88,7 +88,7 @@ jobs:
       - name: Install Poetry
         uses: Gr1N/setup-poetry@v8
         with:
-          poetry-version: "1.6.1"
+          poetry-version: "1.8.3"
         if: matrix.os != 'self-hosted'
 
       - name: Install dependencies
