@@ -140,7 +140,7 @@ jobs:
             /tmp/artifacts/ubuntu-20.04/operator-${{ steps.get_version.outputs.VERSION }}-linux-amd64.sha256
             /tmp/artifacts/linux-arm-runner/operator-${{ steps.get_version.outputs.VERSION }}-linux-arm64.tar.gz
             /tmp/artifacts/linux-arm-runner/operator-${{ steps.get_version.outputs.VERSION }}-linux-arm64.sha256
-            /tmp/artifacts/macos-11/operator-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.tar.gz
-            /tmp/artifacts/macos-11/operator-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.sha256
+            /tmp/artifacts/macos-12/operator-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.tar.gz
+            /tmp/artifacts/macos-12/operator-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.sha256
             /tmp/artifacts/windows-latest/operator-${{ steps.get_version.outputs.VERSION }}-windows-amd64.zip
             /tmp/artifacts/windows-latest/operator-${{ steps.get_version.outputs.VERSION }}-windows-amd64.sha256
