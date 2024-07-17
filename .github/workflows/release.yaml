@@ -82,8 +82,8 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          apt-get update
-          apt-get install --no-install-recommends -y build-essential curl libpq-dev postgresql-client
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y build-essential curl libpq-dev postgresql-client
         if: matrix.os == 'linux-arm-runner'
 
       - uses: actions/setup-python@v4
