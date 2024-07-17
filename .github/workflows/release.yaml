@@ -15,7 +15,7 @@ jobs:
       matrix:
         include:
           - OS: ubuntu-20.04
-            PYTHON_VERSION: 3.10.13
+            PYTHON_VERSION: 3.10.14
             BUILD_CMD: |
               export PYTHONHASHSEED=42
               export BUILD_FILE_NAME=operator-${RELEASE_VERSION}-linux-amd64;
@@ -30,7 +30,7 @@ jobs:
               sha256sum ${BUILD_FILE_NAME}.tar.gz | head -c 64 > /tmp/artifacts/${BUILD_FILE_NAME}.sha256;
 
           - OS: self-hosted
-            PYTHON_VERSION: 3.10.13
+            PYTHON_VERSION: 3.10.14
             BUILD_CMD: |
               export PYTHONHASHSEED=42
               export BUILD_FILE_NAME=operator-${RELEASE_VERSION}-linux-arm64;
@@ -46,7 +46,7 @@ jobs:
               sha256sum ${BUILD_FILE_NAME}.tar.gz | head -c 64 > /tmp/artifacts/${BUILD_FILE_NAME}.sha256;
 
           - OS: macos-12
-            PYTHON_VERSION: 3.10.13
+            PYTHON_VERSION: 3.10.14
             BUILD_CMD: |
               export PYTHONHASHSEED=42
               export BUILD_FILE_NAME=operator-${RELEASE_VERSION}-darwin-amd64;
@@ -61,7 +61,7 @@ jobs:
               shasum -a 256 ${BUILD_FILE_NAME}.tar.gz | head -c 64 > /tmp/artifacts/${BUILD_FILE_NAME}.sha256
 
           - OS: windows-latest
-            PYTHON_VERSION: 3.10.11
+            PYTHON_VERSION: 3.10.14
             BUILD_CMD: |
               $RELEASE_VERSION = $env:GITHUB_REF.replace('refs/tags/', '')
               $BUILD_FILE_NAME = "operator-" + $RELEASE_VERSION + "-windows-amd64"
