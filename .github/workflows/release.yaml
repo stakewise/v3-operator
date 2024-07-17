@@ -80,6 +80,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install --no-install-recommends -y build-essential curl libpq-dev postgresql-client
+        if: matrix.os == 'linux-arm-runner'
+
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.PYTHON_VERSION }}
