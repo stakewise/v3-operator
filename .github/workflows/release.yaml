@@ -29,7 +29,7 @@ jobs:
               cp ${BUILD_FILE_NAME}.tar.gz /tmp/artifacts;
               sha256sum ${BUILD_FILE_NAME}.tar.gz | head -c 64 > /tmp/artifacts/${BUILD_FILE_NAME}.sha256;
 
-          - OS: self-hosted
+          - OS: linux-arm-runner
             PYTHON_VERSION: 3.10.14
             BUILD_CMD: |
               export PYTHONHASHSEED=42
@@ -89,7 +89,6 @@ jobs:
         uses: Gr1N/setup-poetry@v8
         with:
           poetry-version: "1.8.3"
-        if: matrix.os != 'self-hosted'
 
       - name: Install dependencies
         run: poetry install --no-interaction --no-root
