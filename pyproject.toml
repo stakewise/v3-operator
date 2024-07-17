@@ -3,6 +3,7 @@ name = "v3-operator"
 version = "v2.0.1"
 description = "StakeWise operator service for registering vault validators"
 authors = ["StakeWise Labs <info@stakewise.io>"]
+package-mode = false
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.11"
