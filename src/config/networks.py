@@ -126,10 +126,10 @@ NETWORKS = {
         V2_POOL_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         V2_POOL_GENESIS_BLOCK=BlockNumber(0),
         V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x1f10dB396120183Fc309d45110979879866Db0D2'
+            '0xA9f21D016E2846BC9Be972Cf45d9e410283c971e'
         ),
         GENESIS_VAULT_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x0bD7de255880d0e4DBD8cA6081a129FD56Ecb661'
+            '0x8A94e1d22D83990205843cda08376d16F150c9bb'
         ),
         GENESIS_VALIDATORS_ROOT=Bytes32(
             Web3.to_bytes(
