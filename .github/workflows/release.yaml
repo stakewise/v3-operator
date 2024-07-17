@@ -45,7 +45,7 @@ jobs:
               cp ${BUILD_FILE_NAME}.tar.gz /tmp/artifacts;
               sha256sum ${BUILD_FILE_NAME}.tar.gz | head -c 64 > /tmp/artifacts/${BUILD_FILE_NAME}.sha256;
 
-          - OS: macos-11
+          - OS: macos-12
             PYTHON_VERSION: 3.10.13
             BUILD_CMD: |
               export PYTHONHASHSEED=42
