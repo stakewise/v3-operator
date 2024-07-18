@@ -15,7 +15,7 @@ jobs:
       matrix:
         include:
           - OS: ubuntu-20.04
-            PYTHON_VERSION: 3.10.13
+            PYTHON_VERSION: 3.10.14
             BUILD_CMD: |
               export PYTHONHASHSEED=42
               export BUILD_FILE_NAME=operator-${RELEASE_VERSION}-linux-amd64;
@@ -29,8 +29,8 @@ jobs:
               cp ${BUILD_FILE_NAME}.tar.gz /tmp/artifacts;
               sha256sum ${BUILD_FILE_NAME}.tar.gz | head -c 64 > /tmp/artifacts/${BUILD_FILE_NAME}.sha256;
 
-          - OS: self-hosted
-            PYTHON_VERSION: 3.10.13
+          - OS: linux-arm-runner
+            PYTHON_VERSION: 3.10.14
             BUILD_CMD: |
               export PYTHONHASHSEED=42
               export BUILD_FILE_NAME=operator-${RELEASE_VERSION}-linux-arm64;
@@ -45,8 +45,8 @@ jobs:
               cp ${BUILD_FILE_NAME}.tar.gz /tmp/artifacts;
               sha256sum ${BUILD_FILE_NAME}.tar.gz | head -c 64 > /tmp/artifacts/${BUILD_FILE_NAME}.sha256;
 
-          - OS: macos-11
-            PYTHON_VERSION: 3.10.13
+          - OS: macos-12
+            PYTHON_VERSION: 3.10.14
             BUILD_CMD: |
               export PYTHONHASHSEED=42
               export BUILD_FILE_NAME=operator-${RELEASE_VERSION}-darwin-amd64;
@@ -80,16 +80,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y build-essential curl libpq-dev postgresql-client
+        if: matrix.os == 'linux-arm-runner'
+
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.PYTHON_VERSION }}
-        if: matrix.os != 'self-hosted'
 
       - name: Install Poetry
         uses: Gr1N/setup-poetry@v8
         with:
-          poetry-version: "1.6.1"
-        if: matrix.os != 'self-hosted'
+          poetry-version: "1.8.3"
 
       - name: Install dependencies
         run: poetry install --no-interaction --no-root
@@ -134,9 +138,9 @@ jobs:
           files: |
             /tmp/artifacts/ubuntu-20.04/operator-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz
             /tmp/artifacts/ubuntu-20.04/operator-${{ steps.get_version.outputs.VERSION }}-linux-amd64.sha256
-            /tmp/artifacts/self-hosted/operator-${{ steps.get_version.outputs.VERSION }}-linux-arm64.tar.gz
-            /tmp/artifacts/self-hosted/operator-${{ steps.get_version.outputs.VERSION }}-linux-arm64.sha256
-            /tmp/artifacts/macos-11/operator-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.tar.gz
-            /tmp/artifacts/macos-11/operator-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.sha256
+            /tmp/artifacts/linux-arm-runner/operator-${{ steps.get_version.outputs.VERSION }}-linux-arm64.tar.gz
+            /tmp/artifacts/linux-arm-runner/operator-${{ steps.get_version.outputs.VERSION }}-linux-arm64.sha256
+            /tmp/artifacts/macos-12/operator-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.tar.gz
+            /tmp/artifacts/macos-12/operator-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.sha256
             /tmp/artifacts/windows-latest/operator-${{ steps.get_version.outputs.VERSION }}-windows-amd64.zip
             /tmp/artifacts/windows-latest/operator-${{ steps.get_version.outputs.VERSION }}-windows-amd64.sha256
