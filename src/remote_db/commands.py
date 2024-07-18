@@ -150,7 +150,7 @@ def upload_keypairs(
     ctx: Context,
     encrypt_key: str,
     execution_endpoints: str,
-    execution_jwt_secret: str,
+    execution_jwt_secret: str | None,
     deposit_data_file: str | None,
     pool_size: int | None,
 ) -> None:
