@@ -76,7 +76,9 @@ class RemoteSignerKeystore(BaseKeystore):
         )
         public_key_bytes = BLSPubkey(Web3.to_bytes(hexstr=public_key))
 
-        exit_signature = await self._sign(public_key_bytes, validator_index, fork, message)
+        exit_signature = await self._sign_exit_request(
+            public_key_bytes, validator_index, fork, message
+        )
 
         bls.Verify(BLSPubkey(Web3.to_bytes(hexstr=public_key)), message, exit_signature)
         return exit_signature
@@ -90,8 +92,8 @@ class RemoteSignerKeystore(BaseKeystore):
         response.raise_for_status()
         return await response.json()
 
-    async def _sign(
-        self,
+    @staticmethod
+    async def _sign_exit_request(
         public_key: BLSPubkey,
         validator_index: int,
         fork: ConsensusFork,
