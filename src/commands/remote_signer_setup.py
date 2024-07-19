@@ -26,6 +26,7 @@ from src.config.settings import (
     settings,
 )
 from src.validators.keystores.local import LocalKeystore
+from src.validators.keystores.remote import RemoteSignerKeystore
 
 logger = logging.getLogger(__name__)
 
@@ -143,15 +144,7 @@ async def main() -> None:
         raise click.ClickException('Keystores not found.')
 
     # Check if remote signer's keymanager API is reachable before taking further steps
-    async with aiohttp.ClientSession(timeout=ClientTimeout(REMOTE_SIGNER_TIMEOUT)) as session:
-        resp = await session.get(f'{settings.remote_signer_url}/eth/v1/keystores')
-        if resp.status == 404:
-            logger.warning(
-                'make sure that you run remote signer with '
-                '`--enable-key-manager-api=true` option'
-            )
-        if resp.status != 200:
-            raise RuntimeError(f'Failed to connect to remote signer, returned {await resp.text()}')
+    await RemoteSignerKeystore.get_public_keys()
 
     # Read keystores without decrypting
     keystores_json = []

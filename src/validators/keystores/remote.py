@@ -2,6 +2,7 @@ import dataclasses
 import logging
 from dataclasses import dataclass
 
+import aiohttp
 import milagro_bls_binding as bls
 from aiohttp import ClientSession, ClientTimeout
 from eth_typing import BLSPubkey, BLSSignature, HexStr
@@ -48,7 +49,7 @@ class RemoteSignerKeystore(BaseKeystore):
 
     @staticmethod
     async def load() -> 'BaseKeystore':
-        public_keys = await RemoteSignerKeystore._get_remote_signer_public_keys()
+        public_keys = await RemoteSignerKeystore.get_public_keys()
         return RemoteSignerKeystore(public_keys)
 
     def __bool__(self) -> bool:
@@ -84,13 +85,21 @@ class RemoteSignerKeystore(BaseKeystore):
         return exit_signature
 
     @staticmethod
-    async def _get_remote_signer_public_keys() -> list[HexStr]:
-        signer_url = f'{settings.remote_signer_url}/api/v1/eth2/publicKeys'
-        async with ClientSession(timeout=ClientTimeout(REMOTE_SIGNER_TIMEOUT)) as session:
-            response = await session.get(signer_url)
+    async def get_public_keys() -> list[HexStr]:
+        signer_url = f'{settings.remote_signer_url}/eth/v1/keystores'
+        async with aiohttp.ClientSession(timeout=ClientTimeout(REMOTE_SIGNER_TIMEOUT)) as session:
+            resp = await session.get(signer_url)
 
-        response.raise_for_status()
-        return await response.json()
+        if resp.status == 404:
+            logger.warning(
+                'make sure that you run remote signer with '
+                '`--enable-key-manager-api=true` option'
+            )
+        if resp.status != 200:
+            raise RuntimeError(f'Failed to connect to remote signer, returned {await resp.text()}')
+
+        validators = (await resp.json())['data']
+        return [HexStr(validator['validating_pubkey']) for validator in validators]
 
     @staticmethod
     async def _sign_exit_request(

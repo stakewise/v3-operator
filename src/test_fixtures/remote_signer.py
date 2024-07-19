@@ -89,13 +89,6 @@ def mocked_remote_signer(
             repeat=True,
         )
 
-        # Mocked get public keys endpoint
-        m.get(
-            f'{remote_signer_url}/api/v1/eth2/publicKeys',
-            callback=_mocked_get_public_keys_endpoint,
-            repeat=True,
-        )
-
         # Mocked keymanager import keystores endpoint
         m.post(
             f'{remote_signer_url}/eth/v1/keystores',
