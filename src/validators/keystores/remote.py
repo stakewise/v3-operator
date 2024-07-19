@@ -11,7 +11,6 @@ from web3 import Web3
 
 from src.config.settings import REMOTE_SIGNER_TIMEOUT, settings
 from src.validators.keystores.base import BaseKeystore
-from src.validators.utils import load_deposit_data
 
 logger = logging.getLogger(__name__)
 
@@ -49,8 +48,8 @@ class RemoteSignerKeystore(BaseKeystore):
 
     @staticmethod
     async def load() -> 'BaseKeystore':
-        deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
-        return RemoteSignerKeystore(deposit_data.public_keys)
+        public_keys = await RemoteSignerKeystore._get_remote_signer_public_keys()
+        return RemoteSignerKeystore(public_keys)
 
     def __bool__(self) -> bool:
         return bool(self._public_keys)
@@ -82,6 +81,15 @@ class RemoteSignerKeystore(BaseKeystore):
         bls.Verify(BLSPubkey(Web3.to_bytes(hexstr=public_key)), message, exit_signature)
         return exit_signature
 
+    @staticmethod
+    async def _get_remote_signer_public_keys() -> list[HexStr]:
+        signer_url = f'{settings.remote_signer_url}/api/v1/eth2/publicKeys'
+        async with ClientSession(timeout=ClientTimeout(REMOTE_SIGNER_TIMEOUT)) as session:
+            response = await session.get(signer_url)
+
+        response.raise_for_status()
+        return await response.json()
+
     async def _sign(
         self,
         public_key: BLSPubkey,
@@ -105,19 +113,18 @@ class RemoteSignerKeystore(BaseKeystore):
             voluntary_exit=VoluntaryExitMessage(epoch=fork.epoch, validator_index=validator_index),
         )
 
+        signer_url = f'{settings.remote_signer_url}/api/v1/eth2/sign/0x{public_key.hex()}'
         async with ClientSession(timeout=ClientTimeout(REMOTE_SIGNER_TIMEOUT)) as session:
-            signer_url = f'{settings.remote_signer_url}/api/v1/eth2/sign/0x{public_key.hex()}'
-
             response = await session.post(signer_url, json=dataclasses.asdict(data))
 
-            if response.status == 404:
-                # Pubkey not present on remote signer side
-                raise RuntimeError(
-                    f'Failed to get signature for {public_key.hex()}.'
-                    f' Is this public key present in the remote signer?'
-                )
+        if response.status == 404:
+            # Pubkey not present on remote signer side
+            raise RuntimeError(
+                f'Failed to get signature for {public_key.hex()}.'
+                f' Is this public key present in the remote signer?'
+            )
 
-            response.raise_for_status()
+        response.raise_for_status()
 
-            signature = (await response.json())['signature']
-            return BLSSignature(Web3.to_bytes(hexstr=signature))
+        signature = (await response.json())['signature']
+        return BLSSignature(Web3.to_bytes(hexstr=signature))
