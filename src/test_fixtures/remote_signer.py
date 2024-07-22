@@ -59,6 +59,12 @@ def mocked_remote_signer(
             },
         )
 
+    def _mocked_get_public_keys_endpoint(url, **kwargs) -> CallbackResult:
+        return CallbackResult(
+            status=200,
+            payload=[pubkey for pubkey in _remote_signer_pubkey_privkey_mapping.keys()],
+        )
+
     def _mocked_sign_endpoint(url, **kwargs) -> CallbackResult:
         public_key_to_sign_for = url.path.split('/')[-1]
 
@@ -80,6 +86,13 @@ def mocked_remote_signer(
         m.get(
             f'{remote_signer_url}/eth/v1/keystores',
             callback=_mocked_keymanager_list_endpoint,
+            repeat=True,
+        )
+
+        # Mocked get public keys endpoint
+        m.get(
+            f'{remote_signer_url}/api/v1/eth2/publicKeys',
+            callback=_mocked_get_public_keys_endpoint,
             repeat=True,
         )
 

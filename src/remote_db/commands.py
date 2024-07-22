@@ -138,11 +138,20 @@ def cleanup(ctx: Context) -> None:
     envvar='POOL_SIZE',
     type=int,
 )
+@click.option(
+    '--execution-jwt-secret',
+    type=str,
+    envvar='EXECUTION_JWT_SECRET',
+    help='JWT secret key used for signing and verifying JSON Web Tokens'
+    'when connecting to execution nodes.',
+)
 @click.pass_context
+# pylint: disable-next=too-many-arguments
 def upload_keypairs(
     ctx: Context,
     encrypt_key: str,
     execution_endpoints: str,
+    execution_jwt_secret: str | None,
     deposit_data_file: str | None,
     pool_size: int | None,
 ) -> None:
@@ -154,6 +163,7 @@ def upload_keypairs(
         deposit_data_file=deposit_data_file,
         verbose=settings.verbose,
         execution_endpoints=execution_endpoints,
+        execution_jwt_secret=execution_jwt_secret,
         pool_size=pool_size,
     )
     try:

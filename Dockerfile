@@ -59,6 +59,9 @@ RUN apt-get update && apt-get upgrade -y; \
     rm -rf /var/lib/apt/lists/* && \
     mkdir -p /nonexistent && chown -R 65534:65534 /nonexistent
 
+# Remove vulnerable setuptools version (CVE-2024-6345)
+RUN pip3 uninstall setuptools -y
+
 USER nobody
 
 # Copy dependencies from build container
