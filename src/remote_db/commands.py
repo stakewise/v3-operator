@@ -146,6 +146,7 @@ def cleanup(ctx: Context) -> None:
     'when connecting to execution nodes.',
 )
 @click.pass_context
+# pylint: disable-next=too-many-arguments
 def upload_keypairs(
     ctx: Context,
     encrypt_key: str,
