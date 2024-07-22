@@ -19,7 +19,7 @@ from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.harvest.execution import get_update_state_calls
 from src.validators.database import NetworkValidatorCrud
 from src.validators.keystores.base import BaseKeystore
-from src.validators.typings import DepositData, DepositDataValidator, NetworkValidator
+from src.validators.typings import DepositData, NetworkValidator, Validator
 
 logger = logging.getLogger(__name__)
 

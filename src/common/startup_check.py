@@ -20,6 +20,7 @@ from src.common.wallet import hot_wallet
 from src.config.settings import settings
 from src.validators.execution import check_deposit_data_root, get_withdrawable_assets
 from src.validators.keystores.local import LocalKeystore
+from src.validators.typings import ValidatorsRegistrationMode
 from src.validators.utils import load_deposit_data
 
 logger = logging.getLogger(__name__)

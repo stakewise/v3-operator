@@ -171,7 +171,7 @@ logger = logging.getLogger(__name__)
     help='The log level.',
 )
 @click.option(
-    '--api-endpoint',
+    '--api-host',
     type=str,
     help=f'API host. Default is {DEFAULT_API_HOST}.',
     envvar='API_HOST',

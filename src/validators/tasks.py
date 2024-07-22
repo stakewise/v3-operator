@@ -30,6 +30,7 @@ from src.validators.execution import (
     update_unused_validator_keys_metric,
 )
 from src.validators.keystores.base import BaseKeystore
+from src.validators.register_validators import register_validators
 from src.validators.signing.common import (
     get_encrypted_exit_signature_shards,
     get_validators_proof,
@@ -90,7 +91,7 @@ async def register_and_remove_pending_validators(
     validators: list[Validator],
 ) -> HexStr | None:
     try:
-        return await register_validators(
+        return await process_validators(
             keystore=keystore, deposit_data=deposit_data, validators=validators
         )
     except Exception as e:
@@ -222,7 +223,7 @@ async def process_validators(
         tx_validators=tx_validators,
         harvest_params=harvest_params,
         validators_registry_root=registry_root,
-        validators_manager_signature=validators_manager_signature,
+        validators_manager_signature=None,
     )
     if tx_hash:
         pub_keys = ', '.join([val.public_key for val in validators])
