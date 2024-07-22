@@ -22,6 +22,7 @@ class Validator:
     index: int
     status: ValidatorStatus
     withdrawal_credentials: HexStr
+    activation_epoch: int
 
     @property
     def withdrawal_address(self) -> ChecksumAddress:

@@ -8,32 +8,44 @@ from src.config.settings import settings
 logger = logging.getLogger(__name__)
 
 
-class WithdrawalCheckpointsCrud:
-    def get_last_completed_withdrawals_block_number(self) -> BlockNumber | None:
+class CheckpointType:
+    PARTIAL = 'partial'
+    COMPLETED = 'completed'
+
+
+class CheckpointsCrud:
+    def get_checkpoint_block_number(self, checkpoint_type: str) -> BlockNumber | None:
         with db_client.get_db_connection() as conn:
-            res = conn.execute(f'''SELECT block_number FROM {self.TABLE}''').fetchone()
+            res = conn.execute(
+                f'SELECT value FROM {self.TABLE} WHERE checkpoint_type = ? ', (checkpoint_type,)
+            ).fetchone()
             if res:
                 return BlockNumber(res[0])
             return None
 
-    def save_last_completed_withdrawals_block_number(self, block_number: BlockNumber) -> None:
+    def update_checkpoint_block_number(
+        self, checkpoint_type: str, block_number: BlockNumber
+    ) -> None:
         """Saves ."""
         with db_client.get_db_connection() as conn:
-            conn.execut(f'DELETE FROM {self.TABLE}')
-            conn.execute(
-                f'INSERT INTO {self.TABLE} VALUES (:block_number)',
-                block_number,
+            conn.execut(
+                f'INSERT INTO {self.TABLE} '
+                'VALUES (:checkpoint_type, :value) '
+                'ON CONFLICT (checkpoint_type) DO UPDATE '
+                'SET value = :value',
+                (checkpoint_type, block_number),
             )
 
     def setup(self) -> None:
         """Creates tables."""
         with db_client.get_db_connection() as conn:
             conn.execute(
-                f"""
+                f'''
                     CREATE TABLE IF NOT EXISTS {self.TABLE} (
-                        block_number INTEGER NOT NULL
+                        checkpoint_type VARCHAR(64) NOT NULL UNIQUE,
+                        value INTEGER NOT NULL
                     )
-                """
+                '''
             )
 
     @property

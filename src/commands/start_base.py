@@ -13,7 +13,7 @@ from src.common.startup_check import startup_checks
 from src.common.utils import get_build_version
 from src.common.vault import Vault
 from src.config.settings import settings
-from src.eigenlayer.database import WithdrawalCheckpointsCrud
+from src.eigenlayer.database import CheckpointsCrud
 from src.eigenlayer.tasks import EigenlayerValidatorsTask, EigenlayerWithdrawalsTask
 from src.exits.tasks import ExitSignatureTask
 from src.harvest.tasks import HarvestTask
@@ -38,7 +38,7 @@ async def start_base() -> None:
         await startup_checks()
 
     NetworkValidatorCrud().setup()
-    WithdrawalCheckpointsCrud().setup()
+    CheckpointsCrud().setup()
 
     # load network validators from ipfs dump
     await load_genesis_validators()

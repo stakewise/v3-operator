@@ -6,6 +6,7 @@ from web3 import Web3
 from web3.types import BlockNumber, ChecksumAddress, HexStr
 
 from src.common.clients import execution_client
+from src.common.consensus import get_chain_epoch_head
 from src.common.contracts import EigenPodOwnerContract
 from src.common.utils import calc_slot_by_block_number
 from src.config.settings import VALIDATORS_WITHDRAWALS_CHUNK_SIZE, settings
@@ -15,7 +16,7 @@ from src.eigenlayer.contracts import (
     delegation_manager_contract,
     eigenpod_manager_contract,
 )
-from src.eigenlayer.database import WithdrawalCheckpointsCrud
+from src.eigenlayer.database import CheckpointsCrud, CheckpointType
 from src.eigenlayer.execution import (
     get_validator_withdrawals_chunk,
     submit_complete_queued_withdrawal_transaction,
@@ -50,7 +51,10 @@ class WithdrawalsProcessor:
         The inputs must be generated as
         in https://github.com/Layr-Labs/eigenpod-proofs-generation.
         '''
-        from_block = await self._get_from_block()
+        if not vault_validators:
+            return []
+
+        from_block = await self._get_from_block(vault_validators)
         # fetch withdrawals
         validators_indexes = {val.index for val in vault_validators}
         withdrawals_chunk = int(
@@ -100,14 +104,17 @@ class WithdrawalsProcessor:
 
         return calls
 
-    async def _get_from_block(self) -> BlockNumber:
-        current_block = self.block_number
+    async def _get_from_block(self, vault_validators: list[Validator]) -> BlockNumber:
+        from_block = CheckpointsCrud().get_checkpoint_block_number(CheckpointType.PARTIAL)
+        if from_block:
+            return BlockNumber(from_block + 1)
+
         events = []
         for pod in self.pod_to_owner.keys():
             partial_withdrawal_redeemed_event = await EigenPodContract(
                 pod
             ).get_last_partial_withdrawal_redeemed_event(
-                from_block=settings.network_config.KEEPER_GENESIS_BLOCK, to_block=current_block
+                from_block=settings.network_config.KEEPER_GENESIS_BLOCK, to_block=self.block_number
             )
             if partial_withdrawal_redeemed_event:
                 events.append(partial_withdrawal_redeemed_event)
@@ -115,14 +122,16 @@ class WithdrawalsProcessor:
             full_withdrawal_redeemed_event = await EigenPodContract(
                 pod
             ).get_last_full_withdrawal_redeemed_event(
-                from_block=settings.network_config.KEEPER_GENESIS_BLOCK, to_block=current_block
+                from_block=settings.network_config.KEEPER_GENESIS_BLOCK, to_block=self.block_number
             )
             if full_withdrawal_redeemed_event:
                 events.append(full_withdrawal_redeemed_event)
         if events:
             return BlockNumber(max(event['blockNumber'] for event in events if event))
 
-        return settings.network_config.KEEPER_GENESIS_BLOCK
+        epoch = min(val.activation_epoch for val in vault_validators)
+        chain_state = await get_chain_epoch_head(epoch)
+        return chain_state.execution_block
 
     @staticmethod
     def _withdrawal_proofs(data):
@@ -383,13 +392,14 @@ class CompleteWithdrawalsProcessor:
                     last_block_number = withdrawal.start_block
 
         if last_block_number:
-            WithdrawalCheckpointsCrud().save_last_completed_withdrawals_block_number(
-                last_block_number
+            CheckpointsCrud().update_checkpoint_block_number(
+                checkpoint_type=CheckpointType.COMPLETED,
+                block_number=last_block_number,
             )
 
     async def _get_from_block(self):
-        last_completed_withdrawals_block = (
-            WithdrawalCheckpointsCrud().get_last_completed_withdrawals_block_number()
+        last_completed_withdrawals_block = CheckpointsCrud().get_checkpoint_block_number(
+            CheckpointType.COMPLETED
         )
         if last_completed_withdrawals_block:
             return last_completed_withdrawals_block

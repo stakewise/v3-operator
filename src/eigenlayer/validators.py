@@ -27,6 +27,7 @@ async def get_vault_validators(current_block: BlockNumber) -> list[Validator]:
                 public_key=beacon_validator['validator']['pubkey'],
                 status=ValidatorStatus(beacon_validator['status']),
                 withdrawal_credentials=beacon_validator['validator']['withdrawal_credentials'],
+                activation_epoch=beacon_validator['validator']['activation_epoch'],
             )
             results.append(validator)
 
