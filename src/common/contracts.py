@@ -153,9 +153,6 @@ class VaultContract(ContractWrapper, VaultStateMixin):
     async def version(self) -> int:
         return await self.contract.functions.version().call()
 
-    async def validators_manager(self):
-        return await self.contract.functions.validatorsManager().call()
-
 
 class GnoVaultContract(ContractWrapper, VaultStateMixin):
     abi_path = 'abi/IGnoVault.json'

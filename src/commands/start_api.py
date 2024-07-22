@@ -6,6 +6,7 @@ from pathlib import Path
 import click
 from eth_typing import ChecksumAddress
 
+import src.validators.api.endpoints  # noqa  # pylint:disable=unused-import
 from src.commands.start_base import start_base
 from src.common.logging import LOG_LEVELS
 from src.common.utils import log_verbose
@@ -13,6 +14,8 @@ from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import (
+    DEFAULT_API_HOST,
+    DEFAULT_API_PORT,
     DEFAULT_MAX_FEE_PER_GAS_GWEI,
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
@@ -168,11 +171,18 @@ logger = logging.getLogger(__name__)
     help='The log level.',
 )
 @click.option(
-    '--relayer-endpoint',
+    '--api-endpoint',
     type=str,
-    help='Relayer endpoint.',
-    prompt='Enter the relayer endpoint',
-    envvar='RELAYER_ENDPOINT',
+    help=f'API host. Default is {DEFAULT_API_HOST}.',
+    envvar='API_HOST',
+    default=DEFAULT_API_HOST,
+)
+@click.option(
+    '--api-port',
+    type=int,
+    help=f'API port. Default is {DEFAULT_API_PORT}.',
+    envvar='API_PORT',
+    default=DEFAULT_API_PORT,
 )
 @click.command(help='Start operator service')
 # pylint: disable-next=too-many-arguments,too-many-locals
@@ -196,7 +206,8 @@ def start_api(
     hot_wallet_password_file: str | None,
     max_fee_per_gas_gwei: int,
     database_dir: str | None,
-    relayer_endpoint: str,
+    api_host: str,
+    api_port: int,
 ) -> None:
     vault_config = VaultConfig(vault, Path(data_dir))
     if network is None:
@@ -225,7 +236,8 @@ def start_api(
         database_dir=database_dir,
         log_level=log_level,
         log_format=log_format,
-        relayer_endpoint=relayer_endpoint,
+        api_host=api_host,
+        api_port=api_port,
         validators_registration_mode=validators_registration_mode,
     )
 

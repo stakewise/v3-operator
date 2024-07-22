@@ -19,7 +19,6 @@ RATED_NETWORKS = [MAINNET, HOLESKY]
 @dataclass
 # pylint: disable-next=too-many-instance-attributes
 class NetworkConfig:
-    CHAIN_ID: int
     WALLET_BALANCE_SYMBOL: str
     VAULT_BALANCE_SYMBOL: str
     VALIDATORS_REGISTRY_CONTRACT_ADDRESS: ChecksumAddress  # consensus deposit contract
@@ -63,7 +62,6 @@ class NetworkConfig:
 
 NETWORKS = {
     MAINNET: NetworkConfig(
-        CHAIN_ID=1,
         WALLET_BALANCE_SYMBOL='ETH',
         VAULT_BALANCE_SYMBOL='ETH',
         VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
@@ -109,7 +107,6 @@ NETWORKS = {
         RATED_API_URL='https://api.rated.network',
     ),
     HOLESKY: NetworkConfig(
-        CHAIN_ID=17000,
         WALLET_BALANCE_SYMBOL='HolETH',
         VAULT_BALANCE_SYMBOL='HolETH',
         VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
@@ -153,7 +150,6 @@ NETWORKS = {
         RATED_API_URL='https://api.rated.network',
     ),
     GNOSIS: NetworkConfig(
-        CHAIN_ID=100,
         WALLET_BALANCE_SYMBOL='xDAI',
         VAULT_BALANCE_SYMBOL='GNO',
         VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
@@ -199,7 +195,6 @@ NETWORKS = {
         RATED_API_URL='https://api.rated.network',
     ),
     CHIADO: NetworkConfig(
-        CHAIN_ID=10200,
         WALLET_BALANCE_SYMBOL='xDAI',
         VAULT_BALANCE_SYMBOL='GNO',
         VALIDATORS_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
