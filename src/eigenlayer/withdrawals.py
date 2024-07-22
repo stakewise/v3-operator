@@ -16,7 +16,11 @@ from src.eigenlayer.contracts import (
     eigenpod_manager_contract,
 )
 from src.eigenlayer.database import WithdrawalCheckpointsCrud
-from src.eigenlayer.execution import get_validator_withdrawals_chunk
+from src.eigenlayer.execution import (
+    get_validator_withdrawals_chunk,
+    submit_complete_queued_withdrawal_transaction,
+    submit_queue_withdrawal_transaction,
+)
 from src.eigenlayer.generator import ProofsGenerationWrapper
 from src.eigenlayer.typings import Validator
 
@@ -249,11 +253,10 @@ class ExitingValidatorsProcessor:
         self.block_number = block_number
         self.pod_to_owner = pod_to_owner
 
-    async def get_contact_calls(
+    async def call(
         self,
         vault_validators: list[Validator],
-    ) -> list[tuple[ChecksumAddress, HexStr]]:
-        calls: list[tuple[ChecksumAddress, HexStr]] = []
+    ) -> None:
         active_validators = [val for val in vault_validators if val.status in ACTIVE_STATUSES]
 
         validators_per_pod: dict[ChecksumAddress, list[Validator]] = defaultdict(list)
@@ -274,12 +277,7 @@ class ExitingValidatorsProcessor:
             MIN_DELTA = Web3.to_wei(32, 'ether')
             current_delta = pod_shares - effective_balances
             if current_delta > MIN_DELTA:
-                call = await EigenPodOwnerContract(
-                    self.pod_to_owner[pod]
-                ).get_queue_withdrawal_call(current_delta)
-                calls.append(call)
-
-        return calls
+                await submit_queue_withdrawal_transaction(self.pod_to_owner[pod], current_delta)
 
 
 class CompleteWithdrawalsProcessor:
@@ -313,9 +311,9 @@ class CompleteWithdrawalsProcessor:
         self.pod_to_owner = pod_to_owner
 
     # pylint: disable-next=too-many-locals
-    async def get_contact_calls(
+    async def call(
         self,
-    ) -> tuple[list[tuple[ChecksumAddress, HexStr]], BlockNumber | None]:
+    ) -> None:
         from_block = await self._get_from_block()
 
         queued_withdrawals_events = await delegation_manager_contract.get_withdrawal_queued_events(
@@ -328,7 +326,6 @@ class CompleteWithdrawalsProcessor:
                 queued_withdrawals_per_pod[withdrawal_event.withdrawer].append(withdrawal_event)
 
         last_block_number = None
-        calls = []
         min_withdrawal_delay_blocks = (
             await delegation_manager_contract.get_min_withdrawal_delay_blocks(self.block_number)
         )
@@ -373,9 +370,8 @@ class CompleteWithdrawalsProcessor:
                         logger.info('')
                         continue
 
-                call = await EigenPodOwnerContract(
-                    self.pod_to_owner[pod]
-                ).get_complete_queued_withdrawal_call(
+                await submit_complete_queued_withdrawal_transaction(
+                    self.pod_to_owner[pod],
                     delegated_to=withdrawal.delegated_to,
                     nonce=withdrawal.nonce,
                     shares=withdrawal.shares[0],
@@ -383,11 +379,13 @@ class CompleteWithdrawalsProcessor:
                     receive_as_tokens=receive_as_tokens,
                 )
 
-                calls.append(call)
                 if not last_block_number or withdrawal.start_block > last_block_number:
                     last_block_number = withdrawal.start_block
 
-        return calls, last_block_number
+        if last_block_number:
+            WithdrawalCheckpointsCrud().save_last_completed_withdrawals_block_number(
+                last_block_number
+            )
 
     async def _get_from_block(self):
         last_completed_withdrawals_block = (

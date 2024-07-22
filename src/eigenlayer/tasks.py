@@ -8,7 +8,7 @@ from web3.types import BlockNumber, ChecksumAddress
 from src.common.app_state import AppState
 from src.common.checks import wait_execution_catch_up_consensus
 from src.common.consensus import get_chain_finalized_head
-from src.common.contracts import EigenPodOwnerContract, vault_restaking_contract
+from src.common.contracts import vault_restaking_contract
 from src.common.execution import check_gas_price
 from src.common.tasks import BaseTask
 from src.config.settings import settings
@@ -17,8 +17,10 @@ from src.eigenlayer.contracts import (
     EigenPodContract,
     eigenpod_manager_contract,
 )
-from src.eigenlayer.database import WithdrawalCheckpointsCrud
-from src.eigenlayer.execution import submit_multicall_transaction
+from src.eigenlayer.execution import (
+    submit_multicall_transaction,
+    submit_verify_withdrawal_credentials_transaction,
+)
 from src.eigenlayer.generator import ProofsGenerationWrapper
 from src.eigenlayer.validators import get_vault_validators
 from src.eigenlayer.withdrawals import (
@@ -59,7 +61,7 @@ class EigenlayerValidatorsTask(BaseTask):
         logger.info(
             'Verifying withdrawal credentials for %s validators...', len(unregistered_validators)
         )
-        calls = []
+
         verify_data: dict[ChecksumAddress, dict] = {}
         pod_to_owner = await vault_restaking_contract.get_eigen_pod_owners(to_block=block_number)
         beacon_oracle_slot = await get_beacon_oracle_slot(block_number=block_number)
@@ -75,22 +77,23 @@ class EigenlayerValidatorsTask(BaseTask):
                     verify_data=verify_data, validator_data=data, pod=pod
                 )
 
+        verified_indexes = []
         for pod, owner in pod_to_owner.items():
-            if verify_data.get(pod):
-                call = await EigenPodOwnerContract(owner).get_verify_withdrawal_credentials_call(
-                    **verify_data[pod]
-                )
-                calls.append(call)
+            logger.info(
+                'Submitting eigenlayer verify withdrawal credentials transaction for pod %s...', pod
+            )
 
-        logger.info('Submitting eigenlayer verify withdrawal credentials transaction...')
-        tx_hash = await submit_multicall_transaction(
-            [
-                *calls,
-            ]
-        )
-        if not tx_hash:
-            return
-        logger.info('Successfully verified withdrawal credentials')
+            if verify_data.get(pod):
+                tx_hash = await submit_verify_withdrawal_credentials_transaction(
+                    owner, **verify_data[pod]
+                )
+                if tx_hash:
+                    verified_indexes.extend(verify_data[pod]['validator_indices'])
+        if verified_indexes:
+            logger.info(
+                'Successfully verified withdrawal credentials for %s validators',
+                len(verified_indexes),
+            )
 
     def _update_verify_data(
         self, verify_data: dict, validator_data: dict, pod: ChecksumAddress
@@ -160,15 +163,9 @@ class EigenlayerWithdrawalsTask(BaseTask):
         vault_validators = await get_vault_validators(current_block)
         pod_to_owner = await vault_restaking_contract.get_eigen_pod_owners(to_block=current_block)
         beacon_oracle_slot = await get_beacon_oracle_slot(current_block)
-        logger.info('processing exiting validators...')
-        exiting_validators_calls = await ExitingValidatorsProcessor(
-            pod_to_owner=pod_to_owner,
-            block_number=current_block,
-        ).get_contact_calls(
-            vault_validators=vault_validators,
-        )
-        logger.info('processing withdrawals...')
 
+        calls = []
+        logger.info('processing withdrawals...')
         withdrawals_calls = await WithdrawalsProcessor(
             pod_to_owner=pod_to_owner,
             block_number=current_block,
@@ -176,6 +173,7 @@ class EigenlayerWithdrawalsTask(BaseTask):
             vault_validators=vault_validators,
             beacon_oracle_slot=beacon_oracle_slot,
         )
+        calls.extend(withdrawals_calls)
 
         logger.info('processing Eigenlayer delayed withdrawals...')
 
@@ -183,32 +181,28 @@ class EigenlayerWithdrawalsTask(BaseTask):
             pod_to_owner=pod_to_owner,
             block_number=current_block,
         ).get_contact_calls()
+        calls.extend(delayed_withdrawals_calls)
+        if calls:
+            logger.info('Submitting multicall withdrawals transaction...')
+            tx_hash = await submit_multicall_transaction(calls)
+            if not tx_hash:
+                return
+
+        logger.info('processing exiting validators...')
+        await ExitingValidatorsProcessor(
+            pod_to_owner=pod_to_owner,
+            block_number=current_block,
+        ).call(
+            vault_validators=vault_validators,
+        )
 
         logger.info('processing Eigenlayer queued withdrawals...')
 
-        (
-            complete_withdrawals_calls,
-            completed_withdrawals_block,
-        ) = await CompleteWithdrawalsProcessor(
+        await CompleteWithdrawalsProcessor(
             pod_to_owner=pod_to_owner,
             block_number=current_block,
-        ).get_contact_calls()
+        ).call()
 
-        logger.info('Submitting multicall withdrawals transaction...')
-        tx_hash = await submit_multicall_transaction(
-            [
-                *exiting_validators_calls,
-                *withdrawals_calls,
-                *delayed_withdrawals_calls,
-                *complete_withdrawals_calls,
-            ]
-        )
-        if not tx_hash:
-            return
-        if completed_withdrawals_block:
-            WithdrawalCheckpointsCrud().save_last_completed_withdrawals_block_number(
-                completed_withdrawals_block
-            )
         app_state.last_withdrawals_update_timestamp = now
         logger.info('Successfully processed pod withdrawals')
 

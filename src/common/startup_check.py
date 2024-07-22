@@ -193,10 +193,10 @@ async def check_withdrawal_address() -> None:
     #  Add startup check for AUTO mode that
     #  withdrawal address is presented in deposit data file and is one of the eigen pods.
     deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
-
     vault_pods = await vault_restaking_contract.get_eigen_pods()
-    if deposit_data.withdrawal_address not in vault_pods:
-        raise ValueError('Invalid withdrawal address in deposit data')
+    for withdrawal_address in deposit_data.withdrawal_addresses:
+        if withdrawal_address not in vault_pods:
+            raise ValueError('Invalid withdrawal address in deposit data')
 
 
 async def startup_checks():

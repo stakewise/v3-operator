@@ -111,8 +111,10 @@ class Credential:
         datum_dict.update({'deposit_data_root': signed_deposit_datum.hash_tree_root})
         datum_dict.update({'fork_version': fork_version})
         datum_dict.update({'network_name': self.network})
-        datum_dict.update({'withdrawal_address': self.withdrawal_address})
         datum_dict.update({'deposit_cli_version': DEPOSIT_CLI_VERSION})
+        if self.withdrawal_address:
+            datum_dict.update({'withdrawal_address': self.withdrawal_address.lower()})
+
         return datum_dict
 
 

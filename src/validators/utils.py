@@ -151,13 +151,17 @@ def generate_validators_tree(
     for i, data in enumerate(deposit_data):
         credentials = get_eth1_withdrawal_credentials(data.get('withdrawal_address') or vault)
 
+        withdrawal_address = data.get('withdrawal_address')
+        if withdrawal_address:
+            withdrawal_address = Web3.to_checksum_address(withdrawal_address)
+
         validator = DepositDataValidator(
             deposit_data_index=i,
             public_key=add_0x_prefix(data['pubkey']),
             signature=add_0x_prefix(data['signature']),
             amount_gwei=int(data['amount']),
             deposit_data_root=add_0x_prefix(data['deposit_data_root']),
-            withdrawal_address=data.get('withdrawal_address'),
+            withdrawal_address=withdrawal_address,
         )
         leaves.append((encode_tx_validator(credentials, validator), i))
         validators.append(validator)

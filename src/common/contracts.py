@@ -394,17 +394,6 @@ class EigenPodOwnerContract(ContractWrapper):
 
         return self.address, call
 
-    async def get_queue_withdrawal_call(
-        self,
-        shares: int,
-    ) -> tuple[ChecksumAddress, HexStr]:
-        call = self.encode_abi(
-            fn_name='queueWithdrawal',
-            args=[shares],
-        )
-
-        return self.address, call
-
     async def get_claim_delayed_withdrawals_call(
         self,
         max_number: int,
@@ -412,36 +401,6 @@ class EigenPodOwnerContract(ContractWrapper):
         call = self.encode_abi(
             fn_name='claimDelayedWithdrawals',
             args=[max_number],
-        )
-
-        return self.address, call
-
-    # pylint: disable-next=too-many-arguments
-    async def get_complete_queued_withdrawal_call(
-        self,
-        # The address that the staker was delegated to at the time that the Withdrawal was created
-        delegated_to: ChecksumAddress,
-        # Nonce used to guarantee that otherwise identical withdrawals have unique hashes
-        nonce: int,
-        # amount of shares
-        shares: int,
-        # withdrawals block
-        start_block: BlockNumber,
-        receive_as_tokens: bool,
-    ) -> tuple[ChecksumAddress, HexStr]:
-        middleware_times_index = (
-            0  # middlewareTimesIndex is unused, but will be used in the Slasher eventually
-        )
-        call = self.encode_abi(
-            fn_name='completeQueuedWithdrawal',
-            args=[
-                delegated_to,
-                nonce,
-                shares,
-                start_block,
-                middleware_times_index,
-                receive_as_tokens,
-            ],
         )
 
         return self.address, call
