@@ -185,7 +185,7 @@ class VaultRestakingContract(VaultContract):
         from_block: BlockNumber | None = None,
         to_block: BlockNumber | None = None,
     ) -> dict[ChecksumAddress, ChecksumAddress]:
-        """Fetches the validator registered events."""
+        """Fetches the pod to owner addresses dict."""
         from_block = from_block or settings.network_config.KEEPER_GENESIS_BLOCK
         to_block = to_block or await execution_client.eth.get_block_number()
         events = await self._get_events(
@@ -333,27 +333,6 @@ class EigenPodOwnerContract(ContractWrapper):
     @property
     def contract_address(self) -> ChecksumAddress:
         return self._address
-
-    # pylint: disable-next=too-many-arguments
-    async def get_verify_withdrawal_credentials_call(
-        self,
-        oracle_timestamp: int,
-        state_root_proof: tuple[bytes, bytes],
-        validator_indices: list[int],
-        validator_fields_proofs: list[bytes],
-        validator_fields: list[list[bytes]],
-    ) -> tuple[ChecksumAddress, HexStr]:
-        call = self.encode_abi(
-            fn_name='verifyWithdrawalCredentials',
-            args=[
-                oracle_timestamp,
-                state_root_proof,
-                validator_indices,
-                validator_fields_proofs,
-                validator_fields,
-            ],
-        )
-        return self.address, call
 
     # pylint: disable-next=too-many-arguments
     async def get_verify_and_process_withdrawals_call(
