@@ -35,7 +35,6 @@ class Settings(metaclass=Singleton):
     execution_jwt_secret: str | None
 
     harvest_vault: bool
-    process_withdrawals: bool
     verbose: bool
     enable_metrics: bool
     metrics_host: str
@@ -97,7 +96,6 @@ class Settings(metaclass=Singleton):
         execution_endpoints: str = '',
         execution_jwt_secret: str | None = None,
         harvest_vault: bool = False,
-        process_withdrawals: bool = False,
         verbose: bool = False,
         enable_metrics: bool = False,
         metrics_port: int = DEFAULT_METRICS_PORT,
@@ -131,7 +129,6 @@ class Settings(metaclass=Singleton):
         self.execution_endpoints = [node.strip() for node in execution_endpoints.split(',')]
         self.execution_jwt_secret = execution_jwt_secret
         self.harvest_vault = harvest_vault
-        self.process_withdrawals = process_withdrawals
         self.verbose = verbose
         self.enable_metrics = enable_metrics
         self.metrics_host = metrics_host

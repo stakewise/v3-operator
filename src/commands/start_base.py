@@ -94,8 +94,7 @@ async def start_base() -> None:
             tasks.append(HarvestTask().run(interrupt_handler))
         if await Vault().is_restaking():
             tasks.append(EigenlayerValidatorsTask().run(interrupt_handler))
-            if settings.process_withdrawals:
-                tasks.append(EigenlayerWithdrawalsTask().run(interrupt_handler))
+            tasks.append(EigenlayerWithdrawalsTask().run(interrupt_handler))
 
         await asyncio.gather(*tasks)
 
