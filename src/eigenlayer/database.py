@@ -26,7 +26,6 @@ class CheckpointsCrud:
     def update_checkpoint_block_number(
         self, checkpoint_type: str, block_number: BlockNumber
     ) -> None:
-        """Saves ."""
         with db_client.get_db_connection() as conn:
             conn.execut(
                 f'INSERT INTO {self.TABLE} '

@@ -12,8 +12,6 @@ SLOTS_PER_HISTORICAL_ROOT = 8192
 
 
 class ProofsGenerationWrapper:
-    # todo: use tempfile?
-
     def __init__(self, slot: int, chain_id: int):
         self.slot = slot
         self.chain_id = chain_id
@@ -28,15 +26,15 @@ class ProofsGenerationWrapper:
             self._cleanup_file(file)
 
     async def generate_withdrawal_credentials(self, validator_index: int) -> dict:
-        '''
-        $ ./generation/generation \
+        """
+        generation/generation \
         -command ValidatorFieldsProof \
         -oracleBlockHeaderFile [ORACLE_BLOCK_HEADER_FILE_PATH] \
         -stateFile [STATE_FILE_PATH] \
         -validatorIndex [VALIDATOR_INDEX] \
         -outputFile [OUTPUT_FILE_PATH] \
         -chainID [CHAIN_ID]
-        '''
+        """
 
         block_header_file = await self._prepare_block_header_file(self.slot)
         state_data_file = await self._prepare_state_data_file(self.slot)
@@ -78,20 +76,21 @@ class ProofsGenerationWrapper:
     async def generate_withdrawal_fields_proof(
         self, withdrawals_slot: int, validator_index: int, withdrawal_index: int
     ) -> dict:
-        '''
-          -command WithdrawalFieldsProof \
-          -oracleBlockHeaderFile [ORACLE_BLOCK_HEADER_FILE_PATH] \
-          -stateFile [STATE_FILE_PATH] \
-          -validatorIndex [VALIDATOR_INDEX] \
-          -outputFile [OUTPUT_FILE_PATH] \
-          -chainID [CHAIN_ID] \
-          -historicalSummariesIndex [HISTORICAL_SUMMARIES_INDEX] \
-          -blockHeaderIndex [BLOCK_HEADER_INDEX] \
-          -historicalSummaryStateFile [HISTORICAL_SUMMARY_STATE_FILE_PATH] \
-          -blockHeaderFile [BLOCK_HEADER_FILE_PATH] \
-          -blockBodyFile [BLOCK_BODY_FILE_PATH] \
-          -withdrawalIndex [WITHDRAWAL_INDEX]
-        '''
+        """
+        generation/generation \
+        -command WithdrawalFieldsProof \
+        -oracleBlockHeaderFile [ORACLE_BLOCK_HEADER_FILE_PATH] \
+        -stateFile [STATE_FILE_PATH] \
+        -validatorIndex [VALIDATOR_INDEX] \
+        -outputFile [OUTPUT_FILE_PATH] \
+        -chainID [CHAIN_ID] \
+        -historicalSummariesIndex [HISTORICAL_SUMMARIES_INDEX] \
+        -blockHeaderIndex [BLOCK_HEADER_INDEX] \
+        -historicalSummaryStateFile [HISTORICAL_SUMMARY_STATE_FILE_PATH] \
+        -blockHeaderFile [BLOCK_HEADER_FILE_PATH] \
+        -blockBodyFile [BLOCK_BODY_FILE_PATH] \
+        -withdrawalIndex [WITHDRAWAL_INDEX]
+        """
         oracle_block_header_file = await self._prepare_block_header_file(self.slot)
         state_data_file = await self._prepare_state_data_file(self.slot)
         self.files.update([oracle_block_header_file, state_data_file])
@@ -101,15 +100,12 @@ class ProofsGenerationWrapper:
         ) // SLOTS_PER_HISTORICAL_ROOT
 
         # "historicalSummaryStateFile" This is the beacon state at the slot such that:
-        # historical_summary_state_slot =
-        #    SLOTS_PER_HISTORICAL_ROOT * ((withdrawal_slot // SLOTS_PER_HISTORICAL_ROOT) + 1).
         historical_summary_state_slot = self._get_historical_summary_state_slot(withdrawals_slot)
         historical_summary_state_file = await self._prepare_state_data_file(
             historical_summary_state_slot
         )
 
         # blockHeaderIndex this is the blockheaderRoot index within the historical summaries entry
-        # which can be calculated like this: withdrawal_slot mod SLOTS_PER_HISTORICAL_ROOT
         block_header_index = withdrawals_slot % SLOTS_PER_HISTORICAL_ROOT
 
         block_header_file = await self._prepare_block_header_file(withdrawals_slot)

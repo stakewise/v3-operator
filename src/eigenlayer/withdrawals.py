@@ -8,6 +8,7 @@ from web3.types import BlockNumber, ChecksumAddress, HexStr
 from src.common.clients import execution_client
 from src.common.consensus import get_chain_epoch_head
 from src.common.contracts import EigenPodOwnerContract
+from src.common.execution import get_protocol_config
 from src.common.utils import calc_slot_by_block_number
 from src.config.settings import VALIDATORS_WITHDRAWALS_CHUNK_SIZE, settings
 from src.eigenlayer.contracts import (
@@ -44,13 +45,12 @@ class WithdrawalsProcessor:
         vault_validators: list[Validator],
         beacon_oracle_slot: int,
     ) -> list[tuple[ChecksumAddress, HexStr]]:
-        '''
+        """
         For full and partial withdrawals of every validator, the operator must call
-        https://github.com/stakewise/v3-core/blob/main
-        /contracts/vaults/ethereum/restake/EigenPodOwner.sol#L211.
+        verifyAndProcessWithdrawals func in EigenPodOwner contract.
         The inputs must be generated as
         in https://github.com/Layr-Labs/eigenpod-proofs-generation.
-        '''
+        """
         if not vault_validators:
             return []
 
@@ -146,24 +146,10 @@ class WithdrawalsProcessor:
         return chain_state.execution_block
 
     @staticmethod
-    def _withdrawal_proofs(data):
-        '''
-        struct WithdrawalProof {
-        bytes withdrawalProof; +
-        bytes slotProof; +
-        bytes executionPayloadProof; +
-        bytes timestampProof; +
-        bytes historicalSummaryBlockRootProof; + HistoricalSummaryProof
-        uint64 blockRootIndex;  consensus
-        uint64 historicalSummaryIndex; +
-        uint64 withdrawalIndex; +
-        bytes32 blockRoot; consensus
-        bytes32 slotRoot; +
-        bytes32 timestampRoot; +
-        bytes32 executionPayloadRoot; +
-        }
-        '''
-
+    def _withdrawal_proofs(
+        data: dict,
+    ) -> tuple[bytes, bytes, bytes, bytes, bytes, int, int, int, bytes, bytes, bytes, bytes]:
+        """process dict to WithdrawalProof struct"""
         return (
             _proof_to_bytes(data['WithdrawalProof']),
             _proof_to_bytes(data['SlotProof']),
@@ -182,6 +168,7 @@ class WithdrawalsProcessor:
     def _update_verify_data(
         self, verify_data: dict, withdrawal_data: dict, pod: ChecksumAddress
     ) -> dict:
+        """Process generated output data to contact call args format"""
         if verify_data.get(pod):
             verify_data[pod]['withdrawal_fields'].append(withdrawal_data['WithdrawalFields'])
             verify_data[pod]['withdrawal_proofs'].append(
@@ -218,14 +205,12 @@ class WithdrawalsProcessor:
 
 
 class DelayedWithdrawalsProcessor:
-    '''
+    """
     If there are any delayed withdrawals completed, call
-    https://github.com/stakewise/v3-core/blob/main/contracts/
-    vaults/ethereum/restake/EigenPodOwner.sol#L189.
-    You can fetch claimable delayed withdrawals with
-    https://github.com/Layr-Labs/eigenlayer-contracts/blob/
-    mainnet-deployment/src/contracts/interfaces/IDelayedWithdrawalRouter.sol#L46
-    '''
+    claimDelayedWithdrawals func in EigenPodOwner contract.
+    Claimable delayed withdrawals can be fetched
+    via getClaimableUserDelayedWithdrawals func.
+    """
 
     def __init__(
         self, pod_to_owner: dict[ChecksumAddress, ChecksumAddress], block_number: BlockNumber
@@ -244,9 +229,7 @@ class DelayedWithdrawalsProcessor:
             )
             delayed_withdrawals = await DelayedWithdrawalRouterContract(
                 delayed_withdrawal_router
-            ).get_claimable_user_delayed_withdrawals(
-                pod, block_number=self.block_number
-            )  # pod address?
+            ).get_claimable_user_delayed_withdrawals(pod, block_number=self.block_number)
 
             call = await EigenPodOwnerContract(
                 self.pod_to_owner[pod]
@@ -257,16 +240,11 @@ class DelayedWithdrawalsProcessor:
 
 
 class ExitingValidatorsProcessor:
-    '''
-    For every validator that is in exiting or higher state, we must call
-    https://github.com/stakewise/v3-core/blob/main/
-    contracts/vaults/ethereum/restake/EigenPodOwner.sol#L135.
-    The shares argument must be the sum of effective balances.
-    The effective balances should be fetched using
-    https://github.com/Layr-Labs/eigenlayer-contracts/blob/
-    v0.2.5-mainnet-m2-minor-eigenpod-upgrade/src/contracts/pods/EigenPod.sol#L806
-    :return:
-    '''
+    """
+    For every validator that is in exiting or higher state,
+    call queueWithdrawal func in EigenPodOwner contract.
+    The shares argument is the sum of effective balances of exiting validators.
+    """
 
     def __init__(
         self, pod_to_owner: dict[ChecksumAddress, ChecksumAddress], block_number: BlockNumber
@@ -295,35 +273,17 @@ class ExitingValidatorsProcessor:
                 )
                 effective_balances += Web3.to_wei(validator_info.restaked_balance_gwei, 'gwei')
 
-            MIN_DELTA = Web3.to_wei(32, 'ether')
+            inactive_validator_balance = (await get_protocol_config()).inactive_validator_balance
             current_delta = pod_shares - effective_balances
-            if current_delta > MIN_DELTA:
+            if current_delta > inactive_validator_balance:
                 await submit_queue_withdrawal_transaction(self.pod_to_owner[pod], current_delta)
 
 
 class CompleteWithdrawalsProcessor:
-    '''
-    Keep track of all the queued withdrawals using WithdrawalQueued event:
-    https://github.com/Layr-Labs/eigenlayer-contracts/blob/
-    v0.2.5-mainnet-m2-minor-eigenpod-upgrade/src/contracts/interfaces/IDelegationManager.sol#L135.
-    Mark withdrawal as undelegation=True if there is StakerUndelegated  or
-    StakerForceUndelegated event in the same block as WithdrawalQueued event.
-    For every withdrawal:
-    Check whether it can be processed by checking that the current block is higher that
-    withdrawal.startBlock + withdrawalsDelayBlocks . withdrawalsDelayBlocks  is calculated
-    as max(
-    minWithdrawalDelayBlocks,
-     strategyWithdrawalDelayBlocks[0xbeaC0eeEeeeeEEeEeEEEEeeEEeEeeeEeeEEBEaC0])
-    can be fetched in https://github.com/Layr-Labs/eigenlayer-contr
-    acts/blob/v0.2.5-mainnet-m2-minor-eigenpod-upgrade/
-    src/contracts/core/DelegationManagerStorage.sol#L85 and
-    https://github.com/Layr-Labs/eigenlayer-contracts/blob/
-     v0.2.5-mainnet-m2-minor-eigenpod-upgrade/src/contracts/interfaces/IDelegationManager.sol#L396
-    If the withdrawal is undelegation , set receiveAsTokens=False , otherwise True .
-    NB! When receiveAsTokens is True
-    the balance of the eigen pod must be >= that withdrawal.shares
-    Clean up processed withdrawal
-    '''
+    """
+    Call completeQueuedWithdrawal func in EigenPodOwner contract
+    for every processed queued withdrawal.
+    """
 
     def __init__(
         self, pod_to_owner: dict[ChecksumAddress, ChecksumAddress], block_number: BlockNumber
@@ -409,7 +369,7 @@ class CompleteWithdrawalsProcessor:
                 block_number=last_block_number,
             )
 
-    async def _get_from_block(self):
+    async def _get_from_block(self) -> BlockNumber:
         last_completed_withdrawals_block = CheckpointsCrud().get_checkpoint_block_number(
             CheckpointType.COMPLETED
         )

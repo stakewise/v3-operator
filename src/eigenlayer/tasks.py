@@ -37,7 +37,8 @@ logger = logging.getLogger(__name__)
 class EigenlayerValidatorsTask(BaseTask):
     # pylint: disable-next=too-many-locals
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
-        """Process restaking vault validators withdrawals if needed."""
+        """Verify validators withdrawal credentials in Eigenlayer if needed."""
+
         # check current gas prices
         if not await check_gas_price():
             return
@@ -99,6 +100,7 @@ class EigenlayerValidatorsTask(BaseTask):
     def _update_verify_data(
         self, verify_data: dict, validator_data: dict, pod: ChecksumAddress
     ) -> dict:
+        """Process generated output data to contact call args format"""
         if verify_data.get(pod):
             verify_data[pod]['validator_indices'].append(validator_data['validatorIndex'])
             verify_data[pod]['validator_fields'].append(

@@ -23,7 +23,6 @@ class EigenPodContract(ContractWrapper):
         from_block: BlockNumber | None = None,
         to_block: BlockNumber | None = None,
     ) -> list[int]:
-        """Fetches the validator approval events."""
         from_block = from_block or settings.network_config.KEEPER_GENESIS_BLOCK
         to_block = to_block or await execution_client.eth.get_block_number()
         events = await self._get_events(
@@ -156,13 +155,6 @@ class DelegationManagerContract(ContractWrapper):
         )
         return [QueuedWithdrawal(*event['args']['withdrawalRoot']) for event in events]
 
-    # async def get_last_withdrawal_queued_event(
-    #     self, from_block: BlockNumber, to_block: BlockNumber
-    # ) -> EventData:
-    #     return await self._get_last_event(
-    #         event=self.events.WithdrawalQueued, from_block=from_block, to_block=to_block
-    #     )
-
     async def get_staker_undelegated_events(
         self, from_block: BlockNumber, to_block: BlockNumber
     ) -> list[EventData]:
@@ -191,13 +183,6 @@ class DelegationManagerContract(ContractWrapper):
     async def get_strategy_withdrawal_delay_blocks(
         self, strategy: ChecksumAddress, block_number: BlockNumber
     ) -> int:
-        """
-        function strategyWithdrawalDelayBlocks(IStrategy strategy)
-        external view returns (uint256);
-
-        :param block_identifier:
-        :return:
-        """
         return await self.contract.functions.strategyWithdrawalDelayBlocks(strategy).call(
             block_identifier=block_number
         )

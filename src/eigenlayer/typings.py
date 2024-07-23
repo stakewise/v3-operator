@@ -32,23 +32,14 @@ class Validator:
 @dataclass
 class ValidatorInfo:
     validator_index: int
-    # amount of beacon chain ETH restaked on EigenLayer in gwei
     restaked_balance_gwei: int
-    # timestamp of the validator's most recent balance update
     most_recent_balance_update_timestamp: Timestamp
-    # VALIDATOR_STATUS
     status: str
 
 
 @dataclass
-class VerifiedWithdrawal:
-    amountToSendGwei: int
-    restakedBalanceGwei: Wei  # gwei?
-
-
-@dataclass
 class DelayedWithdrawal:
-    amount: int  # wei
+    amount: Wei
     block_created: BlockNumber
 
 
@@ -61,7 +52,7 @@ class QueuedWithdrawal:
     nonce: int
     start_block: BlockNumber
     strategies: list[ChecksumAddress]
-    shares: list[Wei]  # gwei?
+    shares: list[Wei]
 
     undelegation: bool = False
     withdrawal_root: bytes | None = None
