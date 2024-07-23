@@ -17,6 +17,7 @@ from src.eigenlayer.contracts import (
     EigenPodContract,
     eigenpod_manager_contract,
 )
+from src.eigenlayer.database import CheckpointsCrud, CheckpointType
 from src.eigenlayer.execution import (
     submit_multicall_transaction,
     submit_verify_withdrawal_credentials_transaction,
@@ -188,6 +189,10 @@ class EigenlayerWithdrawalsTask(BaseTask):
             if not tx_hash:
                 return
 
+        CheckpointsCrud().update_checkpoint_block_number(
+            checkpoint_type=CheckpointType.COMPLETED,
+            block_number=current_block,
+        )
         logger.info('processing exiting validators...')
         await ExitingValidatorsProcessor(
             pod_to_owner=pod_to_owner,

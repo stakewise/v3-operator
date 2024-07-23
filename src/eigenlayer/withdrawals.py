@@ -55,6 +55,10 @@ class WithdrawalsProcessor:
             return []
 
         from_block = await self._get_from_block(vault_validators)
+        logger.info(
+            'fetching withdrawals from block %s to block %s...', from_block, self.block_number
+        )
+
         # fetch withdrawals
         validators_indexes = {val.index for val in vault_validators}
         withdrawals_chunk = int(
@@ -62,9 +66,16 @@ class WithdrawalsProcessor:
         )
         withdrawals = []
         for block_number in range(from_block, self.block_number + 1, withdrawals_chunk):
+            if not block_number % VALIDATORS_WITHDRAWALS_CHUNK_SIZE:
+                logger.info('fetched withdrawals at block %s...', block_number)
+            logger.info(
+                'fetched withdrawals chunk from block %s to block %s...',
+                block_number,
+                BlockNumber(min(block_number + withdrawals_chunk - 1, self.block_number)),
+            )
             chunk = await get_validator_withdrawals_chunk(
                 indexes=validators_indexes,
-                from_block=from_block,
+                from_block=BlockNumber(block_number),
                 to_block=BlockNumber(min(block_number + withdrawals_chunk - 1, self.block_number)),
             )
             withdrawals.extend(chunk)
@@ -75,6 +86,7 @@ class WithdrawalsProcessor:
             return calls
 
         last_slot = None
+        logger.info('generating withdrawals proofs for %s withdrawals...', len(withdrawals))
         with ProofsGenerationWrapper(
             slot=beacon_oracle_slot, chain_id=settings.network_config.CHAIN_ID
         ) as generator:
@@ -281,7 +293,7 @@ class ExitingValidatorsProcessor:
                 validator_info = await EigenPodContract(pod).get_validator_pubkey_to_info(
                     validator.public_key, block_number=self.block_number
                 )
-                effective_balances += validator_info.restaked_balance_gwei
+                effective_balances += Web3.to_wei(validator_info.restaked_balance_gwei, 'gwei')
 
             MIN_DELTA = Web3.to_wei(32, 'ether')
             current_delta = pod_shares - effective_balances

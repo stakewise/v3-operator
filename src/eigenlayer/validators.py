@@ -19,15 +19,12 @@ async def get_vault_validators(current_block: BlockNumber) -> list[Validator]:
             public_keys[i : i + settings.validators_fetch_chunk_size]
         )
         for beacon_validator in validators['data']:
-            # if beacon_validator.get('status') in EXITED_STATUSES:
-            # continue
-
             validator = Validator(
                 index=int(beacon_validator['index']),
                 public_key=beacon_validator['validator']['pubkey'],
                 status=ValidatorStatus(beacon_validator['status']),
                 withdrawal_credentials=beacon_validator['validator']['withdrawal_credentials'],
-                activation_epoch=beacon_validator['validator']['activation_epoch'],
+                activation_epoch=int(beacon_validator['validator']['activation_epoch']),
             )
             results.append(validator)
 
