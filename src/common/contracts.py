@@ -81,6 +81,7 @@ class ContractWrapper:
         event: type[AsyncContractEvent],
         from_block: BlockNumber,
         to_block: BlockNumber,
+        argument_filters: dict | None = None,
     ) -> list[EventData]:
         events: list[EventData] = []
         blocks_range = self.events_blocks_range_interval
@@ -88,6 +89,7 @@ class ContractWrapper:
             range_events = await event.get_logs(
                 fromBlock=from_block,
                 toBlock=BlockNumber(min(from_block + blocks_range, to_block)),
+                argument_filters=argument_filters,
             )
             if range_events:
                 events.extend(range_events)
@@ -260,6 +262,22 @@ class KeeperContract(ContractWrapper):
 
     async def can_harvest(self, vault_address: ChecksumAddress) -> bool:
         return await self.contract.functions.canHarvest(vault_address).call()
+
+    async def get_validators_approval_events(
+        self,
+        vault: ChecksumAddress,
+        from_block: BlockNumber | None = None,
+        to_block: BlockNumber | None = None,
+    ) -> list[EventData]:
+        from_block = from_block or settings.network_config.KEEPER_GENESIS_BLOCK
+        to_block = to_block or await execution_client.eth.get_block_number()
+
+        return await self._get_events(
+            self.events.ExitSignaturesUpdated,
+            from_block=from_block,
+            to_block=to_block,
+            argument_filters={'vault': vault},
+        )
 
 
 class DepositDataRegistryContract(ContractWrapper):
