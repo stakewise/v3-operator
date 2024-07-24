@@ -16,7 +16,8 @@ from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import format_error, log_verbose
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
-from src.config.settings import AVAILABLE_NETWORKS, settings
+from src.config.networks import AVAILABLE_NETWORKS
+from src.config.settings import settings
 from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
 

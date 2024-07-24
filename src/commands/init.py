@@ -6,7 +6,8 @@ from eth_typing import HexAddress
 from src.common.language import LANGUAGES, create_new_mnemonic
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
-from src.config.settings import AVAILABLE_NETWORKS, DEFAULT_NETWORK
+from src.config.networks import AVAILABLE_NETWORKS
+from src.config.settings import DEFAULT_NETWORK
 
 
 @click.option(

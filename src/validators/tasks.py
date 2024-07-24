@@ -20,7 +20,8 @@ from src.common.metrics import metrics
 from src.common.tasks import BaseTask
 from src.common.typings import HarvestParams
 from src.common.utils import get_current_timestamp
-from src.config.settings import DEPOSIT_AMOUNT, GNOSIS_NETWORKS, settings
+from src.config.networks import GNOSIS_NETWORKS
+from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import (
     NetworkValidatorsProcessor,

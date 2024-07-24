@@ -154,14 +154,14 @@ Head to [Usage](#usage) to launch your operator service.
 Pull the latest docker operator docker image:
 
 ```bash
-docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.3.2
+docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v2.0.2
 ```
 
 You can also build the docker image from source by cloning this repo and executing the following command from within
 the `v3-operator` folder:
 
 ```bash
-docker build --pull -t europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.3.2 .
+docker build --pull -t europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v2.0.2 .
 ```
 
 You will execute Operator Service commands using the format below (note the use of flags are optional):
@@ -170,22 +170,10 @@ You will execute Operator Service commands using the format below (note the use 
 docker run --rm -ti \
 -u $(id -u):$(id -g) \
 -v ~/.stakewise/:/data \
-europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.3.2 \
+europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v2.0.2 \
 src/main.py COMMAND \
 --flagA=123 \
 --flagB=xyz
-```
-
-Docker runs under user "nobody". So make sure to set permissions on data-dir for "nobody" user on host machine. For example:
-
-```bash
-chown -R nobody:nogroup ~/.stakewise
-```
-
-If you prefer UIDs the following command also works:
-
-```bash
-chown -R 65534:65534 ~/.stakewise
 ```
 
 Head to [Usage](#usage) to launch your operator service.
@@ -405,20 +393,12 @@ below:
 docker run --restart on-failure:10 \
 -u $(id -u):$(id -g) \
 -v ~/.stakewise/:/data \
-europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v1.3.2 \
+europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v2.0.2 \
 src/main.py start \
 --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
 --data-dir=/data \
 --consensus-endpoints=http://localhost:5052 \
 --execution-endpoints=http://localhost:8545
-```
-
-You can also run docker containers with `docker-compose`. For that, you need to copy [.env.example](.env.example) file
-to `.env` file
-and fill it with correct values. Run docker compose with the following command:
-
-```bash
-docker-compose up
 ```
 
 #### Using Source Files
