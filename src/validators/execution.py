@@ -1,6 +1,6 @@
 import logging
 import struct
-from typing import Sequence, Set
+from typing import Set
 
 from eth_typing import BlockNumber, HexStr
 from sw_utils import EventProcessor, is_valid_deposit_data_signature
@@ -19,7 +19,7 @@ from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.harvest.execution import get_update_state_calls
 from src.validators.database import NetworkValidatorCrud
 from src.validators.keystores.base import BaseKeystore
-from src.validators.typings import DepositData, DepositDataValidator, NetworkValidator
+from src.validators.typings import DepositData, NetworkValidator, Validator
 
 logger = logging.getLogger(__name__)
 
@@ -135,12 +135,12 @@ async def check_deposit_data_root(deposit_data_root: str) -> None:
         )
 
 
-async def get_validators_from_deposit_data(
+async def get_available_validators(
     keystore: BaseKeystore | None,
     deposit_data: DepositData,
     count: int,
     run_check_deposit_data_root: bool = True,
-) -> Sequence[DepositDataValidator]:
+) -> list[Validator]:
     """Fetches vault's available validators."""
     if run_check_deposit_data_root:
         try:
@@ -151,7 +151,7 @@ async def get_validators_from_deposit_data(
             raise
 
     start_index = await Vault().get_validators_index()
-    validators: list[DepositDataValidator] = []
+    validators: list[Validator] = []
 
     for validator in deposit_data.validators[start_index : start_index + count]:
         if keystore and validator.public_key not in keystore:
