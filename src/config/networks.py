@@ -29,6 +29,7 @@ class NetworkConfig:
     DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS: ChecksumAddress
     V2_POOL_CONTRACT_ADDRESS: ChecksumAddress
     V2_POOL_GENESIS_BLOCK: BlockNumber
+    V2_POOL_LAST_VALIDATOR_BLOCK: BlockNumber
     V2_POOL_ESCROW_CONTRACT_ADDRESS: ChecksumAddress
     GENESIS_VAULT_CONTRACT_ADDRESS: ChecksumAddress
     GENESIS_VALIDATORS_ROOT: Bytes32
@@ -81,6 +82,7 @@ NETWORKS = {
             '0xC874b064f465bdD6411D45734b56fac750Cda29A'
         ),
         V2_POOL_GENESIS_BLOCK=BlockNumber(11726297),
+        V2_POOL_LAST_VALIDATOR_BLOCK=BlockNumber(18665913),
         V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x2296e122c1a20Fca3CAc3371357BdAd3be0dF079'
         ),
@@ -125,6 +127,7 @@ NETWORKS = {
         ),
         V2_POOL_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         V2_POOL_GENESIS_BLOCK=BlockNumber(0),
+        V2_POOL_LAST_VALIDATOR_BLOCK=BlockNumber(0),
         V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xA9f21D016E2846BC9Be972Cf45d9e410283c971e'
         ),
@@ -171,6 +174,7 @@ NETWORKS = {
             '0x2f99472b727e15EECf9B9eFF9F7481B85d3b4444'
         ),
         V2_POOL_GENESIS_BLOCK=BlockNumber(21275812),
+        V2_POOL_LAST_VALIDATOR_BLOCK=BlockNumber(23297461),
         V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xfc9B67b6034F6B306EA9Bd8Ec1baf3eFA2490394'
         ),
@@ -215,6 +219,7 @@ NETWORKS = {
         ),
         V2_POOL_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         V2_POOL_GENESIS_BLOCK=BlockNumber(0),
+        V2_POOL_LAST_VALIDATOR_BLOCK=BlockNumber(0),
         V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x928F9a91E674C886Cae0c377670109aBeF7e19d6'
         ),

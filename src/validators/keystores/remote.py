@@ -4,11 +4,13 @@ from dataclasses import dataclass
 
 import milagro_bls_binding as bls
 from aiohttp import ClientSession, ClientTimeout
-from eth_typing import BLSPubkey, BLSSignature, HexStr
+from eth_typing import BlockNumber, BLSPubkey, BLSSignature, HexStr
 from sw_utils import get_exit_message_signing_root
 from sw_utils.typings import ConsensusFork
 from web3 import Web3
 
+from src.common.clients import execution_client
+from src.common.contracts import SECONDS_PER_MONTH, v2_pool_contract, vault_contract
 from src.config.settings import REMOTE_SIGNER_TIMEOUT, settings
 from src.validators.keystores.base import BaseKeystore
 
@@ -85,12 +87,54 @@ class RemoteSignerKeystore(BaseKeystore):
 
     @staticmethod
     async def _get_remote_signer_public_keys() -> list[HexStr]:
+        if settings.fetch_registered_validators_public_keys:
+            return await RemoteSignerKeystore._fetch_registered_validators_public_keys()
+
         signer_url = f'{settings.remote_signer_url}/api/v1/eth2/publicKeys'
         async with ClientSession(timeout=ClientTimeout(REMOTE_SIGNER_TIMEOUT)) as session:
             response = await session.get(signer_url)
 
         response.raise_for_status()
         return await response.json()
+
+    @staticmethod
+    async def _fetch_registered_validators_public_keys() -> list[HexStr]:
+        """
+        Consider the case when remote signer pub keys number is too large.
+        So pub keys can not be fetched via remote signer.
+        Let's fetch from execution node.
+        """
+        logger.info('Fetching registered public keys...')
+        current_block = await execution_client.eth.get_block_number()
+        public_keys = await vault_contract.get_registered_validators_public_keys(
+            from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
+            to_block=current_block,
+        )
+
+        if settings.network_config.IS_SUPPORT_V2_MIGRATION and settings.is_genesis_vault:
+            # fetch registered validators from v2 pool contract
+            # new validators won't be registered after upgrade to the v3,
+            # no need to check up to the latest block
+            to_block = settings.network_config.V2_POOL_LAST_VALIDATOR_BLOCK
+
+            if not to_block:
+                blocks_per_month = int(
+                    SECONDS_PER_MONTH // settings.network_config.SECONDS_PER_BLOCK
+                )
+                to_block = BlockNumber(
+                    min(
+                        settings.network_config.KEEPER_GENESIS_BLOCK + blocks_per_month,
+                        current_block,
+                    )
+                )
+            public_keys.extend(
+                await v2_pool_contract.get_registered_validators_public_keys(
+                    from_block=settings.network_config.V2_POOL_GENESIS_BLOCK, to_block=to_block
+                )
+            )
+        logger.info('Fetched %s registered public keys', len(public_keys))
+
+        return public_keys
 
     @staticmethod
     async def _sign_exit_request(

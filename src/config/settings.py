@@ -84,6 +84,9 @@ class Settings(metaclass=Singleton):
     )
 
     min_validators_registration: int
+    fetch_registered_validators_public_keys: bool = decouple_config(
+        'FETCH_REGISTERED_VALIDATORS_PUBLIC_KEYS', default=False, cast=bool
+    )
 
     # pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements
     def set(
