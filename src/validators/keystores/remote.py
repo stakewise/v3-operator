@@ -89,8 +89,8 @@ class RemoteSignerKeystore(BaseKeystore):
         async with ClientSession(timeout=ClientTimeout(REMOTE_SIGNER_TIMEOUT)) as session:
             response = await session.get(signer_url)
 
-        response.raise_for_status()
-        return await response.json()
+            response.raise_for_status()
+            return await response.json()
 
     @staticmethod
     async def _sign_exit_request(
@@ -119,14 +119,14 @@ class RemoteSignerKeystore(BaseKeystore):
         async with ClientSession(timeout=ClientTimeout(REMOTE_SIGNER_TIMEOUT)) as session:
             response = await session.post(signer_url, json=dataclasses.asdict(data))
 
-        if response.status == 404:
-            # Pubkey not present on remote signer side
-            raise RuntimeError(
-                f'Failed to get signature for {public_key.hex()}.'
-                f' Is this public key present in the remote signer?'
-            )
+            if response.status == 404:
+                # Pubkey not present on remote signer side
+                raise RuntimeError(
+                    f'Failed to get signature for {public_key.hex()}.'
+                    f' Is this public key present in the remote signer?'
+                )
 
-        response.raise_for_status()
+            response.raise_for_status()
 
-        signature = (await response.json())['signature']
+            signature = (await response.json())['signature']
         return BLSSignature(Web3.to_bytes(hexstr=signature))
