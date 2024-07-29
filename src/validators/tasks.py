@@ -107,11 +107,7 @@ async def process_validators(
         return None
 
     harvest_params = await get_harvest_params()
-    validators_count = await get_validators_count_from_vault_assets(harvest_params)
-
-    if not validators_count:
-        # not enough balance to register validators
-        return None
+    validators_count = 1
 
     # Check if there is enough ETH to register the specified minimum number of validators
     if validators_count < settings.min_validators_registration:
