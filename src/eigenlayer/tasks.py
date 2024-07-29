@@ -8,7 +8,7 @@ from web3.types import BlockNumber, ChecksumAddress
 from src.common.app_state import AppState
 from src.common.checks import wait_execution_catch_up_consensus
 from src.common.consensus import get_chain_finalized_head
-from src.common.contracts import vault_restaking_contract
+from src.common.contracts import restake_vault_contract
 from src.common.execution import check_gas_price
 from src.common.tasks import BaseTask
 from src.config.settings import settings
@@ -17,7 +17,7 @@ from src.eigenlayer.contracts import (
     EigenPodContract,
     eigenpod_manager_contract,
 )
-from src.eigenlayer.database import CheckpointsCrud, CheckpointType
+from src.eigenlayer.database import CheckpointType, EigenCheckpointCrud
 from src.eigenlayer.execution import (
     submit_multicall_transaction,
     submit_verify_withdrawal_credentials_transaction,
@@ -34,7 +34,7 @@ from src.eigenlayer.withdrawals import (
 logger = logging.getLogger(__name__)
 
 
-class EigenlayerValidatorsTask(BaseTask):
+class EigenValidatorsTask(BaseTask):
     # pylint: disable-next=too-many-locals
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         """Verify validators withdrawal credentials in Eigenlayer if needed."""
@@ -49,11 +49,9 @@ class EigenlayerValidatorsTask(BaseTask):
 
         # scan eigenpod ValidatorRestaked events
         registered_indexes = []
-        pods = await vault_restaking_contract.get_eigen_pods()
+        pods = await restake_vault_contract.get_eigen_pods()
         for pod in pods:
-            pod_indexes = await EigenPodContract(pod).get_validator_restaked_indexes(
-                to_block=block_number
-            )
+            pod_indexes = await EigenPodContract(pod).get_validator_indexes(to_block=block_number)
             registered_indexes.extend(pod_indexes)
         unregistered_validators = [
             validator for validator in vault_validators if validator.index not in registered_indexes
@@ -65,7 +63,7 @@ class EigenlayerValidatorsTask(BaseTask):
         )
 
         verify_data: dict[ChecksumAddress, dict] = {}
-        pod_to_owner = await vault_restaking_contract.get_eigen_pod_owners(to_block=block_number)
+        pod_to_owner = await restake_vault_contract.get_eigen_pod_owners(to_block=block_number)
         beacon_oracle_slot = await get_beacon_oracle_slot(block_number=block_number)
         with ProofsGenerationWrapper(
             slot=beacon_oracle_slot, chain_id=settings.network_config.CHAIN_ID
@@ -139,7 +137,7 @@ class EigenlayerValidatorsTask(BaseTask):
         return verify_data
 
 
-class EigenlayerWithdrawalsTask(BaseTask):
+class EigenWithdrawalsTask(BaseTask):
     # pylint: disable-next=too-many-locals
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         """Process restaking vault validators withdrawals if needed."""
@@ -148,7 +146,8 @@ class EigenlayerWithdrawalsTask(BaseTask):
         now = int(datetime.now(timezone.utc).timestamp())
         if (
             last_withdrawals_update_timestamp
-            and last_withdrawals_update_timestamp + settings.withdrawals_processing_interval > now
+            and last_withdrawals_update_timestamp + settings.eigen_withdrawals_processing_interval
+            > now
         ):
             return
 
@@ -164,11 +163,11 @@ class EigenlayerWithdrawalsTask(BaseTask):
         current_block = chain_state.execution_block
 
         vault_validators = await get_vault_validators(current_block)
-        pod_to_owner = await vault_restaking_contract.get_eigen_pod_owners(to_block=current_block)
+        pod_to_owner = await restake_vault_contract.get_eigen_pod_owners(to_block=current_block)
         beacon_oracle_slot = await get_beacon_oracle_slot(current_block)
 
         calls = []
-        logger.info('processing withdrawals...')
+        logger.info('Processing eigen full and partial validator withdrawals...')
         withdrawals_calls = await WithdrawalsProcessor(
             pod_to_owner=pod_to_owner,
             block_number=current_block,
@@ -178,7 +177,7 @@ class EigenlayerWithdrawalsTask(BaseTask):
         )
         calls.extend(withdrawals_calls)
 
-        logger.info('processing Eigenlayer delayed withdrawals...')
+        logger.info('Processing eigen delayed withdrawals...')
 
         delayed_withdrawals_calls = await DelayedWithdrawalsProcessor(
             pod_to_owner=pod_to_owner,
@@ -186,16 +185,16 @@ class EigenlayerWithdrawalsTask(BaseTask):
         ).get_contact_calls()
         calls.extend(delayed_withdrawals_calls)
         if calls:
-            logger.info('Submitting multicall withdrawals transaction...')
+            logger.info('Submitting processing withdrawals transaction...')
             tx_hash = await submit_multicall_transaction(calls)
             if not tx_hash:
                 return
 
-        CheckpointsCrud().update_checkpoint_block_number(
+        EigenCheckpointCrud().update_checkpoint_block_number(
             checkpoint_type=CheckpointType.COMPLETED,
             block_number=current_block,
         )
-        logger.info('processing exiting validators...')
+        logger.info('Processing eigen exiting validators...')
         await ExitingValidatorsProcessor(
             pod_to_owner=pod_to_owner,
             block_number=current_block,
@@ -203,7 +202,7 @@ class EigenlayerWithdrawalsTask(BaseTask):
             vault_validators=vault_validators,
         )
 
-        logger.info('processing Eigenlayer queued withdrawals...')
+        logger.info('Processing eigen queued withdrawals...')
 
         await CompleteWithdrawalsProcessor(
             pod_to_owner=pod_to_owner,

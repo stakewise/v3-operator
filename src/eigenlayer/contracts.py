@@ -5,7 +5,7 @@ from web3.types import BlockNumber, ChecksumAddress, EventData, Wei
 from src.common.clients import execution_client
 from src.common.contracts import ContractWrapper
 from src.config.settings import settings
-from src.eigenlayer.typings import DelayedWithdrawal, QueuedWithdrawal, ValidatorInfo
+from src.eigenlayer.typings import QueuedWithdrawal, ValidatorInfo
 
 
 class EigenPodContract(ContractWrapper):
@@ -18,7 +18,7 @@ class EigenPodContract(ContractWrapper):
     def contract_address(self) -> ChecksumAddress:
         return self._address
 
-    async def get_validator_restaked_indexes(
+    async def get_validator_indexes(
         self,
         from_block: BlockNumber | None = None,
         to_block: BlockNumber | None = None,
@@ -75,18 +75,18 @@ class DelayedWithdrawalRouterContract(ContractWrapper):
     def contract_address(self) -> ChecksumAddress:
         return self._address
 
-    async def get_claimable_user_delayed_withdrawals(
+    async def get_claimable_user_delayed_withdrawals_count(
         self, address: ChecksumAddress, block_number: BlockNumber
-    ) -> list[DelayedWithdrawal]:
-        data = await self.contract.functions.getClaimableUserDelayedWithdrawals(address).call(
-            block_identifier=block_number
-        )
-        return [DelayedWithdrawal(*item) for item in data]
+    ) -> int:
+        withdrawals = await self.contract.functions.getClaimableUserDelayedWithdrawals(
+            address
+        ).call(block_identifier=block_number)
+        return len(withdrawals)
 
 
 class EigenPodManagerContract(ContractWrapper):
     abi_path = '../eigenlayer/abi/IEigenPodManager.json'
-    settings_key = 'EIGENLAYER_POD_MANAGER_CONTRACT_ADDRESS'
+    settings_key = 'EIGEN_POD_MANAGER_CONTRACT_ADDRESS'
 
     async def get_last_pod_shares_updated_event(
         self, pod_owner: ChecksumAddress, from_block: BlockNumber, to_block: BlockNumber
@@ -133,7 +133,7 @@ class BeaconChainOracleContract(ContractWrapper):
 
 class DelegationManagerContract(ContractWrapper):
     abi_path = '../eigenlayer/abi/IDelegationManager.json'
-    settings_key = 'EIGENLAYER_DELEGATION_MANAGER_CONTRACT_ADDRESS'
+    settings_key = 'EIGEN_DELEGATION_MANAGER_CONTRACT_ADDRESS'
 
     async def get_withdrawal_queued_events(
         self, from_block: BlockNumber, to_block: BlockNumber

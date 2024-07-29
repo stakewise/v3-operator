@@ -1,7 +1,7 @@
 import logging
 from collections import defaultdict
 
-from sw_utils.consensus import ACTIVE_STATUSES
+from sw_utils.consensus import ValidatorStatus
 from web3 import Web3
 from web3.types import BlockNumber, ChecksumAddress, HexStr
 
@@ -10,14 +10,14 @@ from src.common.consensus import get_chain_epoch_head
 from src.common.contracts import EigenPodOwnerContract
 from src.common.execution import get_protocol_config
 from src.common.utils import calc_slot_by_block_number
-from src.config.settings import VALIDATORS_WITHDRAWALS_CHUNK_SIZE, settings
+from src.config.settings import EIGEN_VALIDATORS_WITHDRAWALS_CHUNK_SIZE, settings
 from src.eigenlayer.contracts import (
     DelayedWithdrawalRouterContract,
     EigenPodContract,
     delegation_manager_contract,
     eigenpod_manager_contract,
 )
-from src.eigenlayer.database import CheckpointsCrud, CheckpointType
+from src.eigenlayer.database import CheckpointType, EigenCheckpointCrud
 from src.eigenlayer.execution import (
     get_validator_withdrawals_chunk,
     submit_complete_queued_withdrawal_transaction,
@@ -62,14 +62,14 @@ class WithdrawalsProcessor:
         # fetch withdrawals
         validators_indexes = {val.index for val in vault_validators}
         withdrawals_chunk = int(
-            VALIDATORS_WITHDRAWALS_CHUNK_SIZE / settings.network_config.SECONDS_PER_BLOCK
+            EIGEN_VALIDATORS_WITHDRAWALS_CHUNK_SIZE / settings.network_config.SECONDS_PER_BLOCK
         )
         withdrawals = []
         for block_number in range(from_block, self.block_number + 1, withdrawals_chunk):
-            if not block_number % VALIDATORS_WITHDRAWALS_CHUNK_SIZE:
-                logger.info('fetched withdrawals at block %s...', block_number)
+            if not block_number % EIGEN_VALIDATORS_WITHDRAWALS_CHUNK_SIZE:
+                logger.info('Fetching eigen withdrawals at block %s...', block_number)
             logger.info(
-                'fetched withdrawals chunk from block %s to block %s...',
+                'Fetching eigen withdrawals chunk from block %s to block %s...',
                 block_number,
                 BlockNumber(min(block_number + withdrawals_chunk - 1, self.block_number)),
             )
@@ -86,7 +86,7 @@ class WithdrawalsProcessor:
             return calls
 
         last_slot = None
-        logger.info('generating withdrawals proofs for %s withdrawals...', len(withdrawals))
+        logger.info('Generating eigen withdrawals proofs for %s withdrawals...', len(withdrawals))
         with ProofsGenerationWrapper(
             slot=beacon_oracle_slot, chain_id=settings.network_config.CHAIN_ID
         ) as generator:
@@ -117,7 +117,7 @@ class WithdrawalsProcessor:
         return calls
 
     async def _get_from_block(self, vault_validators: list[Validator]) -> BlockNumber:
-        from_block = CheckpointsCrud().get_checkpoint_block_number(CheckpointType.PARTIAL)
+        from_block = EigenCheckpointCrud().get_checkpoint_block_number(CheckpointType.PARTIAL)
         if from_block:
             return BlockNumber(from_block + 1)
 
@@ -139,7 +139,7 @@ class WithdrawalsProcessor:
             if full_withdrawal_redeemed_event:
                 events.append(full_withdrawal_redeemed_event)
         if events:
-            return BlockNumber(max(event['blockNumber'] for event in events if event))
+            return BlockNumber(max(event['blockNumber'] for event in events if event) + 1)
 
         epoch = min(val.activation_epoch for val in vault_validators)
         chain_state = await get_chain_epoch_head(epoch)
@@ -227,13 +227,13 @@ class DelayedWithdrawalsProcessor:
             delayed_withdrawal_router = await EigenPodContract(pod).get_delayed_withdrawal_router(
                 self.block_number
             )
-            delayed_withdrawals = await DelayedWithdrawalRouterContract(
+            delayed_withdrawals_count = await DelayedWithdrawalRouterContract(
                 delayed_withdrawal_router
-            ).get_claimable_user_delayed_withdrawals(pod, block_number=self.block_number)
+            ).get_claimable_user_delayed_withdrawals_count(pod, block_number=self.block_number)
 
             call = await EigenPodOwnerContract(
                 self.pod_to_owner[pod]
-            ).get_claim_delayed_withdrawals_call(max_number=len(delayed_withdrawals))
+            ).get_claim_delayed_withdrawals_call(delayed_withdrawals_count)
             calls.append(call)
 
         return calls
@@ -256,18 +256,20 @@ class ExitingValidatorsProcessor:
         self,
         vault_validators: list[Validator],
     ) -> None:
-        active_validators = [val for val in vault_validators if val.status in ACTIVE_STATUSES]
+        active_validators = [
+            val for val in vault_validators if val.status == ValidatorStatus.ACTIVE_ONGOING
+        ]
 
-        validators_per_pod: dict[ChecksumAddress, list[Validator]] = defaultdict(list)
+        pod_to_validators: dict[ChecksumAddress, list[Validator]] = defaultdict(list)
         for validator in active_validators:
-            validators_per_pod[validator.withdrawal_address].append(validator)
+            pod_to_validators[validator.withdrawal_address].append(validator)
 
         for pod, pod_owner in self.pod_to_owner.items():
             pod_shares = await eigenpod_manager_contract.get_pod_shares(
                 pod_owner, block_number=self.block_number
             )
             effective_balances = 0
-            for validator in validators_per_pod.get(pod, []):
+            for validator in pod_to_validators.get(pod, []):
                 validator_info = await EigenPodContract(pod).get_validator_pubkey_to_info(
                     validator.public_key, block_number=self.block_number
                 )
@@ -301,10 +303,10 @@ class CompleteWithdrawalsProcessor:
             from_block=from_block, to_block=self.block_number
         )
 
-        queued_withdrawals_per_pod = defaultdict(list)
+        pod_to_queued_withdrawals = defaultdict(list)
         for withdrawal_event in queued_withdrawals_events:
             if withdrawal_event.withdrawer in self.pod_to_owner.keys():
-                queued_withdrawals_per_pod[withdrawal_event.withdrawer].append(withdrawal_event)
+                pod_to_queued_withdrawals[withdrawal_event.withdrawer].append(withdrawal_event)
 
         last_block_number = None
         min_withdrawal_delay_blocks = (
@@ -333,7 +335,7 @@ class CompleteWithdrawalsProcessor:
             e.blockNumber  # type: ignore[attr-defined]
             for e in [*staker_undelegated_events, *staker_force_undelegated_events]
         }
-        for pod, withdrawals in queued_withdrawals_per_pod.items():
+        for pod, withdrawals in pod_to_queued_withdrawals.items():
             for withdrawal in withdrawals:
                 if withdrawal.block_number in undelegated_blocks:
                     withdrawal.undelegation = True
@@ -341,14 +343,15 @@ class CompleteWithdrawalsProcessor:
                 if self.block_number < withdrawal.start_block + withdrawals_delay_blocks:
                     continue
 
-                receive_as_tokens = True
-                if withdrawal.undelegation:
-                    receive_as_tokens = False
+                receive_as_tokens = not withdrawal.undelegation
 
                 if receive_as_tokens:
                     pod_balance = await execution_client.eth.get_balance(pod)
                     if pod_balance < withdrawal.total_shares:
-                        logger.info('')
+                        logger.info(
+                            'Eigen pod balance must be more than withdrawal shares '
+                            'to receive withdrawal as token.'
+                        )
                         continue
 
                 await submit_complete_queued_withdrawal_transaction(
@@ -364,17 +367,15 @@ class CompleteWithdrawalsProcessor:
                     last_block_number = withdrawal.start_block
 
         if last_block_number:
-            CheckpointsCrud().update_checkpoint_block_number(
+            EigenCheckpointCrud().update_checkpoint_block_number(
                 checkpoint_type=CheckpointType.COMPLETED,
                 block_number=last_block_number,
             )
 
     async def _get_from_block(self) -> BlockNumber:
-        last_completed_withdrawals_block = CheckpointsCrud().get_checkpoint_block_number(
-            CheckpointType.COMPLETED
-        )
-        if last_completed_withdrawals_block:
-            return last_completed_withdrawals_block
+        from_block = EigenCheckpointCrud().get_checkpoint_block_number(CheckpointType.COMPLETED)
+        if from_block:
+            return BlockNumber(from_block + 1)
         return settings.network_config.KEEPER_GENESIS_BLOCK
 
 

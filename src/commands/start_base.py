@@ -13,8 +13,8 @@ from src.common.startup_check import startup_checks
 from src.common.utils import get_build_version
 from src.common.vault import Vault
 from src.config.settings import settings
-from src.eigenlayer.database import CheckpointsCrud
-from src.eigenlayer.tasks import EigenlayerValidatorsTask, EigenlayerWithdrawalsTask
+from src.eigenlayer.database import EigenCheckpointCrud
+from src.eigenlayer.tasks import EigenValidatorsTask, EigenWithdrawalsTask
 from src.exits.tasks import ExitSignatureTask
 from src.harvest.tasks import HarvestTask
 from src.validators.database import NetworkValidatorCrud
@@ -38,7 +38,7 @@ async def start_base() -> None:
         await startup_checks()
 
     NetworkValidatorCrud().setup()
-    CheckpointsCrud().setup()
+    EigenCheckpointCrud().setup()
 
     # load network validators from ipfs dump
     await load_genesis_validators()
@@ -92,9 +92,9 @@ async def start_base() -> None:
         ]
         if settings.harvest_vault:
             tasks.append(HarvestTask().run(interrupt_handler))
-        if await Vault().is_restaking():
-            tasks.append(EigenlayerValidatorsTask().run(interrupt_handler))
-            tasks.append(EigenlayerWithdrawalsTask().run(interrupt_handler))
+        if await Vault().is_restake():
+            tasks.append(EigenValidatorsTask().run(interrupt_handler))
+            tasks.append(EigenWithdrawalsTask().run(interrupt_handler))
 
         await asyncio.gather(*tasks)
 

@@ -170,7 +170,7 @@ class GnoVaultContract(ContractWrapper, VaultStateMixin):
         return self.encode_abi(fn_name='swapXdaiToGno', args=[])
 
 
-class VaultRestakingContract(VaultContract):
+class RestakeVaultContract(VaultContract):
     abi_path = 'abi/IEthRestakeVault.json'
 
     async def restake_withdrawals_manager(self) -> ChecksumAddress:
@@ -392,7 +392,7 @@ def get_gno_vault_contract() -> GnoVaultContract:
 
 vault_contract = VaultContract()
 vault_v1_contract = VaultV1Contract()
-vault_restaking_contract = VaultRestakingContract()
+restake_vault_contract = RestakeVaultContract()
 validators_registry_contract = ValidatorsRegistryContract()
 keeper_contract = KeeperContract()
 v2_pool_contract = V2PoolContract()

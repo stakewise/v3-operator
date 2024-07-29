@@ -47,8 +47,8 @@ from src.common.vault_config import VaultConfig
     callback=validate_eth_address,
 )
 @click.option(
-    '--withdrawal-address',
-    help='The address of the vaultk.',
+    '--eigenpod-address',
+    help='The address of the vault eigenpod.',
     type=str,
     callback=validate_eth_address,
 )
@@ -65,7 +65,7 @@ def create_keys(
     count: int,
     vault: HexAddress,
     data_dir: str,
-    withdrawal_address: ChecksumAddress | None,
+    eigenpod_address: ChecksumAddress | None,
     per_keystore_password: bool,
     pool_size: int | None,
 ) -> None:
@@ -82,7 +82,7 @@ def create_keys(
         mnemonic=mnemonic,
         count=count,
         start_index=config.mnemonic_next_index,
-        withdrawal_address=withdrawal_address,
+        withdrawal_address=eigenpod_address,
         pool_size=pool_size,
     )
     deposit_data = _export_deposit_data_json(

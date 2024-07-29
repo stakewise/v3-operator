@@ -3,12 +3,13 @@ import logging
 
 from eth_typing import HexStr
 from web3 import Web3
+from web3.exceptions import ContractLogicError
 from web3.types import BlockNumber, ChecksumAddress
 
 from src.common.clients import execution_client
 from src.common.contracts import EigenPodOwnerContract, multicall_contract
 from src.common.utils import format_error
-from src.config.settings import VALIDATORS_WITHDRAWALS_CONCURRENCY, settings
+from src.config.settings import EIGEN_VALIDATORS_WITHDRAWALS_CONCURRENCY, settings
 from src.eigenlayer.typings import Withdrawal
 
 logger = logging.getLogger(__name__)
@@ -17,7 +18,13 @@ logger = logging.getLogger(__name__)
 async def submit_multicall_transaction(
     calls: list[tuple[ChecksumAddress, HexStr]]
 ) -> HexStr | None:
-    tx = await multicall_contract.functions.aggregate(calls).transact()
+    try:
+        tx = await multicall_contract.functions.aggregate(calls).transact()
+    except (ValueError, ContractLogicError) as e:
+        logger.error('Failed to process withdrawal: %s', format_error(e))
+        if settings.verbose:
+            logger.exception(e)
+        return None
 
     tx_hash = Web3.to_hex(tx)
     logger.info('Waiting for transaction %s confirmation', tx_hash)
@@ -150,7 +157,7 @@ async def submit_complete_queued_withdrawal_transaction(
 async def get_validator_withdrawals_chunk(
     indexes: set[int], from_block: BlockNumber, to_block: BlockNumber
 ) -> list[Withdrawal]:
-    semaphore = asyncio.BoundedSemaphore(VALIDATORS_WITHDRAWALS_CONCURRENCY)
+    semaphore = asyncio.BoundedSemaphore(EIGEN_VALIDATORS_WITHDRAWALS_CONCURRENCY)
     pending = {
         asyncio.create_task(fetch_withdrawals(BlockNumber(block_number), indexes, semaphore))
         for block_number in range(from_block, to_block + 1)

@@ -38,12 +38,6 @@ class ValidatorInfo:
 
 
 @dataclass
-class DelayedWithdrawal:
-    amount: Wei
-    block_created: BlockNumber
-
-
-@dataclass
 # pylint: disable-next=too-many-instance-attributes
 class QueuedWithdrawal:
     staker: ChecksumAddress

@@ -72,7 +72,7 @@ class Settings(metaclass=Singleton):
     relayer_timeout: int
     validators_registration_mode: ValidatorsRegistrationMode
     skip_startup_checks: bool
-    withdrawals_processing_interval: int
+    eigen_withdrawals_processing_interval: int
 
     # high priority fee
     priority_fee_num_blocks: int = decouple_config('PRIORITY_FEE_NUM_BLOCKS', default=10, cast=int)
@@ -223,8 +223,8 @@ class Settings(metaclass=Singleton):
 
         self.skip_startup_checks = decouple_config('SKIP_STARTUP_CHECKS', default=False, cast=bool)
 
-        self.withdrawals_processing_interval = decouple_config(
-            'WITHDRAWALS_PROCESSING_INTERVAL', default=86400, cast=int
+        self.eigen_withdrawals_processing_interval = decouple_config(
+            'EIGEN_WITHDRAWALS_PROCESSING_INTERVAL', default=86400, cast=int
         )
 
     @property
@@ -282,11 +282,11 @@ HASHI_VAULT_TIMEOUT = 10
 # Graphql timeout
 GRAPH_API_TIMEOUT = 10
 
-VALIDATORS_WITHDRAWALS_CHUNK_SIZE: int = decouple_config(
-    'VALIDATORS_WITHDRAWALS_CHUNK_SIZE', default=86400, cast=int
+EIGEN_VALIDATORS_WITHDRAWALS_CHUNK_SIZE: int = decouple_config(
+    'EIGEN_VALIDATORS_WITHDRAWALS_CHUNK_SIZE', default=86400, cast=int
 )  # seconds
-VALIDATORS_WITHDRAWALS_CONCURRENCY: int = decouple_config(
-    'VALIDATORS_WITHDRAWALS_CONCURRENCY', default=200, cast=int
+EIGEN_VALIDATORS_WITHDRAWALS_CONCURRENCY: int = decouple_config(
+    'EIGEN_VALIDATORS_WITHDRAWALS_CONCURRENCY', default=200, cast=int
 )
 # logging
 LOG_PLAIN = 'plain'

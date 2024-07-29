@@ -44,9 +44,8 @@ class NetworkConfig:
     SHARED_MEV_ESCROW_CONTRACT_ADDRESS: ChecksumAddress
     STAKEWISE_API_URL: str
     RATED_API_URL: str
-    VALIDATORS_CHECKER_CONTRACT_ADDRESS: ChecksumAddress
-    EIGENLAYER_DELEGATION_MANAGER_CONTRACT_ADDRESS: ChecksumAddress
-    EIGENLAYER_POD_MANAGER_CONTRACT_ADDRESS: ChecksumAddress
+    EIGEN_DELEGATION_MANAGER_CONTRACT_ADDRESS: ChecksumAddress
+    EIGEN_POD_MANAGER_CONTRACT_ADDRESS: ChecksumAddress
 
     @property
     def SHAPELLA_FORK(self) -> ConsensusFork:
@@ -116,11 +115,10 @@ NETWORKS = {
         ),
         STAKEWISE_API_URL='https://mainnet-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
-        VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
-        EIGENLAYER_DELEGATION_MANAGER_CONTRACT_ADDRESS=Web3.to_checksum_address(
+        EIGEN_DELEGATION_MANAGER_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x39053D51B77DC0d36036Fc1fCc8Cb819df8Ef37A'
         ),
-        EIGENLAYER_POD_MANAGER_CONTRACT_ADDRESS=Web3.to_checksum_address(
+        EIGEN_POD_MANAGER_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x91E677b07F7AF907ec9a428aafA9fc14a0d3A338'
         ),
     ),
@@ -168,13 +166,10 @@ NETWORKS = {
         ),
         STAKEWISE_API_URL='https://holesky-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
-        VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x23FCd08f2e85f765d329027AB6D4323a0BC057A7'
-        ),
-        EIGENLAYER_DELEGATION_MANAGER_CONTRACT_ADDRESS=Web3.to_checksum_address(
+        EIGEN_DELEGATION_MANAGER_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xA44151489861Fe9e3055d95adC98FbD462B948e7'
         ),
-        EIGENLAYER_POD_MANAGER_CONTRACT_ADDRESS=Web3.to_checksum_address(
+        EIGEN_POD_MANAGER_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x30770d7E3e71112d7A6b7259542D1f680a70e315'
         ),
     ),
@@ -224,9 +219,8 @@ NETWORKS = {
         ),
         STAKEWISE_API_URL='https://gnosis-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
-        VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
-        EIGENLAYER_DELEGATION_MANAGER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
-        EIGENLAYER_POD_MANAGER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        EIGEN_DELEGATION_MANAGER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        EIGEN_POD_MANAGER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
     ),
     CHIADO: NetworkConfig(
         CHAIN_ID=10200,
@@ -272,10 +266,7 @@ NETWORKS = {
         ),
         STAKEWISE_API_URL='https://chiado-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
-        VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x5Fa9600FF682FA65Fff6085df06CCBB7dC01DF08'
-        ),
-        EIGENLAYER_DELEGATION_MANAGER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
-        EIGENLAYER_POD_MANAGER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        EIGEN_DELEGATION_MANAGER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        EIGEN_POD_MANAGER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
     ),
 }

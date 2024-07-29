@@ -149,9 +149,9 @@ def generate_validators_tree(
     leaves: list[tuple[bytes, int]] = []
     validators: list[DepositDataValidator] = []
     for i, data in enumerate(deposit_data):
-        credentials = get_eth1_withdrawal_credentials(data.get('withdrawal_address') or vault)
-
         withdrawal_address = data.get('withdrawal_address')
+        credentials = get_eth1_withdrawal_credentials(withdrawal_address or vault)
+
         if withdrawal_address:
             withdrawal_address = Web3.to_checksum_address(withdrawal_address)
 

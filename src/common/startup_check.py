@@ -9,7 +9,7 @@ from sw_utils import IpfsFetchClient, get_consensus_client, get_execution_client
 from web3 import Web3
 
 from src.common.clients import db_client
-from src.common.contracts import vault_contract, vault_restaking_contract
+from src.common.contracts import restake_vault_contract, vault_contract
 from src.common.execution import (
     check_hot_wallet_balance,
     check_vault_address,
@@ -183,10 +183,14 @@ async def wait_for_deposit_data_file() -> None:
                 time.sleep(15)
 
 
-async def check_restaking() -> None:
-    withdrawals_manager = await vault_restaking_contract.restake_withdrawals_manager()
+async def check_restake_withdrawals_maanger() -> None:
+    withdrawals_manager = await restake_vault_contract.restake_withdrawals_manager()
     if withdrawals_manager != hot_wallet.address:
-        raise ValueError('withdrawals manager address must equal to the wallet addresss')
+        logger.warning(
+            'The withdrawals manager must be updated to the %s address in the vault settings',
+            hot_wallet.address,
+        )
+        raise ValueError('Invalid vault withdrawals manager')
 
 
 async def check_withdrawal_address() -> None:
@@ -195,9 +199,13 @@ async def check_withdrawal_address() -> None:
     and is one of the eigen pods.
     """
     deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
-    vault_pods = await vault_restaking_contract.get_eigen_pods()
+    vault_pods = await restake_vault_contract.get_eigen_pods()
     for withdrawal_address in deposit_data.withdrawal_addresses:
         if withdrawal_address not in vault_pods:
+            logger.warning(
+                'The withdrawal address for every deposit data entry'
+                " must be set to one of the vault's Eigen pods"
+            )
             raise ValueError('Invalid withdrawal address in deposit data')
 
 
@@ -231,7 +239,7 @@ async def startup_checks():
     await check_hot_wallet_balance()
 
     logger.info('Checking restake withdrawals manager...')
-    await check_restaking()
+    await check_restake_withdrawals_maanger()
 
     logger.info('Checking connection to ipfs nodes...')
     healthy_ipfs_endpoint = []
@@ -264,8 +272,8 @@ async def startup_checks():
 
     await _check_validators_manager()
 
-    if await Vault().is_restaking() and settings.is_auto_registration_mode:
-        logger.info('Checking eigenlayer withdrawal address...')
+    if await Vault().is_restake() and settings.is_auto_registration_mode:
+        logger.info('Checking deposit data withdrawal addresses...')
         await check_withdrawal_address()
 
 

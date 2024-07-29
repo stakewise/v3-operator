@@ -1,11 +1,12 @@
 import logging
 
 from sw_utils.typings import Bytes32
+from web3.exceptions import ContractLogicError
 
 from src.common.contracts import (
     deposit_data_registry_contract,
+    restake_vault_contract,
     vault_contract,
-    vault_restaking_contract,
     vault_v1_contract,
 )
 
@@ -16,12 +17,12 @@ class Vault:
     async def version(self):
         return await vault_contract.version()
 
-    async def is_restaking(self) -> bool:
+    async def is_restake(self) -> bool:
         try:
-            await vault_restaking_contract.restake_withdrawals_manager()
+            await restake_vault_contract.restake_withdrawals_manager()
             return True
-        except BaseException as e:
-            logger.debug(e)
+        except (ContractLogicError, ValueError):
+            pass  # vault contract doesn't support restaking
         return False
 
     async def get_validators_root(self) -> Bytes32:

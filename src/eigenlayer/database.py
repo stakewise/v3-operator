@@ -13,7 +13,7 @@ class CheckpointType:
     COMPLETED = 'completed'
 
 
-class CheckpointsCrud:
+class EigenCheckpointCrud:
     def get_checkpoint_block_number(self, checkpoint_type: str) -> BlockNumber | None:
         with db_client.get_db_connection() as conn:
             res = conn.execute(
