@@ -1,5 +1,6 @@
 import json
 import re
+import shutil
 from pathlib import Path
 
 import click
@@ -27,6 +28,16 @@ class VaultConfig:
     @property
     def exists(self) -> bool:
         return self.config_path.is_file()
+
+    @property
+    def vault_tmp_dir(self) -> Path:
+        return self.vault_dir / '.tmp'
+
+    def create_tmp_dir(self) -> None:
+        self.vault_tmp_dir.mkdir(parents=True, exist_ok=True)
+
+    def remove_tmp_dir(self) -> None:
+        shutil.rmtree(self.vault_tmp_dir)
 
     def load(self, mnemonic: str | None = None) -> None:
         if self.config_path.is_file():
