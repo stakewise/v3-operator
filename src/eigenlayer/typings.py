@@ -26,7 +26,12 @@ class Validator:
 
     @property
     def withdrawal_address(self) -> ChecksumAddress:
-        return Web3.to_checksum_address(self.withdrawal_credentials[26:])
+        # address is a first 26 bytes of withdrawal_credentials
+        withdrawal_address_byte_length = 26
+
+        return Web3.to_checksum_address(
+            self.withdrawal_credentials[withdrawal_address_byte_length:]
+        )
 
 
 @dataclass

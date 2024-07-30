@@ -1,5 +1,6 @@
 import asyncio
 import dataclasses
+import functools
 import json
 import logging
 import random
@@ -133,6 +134,7 @@ async def send_approval_request(
     )
 
 
+@functools.cache
 def load_deposit_data(vault: HexAddress, deposit_data_file: Path) -> DepositData:
     """Loads and verifies deposit data."""
     with open(deposit_data_file, 'r', encoding='utf-8') as f:

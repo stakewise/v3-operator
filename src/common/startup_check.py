@@ -183,7 +183,7 @@ async def wait_for_deposit_data_file() -> None:
                 time.sleep(15)
 
 
-async def check_restake_withdrawals_maanger() -> None:
+async def check_restake_withdrawals_manager() -> None:
     withdrawals_manager = await restake_vault_contract.restake_withdrawals_manager()
     if withdrawals_manager != hot_wallet.address:
         logger.warning(
@@ -238,8 +238,9 @@ async def startup_checks():
     logger.info('Checking hot wallet balance %s...', hot_wallet.address)
     await check_hot_wallet_balance()
 
-    logger.info('Checking restake withdrawals manager...')
-    await check_restake_withdrawals_maanger()
+    if await Vault().is_restake():
+        logger.info('Checking restake withdrawals manager...')
+        await check_restake_withdrawals_manager()
 
     logger.info('Checking connection to ipfs nodes...')
     healthy_ipfs_endpoint = []

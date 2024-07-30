@@ -23,14 +23,12 @@ class EigenPodContract(ContractWrapper):
         from_block: BlockNumber | None = None,
         to_block: BlockNumber | None = None,
     ) -> list[int]:
-        from_block = from_block or settings.network_config.KEEPER_GENESIS_BLOCK
-        to_block = to_block or await execution_client.eth.get_block_number()
         events = await self._get_events(
             self.events.ValidatorRestaked,  # type: ignore
             from_block=from_block or settings.network_config.KEEPER_GENESIS_BLOCK,
             to_block=to_block or await execution_client.eth.get_block_number(),
         )
-        return [int(event['args']['validatorIndex']) for event in events]
+        return [event['args']['validatorIndex'] for event in events]
 
     async def get_validator_pubkey_to_info(
         self, public_key: HexStr, block_number: BlockNumber
