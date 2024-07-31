@@ -4,6 +4,7 @@ from eth_typing import ChecksumAddress, HexStr
 from multiproof import MultiProof
 from sw_utils.typings import Bytes32
 from web3 import Web3
+from web3.exceptions import ContractLogicError
 
 from src.common.clients import execution_client
 from src.common.contracts import (
@@ -65,6 +66,18 @@ async def register_validators(
     calls.append(validators_registration_call)
 
     logger.info('Submitting registration transaction')
+    try:
+        await multicall_contract.functions.aggregate(calls).estimate_gas()
+    except (ValueError, ContractLogicError) as e:
+        logger.error(
+            'Failed to register validator(s): %s. '
+            'Most likely registry root has changed during validators registration. Retrying...',
+            format_error(e),
+        )
+        if settings.verbose:
+            logger.exception(e)
+        return None
+
     try:
         tx_params = await get_high_priority_tx_params()
         tx = await multicall_contract.functions.aggregate(calls).transact(tx_params)
