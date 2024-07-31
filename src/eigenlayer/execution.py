@@ -8,7 +8,7 @@ from web3.types import BlockNumber, ChecksumAddress
 
 from src.common.clients import execution_client
 from src.common.contracts import EigenPodOwnerContract, multicall_contract
-from src.common.utils import format_error
+from src.common.utils import format_error, log_verbose
 from src.config.settings import EIGEN_VALIDATORS_WITHDRAWALS_CONCURRENCY, settings
 from src.eigenlayer.typings import Withdrawal
 
@@ -23,7 +23,7 @@ async def submit_multicall_transaction(
     except (ValueError, ContractLogicError) as e:
         logger.error('Failed to process withdrawal: %s', format_error(e))
         if settings.verbose:
-            logger.exception(e)
+            log_verbose(e)
         return None
 
     tx_hash = Web3.to_hex(tx)
@@ -65,7 +65,7 @@ async def submit_verify_withdrawal_credentials_transaction(
         logger.error('Failed to verify withdrawal credentials: %s', format_error(e))
 
         if settings.verbose:
-            logger.exception(e)
+            log_verbose(e)
         return None
 
     logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
@@ -96,7 +96,7 @@ async def submit_queue_withdrawal_transaction(
         logger.error('Failed to queue withdrawal: %s', format_error(e))
 
         if settings.verbose:
-            logger.exception(e)
+            log_verbose(e)
         return None
 
     logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
@@ -141,7 +141,7 @@ async def submit_complete_queued_withdrawal_transaction(
         logger.error('Failed to complete queued withdrawal: %s', format_error(e))
 
         if settings.verbose:
-            logger.exception(e)
+            log_verbose(e)
         return None
 
     logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
@@ -181,16 +181,14 @@ async def fetch_withdrawals(
         block = await execution_client.eth.get_block(block_number)
         withdrawals = []
         for index, withdrawal in enumerate(block.get('withdrawals', [])):
-            if int(withdrawal.validatorIndex) in indexes:  # type: ignore[attr-defined]
+            if int(withdrawal['validator_index']) in indexes:
                 withdrawals.append(
                     Withdrawal(
                         block_number=block_number,
-                        validator_index=int(
-                            withdrawal.validatorIndex  # type: ignore[attr-defined]
-                        ),
+                        validator_index=withdrawal['validator_index'],
                         index=index,
-                        amount=int(withdrawal.amount),  # type: ignore[attr-defined]
-                        withdrawal_address=withdrawal.address,  # type: ignore[attr-defined]
+                        amount=withdrawal['amount'],
+                        withdrawal_address=withdrawal['address'],
                     )
                 )
         return withdrawals

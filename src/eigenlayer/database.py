@@ -27,12 +27,12 @@ class EigenCheckpointCrud:
         self, checkpoint_type: str, block_number: BlockNumber
     ) -> None:
         with db_client.get_db_connection() as conn:
-            conn.execut(
+            conn.execute(
                 f'INSERT INTO {self.TABLE} '
                 'VALUES (:checkpoint_type, :value) '
                 'ON CONFLICT (checkpoint_type) DO UPDATE '
                 'SET value = :value',
-                (checkpoint_type, block_number),
+                {'checkpoint_type': checkpoint_type, 'value': block_number},
             )
 
     def setup(self) -> None:
