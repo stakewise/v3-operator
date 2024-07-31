@@ -25,14 +25,14 @@ from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import (
     NetworkValidatorsProcessor,
-    get_latest_network_validator_public_keys,
+    get_start_validator_index,
     get_validators_from_deposit_data,
     get_withdrawable_assets,
     update_unused_validator_keys_metric,
 )
 from src.validators.keystores.base import BaseKeystore
 from src.validators.register_validators import register_validators
-from src.validators.relayer import BaseRelayerClient, RelayerClient
+from src.validators.relayer import RelayerAdapter
 from src.validators.signing.common import (
     get_encrypted_exit_signature_shards,
     get_validators_proof,
@@ -54,13 +54,13 @@ class ValidatorsTask(BaseTask):
         self,
         keystore: BaseKeystore | None,
         deposit_data: DepositData | None,
-        relayer: BaseRelayerClient | None,
+        relayer_adapter: RelayerAdapter | None,
     ):
         self.keystore = keystore
         self.deposit_data = deposit_data
         network_validators_processor = NetworkValidatorsProcessor()
         self.network_validators_scanner = EventScanner(network_validators_processor)
-        self.relayer = relayer
+        self.relayer_adapter = relayer_adapter
 
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         chain_state = await get_chain_finalized_head()
@@ -80,7 +80,7 @@ class ValidatorsTask(BaseTask):
         await process_validators(
             keystore=self.keystore,
             deposit_data=self.deposit_data,
-            relayer=self.relayer,
+            relayer_adapter=self.relayer_adapter,
         )
 
 
@@ -88,7 +88,7 @@ class ValidatorsTask(BaseTask):
 async def process_validators(
     keystore: BaseKeystore | None,
     deposit_data: DepositData | None,
-    relayer: BaseRelayerClient | None = None,
+    relayer_adapter: RelayerAdapter | None = None,
 ) -> HexStr | None:
     """
     Calculates vault assets, requests oracles approval, submits registration tx
@@ -146,9 +146,9 @@ async def process_validators(
             validators=validators,
         )
     else:
-        start_validator_index = await get_start_validator_index()
-        relayer = cast(RelayerClient, relayer)
-        validators_response = await relayer.get_validators(start_validator_index, validators_count)
+        validators_response = await cast(RelayerAdapter, relayer_adapter).get_validators(
+            validators_count
+        )
         validators = validators_response.validators
         validators_manager_signature = validators_response.validators_manager_signature
         multi_proof = validators_response.multi_proof
@@ -295,14 +295,6 @@ async def create_approval_request(
         request.exit_signature_shards.append(shards.exit_signatures)
 
     return request
-
-
-async def get_start_validator_index():
-    latest_public_keys = await get_latest_network_validator_public_keys()
-    start_validator_index = NetworkValidatorCrud().get_next_validator_index(
-        list(latest_public_keys)
-    )
-    return start_validator_index
 
 
 async def load_genesis_validators() -> None:

@@ -23,12 +23,21 @@ class Validator:
     deposit_data_index: int | None = None
     exit_signature: BLSSignature | None = None
 
+    def copy(self) -> 'Validator':
+        return Validator(
+            public_key=self.public_key,
+            signature=self.signature,
+            amount_gwei=self.amount_gwei,
+            deposit_data_index=self.deposit_data_index,
+            exit_signature=self.exit_signature,
+        )
+
 
 @dataclass
 class RelayerValidatorsResponse:
     validators: list[Validator]
-    validators_manager_signature: HexStr | None
-    multi_proof: MultiProof[tuple[bytes, int]] | None
+    validators_manager_signature: HexStr | None = None
+    multi_proof: MultiProof[tuple[bytes, int]] | None = None
 
 
 @dataclass
@@ -80,3 +89,8 @@ class ValidatorsRegistrationMode(Enum):
 
     AUTO = 'AUTO'
     API = 'API'
+
+
+class RelayerTypes:
+    DVT = 'DVT'
+    DEFAULT = 'DEFAULT'

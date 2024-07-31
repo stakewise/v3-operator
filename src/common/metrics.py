@@ -11,7 +11,6 @@ from src.common.tasks import BaseTask
 from src.config.settings import settings
 
 
-# pylint: disable-next=too-few-public-methods
 class Metrics:
     def __init__(self):
         self.app_version = Info(
@@ -44,7 +43,6 @@ class Metrics:
         self.app_version.info({'version': src.__version__})
 
 
-# pylint: disable-next=too-few-public-methods
 class LazyMetrics:
     def __init__(self):
         self._metrics: Metrics | None = None

@@ -7,7 +7,7 @@ from web3.types import ChecksumAddress
 
 from src.common.typings import Singleton
 from src.config.networks import MAINNET, NETWORKS, NetworkConfig
-from src.validators.typings import ValidatorsRegistrationMode
+from src.validators.typings import RelayerTypes, ValidatorsRegistrationMode
 
 DATA_DIR = Path.home() / '.stakewise'
 
@@ -274,3 +274,5 @@ LOG_PLAIN = 'plain'
 LOG_JSON = 'json'
 LOG_FORMATS = [LOG_PLAIN, LOG_JSON]
 LOG_DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
+
+RELAYER_TYPE = decouple_config('RELAYER_TYPE', default=RelayerTypes.DEFAULT)

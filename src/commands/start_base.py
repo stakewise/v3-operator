@@ -18,7 +18,7 @@ from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import NetworkValidatorsProcessor
 from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
-from src.validators.relayer import BaseRelayerClient, RelayerClient
+from src.validators.relayer import RelayerAdapter, create_relayer_adapter
 from src.validators.tasks import ValidatorsTask, load_genesis_validators
 from src.validators.typings import DepositData, ValidatorsRegistrationMode
 from src.validators.utils import load_deposit_data
@@ -41,7 +41,7 @@ async def start_base() -> None:
 
     keystore: BaseKeystore | None = None
     deposit_data: DepositData | None = None
-    relayer: BaseRelayerClient | None = None
+    relayer_adapter: RelayerAdapter | None = None
 
     # load keystore and deposit data
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
@@ -50,7 +50,7 @@ async def start_base() -> None:
         deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
         logger.info('Loaded deposit data file %s', settings.deposit_data_file)
     else:
-        relayer = RelayerClient()
+        relayer_adapter = create_relayer_adapter()
 
     # start operator tasks
 
@@ -78,7 +78,7 @@ async def start_base() -> None:
             ValidatorsTask(
                 keystore=keystore,
                 deposit_data=deposit_data,
-                relayer=relayer,
+                relayer_adapter=relayer_adapter,
             ).run(interrupt_handler),
             ExitSignatureTask(
                 keystore=keystore,
