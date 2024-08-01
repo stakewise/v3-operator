@@ -8,7 +8,7 @@ from src.common.checks import wait_execution_catch_up_consensus
 from src.common.consensus import get_chain_finalized_head
 from src.common.execution import WalletTask, update_oracles_cache
 from src.common.logging import setup_logging
-from src.common.metrics import MetricsTask, metrics_server
+from src.common.metrics import MetricsTask, metrics, metrics_server
 from src.common.startup_check import startup_checks
 from src.common.utils import get_build_version
 from src.config.settings import settings
@@ -33,6 +33,9 @@ async def start_base() -> None:
 
     if not settings.skip_startup_checks:
         await startup_checks()
+
+    if settings.enable_metrics:
+        await metrics_server()
 
     NetworkValidatorCrud().setup()
 
@@ -69,10 +72,8 @@ async def start_base() -> None:
     if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
         logger.info('Starting api mode')
 
-    if settings.enable_metrics:
-        await metrics_server()
-
     logger.info('Started operator service')
+    metrics.service_started.set(1)
     with InterruptHandler() as interrupt_handler:
         tasks = [
             ValidatorsTask(
