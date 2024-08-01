@@ -80,16 +80,16 @@ def create_keys(
 
     # first generate files in tmp directory
     vault_config.create_tmp_dir()
-    deposit_data_tmp_file = vault_config.vault_tmp_dir / 'deposit_data.json'
-    keystores_tmp_dir = vault_config.vault_tmp_dir / 'keystores'
+    tmp_deposit_data_file = vault_config.tmp_vault_dir / 'deposit_data.json'
+    tmp_keystores_dir = vault_config.tmp_vault_dir / 'keystores'
     try:
         _export_deposit_data_json(
-            credentials=credentials, filename=str(deposit_data_tmp_file), pool_size=pool_size
+            credentials=credentials, filename=str(tmp_deposit_data_file), pool_size=pool_size
         )
 
         _export_keystores(
             credentials=credentials,
-            keystores_dir=keystores_tmp_dir,
+            keystores_dir=tmp_keystores_dir,
             password_file=password_file,
             per_keystore_password=per_keystore_password,
             pool_size=pool_size,
@@ -98,8 +98,8 @@ def create_keys(
         vault_config.increment_mnemonic_index(count)
 
         # move files from tmp dir
-        deposit_data_tmp_file.replace(deposit_data_file)
-        for src_file in keystores_tmp_dir.glob('*'):
+        tmp_deposit_data_file.replace(deposit_data_file)
+        for src_file in tmp_keystores_dir.glob('*'):
             src_file.rename(keystores_dir.joinpath(src_file.name))
 
     finally:
