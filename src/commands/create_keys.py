@@ -74,15 +74,16 @@ def create_keys(
     deposit_data_tmp_file = vault_config.vault_tmp_dir / 'deposit_data.json'
     keystores_tmp_dir = vault_config.vault_tmp_dir / 'keystores'
 
+    credentials = CredentialManager.generate_credentials(
+        network=vault_config.network,
+        vault=vault,
+        mnemonic=mnemonic,
+        count=count,
+        start_index=vault_config.mnemonic_next_index,
+        pool_size=pool_size,
+    )
+
     try:
-        credentials = CredentialManager.generate_credentials(
-            network=vault_config.network,
-            vault=vault,
-            mnemonic=mnemonic,
-            count=count,
-            start_index=vault_config.mnemonic_next_index,
-            pool_size=pool_size,
-        )
         _export_deposit_data_json(
             credentials=credentials, filename=str(deposit_data_tmp_file), pool_size=pool_size
         )
