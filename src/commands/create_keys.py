@@ -78,12 +78,11 @@ def create_keys(
         pool_size=pool_size,
     )
 
+    # first generate files in tmp directory
+    vault_config.create_tmp_dir()
+    deposit_data_tmp_file = vault_config.vault_tmp_dir / 'deposit_data.json'
+    keystores_tmp_dir = vault_config.vault_tmp_dir / 'keystores'
     try:
-        # first generate files in tmp directory
-        vault_config.create_tmp_dir()
-        deposit_data_tmp_file = vault_config.vault_tmp_dir / 'deposit_data.json'
-        keystores_tmp_dir = vault_config.vault_tmp_dir / 'keystores'
-
         _export_deposit_data_json(
             credentials=credentials, filename=str(deposit_data_tmp_file), pool_size=pool_size
         )
