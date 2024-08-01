@@ -31,6 +31,7 @@ from src.common.vault_config import VaultConfig
     help='The mnemonic for generating the validator keys.',
     prompt='Enter the mnemonic for generating the validator keys',
     type=str,
+    hide_input=True,
     callback=validate_mnemonic,
 )
 @click.option(
