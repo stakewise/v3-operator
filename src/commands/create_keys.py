@@ -63,45 +63,59 @@ def create_keys(
     per_keystore_password: bool,
     pool_size: int | None,
 ) -> None:
-    config = VaultConfig(vault, Path(data_dir))
-    config.load(mnemonic)
+    vault_config = VaultConfig(vault, Path(data_dir))
+    vault_config.load(mnemonic)
 
-    deposit_data_file = config.vault_dir / 'deposit_data.json'
-    keystores_dir = config.vault_dir / 'keystores'
+    deposit_data_file = vault_config.vault_dir / 'deposit_data.json'
+    keystores_dir = vault_config.vault_dir / 'keystores'
     password_file = keystores_dir / 'password.txt'
 
     credentials = CredentialManager.generate_credentials(
-        network=config.network,
+        network=vault_config.network,
         vault=vault,
         mnemonic=mnemonic,
         count=count,
-        start_index=config.mnemonic_next_index,
-        pool_size=pool_size,
-    )
-    deposit_data = _export_deposit_data_json(
-        credentials=credentials, filename=str(deposit_data_file), pool_size=pool_size
-    )
-
-    _export_keystores(
-        credentials=credentials,
-        keystores_dir=keystores_dir,
-        password_file=password_file,
-        per_keystore_password=per_keystore_password,
+        start_index=vault_config.mnemonic_next_index,
         pool_size=pool_size,
     )
 
-    config.increment_mnemonic_index(count)
+    # first generate files in tmp directory
+    vault_config.create_tmp_dir()
+    tmp_deposit_data_file = vault_config.tmp_vault_dir / 'deposit_data.json'
+    tmp_keystores_dir = vault_config.tmp_vault_dir / 'keystores'
+    try:
+        _export_deposit_data_json(
+            credentials=credentials, filename=str(tmp_deposit_data_file), pool_size=pool_size
+        )
+
+        _export_keystores(
+            credentials=credentials,
+            keystores_dir=tmp_keystores_dir,
+            password_file=password_file,
+            per_keystore_password=per_keystore_password,
+            pool_size=pool_size,
+        )
+
+        vault_config.increment_mnemonic_index(count)
+
+        # move files from tmp dir
+        tmp_deposit_data_file.replace(deposit_data_file)
+        for src_file in tmp_keystores_dir.glob('*'):
+            src_file.rename(keystores_dir.joinpath(src_file.name))
+
+    finally:
+        vault_config.remove_tmp_dir()
 
     click.echo(
         f'Done. Generated {greenify(count)} keys for {greenify(vault)} vault.\n'
         f'Keystores saved to {greenify(keystores_dir)} file\n'
-        f'Deposit data saved to {greenify(deposit_data)} file'
+        f'Deposit data saved to {greenify(path.abspath(deposit_data_file))} file'
     )
 
 
 def _export_deposit_data_json(
     credentials: list[Credential], filename: str, pool_size: int | None = None
-) -> str:
+) -> None:
     with (
         click.progressbar(  # type: ignore
             length=len(credentials),
@@ -125,7 +139,6 @@ def _export_deposit_data_json(
     makedirs(path.dirname(path.abspath(filename)), exist_ok=True)
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(deposit_data, f, default=lambda x: x.hex())
-    return filename
 
 
 def _export_keystores(
