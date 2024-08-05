@@ -108,7 +108,7 @@ def _get_single_validator_registration_call(
     if validators_manager_signature:
         return vault_contract.address, vault_contract.encode_abi(
             fn_name='registerValidators',
-            args=[keeper_approval_params, validators_manager_signature],
+            args=[keeper_approval_params, Web3.to_bytes(hexstr=validators_manager_signature)],
         )
 
     if multi_proof is None:
@@ -134,7 +134,7 @@ def _get_multiple_validators_registration_call(
     if validators_manager_signature:
         return vault_contract.address, vault_contract.encode_abi(
             fn_name='registerValidators',
-            args=[keeper_approval_params, validators_manager_signature],
+            args=[keeper_approval_params, Web3.to_bytes(hexstr=validators_manager_signature)],
         )
 
     if multi_proof is None:
