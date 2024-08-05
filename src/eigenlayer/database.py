@@ -9,8 +9,8 @@ logger = logging.getLogger(__name__)
 
 
 class CheckpointType:
-    PARTIAL = 'partial'
-    COMPLETED = 'completed'
+    WITHDRAWALS = 'withdrawals'
+    EXITS = 'exits'
 
 
 class EigenCheckpointCrud:

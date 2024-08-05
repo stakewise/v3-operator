@@ -51,7 +51,8 @@ class EigenValidatorsTask(BaseTask):
         registered_indexes = []
         pods = await restake_vault_contract.get_eigen_pods()
         for pod in pods:
-            pod_indexes = await EigenPodContract(pod).get_validator_indexes(to_block=block_number)
+            # fetch indexes up to latest block
+            pod_indexes = await EigenPodContract(pod).get_validator_indexes()
             registered_indexes.extend(pod_indexes)
         unregistered_validators = [
             validator for validator in vault_validators if validator.index not in registered_indexes
@@ -191,7 +192,7 @@ class EigenWithdrawalsTask(BaseTask):
                 return
 
         EigenCheckpointCrud().update_checkpoint_block_number(
-            checkpoint_type=CheckpointType.COMPLETED,
+            checkpoint_type=CheckpointType.WITHDRAWALS,
             block_number=current_block,
         )
         logger.info('Processing eigen exiting validators...')

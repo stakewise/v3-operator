@@ -12,7 +12,8 @@ from web3 import Web3
 from web3.exceptions import Web3Exception
 from web3.types import Timestamp
 
-from src.common.clients import consensus_client, execution_client
+from src.common.clients import execution_client
+from src.common.consensus import get_chain_finalized_head
 from src.common.exceptions import (
     InvalidOraclesRequestError,
     NotEnoughOracleApprovalsError,
@@ -61,9 +62,7 @@ def format_error(e: Exception) -> str:
 
 
 async def is_block_finalized(block_number: BlockNumber) -> bool:
-    chain_head = await consensus_client.get_chain_finalized_head(
-        settings.network_config.SLOTS_PER_EPOCH
-    )
+    chain_head = await get_chain_finalized_head()
     return chain_head.execution_block >= block_number
 
 

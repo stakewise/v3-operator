@@ -181,11 +181,11 @@ async def fetch_withdrawals(
         block = await execution_client.eth.get_block(block_number)
         withdrawals = []
         for index, withdrawal in enumerate(block.get('withdrawals', [])):
-            if int(withdrawal['validator_index']) in indexes:
+            if int(withdrawal['validatorIndex']) in indexes:  # type: ignore
                 withdrawals.append(
                     Withdrawal(
                         block_number=block_number,
-                        validator_index=withdrawal['validator_index'],
+                        validator_index=withdrawal['validatorIndex'],  # type: ignore
                         index=index,
                         amount=withdrawal['amount'],
                         withdrawal_address=withdrawal['address'],

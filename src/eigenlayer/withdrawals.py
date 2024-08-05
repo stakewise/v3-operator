@@ -1,7 +1,7 @@
 import logging
 from collections import defaultdict
 
-from sw_utils.consensus import ValidatorStatus
+from sw_utils.consensus import PENDING_STATUSES, ValidatorStatus
 from web3 import Web3
 from web3.types import BlockNumber, ChecksumAddress, HexStr
 
@@ -73,12 +73,20 @@ class WithdrawalsProcessor:
                 block_number,
                 BlockNumber(min(block_number + withdrawals_chunk - 1, self.block_number)),
             )
+            to_block = BlockNumber(min(block_number + withdrawals_chunk - 1, self.block_number))
             chunk = await get_validator_withdrawals_chunk(
                 indexes=validators_indexes,
                 from_block=BlockNumber(block_number),
-                to_block=BlockNumber(min(block_number + withdrawals_chunk - 1, self.block_number)),
+                to_block=to_block,
             )
             withdrawals.extend(chunk)
+
+            if not withdrawals:
+                # can update checkpoint after empty chunk
+                EigenCheckpointCrud().update_checkpoint_block_number(
+                    checkpoint_type=CheckpointType.WITHDRAWALS,
+                    block_number=to_block,
+                )
 
         verify_data: dict[ChecksumAddress, dict] = {}
         calls: list[tuple[ChecksumAddress, HexStr]] = []
@@ -117,7 +125,7 @@ class WithdrawalsProcessor:
         return calls
 
     async def _get_from_block(self, vault_validators: list[Validator]) -> BlockNumber:
-        from_block = EigenCheckpointCrud().get_checkpoint_block_number(CheckpointType.PARTIAL)
+        from_block = EigenCheckpointCrud().get_checkpoint_block_number(CheckpointType.WITHDRAWALS)
         if from_block:
             return BlockNumber(from_block + 1)
 
@@ -256,9 +264,8 @@ class ExitingValidatorsProcessor:
         self,
         vault_validators: list[Validator],
     ) -> None:
-        active_validators = [
-            val for val in vault_validators if val.status == ValidatorStatus.ACTIVE_ONGOING
-        ]
+        statuses = PENDING_STATUSES + [ValidatorStatus.ACTIVE_ONGOING]
+        active_validators = [val for val in vault_validators if val.status in statuses]
 
         pod_to_validators: dict[ChecksumAddress, list[Validator]] = defaultdict(list)
         for validator in active_validators:
@@ -268,15 +275,15 @@ class ExitingValidatorsProcessor:
             pod_shares = await eigenpod_manager_contract.get_pod_shares(
                 pod_owner, block_number=self.block_number
             )
-            effective_balances = 0
+            restaked_balances = 0
             for validator in pod_to_validators.get(pod, []):
                 validator_info = await EigenPodContract(pod).get_validator_pubkey_to_info(
                     validator.public_key, block_number=self.block_number
                 )
-                effective_balances += Web3.to_wei(validator_info.restaked_balance_gwei, 'gwei')
+                restaked_balances += Web3.to_wei(validator_info.restaked_balance_gwei, 'gwei')
 
             inactive_validator_balance = (await get_protocol_config()).inactive_validator_balance
-            current_delta = pod_shares - effective_balances
+            current_delta = pod_shares - restaked_balances
             if current_delta > inactive_validator_balance:
                 await submit_queue_withdrawal_transaction(self.pod_to_owner[pod], current_delta)
 
@@ -368,12 +375,12 @@ class CompleteWithdrawalsProcessor:
 
         if last_block_number:
             EigenCheckpointCrud().update_checkpoint_block_number(
-                checkpoint_type=CheckpointType.COMPLETED,
+                checkpoint_type=CheckpointType.EXITS,
                 block_number=last_block_number,
             )
 
     async def _get_from_block(self) -> BlockNumber:
-        from_block = EigenCheckpointCrud().get_checkpoint_block_number(CheckpointType.COMPLETED)
+        from_block = EigenCheckpointCrud().get_checkpoint_block_number(CheckpointType.EXITS)
         if from_block:
             return BlockNumber(from_block + 1)
         return settings.network_config.KEEPER_GENESIS_BLOCK
