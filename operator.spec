@@ -4,6 +4,7 @@ from sys import platform
 
 datas = [
     ('src/common/abi/*', 'src/common/abi/'),
+    ('src/eigenlayer/abi/*', 'src/eigenlayer/abi/'),
     ('src/common/word_lists/*', 'src/common/word_lists/'),
     ('./pyproject.toml', '.'),
     ('./GIT_SHA', '.'),
