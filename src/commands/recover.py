@@ -45,6 +45,7 @@ from src.config.settings import DEFAULT_NETWORK, settings
     help='The mnemonic for generating the validator keys.',
     prompt='Enter the mnemonic for generating the validator keys',
     type=str,
+    hide_input=True,
     callback=validate_mnemonic,
 )
 @click.option(

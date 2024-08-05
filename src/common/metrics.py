@@ -11,11 +11,17 @@ from src.common.tasks import BaseTask
 from src.config.settings import settings
 
 
-# pylint: disable-next=too-few-public-methods
+# pylint: disable=too-few-public-methods
+# pylint: disable-next=too-many-instance-attributes
 class Metrics:
     def __init__(self):
         self.app_version = Info(
             'app_version', 'V3 Operator version', namespace=settings.metrics_prefix
+        )
+        self.service_started = Gauge(
+            'service_started',
+            'Is service ready to register validators',
+            namespace=settings.metrics_prefix,
         )
         self.block_number = Gauge(
             'block_number', 'Current block number', namespace=settings.metrics_prefix

@@ -4,6 +4,7 @@ from eth_typing import ChecksumAddress, HexStr
 from multiproof import MultiProof
 from sw_utils.typings import Bytes32
 from web3 import Web3
+from web3.exceptions import ContractLogicError
 
 from src.common.clients import execution_client
 from src.common.contracts import (
@@ -66,6 +67,18 @@ async def register_validators(
 
     logger.info('Submitting registration transaction')
     try:
+        await multicall_contract.functions.aggregate(calls).estimate_gas()
+    except (ValueError, ContractLogicError) as e:
+        logger.error(
+            'Failed to register validator(s): %s. '
+            'Most likely registry root has changed during validators registration. Retrying...',
+            format_error(e),
+        )
+        if settings.verbose:
+            logger.exception(e)
+        return None
+
+    try:
         tx_params = await get_high_priority_tx_params()
         tx = await multicall_contract.functions.aggregate(calls).transact(tx_params)
     except Exception as e:
@@ -95,7 +108,7 @@ def _get_single_validator_registration_call(
     if validators_manager_signature:
         return vault_contract.address, vault_contract.encode_abi(
             fn_name='registerValidators',
-            args=[keeper_approval_params, validators_manager_signature],
+            args=[keeper_approval_params, Web3.to_bytes(hexstr=validators_manager_signature)],
         )
 
     if multi_proof is None:
@@ -121,7 +134,7 @@ def _get_multiple_validators_registration_call(
     if validators_manager_signature:
         return vault_contract.address, vault_contract.encode_abi(
             fn_name='registerValidators',
-            args=[keeper_approval_params, validators_manager_signature],
+            args=[keeper_approval_params, Web3.to_bytes(hexstr=validators_manager_signature)],
         )
 
     if multi_proof is None:
