@@ -24,6 +24,7 @@ from src.common.vault_config import VaultConfig
     help='The mnemonic for generating the wallet.',
     prompt='Enter the mnemonic for generating the wallet',
     type=str,
+    hide_input=True,
     callback=validate_mnemonic,
 )
 @click.option(
