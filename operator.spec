@@ -10,6 +10,10 @@ datas = [
     ('./GIT_SHA', '.'),
 ]
 
+binaries = [
+    ('bin/generation', '.'),
+]
+
 datas += collect_data_files('certifi')
 datas += collect_data_files('coincurve')
 datas += collect_data_files('eth_account')
@@ -20,7 +24,7 @@ block_cipher = None
 a = Analysis(
     ['src/main.py'],
     pathex=[],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=['multiaddr.codecs.uint16be', 'multiaddr.codecs.idna', 'pkg_resources.extern'],
     hookspath=[],

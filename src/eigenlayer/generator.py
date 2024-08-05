@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import subprocess  # nosec
+import sys
 
 from src.common.clients import consensus_client
 from src.config.settings import settings
@@ -41,7 +42,7 @@ class ProofsGenerationWrapper:
         self.files.update([block_header_file, state_data_file])
         output_filename = f'tmp_withdrawal_credentials_output_{validator_index}_{self.slot}'
         args = [
-            'bin/generation',
+            resource_path('generation'),
             '-command',
             'ValidatorFieldsProof',
             '-oracleBlockHeaderFile',
@@ -112,7 +113,7 @@ class ProofsGenerationWrapper:
         block_body_file = await self._prepare_block_body_file(withdrawals_slot)
         output_filename = f'tmp_verify_withdrawal_fields_proof_output_{validator_index}_{self.slot}'
         args = [
-            'bin/generation',
+            resource_path('generation'),
             '-command',
             'WithdrawalFieldsProof',
             '-oracleBlockHeaderFile',
@@ -202,3 +203,14 @@ class ProofsGenerationWrapper:
 
     def _get_historical_summary_state_slot(self, slot: int) -> int:
         return SLOTS_PER_HISTORICAL_ROOT * ((slot // SLOTS_PER_HISTORICAL_ROOT) + 1)
+
+
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS  # pylint: disable=no-member,protected-access
+    except BaseException:
+        base_path = os.path.abspath('.') + '/bin'
+
+    return os.path.join(base_path, relative_path)
