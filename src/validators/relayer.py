@@ -3,6 +3,7 @@ import abc
 import aiohttp
 from aiohttp import ClientTimeout
 from eth_typing import BLSSignature
+from eth_utils import add_0x_prefix
 from web3 import Web3
 
 from src.config.settings import settings
@@ -32,14 +33,18 @@ class RelayerClient(BaseRelayerClient):
             resp_json = await resp.json()
             validators = [
                 RelayerValidator(
-                    public_key=v['public_key'],
+                    public_key=add_0x_prefix(v['public_key']),
                     amount_gwei=v['amount_gwei'],
-                    signature=v['deposit_signature'],
-                    exit_signature=BLSSignature(Web3.to_bytes(hexstr=v['exit_signature'])),
+                    signature=add_0x_prefix(v['deposit_signature']),
+                    exit_signature=BLSSignature(
+                        Web3.to_bytes(hexstr=add_0x_prefix(v['exit_signature']))
+                    ),
                 )
                 for v in resp_json['validators']
             ]
             return RelayerValidatorsResponse(
                 validators=validators,
-                validators_manager_signature=resp_json['validators_manager_signature'],
+                validators_manager_signature=add_0x_prefix(
+                    resp_json['validators_manager_signature']
+                ),
             )
