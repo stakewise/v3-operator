@@ -5,6 +5,7 @@ from typing import cast
 import aiohttp
 from aiohttp import ClientTimeout
 from eth_typing import BLSSignature, HexStr
+from eth_utils import add_0x_prefix
 from web3 import Web3
 
 from src.config.settings import RELAYER_TYPE, settings
@@ -73,16 +74,20 @@ class RelayerAdapter:
         )
         validators = [
             Validator(
-                public_key=v['public_key'],
+                public_key=add_0x_prefix(v['public_key']),
                 amount_gwei=v['amount_gwei'],
-                signature=v['deposit_signature'],
-                exit_signature=BLSSignature(Web3.to_bytes(hexstr=v['exit_signature'])),
+                signature=add_0x_prefix(v['deposit_signature']),
+                exit_signature=BLSSignature(
+                    Web3.to_bytes(hexstr=add_0x_prefix(v['exit_signature']))
+                ),
             )
             for v in relayer_response['validators']
         ]
         return RelayerValidatorsResponse(
             validators=validators,
-            validators_manager_signature=relayer_response['validators_manager_signature'],
+            validators_manager_signature=add_0x_prefix(
+                relayer_response['validators_manager_signature']
+            ),
         )
 
     async def _get_validators_from_dvt_relayer(self, count: int) -> RelayerValidatorsResponse:
@@ -110,7 +115,9 @@ class RelayerAdapter:
         validators: list[Validator] = []
         for v in relayer_response['validators']:
             validator = public_key_to_validator[v['public_key']].copy()
-            validator.exit_signature = BLSSignature(Web3.to_bytes(hexstr=v['exit_signature']))
+            validator.exit_signature = BLSSignature(
+                Web3.to_bytes(hexstr=add_0x_prefix(v['exit_signature']))
+            )
             validators.append(validator)
         multi_proof = get_validators_proof(
             tree=cast(DepositData, self.deposit_data).tree,
