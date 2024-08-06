@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import NewType, Sequence
+from typing import NewType, Sequence, Union
 
 from eth_typing import BlockNumber, BLSSignature, ChecksumAddress, HexStr
-from multiproof import StandardMerkleTree
+from multiproof import MultiProof, StandardMerkleTree
 from sw_utils.typings import Bytes32
 
 BLSPrivkey = NewType('BLSPrivkey', bytes)
@@ -20,28 +20,30 @@ class Validator:
     public_key: HexStr
     signature: HexStr
     amount_gwei: int
+    deposit_data_index: int | None = None
+    exit_signature: BLSSignature | None = None
+    exit_signature_shards: Union['ExitSignatureShards', None] = None
 
-
-@dataclass
-class DepositDataValidator(Validator):
-    deposit_data_index: int
-    deposit_data_root: HexStr
-
-
-@dataclass
-class RelayerValidator(Validator):
-    exit_signature: BLSSignature
+    def copy(self) -> 'Validator':
+        return Validator(
+            public_key=self.public_key,
+            signature=self.signature,
+            amount_gwei=self.amount_gwei,
+            deposit_data_index=self.deposit_data_index,
+            exit_signature_shards=self.exit_signature_shards,
+        )
 
 
 @dataclass
 class RelayerValidatorsResponse:
-    validators: list[RelayerValidator]
-    validators_manager_signature: HexStr
+    validators: list[Validator]
+    validators_manager_signature: HexStr | None = None
+    multi_proof: MultiProof[tuple[bytes, int]] | None = None
 
 
 @dataclass
 class DepositData:
-    validators: Sequence[DepositDataValidator]
+    validators: Sequence[Validator]
     tree: StandardMerkleTree
 
     @property
@@ -88,3 +90,8 @@ class ValidatorsRegistrationMode(Enum):
 
     AUTO = 'AUTO'
     API = 'API'
+
+
+class RelayerTypes:
+    DVT = 'DVT'
+    DEFAULT = 'DEFAULT'

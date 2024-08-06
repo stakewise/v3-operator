@@ -50,7 +50,6 @@ class Metrics:
         self.app_version.info({'version': src.__version__})
 
 
-# pylint: disable-next=too-few-public-methods
 class LazyMetrics:
     def __init__(self):
         self._metrics: Metrics | None = None

@@ -1,4 +1,5 @@
 import logging
+from typing import Sequence
 
 from eth_typing import ChecksumAddress, HexStr
 from multiproof import MultiProof
@@ -18,19 +19,24 @@ from src.common.typings import HarvestParams, OraclesApproval
 from src.common.utils import format_error
 from src.config.settings import settings
 from src.harvest.execution import get_update_state_calls
+from src.validators.signing.common import encode_tx_validator_list
+from src.validators.typings import Validator
 
 logger = logging.getLogger(__name__)
 
 
-# pylint: disable=too-many-arguments
+# pylint: disable=too-many-arguments,too-many-locals
 async def register_validators(
     approval: OraclesApproval,
     multi_proof: MultiProof | None,
-    tx_validators: list[bytes],
+    validators: Sequence[Validator],
     harvest_params: HarvestParams | None,
     validators_registry_root: Bytes32,
     validators_manager_signature: HexStr | None,
 ) -> HexStr | None:
+    tx_validators = [
+        Web3.to_bytes(tx_validator) for tx_validator in encode_tx_validator_list(validators)
+    ]
     if harvest_params is not None:
         # add update state calls before validator registration
         calls = await get_update_state_calls(harvest_params)

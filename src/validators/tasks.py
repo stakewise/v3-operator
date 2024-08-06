@@ -25,25 +25,22 @@ from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import (
     NetworkValidatorsProcessor,
-    get_latest_network_validator_public_keys,
+    get_start_validator_index,
     get_validators_from_deposit_data,
     get_withdrawable_assets,
     update_unused_validator_keys_metric,
 )
 from src.validators.keystores.base import BaseKeystore
 from src.validators.register_validators import register_validators
-from src.validators.relayer import BaseRelayerClient, RelayerClient
+from src.validators.relayer import RelayerAdapter
 from src.validators.signing.common import (
-    encode_tx_validator_list,
     get_encrypted_exit_signature_shards,
     get_validators_proof,
 )
 from src.validators.typings import (
     ApprovalRequest,
     DepositData,
-    DepositDataValidator,
     NetworkValidator,
-    RelayerValidator,
     Validator,
     ValidatorsRegistrationMode,
 )
@@ -57,13 +54,13 @@ class ValidatorsTask(BaseTask):
         self,
         keystore: BaseKeystore | None,
         deposit_data: DepositData | None,
-        relayer: BaseRelayerClient | None,
+        relayer_adapter: RelayerAdapter | None,
     ):
         self.keystore = keystore
         self.deposit_data = deposit_data
         network_validators_processor = NetworkValidatorsProcessor()
         self.network_validators_scanner = EventScanner(network_validators_processor)
-        self.relayer = relayer
+        self.relayer_adapter = relayer_adapter
 
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         chain_state = await get_chain_finalized_head()
@@ -83,7 +80,7 @@ class ValidatorsTask(BaseTask):
         await process_validators(
             keystore=self.keystore,
             deposit_data=self.deposit_data,
-            relayer=self.relayer,
+            relayer_adapter=self.relayer_adapter,
         )
 
 
@@ -91,7 +88,7 @@ class ValidatorsTask(BaseTask):
 async def process_validators(
     keystore: BaseKeystore | None,
     deposit_data: DepositData | None,
-    relayer: BaseRelayerClient | None = None,
+    relayer_adapter: RelayerAdapter | None = None,
 ) -> HexStr | None:
     """
     Calculates vault assets, requests oracles approval, submits registration tx
@@ -128,6 +125,7 @@ async def process_validators(
     validators_count = min(protocol_config.validators_approval_batch_limit, validators_count)
     validators_manager_signature: HexStr | None = None
     validators: Sequence[Validator]
+    multi_proof: MultiProof[tuple[bytes, int]] | None
 
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
         validators = await get_validators_from_deposit_data(
@@ -143,31 +141,22 @@ async def process_validators(
                     'To register additional validators, you must upload new deposit data.'
                 )
             return None
+        multi_proof = get_validators_proof(
+            tree=cast(DepositData, deposit_data).tree,
+            validators=validators,
+        )
     else:
-        start_validator_index = await get_start_validator_index()
-        relayer = cast(RelayerClient, relayer)
-        validators_response = await relayer.get_validators(start_validator_index, validators_count)
+        validators_response = await cast(RelayerAdapter, relayer_adapter).get_validators(
+            validators_count
+        )
         validators = validators_response.validators
         validators_manager_signature = validators_response.validators_manager_signature
+        multi_proof = validators_response.multi_proof
 
     if not await check_gas_price(high_priority=True):
         return None
 
     logger.info('Started registration of %d validator(s)', len(validators))
-
-    if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
-        tx_validators, multi_proof = get_validators_proof(
-            tree=cast(DepositData, deposit_data).tree,
-            validators=cast(list[DepositDataValidator], validators),
-        )
-        proof_indexes = [leaf[1] for leaf in multi_proof.leaves]
-
-    else:
-        tx_validators = [
-            Web3.to_bytes(tx_validator) for tx_validator in encode_tx_validator_list(validators)
-        ]
-        multi_proof = None
-        proof_indexes = None
 
     registry_root = None
     oracles_request = None
@@ -195,7 +184,6 @@ async def process_validators(
                 validators=validators,
                 registry_root=registry_root,
                 multi_proof=multi_proof,
-                proof_indexes=proof_indexes,
                 deadline=deadline,
                 validators_manager_signature=validators_manager_signature,
             )
@@ -215,7 +203,7 @@ async def process_validators(
     tx_hash = await register_validators(
         approval=oracles_approval,
         multi_proof=multi_proof,
-        tx_validators=tx_validators,
+        validators=validators,
         harvest_params=harvest_params,
         validators_registry_root=registry_root,
         validators_manager_signature=validators_manager_signature,
@@ -246,8 +234,7 @@ async def create_approval_request(
     keystore: BaseKeystore | None,
     validators: Sequence[Validator],
     registry_root: Bytes32,
-    multi_proof: MultiProof | None,
-    proof_indexes: list[int] | None,
+    multi_proof: MultiProof[tuple[bytes, int]] | None,
     deadline: int,
     validators_manager_signature: HexStr | None,
 ) -> ApprovalRequest:
@@ -257,11 +244,12 @@ async def create_approval_request(
     start_validator_index = await get_start_validator_index()
     logger.debug('Next validator index for exit signature: %d', start_validator_index)
 
-    proof, proof_flags = None, None
+    proof, proof_flags, proof_indexes = None, None, None
 
     if multi_proof:
         proof = multi_proof.proof
         proof_flags = multi_proof.proof_flags
+        proof_indexes = [leaf[1] for leaf in multi_proof.leaves]
 
     # get exit signature shards
     request = ApprovalRequest(
@@ -280,18 +268,16 @@ async def create_approval_request(
     )
 
     for validator_index, validator in enumerate(validators, start_validator_index):
-        if isinstance(validator, RelayerValidator):
-            exit_signature = validator.exit_signature
-        else:
-            exit_signature = None
+        shards = validator.exit_signature_shards
 
-        shards = await get_encrypted_exit_signature_shards(
-            keystore=keystore,
-            public_key=validator.public_key,
-            validator_index=validator_index,
-            protocol_config=protocol_config,
-            exit_signature=exit_signature,
-        )
+        if not shards:
+            shards = await get_encrypted_exit_signature_shards(
+                keystore=keystore,
+                public_key=validator.public_key,
+                validator_index=validator_index,
+                protocol_config=protocol_config,
+                exit_signature=validator.exit_signature,
+            )
 
         if not shards:
             logger.warning(
@@ -305,14 +291,6 @@ async def create_approval_request(
         request.exit_signature_shards.append(shards.exit_signatures)
 
     return request
-
-
-async def get_start_validator_index():
-    latest_public_keys = await get_latest_network_validator_public_keys()
-    start_validator_index = NetworkValidatorCrud().get_next_validator_index(
-        list(latest_public_keys)
-    )
-    return start_validator_index
 
 
 async def load_genesis_validators() -> None:

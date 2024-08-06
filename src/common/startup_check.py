@@ -250,10 +250,6 @@ async def _aiohttp_fetch(session: ClientSession, url: str) -> str:
 
 
 async def _check_validators_manager() -> None:
-    if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
-        if await vault_contract.version() == 1:
-            raise RuntimeError('Vault version must be 2')
-
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
         if await vault_contract.version() > 1:
             validators_manager = await vault_contract.validators_manager()
