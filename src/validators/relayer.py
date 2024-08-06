@@ -16,6 +16,7 @@ from src.validators.execution import (
 from src.validators.signing.common import get_validators_proof
 from src.validators.typings import (
     DepositData,
+    ExitSignatureShards,
     RelayerTypes,
     RelayerValidatorsResponse,
     Validator,
@@ -72,22 +73,26 @@ class RelayerAdapter:
         relayer_response = await cast(DefaultRelayerClient, self.relayer).get_validators(
             start_index, count
         )
-        validators = [
-            Validator(
-                public_key=add_0x_prefix(v['public_key']),
+        validators: list[Validator] = []
+        for v in relayer_response['validators']:
+            public_key = add_0x_prefix(v['public_key'])
+            deposit_signature = add_0x_prefix(v['deposit_signature'])
+            exit_signature = add_0x_prefix(v['exit_signature'])
+
+            validator = Validator(
+                public_key=public_key,
                 amount_gwei=v['amount_gwei'],
-                signature=add_0x_prefix(v['deposit_signature']),
-                exit_signature=BLSSignature(
-                    Web3.to_bytes(hexstr=add_0x_prefix(v['exit_signature']))
-                ),
+                signature=deposit_signature,
+                exit_signature=BLSSignature(Web3.to_bytes(hexstr=exit_signature)),
             )
-            for v in relayer_response['validators']
-        ]
+            validators.append(validator)
+
+        validators_manager_signature = add_0x_prefix(
+            relayer_response['validators_manager_signature']
+        )
         return RelayerValidatorsResponse(
             validators=validators,
-            validators_manager_signature=add_0x_prefix(
-                relayer_response['validators_manager_signature']
-            ),
+            validators_manager_signature=validators_manager_signature,
         )
 
     async def _get_validators_from_dvt_relayer(self, count: int) -> RelayerValidatorsResponse:
@@ -106,7 +111,7 @@ class RelayerAdapter:
             relayer_response = await cast(DvtRelayerClient, self.relayer).get_validators(
                 public_keys
             )
-            if all(v['exit_signature'] for v in relayer_response['validators']):
+            if all(v['oracles_exit_signature_shares'] for v in relayer_response['validators']):
                 break
             await asyncio.sleep(1)
         logger.debug('relayer_response %s', relayer_response)
@@ -114,11 +119,23 @@ class RelayerAdapter:
         # handle response
         validators: list[Validator] = []
         for v in relayer_response['validators']:
-            validator = public_key_to_validator[v['public_key']].copy()
-            validator.exit_signature = BLSSignature(
-                Web3.to_bytes(hexstr=add_0x_prefix(v['exit_signature']))
-            )
+            public_key = add_0x_prefix(v['public_key'])
+
+            exit_signature_shards = None
+            if oracle_shares := v['oracles_exit_signature_shares']:
+                exit_signatures = [
+                    add_0x_prefix(s) for s in oracle_shares['encrypted_exit_signatures']
+                ]
+                public_keys = [add_0x_prefix(s) for s in oracle_shares['public_keys']]
+                exit_signature_shards = ExitSignatureShards(
+                    public_keys=public_keys,
+                    exit_signatures=exit_signatures,
+                )
+
+            validator = public_key_to_validator[public_key].copy()
+            validator.exit_signature_shards = exit_signature_shards
             validators.append(validator)
+
         multi_proof = get_validators_proof(
             tree=cast(DepositData, self.deposit_data).tree,
             validators=validators,

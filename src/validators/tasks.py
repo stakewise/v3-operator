@@ -268,13 +268,16 @@ async def create_approval_request(
     )
 
     for validator_index, validator in enumerate(validators, start_validator_index):
-        shards = await get_encrypted_exit_signature_shards(
-            keystore=keystore,
-            public_key=validator.public_key,
-            validator_index=validator_index,
-            protocol_config=protocol_config,
-            exit_signature=validator.exit_signature,
-        )
+        shards = validator.exit_signature_shards
+
+        if not shards:
+            shards = await get_encrypted_exit_signature_shards(
+                keystore=keystore,
+                public_key=validator.public_key,
+                validator_index=validator_index,
+                protocol_config=protocol_config,
+                exit_signature=validator.exit_signature,
+            )
 
         if not shards:
             logger.warning(

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import NewType, Sequence
+from typing import NewType, Sequence, Union
 
 from eth_typing import BlockNumber, BLSSignature, ChecksumAddress, HexStr
 from multiproof import MultiProof, StandardMerkleTree
@@ -22,6 +22,7 @@ class Validator:
     amount_gwei: int
     deposit_data_index: int | None = None
     exit_signature: BLSSignature | None = None
+    exit_signature_shards: Union['ExitSignatureShards', None] = None
 
     def copy(self) -> 'Validator':
         return Validator(
@@ -29,7 +30,7 @@ class Validator:
             signature=self.signature,
             amount_gwei=self.amount_gwei,
             deposit_data_index=self.deposit_data_index,
-            exit_signature=self.exit_signature,
+            exit_signature_shards=self.exit_signature_shards,
         )
 
 
