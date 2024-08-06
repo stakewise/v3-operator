@@ -24,6 +24,7 @@ from src.common.vault_config import VaultConfig
     help='The mnemonic for generating the wallet.',
     prompt='Enter the mnemonic for generating the wallet',
     type=str,
+    hide_input=True,
     callback=validate_mnemonic,
 )
 @click.option(
@@ -36,7 +37,7 @@ from src.common.vault_config import VaultConfig
 @click.command(help='Creates the encrypted hot wallet from the mnemonic.')
 def create_wallet(mnemonic: str, vault: HexAddress, data_dir: str) -> None:
     vault_config = VaultConfig(vault, Path(data_dir))
-    vault_config.load(mnemonic)
+    vault_config.load()
     wallet_dir = vault_config.vault_dir / 'wallet'
 
     wallet_dir.mkdir(parents=True, exist_ok=True)

@@ -200,13 +200,6 @@ async def process_validators(
         approvals_time = time.time() - approval_start_time
         await asyncio.sleep(approvals_min_interval - approvals_time)
 
-    # compare validators root just before transaction to reduce reverted calls
-    if registry_root != await validators_registry_contract.get_registry_root():
-        logger.info(
-            'Registry root has changed during validators registration. Retrying...',
-        )
-        return None
-
     tx_hash = await register_validators(
         approval=oracles_approval,
         multi_proof=multi_proof,
