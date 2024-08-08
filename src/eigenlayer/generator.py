@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import platform
 import subprocess  # nosec
 import sys
 
@@ -42,7 +43,7 @@ class ProofsGenerationWrapper:
         self.files.update([block_header_file, state_data_file])
         output_filename = f'tmp_withdrawal_credentials_output_{validator_index}_{self.slot}'
         args = [
-            resource_path('generation'),
+            resource_path(self.binary_filename),
             '-command',
             'ValidatorFieldsProof',
             '-oracleBlockHeaderFile',
@@ -113,7 +114,7 @@ class ProofsGenerationWrapper:
         block_body_file = await self._prepare_block_body_file(withdrawals_slot)
         output_filename = f'tmp_verify_withdrawal_fields_proof_output_{validator_index}_{self.slot}'
         args = [
-            resource_path('generation'),
+            resource_path(self.binary_filename),
             '-command',
             'WithdrawalFieldsProof',
             '-oracleBlockHeaderFile',
@@ -203,6 +204,16 @@ class ProofsGenerationWrapper:
 
     def _get_historical_summary_state_slot(self, slot: int) -> int:
         return SLOTS_PER_HISTORICAL_ROOT * ((slot // SLOTS_PER_HISTORICAL_ROOT) + 1)
+
+    @property
+    def binary_filename(self) -> str:
+        system_aliases = {
+            'linix2': 'linux',
+            'win32': 'windows',
+        }
+        system = platform.system().lower()
+        filename = f'generation_{system_aliases.get(system, system)}'
+        return resource_path(filename)
 
 
 def resource_path(relative_path):

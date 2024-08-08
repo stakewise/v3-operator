@@ -11,7 +11,7 @@ datas = [
 ]
 
 binaries = [
-    ('bin/generation', '.'),
+    ('bin/*', '.'),
 ]
 
 datas += collect_data_files('certifi')
