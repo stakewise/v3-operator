@@ -4,9 +4,14 @@ from sys import platform
 
 datas = [
     ('src/common/abi/*', 'src/common/abi/'),
+    ('src/eigenlayer/abi/*', 'src/eigenlayer/abi/'),
     ('src/common/word_lists/*', 'src/common/word_lists/'),
     ('./pyproject.toml', '.'),
     ('./GIT_SHA', '.'),
+]
+
+binaries = [
+    ('bin/*', '.'),
 ]
 
 datas += collect_data_files('certifi')
@@ -19,7 +24,7 @@ block_cipher = None
 a = Analysis(
     ['src/main.py'],
     pathex=[],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=['multiaddr.codecs.uint16be', 'multiaddr.codecs.idna', 'pkg_resources.extern'],
     hookspath=[],

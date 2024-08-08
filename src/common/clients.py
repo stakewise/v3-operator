@@ -19,10 +19,10 @@ logger = logging.getLogger(__name__)
 
 
 class Database:
-    def get_db_connection(self):
+    def get_db_connection(self) -> sqlite3.Connection:
         return sqlite3.connect(settings.database)
 
-    def create_db_dir(self):
+    def create_db_dir(self) -> None:
         settings.database.parent.mkdir(parents=True, exist_ok=True)
 
 

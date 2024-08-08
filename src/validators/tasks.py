@@ -278,7 +278,7 @@ async def create_approval_request(
         deadline=deadline,
         validators_manager_signature=validators_manager_signature,
     )
-
+    withdrawal_addresses = []
     for validator_index, validator in enumerate(validators, start_validator_index):
         if isinstance(validator, RelayerValidator):
             exit_signature = validator.exit_signature
@@ -303,7 +303,10 @@ async def create_approval_request(
         request.deposit_signatures.append(validator.signature)
         request.public_key_shards.append(shards.public_keys)
         request.exit_signature_shards.append(shards.exit_signatures)
-
+        if validator.withdrawal_address:
+            withdrawal_addresses.append(validator.withdrawal_address)
+    if withdrawal_addresses:
+        request.withdrawal_addresses = withdrawal_addresses
     return request
 
 
