@@ -107,3 +107,6 @@ exclude = '''
 
 [tool.coverage.report]
 fail_under = 70
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
