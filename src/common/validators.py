@@ -7,13 +7,13 @@ from src.common.language import validate_mnemonic as verify_mnemonic
 
 
 # pylint: disable-next=unused-argument
-def validate_mnemonic(ctx, param, value):
+def validate_mnemonic(ctx, param, value):  # type: ignore
     value = value.replace('"', '')
     return verify_mnemonic(value)
 
 
 # pylint: disable-next=unused-argument
-def validate_eth_address(ctx, param, value):
+def validate_eth_address(ctx, param, value):  # type: ignore
     if not value:
         return None
     try:
@@ -26,14 +26,14 @@ def validate_eth_address(ctx, param, value):
 
 
 # pylint: disable-next=unused-argument
-def validate_db_uri(ctx, param, value):
+def validate_db_uri(ctx, param, value):  # type: ignore
     pattern = re.compile(r'.+:\/\/.+:.*@.+\/.+')
     if not pattern.match(value):
         raise click.BadParameter('Invalid database connection string')
     return value
 
 
-def validate_dappnode_execution_endpoints(ctx, param, value):
+def validate_dappnode_execution_endpoints(ctx, param, value):  # type: ignore
     dappnode = ctx.params.get('dappnode')
     if dappnode and not value:
         raise click.MissingParameter(

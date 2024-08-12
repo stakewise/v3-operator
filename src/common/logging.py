@@ -13,7 +13,7 @@ LOG_LEVELS = [
 ]
 
 
-def setup_logging():
+def setup_logging() -> None:
     if settings.log_format == LOG_JSON:
         formatter = JsonFormatter('%(timestamp)s %(level)s %(name)s %(message)s')
         logHandler = logging.StreamHandler()
