@@ -45,7 +45,7 @@ class LocalKeystore(BaseKeystore):
         keys = {}
         with Pool(processes=settings.pool_size) as pool:
             # pylint: disable-next=unused-argument
-            def _stop_pool(*args, **kwargs):
+            def _stop_pool(*args, **kwargs):  # type: ignore
                 pool.close()
 
             results = [
@@ -71,7 +71,7 @@ class LocalKeystore(BaseKeystore):
     def __bool__(self) -> bool:
         return len(self.keys) > 0
 
-    def __contains__(self, public_key):
+    def __contains__(self, public_key: HexStr) -> bool:
         return public_key in self.keys
 
     def __len__(self) -> int:

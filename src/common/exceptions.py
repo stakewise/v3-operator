@@ -3,7 +3,7 @@ NOT_ENOUGH_ORACLE_APPROVALS = 'Not enough oracle approvals received'
 
 
 class InvalidOraclesRequestError(ValueError):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(INVALID_ORACLES_REQUEST)
 
 

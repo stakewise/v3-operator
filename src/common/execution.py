@@ -110,7 +110,6 @@ async def get_protocol_config() -> ProtocolConfig:
         rewards_threshold=oracles_cache.rewards_threshold,
         validators_threshold=oracles_cache.validators_threshold,
     )
-    pc.rewards_threshold = cast(int, pc.rewards_threshold)
     return pc
 
 
