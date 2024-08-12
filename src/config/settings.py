@@ -278,7 +278,7 @@ LOG_DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
 RELAYER_TYPE: str = decouple_config(
     'RELAYER_TYPE',
     default=RelayerTypes.DEFAULT,
-    choices=Choices(
+    cast=Choices(
         [
             RelayerTypes.DEFAULT,
             RelayerTypes.DVT,
