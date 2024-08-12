@@ -14,15 +14,15 @@ from src.validators.typings import RelayerValidator, RelayerValidatorsResponse
 class BaseRelayerClient(abc.ABC):
     @abc.abstractmethod
     async def get_validators(
-        self, validators_start_index: int, validators_count: int, validators_total: int
+        self, validators_start_index: int, validators_batch_size: int, validators_total: int
     ) -> RelayerValidatorsResponse:
         """
         :param validators_start_index: - validator index for the first validator in a batch.
          Relayer should increment this index for each validator except the first one
-        :param validators_count: - number of validators in a batch. Relayer is expected
-         to return `validators_count` validators at most
+        :param validators_batch_size: - number of validators in a batch. Relayer is expected
+         to return `validators_batch_size` validators at most
         :param validators_total: - total number of validators supplied by vault assets.
-         Should be more than or equal to `validators_count`.
+         Should be more than or equal to `validators_batch_size`.
          Relayer may use `validators_total` to create larger portions of validators in background.
         """
         raise NotImplementedError()
@@ -31,12 +31,12 @@ class BaseRelayerClient(abc.ABC):
 # pylint:disable-next=too-few-public-methods
 class RelayerClient(BaseRelayerClient):
     async def get_validators(
-        self, validators_start_index: int, validators_count: int, validators_total: int
+        self, validators_start_index: int, validators_batch_size: int, validators_total: int
     ) -> RelayerValidatorsResponse:
         jsn = {
             'vault': settings.vault,
             'validators_start_index': validators_start_index,
-            'validators_count': validators_count,
+            'validators_batch_size': validators_batch_size,
             'validators_total': validators_total,
         }
         async with aiohttp.ClientSession(

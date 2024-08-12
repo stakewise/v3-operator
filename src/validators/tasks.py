@@ -125,7 +125,7 @@ async def process_validators(
     # get latest config
     protocol_config = await get_protocol_config()
 
-    validators_batch_count = min(protocol_config.validators_approval_batch_limit, validators_count)
+    validators_batch_size = min(protocol_config.validators_approval_batch_limit, validators_count)
     validators_manager_signature: HexStr | None = None
     validators: Sequence[Validator]
 
@@ -133,7 +133,7 @@ async def process_validators(
         validators = await get_validators_from_deposit_data(
             keystore=keystore,
             deposit_data=cast(DepositData, deposit_data),
-            count=validators_batch_count,
+            count=validators_batch_size,
         )
         if not validators:
             if not settings.disable_deposit_data_warnings:
@@ -147,7 +147,7 @@ async def process_validators(
         validators_start_index = await get_validators_start_index()
         relayer = cast(RelayerClient, relayer)
         validators_response = await relayer.get_validators(
-            validators_start_index, validators_batch_count, validators_count
+            validators_start_index, validators_batch_size, validators_count
         )
         validators = validators_response.validators
         if not validators:
