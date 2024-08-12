@@ -13,7 +13,7 @@ GRAPH_PAGE_SIZE = 100
 class GraphClient:
     gql_client: Client
 
-    def __init__(self):
+    def __init__(self) -> None:
         transport = AIOHTTPTransport(
             url=settings.network_config.STAKEWISE_API_URL,
             timeout=GRAPH_API_TIMEOUT,

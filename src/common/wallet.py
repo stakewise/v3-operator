@@ -32,7 +32,7 @@ class HotWallet:
         key = Account.decrypt(keyfile_json, password)
         return Account().from_key(key)
 
-    def __getattr__(self, item):
+    def __getattr__(self, item):  # type: ignore
         return getattr(self.account, item)
 
 

@@ -21,7 +21,7 @@ class HashiVaultConfiguration:
     key_path: str
 
     @classmethod
-    def from_settings(cls):
+    def from_settings(cls) -> 'HashiVaultConfiguration':
         if not (
             settings.hashi_vault_url is not None
             and settings.hashi_vault_token is not None
@@ -36,7 +36,7 @@ class HashiVaultConfiguration:
             key_path=settings.hashi_vault_key_path,
         )
 
-    def secret_url(self):
+    def secret_url(self) -> str:
         return urllib.parse.urljoin(
             self.url,
             f'/v1/secret/data/{self.key_path}',
