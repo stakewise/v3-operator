@@ -146,11 +146,11 @@ class RelayerAdapter:
         )
 
 
-def create_relayer_adapter():
+def create_relayer_adapter() -> RelayerAdapter:
     if RELAYER_TYPE == RelayerTypes.DVT:
-        relayer = DvtRelayerClient()
+        dvt_relayer = DvtRelayerClient()
         deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
-        return RelayerAdapter(relayer, deposit_data)
+        return RelayerAdapter(dvt_relayer, deposit_data)
 
     relayer = DefaultRelayerClient()
     return RelayerAdapter(relayer)
