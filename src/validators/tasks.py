@@ -312,7 +312,7 @@ async def create_approval_request(
     return request
 
 
-async def get_validators_start_index():
+async def get_validators_start_index() -> int:
     latest_public_keys = await get_latest_network_validator_public_keys()
     validators_start_index = NetworkValidatorCrud().get_next_validator_index(
         list(latest_public_keys)

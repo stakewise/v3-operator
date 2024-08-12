@@ -21,6 +21,6 @@ class ExitSignatureUpdateCache:
 
 # pylint: disable-next=too-few-public-methods
 class AppState(metaclass=Singleton):
-    def __init__(self):
+    def __init__(self) -> None:
         self.exit_signature_update_cache = ExitSignatureUpdateCache()
         self.oracles_cache: OraclesCache | None = None

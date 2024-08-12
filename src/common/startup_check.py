@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 IPFS_HASH_EXAMPLE = 'QmawUdo17Fvo7xa6ARCUSMV1eoVwPtVuzx8L8Crj2xozWm'
 
 
-def validate_settings():
+def validate_settings() -> None:
     if not settings.execution_endpoints:
         raise ValueError('EXECUTION_ENDPOINTS is missing')
 
@@ -182,7 +182,7 @@ async def wait_for_deposit_data_file() -> None:
                 time.sleep(15)
 
 
-async def startup_checks():
+async def startup_checks() -> None:
     validate_settings()
 
     logger.info('Checking connection to database...')

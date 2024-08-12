@@ -153,7 +153,7 @@ class VaultContract(ContractWrapper, VaultStateMixin):
     async def version(self) -> int:
         return await self.contract.functions.version().call()
 
-    async def validators_manager(self):
+    async def validators_manager(self) -> ChecksumAddress:
         return await self.contract.functions.validatorsManager().call()
 
 

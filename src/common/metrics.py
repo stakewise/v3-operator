@@ -14,7 +14,7 @@ from src.config.settings import settings
 # pylint: disable=too-few-public-methods
 # pylint: disable-next=too-many-instance-attributes
 class Metrics:
-    def __init__(self):
+    def __init__(self) -> None:
         self.app_version = Info(
             'app_version', 'V3 Operator version', namespace=settings.metrics_prefix
         )
@@ -46,16 +46,16 @@ class Metrics:
             namespace=settings.metrics_prefix,
         )
 
-    def set_app_version(self):
+    def set_app_version(self) -> None:
         self.app_version.info({'version': src.__version__})
 
 
 # pylint: disable-next=too-few-public-methods
 class LazyMetrics:
-    def __init__(self):
+    def __init__(self) -> None:
         self._metrics: Metrics | None = None
 
-    def __getattr__(self, item):
+    def __getattr__(self, item):  # type: ignore
         if self._metrics is None:
             self._metrics = Metrics()
         return getattr(self._metrics, item)
