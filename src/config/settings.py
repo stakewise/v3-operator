@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from decouple import Csv
+from decouple import Choices, Csv
 from decouple import config as decouple_config
 from web3 import Web3
 from web3.types import ChecksumAddress
@@ -275,4 +275,13 @@ LOG_JSON = 'json'
 LOG_FORMATS = [LOG_PLAIN, LOG_JSON]
 LOG_DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
 
-RELAYER_TYPE = decouple_config('RELAYER_TYPE', default=RelayerTypes.DEFAULT)
+RELAYER_TYPE: str = decouple_config(
+    'RELAYER_TYPE',
+    default=RelayerTypes.DEFAULT,
+    choices=Choices(
+        [
+            RelayerTypes.DEFAULT,
+            RelayerTypes.DVT,
+        ]
+    ),
+)
