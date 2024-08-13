@@ -25,8 +25,8 @@ from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import (
     NetworkValidatorsProcessor,
-    get_start_validator_index,
     get_validators_from_deposit_data,
+    get_validators_start_index,
     get_withdrawable_assets,
     update_unused_validator_keys_metric,
 )
@@ -122,7 +122,7 @@ async def process_validators(
     # get latest config
     protocol_config = await get_protocol_config()
 
-    validators_count = min(protocol_config.validators_approval_batch_limit, validators_count)
+    validators_batch_size = min(protocol_config.validators_approval_batch_limit, validators_count)
     validators_manager_signature: HexStr | None = None
     validators: Sequence[Validator]
     multi_proof: MultiProof[tuple[bytes, int]] | None
@@ -131,7 +131,7 @@ async def process_validators(
         validators = await get_validators_from_deposit_data(
             keystore=keystore,
             deposit_data=cast(DepositData, deposit_data),
-            count=validators_count,
+            count=validators_batch_size,
         )
         if not validators:
             if not settings.disable_deposit_data_warnings:
@@ -147,9 +147,12 @@ async def process_validators(
         )
     else:
         validators_response = await cast(RelayerAdapter, relayer_adapter).get_validators(
-            validators_count
+            validators_batch_size, validators_total=validators_count
         )
         validators = validators_response.validators
+        if not validators:
+            logger.info('Waiting for relayer validators')
+            return None
         validators_manager_signature = validators_response.validators_manager_signature
         multi_proof = validators_response.multi_proof
 
@@ -241,8 +244,8 @@ async def create_approval_request(
     """Generate validator registration request data"""
 
     # get next validator index for exit signature
-    start_validator_index = await get_start_validator_index()
-    logger.debug('Next validator index for exit signature: %d', start_validator_index)
+    validators_start_index = await get_validators_start_index()
+    logger.debug('Next validator index for exit signature: %d', validators_start_index)
 
     proof, proof_flags, proof_indexes = None, None, None
 
@@ -253,7 +256,7 @@ async def create_approval_request(
 
     # get exit signature shards
     request = ApprovalRequest(
-        validator_index=start_validator_index,
+        validator_index=validators_start_index,
         vault_address=settings.vault,
         validators_root=Web3.to_hex(registry_root),
         public_keys=[],
@@ -267,7 +270,7 @@ async def create_approval_request(
         validators_manager_signature=validators_manager_signature,
     )
 
-    for validator_index, validator in enumerate(validators, start_validator_index):
+    for validator_index, validator in enumerate(validators, validators_start_index):
         shards = validator.exit_signature_shards
 
         if not shards:

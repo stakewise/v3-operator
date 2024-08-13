@@ -10,8 +10,8 @@ from web3 import Web3
 
 from src.config.settings import RELAYER_TYPE, settings
 from src.validators.execution import (
-    get_start_validator_index,
     get_validators_from_deposit_data,
+    get_validators_start_index,
 )
 from src.validators.signing.common import get_validators_proof
 from src.validators.typings import (
@@ -27,11 +27,23 @@ logger = logging.getLogger(__name__)
 
 
 class DefaultRelayerClient:
-    async def get_validators(self, start_index: int, count: int) -> dict:
+    async def get_validators(
+        self, validators_start_index: int, validators_batch_size: int, validators_total: int
+    ) -> dict:
+        """
+        :param validators_start_index: - validator index for the first validator in a batch.
+         Relayer should increment this index for each validator except the first one
+        :param validators_batch_size: - number of validators in a batch. Relayer is expected
+         to return `validators_batch_size` validators at most
+        :param validators_total: - total number of validators supplied by vault assets.
+         Should be more than or equal to `validators_batch_size`.
+         Relayer may use `validators_total` to create larger portions of validators in background.
+        """
         jsn = {
             'vault': settings.vault,
-            'validator_index': start_index,
-            'validators_count': count,
+            'validators_start_index': validators_start_index,
+            'validators_batch_size': validators_batch_size,
+            'validators_total': validators_total,
         }
         async with aiohttp.ClientSession(
             timeout=ClientTimeout(settings.relayer_timeout)
@@ -61,20 +73,26 @@ class RelayerAdapter:
         self.relayer = relayer
         self.deposit_data = deposit_data
 
-    async def get_validators(self, count: int) -> RelayerValidatorsResponse:
+    async def get_validators(
+        self, validators_batch_size: int, validators_total: int
+    ) -> RelayerValidatorsResponse:
         if isinstance(self.relayer, DefaultRelayerClient):
-            return await self._get_validators_from_default_relayer(count)
+            return await self._get_validators_from_default_relayer(
+                validators_batch_size, validators_total
+            )
         if isinstance(self.relayer, DvtRelayerClient):
-            return await self._get_validators_from_dvt_relayer(count)
+            return await self._get_validators_from_dvt_relayer(validators_batch_size)
         raise RuntimeError('Unknown relayer type', type(self.relayer))
 
-    async def _get_validators_from_default_relayer(self, count: int) -> RelayerValidatorsResponse:
-        start_index = await get_start_validator_index()
+    async def _get_validators_from_default_relayer(
+        self, validators_batch_size: int, validators_total: int
+    ) -> RelayerValidatorsResponse:
+        validators_start_index = await get_validators_start_index()
         relayer_response = await cast(DefaultRelayerClient, self.relayer).get_validators(
-            start_index, count
+            validators_start_index, validators_batch_size, validators_total
         )
         validators: list[Validator] = []
-        for v in relayer_response['validators']:
+        for v in relayer_response.get('validators') or []:
             public_key = add_0x_prefix(v['public_key'])
             deposit_signature = add_0x_prefix(v['deposit_signature'])
             exit_signature = add_0x_prefix(v['exit_signature'])
@@ -88,19 +106,21 @@ class RelayerAdapter:
             validators.append(validator)
 
         validators_manager_signature = add_0x_prefix(
-            relayer_response['validators_manager_signature']
+            relayer_response.get('validators_manager_signature') or HexStr('0x')
         )
         return RelayerValidatorsResponse(
             validators=validators,
             validators_manager_signature=validators_manager_signature,
         )
 
-    async def _get_validators_from_dvt_relayer(self, count: int) -> RelayerValidatorsResponse:
+    async def _get_validators_from_dvt_relayer(
+        self, validators_batch_size: int
+    ) -> RelayerValidatorsResponse:
         # build request
         deposit_data_validators = await get_validators_from_deposit_data(
             keystore=None,
             deposit_data=cast(DepositData, self.deposit_data),
-            count=count,
+            count=validators_batch_size,
         )
         public_key_to_validator = {v.public_key: v for v in deposit_data_validators}
         public_keys = list(public_key_to_validator.keys())

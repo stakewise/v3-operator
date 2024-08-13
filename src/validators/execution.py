@@ -199,9 +199,9 @@ async def update_unused_validator_keys_metric(
     return validators
 
 
-async def get_start_validator_index() -> int:
+async def get_validators_start_index() -> int:
     latest_public_keys = await get_latest_network_validator_public_keys()
-    start_validator_index = NetworkValidatorCrud().get_next_validator_index(
+    validators_start_index = NetworkValidatorCrud().get_next_validator_index(
         list(latest_public_keys)
     )
-    return start_validator_index
+    return validators_start_index
