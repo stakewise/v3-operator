@@ -8,11 +8,9 @@ datas = [
     ('src/common/word_lists/*', 'src/common/word_lists/'),
     ('./pyproject.toml', '.'),
     ('./GIT_SHA', '.'),
-]
-
-binaries = [
     ('bin/*', '.'),
 ]
+
 
 datas += collect_data_files('certifi')
 datas += collect_data_files('coincurve')
@@ -24,7 +22,7 @@ block_cipher = None
 a = Analysis(
     ['src/main.py'],
     pathex=[],
-    binaries=binaries,
+    binaries=[],
     datas=datas,
     hiddenimports=['multiaddr.codecs.uint16be', 'multiaddr.codecs.idna', 'pkg_resources.extern'],
     hookspath=[],
