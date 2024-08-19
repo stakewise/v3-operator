@@ -163,7 +163,7 @@ class Settings(metaclass=Singleton):
 
         # hashi vault configuration
         if hashi_vault_key_paths is not None:
-            if sorted(list(set(hashi_vault_key_paths))) != sorted(hashi_vault_key_paths):
+            if len(set(hashi_vault_key_paths)) != len(hashi_vault_key_paths):
                 raise RuntimeError('Found duplicate addresses in hashi vault key paths')
 
         self.hashi_vault_url = hashi_vault_url
