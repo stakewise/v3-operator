@@ -57,7 +57,7 @@ class RemoteSignerKeystore(BaseKeystore):
     def __len__(self) -> int:
         return len(self._public_keys)
 
-    def __contains__(self, public_key):
+    def __contains__(self, public_key: HexStr) -> bool:
         return public_key in self._public_keys
 
     @property

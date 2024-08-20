@@ -138,7 +138,7 @@ class CredentialManager:
             show_pos=True,
         ) as progress_bar, Pool(processes=pool_size) as pool:
 
-            def bar_updated(result):
+            def bar_updated(result: list) -> None:
                 progress_bar.update(len(result))
 
             results = []

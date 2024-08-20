@@ -3,6 +3,7 @@ import logging
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any, Iterator
 
 import click
 import tenacity
@@ -94,12 +95,12 @@ def process_oracles_approvals(
     return OraclesApproval(ipfs_hash=winner[0], signatures=signatures, deadline=winner[1])
 
 
-def chunkify(items, size):
+def chunkify(items: list | range, size: int) -> Iterator[list | range]:
     for i in range(0, len(items), size):
         yield items[i : i + size]
 
 
-def greenify(value):
+def greenify(value: Any) -> str:
     return click.style(value, bold=True, fg='green')
 
 
@@ -115,7 +116,7 @@ async def calc_slot_by_block_number(block_number: BlockNumber) -> int:
 
 
 class JsonFormatter(jsonlogger.JsonFormatter):
-    def add_fields(self, log_record, record, message_dict):
+    def add_fields(self, log_record, record, message_dict):  # type: ignore
         super().add_fields(log_record, record, message_dict)
         if not log_record.get('timestamp'):
             date = datetime.fromtimestamp(record.created, tz=timezone.utc)

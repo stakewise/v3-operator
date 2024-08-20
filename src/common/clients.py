@@ -1,6 +1,7 @@
 import logging
 import sqlite3
 from functools import cached_property
+from sqlite3 import Connection
 from typing import cast
 
 from sw_utils import (
@@ -19,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class Database:
-    def get_db_connection(self) -> sqlite3.Connection:
+    def get_db_connection(self) -> Connection:
         return sqlite3.connect(settings.database)
 
     def create_db_dir(self) -> None:
@@ -45,7 +46,7 @@ class ExecutionClient:
 
         return w3
 
-    def __getattr__(self, item):
+    def __getattr__(self, item):  # type: ignore
         return getattr(self.client, item)
 
 
@@ -58,7 +59,7 @@ class ConsensusClient:
             retry_timeout=settings.consensus_retry_timeout,
         )
 
-    def __getattr__(self, item):
+    def __getattr__(self, item):  # type: ignore
         return getattr(self.client, item)
 
 

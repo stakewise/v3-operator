@@ -28,7 +28,7 @@ class NetworkValidatorsProcessor(EventProcessor):
     contract_event = 'DepositEvent'
 
     @property
-    def contract(self):
+    def contract(self):  # type: ignore
         return validators_registry_contract
 
     @staticmethod

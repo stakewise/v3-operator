@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class Vault:
-    async def version(self):
+    async def version(self) -> int:
         return await vault_contract.version()
 
     async def is_restake(self) -> bool:

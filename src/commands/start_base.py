@@ -110,7 +110,7 @@ def log_start() -> None:
         logger.info('%s, version %s', start_str, src.__version__)
 
 
-def setup_sentry():
+def setup_sentry() -> None:
     if settings.sentry_dsn:
         # pylint: disable-next=import-outside-toplevel
         import sentry_sdk

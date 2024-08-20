@@ -107,6 +107,7 @@ def create_keys(
         vault_config.increment_mnemonic_index(count)
 
         # move files from tmp dir
+        keystores_dir.mkdir(exist_ok=True)
         tmp_deposit_data_file.replace(deposit_data_file)
         for src_file in tmp_keystores_dir.glob('*'):
             src_file.rename(keystores_dir.joinpath(src_file.name))

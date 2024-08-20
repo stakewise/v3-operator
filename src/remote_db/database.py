@@ -8,7 +8,7 @@ from src.config.settings import settings
 from src.remote_db.typings import RemoteDatabaseKeyPair
 
 
-def get_db_connection(db_url):
+def get_db_connection(db_url: str):  # type: ignore
     import psycopg2  # pylint: disable=import-outside-toplevel
 
     return psycopg2.connect(dsn=db_url)
@@ -29,7 +29,12 @@ def check_db_connection(db_url: str) -> None:
 
 class KeyPairsCrud:
     def __init__(self, db_connection: Any | None = None, db_url: str | None = None):
-        self.db_connection = db_connection or get_db_connection(db_url)
+        if db_connection:
+            self.db_connection = db_connection
+        elif db_url:
+            self.db_connection = get_db_connection(db_url)
+        else:
+            raise RuntimeError('db_connection or db_url must be set')
 
     @property
     def table(self) -> str:
@@ -154,7 +159,12 @@ class ConfigsCrud:
     deposit_data_name = 'deposit_data.json'
 
     def __init__(self, db_connection: Any | None = None, db_url: str | None = None):
-        self.db_connection = db_connection or get_db_connection(db_url)
+        if db_connection:
+            self.db_connection = db_connection
+        elif db_url:
+            self.db_connection = get_db_connection(db_url)
+        else:
+            raise RuntimeError('db_connection or db_url must be set')
 
     @property
     def table(self) -> str:
