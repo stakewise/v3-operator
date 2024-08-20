@@ -327,7 +327,7 @@ class MulticallContract(ContractWrapper):
 class EigenPodOwnerContract(ContractWrapper):
     abi_path = 'abi/IEigenPodOwner.json'
 
-    def __init__(self, address):
+    def __init__(self, address: ChecksumAddress) -> None:
         self._address = address
 
     @property

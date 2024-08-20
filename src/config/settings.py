@@ -253,11 +253,11 @@ class Settings(metaclass=Singleton):
         return self.vault == settings.network_config.GENESIS_VAULT_CONTRACT_ADDRESS
 
     @property
-    def is_auto_registration_mode(self):
+    def is_auto_registration_mode(self) -> bool:
         return settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO
 
     @property
-    def is_api_registration_mode(self):
+    def is_api_registration_mode(self) -> bool:
         return settings.validators_registration_mode == ValidatorsRegistrationMode.API
 
 

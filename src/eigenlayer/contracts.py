@@ -11,7 +11,7 @@ from src.eigenlayer.typings import QueuedWithdrawal, ValidatorInfo
 class EigenPodContract(ContractWrapper):
     abi_path = '../eigenlayer/abi/IEigenPod.json'
 
-    def __init__(self, address):
+    def __init__(self, address: ChecksumAddress) -> None:
         self._address = address
 
     @property
@@ -66,7 +66,7 @@ class EigenPodContract(ContractWrapper):
 class DelayedWithdrawalRouterContract(ContractWrapper):
     abi_path = '../eigenlayer/abi/IDelayedWithdrawalRouter.json'
 
-    def __init__(self, address):
+    def __init__(self, address: ChecksumAddress) -> None:
         self._address = address
 
     @property
@@ -112,7 +112,7 @@ class EigenPodManagerContract(ContractWrapper):
 class BeaconChainOracleContract(ContractWrapper):
     abi_path = '../eigenlayer/abi/IBeaconChainOracle.json'
 
-    def __init__(self, address):
+    def __init__(self, address: ChecksumAddress) -> None:
         self._address = address
 
     @property

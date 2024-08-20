@@ -20,10 +20,10 @@ class ProofsGenerationWrapper:
 
         self.files: set[str] = set()
 
-    def __enter__(self):
+    def __enter__(self) -> 'ProofsGenerationWrapper':
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb):  # type: ignore
         for file in self.files:
             self._cleanup_file(file)
 
@@ -216,11 +216,12 @@ class ProofsGenerationWrapper:
         return resource_path(filename)
 
 
-def resource_path(relative_path):
+def resource_path(relative_path: str) -> str:
     """Get absolute path to resource, works for dev and for PyInstaller"""
     try:
         # PyInstaller creates a temp folder and stores path in _MEIPASS
-        base_path = sys._MEIPASS  # pylint: disable=no-member,protected-access
+        # pylint: disable-next=no-member,protected-access
+        base_path = sys._MEIPASS  # type: ignore
     except BaseException:
         base_path = os.path.abspath('.') + '/bin'
 

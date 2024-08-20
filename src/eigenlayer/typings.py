@@ -57,7 +57,7 @@ class QueuedWithdrawal:
     withdrawal_root: bytes | None = None
 
     @property
-    def block_number(self):
+    def block_number(self) -> BlockNumber:
         return self.start_block
 
     @property
