@@ -71,8 +71,9 @@ async def upload_keypairs(db_url: str, b64_encrypt_key: str) -> None:
     with open(settings.deposit_data_file, 'r', encoding='utf-8') as f:
         deposit_data: list[dict] = json.load(f)
 
-    deposit_data_tree, _ = generate_validators_tree(settings.vault, deposit_data)
-    await check_deposit_data_root(deposit_data_tree.root)
+    if not settings.disable_deposit_data_warnings:
+        deposit_data_tree, _ = generate_validators_tree(settings.vault, deposit_data)
+        await check_deposit_data_root(deposit_data_tree.root)
 
     click.echo(f'Loading keystores from {settings.keystores_dir}...')
     keystore = await LocalKeystore.load()
