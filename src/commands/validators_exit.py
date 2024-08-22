@@ -17,7 +17,7 @@ from src.common.utils import format_error, log_verbose
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
 from src.config.networks import AVAILABLE_NETWORKS
-from src.config.settings import DEFAULT_HASHI_VAULT_PARALLELISM, settings
+from src.config.settings import DEFAULT_HASHI_VAULT_PARALLELISM, DEFAULT_HASHI_VAULT_ENGINE_NAME, settings
 from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
 
@@ -78,6 +78,12 @@ EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
     help='The base URL of the vault service, e.g. http://vault:8200.',
 )
 @click.option(
+    '--hashi-vault-engine-name',
+    envvar='HASHI_VAULT_ENGINE_NAME',
+    help='The name of the secret engine, e.g. keystores',
+    default=DEFAULT_HASHI_VAULT_ENGINE_NAME,
+)
+@click.option(
     '--hashi-vault-token',
     envvar='HASHI_VAULT_TOKEN',
     help='Authentication token for accessing Hashi vault.',
@@ -128,6 +134,7 @@ def validators_exit(
     hashi_vault_key_path: list[str] | None,
     hashi_vault_token: str | None,
     hashi_vault_url: str | None,
+    hashi_vault_engine_name: str | None,
     hashi_vault_parallelism: int,
     data_dir: str,
     verbose: bool,
@@ -149,6 +156,7 @@ def validators_exit(
         hashi_vault_token=hashi_vault_token,
         hashi_vault_key_paths=hashi_vault_key_path,
         hashi_vault_url=hashi_vault_url,
+        hashi_vault_engine_name=hashi_vault_engine_name,
         hashi_vault_parallelism=hashi_vault_parallelism,
         verbose=verbose,
         log_level=log_level,

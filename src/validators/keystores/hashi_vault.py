@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 class HashiVaultConfiguration:
     token: str
     url: str
+    engine_name: str
     key_paths: list[str]
     parallelism: int
 
@@ -36,14 +37,15 @@ class HashiVaultConfiguration:
         return cls(
             token=settings.hashi_vault_token,
             url=settings.hashi_vault_url,
+            engine_name=settings.hashi_vault_engine_name,
             key_paths=settings.hashi_vault_key_paths,
             parallelism=settings.hashi_vault_parallelism,
         )
 
-    def secret_url(self, key_path: str) -> str:
+    def secret_url(self, engine_name: str, key_path: str) -> str:
         return urllib.parse.urljoin(
             self.url,
-            f'/v1/secret/data/{key_path}',
+            f'/v1/{engine_name}/data/{key_path}',
         )
 
 
@@ -55,6 +57,7 @@ class HashiVaultKeystore(LocalKeystore):
 
         parallelism = hashi_vault_config.parallelism
         key_paths = hashi_vault_config.key_paths
+        engine_name = hashi_vault_config.engine_name
         merged_keys = Keys({})
 
         key_paths_iter = iter(key_paths)
@@ -66,7 +69,7 @@ class HashiVaultKeystore(LocalKeystore):
                 keys_responses = await asyncio.gather(
                     *[
                         HashiVaultKeystore._load_hashi_vault_keys(
-                            session=session, secret_url=hashi_vault_config.secret_url(key_path)
+                            session=session, secret_url=hashi_vault_config.secret_url(engine_name, key_path)
                         )
                         for key_path in key_chunk
                     ]
