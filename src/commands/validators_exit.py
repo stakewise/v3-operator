@@ -17,7 +17,7 @@ from src.common.utils import format_error, log_verbose
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
 from src.config.networks import AVAILABLE_NETWORKS
-from src.config.settings import settings
+from src.config.settings import DEFAULT_HASHI_VAULT_PARALLELISM, settings
 from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
 
@@ -84,8 +84,15 @@ EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
 )
 @click.option(
     '--hashi-vault-key-path',
+    multiple=True,
     envvar='HASHI_VAULT_KEY_PATH',
     help='Key path in the K/V secret engine where validator signing keys are stored.',
+)
+@click.option(
+    '--hashi-vault-parallelism',
+    envvar='HASHI_VAULT_PARALLELISM',
+    help='How much requests to K/V secrets engine to do in parallel.',
+    default=DEFAULT_HASHI_VAULT_PARALLELISM,
 )
 @click.option(
     '-v',
@@ -111,16 +118,17 @@ EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
     type=int,
 )
 @click.command(help='Performs a voluntary exit for active vault validators.')
-# pylint: disable-next=too-many-arguments
+# pylint: disable-next=too-many-arguments,too-many-locals
 def validators_exit(
     network: str,
     vault: HexAddress,
     count: int | None,
     consensus_endpoints: str,
     remote_signer_url: str,
-    hashi_vault_key_path: str | None,
+    hashi_vault_key_path: list[str] | None,
     hashi_vault_token: str | None,
     hashi_vault_url: str | None,
+    hashi_vault_parallelism: int,
     data_dir: str,
     verbose: bool,
     log_level: str,
@@ -139,8 +147,9 @@ def validators_exit(
         consensus_endpoints=consensus_endpoints,
         remote_signer_url=remote_signer_url,
         hashi_vault_token=hashi_vault_token,
-        hashi_vault_key_path=hashi_vault_key_path,
+        hashi_vault_key_paths=hashi_vault_key_path,
         hashi_vault_url=hashi_vault_url,
+        hashi_vault_parallelism=hashi_vault_parallelism,
         verbose=verbose,
         log_level=log_level,
         pool_size=pool_size,

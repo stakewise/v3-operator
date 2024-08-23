@@ -19,6 +19,8 @@ DEFAULT_METRICS_PREFIX = 'sw_operator'
 
 DEFAULT_MIN_VALIDATORS_REGISTRATION = 1
 
+DEFAULT_HASHI_VAULT_PARALLELISM = 8
+
 
 # pylint: disable-next=too-many-public-methods,too-many-instance-attributes
 class Settings(metaclass=Singleton):
@@ -46,9 +48,10 @@ class Settings(metaclass=Singleton):
     keystores_password_file: Path
     remote_signer_url: str | None
     dappnode: bool = False
-    hashi_vault_key_path: str | None
+    hashi_vault_key_paths: list[str] | None
     hashi_vault_url: str | None
     hashi_vault_token: str | None
+    hashi_vault_parallelism: int
     hot_wallet_file: Path
     hot_wallet_password_file: Path
     max_fee_per_gas_gwei: int
@@ -106,9 +109,10 @@ class Settings(metaclass=Singleton):
         keystores_password_file: str | None = None,
         remote_signer_url: str | None = None,
         dappnode: bool = False,
-        hashi_vault_key_path: str | None = None,
+        hashi_vault_key_paths: list[str] | None = None,
         hashi_vault_url: str | None = None,
         hashi_vault_token: str | None = None,
+        hashi_vault_parallelism: int = DEFAULT_HASHI_VAULT_PARALLELISM,
         hot_wallet_file: str | None = None,
         hot_wallet_password_file: str | None = None,
         database_dir: str | None = None,
@@ -158,9 +162,14 @@ class Settings(metaclass=Singleton):
         self.dappnode = dappnode
 
         # hashi vault configuration
+        if hashi_vault_key_paths is not None:
+            if len(set(hashi_vault_key_paths)) != len(hashi_vault_key_paths):
+                raise RuntimeError('Found duplicate addresses in hashi vault key paths')
+
         self.hashi_vault_url = hashi_vault_url
-        self.hashi_vault_key_path = hashi_vault_key_path
+        self.hashi_vault_key_paths = hashi_vault_key_paths
         self.hashi_vault_token = hashi_vault_token
+        self.hashi_vault_parallelism = hashi_vault_parallelism
 
         # hot wallet
         self.hot_wallet_file = (
@@ -186,7 +195,6 @@ class Settings(metaclass=Singleton):
             'IPFS_FETCH_ENDPOINTS',
             cast=Csv(),
             default='https://stakewise-v3.infura-ipfs.io,'
-            'http://cloudflare-ipfs.com,'
             'https://gateway.pinata.cloud,https://ipfs.io',
         )
         self.ipfs_timeout = decouple_config('IPFS_TIMEOUT', default=60, cast=int)

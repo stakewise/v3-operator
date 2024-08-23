@@ -13,6 +13,7 @@ from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import (
+    DEFAULT_HASHI_VAULT_PARALLELISM,
     DEFAULT_MAX_FEE_PER_GAS_GWEI,
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
@@ -179,7 +180,14 @@ logger = logging.getLogger(__name__)
 @click.option(
     '--hashi-vault-key-path',
     envvar='HASHI_VAULT_KEY_PATH',
-    help='Key path in the K/V secret engine where validator signing keys are stored.',
+    multiple=True,
+    help='Key path(s) in the K/V secret engine where validator signing keys are stored.',
+)
+@click.option(
+    '--hashi-vault-parallelism',
+    envvar='HASHI_VAULT_PARALLELISM',
+    help='How much requests to K/V secrets engine to do in parallel.',
+    default=DEFAULT_HASHI_VAULT_PARALLELISM,
 )
 @click.option(
     '--log-format',
@@ -235,9 +243,10 @@ def start(
     keystores_dir: str | None,
     keystores_password_file: str | None,
     remote_signer_url: str | None,
-    hashi_vault_key_path: str | None,
+    hashi_vault_key_path: list[str] | None,
     hashi_vault_token: str | None,
     hashi_vault_url: str | None,
+    hashi_vault_parallelism: int,
     hot_wallet_file: str | None,
     hot_wallet_password_file: str | None,
     max_fee_per_gas_gwei: int,
@@ -268,7 +277,8 @@ def start(
         keystores_password_file=keystores_password_file,
         remote_signer_url=remote_signer_url,
         hashi_vault_token=hashi_vault_token,
-        hashi_vault_key_path=hashi_vault_key_path,
+        hashi_vault_key_paths=hashi_vault_key_path,
+        hashi_vault_parallelism=hashi_vault_parallelism,
         hashi_vault_url=hashi_vault_url,
         hot_wallet_file=hot_wallet_file,
         hot_wallet_password_file=hot_wallet_password_file,
