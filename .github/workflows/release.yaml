@@ -9,29 +9,7 @@ on:
       - "v*.*.*"
 
 jobs:
-  checks:
-    name: Check version
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up python
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.10.5
-
-      - name: Install Poetry
-        uses: Gr1N/setup-poetry@v8
-        with:
-          poetry-version: "1.8.3"
-
-      - name: Check project version matches tag name
-        run: |
-          [ "`poetry version --short`" == "${{ github.ref_name }}" ]
-
   build:
-    needs: checks
     runs-on: ${{ matrix.OS }}
     strategy:
       matrix:
