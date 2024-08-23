@@ -9,6 +9,7 @@ from eth_utils import add_0x_prefix
 from web3 import Web3
 
 from src.config.settings import RELAYER_TYPE, settings
+from src.validators.exceptions import MissingDepositDataValidatorsException
 from src.validators.execution import (
     get_validators_from_deposit_data,
     get_validators_start_index,
@@ -126,6 +127,9 @@ class RelayerAdapter:
             deposit_data=cast(DepositData, self.deposit_data),
             count=validators_batch_size,
         )
+        if not deposit_data_validators:
+            raise MissingDepositDataValidatorsException()
+
         public_key_to_validator = {v.public_key: v for v in deposit_data_validators}
         public_keys = list(public_key_to_validator.keys())
 

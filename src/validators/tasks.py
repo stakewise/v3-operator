@@ -23,6 +23,7 @@ from src.common.utils import get_current_timestamp
 from src.config.networks import GNOSIS_NETWORKS
 from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.validators.database import NetworkValidatorCrud
+from src.validators.exceptions import MissingDepositDataValidatorsException
 from src.validators.execution import (
     NetworkValidatorsProcessor,
     get_validators_from_deposit_data,
@@ -146,9 +147,20 @@ async def process_validators(
             validators=validators,
         )
     else:
-        validators_response = await cast(RelayerAdapter, relayer_adapter).get_validators(
-            validators_batch_size, validators_total=validators_count
-        )
+        try:
+            validators_response = await cast(RelayerAdapter, relayer_adapter).get_validators(
+                validators_batch_size, validators_total=validators_count
+            )
+        except MissingDepositDataValidatorsException:
+            # Deposit data validators are required when using DVT Relayer
+            if not settings.disable_deposit_data_warnings:
+                logger.warning(
+                    'There are no available validators in the current deposit data '
+                    'to proceed with registration. '
+                    'To register additional validators, you must upload new deposit data.'
+                )
+            return None
+
         validators = validators_response.validators
         if not validators:
             logger.info('Waiting for relayer validators')
