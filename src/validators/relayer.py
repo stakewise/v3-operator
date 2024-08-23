@@ -49,6 +49,8 @@ class DefaultRelayerClient:
             timeout=ClientTimeout(settings.relayer_timeout)
         ) as session:
             resp = await session.post(f'{settings.relayer_endpoint}/validators', json=jsn)
+            if 400 <= resp.status < 500:
+                logger.debug('Relayer response: %s', await resp.read())
             resp.raise_for_status()
             return await resp.json()
 
@@ -60,6 +62,8 @@ class DvtRelayerClient:
             timeout=ClientTimeout(settings.relayer_timeout)
         ) as session:
             resp = await session.post(f'{settings.relayer_endpoint}/validators', json=jsn)
+            if 400 <= resp.status < 500:
+                logger.debug('Relayer response: %s', await resp.read())
             resp.raise_for_status()
             return await resp.json()
 
