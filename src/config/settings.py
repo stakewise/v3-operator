@@ -71,7 +71,7 @@ class Settings(metaclass=Singleton):
     sentry_environment: str
     pool_size: int | None
 
-    relayer_endpoint: str | None
+    relayer_endpoint: str
     relayer_timeout: int
     validators_registration_mode: ValidatorsRegistrationMode
     skip_startup_checks: bool
@@ -223,7 +223,7 @@ class Settings(metaclass=Singleton):
         self.consensus_retry_timeout = decouple_config(
             'CONSENSUS_RETRY_TIMEOUT', default=120, cast=int
         )
-        self.relayer_endpoint = relayer_endpoint
+        self.relayer_endpoint = relayer_endpoint or ''
         self.relayer_timeout = decouple_config('RELAYER_TIMEOUT', default=10, cast=int)
 
         self.validators_registration_mode = validators_registration_mode

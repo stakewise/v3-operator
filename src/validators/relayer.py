@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from typing import cast
+from urllib.parse import urljoin
 
 import aiohttp
 from aiohttp import ClientTimeout
@@ -40,6 +41,7 @@ class DefaultRelayerClient:
          Should be more than or equal to `validators_batch_size`.
          Relayer may use `validators_total` to create larger portions of validators in background.
         """
+        url = urljoin(settings.relayer_endpoint, 'validators')
         jsn = {
             'vault': settings.vault,
             'validators_start_index': validators_start_index,
@@ -49,7 +51,7 @@ class DefaultRelayerClient:
         async with aiohttp.ClientSession(
             timeout=ClientTimeout(settings.relayer_timeout)
         ) as session:
-            resp = await session.post(f'{settings.relayer_endpoint}/validators', json=jsn)
+            resp = await session.post(url, json=jsn)
             if 400 <= resp.status < 500:
                 logger.debug('Relayer response: %s', await resp.read())
             resp.raise_for_status()
@@ -58,11 +60,12 @@ class DefaultRelayerClient:
 
 class DvtRelayerClient:
     async def get_validators(self, public_keys: list[HexStr]) -> dict:
+        url = urljoin(settings.relayer_endpoint, 'validators')
         jsn = {'public_keys': public_keys}
         async with aiohttp.ClientSession(
             timeout=ClientTimeout(settings.relayer_timeout)
         ) as session:
-            resp = await session.post(f'{settings.relayer_endpoint}/validators', json=jsn)
+            resp = await session.post(url, json=jsn)
             if 400 <= resp.status < 500:
                 logger.debug('Relayer response: %s', await resp.read())
             resp.raise_for_status()
