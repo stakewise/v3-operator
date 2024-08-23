@@ -195,7 +195,6 @@ class Settings(metaclass=Singleton):
             'IPFS_FETCH_ENDPOINTS',
             cast=Csv(),
             default='https://stakewise-v3.infura-ipfs.io,'
-            'http://cloudflare-ipfs.com,'
             'https://gateway.pinata.cloud,https://ipfs.io',
         )
         self.ipfs_timeout = decouple_config('IPFS_TIMEOUT', default=60, cast=int)
