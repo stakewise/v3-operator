@@ -50,6 +50,7 @@ class RelayerClient(BaseRelayerClient):
                     public_key=add_0x_prefix(v['public_key']),
                     amount_gwei=v['amount_gwei'],
                     signature=add_0x_prefix(v['deposit_signature']),
+                    withdrawal_address=v.get('withdrawal_address'),
                     exit_signature=BLSSignature(
                         Web3.to_bytes(hexstr=add_0x_prefix(v['exit_signature']))
                     ),

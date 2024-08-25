@@ -4,7 +4,7 @@ from ens.constants import EMPTY_ADDR_HEX
 from eth_typing import BlockNumber, ChecksumAddress, HexStr
 from sw_utils.typings import Bytes32, ConsensusFork
 from web3 import Web3
-from web3.types import Wei
+from web3.types import Timestamp, Wei
 
 MAINNET = 'mainnet'
 GNOSIS = 'gnosis'
@@ -33,6 +33,7 @@ class NetworkConfig:
     GENESIS_VAULT_CONTRACT_ADDRESS: ChecksumAddress
     GENESIS_VALIDATORS_ROOT: Bytes32
     GENESIS_VALIDATORS_IPFS_HASH: str
+    GENESIS_TIMESTAMP: Timestamp
     SLOTS_PER_EPOCH: int
     SECONDS_PER_BLOCK: int
     GENESIS_FORK_VERSION: bytes
@@ -43,6 +44,8 @@ class NetworkConfig:
     SHARED_MEV_ESCROW_CONTRACT_ADDRESS: ChecksumAddress
     STAKEWISE_API_URL: str
     RATED_API_URL: str
+    EIGEN_DELEGATION_MANAGER_CONTRACT_ADDRESS: ChecksumAddress
+    EIGEN_POD_MANAGER_CONTRACT_ADDRESS: ChecksumAddress
 
     @property
     def SHAPELLA_FORK(self) -> ConsensusFork:
@@ -50,6 +53,10 @@ class NetworkConfig:
             version=self.SHAPELLA_FORK_VERSION,
             epoch=self.SHAPELLA_EPOCH,
         )
+
+    @property
+    def SHAPELLA_SLOT(self) -> int:
+        return self.SHAPELLA_EPOCH * self.SLOTS_PER_EPOCH
 
     @property
     def IS_SUPPORT_V2_MIGRATION(self) -> bool:
@@ -93,6 +100,7 @@ NETWORKS = {
             )
         ),
         GENESIS_VALIDATORS_IPFS_HASH='bafybeigzq2ntq5zw4tdym5vckbf66mla5q3ge2fzdgqslhckdytlmm7k7y',
+        GENESIS_TIMESTAMP=Timestamp(1606824023),
         SLOTS_PER_EPOCH=32,
         SECONDS_PER_BLOCK=12,
         GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x00000000')),
@@ -107,6 +115,12 @@ NETWORKS = {
         ),
         STAKEWISE_API_URL='https://mainnet-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
+        EIGEN_DELEGATION_MANAGER_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x39053D51B77DC0d36036Fc1fCc8Cb819df8Ef37A'
+        ),
+        EIGEN_POD_MANAGER_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x91E677b07F7AF907ec9a428aafA9fc14a0d3A338'
+        ),
     ),
     HOLESKY: NetworkConfig(
         CHAIN_ID=17000,
@@ -137,6 +151,7 @@ NETWORKS = {
             )
         ),
         GENESIS_VALIDATORS_IPFS_HASH='bafybeihhaxvlkbvwda6jy3ucawb4cdmgbaumbvoi337gdyp6hdtlrfnb64',
+        GENESIS_TIMESTAMP=Timestamp(1695902400),
         SLOTS_PER_EPOCH=32,
         SECONDS_PER_BLOCK=12,
         GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x01017000')),
@@ -151,6 +166,12 @@ NETWORKS = {
         ),
         STAKEWISE_API_URL='https://holesky-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
+        EIGEN_DELEGATION_MANAGER_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0xA44151489861Fe9e3055d95adC98FbD462B948e7'
+        ),
+        EIGEN_POD_MANAGER_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x30770d7E3e71112d7A6b7259542D1f680a70e315'
+        ),
     ),
     GNOSIS: NetworkConfig(
         CHAIN_ID=100,
@@ -183,6 +204,7 @@ NETWORKS = {
             )
         ),
         GENESIS_VALIDATORS_IPFS_HASH='bafybeid4xnpjblh4izjb32qygdubyugotivm5rscx6b3jpsez4vxlyig44',
+        GENESIS_TIMESTAMP=Timestamp(1638993340),
         SLOTS_PER_EPOCH=16,
         SECONDS_PER_BLOCK=5,
         GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x00000064')),
@@ -197,6 +219,8 @@ NETWORKS = {
         ),
         STAKEWISE_API_URL='https://gnosis-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
+        EIGEN_DELEGATION_MANAGER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        EIGEN_POD_MANAGER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
     ),
     CHIADO: NetworkConfig(
         CHAIN_ID=10200,
@@ -227,6 +251,7 @@ NETWORKS = {
             )
         ),
         GENESIS_VALIDATORS_IPFS_HASH='bafybeih2he7opyg4e7ontq4cvh42tou4ekizpbn4emg6u5lhfziyxcm3zq',
+        GENESIS_TIMESTAMP=Timestamp(1665396300),
         SLOTS_PER_EPOCH=16,
         SECONDS_PER_BLOCK=5,
         GENESIS_FORK_VERSION=Web3.to_bytes(hexstr=HexStr('0x0000006f')),
@@ -241,5 +266,7 @@ NETWORKS = {
         ),
         STAKEWISE_API_URL='https://chiado-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
+        EIGEN_DELEGATION_MANAGER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        EIGEN_POD_MANAGER_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
     ),
 }

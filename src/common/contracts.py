@@ -81,6 +81,7 @@ class ContractWrapper:
         event: type[AsyncContractEvent],
         from_block: BlockNumber,
         to_block: BlockNumber,
+        argument_filters: dict | None = None,
     ) -> list[EventData]:
         events: list[EventData] = []
         blocks_range = self.events_blocks_range_interval
@@ -88,6 +89,7 @@ class ContractWrapper:
             range_events = await event.get_logs(
                 fromBlock=from_block,
                 toBlock=BlockNumber(min(from_block + blocks_range, to_block)),
+                argument_filters=argument_filters,
             )
             if range_events:
                 events.extend(range_events)
@@ -166,6 +168,37 @@ class GnoVaultContract(ContractWrapper, VaultStateMixin):
 
     def get_swap_xdai_call(self) -> HexStr:
         return self.encode_abi(fn_name='swapXdaiToGno', args=[])
+
+
+class RestakeVaultContract(VaultContract):
+    abi_path = 'abi/IEthRestakeVault.json'
+
+    async def restake_withdrawals_manager(self) -> ChecksumAddress:
+        return await self.contract.functions.restakeWithdrawalsManager().call()
+
+    async def get_eigen_pods(self) -> list[ChecksumAddress]:
+        pods = await self.contract.functions.getEigenPods().call()
+        return [Web3.to_checksum_address(pod) for pod in pods]
+
+    async def get_eigen_pod_owners(
+        self,
+        from_block: BlockNumber | None = None,
+        to_block: BlockNumber | None = None,
+    ) -> dict[ChecksumAddress, ChecksumAddress]:
+        """Fetches the pod to owner addresses dict."""
+        from_block = from_block or settings.network_config.KEEPER_GENESIS_BLOCK
+        to_block = to_block or await execution_client.eth.get_block_number()
+        events = await self._get_events(
+            event=self.events.EigenPodCreated,  # type: ignore
+            from_block=from_block,
+            to_block=to_block,
+        )
+        return {
+            Web3.to_checksum_address(event['args']['eigenPod']): Web3.to_checksum_address(
+                event['args']['eigenPodOwner']
+            )
+            for event in events
+        }
 
 
 class V2PoolContract(ContractWrapper):
@@ -291,6 +324,67 @@ class MulticallContract(ContractWrapper):
         return await self.contract.functions.aggregate(data).call(block_identifier=block_number)
 
 
+class EigenPodOwnerContract(ContractWrapper):
+    abi_path = 'abi/IEigenPodOwner.json'
+
+    def __init__(self, address: ChecksumAddress) -> None:
+        self._address = address
+
+    @property
+    def contract_address(self) -> ChecksumAddress:
+        return self._address
+
+    # pylint: disable-next=too-many-arguments
+    async def get_verify_and_process_withdrawals_call(
+        self,
+        oracle_timestamp: int,
+        state_root_proof: tuple[bytes, bytes],
+        validator_fields_proofs: list[bytes],
+        validator_fields: list[list[bytes]],
+        withdrawal_proofs: list[
+            tuple[
+                bytes,
+                bytes,
+                bytes,
+                bytes,
+                bytes,
+                int,
+                int,
+                int,
+                bytes,
+                bytes,
+                bytes,
+                bytes,
+            ]
+        ],
+        withdrawal_fields: list[bytes],
+    ) -> tuple[ChecksumAddress, HexStr]:
+        call = self.encode_abi(
+            fn_name='verifyAndProcessWithdrawals',
+            args=[
+                oracle_timestamp,
+                state_root_proof,
+                withdrawal_proofs,
+                validator_fields_proofs,
+                validator_fields,
+                withdrawal_fields,
+            ],
+        )
+
+        return self.address, call
+
+    async def get_claim_delayed_withdrawals_call(
+        self,
+        max_number: int,
+    ) -> tuple[ChecksumAddress, HexStr]:
+        call = self.encode_abi(
+            fn_name='claimDelayedWithdrawals',
+            args=[max_number],
+        )
+
+        return self.address, call
+
+
 @functools.cache
 def get_gno_vault_contract() -> GnoVaultContract:
     return GnoVaultContract()
@@ -298,6 +392,7 @@ def get_gno_vault_contract() -> GnoVaultContract:
 
 vault_contract = VaultContract()
 vault_v1_contract = VaultV1Contract()
+restake_vault_contract = RestakeVaultContract()
 validators_registry_contract = ValidatorsRegistryContract()
 keeper_contract = KeeperContract()
 v2_pool_contract = V2PoolContract()

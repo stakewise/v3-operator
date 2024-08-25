@@ -1,5 +1,6 @@
 import asyncio
 import dataclasses
+import functools
 import json
 import logging
 import random
@@ -133,6 +134,7 @@ async def send_approval_request(
     )
 
 
+@functools.cache
 def load_deposit_data(vault: HexAddress, deposit_data_file: Path) -> DepositData:
     """Loads and verifies deposit data."""
     with open(deposit_data_file, 'r', encoding='utf-8') as f:
@@ -146,16 +148,22 @@ def generate_validators_tree(
     vault: HexAddress, deposit_data: list[dict]
 ) -> tuple[StandardMerkleTree, list[DepositDataValidator]]:
     """Generates validators tree."""
-    credentials = get_eth1_withdrawal_credentials(vault)
     leaves: list[tuple[bytes, int]] = []
     validators: list[DepositDataValidator] = []
     for i, data in enumerate(deposit_data):
+        withdrawal_address = data.get('withdrawal_address')
+        credentials = get_eth1_withdrawal_credentials(withdrawal_address or vault)
+
+        if withdrawal_address:
+            withdrawal_address = Web3.to_checksum_address(withdrawal_address)
+
         validator = DepositDataValidator(
             deposit_data_index=i,
             public_key=add_0x_prefix(data['pubkey']),
             signature=add_0x_prefix(data['signature']),
             amount_gwei=int(data['amount']),
             deposit_data_root=add_0x_prefix(data['deposit_data_root']),
+            withdrawal_address=withdrawal_address,
         )
         leaves.append((encode_tx_validator(credentials, validator), i))
         validators.append(validator)

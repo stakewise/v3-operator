@@ -4,7 +4,7 @@ from os import makedirs, path
 from pathlib import Path
 
 import click
-from eth_typing import HexAddress
+from eth_typing import ChecksumAddress, HexAddress
 
 from src.common.credentials import Credential, CredentialManager
 from src.common.password import generate_password, get_or_create_password_file
@@ -48,6 +48,12 @@ from src.common.vault_config import VaultConfig
     callback=validate_eth_address,
 )
 @click.option(
+    '--eigenpod-address',
+    help='The address of the vault eigenpod.',
+    type=str,
+    callback=validate_eth_address,
+)
+@click.option(
     '--pool-size',
     help='Number of processes in a pool.',
     envvar='POOL_SIZE',
@@ -60,6 +66,7 @@ def create_keys(
     count: int,
     vault: HexAddress,
     data_dir: str,
+    eigenpod_address: ChecksumAddress | None,
     per_keystore_password: bool,
     pool_size: int | None,
 ) -> None:
@@ -76,6 +83,7 @@ def create_keys(
         mnemonic=mnemonic,
         count=count,
         start_index=vault_config.mnemonic_next_index,
+        withdrawal_address=eigenpod_address,
         pool_size=pool_size,
     )
 

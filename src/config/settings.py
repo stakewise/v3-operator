@@ -75,6 +75,7 @@ class Settings(metaclass=Singleton):
     relayer_timeout: int
     validators_registration_mode: ValidatorsRegistrationMode
     skip_startup_checks: bool
+    eigen_withdrawals_processing_interval: int
 
     # high priority fee
     priority_fee_num_blocks: int = decouple_config('PRIORITY_FEE_NUM_BLOCKS', default=10, cast=int)
@@ -230,6 +231,10 @@ class Settings(metaclass=Singleton):
 
         self.skip_startup_checks = decouple_config('SKIP_STARTUP_CHECKS', default=False, cast=bool)
 
+        self.eigen_withdrawals_processing_interval = decouple_config(
+            'EIGEN_WITHDRAWALS_PROCESSING_INTERVAL', default=86400, cast=int
+        )
+
     @property
     def keystore_cls_str(self) -> str:
         if self.remote_signer_url:
@@ -245,6 +250,14 @@ class Settings(metaclass=Singleton):
     @property
     def is_genesis_vault(self) -> bool:
         return self.vault == settings.network_config.GENESIS_VAULT_CONTRACT_ADDRESS
+
+    @property
+    def is_auto_registration_mode(self) -> bool:
+        return settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO
+
+    @property
+    def is_api_registration_mode(self) -> bool:
+        return settings.validators_registration_mode == ValidatorsRegistrationMode.API
 
 
 settings = Settings()
@@ -277,6 +290,12 @@ HASHI_VAULT_TIMEOUT = 10
 # Graphql timeout
 GRAPH_API_TIMEOUT = 10
 
+EIGEN_VALIDATORS_WITHDRAWALS_CHUNK_SIZE: int = decouple_config(
+    'EIGEN_VALIDATORS_WITHDRAWALS_CHUNK_SIZE', default=86400, cast=int
+)  # seconds
+EIGEN_VALIDATORS_WITHDRAWALS_CONCURRENCY: int = decouple_config(
+    'EIGEN_VALIDATORS_WITHDRAWALS_CONCURRENCY', default=200, cast=int
+)
 # logging
 LOG_PLAIN = 'plain'
 LOG_JSON = 'json'

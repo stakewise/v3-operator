@@ -4,10 +4,13 @@ from sys import platform
 
 datas = [
     ('src/common/abi/*', 'src/common/abi/'),
+    ('src/eigenlayer/abi/*', 'src/eigenlayer/abi/'),
     ('src/common/word_lists/*', 'src/common/word_lists/'),
     ('./pyproject.toml', '.'),
     ('./GIT_SHA', '.'),
+    ('bin/*', '.'),
 ]
+
 
 datas += collect_data_files('certifi')
 datas += collect_data_files('coincurve')
