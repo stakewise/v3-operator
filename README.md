@@ -154,14 +154,14 @@ Head to [Usage](#usage) to launch your operator service.
 Pull the latest docker operator docker image:
 
 ```bash
-docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v2.0.6
+docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v2.0.7
 ```
 
 You can also build the docker image from source by cloning this repo and executing the following command from within
 the `v3-operator` folder:
 
 ```bash
-docker build --pull -t europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v2.0.6 .
+docker build --pull -t europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v2.0.7 .
 ```
 
 You will execute Operator Service commands using the format below (note the use of flags are optional):
@@ -170,7 +170,7 @@ You will execute Operator Service commands using the format below (note the use 
 docker run --rm -ti \
 -u $(id -u):$(id -g) \
 -v ~/.stakewise/:/data \
-europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v2.0.6 \
+europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v2.0.7 \
 src/main.py COMMAND \
 --flagA=123 \
 --flagB=xyz
@@ -393,7 +393,7 @@ below:
 docker run --restart on-failure:10 \
 -u $(id -u):$(id -g) \
 -v ~/.stakewise/:/data \
-europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v2.0.6 \
+europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v2.0.7 \
 src/main.py start \
 --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
 --data-dir=/data \
