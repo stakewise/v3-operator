@@ -25,7 +25,7 @@ class TestHashiVault:
         async with ClientSession() as session:
             keystore = await HashiVaultKeystore._load_hashi_vault_keys(
                 session=session,
-                secret_url=config.secret_url('secret', 'ethereum/signing/keystores'),
+                secret_url=config.secret_url('ethereum/signing/keystores'),
             )
 
         assert len(keystore) == 2
@@ -62,7 +62,7 @@ class TestHashiVault:
             async with ClientSession() as session:
                 await HashiVaultKeystore._load_hashi_vault_keys(
                     session=session,
-                    secret_url=config.secret_url('secret', 'ethereum/inaccessible/keystores'),
+                    secret_url=config.secret_url('ethereum/inaccessible/keystores'),
                 )
 
     @pytest.mark.usefixtures('mocked_hashi_vault')
@@ -137,7 +137,7 @@ class TestHashiVault:
         async with ClientSession() as session:
             keystore = await HashiVaultKeystore._load_hashi_vault_keys(
                 session=session,
-                secret_url=config.secret_url('custom', 'ethereum/signing/keystores'),
+                secret_url=config.secret_url('ethereum/signing/keystores'),
             )
 
         assert len(keystore) == 2

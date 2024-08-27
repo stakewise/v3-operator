@@ -42,10 +42,10 @@ class HashiVaultConfiguration:
             parallelism=settings.hashi_vault_parallelism,
         )
 
-    def secret_url(self, engine_name: str, key_path: str) -> str:
+    def secret_url(self, key_path: str) -> str:
         return urllib.parse.urljoin(
             self.url,
-            f'/v1/{engine_name}/data/{key_path}',
+            f'/v1/{self.engine_name}/data/{key_path}',
         )
 
 
@@ -57,7 +57,6 @@ class HashiVaultKeystore(LocalKeystore):
 
         parallelism = hashi_vault_config.parallelism
         key_paths = hashi_vault_config.key_paths
-        engine_name = hashi_vault_config.engine_name
         merged_keys = Keys({})
 
         key_paths_iter = iter(key_paths)
@@ -70,7 +69,7 @@ class HashiVaultKeystore(LocalKeystore):
                     *[
                         HashiVaultKeystore._load_hashi_vault_keys(
                             session=session,
-                            secret_url=hashi_vault_config.secret_url(engine_name, key_path),
+                            secret_url=hashi_vault_config.secret_url(key_path),
                         )
                         for key_path in key_chunk
                     ]
