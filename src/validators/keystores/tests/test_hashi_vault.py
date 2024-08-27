@@ -15,7 +15,7 @@ class TestHashiVault:
         hashi_vault_url: str,
     ):
         settings.hashi_vault_url = hashi_vault_url
-        settings.hashi_vault_engine_name = "secret"
+        settings.hashi_vault_engine_name = 'secret'
         settings.hashi_vault_token = 'Secret'
         settings.hashi_vault_key_paths = []
         settings.hashi_vault_parallelism = 1
@@ -24,7 +24,8 @@ class TestHashiVault:
 
         async with ClientSession() as session:
             keystore = await HashiVaultKeystore._load_hashi_vault_keys(
-                session=session, secret_url=config.secret_url('secret', 'ethereum/signing/keystores')
+                session=session,
+                secret_url=config.secret_url('secret', 'ethereum/signing/keystores'),
             )
 
         assert len(keystore) == 2
@@ -35,7 +36,7 @@ class TestHashiVault:
         hashi_vault_url: str,
     ):
         settings.hashi_vault_url = hashi_vault_url
-        settings.hashi_vault_engine_name = "secret"
+        settings.hashi_vault_engine_name = 'secret'
         settings.hashi_vault_token = None
         settings.hashi_vault_key_path = None
         settings.hashi_vault_parallelism = 1
@@ -49,7 +50,7 @@ class TestHashiVault:
         hashi_vault_url: str,
     ):
         settings.hashi_vault_url = hashi_vault_url
-        settings.hashi_vault_engine_name = "secret"
+        settings.hashi_vault_engine_name = 'secret'
         settings.hashi_vault_token = 'Secret'
         settings.hashi_vault_key_path = []
         settings.hashi_vault_parallelism = 1
@@ -60,7 +61,8 @@ class TestHashiVault:
             config = HashiVaultConfiguration.from_settings()
             async with ClientSession() as session:
                 await HashiVaultKeystore._load_hashi_vault_keys(
-                    session=session, secret_url=config.secret_url('secret', 'ethereum/inaccessible/keystores')
+                    session=session,
+                    secret_url=config.secret_url('secret', 'ethereum/inaccessible/keystores'),
                 )
 
     @pytest.mark.usefixtures('mocked_hashi_vault')
@@ -69,7 +71,7 @@ class TestHashiVault:
         hashi_vault_url: str,
     ):
         settings.hashi_vault_url = hashi_vault_url
-        settings.hashi_vault_engine_name = "secret"
+        settings.hashi_vault_engine_name = 'secret'
         settings.hashi_vault_token = 'Secret'
         settings.hashi_vault_key_paths = [
             'ethereum/signing/keystores',
@@ -88,7 +90,7 @@ class TestHashiVault:
         hashi_vault_url: str,
     ):
         settings.hashi_vault_url = hashi_vault_url
-        settings.hashi_vault_engine_name = "secret"
+        settings.hashi_vault_engine_name = 'secret'
         settings.hashi_vault_token = 'Secret'
         settings.hashi_vault_key_paths = [
             'ethereum/signing/keystores',
@@ -107,7 +109,7 @@ class TestHashiVault:
         hashi_vault_url: str,
     ):
         settings.hashi_vault_url = hashi_vault_url
-        settings.hashi_vault_engine_name = "secret"
+        settings.hashi_vault_engine_name = 'secret'
         settings.hashi_vault_token = 'Secret'
         settings.hashi_vault_key_paths = [
             'ethereum/signing/keystores',
@@ -125,7 +127,7 @@ class TestHashiVault:
         hashi_vault_url: str,
     ):
         settings.hashi_vault_url = hashi_vault_url
-        settings.hashi_vault_engine_name = "custom"
+        settings.hashi_vault_engine_name = 'custom'
         settings.hashi_vault_token = 'Secret'
         settings.hashi_vault_key_paths = []
         settings.hashi_vault_parallelism = 1
@@ -134,7 +136,8 @@ class TestHashiVault:
 
         async with ClientSession() as session:
             keystore = await HashiVaultKeystore._load_hashi_vault_keys(
-                session=session, secret_url=config.secret_url('custom', 'ethereum/signing/keystores')
+                session=session,
+                secret_url=config.secret_url('custom', 'ethereum/signing/keystores'),
             )
 
         assert len(keystore) == 2

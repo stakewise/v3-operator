@@ -69,7 +69,8 @@ class HashiVaultKeystore(LocalKeystore):
                 keys_responses = await asyncio.gather(
                     *[
                         HashiVaultKeystore._load_hashi_vault_keys(
-                            session=session, secret_url=hashi_vault_config.secret_url(engine_name, key_path)
+                            session=session,
+                            secret_url=hashi_vault_config.secret_url(engine_name, key_path),
                         )
                         for key_path in key_chunk
                     ]

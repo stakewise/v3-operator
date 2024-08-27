@@ -20,7 +20,7 @@ DEFAULT_METRICS_PREFIX = 'sw_operator'
 DEFAULT_MIN_VALIDATORS_REGISTRATION = 1
 
 DEFAULT_HASHI_VAULT_PARALLELISM = 8
-DEFAULT_HASHI_VAULT_ENGINE_NAME = "secret"
+DEFAULT_HASHI_VAULT_ENGINE_NAME = 'secret'
 
 
 # pylint: disable-next=too-many-public-methods,too-many-instance-attributes
@@ -51,7 +51,7 @@ class Settings(metaclass=Singleton):
     dappnode: bool = False
     hashi_vault_key_paths: list[str] | None
     hashi_vault_url: str | None
-    hashi_vault_engine_name: str | None
+    hashi_vault_engine_name: str
     hashi_vault_token: str | None
     hashi_vault_parallelism: int
     hot_wallet_file: Path
