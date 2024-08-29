@@ -19,7 +19,6 @@ class ExitSignatureUpdateCache:
     last_event_block: BlockNumber | None = None
 
 
-# pylint: disable-next=too-few-public-methods
 class AppState(metaclass=Singleton):
     def __init__(self) -> None:
         self.exit_signature_update_cache = ExitSignatureUpdateCache()

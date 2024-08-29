@@ -14,3 +14,7 @@ class RegistryRootChangedError(ValueError):
 class ValidatorIndexChangedError(ValueError):
     def __init__(self) -> None:
         super().__init__(VALIDATOR_INDEX_CHANGED)
+
+
+class MissingDepositDataValidatorsException(Exception):
+    ...
