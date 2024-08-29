@@ -68,6 +68,12 @@ def mocked_hashi_vault(
             callback=partial(_mocked_secret_path, _hashi_vault_pk_sk_mapping_2),
             repeat=True,
         )
+        # Mocked signing keys endpoints with custom engine name
+        m.get(
+            f'{hashi_vault_url}/v1/custom/data/ethereum/signing/keystores',
+            callback=partial(_mocked_secret_path, _hashi_vault_pk_sk_mapping_1),
+            repeat=True,
+        )
         # Mocked inacessible signing keys endpoint
         m.get(
             f'{hashi_vault_url}/v1/secret/data/ethereum/inaccessible/keystores',
