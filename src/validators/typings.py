@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import NewType, Sequence, Union
+from typing import NewType, Sequence
 
 from eth_typing import BlockNumber, BLSSignature, ChecksumAddress, HexStr
 from multiproof import MultiProof, StandardMerkleTree
@@ -16,13 +16,19 @@ class NetworkValidator:
 
 
 @dataclass
+class ExitSignatureShards:
+    public_keys: list[HexStr]
+    exit_signatures: list[HexStr]
+
+
+@dataclass
 class Validator:
     public_key: HexStr
     signature: HexStr
     amount_gwei: int
     deposit_data_index: int | None = None
     exit_signature: BLSSignature | None = None
-    exit_signature_shards: Union['ExitSignatureShards', None] = None
+    exit_signature_shards: ExitSignatureShards | None = None
 
     def copy(self) -> 'Validator':
         return Validator(
@@ -49,12 +55,6 @@ class DepositData:
     @property
     def public_keys(self) -> list[HexStr]:
         return [v.public_key for v in self.validators]
-
-
-@dataclass
-class ExitSignatureShards:
-    public_keys: list[HexStr]
-    exit_signatures: list[HexStr]
 
 
 @dataclass
