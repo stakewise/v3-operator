@@ -27,10 +27,6 @@ class ContractWrapper:
     settings_key: str = ''
 
     @property
-    def events_blocks_range_interval(self) -> int:
-        return 43200 // settings.network_config.SECONDS_PER_BLOCK  # 12 hrs
-
-    @property
     def contract_address(self) -> ChecksumAddress:
         return getattr(settings.network_config, self.settings_key)
 
@@ -63,8 +59,7 @@ class ContractWrapper:
         to_block: BlockNumber,
         argument_filters: dict | None = None,
     ) -> EventData | None:
-        blocks_range = self.events_blocks_range_interval
-
+        blocks_range = settings.events_blocks_range_interval
         while to_block >= from_block:
             events = await event.get_logs(
                 fromBlock=BlockNumber(max(to_block - blocks_range, from_block)),
@@ -83,7 +78,7 @@ class ContractWrapper:
         to_block: BlockNumber,
     ) -> list[EventData]:
         events: list[EventData] = []
-        blocks_range = self.events_blocks_range_interval
+        blocks_range = settings.events_blocks_range_interval
         while to_block >= from_block:
             range_events = await event.get_logs(
                 fromBlock=from_block,
