@@ -7,9 +7,8 @@ from os import path
 from aiohttp import ClientSession, ClientTimeout
 from sw_utils import IpfsFetchClient, get_consensus_client, get_execution_client
 from web3 import Web3
-from web3.types import BlockNumber
 
-from src.common.clients import db_client, execution_client
+from src.common.clients import db_client
 from src.common.contracts import keeper_contract, vault_contract
 from src.common.execution import (
     check_hot_wallet_balance,
@@ -77,19 +76,19 @@ async def wait_for_execution_node() -> None:
     while True:
         for execution_endpoint in settings.execution_endpoints:
             try:
-                _execution_client = get_execution_client(
+                execution_client = get_execution_client(
                     [execution_endpoint],
                     jwt_secret=settings.execution_jwt_secret,
                 )
 
-                syncing = await _execution_client.eth.syncing
+                syncing = await execution_client.eth.syncing
                 if syncing is True:
                     logger.warning(
                         'The execution node located at %s has not completed synchronization yet.',
                         execution_endpoint,
                     )
                     continue
-                block_number = await _execution_client.eth.block_number
+                block_number = await execution_client.eth.block_number
                 if block_number <= 0:
                     # There was a case when `block_number` equals to 0 although `syncing` is False.
                     logger.warning(
@@ -265,18 +264,10 @@ async def _check_validators_manager() -> None:
 
 async def _check_events_logs() -> None:
     """Check that EL client didn't prune logs"""
-    blocks_range = settings.events_blocks_range_interval
-    from_block = settings.network_config.KEEPER_GENESIS_BLOCK
-    to_block = await execution_client.eth.get_block_number()
-    events = None
-    while to_block >= from_block:
-        events = await keeper_contract.events.ConfigUpdated.get_logs(  # type: ignore
-            fromBlock=from_block,
-            toBlock=BlockNumber(min(from_block + blocks_range, to_block)),
-        )
-        if events:
-            return
-        from_block = BlockNumber(from_block + blocks_range + 1)
+    events = await keeper_contract.events.ConfigUpdated.get_logs(  # type: ignore
+        fromBlock=settings.network_config.CONFIG_UPDATE_EVENT_BLOCK,
+        toBlock=settings.network_config.CONFIG_UPDATE_EVENT_BLOCK,
+    )
     if not events:
         raise ValueError(
             "Can't find oracle config. Please, ensure that EL client didn't prune event logs."
