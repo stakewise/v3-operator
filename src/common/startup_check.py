@@ -9,7 +9,7 @@ from sw_utils import IpfsFetchClient, get_consensus_client, get_execution_client
 from web3 import Web3
 
 from src.common.clients import db_client
-from src.common.contracts import vault_contract
+from src.common.contracts import keeper_contract, vault_contract
 from src.common.execution import (
     check_hot_wallet_balance,
     check_vault_address,
@@ -197,6 +197,9 @@ async def startup_checks() -> None:
     logger.info('Checking connection to execution nodes...')
     await wait_for_execution_node()
 
+    logger.info('Checking oracles config...')
+    await _check_events_logs()
+
     logger.info('Checking vault address %s...', settings.vault)
     await check_vault_address()
 
@@ -257,3 +260,15 @@ async def _check_validators_manager() -> None:
                 raise RuntimeError(
                     'validators manager address must equal to deposit data registry address'
                 )
+
+
+async def _check_events_logs() -> None:
+    """Check that EL client didn't prune logs"""
+    events = await keeper_contract.events.ConfigUpdated.get_logs(  # type: ignore
+        fromBlock=settings.network_config.CONFIG_UPDATE_EVENT_BLOCK,
+        toBlock=settings.network_config.CONFIG_UPDATE_EVENT_BLOCK,
+    )
+    if not events:
+        raise ValueError(
+            "Can't find oracle config. Please, ensure that EL client didn't prune event logs."
+        )

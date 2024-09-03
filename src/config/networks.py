@@ -43,6 +43,7 @@ class NetworkConfig:
     SHARED_MEV_ESCROW_CONTRACT_ADDRESS: ChecksumAddress
     STAKEWISE_API_URL: str
     RATED_API_URL: str
+    CONFIG_UPDATE_EVENT_BLOCK: BlockNumber
 
     @property
     def SHAPELLA_FORK(self) -> ConsensusFork:
@@ -107,6 +108,7 @@ NETWORKS = {
         ),
         STAKEWISE_API_URL='https://mainnet-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
+        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(18470104),
     ),
     HOLESKY: NetworkConfig(
         CHAIN_ID=17000,
@@ -151,6 +153,7 @@ NETWORKS = {
         ),
         STAKEWISE_API_URL='https://holesky-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
+        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(215397),
     ),
     GNOSIS: NetworkConfig(
         CHAIN_ID=100,
@@ -197,6 +200,7 @@ NETWORKS = {
         ),
         STAKEWISE_API_URL='https://gnosis-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
+        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(34778569),
     ),
     CHIADO: NetworkConfig(
         CHAIN_ID=10200,
@@ -241,5 +245,6 @@ NETWORKS = {
         ),
         STAKEWISE_API_URL='https://chiado-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
+        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(10627606),
     ),
 }
