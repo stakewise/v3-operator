@@ -35,6 +35,7 @@ class Settings(metaclass=Singleton):
     execution_timeout: int
     execution_transaction_timeout: int
     execution_retry_timeout: int
+    events_blocks_range_interval: int
     execution_jwt_secret: str | None
 
     harvest_vault: bool
@@ -222,6 +223,11 @@ class Settings(metaclass=Singleton):
         )
         self.execution_retry_timeout = decouple_config(
             'EXECUTION_RETRY_TIMEOUT', default=60, cast=int
+        )
+        self.events_blocks_range_interval = decouple_config(
+            'EVENTS_BLOCKS_RANGE_INTERVAL',
+            default=43200 // self.network_config.SECONDS_PER_BLOCK,  # 12 hrs
+            cast=int,
         )
         self.consensus_timeout = decouple_config('CONSENSUS_TIMEOUT', default=60, cast=int)
         self.consensus_retry_timeout = decouple_config(
