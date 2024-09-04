@@ -21,14 +21,14 @@ async def wait_execution_catch_up_consensus(
             return
 
         execution_block_number = await execution_client.eth.get_block_number()
-        if execution_block_number >= chain_state.execution_block:
+        if execution_block_number >= chain_state.block_number:
             return
 
         logger.warning(
             'The execution client is behind the consensus client: '
             'execution block %d, consensus finalized block %d',
             execution_block_number,
-            chain_state.execution_block,
+            chain_state.block_number,
         )
         sleep_time = float(settings.network_config.SECONDS_PER_BLOCK)
 

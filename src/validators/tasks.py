@@ -70,7 +70,7 @@ class ValidatorsTask(BaseTask):
         )
 
         # process new network validators
-        await self.network_validators_scanner.process_new_events(chain_state.execution_block)
+        await self.network_validators_scanner.process_new_events(chain_state.block_number)
 
         if self.keystore and self.deposit_data:
             await update_unused_validator_keys_metric(
