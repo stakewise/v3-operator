@@ -64,7 +64,7 @@ async def start_base() -> None:
     logger.info('Syncing network validator events...')
     chain_state = await get_chain_finalized_head()
     await wait_execution_catch_up_consensus(chain_state)
-    await network_validators_scanner.process_new_events(chain_state.execution_block)
+    await network_validators_scanner.process_new_events(chain_state.block_number)
 
     logger.info('Updating oracles cache...')
     await update_oracles_cache()
