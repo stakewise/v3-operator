@@ -13,6 +13,7 @@ from web3 import Web3
 
 from src.config.settings import REMOTE_SIGNER_TIMEOUT, settings
 from src.validators.keystores.base import BaseKeystore
+from src.validators.utils import load_deposit_data
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,10 @@ class RemoteSignerKeystore(BaseKeystore):
 
     @staticmethod
     async def load() -> 'BaseKeystore':
+        if settings.remote_signer_use_deposit_data:
+            deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
+            return RemoteSignerKeystore(deposit_data.public_keys)
+
         public_keys = await RemoteSignerKeystore._get_remote_signer_public_keys()
         return RemoteSignerKeystore(public_keys)
 
