@@ -50,6 +50,7 @@ class Settings(metaclass=Singleton):
     keystores_password_file: Path
     remote_signer_url: str | None
     remote_signer_public_keys_url: str | None
+    remote_signer_use_deposit_data: bool
     dappnode: bool = False
     hashi_vault_key_paths: list[str] | None
     hashi_vault_url: str | None
@@ -166,6 +167,9 @@ class Settings(metaclass=Singleton):
         self.remote_signer_url = remote_signer_url
         self.remote_signer_public_keys_url: str = decouple_config(
             'REMOTE_SIGNER_PUBLIC_KEYS_URL', default=None
+        )
+        self.remote_signer_use_deposit_data: bool = decouple_config(
+            'REMOTE_SIGNER_USE_DEPOSIT_DATA', default=False, cast=bool
         )
         self.dappnode = dappnode
 
