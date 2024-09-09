@@ -2,11 +2,11 @@ import asyncio
 import dataclasses
 import logging
 import random
-from urllib.parse import urljoin
 
 import aiohttp
 from aiohttp import ClientError
 from eth_typing import ChecksumAddress
+from sw_utils.common import urljoin
 from sw_utils.decorators import retry_aiohttp_errors
 from sw_utils.typings import ProtocolConfig
 from web3 import Web3

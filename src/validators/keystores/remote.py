@@ -2,12 +2,12 @@ import dataclasses
 import logging
 from dataclasses import dataclass
 from typing import cast
-from urllib.parse import urljoin
 
 import milagro_bls_binding as bls
 from aiohttp import ClientSession, ClientTimeout
 from eth_typing import BLSPubkey, BLSSignature, HexStr
 from sw_utils import get_exit_message_signing_root
+from sw_utils.common import urljoin
 from sw_utils.typings import ConsensusFork
 from web3 import Web3
 
