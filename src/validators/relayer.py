@@ -1,12 +1,12 @@
 import asyncio
 import logging
 from typing import cast
-from urllib.parse import urljoin
 
 import aiohttp
 from aiohttp import ClientTimeout
 from eth_typing import BLSSignature, HexStr
 from eth_utils import add_0x_prefix
+from sw_utils.common import urljoin
 from web3 import Web3
 
 from src.config.settings import RELAYER_TYPE, settings
