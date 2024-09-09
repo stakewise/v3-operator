@@ -281,7 +281,7 @@ http_copy() {
 github_release() {
   owner_repo=$1
   version=$2
-  test -z "$version" && version="v2.1.1"
+  test -z "$version" && version="v2.1.2"
   giturl="https://github.com/${owner_repo}/releases/${version}"
   json=$(http_copy "$giturl" "Accept:application/json")
   test -z "$json" && return 1
