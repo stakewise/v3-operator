@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from decouple import Choices, Csv
+from decouple import Csv
 from decouple import config as decouple_config
 from web3 import Web3
 from web3.types import ChecksumAddress
@@ -76,6 +76,7 @@ class Settings(metaclass=Singleton):
     sentry_environment: str
     pool_size: int | None
 
+    relayer_type: str
     relayer_endpoint: str
     relayer_timeout: int
     validators_registration_mode: ValidatorsRegistrationMode
@@ -125,6 +126,7 @@ class Settings(metaclass=Singleton):
         log_level: str | None = None,
         log_format: str | None = None,
         pool_size: int | None = None,
+        relayer_type: str = RelayerTypes.DEFAULT,
         relayer_endpoint: str | None = None,
         validators_registration_mode: ValidatorsRegistrationMode = ValidatorsRegistrationMode.AUTO,
         min_validators_registration: int = DEFAULT_MIN_VALIDATORS_REGISTRATION,
@@ -241,6 +243,7 @@ class Settings(metaclass=Singleton):
         self.consensus_retry_timeout = decouple_config(
             'CONSENSUS_RETRY_TIMEOUT', default=120, cast=int
         )
+        self.relayer_type = relayer_type
         self.relayer_endpoint = relayer_endpoint or ''
         self.relayer_timeout = decouple_config('RELAYER_TIMEOUT', default=10, cast=int)
 
@@ -300,14 +303,3 @@ LOG_PLAIN = 'plain'
 LOG_JSON = 'json'
 LOG_FORMATS = [LOG_PLAIN, LOG_JSON]
 LOG_DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
-
-RELAYER_TYPE: str = decouple_config(
-    'RELAYER_TYPE',
-    default=RelayerTypes.DEFAULT,
-    cast=Choices(
-        [
-            RelayerTypes.DEFAULT,
-            RelayerTypes.DVT,
-        ]
-    ),
-)

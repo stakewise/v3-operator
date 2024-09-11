@@ -9,7 +9,7 @@ from eth_utils import add_0x_prefix
 from sw_utils.common import urljoin
 from web3 import Web3
 
-from src.config.settings import RELAYER_TYPE, settings
+from src.config.settings import settings
 from src.validators.exceptions import MissingDepositDataValidatorsException
 from src.validators.execution import (
     get_validators_from_deposit_data,
@@ -178,7 +178,7 @@ class RelayerAdapter:
 
 
 def create_relayer_adapter() -> RelayerAdapter:
-    if RELAYER_TYPE == RelayerTypes.DVT:
+    if settings.relayer_type == RelayerTypes.DVT:
         dvt_relayer = DvtRelayerClient()
         deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
         return RelayerAdapter(dvt_relayer, deposit_data)
