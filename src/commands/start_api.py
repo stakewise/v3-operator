@@ -175,7 +175,6 @@ logger = logging.getLogger(__name__)
     ),
     default=RelayerTypes.DEFAULT,
     help='Relayer type.',
-    prompt='Enter the relayer type',
     envvar='RELAYER_TYPE',
 )
 @click.option(
