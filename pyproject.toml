@@ -33,7 +33,6 @@ pre-commit = "==3.5.0"
 Flake8-pyproject = "==1.2.3"
 bandit = { version = "==1.7.5", extras = ["toml"] }
 black = { version = "==23.10.0", extras = ["d"] }
-pyinstaller = "==5.13.2"
 faker = "==19.11.0"
 flake8-print = "==5.0.0"
 flake8-datetimez = "==20.10.0"
@@ -42,6 +41,9 @@ coverage = "==7.3.2"
 aioresponses = "^0.7.4"
 types-requests = "==2.31.0.20240406"
 types-setuptools = "==70.0.0.20240524"
+
+[tool.poetry.group.build.dependencies]
+pyinstaller = "==5.13.2"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
