@@ -21,7 +21,7 @@ from src.config.settings import (
     LOG_PLAIN,
     settings,
 )
-from src.validators.typings import ValidatorsRegistrationMode
+from src.validators.typings import RelayerTypes, ValidatorsRegistrationMode
 
 logger = logging.getLogger(__name__)
 
@@ -168,6 +168,16 @@ logger = logging.getLogger(__name__)
     help='The log level.',
 )
 @click.option(
+    '--relayer-type',
+    type=click.Choice(
+        [RelayerTypes.DEFAULT, RelayerTypes.DVT],
+        case_sensitive=False,
+    ),
+    default=RelayerTypes.DEFAULT,
+    help='Relayer type.',
+    envvar='RELAYER_TYPE',
+)
+@click.option(
     '--relayer-endpoint',
     type=str,
     help='Relayer endpoint.',
@@ -196,6 +206,7 @@ def start_api(
     hot_wallet_password_file: str | None,
     max_fee_per_gas_gwei: int,
     database_dir: str | None,
+    relayer_type: str,
     relayer_endpoint: str,
 ) -> None:
     vault_config = VaultConfig(vault, Path(data_dir))
@@ -225,6 +236,7 @@ def start_api(
         database_dir=database_dir,
         log_level=log_level,
         log_format=log_format,
+        relayer_type=relayer_type,
         relayer_endpoint=relayer_endpoint,
         validators_registration_mode=validators_registration_mode,
     )
