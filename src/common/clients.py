@@ -31,6 +31,8 @@ class ExecutionClient:
     client: AsyncWeb3
 
     async def setup(self) -> None:
+        if not any(settings.execution_endpoints):
+            return
         w3 = get_execution_client(
             settings.execution_endpoints,
             timeout=settings.execution_timeout,
