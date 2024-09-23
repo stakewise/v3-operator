@@ -11,6 +11,7 @@ import click
 from aiohttp import ClientTimeout
 from eth_typing import HexAddress
 
+from src.common.clients import setup_clients
 from src.common.contracts import vault_contract
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.startup_check import wait_for_execution_node
@@ -138,6 +139,8 @@ def remote_signer_setup(
 
 async def main() -> None:
     setup_logging()
+    await setup_clients()
+
     keystore_files = LocalKeystore.list_keystore_files()
     if len(keystore_files) == 0:
         raise click.ClickException('Keystores not found.')
