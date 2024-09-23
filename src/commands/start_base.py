@@ -5,6 +5,7 @@ from sw_utils import EventScanner, InterruptHandler
 
 import src
 from src.common.checks import wait_execution_catch_up_consensus
+from src.common.clients import setup_clients
 from src.common.consensus import get_chain_finalized_head
 from src.common.execution import WalletTask, update_oracles_cache
 from src.common.logging import setup_logging
@@ -29,6 +30,8 @@ logger = logging.getLogger(__name__)
 async def start_base() -> None:
     setup_logging()
     setup_sentry()
+    await setup_clients()
+
     log_start()
 
     if not settings.skip_startup_checks:

@@ -7,11 +7,11 @@ from typing import cast
 from sw_utils import (
     ExtendedAsyncBeacon,
     IpfsFetchClient,
-    construct_async_sign_and_send_raw_middleware,
     get_consensus_client,
     get_execution_client,
 )
 from web3 import AsyncWeb3
+from web3.middleware.signing import async_construct_sign_and_send_raw_middleware
 
 from src.common.wallet import hot_wallet
 from src.config.settings import settings
@@ -28,8 +28,9 @@ class Database:
 
 
 class ExecutionClient:
-    @cached_property
-    def client(self) -> AsyncWeb3:
+    client: AsyncWeb3
+
+    async def setup(self) -> None:
         w3 = get_execution_client(
             settings.execution_endpoints,
             timeout=settings.execution_timeout,
@@ -40,11 +41,12 @@ class ExecutionClient:
         # For read-only queries account may be omitted.
         if hot_wallet.can_load():
             w3.middleware_onion.add(
-                construct_async_sign_and_send_raw_middleware(hot_wallet.account)
+                await async_construct_sign_and_send_raw_middleware(hot_wallet.account)
             )
             w3.eth.default_account = hot_wallet.address
 
-        return w3
+        self.client = w3
+        return None
 
     def __getattr__(self, item):  # type: ignore
         return getattr(self.client, item)
@@ -83,3 +85,7 @@ db_client = Database()
 execution_client = cast(AsyncWeb3, ExecutionClient())
 consensus_client = cast(ExtendedAsyncBeacon, ConsensusClient())
 ipfs_fetch_client = IpfsLazyFetchClient()
+
+
+async def setup_clients() -> None:
+    await execution_client.setup()  # type: ignore

@@ -7,7 +7,7 @@ from eth_typing import BlockNumber, HexAddress, HexStr
 from eth_utils import add_0x_prefix
 from sw_utils.consensus import EXITED_STATUSES, ValidatorStatus
 
-from src.common.clients import consensus_client, execution_client
+from src.common.clients import consensus_client, execution_client, setup_clients
 from src.common.contracts import v2_pool_contract, vault_contract
 from src.common.credentials import CredentialManager
 from src.common.execution import SECONDS_PER_MONTH
@@ -149,6 +149,8 @@ async def main(
     config: VaultConfig,
 ) -> None:
     setup_logging()
+    await setup_clients()
+
     validators = await _fetch_registered_validators()
     if not validators:
         raise click.ClickException('No registered validators')
