@@ -11,7 +11,7 @@ from src.common.contracts import (
     vault_contract,
 )
 from src.common.typings import HarvestParams
-from src.common.utils import format_error
+from src.common.utils import format_error, warning_verbose
 from src.config.networks import GNOSIS_NETWORKS
 from src.config.settings import settings
 
@@ -55,7 +55,7 @@ async def get_update_state_calls(
         try:
             await gno_vault_contract.functions.multicall(calls).call()
         except (ValueError, ContractLogicError):
-            logger.warning('xDAI swap failed, excluding from the call.')
+            warning_verbose('xDAI swap failed, excluding from the call.')
             calls.pop()
 
     return [(vault_contract.address, call) for call in calls]
