@@ -126,7 +126,7 @@ async def collect_healthy_oracles() -> list:
                 for replicas in endpoints
                 for endpoint in replicas
             ],
-            return_exceptions=True
+            return_exceptions=True,
         )
 
     healthy_oracles = []
@@ -197,6 +197,12 @@ async def startup_checks() -> None:
     logger.info('Checking connection to execution nodes...')
     await wait_for_execution_node()
 
+    logger.info('Checking consensus node chain id...')
+    await _check_consensus_chain_id()
+
+    logger.info('Checking execution node chain id...')
+    await _check_execution_chain_id()
+
     logger.info('Checking oracles config...')
     await _check_events_logs()
 
@@ -247,6 +253,34 @@ async def startup_checks() -> None:
         logger.info('Found keystores dir')
 
     await _check_validators_manager()
+
+
+async def _check_consensus_chain_id() -> None:
+    for consensus_endpoint in settings.consensus_endpoints:
+        consensus_client = get_consensus_client([consensus_endpoint])
+        deposit_contract_data = (await consensus_client.get_deposit_contract())['data']
+        consensus_chain_id = int(deposit_contract_data['chain_id'])
+        if settings.network_config.CHAIN_ID != consensus_chain_id:
+            raise ValueError(
+                f'Consensus node chain id is {consensus_chain_id}, '
+                f'does not match {settings.network_config.CHAIN_ID} '
+                f'({settings.network})'
+            )
+
+
+async def _check_execution_chain_id() -> None:
+    for execution_endpoint in settings.execution_endpoints:
+        execution_client = get_execution_client(
+            [execution_endpoint],
+            jwt_secret=settings.execution_jwt_secret,
+        )
+        execution_chain_id = await execution_client.eth.chain_id
+        if settings.network_config.CHAIN_ID != execution_chain_id:
+            raise ValueError(
+                f'Execution node chain id is {execution_chain_id}, '
+                f'does not match {settings.network_config.CHAIN_ID} '
+                f'({settings.network})'
+            )
 
 
 async def _aiohttp_fetch(session: ClientSession, url: str) -> str:
