@@ -39,6 +39,9 @@ def validate_settings() -> None:
 
 
 async def wait_for_consensus_node() -> None:
+    """
+    Waits until at least one endpoint in the list of consensus endpoints is available
+    """
     done = False
     while True:
         for consensus_endpoint in settings.consensus_endpoints:
@@ -73,6 +76,9 @@ async def wait_for_consensus_node() -> None:
 
 
 async def wait_for_execution_node() -> None:
+    """
+    Waits until at least one endpoint in the list of execution endpoints is available
+    """
     done = False
     while True:
         for execution_endpoint in settings.execution_endpoints:
