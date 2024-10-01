@@ -263,6 +263,9 @@ async def startup_checks() -> None:
 
 
 async def _check_consensus_nodes_network() -> None:
+    """
+    Checks that consensus node network is the same as settings.network
+    """
     chain_id_to_network = get_chain_id_to_network_dict()
     for consensus_endpoint in settings.consensus_endpoints:
         consensus_client = get_consensus_client([consensus_endpoint])
@@ -277,6 +280,9 @@ async def _check_consensus_nodes_network() -> None:
 
 
 async def _check_execution_nodes_network() -> None:
+    """
+    Checks that execution node network is the same as settings.network
+    """
     chain_id_to_network = get_chain_id_to_network_dict()
     for execution_endpoint in settings.execution_endpoints:
         execution_client = get_execution_client(
