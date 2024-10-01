@@ -62,7 +62,7 @@ class NetworkConfig:
         ]
 
 
-NETWORKS = {
+NETWORKS: dict[str, NetworkConfig] = {
     MAINNET: NetworkConfig(
         CHAIN_ID=1,
         WALLET_BALANCE_SYMBOL='ETH',

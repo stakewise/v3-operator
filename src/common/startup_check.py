@@ -18,6 +18,7 @@ from src.common.execution import (
 from src.common.harvest import get_harvest_params
 from src.common.utils import format_error, warning_verbose
 from src.common.wallet import hot_wallet
+from src.config.networks import NETWORKS
 from src.config.settings import settings
 from src.validators.execution import check_deposit_data_root, get_withdrawable_assets
 from src.validators.keystores.local import LocalKeystore
@@ -38,6 +39,9 @@ def validate_settings() -> None:
 
 
 async def wait_for_consensus_node() -> None:
+    """
+    Waits until at least one endpoint in the list of consensus endpoints is available
+    """
     done = False
     while True:
         for consensus_endpoint in settings.consensus_endpoints:
@@ -72,6 +76,9 @@ async def wait_for_consensus_node() -> None:
 
 
 async def wait_for_execution_node() -> None:
+    """
+    Waits until at least one endpoint in the list of execution endpoints is available
+    """
     done = False
     while True:
         for execution_endpoint in settings.execution_endpoints:
@@ -126,7 +133,7 @@ async def collect_healthy_oracles() -> list:
                 for replicas in endpoints
                 for endpoint in replicas
             ],
-            return_exceptions=True
+            return_exceptions=True,
         )
 
     healthy_oracles = []
@@ -197,6 +204,12 @@ async def startup_checks() -> None:
     logger.info('Checking connection to execution nodes...')
     await wait_for_execution_node()
 
+    logger.info('Checking consensus nodes network...')
+    await _check_consensus_nodes_network()
+
+    logger.info('Checking execution nodes network...')
+    await _check_execution_nodes_network()
+
     logger.info('Checking oracles config...')
     await _check_events_logs()
 
@@ -247,6 +260,49 @@ async def startup_checks() -> None:
         logger.info('Found keystores dir')
 
     await _check_validators_manager()
+
+
+async def _check_consensus_nodes_network() -> None:
+    """
+    Checks that consensus node network is the same as settings.network
+    """
+    chain_id_to_network = get_chain_id_to_network_dict()
+    for consensus_endpoint in settings.consensus_endpoints:
+        consensus_client = get_consensus_client([consensus_endpoint])
+        deposit_contract_data = (await consensus_client.get_deposit_contract())['data']
+        consensus_chain_id = int(deposit_contract_data['chain_id'])
+        consensus_network = chain_id_to_network.get(consensus_chain_id)
+        if settings.network_config.CHAIN_ID != consensus_chain_id:
+            raise ValueError(
+                f'Consensus node network is {consensus_network or "unknown"}, '
+                f'while {settings.network} is passed in "--network" parameter'
+            )
+
+
+async def _check_execution_nodes_network() -> None:
+    """
+    Checks that execution node network is the same as settings.network
+    """
+    chain_id_to_network = get_chain_id_to_network_dict()
+    for execution_endpoint in settings.execution_endpoints:
+        execution_client = get_execution_client(
+            [execution_endpoint],
+            jwt_secret=settings.execution_jwt_secret,
+        )
+        execution_chain_id = await execution_client.eth.chain_id
+        execution_network = chain_id_to_network.get(execution_chain_id)
+        if settings.network_config.CHAIN_ID != execution_chain_id:
+            raise ValueError(
+                f'Execution node network is {execution_network or "unknown"}, '
+                f'while {settings.network} is passed in "--network" parameter'
+            )
+
+
+def get_chain_id_to_network_dict() -> dict[int, str]:
+    chain_id_to_network: dict[int, str] = {}
+    for network, network_config in NETWORKS.items():
+        chain_id_to_network[network_config.CHAIN_ID] = network
+    return chain_id_to_network
 
 
 async def _aiohttp_fetch(session: ClientSession, url: str) -> str:
