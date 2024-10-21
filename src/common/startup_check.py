@@ -229,7 +229,7 @@ async def startup_checks() -> None:
     await check_hot_wallet_balance()
 
     logger.info('Checking connection to ipfs nodes...')
-    healthy_ipfs_endpoints = await _check_healthy_ipfs_endpoints()
+    healthy_ipfs_endpoints = await _check_ipfs_endpoints()
 
     logger.info('Connected to ipfs nodes at %s.', ', '.join(healthy_ipfs_endpoints))
 
@@ -312,7 +312,7 @@ async def _aiohttp_fetch(session: ClientSession, url: str) -> str:
     return url
 
 
-async def _check_healthy_ipfs_endpoints() -> list[str]:
+async def _check_ipfs_endpoints() -> list[str]:
     healthy_ipfs_endpoints = []
 
     for endpoint in settings.ipfs_fetch_endpoints:
