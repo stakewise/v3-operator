@@ -1,4 +1,5 @@
 from eth_typing import ChecksumAddress
+from hexbytes import HexBytes
 from web3 import Web3
 from web3.types import Wei
 
@@ -52,10 +53,10 @@ async def _fetch_harvest_params_from_ipfs(
             reward = Wei(vault_data['consensus_reward'])
 
         return HarvestParams(
-            rewards_root=rewards_root,
+            rewards_root=HexBytes(rewards_root),
             reward=reward,
             unlocked_mev_reward=unlocked_mev_reward,
-            proof=[Web3.to_bytes(hexstr=x) for x in vault_data['proof']],
+            proof=[HexBytes(Web3.to_bytes(hexstr=x)) for x in vault_data['proof']],
         )
 
     return None
