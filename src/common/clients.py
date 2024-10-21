@@ -29,6 +29,7 @@ class Database:
 
 class ExecutionClient:
     client: AsyncWeb3
+    is_set_up = False
 
     async def setup(self) -> None:
         if not any(settings.execution_endpoints):
@@ -48,9 +49,12 @@ class ExecutionClient:
             w3.eth.default_account = hot_wallet.address
 
         self.client = w3
+        self.is_set_up = True
         return None
 
     def __getattr__(self, item):  # type: ignore
+        if not self.is_set_up:
+            raise RuntimeError('Execution client is not ready. You need to call setup() method')
         return getattr(self.client, item)
 
 
