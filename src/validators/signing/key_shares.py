@@ -13,36 +13,11 @@ from py_ecc.bls.hash_to_curve import hash_to_G2
 from py_ecc.optimized_bls12_381.optimized_curve import (
     G1 as P1,  # don't confuse group name (G1) with primitive element name (P1)
 )
-from py_ecc.optimized_bls12_381.optimized_curve import (
-    Z1,
-    Z2,
-    add,
-    curve_order,
-    multiply,
-)
+from py_ecc.optimized_bls12_381.optimized_curve import add, curve_order, multiply
 from py_ecc.typing import Optimized_Field, Optimized_Point3D
-from py_ecc.utils import prime_field_inv
-
-from src.validators.typings import BLSPrivkey
 
 # element of G1 or G2
 G12: TypeAlias = Optimized_Point3D[Optimized_Field]
-
-
-def get_polynomial_points(coefficients: list[int], num_points: int) -> list[int]:
-    """Calculates polynomial points."""
-    points = []
-    for x in range(1, num_points + 1):
-        # start with x=1 and calculate the value of y
-        y = coefficients[0]
-        # calculate each term and add it to y, using modular math
-        for i in range(1, len(coefficients)):
-            exponentiation = (x**i) % curve_order
-            term = (coefficients[i] * exponentiation) % curve_order
-            y = (y + term) % curve_order
-        # add the point to the list of points
-        points.append(y)
-    return points
 
 
 def get_G12_polynomial_points(coefficients: list, num_points: int) -> list:
@@ -60,21 +35,6 @@ def get_G12_polynomial_points(coefficients: list, num_points: int) -> list:
         # add the point to the list of points
         points.append(y)
     return points
-
-
-def private_key_to_private_key_shares(
-    private_key: BLSPrivkey,
-    threshold: int,
-    total: int,
-) -> list[BLSPrivkey]:
-    coefficients: list[int] = [int.from_bytes(private_key, 'big')]
-
-    for _ in range(threshold - 1):
-        coefficients.append(secrets.randbelow(curve_order))
-
-    points = get_polynomial_points(coefficients, total)
-
-    return [BLSPrivkey(p.to_bytes(32, 'big')) for p in points]
 
 
 def bls_signature_to_shares(
@@ -121,31 +81,3 @@ def bls_signature_and_public_key_to_shares(
     public_key_shards = bls_public_key_to_shares(public_key, coefficients_G1, total)
 
     return bls_signature_shards, public_key_shards
-
-
-def reconstruct_shared_bls_signature(signatures: dict[int, BLSSignature]) -> BLSSignature:
-    """
-    Reconstructs shared BLS private key signature.
-    Copied from https://github.com/dankrad/python-ibft/blob/master/bls_threshold.py
-    """
-    r = Z2
-    for i, sig in signatures.items():
-        sig_point = signature_to_G2(sig)
-        coef = 1
-        for j in signatures:
-            if j != i:
-                coef = -coef * (j + 1) * prime_field_inv(i - j, curve_order) % curve_order
-        r = add(r, multiply(sig_point, coef))
-    return G2_to_signature(r)
-
-
-def get_aggregate_key(keyshares: dict[int, BLSPubkey]) -> BLSPubkey:
-    r = Z1
-    for i, key in keyshares.items():
-        key_point = pubkey_to_G1(key)
-        coef = 1
-        for j in keyshares:
-            if j != i:
-                coef = -coef * (j + 1) * prime_field_inv(i - j, curve_order) % curve_order
-        r = add(r, multiply(key_point, coef))
-    return G1_to_pubkey(r)

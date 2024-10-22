@@ -116,3 +116,15 @@ fail_under = 70
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+
+[tool.vulture]
+exclude = ["*/test*", "conftest.py", "networks.py"]
+ignore_names = [
+    "default_account",  # execution client
+    "_async_session_pool",  # credentials.py
+    "eth_typing_metadata", "ssz_metadata",  # pyinstaller
+    "DATA_DIR",  # settings
+    "contract_event", "get_from_block", "process_events",  # event processor
+    "validators_root",  # ApprovalRequest
+    "previous_version", "current_version", "genesis_validators_root", "fork_info", "voluntary_exit"  # remote.py
+]
