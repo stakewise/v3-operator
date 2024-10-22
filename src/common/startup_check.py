@@ -22,7 +22,8 @@ from src.config.networks import NETWORKS
 from src.config.settings import settings
 from src.validators.execution import check_deposit_data_root, get_withdrawable_assets
 from src.validators.keystores.local import LocalKeystore
-from src.validators.typings import ValidatorsRegistrationMode
+from src.validators.relayer import DvtRelayerClient
+from src.validators.typings import RelayerTypes, ValidatorsRegistrationMode
 from src.validators.utils import load_deposit_data
 
 logger = logging.getLogger(__name__)
@@ -228,16 +229,9 @@ async def startup_checks() -> None:
     await check_hot_wallet_balance()
 
     logger.info('Checking connection to ipfs nodes...')
-    healthy_ipfs_endpoint = []
-    for endpoint in settings.ipfs_fetch_endpoints:
-        client = IpfsFetchClient([endpoint])
-        try:
-            await client.fetch_json(IPFS_HASH_EXAMPLE)
-        except Exception as e:
-            logger.warning("Can't connect to ipfs node %s: %s", endpoint, e)
-        else:
-            healthy_ipfs_endpoint.append(endpoint)
-    logger.info('Connected to ipfs nodes at %s.', ', '.join(healthy_ipfs_endpoint))
+    healthy_ipfs_endpoints = await _check_ipfs_endpoints()
+
+    logger.info('Connected to ipfs nodes at %s.', ', '.join(healthy_ipfs_endpoints))
 
     logger.info('Checking connection to oracles set...')
     healthy_oracles = await collect_healthy_oracles()
@@ -260,6 +254,13 @@ async def startup_checks() -> None:
         logger.info('Found keystores dir')
 
     await _check_validators_manager()
+
+    if (
+        settings.validators_registration_mode == ValidatorsRegistrationMode.API
+        and settings.relayer_type == RelayerTypes.DVT
+    ):
+        logger.info('Checking DVT Relayer endpoint %s...', settings.relayer_endpoint)
+        await _check_dvt_relayer_endpoint()
 
 
 async def _check_consensus_nodes_network() -> None:
@@ -311,6 +312,21 @@ async def _aiohttp_fetch(session: ClientSession, url: str) -> str:
     return url
 
 
+async def _check_ipfs_endpoints() -> list[str]:
+    healthy_ipfs_endpoints = []
+
+    for endpoint in settings.ipfs_fetch_endpoints:
+        client = IpfsFetchClient([endpoint])
+        try:
+            await client.fetch_json(IPFS_HASH_EXAMPLE)
+        except Exception as e:
+            logger.warning("Can't connect to ipfs node %s: %s", endpoint, e)
+        else:
+            healthy_ipfs_endpoints.append(endpoint)
+
+    return healthy_ipfs_endpoints
+
+
 async def _check_validators_manager() -> None:
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
         if await vault_contract.version() > 1:
@@ -330,4 +346,15 @@ async def _check_events_logs() -> None:
     if not events:
         raise ValueError(
             "Can't find oracle config. Please, ensure that EL client didn't prune event logs."
+        )
+
+
+async def _check_dvt_relayer_endpoint() -> None:
+    info = await DvtRelayerClient().get_info()
+
+    relayer_network = info['network']
+    if relayer_network != settings.network:
+        raise ValueError(
+            f'Relayer network "{relayer_network}" does not match '
+            f'Operator network "{settings.network}"'
         )

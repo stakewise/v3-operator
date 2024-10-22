@@ -59,6 +59,17 @@ class DefaultRelayerClient:
 
 
 class DvtRelayerClient:
+    async def get_info(self) -> dict:
+        url = urljoin(settings.relayer_endpoint, 'info')
+        async with aiohttp.ClientSession(
+            timeout=ClientTimeout(settings.relayer_timeout)
+        ) as session:
+            resp = await session.get(url)
+            if 400 <= resp.status < 500:
+                logger.debug('Relayer response: %s', await resp.read())
+            resp.raise_for_status()
+            return await resp.json()
+
     async def get_validators(self, public_keys: list[HexStr]) -> dict:
         url = urljoin(settings.relayer_endpoint, 'validators')
         jsn = {'public_keys': public_keys}
