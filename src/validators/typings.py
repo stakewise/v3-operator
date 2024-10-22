@@ -4,7 +4,6 @@ from typing import NewType, Sequence
 
 from eth_typing import BlockNumber, BLSSignature, ChecksumAddress, HexStr
 from multiproof import MultiProof, StandardMerkleTree
-from sw_utils.typings import Bytes32
 
 BLSPrivkey = NewType('BLSPrivkey', bytes)
 
@@ -72,14 +71,6 @@ class ApprovalRequest:
     proof_flags: list[bool] | None
     proof_indexes: list[int] | None
     validators_manager_signature: HexStr | None = None
-
-
-@dataclass
-class KeeperApprovalParams:
-    validatorsRegistryRoot: HexStr | Bytes32
-    validators: HexStr | bytes
-    signatures: HexStr | bytes
-    exitSignaturesIpfsHash: str
 
 
 class ValidatorsRegistrationMode(Enum):

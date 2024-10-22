@@ -8,7 +8,7 @@ from sw_utils.typings import ConsensusFork
 from web3 import Web3
 
 from src.config.settings import settings
-from src.validators.signing.key_shares import (
+from src.validators.signing.tests.key_shares import (
     get_aggregate_key,
     reconstruct_shared_bls_signature,
 )

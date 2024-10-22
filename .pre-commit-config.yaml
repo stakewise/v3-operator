@@ -82,3 +82,11 @@ repos:
         files: no-files
         args: ["lock", "--check"]
         always_run: true
+
+  - repo: https://github.com/jendrikseipp/vulture
+    rev: 'v2.13'
+    hooks:
+      - id: vulture
+        args: ["src/"]
+        files: no-files
+        always_run: true

@@ -245,14 +245,6 @@ class KeeperContract(ContractWrapper):
 
         return last_event
 
-    async def get_rewards_min_oracles(self) -> int:
-        """Fetches the last oracles config updated event."""
-        return await self.contract.functions.rewardsMinOracles().call()
-
-    async def get_validators_min_oracles(self) -> int:
-        """Fetches the last oracles config updated event."""
-        return await self.contract.functions.validatorsMinOracles().call()
-
     async def can_harvest(self, vault_address: ChecksumAddress) -> bool:
         return await self.contract.functions.canHarvest(vault_address).call()
 
@@ -260,10 +252,6 @@ class KeeperContract(ContractWrapper):
 class DepositDataRegistryContract(ContractWrapper):
     abi_path = 'abi/IDepositDataRegistry.json'
     settings_key = 'DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS'
-
-    async def get_deposit_data_manager(self) -> ChecksumAddress:
-        """Fetches the vault deposit data manager address."""
-        return await self.contract.functions.getDepositDataManager(settings.vault).call()
 
     async def get_validators_root(self) -> Bytes32:
         """Fetches vault's validators root."""
