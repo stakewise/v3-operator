@@ -1,6 +1,7 @@
 import logging
 
 from eth_typing import ChecksumAddress, HexStr
+from sw_utils.networks import GNO_NETWORKS
 from web3 import Web3
 from web3.exceptions import ContractLogicError
 
@@ -12,7 +13,6 @@ from src.common.contracts import (
 )
 from src.common.typings import HarvestParams
 from src.common.utils import format_error, warning_verbose
-from src.config.networks import GNOSIS_NETWORKS
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ async def get_update_state_calls(
     update_state_call = vault_contract.get_update_state_call(harvest_params)
     calls = [update_state_call]
 
-    if settings.network in GNOSIS_NETWORKS:
+    if settings.network in GNO_NETWORKS:
         gno_vault_contract = get_gno_vault_contract()
         swap_xdai_call = gno_vault_contract.get_swap_xdai_call()
         calls.append(swap_xdai_call)
