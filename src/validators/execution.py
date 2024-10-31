@@ -187,7 +187,9 @@ async def update_unused_validator_keys_metric(
 
     validators: int = 0
     for validator in deposit_data.validators:
-        if validator.public_key not in keystore:
+        # This check is skipped for DVT, since keystore contains
+        # key shares and not original public keys
+        if validator.public_key not in keystore and not settings.runs_dvt_setup:
             continue
 
         if NetworkValidatorCrud().is_validator_registered(validator.public_key):
