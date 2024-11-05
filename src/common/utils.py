@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from collections import defaultdict
 from datetime import datetime, timezone
 from decimal import ROUND_FLOOR, Decimal, localcontext
@@ -114,6 +115,21 @@ class JsonFormatter(jsonlogger.JsonFormatter):
             log_record['level'] = log_record['level'].upper()
         else:
             log_record['level'] = record.levelname
+
+
+class RateLimiter:
+    def __init__(self, min_interval: int) -> None:
+        self.min_interval = min_interval
+        self.previous_time: float | None = None
+
+    async def ensure_interval(self) -> None:
+        current_time = time.time()
+
+        if self.previous_time is not None:
+            elapsed = current_time - self.previous_time
+            await asyncio.sleep(self.min_interval - elapsed)
+
+        self.previous_time = current_time
 
 
 def round_down(d: int | Decimal, precision: int) -> Decimal:
