@@ -11,7 +11,7 @@ from src.common.logging import LOG_LEVELS
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
-from src.config.networks import AVAILABLE_NETWORKS
+from src.config.networks import AVAILABLE_NETWORKS, NETWORKS
 from src.config.settings import (
     DEFAULT_MAX_FEE_PER_GAS_GWEI,
     DEFAULT_METRICS_HOST,
@@ -24,6 +24,10 @@ from src.config.settings import (
 from src.validators.typings import RelayerTypes, ValidatorsRegistrationMode
 
 logger = logging.getLogger(__name__)
+
+
+# Special value used to dynamically determine option value
+AUTO = 'AUTO'
 
 
 @click.option(
@@ -183,6 +187,7 @@ logger = logging.getLogger(__name__)
     help='Relayer endpoint.',
     prompt='Enter the relayer endpoint',
     envvar='RELAYER_ENDPOINT',
+    default=AUTO,
 )
 @click.command(help='Start operator service')
 # pylint: disable-next=too-many-arguments,too-many-locals
@@ -213,6 +218,13 @@ def start_api(
     if network is None:
         vault_config.load()
         network = vault_config.network
+
+    if relayer_endpoint == AUTO and relayer_type == RelayerTypes.DVT:
+        network_config = NETWORKS[network]
+        relayer_endpoint = network_config.DEFAULT_DVT_RELAYER_ENDPOINT
+
+    if relayer_endpoint == AUTO and relayer_type == RelayerTypes.DEFAULT:
+        raise click.ClickException('Relayer endpoint must be specified for default relayer type')
 
     validators_registration_mode = ValidatorsRegistrationMode.API
 
