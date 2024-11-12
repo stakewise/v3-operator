@@ -44,6 +44,7 @@ class NetworkConfig:
     STAKEWISE_API_URL: str
     RATED_API_URL: str
     CONFIG_UPDATE_EVENT_BLOCK: BlockNumber
+    DEFAULT_DVT_RELAYER_ENDPOINT: str
 
     @property
     def SHAPELLA_FORK(self) -> ConsensusFork:
@@ -109,6 +110,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         STAKEWISE_API_URL='https://mainnet-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(18470104),
+        DEFAULT_DVT_RELAYER_ENDPOINT='https://mainnet-dvt-relayer.stakewise.io',
     ),
     HOLESKY: NetworkConfig(
         CHAIN_ID=17000,
@@ -154,6 +156,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         STAKEWISE_API_URL='https://holesky-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(215397),
+        DEFAULT_DVT_RELAYER_ENDPOINT='https://holesky-dvt-relayer.stakewise.io',
     ),
     GNOSIS: NetworkConfig(
         CHAIN_ID=100,
@@ -201,6 +204,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         STAKEWISE_API_URL='https://gnosis-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(34778569),
+        DEFAULT_DVT_RELAYER_ENDPOINT='gnosis-dvt-relayer.stakewise.io',
     ),
     CHIADO: NetworkConfig(
         CHAIN_ID=10200,
@@ -246,5 +250,6 @@ NETWORKS: dict[str, NetworkConfig] = {
         STAKEWISE_API_URL='https://chiado-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(10627606),
+        DEFAULT_DVT_RELAYER_ENDPOINT='chiado-dvt-relayer.stakewise.io',
     ),
 }
