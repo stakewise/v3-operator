@@ -13,3 +13,6 @@ build
 database
 *.db
 .DS_Store
+.vscode
+.coverage
+.python-version

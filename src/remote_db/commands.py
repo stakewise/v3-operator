@@ -6,6 +6,7 @@ import click
 from click import Context
 from eth_typing import ChecksumAddress, HexAddress
 
+from src.common.clients import setup_clients
 from src.common.utils import greenify, log_verbose
 from src.common.validators import validate_db_uri, validate_eth_address
 from src.common.vault_config import VaultConfig
@@ -167,10 +168,15 @@ def upload_keypairs(
         pool_size=pool_size,
     )
     try:
-        asyncio.run(tasks.upload_keypairs(ctx.obj['db_url'], encrypt_key))
+        asyncio.run(_setup_clients_and_upload_keypairs(ctx.obj['db_url'], encrypt_key))
         click.echo(f'Successfully uploaded keypairs for the {greenify(settings.vault)} vault.')
     except Exception as e:
         log_verbose(e)
+
+
+async def _setup_clients_and_upload_keypairs(db_url: str, encrypt_key: str) -> None:
+    await setup_clients()
+    await tasks.upload_keypairs(db_url, encrypt_key)
 
 
 @remote_db_group.command(help='Retrieves web3signer private keys from the database.')
