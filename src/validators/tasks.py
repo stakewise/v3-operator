@@ -6,6 +6,7 @@ from typing import Sequence, cast
 from eth_typing import HexStr
 from multiproof.standard import MultiProof
 from sw_utils import EventScanner, InterruptHandler, IpfsFetchClient, convert_to_mgno
+from sw_utils.networks import GNO_NETWORKS
 from sw_utils.typings import Bytes32, ProtocolConfig
 from web3 import Web3
 from web3.types import BlockNumber
@@ -20,7 +21,6 @@ from src.common.metrics import metrics
 from src.common.tasks import BaseTask
 from src.common.typings import HarvestParams
 from src.common.utils import get_current_timestamp
-from src.config.networks import GNOSIS_NETWORKS
 from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import MissingDepositDataValidatorsException
@@ -232,7 +232,7 @@ async def process_validators(
 
 async def get_validators_count_from_vault_assets(harvest_params: HarvestParams | None) -> int:
     vault_balance = await get_withdrawable_assets(harvest_params)
-    if settings.network in GNOSIS_NETWORKS:
+    if settings.network in GNO_NETWORKS:
         # apply GNO -> mGNO exchange rate
         vault_balance = convert_to_mgno(vault_balance)
 
