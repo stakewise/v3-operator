@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from functools import cached_property
 from multiprocessing import Pool
 from os import path
+from secrets import randbits
 
 import click
 import milagro_bls_binding as bls
@@ -63,7 +64,11 @@ class Credential:
 
     def encrypt_signing_keystore(self, password: str) -> Keystore:
         return ScryptKeystore.encrypt(
-            secret=self.private_key_bytes, password=password, path=self.path
+            secret=self.private_key_bytes,
+            password=password,
+            path=self.path,
+            kdf_salt=randbits(256).to_bytes(32, 'big'),
+            aes_iv=randbits(128).to_bytes(16, 'big'),
         )
 
     def save_signing_keystore(
