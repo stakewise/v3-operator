@@ -25,7 +25,6 @@ SECONDS_PER_MONTH: int = 2628000
 class ContractWrapper:
     abi_path: str = ''
     settings_key: str = ''
-    execution_client: AsyncWeb3
 
     def __init__(self, execution_client: AsyncWeb3 | None = None):
         self.execution_client = execution_client or default_execution_client
