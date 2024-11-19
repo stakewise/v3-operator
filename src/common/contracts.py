@@ -6,7 +6,7 @@ from typing import Callable
 
 from eth_typing import HexStr
 from sw_utils.typings import Bytes32
-from web3 import Web3
+from web3 import AsyncWeb3, Web3
 from web3.contract import AsyncContract
 from web3.contract.async_contract import (
     AsyncContractEvent,
@@ -15,7 +15,7 @@ from web3.contract.async_contract import (
 )
 from web3.types import BlockNumber, ChecksumAddress, EventData
 
-from src.common.clients import execution_client
+from src.common.clients import execution_client as default_execution_client
 from src.common.typings import HarvestParams, RewardVoteInfo
 from src.config.settings import settings
 
@@ -25,6 +25,10 @@ SECONDS_PER_MONTH: int = 2628000
 class ContractWrapper:
     abi_path: str = ''
     settings_key: str = ''
+    execution_client: AsyncWeb3
+
+    def __init__(self, execution_client: AsyncWeb3 | None = None):
+        self.execution_client = execution_client or default_execution_client
 
     @property
     def contract_address(self) -> ChecksumAddress:
@@ -35,7 +39,7 @@ class ContractWrapper:
         current_dir = os.path.dirname(__file__)
         with open(os.path.join(current_dir, self.abi_path), encoding='utf-8') as f:
             abi = json.load(f)
-        return execution_client.eth.contract(abi=abi, address=self.contract_address)
+        return self.execution_client.eth.contract(abi=abi, address=self.contract_address)
 
     @property
     def address(self) -> ChecksumAddress:
@@ -208,7 +212,7 @@ class KeeperContract(ContractWrapper):
         return await self._get_last_event(
             self.events.ConfigUpdated,  # type: ignore
             from_block=from_block or settings.network_config.KEEPER_GENESIS_BLOCK,
-            to_block=to_block or await execution_client.eth.get_block_number(),
+            to_block=to_block or await self.execution_client.eth.get_block_number(),
         )
 
     async def get_last_rewards_update(self) -> RewardVoteInfo | None:
@@ -216,7 +220,7 @@ class KeeperContract(ContractWrapper):
         last_event = await self._get_last_event(
             self.events.RewardsUpdated,  # type: ignore
             from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
-            to_block=await execution_client.eth.get_block_number(),
+            to_block=await self.execution_client.eth.get_block_number(),
         )
         if not last_event:
             return None
@@ -234,7 +238,7 @@ class KeeperContract(ContractWrapper):
         to_block: BlockNumber | None = None,
     ) -> EventData | None:
         from_block = from_block or settings.network_config.KEEPER_GENESIS_BLOCK
-        to_block = to_block or await execution_client.eth.get_block_number()
+        to_block = to_block or await self.execution_client.eth.get_block_number()
 
         last_event = await self._get_last_event(
             self.events.ExitSignaturesUpdated,  # type: ignore

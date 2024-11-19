@@ -30,14 +30,23 @@ class Database:
 class ExecutionClient:
     client: AsyncWeb3
     is_set_up = False
+    use_retries = True
+
+    def __init__(self, use_retries: bool = True) -> None:
+        self.use_retries = use_retries
 
     async def setup(self) -> None:
         if not any(settings.execution_endpoints):
             return
+
+        retry_timeout = 0
+        if self.use_retries:
+            retry_timeout = settings.execution_retry_timeout
+
         w3 = get_execution_client(
             settings.execution_endpoints,
             timeout=settings.execution_timeout,
-            retry_timeout=settings.execution_retry_timeout,
+            retry_timeout=retry_timeout,
             jwt_secret=settings.execution_jwt_secret,
         )
         # Account is required when emitting transactions.
@@ -89,9 +98,11 @@ class IpfsLazyFetchClient:
 
 db_client = Database()
 execution_client = cast(AsyncWeb3, ExecutionClient())
+execution_non_retry_client = cast(AsyncWeb3, ExecutionClient(use_retries=False))
 consensus_client = cast(ExtendedAsyncBeacon, ConsensusClient())
 ipfs_fetch_client = IpfsLazyFetchClient()
 
 
 async def setup_clients() -> None:
     await execution_client.setup()  # type: ignore
+    await execution_non_retry_client.setup()  # type: ignore
