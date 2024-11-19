@@ -47,10 +47,23 @@ class NetworkValidatorsProcessor(EventProcessor):
         NetworkValidatorCrud().save_network_validators(validators)
 
 
-def process_network_validator_events(events: list[EventData]) -> list[NetworkValidator]:
+class NetworkValidatorsStartupProcessor(NetworkValidatorsProcessor):
+    """Use multiprocessing event processor"""
+
+    @staticmethod
+    # pylint: disable-next=unused-argument
+    async def process_events(events: list[EventData], to_block: BlockNumber) -> None:
+        validators = process_network_validator_events_multiprocessing(events)
+        NetworkValidatorCrud().save_network_validators(validators)
+
+
+def process_network_validator_events_multiprocessing(
+    events: list[EventData],
+) -> list[NetworkValidator]:
     """
     Processes `ValidatorsRegistry` registration events
     and returns the list of valid validators.
+    Use multiprocessing to speed up operator startup.
     """
     with Pool(processes=settings.pool_size) as pool:
         results = [
@@ -64,6 +77,25 @@ def process_network_validator_events(events: list[EventData]) -> list[NetworkVal
             result.wait()
         validators = [result.get() for result in results]
         return [val for val in validators if val]
+
+
+def process_network_validator_events(events: list[EventData]) -> list[NetworkValidator]:
+    """
+    Processes `ValidatorsRegistry` registration events
+    and returns the list of valid validators.
+    Multiprocessing version works slowly on small blocks ranges.
+    """
+    result: list[NetworkValidator] = []
+    for event in events:
+        validator = process_network_validator_event(
+            event, settings.network_config.GENESIS_FORK_VERSION
+        )
+        if not validator:
+            continue
+
+        result.append(validator)
+
+    return result
 
 
 def process_network_validator_event(
