@@ -16,7 +16,7 @@ from src.config.settings import settings
 from src.exits.tasks import ExitSignatureTask
 from src.harvest.tasks import HarvestTask
 from src.validators.database import NetworkValidatorCrud
-from src.validators.execution import NetworkValidatorsProcessor
+from src.validators.execution import NetworkValidatorsStartupProcessor
 from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
 from src.validators.relayer import RelayerAdapter, create_relayer_adapter
@@ -60,9 +60,9 @@ async def start_base() -> None:
 
     # start operator tasks
 
-    # periodically scan network validator updates
-    network_validators_processor = NetworkValidatorsProcessor()
-    network_validators_scanner = EventScanner(network_validators_processor)
+    # scan network validator updates
+    network_validators_startup_processor = NetworkValidatorsStartupProcessor()
+    network_validators_scanner = EventScanner(network_validators_startup_processor)
 
     logger.info('Syncing network validator events...')
     chain_state = await get_chain_finalized_head()

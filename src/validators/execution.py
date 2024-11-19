@@ -1,5 +1,6 @@
 import logging
 import struct
+from multiprocessing import Pool
 from typing import Sequence, Set
 
 from eth_typing import BlockNumber, HexStr
@@ -46,25 +47,60 @@ class NetworkValidatorsProcessor(EventProcessor):
         NetworkValidatorCrud().save_network_validators(validators)
 
 
+class NetworkValidatorsStartupProcessor(NetworkValidatorsProcessor):
+    """Use multiprocessing event processor"""
+
+    @staticmethod
+    # pylint: disable-next=unused-argument
+    async def process_events(events: list[EventData], to_block: BlockNumber) -> None:
+        validators = process_network_validator_events_multiprocessing(events)
+        NetworkValidatorCrud().save_network_validators(validators)
+
+
+def process_network_validator_events_multiprocessing(
+    events: list[EventData],
+) -> list[NetworkValidator]:
+    """
+    Processes `ValidatorsRegistry` registration events
+    and returns the list of valid validators.
+    Use multiprocessing to speed up operator startup.
+    """
+    with Pool(processes=settings.pool_size) as pool:
+        results = [
+            pool.apply_async(
+                process_network_validator_event,
+                [event, settings.network_config.GENESIS_FORK_VERSION],
+            )
+            for event in events
+        ]
+        for result in results:
+            result.wait()
+        validators = [result.get() for result in results]
+        return [val for val in validators if val]
+
+
 def process_network_validator_events(events: list[EventData]) -> list[NetworkValidator]:
     """
     Processes `ValidatorsRegistry` registration events
     and returns the list of valid validators.
+    Multiprocessing version works slowly on small blocks ranges.
     """
     result: list[NetworkValidator] = []
     for event in events:
-        public_key = process_network_validator_event(event)
-        if not public_key:
+        validator = process_network_validator_event(
+            event, settings.network_config.GENESIS_FORK_VERSION
+        )
+        if not validator:
             continue
 
-        result.append(
-            NetworkValidator(public_key=public_key, block_number=BlockNumber(event['blockNumber']))
-        )
+        result.append(validator)
 
     return result
 
 
-def process_network_validator_event(event: EventData) -> HexStr | None:
+def process_network_validator_event(
+    event: EventData, fork_version: bytes
+) -> NetworkValidator | None:
     """
     Processes validator deposit event
     and returns its public key if the deposit is valid.
@@ -73,12 +109,12 @@ def process_network_validator_event(event: EventData) -> HexStr | None:
     withdrawal_creds = event['args']['withdrawal_credentials']
     amount_gwei = struct.unpack('<Q', event['args']['amount'])[0]
     signature = event['args']['signature']
-    fork_version = settings.network_config.GENESIS_FORK_VERSION
     if is_valid_deposit_data_signature(
         public_key, withdrawal_creds, signature, amount_gwei, fork_version
     ):
-        return Web3.to_hex(public_key)
-
+        return NetworkValidator(
+            public_key=Web3.to_hex(public_key), block_number=BlockNumber(event['blockNumber'])
+        )
     return None
 
 
@@ -95,9 +131,11 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
     )
     new_public_keys: Set[HexStr] = set()
     for event in new_events:
-        public_key = process_network_validator_event(event)
-        if public_key:
-            new_public_keys.add(public_key)
+        validator = process_network_validator_event(
+            event, settings.network_config.GENESIS_FORK_VERSION
+        )
+        if validator:
+            new_public_keys.add(validator.public_key)
 
     return new_public_keys
 
