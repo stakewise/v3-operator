@@ -8,7 +8,9 @@ from sw_utils import EventProcessor, is_valid_deposit_data_signature
 from web3 import Web3
 from web3.types import EventData, Wei
 
+from src.common.clients import execution_non_retry_client
 from src.common.contracts import (
+    ValidatorsRegistryContract,
     multicall_contract,
     validators_registry_contract,
     vault_contract,
@@ -28,9 +30,10 @@ logger = logging.getLogger(__name__)
 class NetworkValidatorsProcessor(EventProcessor):
     contract_event = 'DepositEvent'
 
-    @property
-    def contract(self):  # type: ignore
-        return validators_registry_contract
+    def __init__(self) -> None:
+        self.contract = ValidatorsRegistryContract(
+            execution_client=execution_non_retry_client
+        ).contract
 
     @staticmethod
     async def get_from_block() -> BlockNumber:
