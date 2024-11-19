@@ -30,7 +30,6 @@ class Database:
 class ExecutionClient:
     client: AsyncWeb3
     is_set_up = False
-    use_retries = True
 
     def __init__(self, use_retries: bool = True) -> None:
         self.use_retries = use_retries
