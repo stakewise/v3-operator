@@ -92,6 +92,10 @@ class Settings(metaclass=Singleton):
         'DISABLE_DEPOSIT_DATA_WARNINGS', default=False, cast=bool
     )
 
+    runs_dvt_setup: bool = decouple_config(
+        'RUNS_DVT_SETUP', default=False, cast=bool,
+    )
+
     min_validators_registration: int
 
     # pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements

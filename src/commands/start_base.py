@@ -21,7 +21,7 @@ from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
 from src.validators.relayer import RelayerAdapter, create_relayer_adapter
 from src.validators.tasks import ValidatorsTask, load_genesis_validators
-from src.validators.typings import DepositData, ValidatorsRegistrationMode
+from src.validators.typings import DepositData, RelayerTypes, ValidatorsRegistrationMode
 from src.validators.utils import load_deposit_data
 
 logger = logging.getLogger(__name__)
@@ -48,6 +48,10 @@ async def start_base() -> None:
     keystore: BaseKeystore | None = None
     deposit_data: DepositData | None = None
     relayer_adapter: RelayerAdapter | None = None
+
+    # Override dvt setting for API setups running with DVT relayer
+    if settings.relayer_type == RelayerTypes.DVT:
+        settings.runs_dvt_setup = True
 
     # load keystore and deposit data
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
