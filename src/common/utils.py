@@ -2,6 +2,7 @@ import asyncio
 import logging
 from collections import defaultdict
 from datetime import datetime, timezone
+from decimal import ROUND_FLOOR, Decimal, localcontext
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -113,3 +114,12 @@ class JsonFormatter(jsonlogger.JsonFormatter):
             log_record['level'] = log_record['level'].upper()
         else:
             log_record['level'] = record.levelname
+
+
+def round_down(d: int | Decimal, precision: int) -> Decimal:
+    if isinstance(d, int):
+        d = Decimal(d)
+
+    with localcontext() as ctx:
+        ctx.rounding = ROUND_FLOOR
+        return round(d, precision)

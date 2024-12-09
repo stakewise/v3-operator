@@ -16,7 +16,7 @@ from src.common.execution import (
     get_protocol_config,
 )
 from src.common.harvest import get_harvest_params
-from src.common.utils import format_error, warning_verbose
+from src.common.utils import format_error, round_down, warning_verbose
 from src.common.wallet import hot_wallet
 from src.config.networks import NETWORKS
 from src.config.settings import settings
@@ -219,9 +219,13 @@ async def startup_checks() -> None:
 
     harvest_params = await get_harvest_params()
     withdrawable_assets = await get_withdrawable_assets(harvest_params)
+
+    # Note. We round down assets in the log message because of the case when assets
+    # is slightly less than required amount to register validator.
+    # Standard rounding will show that we have enough assets, but in fact we don't.
     logger.info(
         'Vault withdrawable assets: %s %s',
-        round(Web3.from_wei(withdrawable_assets, 'ether'), 2),
+        round_down(Web3.from_wei(withdrawable_assets, 'ether'), 2),
         settings.network_config.VAULT_BALANCE_SYMBOL,
     )
 

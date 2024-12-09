@@ -128,5 +128,6 @@ ignore_names = [
     "DATA_DIR",  # settings
     "contract_event", "get_from_block", "process_events",  # event processor
     "validators_root",  # ApprovalRequest
-    "previous_version", "current_version", "genesis_validators_root", "fork_info", "voluntary_exit"  # remote.py
+    "previous_version", "current_version", "genesis_validators_root", "fork_info", "voluntary_exit",  # remote.py
+    "rounding"  # decimal context
 ]

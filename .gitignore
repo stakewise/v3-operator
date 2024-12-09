@@ -16,3 +16,4 @@ database
 .vscode
 .coverage
 .python-version
+.history
