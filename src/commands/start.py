@@ -184,6 +184,12 @@ logger = logging.getLogger(__name__)
     help='Key path(s) in the K/V secret engine where validator signing keys are stored.',
 )
 @click.option(
+    '--hashi-vault-key-prefix',
+    envvar='HASHI_VAULT_KEY_PREFIX',
+    multiple=True,
+    help='Key prefix(es) in the K/V secret engine under which validator signing keys are stored.',
+)
+@click.option(
     '--hashi-vault-parallelism',
     envvar='HASHI_VAULT_PARALLELISM',
     help='How much requests to K/V secrets engine to do in parallel.',
@@ -244,6 +250,7 @@ def start(
     keystores_password_file: str | None,
     remote_signer_url: str | None,
     hashi_vault_key_path: list[str] | None,
+    hashi_vault_key_prefix: list[str] | None,
     hashi_vault_token: str | None,
     hashi_vault_url: str | None,
     hashi_vault_parallelism: int,
@@ -278,6 +285,7 @@ def start(
         remote_signer_url=remote_signer_url,
         hashi_vault_token=hashi_vault_token,
         hashi_vault_key_paths=hashi_vault_key_path,
+        hashi_vault_key_prefixes=hashi_vault_key_prefix,
         hashi_vault_parallelism=hashi_vault_parallelism,
         hashi_vault_url=hashi_vault_url,
         hot_wallet_file=hot_wallet_file,
