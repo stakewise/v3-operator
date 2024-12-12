@@ -53,6 +53,7 @@ class Settings(metaclass=Singleton):
     remote_signer_use_deposit_data: bool
     dappnode: bool = False
     hashi_vault_key_paths: list[str] | None
+    hashi_vault_key_prefixes: list[str] | None
     hashi_vault_url: str | None
     hashi_vault_engine_name: str
     hashi_vault_token: str | None
@@ -116,6 +117,7 @@ class Settings(metaclass=Singleton):
         remote_signer_url: str | None = None,
         dappnode: bool = False,
         hashi_vault_key_paths: list[str] | None = None,
+        hashi_vault_key_prefixes: list[str] | None = None,
         hashi_vault_url: str | None = None,
         hashi_vault_engine_name: str = DEFAULT_HASHI_VAULT_ENGINE_NAME,
         hashi_vault_token: str | None = None,
@@ -183,6 +185,7 @@ class Settings(metaclass=Singleton):
         self.hashi_vault_url = hashi_vault_url
         self.hashi_vault_engine_name = hashi_vault_engine_name
         self.hashi_vault_key_paths = hashi_vault_key_paths
+        self.hashi_vault_key_prefixes = hashi_vault_key_prefixes
         self.hashi_vault_token = hashi_vault_token
         self.hashi_vault_parallelism = hashi_vault_parallelism
 
