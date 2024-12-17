@@ -20,11 +20,6 @@ class GraphClient:
         )
         self.gql_client = Client(transport=transport)
 
-    @retry_gql_errors(delay=DEFAULT_RETRY_TIME)
-    async def run_query(self, query: DocumentNode, params: dict | None = None) -> dict:
-        result = await self.gql_client.execute_async(query, variable_values=params)
-        return result
-
     async def get_vault_validators(self, vault: str) -> list[str]:
         query = gql(
             """
@@ -55,3 +50,8 @@ class GraphClient:
             variables['skip'] += GRAPH_PAGE_SIZE
 
         return all_validators
+
+    @retry_gql_errors(delay=DEFAULT_RETRY_TIME)
+    async def run_query(self, query: DocumentNode, params: dict | None = None) -> dict:
+        result = await self.gql_client.execute_async(query, variable_values=params)
+        return result

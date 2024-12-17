@@ -29,9 +29,9 @@ from src.validators.execution import (
     get_validators_from_deposit_data,
     get_validators_start_index,
     get_withdrawable_assets,
-    update_unused_validator_keys_metric,
 )
 from src.validators.keystores.base import BaseKeystore
+from src.validators.metrics import update_unused_validator_keys_metric
 from src.validators.register_validators import register_validators
 from src.validators.relayer import RelayerAdapter
 from src.validators.signing.common import (

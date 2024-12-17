@@ -31,6 +31,83 @@ logger = logging.getLogger(__name__)
 IPFS_HASH_EXAMPLE = 'QmawUdo17Fvo7xa6ARCUSMV1eoVwPtVuzx8L8Crj2xozWm'
 
 
+async def startup_checks() -> None:
+    validate_settings()
+
+    logger.info('Checking connection to database...')
+    db_client.create_db_dir()
+    with db_client.get_db_connection() as conn:
+        conn.cursor()
+    logger.info('Connected to database %s.', settings.database)
+
+    logger.info('Checking connection to consensus nodes...')
+    await wait_for_consensus_node()
+
+    logger.info('Checking connection to execution nodes...')
+    await wait_for_execution_node()
+
+    logger.info('Checking consensus nodes network...')
+    await _check_consensus_nodes_network()
+
+    logger.info('Checking execution nodes network...')
+    await _check_execution_nodes_network()
+
+    logger.info('Checking oracles config...')
+    await _check_events_logs()
+
+    logger.info('Checking vault address %s...', settings.vault)
+    await check_vault_address()
+
+    harvest_params = await get_harvest_params()
+    withdrawable_assets = await get_withdrawable_assets(harvest_params)
+
+    # Note. We round down assets in the log message because of the case when assets
+    # is slightly less than required amount to register validator.
+    # Standard rounding will show that we have enough assets, but in fact we don't.
+    logger.info(
+        'Vault withdrawable assets: %s %s',
+        round_down(Web3.from_wei(withdrawable_assets, 'ether'), 2),
+        settings.network_config.VAULT_BALANCE_SYMBOL,
+    )
+
+    logger.info('Checking hot wallet balance %s...', hot_wallet.address)
+    await check_hot_wallet_balance()
+
+    logger.info('Checking connection to ipfs nodes...')
+    healthy_ipfs_endpoints = await _check_ipfs_endpoints()
+
+    logger.info('Connected to ipfs nodes at %s.', ', '.join(healthy_ipfs_endpoints))
+
+    logger.info('Checking connection to oracles set...')
+    healthy_oracles = await collect_healthy_oracles()
+    logger.info('Connected to oracles at %s', ', '.join(healthy_oracles))
+
+    if settings.enable_metrics:
+        logger.info('Checking metrics server...')
+        check_metrics_port()
+
+    if settings.need_deposit_data_file:
+        logger.info('Checking deposit data file...')
+        await wait_for_deposit_data_file()
+
+    if (
+        settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO
+        and settings.keystore_cls_str == LocalKeystore.__name__
+    ):
+        logger.info('Checking keystores dir...')
+        wait_for_keystores_dir()
+        logger.info('Found keystores dir')
+
+    await _check_validators_manager()
+
+    if (
+        settings.validators_registration_mode == ValidatorsRegistrationMode.API
+        and settings.relayer_type == RelayerTypes.DVT
+    ):
+        logger.info('Checking DVT Relayer endpoint %s...', settings.relayer_endpoint)
+        await _check_dvt_relayer_endpoint()
+
+
 def validate_settings() -> None:
     if not settings.execution_endpoints:
         raise ValueError('EXECUTION_ENDPOINTS is missing')
@@ -188,83 +265,6 @@ async def wait_for_deposit_data_file() -> None:
             except RuntimeError as e:
                 logger.warning(e)
                 time.sleep(15)
-
-
-async def startup_checks() -> None:
-    validate_settings()
-
-    logger.info('Checking connection to database...')
-    db_client.create_db_dir()
-    with db_client.get_db_connection() as conn:
-        conn.cursor()
-    logger.info('Connected to database %s.', settings.database)
-
-    logger.info('Checking connection to consensus nodes...')
-    await wait_for_consensus_node()
-
-    logger.info('Checking connection to execution nodes...')
-    await wait_for_execution_node()
-
-    logger.info('Checking consensus nodes network...')
-    await _check_consensus_nodes_network()
-
-    logger.info('Checking execution nodes network...')
-    await _check_execution_nodes_network()
-
-    logger.info('Checking oracles config...')
-    await _check_events_logs()
-
-    logger.info('Checking vault address %s...', settings.vault)
-    await check_vault_address()
-
-    harvest_params = await get_harvest_params()
-    withdrawable_assets = await get_withdrawable_assets(harvest_params)
-
-    # Note. We round down assets in the log message because of the case when assets
-    # is slightly less than required amount to register validator.
-    # Standard rounding will show that we have enough assets, but in fact we don't.
-    logger.info(
-        'Vault withdrawable assets: %s %s',
-        round_down(Web3.from_wei(withdrawable_assets, 'ether'), 2),
-        settings.network_config.VAULT_BALANCE_SYMBOL,
-    )
-
-    logger.info('Checking hot wallet balance %s...', hot_wallet.address)
-    await check_hot_wallet_balance()
-
-    logger.info('Checking connection to ipfs nodes...')
-    healthy_ipfs_endpoints = await _check_ipfs_endpoints()
-
-    logger.info('Connected to ipfs nodes at %s.', ', '.join(healthy_ipfs_endpoints))
-
-    logger.info('Checking connection to oracles set...')
-    healthy_oracles = await collect_healthy_oracles()
-    logger.info('Connected to oracles at %s', ', '.join(healthy_oracles))
-
-    if settings.enable_metrics:
-        logger.info('Checking metrics server...')
-        check_metrics_port()
-
-    if settings.need_deposit_data_file:
-        logger.info('Checking deposit data file...')
-        await wait_for_deposit_data_file()
-
-    if (
-        settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO
-        and settings.keystore_cls_str == LocalKeystore.__name__
-    ):
-        logger.info('Checking keystores dir...')
-        wait_for_keystores_dir()
-        logger.info('Found keystores dir')
-
-    await _check_validators_manager()
-
-    if (
-        settings.validators_registration_mode == ValidatorsRegistrationMode.API
-        and settings.relayer_type == RelayerTypes.DVT
-    ):
-        logger.info('Checking DVT Relayer endpoint %s...', settings.relayer_endpoint)
-        await _check_dvt_relayer_endpoint()
 
 
 async def _check_consensus_nodes_network() -> None:

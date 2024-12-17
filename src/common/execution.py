@@ -23,10 +23,6 @@ SECONDS_PER_MONTH: int = 2628000
 logger = logging.getLogger(__name__)
 
 
-async def get_hot_wallet_balance() -> Wei:
-    return await execution_client.eth.get_balance(hot_wallet.address)
-
-
 async def check_vault_address() -> None:
     try:
         await Vault().get_validators_root()
@@ -34,24 +30,17 @@ async def check_vault_address() -> None:
         raise click.ClickException('Invalid vault contract address') from e
 
 
-async def check_hot_wallet_balance() -> None:
-    hot_wallet_min_balance = settings.network_config.HOT_WALLET_MIN_BALANCE
-    symbol = settings.network_config.WALLET_BALANCE_SYMBOL
+async def get_protocol_config() -> ProtocolConfig:
+    await update_oracles_cache()
+    app_state = AppState()
 
-    if hot_wallet_min_balance <= 0:
-        return
-
-    hot_wallet_balance = await get_hot_wallet_balance()
-
-    metrics.wallet_balance.set(hot_wallet_balance)
-
-    if hot_wallet_balance < hot_wallet_min_balance:
-        logger.warning(
-            'Wallet %s balance is too low. At least %s %s is recommended.',
-            hot_wallet.address,
-            Web3.from_wei(hot_wallet_min_balance, 'ether'),
-            symbol,
-        )
+    oracles_cache = cast(OraclesCache, app_state.oracles_cache)
+    pc = build_protocol_config(
+        config_data=oracles_cache.config,
+        rewards_threshold=oracles_cache.rewards_threshold,
+        validators_threshold=oracles_cache.validators_threshold,
+    )
+    return pc
 
 
 async def update_oracles_cache() -> None:
@@ -100,17 +89,24 @@ async def update_oracles_cache() -> None:
     )
 
 
-async def get_protocol_config() -> ProtocolConfig:
-    await update_oracles_cache()
-    app_state = AppState()
+async def check_gas_price(high_priority: bool = False) -> bool:
+    if high_priority:
+        tx_params = await get_high_priority_tx_params()
+        max_fee_per_gas = Wei(int(tx_params['maxFeePerGas']))
+    else:
+        # fallback to logic from web3
+        max_fee_per_gas = await _max_fee_per_gas(execution_client, {})
 
-    oracles_cache = cast(OraclesCache, app_state.oracles_cache)
-    pc = build_protocol_config(
-        config_data=oracles_cache.config,
-        rewards_threshold=oracles_cache.rewards_threshold,
-        validators_threshold=oracles_cache.validators_threshold,
-    )
-    return pc
+    if max_fee_per_gas >= Web3.to_wei(settings.max_fee_per_gas_gwei, 'gwei'):
+        logging.warning(
+            'Current gas price (%s gwei) is too high. '
+            'Will try to submit transaction on the next block if the gas '
+            'price is acceptable.',
+            Web3.from_wei(max_fee_per_gas, 'gwei'),
+        )
+        return False
+
+    return True
 
 
 async def get_high_priority_tx_params() -> TxParams:
@@ -152,26 +148,30 @@ async def _calc_high_priority_fee() -> Wei:
     return Wei(mean_reward)
 
 
-async def check_gas_price(high_priority: bool = False) -> bool:
-    if high_priority:
-        tx_params = await get_high_priority_tx_params()
-        max_fee_per_gas = Wei(int(tx_params['maxFeePerGas']))
-    else:
-        # fallback to logic from web3
-        max_fee_per_gas = await _max_fee_per_gas(execution_client, {})
-
-    if max_fee_per_gas >= Web3.to_wei(settings.max_fee_per_gas_gwei, 'gwei'):
-        logging.warning(
-            'Current gas price (%s gwei) is too high. '
-            'Will try to submit transaction on the next block if the gas '
-            'price is acceptable.',
-            Web3.from_wei(max_fee_per_gas, 'gwei'),
-        )
-        return False
-
-    return True
-
-
 class WalletTask(BaseTask):
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         await check_hot_wallet_balance()
+
+
+async def check_hot_wallet_balance() -> None:
+    hot_wallet_min_balance = settings.network_config.HOT_WALLET_MIN_BALANCE
+    symbol = settings.network_config.WALLET_BALANCE_SYMBOL
+
+    if hot_wallet_min_balance <= 0:
+        return
+
+    hot_wallet_balance = await get_hot_wallet_balance()
+
+    metrics.wallet_balance.set(hot_wallet_balance)
+
+    if hot_wallet_balance < hot_wallet_min_balance:
+        logger.warning(
+            'Wallet %s balance is too low. At least %s %s is recommended.',
+            hot_wallet.address,
+            Web3.from_wei(hot_wallet_min_balance, 'ether'),
+            symbol,
+        )
+
+
+async def get_hot_wallet_balance() -> Wei:
+    return await execution_client.eth.get_balance(hot_wallet.address)

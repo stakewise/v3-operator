@@ -62,15 +62,6 @@ class Credential:
     def withdrawal_credentials(self) -> Bytes32:
         return get_eth1_withdrawal_credentials(self.vault)
 
-    def encrypt_signing_keystore(self, password: str) -> Keystore:
-        return ScryptKeystore.encrypt(
-            secret=self.private_key_bytes,
-            password=password,
-            path=self.path,
-            kdf_salt=randbits(256).to_bytes(32, 'big'),
-            aes_iv=randbits(128).to_bytes(16, 'big'),
-        )
-
     def save_signing_keystore(
         self, password: str, folder: str, per_keystore_password: bool = False
     ) -> str:
@@ -85,6 +76,15 @@ class Credential:
 
         keystore.save(file_path)
         return file_path
+
+    def encrypt_signing_keystore(self, password: str) -> Keystore:
+        return ScryptKeystore.encrypt(
+            secret=self.private_key_bytes,
+            password=password,
+            path=self.path,
+            kdf_salt=randbits(256).to_bytes(32, 'big'),
+            aes_iv=randbits(128).to_bytes(16, 'big'),
+        )
 
     @property
     def deposit_message(self) -> DepositMessage:
@@ -181,6 +181,15 @@ class CredentialManager:
         return credentials
 
     @staticmethod
+    def generate_credential_first_public_key(network: str, vault: HexAddress, mnemonic: str) -> str:
+        return CredentialManager.generate_credential(
+            network=network,
+            vault=vault,
+            mnemonic=mnemonic,
+            index=0,
+        ).public_key
+
+    @staticmethod
     def generate_credential(
         network: str, vault: HexAddress, mnemonic: str, index: int
     ) -> Credential:
@@ -196,12 +205,3 @@ class CredentialManager:
         return Credential(
             private_key=private_key, path=signing_key_path, network=network, vault=vault
         )
-
-    @staticmethod
-    def generate_credential_first_public_key(network: str, vault: HexAddress, mnemonic: str) -> str:
-        return CredentialManager.generate_credential(
-            network=network,
-            vault=vault,
-            mnemonic=mnemonic,
-            index=0,
-        ).public_key

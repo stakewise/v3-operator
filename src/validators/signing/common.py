@@ -19,19 +19,6 @@ from src.validators.signing.key_shares import bls_signature_and_public_key_to_sh
 from src.validators.typings import ExitSignatureShards, Validator
 
 
-def encrypt_signature(oracle_pubkey: HexStr, signature: BLSSignature) -> HexStr:
-    return Web3.to_hex(ecies.encrypt(oracle_pubkey, signature))
-
-
-def encrypt_signatures_list(
-    oracle_pubkeys: list[HexStr], signatures: list[BLSSignature]
-) -> list[HexStr]:
-    res: list[HexStr] = []
-    for signature, oracle_pubkey in zip(signatures, oracle_pubkeys):
-        res.append(encrypt_signature(oracle_pubkey, signature))
-    return res
-
-
 def get_validators_proof(
     tree: StandardMerkleTree,
     validators: Sequence[Validator],
@@ -112,3 +99,16 @@ async def get_encrypted_exit_signature_shards(
         public_keys=[Web3.to_hex(p) for p in public_key_shares],
         exit_signatures=encrypted_exit_signature_shards,
     )
+
+
+def encrypt_signature(oracle_pubkey: HexStr, signature: BLSSignature) -> HexStr:
+    return Web3.to_hex(ecies.encrypt(oracle_pubkey, signature))
+
+
+def encrypt_signatures_list(
+    oracle_pubkeys: list[HexStr], signatures: list[BLSSignature]
+) -> list[HexStr]:
+    res: list[HexStr] = []
+    for signature, oracle_pubkey in zip(signatures, oracle_pubkeys):
+        res.append(encrypt_signature(oracle_pubkey, signature))
+    return res

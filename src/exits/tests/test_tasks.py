@@ -83,13 +83,6 @@ class TestGetOraclesRequest:
             assert request.deadline == deadline
 
 
-@contextlib.contextmanager
-def patch_latest_block(block_number):
-    with mock.patch('src.exits.tasks.execution_client', new=AsyncMock()) as execution_client_mock:
-        execution_client_mock.eth.get_block_number.return_value = block_number
-        yield
-
-
 @pytest.mark.usefixtures('fake_settings')
 class TestFetchLastExitSignatureUpdateBlock:
     async def test_normal(self):
@@ -134,3 +127,10 @@ class TestFetchLastExitSignatureUpdateBlock:
 
         assert last_update_block == 11
         get_event_mock.assert_called_once_with(vault=settings.vault, from_block=16, to_block=20)
+
+
+@contextlib.contextmanager
+def patch_latest_block(block_number):
+    with mock.patch('src.exits.tasks.execution_client', new=AsyncMock()) as execution_client_mock:
+        execution_client_mock.eth.get_block_number.return_value = block_number
+        yield

@@ -12,9 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 class Vault:
-    async def version(self) -> int:
-        return await vault_contract.version()
-
     async def get_validators_root(self) -> Bytes32:
         """Fetches vault's validators root."""
         if await self.version() == 1:
@@ -26,3 +23,6 @@ class Vault:
         if await self.version() == 1:
             return await vault_v1_contract.get_validators_index()
         return await deposit_data_registry_contract.get_validators_index()
+
+    async def version(self) -> int:
+        return await vault_contract.version()
