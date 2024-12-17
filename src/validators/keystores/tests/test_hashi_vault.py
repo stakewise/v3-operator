@@ -50,6 +50,7 @@ class TestHashiVault:
         async with ClientSession() as session:
             keystores_prefixes = await HashiVaultPrefixedKeysLoader._find_prefixed_hashi_vault_keys(
                 session=session,
+                prefix='ethereum/signing/prefixed1',
                 prefix_url=config.prefix_url('ethereum/signing/prefixed1'),
             )
         assert len(keystores_prefixes) == 2
@@ -136,7 +137,7 @@ class TestHashiVault:
             input_iter=iter(settings.hashi_vault_key_paths),
         )
         keys = {}
-        await loader.load_into_merged(keys)
+        await loader.load(keys)
 
         assert len(keys) == 4
 
@@ -161,7 +162,7 @@ class TestHashiVault:
             input_iter=iter(settings.hashi_vault_key_paths),
         )
         keys = {}
-        await loader.load_into_merged(keys)
+        await loader.load(keys)
 
         assert len(keys) == 4
 
@@ -222,7 +223,7 @@ class TestHashiVault:
             config=config, input_iter=iter(['ethereum/signing/prefixed1'])
         )
         keystore = {}
-        await loader.load_into_merged(keystore)
+        await loader.load(keystore)
 
         assert len(keystore) == 2
 

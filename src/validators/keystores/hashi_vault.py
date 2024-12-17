@@ -4,7 +4,7 @@ import itertools
 import logging
 import urllib.parse
 from dataclasses import dataclass
-from typing import AsyncContextManager, Iterator
+from typing import Iterator
 
 from aiohttp import ClientSession, ClientTimeout
 from eth_typing import HexStr
@@ -67,7 +67,7 @@ class HashiVaultKeysLoader(metaclass=abc.ABCMeta):
     config: HashiVaultConfiguration
     input_iter: Iterator[str]
 
-    def session(self) -> AsyncContextManager:
+    def session(self) -> ClientSession:
         return ClientSession(
             timeout=ClientTimeout(HASHI_VAULT_TIMEOUT),
             headers={'X-Vault-Token': self.config.token},
@@ -75,6 +75,8 @@ class HashiVaultKeysLoader(metaclass=abc.ABCMeta):
 
     @staticmethod
     def merge_keys_responses(keys_responses: list[Keys], merged_keys: Keys) -> None:
+        """Merge keys objects, proactively searching for duplicate keys to prevent
+        potential slashing."""
         for keys in keys_responses:
             for pk, sk in keys.items():
                 if pk in merged_keys:
@@ -82,17 +84,28 @@ class HashiVaultKeysLoader(metaclass=abc.ABCMeta):
                     raise RuntimeError('Found duplicate key in path')
                 merged_keys[pk] = sk
 
-    async def load_into_merged(self, merged_keys: Keys) -> None:
-        while key_chunk := list(itertools.islice(self.input_iter, self.config.parallelism)):
-            await self.process_keys_chunk(key_chunk, merged_keys)
-
     @abc.abstractmethod
-    async def process_keys_chunk(self, input_chunk: list[str], merged_keys: Keys) -> None:
-        """Given input_iter list of keys, load either bundled or prefixed keys."""
+    async def load(self, merged_keys: Keys) -> None:
+        """Populate merged_keys structure with validator keys from given loader."""
         raise NotImplementedError
 
 
 class HashiVaultBundledKeysLoader(HashiVaultKeysLoader):
+    async def load(self, merged_keys: Keys) -> None:
+        """Load all the key bundles from input locations."""
+        while key_chunk := list(itertools.islice(self.input_iter, self.config.parallelism)):
+            async with self.session() as session:
+                keys_responses = await asyncio.gather(
+                    *[
+                        self._load_bundled_hashi_vault_keys(
+                            session=session,
+                            secret_url=self.config.secret_url(key_path),
+                        )
+                        for key_path in key_chunk
+                    ]
+                )
+            self.merge_keys_responses(keys_responses, merged_keys)
+
     @staticmethod
     async def _load_bundled_hashi_vault_keys(session: ClientSession, secret_url: str) -> Keys:
         """
@@ -121,34 +134,47 @@ class HashiVaultBundledKeysLoader(HashiVaultKeysLoader):
         validator_keys = Keys(dict(keys))
         return validator_keys
 
-    async def process_keys_chunk(self, input_chunk: list[str], merged_keys: Keys) -> None:
-        async with self.session() as session:
-            keys_responses = await asyncio.gather(
-                *[
-                    self._load_bundled_hashi_vault_keys(
-                        session=session,
-                        secret_url=self.config.secret_url(key_path),
-                    )
-                    for key_path in input_chunk
-                ]
-            )
-        self.merge_keys_responses(keys_responses, merged_keys)
-
-
-@dataclass
-class PrefixedKeysLoadedCallback:
-    """Future done callback, that appends keys to shared dict."""
-
-    prefix: str
-    mapping: dict[str, list[str]]
-
-    def __call__(self, keys_future_resolved: asyncio.Future) -> None:
-        self.mapping.update({self.prefix: keys_future_resolved.result()})
-
 
 class HashiVaultPrefixedKeysLoader(HashiVaultKeysLoader):
+    async def load(self, merged_keys: Keys) -> None:
+        """Discover all the keys under given prefix. Then, load the keys into merged structure."""
+        prefix_leaf_location_tuples = []
+        while prefix_chunk := list(itertools.islice(self.input_iter, self.config.parallelism)):
+            async with self.session() as session:
+                prefix_leaf_location_tuples += await asyncio.gather(
+                    *[
+                        self._find_prefixed_hashi_vault_keys(
+                            session=session,
+                            prefix=prefix_path,
+                            prefix_url=self.config.prefix_url(prefix_path),
+                        )
+                        for prefix_path in prefix_chunk
+                    ]
+                )
+
+        # Flattened list of prefix, pubkey tuples
+        keys_paired_with_prefix: list[tuple[str, str]] = sum(
+            prefix_leaf_location_tuples,
+            [],
+        )
+        prefixed_keys_iter = iter(keys_paired_with_prefix)
+        while prefixed_chunk := list(itertools.islice(prefixed_keys_iter, self.config.parallelism)):
+            async with self.session() as session:
+                keys_responses = await asyncio.gather(
+                    *[
+                        self._load_prefixed_hashi_vault_key(
+                            session=session,
+                            secret_url=self.config.secret_url(f'{key_prefix}/{key_path}'),
+                        )
+                        for (key_prefix, key_path) in prefixed_chunk
+                    ]
+                )
+            self.merge_keys_responses(keys_responses, merged_keys)
+
     @staticmethod
-    async def _find_prefixed_hashi_vault_keys(session: ClientSession, prefix_url: str) -> list[str]:
+    async def _find_prefixed_hashi_vault_keys(
+        session: ClientSession, prefix: str, prefix_url: str
+    ) -> list[tuple[str, str]]:
         """
         Discover public keys under prefix in hashi vault K/V secret engine
 
@@ -165,7 +191,8 @@ class HashiVaultPrefixedKeysLoader(HashiVaultKeysLoader):
             for error in key_paths.get('errors', []):
                 logger.error('hashi vault error: %s', error)
             raise RuntimeError('Can not discover validator public keys from hashi vault')
-        return key_paths['data']['keys']
+        discovered_keys = key_paths['data']['keys']
+        return list(zip([prefix] * len(discovered_keys), discovered_keys))
 
     @staticmethod
     async def _load_prefixed_hashi_vault_key(session: ClientSession, secret_url: str) -> Keys:
@@ -179,7 +206,7 @@ class HashiVaultPrefixedKeysLoader(HashiVaultKeysLoader):
                 logger.error('hashi vault error: %s', error)
             raise RuntimeError('Can not retrieve validator signing keys from hashi vault')
         # Last chunk of URL is a public key
-        pk = secret_url.strip('/').split('/')[-1].strip('0x')
+        pk = add_0x_prefix(HexStr(secret_url.strip('/').split('/')[-1]))
         if len(key_data['data']['data']) > 1:
             raise RuntimeError(
                 f'Invalid multi-value secret at path {secret_url}, '
@@ -187,48 +214,7 @@ class HashiVaultPrefixedKeysLoader(HashiVaultKeysLoader):
             )
         sk = list(key_data['data']['data'].values())[0]
         sk_bytes = Web3.to_bytes(hexstr=sk)
-        return Keys({add_0x_prefix(HexStr(pk)): BLSPrivkey(sk_bytes)})
-
-    async def process_keys_chunk(self, input_chunk: list[str], merged_keys: Keys) -> None:
-        prefixed_keys_mapping: dict[str, list[str]] = {}
-        async with self.session() as session:
-            futs = []
-            for prefix_path in input_chunk:
-                fut = asyncio.create_task(
-                    self._find_prefixed_hashi_vault_keys(
-                        session=session, prefix_url=self.config.prefix_url(prefix_path)
-                    )
-                )
-                fut.add_done_callback(
-                    PrefixedKeysLoadedCallback(
-                        prefix=prefix_path,
-                        mapping=prefixed_keys_mapping,
-                    )
-                )
-                futs.append(fut)
-            await asyncio.gather(*futs)
-
-        # Flattened list of prefix, pubkey tuples
-        keys_paired_with_prefix: list[tuple[str, str]] = sum(
-            [
-                [(prefix, pubkey) for pubkey in loaded_values]
-                for (prefix, loaded_values) in prefixed_keys_mapping.items()
-            ],
-            [],
-        )
-        prefixed_keys_iter = iter(keys_paired_with_prefix)
-        while prefixed_chunk := list(itertools.islice(prefixed_keys_iter, self.config.parallelism)):
-            async with self.session() as session:
-                keys_responses = await asyncio.gather(
-                    *[
-                        self._load_prefixed_hashi_vault_key(
-                            session=session,
-                            secret_url=self.config.secret_url(f'{key_prefix}/{key_path}'),
-                        )
-                        for (key_prefix, key_path) in prefixed_chunk
-                    ]
-                )
-            self.merge_keys_responses(keys_responses, merged_keys)
+        return Keys({pk: BLSPrivkey(sk_bytes)})
 
 
 class HashiVaultKeystore(LocalKeystore):
@@ -247,6 +233,6 @@ class HashiVaultKeystore(LocalKeystore):
                 config=hashi_vault_config,
                 input_iter=input_iter,
             )
-            await loader.load_into_merged(merged_keys)
+            await loader.load(merged_keys)
 
         return HashiVaultKeystore(merged_keys)
