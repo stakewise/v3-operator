@@ -99,6 +99,12 @@ EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
     help='Key path in the K/V secret engine where validator signing keys are stored.',
 )
 @click.option(
+    '--hashi-vault-key-prefix',
+    envvar='HASHI_VAULT_KEY_PREFIX',
+    multiple=True,
+    help='Key prefix(es) in the K/V secret engine under which validator signing keys are stored.',
+)
+@click.option(
     '--hashi-vault-parallelism',
     envvar='HASHI_VAULT_PARALLELISM',
     help='How much requests to K/V secrets engine to do in parallel.',
@@ -136,6 +142,7 @@ def validators_exit(
     consensus_endpoints: str,
     remote_signer_url: str,
     hashi_vault_key_path: list[str] | None,
+    hashi_vault_key_prefix: list[str] | None,
     hashi_vault_token: str | None,
     hashi_vault_url: str | None,
     hashi_vault_engine_name: str,
@@ -159,6 +166,7 @@ def validators_exit(
         remote_signer_url=remote_signer_url,
         hashi_vault_token=hashi_vault_token,
         hashi_vault_key_paths=hashi_vault_key_path,
+        hashi_vault_key_prefixes=hashi_vault_key_prefix,
         hashi_vault_url=hashi_vault_url,
         hashi_vault_engine_name=hashi_vault_engine_name,
         hashi_vault_parallelism=hashi_vault_parallelism,
