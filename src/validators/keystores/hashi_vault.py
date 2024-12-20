@@ -49,17 +49,17 @@ class HashiVaultConfiguration:
             parallelism=settings.hashi_vault_parallelism,
         )
 
-    def secret_url(self, key_path: str, location: str = 'data') -> str:
-        return urllib.parse.urljoin(
-            self.url,
-            f'/v1/{self.engine_name}/{location}/{key_path}',
-        )
-
     def prefix_url(self, keys_prefix: str) -> str:
         """An URL for Vault secrets engine location that holds prefixes for keys."""
         keys_prefix = keys_prefix.strip('/')
         # URL is used for listing, so it lists metadata
         return self.secret_url(keys_prefix, location='metadata')
+
+    def secret_url(self, key_path: str, location: str = 'data') -> str:
+        return urllib.parse.urljoin(
+            self.url,
+            f'/v1/{self.engine_name}/{location}/{key_path}',
+        )
 
 
 @dataclass
@@ -221,7 +221,7 @@ class HashiVaultKeystore(LocalKeystore):
     @staticmethod
     async def load() -> 'HashiVaultKeystore':
         """Extracts private keys from the keystores."""
-        hashi_vault_config = HashiVaultConfiguration.from_settings()
+        hashi_vault_config = HashiVaultConfiguration.from_settings()  # noqa: NEW100
 
         merged_keys = Keys({})
 

@@ -8,25 +8,6 @@ from src.config.settings import settings
 from src.remote_db.typings import RemoteDatabaseKeyPair
 
 
-def get_db_connection(db_url: str):  # type: ignore
-    import psycopg2  # pylint: disable=import-outside-toplevel
-
-    return psycopg2.connect(dsn=db_url)
-
-
-def check_db_connection(db_url: str) -> None:
-    import psycopg2  # pylint: disable=import-outside-toplevel
-
-    try:
-        with get_db_connection(db_url) as conn:
-            cur = conn.cursor()
-            cur.execute('SELECT 1')
-    except psycopg2.OperationalError as e:
-        raise click.ClickException(
-            f'Error: failed to connect to the database server with provided URL.\n' f'Details: {e}',
-        )
-
-
 class KeyPairsCrud:
     def __init__(self, db_connection: Any | None = None, db_url: str | None = None):
         if db_connection:
@@ -226,3 +207,22 @@ class ConfigsCrud:
                     )
                 '''
             )
+
+
+def check_db_connection(db_url: str) -> None:
+    import psycopg2  # pylint: disable=import-outside-toplevel
+
+    try:
+        with get_db_connection(db_url) as conn:
+            cur = conn.cursor()
+            cur.execute('SELECT 1')
+    except psycopg2.OperationalError as e:
+        raise click.ClickException(
+            f'Error: failed to connect to the database server with provided URL.\n' f'Details: {e}',
+        )
+
+
+def get_db_connection(db_url: str):  # type: ignore
+    import psycopg2  # pylint: disable=import-outside-toplevel
+
+    return psycopg2.connect(dsn=db_url)

@@ -15,7 +15,6 @@ from src.common.contracts import (
     validators_registry_contract,
     vault_contract,
 )
-from src.common.metrics import metrics
 from src.common.typings import HarvestParams
 from src.common.vault import Vault
 from src.config.settings import DEPOSIT_AMOUNT, settings
@@ -101,24 +100,12 @@ def process_network_validator_events(events: list[EventData]) -> list[NetworkVal
     return result
 
 
-def process_network_validator_event(
-    event: EventData, fork_version: bytes
-) -> NetworkValidator | None:
-    """
-    Processes validator deposit event
-    and returns its public key if the deposit is valid.
-    """
-    public_key = event['args']['pubkey']
-    withdrawal_creds = event['args']['withdrawal_credentials']
-    amount_gwei = struct.unpack('<Q', event['args']['amount'])[0]
-    signature = event['args']['signature']
-    if is_valid_deposit_data_signature(
-        public_key, withdrawal_creds, signature, amount_gwei, fork_version
-    ):
-        return NetworkValidator(
-            public_key=Web3.to_hex(public_key), block_number=BlockNumber(event['blockNumber'])
-        )
-    return None
+async def get_validators_start_index() -> int:
+    latest_public_keys = await get_latest_network_validator_public_keys()
+    validators_start_index = NetworkValidatorCrud().get_next_validator_index(
+        list(latest_public_keys)
+    )
+    return validators_start_index
 
 
 async def get_latest_network_validator_public_keys() -> Set[HexStr]:
@@ -143,6 +130,26 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
     return new_public_keys
 
 
+def process_network_validator_event(
+    event: EventData, fork_version: bytes
+) -> NetworkValidator | None:
+    """
+    Processes validator deposit event
+    and returns its public key if the deposit is valid.
+    """
+    public_key = event['args']['pubkey']
+    withdrawal_creds = event['args']['withdrawal_credentials']
+    amount_gwei = struct.unpack('<Q', event['args']['amount'])[0]
+    signature = event['args']['signature']
+    if is_valid_deposit_data_signature(
+        public_key, withdrawal_creds, signature, amount_gwei, fork_version
+    ):
+        return NetworkValidator(
+            public_key=Web3.to_hex(public_key), block_number=BlockNumber(event['blockNumber'])
+        )
+    return None
+
+
 async def get_withdrawable_assets(harvest_params: HarvestParams | None) -> Wei:
     """Fetches vault's available assets for staking."""
     before_update_assets = await vault_contract.functions.withdrawableAssets().call()
@@ -163,17 +170,6 @@ async def get_withdrawable_assets(harvest_params: HarvestParams | None) -> Wei:
         return Wei(after_update_assets)
 
     return Wei(before_update_assets)
-
-
-async def check_deposit_data_root(deposit_data_root: str) -> None:
-    """Checks whether deposit data root matches validators root in Vault."""
-
-    vault_deposit_data_root = await Vault().get_validators_root()
-    if deposit_data_root != Web3.to_hex(vault_deposit_data_root):
-        raise RuntimeError(
-            "Deposit data tree root and vault's validators root don't match."
-            ' Have you updated vault deposit data?'
-        )
 
 
 async def get_validators_from_deposit_data(
@@ -216,33 +212,12 @@ async def get_validators_from_deposit_data(
     return validators
 
 
-async def update_unused_validator_keys_metric(
-    keystore: BaseKeystore,
-    deposit_data: DepositData,
-) -> int:
-    try:
-        await check_deposit_data_root(deposit_data.tree.root)
-    except RuntimeError:
-        metrics.unused_validator_keys.set(0)
-        return 0
+async def check_deposit_data_root(deposit_data_root: str) -> None:
+    """Checks whether deposit data root matches validators root in Vault."""
 
-    validators: int = 0
-    for validator in deposit_data.validators:
-        if validator.public_key not in keystore:
-            continue
-
-        if NetworkValidatorCrud().is_validator_registered(validator.public_key):
-            continue
-        validators += 1
-
-    metrics.unused_validator_keys.set(validators)
-
-    return validators
-
-
-async def get_validators_start_index() -> int:
-    latest_public_keys = await get_latest_network_validator_public_keys()
-    validators_start_index = NetworkValidatorCrud().get_next_validator_index(
-        list(latest_public_keys)
-    )
-    return validators_start_index
+    vault_deposit_data_root = await Vault().get_validators_root()
+    if deposit_data_root != Web3.to_hex(vault_deposit_data_root):
+        raise RuntimeError(
+            "Deposit data tree root and vault's validators root don't match."
+            ' Have you updated vault deposit data?'
+        )

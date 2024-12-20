@@ -18,36 +18,6 @@ from src.validators.typings import ExitSignatureShards
 
 
 class TestGetEncryptedExitSignatureShards:
-    @staticmethod
-    def check_signature_shards(
-        shards: ExitSignatureShards,
-        committee: OracleCommittee,
-        validator_pubkey: BLSPubkey,
-        validator_index: int,
-        fork: ConsensusFork,
-        exit_signature: BLSSignature | None = None,
-    ):
-        committee.verify_signature_shards(
-            validator_pubkey=validator_pubkey,
-            validator_index=validator_index,
-            fork=fork,
-            exit_signature_shards=shards,
-            exit_signature=exit_signature,
-        )
-
-        # If less than exit_signature_recover_threshold signatures are used,
-        # the signature should not be possible to reconstruct
-        with pytest.raises(AssertionError, match='Unable to reconstruct full signature'):
-            committee.exit_signature_recover_threshold -= 1
-            committee.verify_signature_shards(
-                validator_pubkey=validator_pubkey,
-                validator_index=validator_index,
-                fork=fork,
-                exit_signature_shards=shards,
-            )
-        # Revert the change to exit_signature_recover_threshold
-        committee.exit_signature_recover_threshold += 1
-
     @pytest.mark.usefixtures('fake_settings')
     @pytest.mark.parametrize(
         ['_mocked_oracle_committee'],
@@ -197,3 +167,33 @@ class TestGetEncryptedExitSignatureShards:
                 protocol_config=mocked_protocol_config,
                 fork=fork,
             )
+
+    @staticmethod
+    def check_signature_shards(
+        shards: ExitSignatureShards,
+        committee: OracleCommittee,
+        validator_pubkey: BLSPubkey,
+        validator_index: int,
+        fork: ConsensusFork,
+        exit_signature: BLSSignature | None = None,
+    ):
+        committee.verify_signature_shards(
+            validator_pubkey=validator_pubkey,
+            validator_index=validator_index,
+            fork=fork,
+            exit_signature_shards=shards,
+            exit_signature=exit_signature,
+        )
+
+        # If less than exit_signature_recover_threshold signatures are used,
+        # the signature should not be possible to reconstruct
+        with pytest.raises(AssertionError, match='Unable to reconstruct full signature'):
+            committee.exit_signature_recover_threshold -= 1
+            committee.verify_signature_shards(
+                validator_pubkey=validator_pubkey,
+                validator_index=validator_index,
+                fork=fork,
+                exit_signature_shards=shards,
+            )
+        # Revert the change to exit_signature_recover_threshold
+        committee.exit_signature_recover_threshold += 1

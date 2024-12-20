@@ -5,6 +5,19 @@ from pathlib import Path
 SPECIAL_CHARS = '!@#$%^&*()_'
 
 
+def get_or_create_password_file(password_file: Path) -> str:
+    try:
+        with open(password_file, 'r', encoding='utf-8') as file:
+            password = file.readline()
+    except FileNotFoundError:
+        password = generate_password()
+        password_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(password_file, 'w', encoding='utf-8') as file:
+            file.write(password)
+
+    return password
+
+
 def generate_password() -> str:
     alphabet = string.ascii_letters + string.digits + SPECIAL_CHARS
     lower_set = set(string.ascii_lowercase)
@@ -21,16 +34,3 @@ def generate_password() -> str:
             and digits_set.intersection(password_set)
         ):
             return ''.join(password)
-
-
-def get_or_create_password_file(password_file: Path) -> str:
-    try:
-        with open(password_file, 'r', encoding='utf-8') as file:
-            password = file.readline()
-    except FileNotFoundError:
-        password = generate_password()
-        password_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(password_file, 'w', encoding='utf-8') as file:
-            file.write(password)
-
-    return password

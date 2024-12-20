@@ -39,30 +39,6 @@ def _patch_check_deposit_data_root() -> Generator:
         yield
 
 
-def _get_remote_db_keypairs(
-    encryption_key: bytes, vault_address: HexAddress, total_validators: int
-) -> list[RemoteDatabaseKeyPair]:
-    keystores = {}
-    for _ in range(total_validators):
-        seed = randbits(256).to_bytes(32, 'big')
-        private_key = BLSPrivkey(G2ProofOfPossession.KeyGen(seed).to_bytes(32, 'big'))
-        public_key = Web3.to_hex(bls.SkToPk(private_key))
-        keystores[public_key] = private_key
-
-    key_records: list[RemoteDatabaseKeyPair] = []
-    for public_key, private_key in keystores.items():  # pylint: disable=no-member
-        encrypted_priv_key, nonce = _encrypt_private_key(private_key, encryption_key)
-        key_records.append(
-            RemoteDatabaseKeyPair(
-                vault=ChecksumAddress(vault_address),
-                public_key=public_key,
-                private_key=Web3.to_hex(encrypted_priv_key),
-                nonce=Web3.to_hex(nonce),
-            )
-        )
-    return key_records
-
-
 @pytest.mark.usefixtures('_init_vault', '_patch_check_db_connection', '_patch_get_db_connection')
 class TestRemoteDbSetup:
     def test_setup_works(
@@ -342,3 +318,27 @@ class TestRemoteDbSetupOperator:
             result = runner.invoke(remote_db_group, args)
             output = 'Successfully created operator configuration file.\n'
             assert output.strip() in result.output.strip()
+
+
+def _get_remote_db_keypairs(
+    encryption_key: bytes, vault_address: HexAddress, total_validators: int
+) -> list[RemoteDatabaseKeyPair]:
+    keystores = {}
+    for _ in range(total_validators):
+        seed = randbits(256).to_bytes(32, 'big')
+        private_key = BLSPrivkey(G2ProofOfPossession.KeyGen(seed).to_bytes(32, 'big'))
+        public_key = Web3.to_hex(bls.SkToPk(private_key))
+        keystores[public_key] = private_key
+
+    key_records: list[RemoteDatabaseKeyPair] = []
+    for public_key, private_key in keystores.items():  # pylint: disable=no-member
+        encrypted_priv_key, nonce = _encrypt_private_key(private_key, encryption_key)
+        key_records.append(
+            RemoteDatabaseKeyPair(
+                vault=ChecksumAddress(vault_address),
+                public_key=public_key,
+                private_key=Web3.to_hex(encrypted_priv_key),
+                nonce=Web3.to_hex(nonce),
+            )
+        )
+    return key_records

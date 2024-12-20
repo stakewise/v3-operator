@@ -220,16 +220,6 @@ def setup_operator(db_url: str, output_dir: Path) -> None:
     click.secho(f'Operator deposit data saved to {greenify(output_file)} file.')
 
 
-def _encrypt_private_key(private_key: BLSPrivkey, encryption_key: bytes) -> tuple[bytes, bytes]:
-    cipher = AES.new(encryption_key, AES.MODE_EAX)
-    return cipher.encrypt(private_key), cipher.nonce
-
-
-def _decrypt_private_key(private_key: bytes, encryption_key: bytes, nonce: bytes) -> BLSPrivkey:
-    cipher = AES.new(encryption_key, AES.MODE_EAX, nonce=nonce)
-    return BLSPrivkey(cipher.decrypt(private_key))
-
-
 def _check_encryption_key(db_url: str, b64_encrypt_key: str) -> bytes:
     try:
         encryption_key = base64.b64decode(b64_encrypt_key)
@@ -255,6 +245,16 @@ def _check_encryption_key(db_url: str, b64_encrypt_key: str) -> bytes:
         raise click.ClickException('Failed to decrypt first private key.')
 
     return encryption_key
+
+
+def _encrypt_private_key(private_key: BLSPrivkey, encryption_key: bytes) -> tuple[bytes, bytes]:
+    cipher = AES.new(encryption_key, AES.MODE_EAX)
+    return cipher.encrypt(private_key), cipher.nonce
+
+
+def _decrypt_private_key(private_key: bytes, encryption_key: bytes, nonce: bytes) -> BLSPrivkey:
+    cipher = AES.new(encryption_key, AES.MODE_EAX, nonce=nonce)
+    return BLSPrivkey(cipher.decrypt(private_key))
 
 
 def _generate_lighthouse_config(

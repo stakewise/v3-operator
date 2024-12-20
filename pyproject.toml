@@ -42,6 +42,7 @@ coverage = "==7.3.2"
 aioresponses = "^0.7.4"
 types-requests = "==2.31.0.20240406"
 types-setuptools = "==70.0.0.20240524"
+flake8-newspaper-style = "==0.4.3"
 
 [tool.poetry.group.build.dependencies]
 pyinstaller = "==5.13.2"
