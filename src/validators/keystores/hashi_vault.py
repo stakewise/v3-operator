@@ -105,30 +105,27 @@ class HashiVaultKeysLoader(metaclass=abc.ABCMeta):
 
 class HashiVaultBundledKeysLoader(HashiVaultKeysLoader):
     async def load(self) -> HashiKeys:
-        return await self._load_from_key_paths(self.config.key_paths)
+        async with self.session() as session:
+            return await self._load_from_key_paths(session=session)
 
-    async def _load_from_key_paths(self, key_paths: list[str]) -> HashiKeys:
+    async def _load_from_key_paths(self, session: ClientSession) -> HashiKeys:
         """Load all the key bundles from key paths."""
         merged_keys = HashiKeys()
+        key_paths_iter = iter(self.config.key_paths)
 
-        while key_chunk := list(itertools.islice(key_paths, self.config.parallelism)):
-            async with self.session() as session:
-                keys_responses = await asyncio.gather(
-                    *[
-                        self._load_bundled_keys(
-                            session=session,
-                            secret_url=self.config.secret_url(key_path),
-                        )
-                        for key_path in key_chunk
-                    ]
-                )
+        while key_chunk := list(itertools.islice(key_paths_iter, self.config.parallelism)):
+            keys_responses = await asyncio.gather(
+                *[
+                    self._load_bundled_keys(session=session, key_path=key_path)
+                    for key_path in key_chunk
+                ]
+            )
             for keys_response in keys_responses:
                 merged_keys.update(keys_response)
 
         return merged_keys
 
-    @staticmethod
-    async def _load_bundled_keys(session: ClientSession, secret_url: str) -> Keys:
+    async def _load_bundled_keys(self, session: ClientSession, key_path: str) -> Keys:
         """
         Load public and private keys from hashi vault
         K/V secret engine.
@@ -136,6 +133,7 @@ class HashiVaultBundledKeysLoader(HashiVaultKeysLoader):
         All public and private keys must be stored as hex string  with or without 0x prefix.
         """
         keys = []
+        secret_url = self.config.secret_url(key_path)
         logger.info('Will load validator keys from %s', secret_url)
 
         async with session.get(secret_url) as response:
@@ -181,10 +179,9 @@ class HashiVaultPrefixedKeysLoader(HashiVaultKeysLoader):
 
     async def _get_prefix_pubkey_pairs(self, session: ClientSession) -> list[tuple[str, str]]:
         prefix_pubkey_pairs: list[tuple[str, str]] = []
+        key_prefixes_iter = iter(self.config.key_prefixes)
 
-        while prefix_chunk := list(
-            itertools.islice(self.config.key_prefixes, self.config.parallelism)
-        ):
+        while prefix_chunk := list(itertools.islice(key_prefixes_iter, self.config.parallelism)):
             keys_results = await asyncio.gather(
                 *[
                     self._find_keys_by_prefix(
