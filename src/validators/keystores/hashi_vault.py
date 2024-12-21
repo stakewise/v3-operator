@@ -115,7 +115,7 @@ class HashiVaultBundledKeysLoader(HashiVaultKeysLoader):
             async with self.session() as session:
                 keys_responses = await asyncio.gather(
                     *[
-                        self._load_bundled_hashi_vault_keys(
+                        self._load_bundled_keys(
                             session=session,
                             secret_url=self.config.secret_url(key_path),
                         )
@@ -128,7 +128,7 @@ class HashiVaultBundledKeysLoader(HashiVaultKeysLoader):
         return merged_keys
 
     @staticmethod
-    async def _load_bundled_hashi_vault_keys(session: ClientSession, secret_url: str) -> Keys:
+    async def _load_bundled_keys(session: ClientSession, secret_url: str) -> Keys:
         """
         Load public and private keys from hashi vault
         K/V secret engine.
@@ -170,9 +170,7 @@ class HashiVaultPrefixedKeysLoader(HashiVaultKeysLoader):
         ):
             keys_responses = await asyncio.gather(
                 *[
-                    self._load_prefixed_hashi_vault_key(
-                        session=session, prefix=prefix, pubkey=pubkey
-                    )
+                    self._load_prefixed_key(session=session, prefix=prefix, pubkey=pubkey)
                     for prefix, pubkey in prefix_pubkey_chunk
                 ]
             )
@@ -226,9 +224,7 @@ class HashiVaultPrefixedKeysLoader(HashiVaultKeysLoader):
         discovered_keys = key_paths['data']['keys']
         return discovered_keys
 
-    async def _load_prefixed_hashi_vault_key(
-        self, session: ClientSession, prefix: str, pubkey: str
-    ) -> Keys:
+    async def _load_prefixed_key(self, session: ClientSession, prefix: str, pubkey: str) -> Keys:
         secret_url = self.config.secret_url(f'{prefix}/{pubkey}')
         logger.info('Will load keys from %s', secret_url)
 

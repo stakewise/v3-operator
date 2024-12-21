@@ -26,7 +26,7 @@ class TestHashiVault:
         config = HashiVaultConfiguration.from_settings()
 
         async with ClientSession() as session:
-            keystore = await HashiVaultBundledKeysLoader._load_bundled_hashi_vault_keys(
+            keystore = await HashiVaultBundledKeysLoader._load_bundled_keys(
                 session=session,
                 secret_url=config.secret_url('ethereum/signing/keystores'),
             )
@@ -70,7 +70,7 @@ class TestHashiVault:
         config = HashiVaultConfiguration.from_settings()
 
         async with ClientSession() as session:
-            keystore = await HashiVaultPrefixedKeysLoader._load_prefixed_hashi_vault_key(
+            keystore = await HashiVaultPrefixedKeysLoader._load_prefixed_key(
                 session=session,
                 secret_url=config.secret_url(
                     'ethereum/signing/prefixed1/8b09379ca969e8283a42a09285f430e8bd58c70bb33b44397ae81dac01b1403d0f631f156d211b6931a1c6284e2e469c',
@@ -111,7 +111,7 @@ class TestHashiVault:
         ):
             config = HashiVaultConfiguration.from_settings()
             async with ClientSession() as session:
-                await HashiVaultBundledKeysLoader._load_bundled_hashi_vault_keys(
+                await HashiVaultBundledKeysLoader._load_bundled_keys(
                     session=session,
                     secret_url=config.secret_url('ethereum/inaccessible/keystores'),
                 )
@@ -198,7 +198,7 @@ class TestHashiVault:
         config = HashiVaultConfiguration.from_settings()
 
         async with ClientSession() as session:
-            keystore = await HashiVaultBundledKeysLoader._load_bundled_hashi_vault_keys(
+            keystore = await HashiVaultBundledKeysLoader._load_bundled_keys(
                 session=session,
                 secret_url=config.secret_url('ethereum/signing/keystores'),
             )
