@@ -1,6 +1,5 @@
 import abc
 import asyncio
-import itertools
 import logging
 import urllib.parse
 from dataclasses import dataclass
@@ -11,6 +10,7 @@ from eth_typing import HexStr
 from eth_utils import add_0x_prefix
 from web3 import Web3
 
+from src.common.utils import chunkify
 from src.config.settings import HASHI_VAULT_TIMEOUT, settings
 from src.validators.keystores.local import Keys, LocalKeystore
 from src.validators.typings import BLSPrivkey
@@ -111,9 +111,8 @@ class HashiVaultBundledKeysLoader(HashiVaultKeysLoader):
     async def _load_from_key_paths(self, session: ClientSession) -> HashiKeys:
         """Load all the key bundles from key paths."""
         merged_keys = HashiKeys()
-        key_paths_iter = iter(self.config.key_paths)
 
-        while key_chunk := list(itertools.islice(key_paths_iter, self.config.parallelism)):
+        for key_chunk in chunkify(self.config.key_paths, self.config.parallelism):
             keys_responses = await asyncio.gather(
                 *[
                     self._load_bundled_keys(session=session, key_path=key_path)
@@ -163,9 +162,7 @@ class HashiVaultPrefixedKeysLoader(HashiVaultKeysLoader):
         merged_keys = HashiKeys()
         prefix_pubkey_pairs = await self._get_prefix_pubkey_pairs(session=session)
 
-        while prefix_pubkey_chunk := list(
-            itertools.islice(iter(prefix_pubkey_pairs), self.config.parallelism)
-        ):
+        for prefix_pubkey_chunk in chunkify(prefix_pubkey_pairs, self.config.parallelism):
             keys_responses = await asyncio.gather(
                 *[
                     self._load_prefixed_key(session=session, prefix=prefix, pubkey=pubkey)
@@ -179,9 +176,8 @@ class HashiVaultPrefixedKeysLoader(HashiVaultKeysLoader):
 
     async def _get_prefix_pubkey_pairs(self, session: ClientSession) -> list[tuple[str, str]]:
         prefix_pubkey_pairs: list[tuple[str, str]] = []
-        key_prefixes_iter = iter(self.config.key_prefixes)
 
-        while prefix_chunk := list(itertools.islice(key_prefixes_iter, self.config.parallelism)):
+        for prefix_chunk in chunkify(self.config.key_prefixes, self.config.parallelism):
             keys_results = await asyncio.gather(
                 *[
                     self._find_keys_by_prefix(
