@@ -158,23 +158,26 @@ class HashiVaultBundledKeysLoader(HashiVaultKeysLoader):
 
 class HashiVaultPrefixedKeysLoader(HashiVaultKeysLoader):
     async def load(self) -> HashiKeys:
-        return await self._load_from_key_prefixes(self.config.key_prefixes)
+        async with self.session() as session:
+            return await self._load_from_key_prefixes(
+                session=session, key_prefixes=self.config.key_prefixes
+            )
 
-    async def _load_from_key_prefixes(self, key_prefixes: list[str]) -> HashiKeys:
+    async def _load_from_key_prefixes(
+        self, session: ClientSession, key_prefixes: list[str]
+    ) -> HashiKeys:
         """Discover all the keys under given prefix. Then, load the keys into merged structure."""
         prefix_leaf_location_tuples = []
         while prefix_chunk := list(itertools.islice(key_prefixes, self.config.parallelism)):
-            async with self.session() as session:
-                prefix_leaf_location_tuples += await asyncio.gather(
-                    *[
-                        self._find_prefixed_hashi_vault_keys(
-                            session=session,
-                            prefix=prefix_path,
-                            prefix_url=self.config.prefix_url(prefix_path),
-                        )
-                        for prefix_path in prefix_chunk
-                    ]
-                )
+            prefix_leaf_location_tuples += await asyncio.gather(
+                *[
+                    self._find_prefixed_hashi_vault_keys(
+                        session=session,
+                        prefix=prefix_path,
+                    )
+                    for prefix_path in prefix_chunk
+                ]
+            )
 
         # Flattened list of prefix, pubkey tuples
         keys_paired_with_prefix: list[tuple[str, str]] = sum(
@@ -184,24 +187,22 @@ class HashiVaultPrefixedKeysLoader(HashiVaultKeysLoader):
         merged_keys = HashiKeys()
         prefixed_keys_iter = iter(keys_paired_with_prefix)
         while prefixed_chunk := list(itertools.islice(prefixed_keys_iter, self.config.parallelism)):
-            async with self.session() as session:
-                keys_responses = await asyncio.gather(
-                    *[
-                        self._load_prefixed_hashi_vault_key(
-                            session=session,
-                            secret_url=self.config.secret_url(f'{key_prefix}/{key_path}'),
-                        )
-                        for (key_prefix, key_path) in prefixed_chunk
-                    ]
-                )
+            keys_responses = await asyncio.gather(
+                *[
+                    self._load_prefixed_hashi_vault_key(
+                        session=session,
+                        secret_url=self.config.secret_url(f'{key_prefix}/{key_path}'),
+                    )
+                    for key_prefix, key_path in prefixed_chunk
+                ]
+            )
             for keys_response in keys_responses:
                 merged_keys.update(keys_response)
 
         return merged_keys
 
-    @staticmethod
     async def _find_prefixed_hashi_vault_keys(
-        session: ClientSession, prefix: str, prefix_url: str
+        self, session: ClientSession, prefix: str
     ) -> list[tuple[str, str]]:
         """
         Discover public keys under prefix in hashi vault K/V secret engine
@@ -210,6 +211,7 @@ class HashiVaultPrefixedKeysLoader(HashiVaultKeysLoader):
         all secret keys are stored under these paths with arbitrary secret dictionary
         key, and secret value with or without 0x prefix.
         """
+        prefix_url = self.config.prefix_url(prefix)
         logger.info('Will discover validator keys in %s', prefix_url)
         response = await session.request(method='LIST', url=prefix_url)
         response.raise_for_status()
