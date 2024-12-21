@@ -138,10 +138,9 @@ class HashiVaultBundledKeysLoader(HashiVaultKeysLoader):
         keys = []
         logger.info('Will load validator keys from %s', secret_url)
 
-        response = await session.get(secret_url)
-        response.raise_for_status()
-
-        key_data = await response.json()
+        async with session.get(secret_url) as response:
+            response.raise_for_status()
+            key_data = await response.json()
 
         if 'data' not in key_data:
             logger.error('Failed to retrieve keys from hashi vault')
@@ -214,9 +213,11 @@ class HashiVaultPrefixedKeysLoader(HashiVaultKeysLoader):
         """
         prefix_url = self.config.prefix_url(prefix)
         logger.info('Will discover validator keys in %s', prefix_url)
-        response = await session.request(method='LIST', url=prefix_url)
-        response.raise_for_status()
-        key_paths = await response.json()
+
+        async with session.request(method='LIST', url=prefix_url) as response:
+            response.raise_for_status()
+            key_paths = await response.json()
+
         if 'data' not in key_paths:
             logger.error('Failed to discover keys in hashi vault')
             for error in key_paths.get('errors', []):
@@ -230,9 +231,11 @@ class HashiVaultPrefixedKeysLoader(HashiVaultKeysLoader):
     ) -> Keys:
         secret_url = self.config.secret_url(f'{prefix}/{pubkey}')
         logger.info('Will load keys from %s', secret_url)
-        response = await session.get(url=secret_url)
-        response.raise_for_status()
-        key_data = await response.json()
+
+        async with session.get(url=secret_url) as response:
+            response.raise_for_status()
+            key_data = await response.json()
+
         if 'data' not in key_data:
             logger.error('Failed to retrieve keys from hashi vault')
             for error in key_data.get('errors', []):
