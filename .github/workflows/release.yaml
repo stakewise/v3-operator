@@ -106,7 +106,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y build-essential curl libpq-dev postgresql-client
-        if: matrix.os == 'linux-arm-runner'
+        if: matrix.os == 'linux-arm-runner' || matrix.os == 'macos-13'
 
       - uses: actions/setup-python@v4
         with:
