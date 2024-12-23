@@ -111,6 +111,7 @@ jobs:
       - name: Install build dependencies for MacOS
         run: |
           brew install libpq
+          brew link --force libpq
         if: matrix.os == 'macos-13'
 
       - uses: actions/setup-python@v4
