@@ -63,6 +63,11 @@ class HashiVaultConfiguration:
 
 
 class HashiKeys:
+    """
+    Wrapper around Keys that proactively searches for duplicate keys to prevent
+    potential slashing.
+    """
+
     def __init__(self, keys: Keys | None = None):
         self.keys = keys or Keys({})
 
@@ -70,8 +75,6 @@ class HashiKeys:
         return self.keys[key]
 
     def __setitem__(self, key: HexStr, value: BLSPrivkey) -> None:
-        """Add new key/value pair proactively searching for duplicate keys to prevent
-        potential slashing."""
         if key in self.keys:
             raise RuntimeError(f'Duplicate validator key {key} found in hashi vault')
         self.keys[key] = value
@@ -82,6 +85,9 @@ class HashiKeys:
     def update(self, new_keys: 'HashiKeys' | Keys) -> None:
         for key, value in new_keys.items():
             self[key] = value
+
+    def __len__(self) -> int:
+        return len(self.keys)
 
     def __repr__(self) -> str:
         return f'HashiKeys({self.keys})'
