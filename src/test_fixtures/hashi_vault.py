@@ -4,6 +4,8 @@ from typing import Generator
 
 import pytest
 from aioresponses import CallbackResult, aioresponses
+from sw_utils.tests import faker
+from web3 import Web3
 
 
 @pytest.fixture
@@ -11,47 +13,53 @@ def hashi_vault_url() -> str:
     return 'http://vault:8200'
 
 
+class HashiVaultStub:
+    bundled_pk_1 = faker.validator_public_key()
+    bundled_sk_1 = Web3.to_hex(faker.private_key())
+
+    bundled_pk_2 = faker.validator_public_key()
+    bundled_sk_2 = Web3.to_hex(faker.private_key())
+
+    bundled_pk_3 = faker.validator_public_key()
+    bundled_sk_3 = Web3.to_hex(faker.private_key())
+
+    bundled_pk_4 = faker.validator_public_key()
+    bundled_sk_4 = Web3.to_hex(faker.private_key())
+
+    prefixed_pk_1 = faker.validator_public_key()
+    prefixed_sk_1 = Web3.to_hex(faker.private_key())
+
+    prefixed_pk_2 = faker.validator_public_key()
+    prefixed_sk_2 = Web3.to_hex(faker.private_key())
+
+    prefixed_pk_3 = faker.validator_public_key()
+    prefixed_sk_3 = Web3.to_hex(faker.private_key())
+
+    prefixed_pk_4 = faker.validator_public_key()
+    prefixed_sk_4 = Web3.to_hex(faker.private_key())
+
+
 @pytest.fixture
 def mocked_hashi_vault(
     hashi_vault_url: str,
 ) -> Generator:
-    # Generated via
-    # eth-staking-smith existing-mnemonic \
-    #   --chain holesky \
-    #   --num_validators 2 \
-    #   --mnemonic 'provide iron update bronze session immense garage want round enhance artefact position make wash analyst skirt float jealous trend spread ginger rapid express tool'
     _hashi_vault_pk_sk_mapping_1 = {
-        'b05e93c4501233eeb7f1e7b0ee400caaa04608249c4aab61c18e04c675aaf2a0f03808d533c877fbbd57b04927c01ce0': '3eeedd7a6679d2e2036682b6f03ef16105a847321303aec163548aa3fa5e9eeb',
-        'aa84894836cb3d897a1a11344920c41c472ed67667fd8a3453e557214442370ffc1d007ae7af67120de00afa068349be': '236f33410e6972a2db36ba3736099396768219b327e18eae49392f153007d468',
+        HashiVaultStub.bundled_pk_1: HashiVaultStub.bundled_sk_1,
+        HashiVaultStub.bundled_pk_2: HashiVaultStub.bundled_sk_2,
     }
-    # Generated via
-    # eth-staking-smith existing-mnemonic \
-    #   --chain holesky \
-    #   --num_validators 2 \
-    #   --mnemonic 'wheel treat brand feel motion atom card impose achieve rough shove bless glory wheel gold ensure maid despair turtle carry recall best outer fuel'
     _hashi_vault_pk_sk_mapping_2 = {
-        '9548e46c8e3b11d686b11fe5c4aea53a6ffd6cef622920fe8d73b4b7bff71938d2a0652b607fa6d757e840f3ddc2d7a4': '2c7310981a6e12bef7f444860b450c70235acd3e9f74e0a3ee82da3fdbc657a5',
-        '8bc90a3110cf2b1ebaf8f5367bbfec1066797fca1f71ddbbf4f8f37ef74064404a78c31284c571656b7cb6efa29445ab': '56336628453e51cb9158da0651ea27dcb297eacdbd5cffdf0ea9d65fa154c327',
+        HashiVaultStub.bundled_pk_3: HashiVaultStub.bundled_sk_3,
+        HashiVaultStub.bundled_pk_4: HashiVaultStub.bundled_sk_4,
     }
 
-    # Generated via
-    # eth-staking-smith existing-mnemonic \
-    #   --chain holesky \
-    #   --num_validators 2 \
-    #   --mnemonic 'route flight verb churn work creek crane hole obscure young shaft area bird border refuse usage flash engage burden retreat drama bamboo profit sense'
     _hashi_vault_prefixed_pk_sk_mapping1 = {
-        '8b09379ca969e8283a42a09285f430e8bd58c70bb33b44397ae81dac01b1403d0f631f156d211b6931a1c6284e2e469c': '5d88e114821bf871f321399d99fe58cb24d6434b416f112e8e46077e05399dc0',
-        '8979806d4e5d841758868b208df0dd961c12a0cf044e2de1d18e269ca0ad0308672be2f71d3d5606834764fe5b1d0bc4': '01352aec5cadb78eba6f716570d28b40f24b96c522dac535bc81375ceb54bf0b',
+        HashiVaultStub.prefixed_pk_1: HashiVaultStub.prefixed_sk_1,
+        HashiVaultStub.prefixed_pk_2: HashiVaultStub.prefixed_sk_2,
     }
 
-    # Generated via
-    # eth-staking-smith existing-mnemonic \
-    #   --chain holesky \
-    #   --num_validators 2 \
-    #   --mnemonic 'lion toilet tooth guess excuse wise amateur evolve moment damage curtain image zebra dress drill circle luggage seminar similar symptom happy floor govern gravity'
     _hashi_vault_prefixed_pk_sk_mapping2 = {
-        '859f3fc64e32a1e95aadc7a7ec35207f6305951e7dafacf9252aaa9edef3d1edf74d268041cb59ca64e703ba064890be': '17dd0ad25bd239092bfa47b53c94d7eec2f3621a99ffafc28cd3c6b25a72d7f9',
-        'a60dcf78a344afc297b4917f76b5b387924153182390361d5199c3455299d67fbb932b77943ffe5477150304f3cb600f': '4f768f0b9589fdff6e8371dd268d8d78b97bf968f6fc469657332cff48b1dea4',
+        HashiVaultStub.prefixed_pk_3: HashiVaultStub.prefixed_sk_3,
+        HashiVaultStub.prefixed_pk_4: HashiVaultStub.prefixed_sk_4,
     }
 
     def _mocked_secret_path(data, url, **kwargs) -> CallbackResult:

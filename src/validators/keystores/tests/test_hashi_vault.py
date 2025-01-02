@@ -1,6 +1,7 @@
 import pytest
 
 from src.config.settings import settings
+from src.test_fixtures.hashi_vault import HashiVaultStub
 from src.validators.keystores.hashi_vault import (
     HashiVaultConfiguration,
     HashiVaultKeystore,
@@ -23,6 +24,8 @@ class TestHashiVault:
         keystore = await HashiVaultKeystore.load()
 
         assert len(keystore) == 2
+        assert HashiVaultStub.bundled_pk_1 in keystore
+        assert HashiVaultStub.bundled_pk_2 in keystore
 
     @pytest.mark.usefixtures('mocked_hashi_vault')
     async def test_hashi_vault_keystores_not_configured(
@@ -73,6 +76,10 @@ class TestHashiVault:
         keystore = await HashiVaultKeystore.load()
 
         assert len(keystore) == 4
+        assert HashiVaultStub.bundled_pk_1 in keystore
+        assert HashiVaultStub.bundled_pk_2 in keystore
+        assert HashiVaultStub.bundled_pk_3 in keystore
+        assert HashiVaultStub.bundled_pk_4 in keystore
 
     @pytest.mark.usefixtures('mocked_hashi_vault')
     async def test_hashi_vault_bundled_keystores_sequential(
@@ -91,6 +98,10 @@ class TestHashiVault:
         keystore = await HashiVaultKeystore.load()
 
         assert len(keystore) == 4
+        assert HashiVaultStub.bundled_pk_1 in keystore
+        assert HashiVaultStub.bundled_pk_2 in keystore
+        assert HashiVaultStub.bundled_pk_3 in keystore
+        assert HashiVaultStub.bundled_pk_4 in keystore
 
     @pytest.mark.usefixtures('mocked_hashi_vault')
     async def test_hashi_vault_duplicates_parallel(
@@ -123,6 +134,8 @@ class TestHashiVault:
         keystore = await HashiVaultKeystore.load()
 
         assert len(keystore) == 2
+        assert HashiVaultStub.bundled_pk_1 in keystore
+        assert HashiVaultStub.bundled_pk_2 in keystore
 
     @pytest.mark.usefixtures('mocked_hashi_vault')
     async def test_hashi_vault_keystores_prefixed_loader(
@@ -139,6 +152,8 @@ class TestHashiVault:
         keystore = await HashiVaultKeystore.load()
 
         assert len(keystore) == 2
+        assert HashiVaultStub.prefixed_pk_1 in keystore
+        assert HashiVaultStub.prefixed_pk_2 in keystore
 
     @pytest.mark.usefixtures('mocked_hashi_vault')
     async def test_hashi_vault_load_bundled_and_prefixed(
@@ -161,3 +176,13 @@ class TestHashiVault:
         keystore = await HashiVaultKeystore.load()
 
         assert len(keystore) == 8
+
+        assert HashiVaultStub.bundled_pk_1 in keystore
+        assert HashiVaultStub.bundled_pk_2 in keystore
+        assert HashiVaultStub.bundled_pk_3 in keystore
+        assert HashiVaultStub.bundled_pk_4 in keystore
+
+        assert HashiVaultStub.prefixed_pk_1 in keystore
+        assert HashiVaultStub.prefixed_pk_2 in keystore
+        assert HashiVaultStub.prefixed_pk_3 in keystore
+        assert HashiVaultStub.prefixed_pk_4 in keystore
