@@ -194,19 +194,6 @@ async def process_validators(
     return tx_hash
 
 
-async def get_validators_count_from_vault_assets(harvest_params: HarvestParams | None) -> int:
-    vault_balance = await get_withdrawable_assets(harvest_params)
-    if settings.network in GNO_NETWORKS:
-        # apply GNO -> mGNO exchange rate
-        vault_balance = convert_to_mgno(vault_balance)
-
-    metrics.stakeable_assets.set(int(vault_balance))
-
-    # calculate number of validators that can be registered
-    validators_count = vault_balance // DEPOSIT_AMOUNT
-    return validators_count
-
-
 async def poll_oracles_approval(
     keystore: BaseKeystore | None,
     validators: Sequence[Validator],
@@ -263,6 +250,19 @@ async def poll_oracles_approval(
                 e.num_votes,
                 e.threshold,
             )
+
+
+async def get_validators_count_from_vault_assets(harvest_params: HarvestParams | None) -> int:
+    vault_balance = await get_withdrawable_assets(harvest_params)
+    if settings.network in GNO_NETWORKS:
+        # apply GNO -> mGNO exchange rate
+        vault_balance = convert_to_mgno(vault_balance)
+
+    metrics.stakeable_assets.set(int(vault_balance))
+
+    # calculate number of validators that can be registered
+    validators_count = vault_balance // DEPOSIT_AMOUNT
+    return validators_count
 
 
 # pylint: disable-next=too-many-arguments,too-many-locals
