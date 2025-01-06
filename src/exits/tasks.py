@@ -90,9 +90,9 @@ async def _fetch_last_update_block_replicas(replicas: list[str]) -> BlockNumber 
     results = await asyncio.gather(
         *[_fetch_exit_signature_block(endpoint) for endpoint in replicas], return_exceptions=True
     )
-    blocks = []
+    blocks: list[BlockNumber] = []
     for res in results:
-        if not isinstance(res, Exception) and res is not None:
+        if not isinstance(res, BaseException) and res is not None:
             blocks.append(res)
     if blocks:
         return min(blocks)
@@ -153,14 +153,15 @@ async def _update_exit_signatures(
     logger.info('Starting exit signature rotation for %d validators', len(outdated_indexes))
     # pylint: disable=duplicate-code
     validators = await get_validator_public_keys(outdated_indexes)
-    deadline = None
     approvals_min_interval = 1
+    deadline: int | None = None
+    oracles_request: SignatureRotationRequest | None = None
 
     while True:
         approval_start_time = time.time()
 
         current_timestamp = get_current_timestamp()
-        if not deadline or deadline <= current_timestamp:
+        if not oracles_request or deadline is None or deadline <= current_timestamp:
             deadline = current_timestamp + protocol_config.signature_validity_period
             oracles_request = await _get_oracles_request(
                 protocol_config=protocol_config,

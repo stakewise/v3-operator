@@ -45,7 +45,7 @@ async def send_signature_rotation_requests(
             return_exceptions=True,
         )
         for (address, replicas), result in zip(endpoints, results):
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 warning_verbose(
                     'All endpoints for oracle %s failed to sign signature rotation request. '
                     'Last error: %s',

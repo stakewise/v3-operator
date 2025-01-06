@@ -51,7 +51,7 @@ async def send_approval_requests(
     failed_endpoints: list[str] = []
 
     for (address, replicas), result in zip(endpoints, results):
-        if isinstance(result, Exception):
+        if isinstance(result, BaseException):
             warning_verbose(
                 'All endpoints for oracle %s failed to sign validators approval request. '
                 'Last error: %s',

@@ -47,7 +47,7 @@ def warning_verbose(msg: str, *args) -> None:  # type: ignore
         logger.warning(msg, *args)
 
 
-def format_error(e: Exception) -> str:
+def format_error(e: BaseException) -> str:
     if isinstance(e, tenacity.RetryError):
         # get original error
         e = e.last_attempt.exception()  # type: ignore
