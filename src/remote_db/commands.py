@@ -284,3 +284,33 @@ def setup_operator(ctx: Context, output_dir: str | None) -> None:
         output_dir=dest_dir,
     )
     click.echo('Successfully created operator configuration file.')
+
+
+@remote_db_group.command(help='Restore keystores from the database.')
+@click.option(
+    '--encrypt-key',
+    envvar='REMOTE_DB_ENCRYPT_KEY',
+    help='The encryption key for the remote database.',
+    required=True,
+    prompt='Enter the encryption key for the remote database',
+)
+@click.option(
+    '--output-dir',
+    envvar='REMOTE_DB_OUTPUT_DIR',
+    help='The folder where web3signer keystores will be saved.',
+    prompt='Enter the folder where web3signer keystores will be saved',
+    default=os.getcwd(),
+    type=click.Path(exists=False, file_okay=False, dir_okay=True),
+)
+@click.option(
+    '--per-keystore-password',
+    is_flag=True,
+    default=False,
+    help='Creates separate password file for each keystore.',
+)
+@click.pass_context
+def restore_keystores(
+    ctx: Context, encrypt_key: str, output_dir: str, per_keystore_password: bool
+) -> None:
+    tasks.restore_keystores(ctx.obj['db_url'], encrypt_key, Path(output_dir), per_keystore_password)
+    click.echo('Successfully retrieved web3signer private keys from the database.')

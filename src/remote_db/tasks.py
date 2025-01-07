@@ -7,9 +7,11 @@ import milagro_bls_binding as bls
 import yaml
 from Cryptodome.Cipher import AES
 from Cryptodome.Random import get_random_bytes
-from eth_typing import ChecksumAddress, HexStr
+from eth_typing import BLSPrivateKey, ChecksumAddress, HexStr
 from web3 import Web3
 
+from src.commands.create_keys import _export_keystores
+from src.common.credentials import COIN_TYPE, PURPOSE, Credential
 from src.common.utils import greenify
 from src.config.settings import settings
 from src.remote_db.database import ConfigsCrud, KeyPairsCrud, get_db_connection
@@ -218,6 +220,54 @@ def setup_operator(db_url: str, output_dir: Path) -> None:
     with open(output_file, 'w', encoding='utf-8') as f:
         json.dump(deposit_data, f)
     click.secho(f'Operator deposit data saved to {greenify(output_file)} file.')
+
+
+def restore_keystores(
+    db_url: str, b64_encrypt_key: str, output_dir: Path, per_keystore_password: bool
+) -> None:
+    """Fetch and decrypt keys for web3signer and store them as keypairs in the output_dir."""
+    encryption_key = _check_encryption_key(db_url, b64_encrypt_key)
+    password_file = output_dir / 'password.txt'
+
+    click.echo('Fetching keypairs from the remote db...')
+    keypairs = KeyPairsCrud(db_url=db_url).get_keypairs()
+    if len(keypairs) == 0:
+        raise click.ClickException('No keypairs found in the remote db.')
+
+    click.echo(f'Decrypting {len(keypairs)} keystores...')
+    private_keys: set[BLSPrivateKey] = set()
+    for keypair in keypairs:
+        decrypted_private_key = _decrypt_private_key(
+            private_key=Web3.to_bytes(hexstr=keypair.private_key),
+            encryption_key=encryption_key,
+            nonce=Web3.to_bytes(hexstr=keypair.nonce),
+        )
+        hexed = Web3.to_hex(decrypted_private_key)
+        private_keys.add(BLSPrivateKey(Web3.to_int(hexstr=hexed)))
+
+    click.echo(f'Saving {len(private_keys)} private keys to {output_dir}...')
+    if not output_dir.exists():
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+    sorted_private_keys = sorted(list(private_keys))
+
+    credentials = []
+    for index, private_key in enumerate(sorted_private_keys):
+        c = Credential(
+            private_key=private_key,
+            path=f'm/{PURPOSE}/{COIN_TYPE}/{index}/0/0',
+            network=settings.network,
+            vault=settings.vault,
+        )
+        credentials.append(c)
+
+    _export_keystores(
+        credentials=credentials,
+        keystores_dir=output_dir,
+        password_file=password_file,
+        per_keystore_password=per_keystore_password,
+        pool_size=2,
+    )
 
 
 def _check_encryption_key(db_url: str, b64_encrypt_key: str) -> bytes:
