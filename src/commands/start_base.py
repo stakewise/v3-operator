@@ -118,3 +118,4 @@ def setup_sentry() -> None:
         )
         sentry_sdk.set_tag('network', settings.network)
         sentry_sdk.set_tag('vault', settings.vault)
+        sentry_sdk.set_tag('project_version', src.__version__)
