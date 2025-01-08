@@ -35,14 +35,12 @@ class KeyPairsCrud:
         """Returns the first keypair in the database."""
         with self.db_connection.cursor() as cur:
             cur.execute(
-                f'''
+                '''
                     SELECT public_key, private_key, nonce
-                    FROM {self.table}
-                    WHERE vault = %s
+                    FROM keys
                     ORDER BY public_key
                     LIMIT 1
                 ''',
-                (settings.vault,),
             )
             row = cur.fetchone()
             if row is None:
@@ -58,9 +56,9 @@ class KeyPairsCrud:
         """Returns keypairs from the database."""
         params: dict = {}
 
-        query = f'''
+        query = '''
                 SELECT public_key, private_key, nonce
-                FROM {self.table}
+                FROM keys
         '''
 
         query += 'ORDER BY public_key'
@@ -125,12 +123,12 @@ class KeyPairsCrud:
         """Create table."""
         with self.db_connection.cursor() as cur:
             cur.execute(
-                f'''
-                    CREATE TABLE IF NOT EXISTS {self.table} (
-                        vault VARCHAR(42) NOT NULL,
-                        public_key VARCHAR(98) UNIQUE NOT NULL,
-                        private_key VARCHAR(66) UNIQUE NOT NULL,
-                        nonce VARCHAR(34) UNIQUE NOT NULL
+                '''
+                    CREATE TABLE IF NOT EXISTS keys (
+                        public_key TEXT UNIQUE NOT NULL,
+                        private_key TEXT UNIQUE NOT NULL,
+                        nonce TEXT NOT NULL,
+                        validator_index TEXT NOT NULL
                     )
                 '''
             )

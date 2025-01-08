@@ -270,6 +270,55 @@ def restore_keystores(
     )
 
 
+def restore_keystores_old(
+    db_url: str, b64_encrypt_key: str, output_dir: Path, per_keystore_password: bool
+) -> None:
+    """Fetch and decrypt keys for web3signer and store them as keypairs in the output_dir."""
+    encryption_key = _check_encryption_key(db_url, b64_encrypt_key)
+    password_file = output_dir / 'password.txt'
+
+    click.echo('Fetching keypairs from the remote db...')
+    keypairs = KeyPairsCrud(db_url=db_url).get_keypairs()
+    if len(keypairs) == 0:
+        raise click.ClickException('No keypairs found in the remote db.')
+
+    click.echo(f'Decrypting {len(keypairs)} keystores...')
+    private_keys: set[BLSPrivateKey] = set()
+    for keypair in keypairs:
+        decrypted_private_key = _decrypt_private_key(
+            private_key=base64.b64decode(keypair.private_key),
+            encryption_key=encryption_key,
+            nonce=base64.b64decode(keypair.nonce),
+        )
+        hexed = Web3.to_hex(int(decrypted_private_key))
+        hexed = f'0x{hexed[2:].zfill(64)}'
+        private_keys.add(BLSPrivateKey(Web3.to_int(hexstr=hexed)))
+
+    click.echo(f'Saving {len(private_keys)} private keys to {output_dir}...')
+    if not output_dir.exists():
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+    sorted_private_keys = sorted(list(private_keys))
+
+    credentials = []
+    for index, private_key in enumerate(sorted_private_keys):
+        c = Credential(
+            private_key=private_key,
+            path=f'm/{PURPOSE}/{COIN_TYPE}/{index}/0/0',
+            network=settings.network,
+            vault=settings.vault,
+        )
+        credentials.append(c)
+
+    _export_keystores(
+        credentials=credentials,
+        keystores_dir=output_dir,
+        password_file=password_file,
+        per_keystore_password=per_keystore_password,
+        pool_size=2,
+    )
+
+
 def _check_encryption_key(db_url: str, b64_encrypt_key: str) -> bytes:
     try:
         encryption_key = base64.b64decode(b64_encrypt_key)
@@ -284,14 +333,17 @@ def _check_encryption_key(db_url: str, b64_encrypt_key: str) -> bytes:
 
     try:
         decrypted_private_key = _decrypt_private_key(
-            private_key=Web3.to_bytes(hexstr=keypair.private_key),
+            private_key=base64.b64decode(keypair.private_key),
             encryption_key=encryption_key,
-            nonce=Web3.to_bytes(hexstr=keypair.nonce),
+            nonce=base64.b64decode(keypair.nonce),
         )
     except Exception as e:
         raise click.ClickException('Failed to decrypt first private key.') from e
 
-    if bls.SkToPk(decrypted_private_key) != Web3.to_bytes(hexstr=keypair.public_key):
+    hexed = Web3.to_hex(int(decrypted_private_key))
+    hexed = f'0x{hexed[2:].zfill(64)}'
+    key = Web3.to_bytes(hexstr=hexed)
+    if bls.SkToPk(key) != Web3.to_bytes(hexstr=keypair.public_key):
         raise click.ClickException('Failed to decrypt first private key.')
 
     return encryption_key
