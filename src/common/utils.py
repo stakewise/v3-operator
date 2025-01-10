@@ -5,7 +5,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from decimal import ROUND_FLOOR, Decimal, localcontext
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Iterator, TypeVar, overload
 
 import click
 import tenacity
@@ -24,6 +24,8 @@ from src.common.typings import OracleApproval, OraclesApproval
 from src.config.settings import LOG_DATE_FORMAT, settings
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar('T')
 
 
 def get_build_version() -> str | None:
@@ -96,7 +98,17 @@ def process_oracles_approvals(
     return OraclesApproval(ipfs_hash=winner[0], signatures=signatures, deadline=winner[1])
 
 
-def chunkify(items: list | range, size: int) -> Iterator[list | range]:
+@overload
+def chunkify(items: list[T], size: int) -> Iterator[list[T]]:
+    ...
+
+
+@overload
+def chunkify(items: range, size: int) -> Iterator[range]:
+    ...
+
+
+def chunkify(items, size):  # type: ignore[no-untyped-def]
     for i in range(0, len(items), size):
         yield items[i : i + size]
 

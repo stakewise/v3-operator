@@ -177,7 +177,7 @@ async def main() -> None:
         ):
             data = {
                 'keystores': keystores_json_chunk,
-                'passwords': [kf.password for kf in keystore_files_chunk],  # type: ignore
+                'passwords': [kf.password for kf in keystore_files_chunk],
             }
 
             # Only add tags and fee_recipient if --dappnode is set
@@ -191,7 +191,7 @@ async def main() -> None:
                 data.update(
                     {
                         'tags': tags_array,
-                        'feeRecipients': fee_recipient_array,
+                        'feeRecipients': fee_recipient_array,  # type: ignore
                     }
                 )
 
