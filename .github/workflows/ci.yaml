@@ -13,7 +13,7 @@ jobs:
       - name: Set up python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.10.14
+          python-version: 3.12.8
 
       # Install poetry
       - name: Load cached Poetry installation
@@ -58,7 +58,7 @@ jobs:
       - name: Set up python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.10.14
+          python-version: 3.12.8
 
       # Install poetry
       - name: Load cached Poetry installation
@@ -96,7 +96,7 @@ jobs:
       - name: Set up python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.10.14
+          python-version: 3.12.8
 
       # Install poetry
       - name: Load cached Poetry installation
