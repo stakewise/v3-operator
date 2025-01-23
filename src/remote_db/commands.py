@@ -100,7 +100,7 @@ def setup(ctx: Context) -> None:
     click.echo(
         f'Successfully configured remote database.\n'
         f'Encryption key: {greenify(encryption_key)}\n'
-        f'{click.style("NB! You must store your encryption in a secure cold storage!", bold=True)}'
+        f'{click.style('NB! You must store your encryption in a secure cold storage!', bold=True)}'
     )
 
 

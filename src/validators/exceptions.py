@@ -2,8 +2,7 @@ REGISTRY_ROOT_CHANGED = 'Validators registry root has changed'
 VALIDATOR_INDEX_CHANGED = 'Validator index has changed'
 
 
-class KeystoreException(Exception):
-    ...
+class KeystoreException(Exception): ...
 
 
 class RegistryRootChangedError(ValueError):
@@ -16,5 +15,4 @@ class ValidatorIndexChangedError(ValueError):
         super().__init__(VALIDATOR_INDEX_CHANGED)
 
 
-class MissingDepositDataValidatorsException(Exception):
-    ...
+class MissingDepositDataValidatorsException(Exception): ...

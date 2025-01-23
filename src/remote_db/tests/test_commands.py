@@ -27,8 +27,9 @@ def _patch_check_db_connection() -> Generator:
 
 @pytest.fixture
 def _patch_get_db_connection() -> Generator:
-    with mock.patch('src.remote_db.tasks.get_db_connection'), mock.patch(
-        'src.remote_db.database.get_db_connection'
+    with (
+        mock.patch('src.remote_db.tasks.get_db_connection'),
+        mock.patch('src.remote_db.database.get_db_connection'),
     ):
         yield
 
@@ -50,12 +51,14 @@ class TestRemoteDbSetup:
         db_url = 'postgresql://user:password@localhost:5432/dbname'
 
         args = ['--db-url', db_url, '--vault', vault_address, '--data-dir', str(data_dir), 'setup']
-        with mock.patch.object(
-            KeyPairsCrud, 'get_keypairs_count', return_value=0
-        ) as get_keypairs_count_mock, mock.patch.object(
-            ConfigsCrud, 'get_configs_count', return_value=0
-        ) as get_configs_count_mock, mock.patch(
-            'src.remote_db.tasks.get_random_bytes', return_value=b'1'
+        with (
+            mock.patch.object(
+                KeyPairsCrud, 'get_keypairs_count', return_value=0
+            ) as get_keypairs_count_mock,
+            mock.patch.object(
+                ConfigsCrud, 'get_configs_count', return_value=0
+            ) as get_configs_count_mock,
+            mock.patch('src.remote_db.tasks.get_random_bytes', return_value=b'1'),
         ):
             result = runner.invoke(remote_db_group, args)
             assert get_keypairs_count_mock.call_count == 1
@@ -84,11 +87,10 @@ class TestRemoteDbSetup:
             str(data_dir),
             'cleanup',
         ]
-        with mock.patch.object(
-            KeyPairsCrud, 'remove_keypairs'
-        ) as remove_keypairs_mock, mock.patch.object(
-            ConfigsCrud, 'remove_configs'
-        ) as remove_configs_mock:
+        with (
+            mock.patch.object(KeyPairsCrud, 'remove_keypairs') as remove_keypairs_mock,
+            mock.patch.object(ConfigsCrud, 'remove_configs') as remove_configs_mock,
+        ):
             result = runner.invoke(remote_db_group, args)
             assert remove_keypairs_mock.call_count == 1
             assert remove_configs_mock.call_count == 1
@@ -212,9 +214,11 @@ class TestRemoteDbSetupWeb3Signer:
             base64.b64decode(encryption_key), vault_address, total_validators=3
         )
 
-        with runner.isolated_filesystem(), mock.patch.object(
-            KeyPairsCrud, 'get_first_keypair', return_value=keypairs[0]
-        ), mock.patch.object(KeyPairsCrud, 'get_keypairs', return_value=keypairs):
+        with (
+            runner.isolated_filesystem(),
+            mock.patch.object(KeyPairsCrud, 'get_first_keypair', return_value=keypairs[0]),
+            mock.patch.object(KeyPairsCrud, 'get_keypairs', return_value=keypairs),
+        ):
             result = runner.invoke(remote_db_group, args)
             output = 'Successfully retrieved web3signer private keys from the database.\n'
             assert output.strip() in result.output.strip()
@@ -258,9 +262,11 @@ class TestRemoteDbSetupValidator:
             base64.b64decode(encryption_key), vault_address, total_validators=3
         )
 
-        with runner.isolated_filesystem(), mock.patch.object(
-            KeyPairsCrud, 'get_first_keypair', return_value=keypairs[0]
-        ), mock.patch.object(KeyPairsCrud, 'get_keypairs', return_value=keypairs):
+        with (
+            runner.isolated_filesystem(),
+            mock.patch.object(KeyPairsCrud, 'get_first_keypair', return_value=keypairs[0]),
+            mock.patch.object(KeyPairsCrud, 'get_keypairs', return_value=keypairs),
+        ):
             result = runner.invoke(remote_db_group, args)
             output = (
                 'Generated configs with 3 keys '
@@ -308,12 +314,11 @@ class TestRemoteDbSetupOperator:
         for keypair in keypairs:
             remote_config['public_key'].append(keypair.public_key)
 
-        with runner.isolated_filesystem(), mock.patch.object(
-            KeyPairsCrud, 'get_first_keypair', return_value=keypairs[0]
-        ), mock.patch.object(
-            KeyPairsCrud, 'get_keypairs', return_value=keypairs
-        ), mock.patch.object(
-            ConfigsCrud, 'get_deposit_data', return_value=[]
+        with (
+            runner.isolated_filesystem(),
+            mock.patch.object(KeyPairsCrud, 'get_first_keypair', return_value=keypairs[0]),
+            mock.patch.object(KeyPairsCrud, 'get_keypairs', return_value=keypairs),
+            mock.patch.object(ConfigsCrud, 'get_deposit_data', return_value=[]),
         ):
             result = runner.invoke(remote_db_group, args)
             output = 'Successfully created operator configuration file.\n'
