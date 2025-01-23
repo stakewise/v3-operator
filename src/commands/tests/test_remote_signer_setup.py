@@ -12,7 +12,9 @@ from src.config.settings import settings
 
 class TestOperatorRemoteSignerSetup:
     @pytest.mark.usefixtures(
-        '_init_vault', '_create_keys', 'mocked_remote_signer', 'mock_scrypt_keystore'
+        '_init_vault',
+        '_create_keys',
+        'mocked_remote_signer',
     )
     async def test_basic(
         self,
@@ -52,7 +54,7 @@ class TestOperatorRemoteSignerSetup:
             pubkeys_remote_signer = {pubkey_dict.get('validating_pubkey') for pubkey_dict in data}
             assert len(pubkeys_remote_signer) == key_count
 
-    @pytest.mark.usefixtures('_init_vault', 'mocked_remote_signer', 'mock_scrypt_keystore')
+    @pytest.mark.usefixtures('_init_vault', 'mocked_remote_signer')
     def test_add_more_keys_later(
         self,
         vault_address: HexAddress,
