@@ -45,7 +45,7 @@ types-setuptools = "==70.0.0.20240524"
 flake8-newspaper-style = "==0.4.3"
 
 [tool.poetry.group.build.dependencies]
-pyinstaller = "==5.13.2"
+pyinstaller = "==6.11.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
