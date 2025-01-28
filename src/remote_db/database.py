@@ -91,7 +91,7 @@ class KeyPairsCrud:
         query = f'''
                 DELETE FROM {self.table}
         '''
-        query += f'WHERE {" AND ".join(where_list)}\n'
+        query += f'WHERE {' AND '.join(where_list)}\n'
 
         with self.db_connection.cursor() as cur:
             cur.execute(query, params)

@@ -208,7 +208,7 @@ async def main(count: int | None) -> None:
 
     click.confirm(
         f'Are you sure you want to exit {len(validators_exits)} validators '
-        f'with indexes: {", ".join(str(x.index) for x in validators_exits)}?',
+        f'with indexes: {', '.join(str(x.index) for x in validators_exits)}?',
         abort=True,
     )
     exited_indexes = []
@@ -239,7 +239,7 @@ async def main(count: int | None) -> None:
 
     if exited_indexes:
         click.secho(
-            f'Validators {", ".join(str(index) for index in exited_indexes)} '
+            f'Validators {', '.join(str(index) for index in exited_indexes)} '
             f'({len(exited_indexes)} of {len(validators_exits)}) '
             f'exits successfully initiated',
             bold=True,

@@ -51,7 +51,7 @@ class NetworkValidatorCrud:
             if latest_public_keys:
                 cur = conn.execute(
                     f'''SELECT COUNT(*) FROM {self.NETWORK_VALIDATORS_TABLE}
-                        WHERE public_key NOT IN ({",".join(["?"] * len(latest_public_keys))})''',
+                        WHERE public_key NOT IN ({','.join(['?'] * len(latest_public_keys))})''',
                     latest_public_keys,
                 )
             else:

@@ -8,7 +8,6 @@ import ecies
 import pytest
 from _pytest.fixtures import SubRequest
 from click.testing import CliRunner
-from Cryptodome.Protocol.KDF import scrypt as raw_scrypt
 from eth_typing import HexAddress, HexStr
 from sw_utils.tests import faker
 from sw_utils.tests.factories import get_mocked_protocol_config
@@ -17,7 +16,7 @@ from sw_utils.typings import Oracle, ProtocolConfig
 from src.commands.create_keys import create_keys
 from src.commands.create_wallet import create_wallet
 from src.commands.remote_signer_setup import remote_signer_setup
-from src.common.credentials import CredentialManager, ScryptKeystore
+from src.common.credentials import CredentialManager
 from src.common.vault_config import VaultConfig
 from src.config.networks import HOLESKY
 from src.config.settings import settings
@@ -77,38 +76,12 @@ def runner() -> CliRunner:
     return CliRunner()
 
 
-def _scrypt_without_validation(
-    *, password: str, salt: str, n: int, r: int, p: int, dklen: int
-) -> bytes:
-    """
-    Shortened version of `staking_deposit.utils.crypto.scrypt`.
-    All validations are deleted to allow small number of hash iterations (`n`).
-    The function is not secure. Use it in tests only.
-    """
-    res = raw_scrypt(password=password, salt=salt, key_len=dklen, N=n, r=r, p=p)
-    return res if isinstance(res, bytes) else res[0]  # PyCryptodome can return Tuple[bytes]
-
-
-@pytest.fixture
-def mock_scrypt_keystore():
-    """
-    Decreases number of iterations of password hashing. Original value is ~200k.
-    This improves speed of keystore encryption.
-    Not secure.
-    """
-    with mock.patch.dict(ScryptKeystore.crypto.kdf.params, {'n': 2}), mock.patch(
-        'staking_deposit.key_handling.keystore.scrypt', new=_scrypt_without_validation
-    ):
-        yield
-
-
 @pytest.fixture
 def _create_keys(
     test_mnemonic: str,
     vault_address: HexAddress,
     data_dir: Path,
     _test_keystore_password_file: Path,
-    mock_scrypt_keystore,
     runner: CliRunner,
 ) -> None:
     count = 3

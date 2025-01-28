@@ -279,7 +279,7 @@ async def _check_consensus_nodes_network() -> None:
         consensus_network = chain_id_to_network.get(consensus_chain_id)
         if settings.network_config.CHAIN_ID != consensus_chain_id:
             raise ValueError(
-                f'Consensus node network is {consensus_network or "unknown"}, '
+                f'Consensus node network is {consensus_network or 'unknown'}, '
                 f'while {settings.network} is passed in "--network" parameter'
             )
 
@@ -298,7 +298,7 @@ async def _check_execution_nodes_network() -> None:
         execution_network = chain_id_to_network.get(execution_chain_id)
         if settings.network_config.CHAIN_ID != execution_chain_id:
             raise ValueError(
-                f'Execution node network is {execution_network or "unknown"}, '
+                f'Execution node network is {execution_network or 'unknown'}, '
                 f'while {settings.network} is passed in "--network" parameter'
             )
 

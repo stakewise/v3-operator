@@ -153,12 +153,15 @@ def _export_keystores(
 
     if not per_keystore_password:
         password = get_or_create_password_file(password_file)
-    with click.progressbar(
-        credentials,
-        label='Exporting validator keystores\t\t',
-        show_percent=False,
-        show_pos=True,
-    ) as progress_bar, Pool(processes=pool_size) as pool:
+    with (
+        click.progressbar(
+            credentials,
+            label='Exporting validator keystores\t\t',
+            show_percent=False,
+            show_pos=True,
+        ) as progress_bar,
+        Pool(processes=pool_size) as pool,
+    ):
         results = [
             pool.apply_async(
                 cred.save_signing_keystore,

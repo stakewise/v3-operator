@@ -66,7 +66,7 @@ class Credential:
         self, password: str, folder: str, per_keystore_password: bool = False
     ) -> str:
         keystore = self.encrypt_signing_keystore(password)
-        file_name = f'keystore-{keystore.path.replace("/", "_")}-{int(time.time())}'
+        file_name = f'keystore-{keystore.path.replace('/', '_')}-{int(time.time())}'
         file_path = path.join(folder, f'{file_name}.json')
 
         if per_keystore_password:

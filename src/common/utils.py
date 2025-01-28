@@ -99,13 +99,11 @@ def process_oracles_approvals(
 
 
 @overload
-def chunkify(items: list[T], size: int) -> Iterator[list[T]]:
-    ...
+def chunkify(items: list[T], size: int) -> Iterator[list[T]]: ...
 
 
 @overload
-def chunkify(items: range, size: int) -> Iterator[range]:
-    ...
+def chunkify(items: range, size: int) -> Iterator[range]: ...
 
 
 def chunkify(items, size):  # type: ignore[no-untyped-def]

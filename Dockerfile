@@ -1,5 +1,5 @@
 # `python-base` sets up all our shared environment variables
-FROM python:3.10.15-slim-bookworm as python-base
+FROM python:3.12.8-slim-bookworm as python-base
 
     # python
 ENV PYTHONUNBUFFERED=1 \
