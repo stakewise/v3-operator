@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-from PyInstaller.utils.hooks import collect_data_files
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 from sys import platform
 
 datas = [
@@ -16,12 +16,18 @@ datas += collect_data_files('eth_utils')
 
 block_cipher = None
 
+hiddenimports=['multiaddr.codecs.uint16be', 'multiaddr.codecs.idna', 'pkg_resources.extern']
+
+# tomli
+hiddenimports += ['ddc459050edb75a05942__mypyc', '__future__']
+hiddenimports += collect_submodules('tomli')
+
 a = Analysis(
     ['src/main.py'],
     pathex=[],
     binaries=[],
     datas=datas,
-    hiddenimports=['multiaddr.codecs.uint16be', 'multiaddr.codecs.idna', 'pkg_resources.extern'],
+    hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
