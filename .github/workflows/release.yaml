@@ -136,7 +136,7 @@ jobs:
         run: ${{ matrix.BUILD_CMD }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.OS }}
           path: /tmp/artifacts/*
