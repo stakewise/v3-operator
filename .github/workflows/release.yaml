@@ -110,9 +110,9 @@ jobs:
 
       - name: Install build dependencies for MacOS
         run: |
-          brew install libpq
-          brew link --force libpq
-          xcode-select --install
+          brew install openssl
+          brew link --force openssl
+          brew --prefix openssl
         if: matrix.os == 'macos-14'
 
       - uses: actions/setup-python@v4
