@@ -127,9 +127,9 @@ jobs:
 
       - name: Install dependencies
         run: poetry install --with build --without dev --no-interaction --no-root
-      env:
-        LDFLAGS: "-L/opt/homebrew/opt/openssl@3/lib"
-        CPPFLAGS: "-I/opt/homebrew/opt/openssl@3/include"
+        env:
+          LDFLAGS: "-L/opt/homebrew/opt/openssl@3/lib"
+          CPPFLAGS: "-I/opt/homebrew/opt/openssl@3/include"
 
       - name: Get the version
         id: get_version
