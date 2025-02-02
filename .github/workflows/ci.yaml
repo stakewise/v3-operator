@@ -16,16 +16,13 @@ jobs:
           python-version: 3.12.8
 
       - name: Check system OpenSSL version
-        run: "echo \"OpenSSL version\" && openssl version"
-
-      - name: List installed OpenSSL versions
-        run: "echo \"Installed OpenSSL versions\" && ls /opt/homebrew/Cellar/openssl@3"
+        run: "openssl version"
       
       - name: List linked OpenSSL versions
-        run: "echo \"Linked OpenSSL versions\" && ls -lh /opt/homebrew/opt/openssl*"
-        
+        run: "ls -lh /opt/homebrew/opt/openssl*"
+
       - name: Check OpenSSL version used in Python
-        run: "echo \"OpenSSL version in python\" && python -c \"import ssl; print(ssl.OPENSSL_VERSION)\""
+        run: "python -c \"import ssl; print(ssl.OPENSSL_VERSION)\""
 
       # Install poetry
       - name: Load cached Poetry installation
