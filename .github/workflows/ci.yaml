@@ -30,9 +30,6 @@ jobs:
           virtualenvs-in-project: true
           installer-parallel: true
 
-      - name: Check python version
-        run: "echo \"python version\" && poetry run python --version"
-
       # Install dependencies
       - name: Install dependencies
         run: poetry install --no-interaction --no-root
