@@ -1,4 +1,5 @@
 from src.common.metrics import metrics
+from src.config.settings import settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import check_deposit_data_root
 from src.validators.keystores.base import BaseKeystore
@@ -12,7 +13,7 @@ async def update_unused_validator_keys_metric(
     try:
         await check_deposit_data_root(deposit_data.tree.root)
     except RuntimeError:
-        metrics.unused_validator_keys.set(0)
+        metrics.unused_validator_keys.labels(network=settings.network).set(0)
         return 0
 
     validators: int = 0
@@ -24,6 +25,6 @@ async def update_unused_validator_keys_metric(
             continue
         validators += 1
 
-    metrics.unused_validator_keys.set(validators)
+    metrics.unused_validator_keys.labels(network=settings.network).set(validators)
 
     return validators

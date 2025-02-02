@@ -16,26 +16,40 @@ from src.config.settings import settings
 class Metrics:
     def __init__(self) -> None:
         self.app_version = Info(
-            'app_version', 'V3 Operator version', namespace=settings.metrics_prefix
+            'app_version',
+            'V3 Operator version',
+            namespace=settings.metrics_prefix,
+            labelnames=['network'],
         )
         self.service_started = Gauge(
             'service_started',
             'Is service ready to register validators',
             namespace=settings.metrics_prefix,
+            labelnames=['network'],
         )
         self.block_number = Gauge(
-            'block_number', 'Current block number', namespace=settings.metrics_prefix
+            'block_number',
+            'Current block number',
+            namespace=settings.metrics_prefix,
+            labelnames=['network'],
         )
         self.slot_number = Gauge(
-            'slot_number', 'Current slot number', namespace=settings.metrics_prefix
+            'slot_number',
+            'Current slot number',
+            namespace=settings.metrics_prefix,
+            labelnames=['network'],
         )
         self.wallet_balance = Gauge(
-            'wallet_balance', 'Current wallet balance', namespace=settings.metrics_prefix
+            'wallet_balance',
+            'Current wallet balance',
+            namespace=settings.metrics_prefix,
+            labelnames=['network'],
         )
         self.outdated_signatures = Gauge(
             'outdated_signatures',
             'The number of outdated signatures',
             namespace=settings.metrics_prefix,
+            labelnames=['network'],
         )
         self.stakeable_assets = Gauge(
             'stakeable_assets', 'The amount of stakeable assets', namespace=settings.metrics_prefix
@@ -44,10 +58,11 @@ class Metrics:
             'unused_validator_keys',
             'The number of unused validator keys in deposit data file',
             namespace=settings.metrics_prefix,
+            labelnames=['network'],
         )
 
     def set_app_version(self) -> None:
-        self.app_version.info({'version': src.__version__})
+        self.app_version.labels(network=settings.network).info({'version': src.__version__})
 
 
 class LazyMetrics:
@@ -75,5 +90,7 @@ class MetricsTask(BaseTask):
         metrics.set_app_version()
 
         chain_state = await get_chain_finalized_head()
-        metrics.block_number.set(await execution_client.eth.get_block_number())
-        metrics.slot_number.set(chain_state.slot)
+        latest_block_number = await execution_client.eth.get_block_number()
+
+        metrics.block_number.labels(network=settings.network).set(latest_block_number)
+        metrics.slot_number.labels(network=settings.network).set(chain_state.slot)
