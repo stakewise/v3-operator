@@ -130,6 +130,18 @@ jobs:
           LDFLAGS: "-L/opt/homebrew/opt/openssl@3/lib"
           CPPFLAGS: "-I/opt/homebrew/opt/openssl@3/include"
 
+      - name: Check system OpenSSL version
+        run: "openssl version"
+        if: matrix.os == 'macos-14'
+
+      - name: List linked OpenSSL versions
+        run: "ls -lh `brew --prefix openssl`*"
+        if: matrix.os == 'macos-14'
+
+      - name: Check OpenSSL version used in Python
+        run: "python -c \"import ssl; print(ssl.OPENSSL_VERSION)\""
+        if: matrix.os == 'macos-14'
+
       - name: Get the version
         id: get_version
         run: echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3)

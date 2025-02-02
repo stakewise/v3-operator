@@ -15,18 +15,6 @@ jobs:
         with:
           python-version: 3.12.8
 
-      - name: Check system OpenSSL version
-        run: "openssl version"
-      
-      - name: Check brew openssl prefix
-        run: "brew --prefix openssl"
-
-      # - name: List linked OpenSSL versions
-      #   run: "ls -lh `brew --prefix openssl`*"
-
-      - name: Check OpenSSL version used in Python
-        run: "python -c \"import ssl; print(ssl.OPENSSL_VERSION)\""
-
       # Install poetry
       - name: Load cached Poetry installation
         uses: actions/cache@v3
