@@ -124,22 +124,11 @@ jobs:
         with:
           poetry-version: "1.8.3"
 
-      - name: Check system OpenSSL version
-        run: "openssl version"
-        if: matrix.os == 'macos-14'
-
-      - name: List linked OpenSSL versions
-        run: "ls -lh `brew --prefix openssl`*"
-        if: matrix.os == 'macos-14'
-
-      - name: Check OpenSSL version used in Python
-        run: "python -c \"import ssl; print(ssl.OPENSSL_VERSION)\""
-        if: matrix.os == 'macos-14'
-
       - name: Install dependencies
         run: poetry install --with build --without dev --no-interaction --no-root
         env:
           # For building psycopg on MacOS
+          # Required the the same version of openssl as the one used by the Python installation
           LDFLAGS: "-L/opt/homebrew/opt/openssl@3.0/lib"
           CPPFLAGS: "-I/opt/homebrew/opt/openssl@3.0/include"
 
