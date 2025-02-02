@@ -19,7 +19,7 @@ jobs:
         run: "openssl version"
       
       - name: List linked OpenSSL versions
-        run: "ls -lh /opt/homebrew/opt/openssl*"
+        run: "ls -lh `brew --prefix openssl`*"
 
       - name: Check OpenSSL version used in Python
         run: "python -c \"import ssl; print(ssl.OPENSSL_VERSION)\""
