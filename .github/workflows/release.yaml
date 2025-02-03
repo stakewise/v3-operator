@@ -17,7 +17,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: 3.12.8
 
@@ -67,11 +67,11 @@ jobs:
               cp ${BUILD_FILE_NAME}.tar.gz /tmp/artifacts;
               sha256sum ${BUILD_FILE_NAME}.tar.gz | head -c 64 > /tmp/artifacts/${BUILD_FILE_NAME}.sha256;
 
-          - OS: macos-13
+          - OS: macos-14
             PYTHON_VERSION: 3.12.8
             BUILD_CMD: |
               export PYTHONHASHSEED=42
-              export BUILD_FILE_NAME=operator-${RELEASE_VERSION}-darwin-amd64;
+              export BUILD_FILE_NAME=operator-${RELEASE_VERSION}-darwin-arm64;
               mkdir ${BUILD_FILE_NAME};
               git rev-parse --short HEAD > GIT_SHA
               poetry run pyinstaller \
@@ -112,9 +112,10 @@ jobs:
         run: |
           brew install libpq
           brew link --force libpq
-        if: matrix.os == 'macos-13'
+          brew install openssl@3.0
+        if: matrix.os == 'macos-14'
 
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.PYTHON_VERSION }}
 
@@ -125,6 +126,11 @@ jobs:
 
       - name: Install dependencies
         run: poetry install --with build --without dev --no-interaction --no-root
+        env:
+          # For building psycopg on MacOS
+          # Required the the same version of openssl as the one used by the Python installation
+          LDFLAGS: "-L/opt/homebrew/opt/openssl@3.0/lib"
+          CPPFLAGS: "-I/opt/homebrew/opt/openssl@3.0/include"
 
       - name: Get the version
         id: get_version
@@ -136,7 +142,7 @@ jobs:
         run: ${{ matrix.BUILD_CMD }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.OS }}
           path: /tmp/artifacts/*
@@ -147,7 +153,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: /tmp/artifacts
 
@@ -168,7 +174,7 @@ jobs:
             /tmp/artifacts/ubuntu-20.04/operator-${{ steps.get_version.outputs.VERSION }}-linux-amd64.sha256
             /tmp/artifacts/linux-arm-runner/operator-${{ steps.get_version.outputs.VERSION }}-linux-arm64.tar.gz
             /tmp/artifacts/linux-arm-runner/operator-${{ steps.get_version.outputs.VERSION }}-linux-arm64.sha256
-            /tmp/artifacts/macos-13/operator-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.tar.gz
-            /tmp/artifacts/macos-13/operator-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.sha256
+            /tmp/artifacts/macos-14/operator-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.tar.gz
+            /tmp/artifacts/macos-14/operator-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.sha256
             /tmp/artifacts/windows-latest/operator-${{ steps.get_version.outputs.VERSION }}-windows-amd64.zip
             /tmp/artifacts/windows-latest/operator-${{ steps.get_version.outputs.VERSION }}-windows-amd64.sha256
