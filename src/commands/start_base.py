@@ -76,7 +76,7 @@ async def start_base() -> None:
         logger.info('Starting api mode')
 
     logger.info('Started operator service')
-    metrics.service_started.set(1)
+    metrics.service_started.labels(network=settings.network).set(1)
     with InterruptHandler() as interrupt_handler:
         tasks = [
             ValidatorsTask(

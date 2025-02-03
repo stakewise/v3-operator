@@ -258,7 +258,7 @@ async def get_validators_count_from_vault_assets(harvest_params: HarvestParams |
         # apply GNO -> mGNO exchange rate
         vault_balance = convert_to_mgno(vault_balance)
 
-    metrics.stakeable_assets.set(int(vault_balance))
+    metrics.stakeable_assets.labels(network=settings.network).set(int(vault_balance))
 
     # calculate number of validators that can be registered
     validators_count = vault_balance // DEPOSIT_AMOUNT

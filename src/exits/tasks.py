@@ -139,7 +139,7 @@ async def _fetch_outdated_indexes(
             continue
         if not update_block or response['exit_signature_block_number'] >= update_block:
             outdated_indexes = [val['index'] for val in response['validators']]
-            metrics.outdated_signatures.set(len(outdated_indexes))
+            metrics.outdated_signatures.labels(network=settings.network).set(len(outdated_indexes))
             return outdated_indexes
     raise RuntimeError('Oracles are down or have not synced exit signatures yet')
 

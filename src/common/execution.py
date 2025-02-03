@@ -162,7 +162,7 @@ async def check_hot_wallet_balance() -> None:
 
     hot_wallet_balance = await get_hot_wallet_balance()
 
-    metrics.wallet_balance.set(hot_wallet_balance)
+    metrics.wallet_balance.labels(network=settings.network).set(hot_wallet_balance)
 
     if hot_wallet_balance < hot_wallet_min_balance:
         logger.warning(
