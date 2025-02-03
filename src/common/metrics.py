@@ -52,7 +52,10 @@ class Metrics:
             labelnames=['network'],
         )
         self.stakeable_assets = Gauge(
-            'stakeable_assets', 'The amount of stakeable assets', namespace=settings.metrics_prefix
+            'stakeable_assets',
+            'The amount of stakeable assets',
+            namespace=settings.metrics_prefix,
+            labelnames=['network'],
         )
         self.unused_validator_keys = Gauge(
             'unused_validator_keys',
