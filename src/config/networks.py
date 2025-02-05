@@ -49,7 +49,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
         STAKEWISE_API_URL='https://mainnet-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
-        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(18470104),
+        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(21471524),
         DEFAULT_DVT_RELAYER_ENDPOINT='https://mainnet-dvt-relayer.stakewise.io',
     ),
     HOLESKY: NetworkConfig(
@@ -65,7 +65,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
         STAKEWISE_API_URL='https://holesky-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
-        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(215397),
+        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(3236751),
         DEFAULT_DVT_RELAYER_ENDPOINT='https://holesky-dvt-relayer.stakewise.io',
     ),
     GNOSIS: NetworkConfig(
@@ -81,7 +81,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
         STAKEWISE_API_URL='https://gnosis-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
-        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(34778569),
+        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(37640206),
         DEFAULT_DVT_RELAYER_ENDPOINT='gnosis-dvt-relayer.stakewise.io',
     ),
     CHIADO: NetworkConfig(
@@ -97,7 +97,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
         STAKEWISE_API_URL='https://chiado-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
-        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(10627606),
+        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(12896244),
         DEFAULT_DVT_RELAYER_ENDPOINT='chiado-dvt-relayer.stakewise.io',
     ),
 }
