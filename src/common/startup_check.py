@@ -9,7 +9,11 @@ from sw_utils import IpfsFetchClient, get_consensus_client, get_execution_client
 from web3 import Web3
 
 from src.common.clients import db_client
-from src.common.contracts import keeper_contract, vault_contract
+from src.common.contracts import (
+    keeper_contract,
+    validators_registry_contract,
+    vault_contract,
+)
 from src.common.execution import (
     check_hot_wallet_balance,
     check_vault_address,
@@ -350,6 +354,16 @@ async def _check_events_logs() -> None:
     if not events:
         raise ValueError(
             "Can't find oracle config. Please, ensure that EL client didn't prune event logs."
+        )
+
+    events = await validators_registry_contract.events.DepositEvent.get_logs(  # type: ignore
+        fromBlock=settings.network_config.GENESIS_VALIDATORS_LAST_BLOCK,
+        toBlock=settings.network_config.GENESIS_VALIDATORS_LAST_BLOCK,
+    )
+    if not events:
+        raise ValueError(
+            "Can't find network validator events. "
+            "Please, ensure that EL client didn't prune event logs."
         )
 
 
