@@ -14,7 +14,7 @@ from src.common.contracts import (
     vault_contract,
     vault_v1_contract,
 )
-from src.common.execution import get_high_priority_tx_params
+from src.common.execution import build_gas_manager
 from src.common.typings import HarvestParams, OraclesApproval
 from src.common.utils import format_error
 from src.config.settings import settings
@@ -85,7 +85,8 @@ async def register_validators(
         return None
 
     try:
-        tx_params = await get_high_priority_tx_params()
+        gas_manager = build_gas_manager()
+        tx_params = await gas_manager.get_high_priority_tx_params()
         tx = await multicall_contract.functions.aggregate(calls).transact(tx_params)
     except Exception as e:
         logger.error('Failed to register validator(s): %s', format_error(e))
