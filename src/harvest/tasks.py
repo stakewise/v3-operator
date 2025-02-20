@@ -2,7 +2,7 @@ import logging
 
 from sw_utils import InterruptHandler
 
-from src.common.execution import check_gas_price
+from src.common.execution import build_gas_manager
 from src.common.harvest import get_harvest_params
 from src.common.tasks import BaseTask
 from src.harvest.execution import submit_harvest_transaction
@@ -18,7 +18,8 @@ class HarvestTask(BaseTask):
         """
 
         # check current gas prices
-        if not await check_gas_price():
+        gas_manager = build_gas_manager()
+        if not await gas_manager.check_gas_price():
             return
 
         harvest_params = await get_harvest_params()

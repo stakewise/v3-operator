@@ -13,7 +13,7 @@ from src.common.checks import wait_execution_catch_up_consensus
 from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import v2_pool_escrow_contract, validators_registry_contract
 from src.common.exceptions import NotEnoughOracleApprovalsError
-from src.common.execution import check_gas_price, get_protocol_config
+from src.common.execution import build_gas_manager, get_protocol_config
 from src.common.harvest import get_harvest_params
 from src.common.metrics import metrics
 from src.common.tasks import BaseTask
@@ -166,7 +166,8 @@ async def process_validators(
         validators_manager_signature = validators_response.validators_manager_signature
         multi_proof = validators_response.multi_proof
 
-    if not await check_gas_price(high_priority=True):
+    gas_manager = build_gas_manager()
+    if not await gas_manager.check_gas_price(high_priority=True):
         return None
 
     logger.info('Started registration of %d validator(s)', len(validators))
