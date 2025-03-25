@@ -20,7 +20,7 @@ class TestCreateMnemonic:
             '--vault',
             vault,
             '--network',
-            'holesky',
+            'hoodi',
         ]
         result = runner.invoke(init, args, input=f'\n{mnemonic}\n')
         assert result.exit_code == 0
@@ -38,7 +38,7 @@ class TestCreateMnemonic:
             '--vault',
             vault,
             '--network',
-            'holesky',
+            'hoodi',
         ]
         result = runner.invoke(init, args, input=f'\n{mnemonic} bad\n\n{mnemonic}\n')
         assert result.exit_code == 0
@@ -57,7 +57,7 @@ class TestCreateMnemonic:
             '--vault',
             vault,
             '--network',
-            'holesky',
+            'hoodi',
         ]
         result = runner.invoke(init, args)
         assert result.exit_code == 0

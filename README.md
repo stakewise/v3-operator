@@ -233,7 +233,7 @@ running Operator Service from binary, you would use:
 ```
 
 ```text
-Enter the network name (mainnet, holesky) [mainnet]:
+Enter the network name (mainnet, hoodi, gnosis, chiado) [mainnet]:
 Enter your vault address: 0x3320a...68
 Choose your mnemonic language (chinese_simplified, chinese_traditional, czech, english, italian, korean, portuguese, spanish) [english]:
 This is your seed phrase. Write it down and store it safely, it is the ONLY way to recover your validator keys.
@@ -516,7 +516,7 @@ To use the `rated-self-report` command, you will need to provide the following p
 
 - `--data-dir`: Path where the vault data will be placed. Default is ~/.stakewise.
 - `--vault`: The vault address.
-- `--network`: The network of your vault (e.g., mainnet, holesky).
+- `--network`: The network of your vault (e.g., mainnet, hoodi).
 - `--pool-tag`: The pool name listed on the Explorer (optional).
 - `--token`: OAuth token for authorization.
 
