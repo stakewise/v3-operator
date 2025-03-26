@@ -111,6 +111,13 @@ class VaultStateMixin:
         return update_state_call
 
 
+class Erc20Contract(ContractWrapper):
+    abi_path = 'abi/Erc20Token.json'
+
+    async def symbol(self) -> str:
+        return await self.contract.functions.symbol().call()
+
+
 class VaultV1Contract(ContractWrapper, VaultStateMixin):
     abi_path = 'abi/IEthVaultV1.json'
 

@@ -8,6 +8,7 @@ from eth_typing import HexAddress
 
 from src.common.credentials import Credential, CredentialManager
 from src.common.password import generate_password, get_or_create_password_file
+from src.common.typings import ValidatorType
 from src.common.utils import greenify
 from src.common.validators import validate_eth_address, validate_mnemonic
 from src.common.vault_config import VaultConfig
@@ -48,6 +49,13 @@ from src.common.vault_config import VaultConfig
     callback=validate_eth_address,
 )
 @click.option(
+    '--validator-type',
+    help='Type of registered validator: 0x01 or 0x02.',
+    envvar='VALIDATOR_TYPE',
+    default='0x02',
+    type=ValidatorType,
+)
+@click.option(
     '--pool-size',
     help='Number of processes in a pool.',
     envvar='POOL_SIZE',
@@ -61,6 +69,7 @@ def create_keys(
     vault: HexAddress,
     data_dir: str,
     per_keystore_password: bool,
+    validator_type: ValidatorType,
     pool_size: int | None,
 ) -> None:
     vault_config = VaultConfig(vault, Path(data_dir))
@@ -74,6 +83,7 @@ def create_keys(
         network=vault_config.network,
         vault=vault,
         mnemonic=mnemonic,
+        validator_type=validator_type,
         count=count,
         start_index=vault_config.mnemonic_next_index,
         pool_size=pool_size,

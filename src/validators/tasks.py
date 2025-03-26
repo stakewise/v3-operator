@@ -7,19 +7,24 @@ from sw_utils import EventScanner, InterruptHandler, IpfsFetchClient, convert_to
 from sw_utils.networks import GNO_NETWORKS
 from sw_utils.typings import Bytes32, ProtocolConfig
 from web3 import Web3
-from web3.types import BlockNumber
+from web3.types import BlockNumber, Wei
 
 from src.common.checks import wait_execution_catch_up_consensus
-from src.common.consensus import get_chain_finalized_head
+from src.common.consensus import fetch_registered_validators, get_chain_finalized_head
 from src.common.contracts import v2_pool_escrow_contract, validators_registry_contract
 from src.common.exceptions import NotEnoughOracleApprovalsError
 from src.common.execution import build_gas_manager, get_protocol_config
 from src.common.harvest import get_harvest_params
 from src.common.metrics import metrics
 from src.common.tasks import BaseTask
-from src.common.typings import HarvestParams, OraclesApproval
+from src.common.typings import HarvestParams, OraclesApproval, Validator, ValidatorType
 from src.common.utils import RateLimiter, get_current_timestamp
-from src.config.settings import DEPOSIT_AMOUNT, settings
+from src.config.settings import (
+    DEPOSIT_AMOUNT,
+    MIN_DEPOSIT_AMOUNT,
+    PECTRA_DEPOSIT_AMOUNT_GWEI,
+    settings,
+)
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import MissingDepositDataValidatorsException
 from src.validators.execution import (
@@ -36,13 +41,9 @@ from src.validators.signing.common import (
     get_encrypted_exit_signature_shards,
     get_validators_proof,
 )
-from src.validators.typings import (
-    ApprovalRequest,
-    DepositData,
-    NetworkValidator,
-    Validator,
-    ValidatorsRegistrationMode,
-)
+from src.validators.typings import ApprovalRequest, DepositData, NetworkValidator
+from src.validators.typings import Validator as Validator2
+from src.validators.typings import ValidatorsRegistrationMode
 from src.validators.utils import send_approval_requests
 
 logger = logging.getLogger(__name__)
@@ -103,7 +104,29 @@ async def process_validators(
         return None
 
     harvest_params = await get_harvest_params()
-    validators_count = await get_validators_count_from_vault_assets(harvest_params)
+    # validators_count = await get_validators_count_from_vault_assets(harvest_params)
+
+    vault_assets = await get_vault_assets(harvest_params)
+    if vault_assets < MIN_DEPOSIT_AMOUNT:
+        return
+
+    vault_validators = await fetch_registered_validators()
+    # calculate number of validators that can be registered
+
+    v2_validators_capacity = sum(
+        max(PECTRA_DEPOSIT_AMOUNT_GWEI - val.balance, 0)
+        for val in vault_validators
+        if val.validator_type == ValidatorType.TWO
+    )
+    if v2_validators_capacity > vault_assets:
+        # call fundValidator
+        return
+
+    # calculate number of validators that can be registered
+    if settings.validator_type == ValidatorType.TWO:
+        validators_count = vault_assets // PECTRA_DEPOSIT_AMOUNT_GWEI
+    else:
+        validators_count = vault_assets // DEPOSIT_AMOUNT
 
     if not validators_count:
         # not enough balance to register validators
@@ -266,6 +289,17 @@ async def get_validators_count_from_vault_assets(harvest_params: HarvestParams |
     return validators_count
 
 
+async def get_vault_assets(harvest_params: HarvestParams | None) -> int:
+    vault_assets = await get_withdrawable_assets(harvest_params)
+    if settings.network in GNO_NETWORKS:
+        # apply GNO -> mGNO exchange rate
+        vault_assets = convert_to_mgno(vault_assets)
+
+    metrics.stakeable_assets.labels(network=settings.network).set(int(vault_assets))
+
+    return vault_assets
+
+
 # pylint: disable-next=too-many-arguments,too-many-locals
 async def create_approval_request(
     protocol_config: ProtocolConfig,
@@ -358,3 +392,24 @@ async def load_genesis_validators() -> None:
 
     NetworkValidatorCrud().save_network_validators(genesis_validators)
     logger.info('Loaded %d genesis validators', len(genesis_validators))
+
+
+def _get_topup_data(vault_validators: list[Validator], amount: Wei) -> dict[str, Wei]:
+    v2_validators_capacity = sum(
+        max(PECTRA_DEPOSIT_AMOUNT_GWEI - val.balance, 0)
+        for val in vault_validators
+        if val.validator_type == ValidatorType.TWO
+    )
+    if v2_validators_capacity < amount:
+        return {}
+
+    vault_validators.sort(key=lambda x: x.balance, reverse=True)
+    result = {}
+    for validator in vault_validators:
+        if PECTRA_DEPOSIT_AMOUNT_GWEI - validator.balance > 0:
+            val_amount = min(PECTRA_DEPOSIT_AMOUNT_GWEI - validator.balance, amount)
+            result[validator.public_key] = val_amount
+            amount -= val_amount
+        if amount <= 0:
+            break
+    return result

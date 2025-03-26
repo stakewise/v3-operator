@@ -44,6 +44,7 @@ class Settings(metaclass=Singleton):
     metrics_host: str
     metrics_port: int
     metrics_prefix: str
+    validator_type: str
     deposit_data_file: Path
     keystores_dir: Path
     keystores_password_dir: Path
@@ -110,6 +111,7 @@ class Settings(metaclass=Singleton):
         metrics_port: int = DEFAULT_METRICS_PORT,
         metrics_host: str = DEFAULT_METRICS_HOST,
         metrics_prefix: str = DEFAULT_METRICS_PREFIX,
+        validator_type: str = '0x02',
         max_fee_per_gas_gwei: int = DEFAULT_MAX_FEE_PER_GAS_GWEI,
         deposit_data_file: str | None = None,
         keystores_dir: str | None = None,
@@ -147,6 +149,7 @@ class Settings(metaclass=Singleton):
         self.metrics_host = metrics_host
         self.metrics_port = metrics_port
         self.metrics_prefix = metrics_prefix
+        self.validator_type = validator_type
         self.max_fee_per_gas_gwei = max_fee_per_gas_gwei
         self.min_validators_registration = min_validators_registration
 
@@ -296,10 +299,23 @@ OUTDATED_SIGNATURES_URL_PATH = '/signatures/{vault}'
 ORACLES_VALIDATORS_TIMEOUT: int = decouple_config(
     'ORACLES_VALIDATORS_TIMEOUT', default=10, cast=int
 )
-
+ORACLES_CONSOLIDATION_TIMEOUT: int = decouple_config(
+    'ORACLES_CONSOLIDATION_TIMEOUT', default=10, cast=int
+)
+# partial withdrawals
+PARTIAL_WITHDRAWALS_INTERVAL: int = decouple_config(
+    'PARTIAL_WITHDRAWALS_INTERVAL', default=666, cast=int
+)
 # common
+MIN_DEPOSIT_AMOUNT = Web3.to_wei(1, 'ether')
+
 DEPOSIT_AMOUNT = Web3.to_wei(32, 'ether')
 DEPOSIT_AMOUNT_GWEI = int(Web3.from_wei(DEPOSIT_AMOUNT, 'gwei'))
+
+PECTRA_DEPOSIT_AMOUNT = Web3.to_wei(2048, 'ether')
+PECTRA_DEPOSIT_AMOUNT_GWEI = int(Web3.from_wei(PECTRA_DEPOSIT_AMOUNT, 'gwei'))
+
+PECTRA_MAX_EFFECTIVE_BALANCE = 2048
 
 # Backoff retries
 DEFAULT_RETRY_TIME = 60

@@ -18,20 +18,22 @@ from staking_deposit.key_handling.key_derivation.tree import (
 )
 from staking_deposit.key_handling.keystore import Keystore, ScryptKeystore
 from staking_deposit.settings import DEPOSIT_CLI_VERSION
-from sw_utils import get_eth1_withdrawal_credentials
 from sw_utils.signing import (
     DepositData,
     DepositMessage,
     compute_deposit_domain,
     compute_signing_root,
+    get_01_withdrawal_credentials,
+    get_02_withdrawal_credentials,
 )
 from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3._utils import request
 
+from src.common.typings import ValidatorType
 from src.common.utils import chunkify
 from src.config.networks import NETWORKS
-from src.config.settings import DEPOSIT_AMOUNT_GWEI
+from src.config.settings import DEPOSIT_AMOUNT_GWEI, PECTRA_DEPOSIT_AMOUNT_GWEI
 
 # Set path as EIP-2334 format
 # https://eips.ethereum.org/EIPS/eip-2334
@@ -45,6 +47,7 @@ class Credential:
     path: str
     network: str
     vault: HexAddress
+    validator_type: ValidatorType
 
     @cached_property
     def public_key(self) -> HexStr:
@@ -56,11 +59,15 @@ class Credential:
 
     @cached_property
     def amount(self) -> int:
-        return DEPOSIT_AMOUNT_GWEI
+        if self.validator_type == ValidatorType.ONE:
+            return DEPOSIT_AMOUNT_GWEI
+        return PECTRA_DEPOSIT_AMOUNT_GWEI
 
     @cached_property
     def withdrawal_credentials(self) -> Bytes32:
-        return get_eth1_withdrawal_credentials(self.vault)
+        if self.validator_type == ValidatorType.ONE:
+            return get_01_withdrawal_credentials(self.vault)
+        return get_02_withdrawal_credentials(self.vault)
 
     def save_signing_keystore(
         self, password: str, folder: str, per_keystore_password: bool = False
@@ -125,6 +132,7 @@ class CredentialManager:
         network: str,
         vault: HexAddress,
         mnemonic: str,
+        validator_type: ValidatorType,
         count: int,
         start_index: int,
         pool_size: int | None = None,
@@ -151,6 +159,7 @@ class CredentialManager:
                             network,
                             vault,
                             mnemonic,
+                            validator_type,
                         ],
                         callback=bar_updated,
                     )
@@ -169,6 +178,7 @@ class CredentialManager:
         network: str,
         vault: HexAddress,
         mnemonic: str,
+        validator_type: ValidatorType,
     ) -> list[Credential]:
         # Hack to run web3 sessions in multiprocessing mode
         # pylint: disable-next=protected-access
@@ -176,7 +186,9 @@ class CredentialManager:
 
         credentials: list[Credential] = []
         for index in indexes:
-            credential = CredentialManager.generate_credential(network, vault, mnemonic, index)
+            credential = CredentialManager.generate_credential(
+                network, vault, mnemonic, index, validator_type
+            )
             credentials.append(credential)
         return credentials
 
@@ -187,11 +199,12 @@ class CredentialManager:
             vault=vault,
             mnemonic=mnemonic,
             index=0,
+            validator_type=ValidatorType.ONE,  # todo
         ).public_key
 
     @staticmethod
     def generate_credential(
-        network: str, vault: HexAddress, mnemonic: str, index: int
+        network: str, vault: HexAddress, mnemonic: str, index: int, validator_type: ValidatorType
     ) -> Credential:
         """Returns the signing key of the mnemonic at a specific index."""
         seed = get_seed(mnemonic=mnemonic, password='')  # nosec
@@ -203,5 +216,9 @@ class CredentialManager:
             private_key = BLSPrivateKey(derive_child_SK(parent_SK=private_key, index=node))
 
         return Credential(
-            private_key=private_key, path=signing_key_path, network=network, vault=vault
+            private_key=private_key,
+            path=signing_key_path,
+            network=network,
+            vault=vault,
+            validator_type=validator_type,
         )

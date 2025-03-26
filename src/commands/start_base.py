@@ -23,6 +23,7 @@ from src.validators.relayer import RelayerAdapter, create_relayer_adapter
 from src.validators.tasks import ValidatorsTask, load_genesis_validators
 from src.validators.typings import DepositData, ValidatorsRegistrationMode
 from src.validators.utils import load_deposit_data
+from src.withdrawals.tasks import PartialWithdrawalsTask
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,7 @@ async def start_base() -> None:
                 deposit_data=deposit_data,
                 relayer_adapter=relayer_adapter,
             ).run(interrupt_handler),
+            PartialWithdrawalsTask().run(interrupt_handler),
             ExitSignatureTask(
                 keystore=keystore,
             ).run(interrupt_handler),

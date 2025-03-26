@@ -13,6 +13,7 @@ from src.common.credentials import CredentialManager
 from src.common.execution import SECONDS_PER_MONTH
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.password import generate_password, get_or_create_password_file
+from src.common.typings import ValidatorType
 from src.common.utils import greenify, log_verbose
 from src.common.validators import validate_eth_address, validate_mnemonic
 from src.common.vault_config import VaultConfig
@@ -262,6 +263,7 @@ async def _generate_keystores(
             vault=settings.vault,
             mnemonic=mnemonic,
             index=index,
+            validator_type=ValidatorType.ONE,  # todo
         )
         public_key = add_0x_prefix(credential.public_key)
         # increase index for next iteration
