@@ -102,8 +102,8 @@ class TestCreateKeys:
         with open(f'{vault_dir}/deposit_data.json', encoding='utf-8') as f:
             data = json.load(f)
             assert count == len(data)
-            assert data[0].get('network_name') == 'holesky'
-            assert data[0].get('fork_version') == '01017000'
+            assert data[0].get('network_name') == 'hoodi'
+            assert data[0].get('fork_version') == '10000910'
             assert data[0].get('deposit_cli_version') == DEPOSIT_CLI_VERSION
             for record in data:
                 assert record['withdrawal_credentials'][:2] == '02'

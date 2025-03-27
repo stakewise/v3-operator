@@ -5,7 +5,7 @@ from eth_typing import BLSPubkey, BLSSignature, HexStr
 from multiproof import StandardMerkleTree
 from multiproof.standard import MultiProof
 from sw_utils import ConsensusFork, ProtocolConfig, get_exit_message_signing_root
-from sw_utils.signing import compute_deposit_data, get_01_withdrawal_credentials
+from sw_utils.signing import compute_deposit_data, get_v1_withdrawal_credentials
 from web3 import Web3
 
 from src.config.settings import settings
@@ -28,7 +28,7 @@ def get_validators_proof(
 
 
 def encode_tx_validator_list(validators: Sequence[Validator]) -> list[bytes]:
-    credentials = get_01_withdrawal_credentials(settings.vault)
+    credentials = get_v1_withdrawal_credentials(settings.vault)
     tx_validators: list[bytes] = []
     for validator in validators:
         tx_validator = encode_tx_validator(credentials, validator)

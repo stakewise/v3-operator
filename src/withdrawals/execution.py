@@ -7,12 +7,12 @@ from web3.types import ChecksumAddress, Wei
 
 from src.common.clients import execution_client
 from src.common.contracts import (
-    Erc20Contract,
-    VaultContract,
+    gno_erc20_contract,
     keeper_contract,
     multicall_contract,
     validators_registry_contract,
     vault_contract,
+    vault_erc20_contract,
 )
 from src.common.typings import HarvestParams
 from src.config.settings import settings
@@ -33,7 +33,7 @@ async def get_vault_assets(
 ) -> tuple[Wei, Wei]:
     # calculate storage position based on the type of the vault
     try:
-        await Erc20Contract(vault_contract.address).symbol()
+        await vault_erc20_contract.symbol()
         storage_position = ERC20_VAULT_UNCLAIMED_ASSETS_STORAGE_POSITION
     except (ValueError, ContractLogicError):
         storage_position = VAULT_UNCLAIMED_ASSETS_STORAGE_POSITION
@@ -53,10 +53,10 @@ async def get_vault_assets(
 
     # define calls
     update_state_call = None
-    if harvest_params and await keeper_contract.can_harvest(vault, block_number):
+    if harvest_params and await keeper_contract.can_harvest(vault):
         update_state_call = (
             vault,
-            _encode_update_state_call(vault_contract, harvest_params),
+            _encode_update_state_call(harvest_params),
         )
 
     queued_shares_call = vault_contract.encode_abi('queuedShares')
@@ -159,7 +159,7 @@ def _get_encoded_balance_call(address: ChecksumAddress) -> tuple[ChecksumAddress
         return multicall_contract.address, eth_balance_call
 
     gno_addr = settings.network_config.GNO_TOKEN_CONTRACT_ADDRESS
-    return gno_addr, Erc20Contract(gno_addr).encode_abi('balanceOf', [address])
+    return gno_addr, gno_erc20_contract.encode_abi('balanceOf', [address])
 
 
 def _get_encoded_gnosis_withdrawable_assets_call(

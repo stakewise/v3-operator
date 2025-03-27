@@ -41,7 +41,7 @@ async def poll_consolidation_approval(
 
     # convert keys format
     public_keys = []
-    for to_key, from_keys in from_to_keys:
+    for to_key, from_keys in from_to_keys.values():
         for from_key in from_keys:
             public_keys.append((from_key, to_key))
     consolidation_request = ConsolidationRequest(

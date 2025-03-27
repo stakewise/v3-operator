@@ -20,6 +20,7 @@ from src.common.execution import (
     get_protocol_config,
 )
 from src.common.harvest import get_harvest_params
+from src.common.typings import ValidatorType
 from src.common.utils import format_error, round_down, warning_verbose
 from src.common.wallet import hot_wallet
 from src.config.networks import NETWORKS
@@ -103,6 +104,7 @@ async def startup_checks() -> None:
         logger.info('Found keystores dir')
 
     await _check_validators_manager()
+    await _check_validators_type()
 
     if (
         settings.validators_registration_mode == ValidatorsRegistrationMode.API
@@ -343,6 +345,13 @@ async def _check_validators_manager() -> None:
                 raise RuntimeError(
                     'validators manager address must equal to deposit data registry address'
                 )
+
+
+async def _check_validators_type() -> None:
+    if not settings.validator_type:
+        return
+    if await vault_contract.version() < 5 and settings.validator_type == ValidatorType.TWO:
+        raise RuntimeError('Validator type 0x02 is not supported for vault version less than 5')
 
 
 async def _check_events_logs() -> None:

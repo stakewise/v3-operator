@@ -23,8 +23,8 @@ from sw_utils.signing import (
     DepositMessage,
     compute_deposit_domain,
     compute_signing_root,
-    get_01_withdrawal_credentials,
-    get_02_withdrawal_credentials,
+    get_v1_withdrawal_credentials,
+    get_v2_withdrawal_credentials,
 )
 from sw_utils.typings import Bytes32
 from web3 import Web3
@@ -66,8 +66,8 @@ class Credential:
     @cached_property
     def withdrawal_credentials(self) -> Bytes32:
         if self.validator_type == ValidatorType.ONE:
-            return get_01_withdrawal_credentials(self.vault)
-        return get_02_withdrawal_credentials(self.vault)
+            return get_v1_withdrawal_credentials(self.vault)
+        return get_v2_withdrawal_credentials(self.vault)
 
     def save_signing_keystore(
         self, password: str, folder: str, per_keystore_password: bool = False

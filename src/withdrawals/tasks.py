@@ -35,7 +35,7 @@ class PartialWithdrawalsTask(BaseTask):
             chain_state=chain_head, interrupt_handler=interrupt_handler
         )
         protocol_config = await get_protocol_config()
-        last_withdrawals_block = await _get_last_withdrawals_block()  # via contract event?
+        last_withdrawals_block = await vault_contract.get_last_partial_withdrawals_block()
         if (
             last_withdrawals_block
             and last_withdrawals_block + PARTIAL_WITHDRAWALS_INTERVAL >= chain_head.block_number
@@ -63,6 +63,7 @@ class PartialWithdrawalsTask(BaseTask):
             return
 
         withdrawals_data = _get_withdrawal_data(validators, partial_withdrawals_amount)
+        validators_manager_signature = ...
         tx_hash = await submit_partial_withdrawals_request(
             validators=withdrawals_data, validators_manager_signature=validators_manager_signature
         )

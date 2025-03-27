@@ -11,7 +11,11 @@ from web3.types import BlockNumber, Wei
 
 from src.common.checks import wait_execution_catch_up_consensus
 from src.common.consensus import fetch_registered_validators, get_chain_finalized_head
-from src.common.contracts import v2_pool_escrow_contract, validators_registry_contract
+from src.common.contracts import (
+    v2_pool_escrow_contract,
+    validators_registry_contract,
+    vault_contract,
+)
 from src.common.exceptions import NotEnoughOracleApprovalsError
 from src.common.execution import build_gas_manager, get_protocol_config
 from src.common.harvest import get_harvest_params
@@ -35,7 +39,7 @@ from src.validators.execution import (
 )
 from src.validators.keystores.base import BaseKeystore
 from src.validators.metrics import update_unused_validator_keys_metric
-from src.validators.register_validators import register_validators
+from src.validators.register_validators import fund_validators, register_validators
 from src.validators.relayer import RelayerAdapter
 from src.validators.signing.common import (
     get_encrypted_exit_signature_shards,
@@ -89,7 +93,7 @@ async def process_validators(
     keystore: BaseKeystore | None,
     deposit_data: DepositData | None,
     relayer_adapter: RelayerAdapter | None = None,
-) -> HexStr | None:
+) -> None:
     """
     Calculates vault assets, requests oracles approval, submits registration tx
     """
@@ -104,24 +108,64 @@ async def process_validators(
         return None
 
     harvest_params = await get_harvest_params()
-    # validators_count = await get_validators_count_from_vault_assets(harvest_params)
 
     vault_assets = await get_vault_assets(harvest_params)
     if vault_assets < MIN_DEPOSIT_AMOUNT:
-        return
+        return None
 
-    vault_validators = await fetch_registered_validators()
-    # calculate number of validators that can be registered
+    vault_version = await vault_contract.version()
+    if vault_version >= 5:
+        vault_validators = await fetch_registered_validators()
 
-    v2_validators_capacity = sum(
-        max(PECTRA_DEPOSIT_AMOUNT_GWEI - val.balance, 0)
-        for val in vault_validators
-        if val.validator_type == ValidatorType.TWO
+        v2_validators_capacity = sum(
+            max(PECTRA_DEPOSIT_AMOUNT_GWEI - val.balance, 0)
+            for val in vault_validators
+            if val.validator_type == ValidatorType.TWO
+        )
+        if v2_validators_capacity > vault_assets:
+            await fund_v2_validators(vault_validators, vault_assets, harvest_params=harvest_params)
+        logger.info('Not enough capacity to fund v2 validators, registering new validators...')
+
+    await register_new_validators(
+        vault_assets=vault_assets,
+        harvest_params=harvest_params,
+        keystore=keystore,
+        deposit_data=deposit_data,
+        relayer_adapter=relayer_adapter,
     )
-    if v2_validators_capacity > vault_assets:
-        # call fundValidator
-        return
 
+
+async def fund_v2_validators(
+    vault_validators: list[Validator], amount: Wei, harvest_params: HarvestParams | None
+) -> HexStr | None:
+    topup_data = _get_topup_data(vault_validators, amount)
+    if not topup_data:
+        return None
+
+    logger.info('Started fund of %d validator(s)', len(topup_data))
+
+    validators_data = ...
+    validators_manager_signature = ...
+    tx_hash = await fund_validators(
+        harvest_params=harvest_params,
+        validators=validators_data,
+        validators_manager_signature=validators_manager_signature,
+    )
+    if tx_hash:
+        pub_keys = ', '.join(topup_data)
+        logger.info('Successfully funded validator(s) with public key(s) %s', pub_keys)
+
+    return tx_hash
+
+
+# pylint: disable-next=too-many-locals,too-many-return-statements,too-many-branches
+async def register_new_validators(
+    vault_assets: int,
+    harvest_params: HarvestParams | None,
+    keystore: BaseKeystore | None,
+    deposit_data: DepositData | None,
+    relayer_adapter: RelayerAdapter | None = None,
+) -> HexStr | None:
     # calculate number of validators that can be registered
     if settings.validator_type == ValidatorType.TWO:
         validators_count = vault_assets // PECTRA_DEPOSIT_AMOUNT_GWEI
@@ -133,7 +177,10 @@ async def process_validators(
         return None
 
     # Check if there is enough ETH to register the specified minimum number of validators
-    if validators_count < settings.min_validators_registration:
+    if (
+        settings.validator_type == ValidatorType.ONE
+        and validators_count < settings.min_validators_registration
+    ):
         logger.debug(
             'Not enough ETH to register %d validators. Current balance allows for %d validators.',
             settings.min_validators_registration,
@@ -146,7 +193,7 @@ async def process_validators(
 
     validators_batch_size = min(protocol_config.validators_approval_batch_limit, validators_count)
     validators_manager_signature: HexStr | None = None
-    validators: Sequence[Validator]
+    validators: Sequence[Validator2]
     multi_proof: MultiProof[tuple[bytes, int]] | None
 
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
@@ -220,7 +267,7 @@ async def process_validators(
 
 async def poll_oracles_approval(
     keystore: BaseKeystore | None,
-    validators: Sequence[Validator],
+    validators: Sequence[Validator2],
     multi_proof: MultiProof[tuple[bytes, int]] | None = None,
     validators_manager_signature: HexStr | None = None,
 ) -> tuple[ApprovalRequest, OraclesApproval]:
@@ -276,17 +323,19 @@ async def poll_oracles_approval(
             )
 
 
-async def get_validators_count_from_vault_assets(harvest_params: HarvestParams | None) -> int:
-    vault_balance = await get_withdrawable_assets(harvest_params)
-    if settings.network in GNO_NETWORKS:
-        # apply GNO -> mGNO exchange rate
-        vault_balance = convert_to_mgno(vault_balance)
-
-    metrics.stakeable_assets.labels(network=settings.network).set(int(vault_balance))
-
-    # calculate number of validators that can be registered
-    validators_count = vault_balance // DEPOSIT_AMOUNT
-    return validators_count
+#
+#
+# async def get_validators_count_from_vault_assets(harvest_params: HarvestParams | None) -> int:
+#     vault_balance = await get_withdrawable_assets(harvest_params)
+#     if settings.network in GNO_NETWORKS:
+#         # apply GNO -> mGNO exchange rate
+#         vault_balance = convert_to_mgno(vault_balance)
+#
+#     metrics.stakeable_assets.labels(network=settings.network).set(int(vault_balance))
+#
+#     # calculate number of validators that can be registered
+#     validators_count = vault_balance // DEPOSIT_AMOUNT
+#     return validators_count
 
 
 async def get_vault_assets(harvest_params: HarvestParams | None) -> int:
@@ -304,7 +353,7 @@ async def get_vault_assets(harvest_params: HarvestParams | None) -> int:
 async def create_approval_request(
     protocol_config: ProtocolConfig,
     keystore: BaseKeystore | None,
-    validators: Sequence[Validator],
+    validators: Sequence[Validator2],
     registry_root: Bytes32,
     multi_proof: MultiProof[tuple[bytes, int]] | None,
     deadline: int,
