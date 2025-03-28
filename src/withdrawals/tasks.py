@@ -63,9 +63,10 @@ class PartialWithdrawalsTask(BaseTask):
             return
 
         withdrawals_data = _get_withdrawal_data(validators, partial_withdrawals_amount)
+        validator_data = _endcode_validators(withdrawals_data)
         validators_manager_signature = ...
-        tx_hash = await submit_partial_withdrawals_request(
-            validators=withdrawals_data, validators_manager_signature=validators_manager_signature
+        tx_hash = await submit_withdraw_validators(
+            validators=validator_data, validators_manager_signature=validators_manager_signature
         )
         if not tx_hash:
             return
@@ -106,19 +107,31 @@ def _get_withdrawal_data(validators: list[Validator], withdrawals_amount: int) -
     return withdrawals_data
 
 
-async def submit_partial_withdrawals_request(
+def _endcode_validators(validators: dict[HexStr, int]) -> bytes:
+    """
+    Encodes validators data for withdrawValidators contract call
+    """
+    data = b''
+    for public_key, amount in validators.items():
+        data += Web3.to_bytes(hexstr=public_key)
+        data += amount.to_bytes(32, 'big')
+
+    return data
+
+
+async def submit_withdraw_validators(
     validators: bytes,
     validators_manager_signature: bytes,
 ) -> HexStr | None:
-    """Sends consolidateValidators transaction to vault contract"""
-    logger.info('Submitting consolidateValidators transaction')
+    """Sends withdrawValidators transaction to vault contract"""
+    logger.info('Submitting withdrawValidators transaction')
     try:
-        tx = await vault_contract.functions.consolidateValidators(
+        tx = await vault_contract.functions.withdrawValidators(
             validators,
             validators_manager_signature,
         ).transact()
     except Exception as e:
-        logger.info('Failed to update exit signatures: %s', format_error(e))
+        logger.info('Failed to withdrawal validators: %s', format_error(e))
         return None
 
     logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
@@ -126,6 +139,6 @@ async def submit_partial_withdrawals_request(
         tx, timeout=settings.execution_transaction_timeout
     )
     if not tx_receipt['status']:
-        logger.info('UpdateExitSignatures transaction failed')
+        logger.info('withdrawValidators transaction failed')
         return None
     return Web3.to_hex(tx)

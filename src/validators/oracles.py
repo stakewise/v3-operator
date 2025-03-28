@@ -30,7 +30,7 @@ class OraclesConsolidation:
 
 async def poll_consolidation_approval(
     protocol_config: ProtocolConfig,
-    from_to_keys: dict[str, list[str]],
+    from_to_keys: list[tuple[HexStr, HexStr]],
     vault: ChecksumAddress,
 ) -> bytes | str:
     """
@@ -39,13 +39,8 @@ async def poll_consolidation_approval(
     approvals_min_interval = 1
     rate_limiter = RateLimiter(approvals_min_interval)
 
-    # convert keys format
-    public_keys = []
-    for to_key, from_keys in from_to_keys.values():
-        for from_key in from_keys:
-            public_keys.append((from_key, to_key))
     consolidation_request = ConsolidationRequest(
-        public_keys=public_keys,
+        public_keys=from_to_keys,
         vault=vault,
     )
     while True:

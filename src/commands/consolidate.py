@@ -152,48 +152,52 @@ async def main(no_confirm: bool) -> None:
         from_to_keys=to_from_keys, vault=settings.vault, protocol_config=protocol_config
     )
     # get validatorsManagerSignature
-    validators_data = ...
+    validators_bytes = _encode_validators(to_from_keys)
     validators_manager_signature = ...
     await submit_consolidate_validators(
-        validators=validators_data,
+        validators=validators_bytes,
         validators_manager_signature=validators_manager_signature,
         oracle_signatures=oracle_signatures,
     )
 
     if to_from_keys:
         click.secho(
-            f'Validators {', '.join(str(index) for index in to_from_keys.values())} was to'
-            f'({', '.join(to_from_keys.keys())}) '
+            f'Validators {', '.join(from_key for from_key, _ in to_from_keys)} was to'
+            f'({', '.join(to_key for _, to_key in to_from_keys)}) '
             f'has been successfully consolidated',
             bold=True,
             fg='green',
         )
 
 
-def _split_validators(validators: list[Validator]) -> dict[str, list[str]]:
+def _split_validators(validators: list[Validator]) -> list[tuple[HexStr, HexStr]]:
     total_balance = sum(x.balance for x in validators)
     new_validators_count = math.ceil(total_balance / PECTRA_MAX_EFFECTIVE_BALANCE)
     new_validators = validators[:new_validators_count]
     compounded_validators = validators[new_validators_count:]
 
-    from_to_public_keys: dict[str, list[str]] = {}
+    from_to_public_keys = []
     current_to_index = 0
     for validator in compounded_validators:
         current_to_validator = new_validators[current_to_index]
         if validator.balance + current_to_validator.balance <= PECTRA_MAX_EFFECTIVE_BALANCE:
             current_to_validator.balance += validator.balance
-            from_to_public_keys.setdefault(current_to_validator.public_key, []).append(
-                validator.public_key
-            )
+            from_to_public_keys.append((current_to_validator.public_key, validator.public_key))
         else:
             current_to_index += 1
             current_to_validator = new_validators[current_to_index]
             current_to_validator.balance += validator.balance
-            from_to_public_keys.setdefault(current_to_validator.public_key, []).append(
-                validator.public_key
-            )
+            from_to_public_keys.append((current_to_validator.public_key, validator.public_key))
 
     return from_to_public_keys
+
+
+def _encode_validators(from_to_public_keys: list[tuple[HexStr, HexStr]]) -> bytes:
+    validators_data = b''
+    for from_key, to_key in from_to_public_keys:
+        validators_data += Web3.to_bytes(hexstr=from_key)
+        validators_data += Web3.to_bytes(hexstr=to_key)
+    return validators_data
 
 
 async def submit_consolidate_validators(
