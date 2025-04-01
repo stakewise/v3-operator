@@ -19,7 +19,7 @@ from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import PECTRA_MAX_EFFECTIVE_BALANCE, settings
-from src.validators.oracles import poll_consolidation_approval
+from src.validators.oracles import poll_consolidation_signature
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +148,7 @@ async def main(no_confirm: bool) -> None:
     to_from_keys = _split_validators(validators)
     protocol_config = await get_protocol_config()
 
-    oracle_signatures = await poll_consolidation_approval(
+    oracle_signatures = await poll_consolidation_signature(
         from_to_keys=to_from_keys, vault=settings.vault, protocol_config=protocol_config
     )
     # get validatorsManagerSignature

@@ -86,3 +86,9 @@ class ValidatorsRegistrationMode(Enum):
 class RelayerTypes:
     DVT = 'DVT'
     DEFAULT = 'DEFAULT'
+
+
+@dataclass
+class ConsolidationRequest:
+    public_keys: list[tuple[HexStr, HexStr]]
+    vault: ChecksumAddress
