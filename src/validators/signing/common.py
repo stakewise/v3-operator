@@ -7,8 +7,8 @@ from multiproof.standard import MultiProof
 from sw_utils import (
     ConsensusFork,
     ProtocolConfig,
-    get_eth1_withdrawal_credentials,
     get_exit_message_signing_root,
+    get_v1_withdrawal_credentials,
 )
 from sw_utils.signing import compute_deposit_data
 from web3 import Web3
@@ -33,7 +33,7 @@ def get_validators_proof(
 
 
 def encode_tx_validator_list(validators: Sequence[Validator]) -> list[bytes]:
-    credentials = get_eth1_withdrawal_credentials(settings.vault)
+    credentials = get_v1_withdrawal_credentials(settings.vault)
     tx_validators: list[bytes] = []
     for validator in validators:
         tx_validator = encode_tx_validator(credentials, validator)
