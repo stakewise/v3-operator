@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "v3-operator"
-version = "v3.0.4"
+version = "v3.1.0"
 description = "StakeWise operator service for registering vault validators"
 authors = ["StakeWise Labs <info@stakewise.io>"]
 package-mode = false
