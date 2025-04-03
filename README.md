@@ -154,14 +154,14 @@ Head to [Usage](#usage) to launch your operator service.
 Pull the latest docker operator docker image:
 
 ```bash
-docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.0.4
+docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.0
 ```
 
 You can also build the docker image from source by cloning this repo and executing the following command from within
 the `v3-operator` folder:
 
 ```bash
-docker build --pull -t europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.0.4 .
+docker build --pull -t europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.0 .
 ```
 
 You will execute Operator Service commands using the format below (note the use of flags are optional):
@@ -170,7 +170,7 @@ You will execute Operator Service commands using the format below (note the use 
 docker run --rm -ti \
 -u $(id -u):$(id -g) \
 -v ~/.stakewise/:/data \
-europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.0.4 \
+europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.0 \
 src/main.py COMMAND \
 --flagA=123 \
 --flagB=xyz
@@ -233,7 +233,7 @@ running Operator Service from binary, you would use:
 ```
 
 ```text
-Enter the network name (mainnet, holesky) [mainnet]:
+Enter the network name (mainnet, hoodi, gnosis, chiado) [mainnet]:
 Enter your vault address: 0x3320a...68
 Choose your mnemonic language (chinese_simplified, chinese_traditional, czech, english, italian, korean, portuguese, spanish) [english]:
 This is your seed phrase. Write it down and store it safely, it is the ONLY way to recover your validator keys.
@@ -393,7 +393,7 @@ below:
 docker run --restart on-failure:10 \
 -u $(id -u):$(id -g) \
 -v ~/.stakewise/:/data \
-europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.0.4 \
+europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.0 \
 src/main.py start \
 --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
 --data-dir=/data \
@@ -516,7 +516,7 @@ To use the `rated-self-report` command, you will need to provide the following p
 
 - `--data-dir`: Path where the vault data will be placed. Default is ~/.stakewise.
 - `--vault`: The vault address.
-- `--network`: The network of your vault (e.g., mainnet, holesky).
+- `--network`: The network of your vault (e.g., mainnet, hoodi).
 - `--pool-tag`: The pool name listed on the Explorer (optional).
 - `--token`: OAuth token for authorization.
 

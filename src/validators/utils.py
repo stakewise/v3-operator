@@ -9,7 +9,7 @@ from aiohttp import ClientError, ClientSession, ClientTimeout
 from eth_typing import ChecksumAddress, HexAddress
 from eth_utils import add_0x_prefix
 from multiproof import StandardMerkleTree
-from sw_utils import ProtocolConfig, get_eth1_withdrawal_credentials
+from sw_utils import ProtocolConfig, get_v1_withdrawal_credentials
 from sw_utils.decorators import retry_aiohttp_errors
 from web3 import Web3
 
@@ -146,7 +146,7 @@ def generate_validators_tree(
     vault: HexAddress, deposit_data: list[dict]
 ) -> tuple[StandardMerkleTree, list[Validator]]:
     """Generates validators tree."""
-    credentials = get_eth1_withdrawal_credentials(vault)
+    credentials = get_v1_withdrawal_credentials(vault)
     leaves: list[tuple[bytes, int]] = []
     validators: list[Validator] = []
     for i, data in enumerate(deposit_data):

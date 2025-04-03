@@ -2,14 +2,14 @@ from dataclasses import asdict, dataclass
 
 from ens.constants import EMPTY_ADDR_HEX
 from eth_typing import BlockNumber, ChecksumAddress
-from sw_utils.networks import CHIADO, GNOSIS, HOLESKY, MAINNET
+from sw_utils.networks import CHIADO, GNOSIS, HOODI, MAINNET
 from sw_utils.networks import NETWORKS as BASE_NETWORKS
 from sw_utils.networks import BaseNetworkConfig
 from web3 import Web3
 from web3.types import Wei
 
-AVAILABLE_NETWORKS = [MAINNET, HOLESKY, GNOSIS, CHIADO]
-RATED_NETWORKS = [MAINNET, HOLESKY]
+AVAILABLE_NETWORKS = [MAINNET, HOODI, GNOSIS, CHIADO]
+RATED_NETWORKS = [MAINNET]
 
 
 @dataclass
@@ -52,21 +52,19 @@ NETWORKS: dict[str, NetworkConfig] = {
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(21471524),
         DEFAULT_DVT_RELAYER_ENDPOINT='https://mainnet-dvt-relayer.stakewise.io',
     ),
-    HOLESKY: NetworkConfig(
-        **asdict(BASE_NETWORKS[HOLESKY]),
-        WALLET_BALANCE_SYMBOL='HolETH',
-        VAULT_BALANCE_SYMBOL='HolETH',
+    HOODI: NetworkConfig(
+        **asdict(BASE_NETWORKS[HOODI]),
+        WALLET_BALANCE_SYMBOL='HoodiETH',
+        VAULT_BALANCE_SYMBOL='HoodiETH',
         DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xAC0F906E433d58FA868F936E8A43230473652885'
+            '0x93a3f880E07B27dacA6Ef2d3C23E77DBd6294487'
         ),
-        V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xA9f21D016E2846BC9Be972Cf45d9e410283c971e'
-        ),
+        V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
-        STAKEWISE_API_URL='https://holesky-api.stakewise.io/graphql',
+        STAKEWISE_API_URL='https://hoodi-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
-        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(3236751),
-        DEFAULT_DVT_RELAYER_ENDPOINT='https://holesky-dvt-relayer.stakewise.io',
+        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(94090),
+        DEFAULT_DVT_RELAYER_ENDPOINT='https://hoodi-dvt-relayer.stakewise.io',
     ),
     GNOSIS: NetworkConfig(
         **asdict(BASE_NETWORKS[GNOSIS]),
