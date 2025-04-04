@@ -20,7 +20,7 @@ from src.common.utils import format_error
 from src.config.settings import settings
 from src.harvest.execution import get_update_state_calls
 from src.validators.signing.common import encode_tx_validator_list
-from src.validators.typings import Validator
+from src.validators.typings import DepositDataValidator
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 async def register_validators(
     approval: OraclesApproval,
     multi_proof: MultiProof | None,
-    validators: Sequence[Validator],
+    validators: Sequence[DepositDataValidator],
     harvest_params: HarvestParams | None,
     validators_registry_root: Bytes32,
     validators_manager_signature: HexStr | None,
@@ -90,6 +90,59 @@ async def register_validators(
         tx = await multicall_contract.functions.aggregate(calls).transact(tx_params)
     except Exception as e:
         logger.error('Failed to register validator(s): %s', format_error(e))
+        if settings.verbose:
+            logger.exception(e)
+        return None
+
+    tx_hash = Web3.to_hex(tx)
+    logger.info('Waiting for transaction %s confirmation', tx_hash)
+    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
+        tx, timeout=settings.execution_transaction_timeout
+    )
+    if not tx_receipt['status']:
+        logger.error('Registration transaction failed')
+        return None
+
+    return tx_hash
+
+
+# pylint: disable=too-many-arguments,too-many-locals
+async def fund_validators(
+    validators: bytes,
+    validators_manager_signature: HexStr | None,
+    harvest_params: HarvestParams | None,
+) -> HexStr | None:
+    if harvest_params is not None:
+        # add update state calls before validator registration
+        calls = await get_update_state_calls(harvest_params)
+    else:
+        # aggregate all the calls into one multicall
+        calls = []
+
+    fund_validators_call = vault_contract.address, vault_contract.encode_abi(
+        fn_name='fundValidators',
+        args=[validators, Web3.to_bytes(hexstr=validators_manager_signature)],
+    )
+    calls.append(fund_validators_call)
+
+    logger.info('Submitting fund validators transaction')
+    try:
+        await multicall_contract.functions.aggregate(calls).estimate_gas()
+    except (ValueError, ContractLogicError) as e:
+        logger.error(
+            'Failed to fund validator(s): %s. Retrying...',
+            format_error(e),
+        )
+        if settings.verbose:
+            logger.exception(e)
+        return None
+
+    try:
+        gas_manager = build_gas_manager()
+        tx_params = await gas_manager.get_high_priority_tx_params()
+        tx = await multicall_contract.functions.aggregate(calls).transact(tx_params)
+    except Exception as e:
+        logger.error('Failed to fund validator(s): %s', format_error(e))
         if settings.verbose:
             logger.exception(e)
         return None

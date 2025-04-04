@@ -120,6 +120,13 @@ logger = logging.getLogger(__name__)
     default=DEFAULT_METRICS_PORT,
 )
 @click.option(
+    '--validator-type',
+    help='Type of registered validator: 0x01 or 0x02.',
+    envvar='VALIDATOR_TYPE',
+    default='0x02',
+    type=int,
+)
+@click.option(
     '-v',
     '--verbose',
     help='Enable debug mode. Default is false.',
@@ -241,6 +248,7 @@ def start(
     metrics_host: str,
     metrics_port: int,
     metrics_prefix: str,
+    validator_type: str,
     data_dir: str,
     log_level: str,
     log_format: str,
@@ -278,6 +286,7 @@ def start(
         metrics_host=metrics_host,
         metrics_port=metrics_port,
         metrics_prefix=metrics_prefix,
+        validator_type=validator_type,
         network=network,
         deposit_data_file=deposit_data_file,
         keystores_dir=keystores_dir,

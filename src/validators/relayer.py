@@ -18,10 +18,10 @@ from src.validators.execution import (
 from src.validators.signing.common import get_validators_proof
 from src.validators.typings import (
     DepositData,
+    DepositDataValidator,
     ExitSignatureShards,
     RelayerTypes,
     RelayerValidatorsResponse,
-    Validator,
 )
 from src.validators.utils import load_deposit_data
 
@@ -110,13 +110,13 @@ class RelayerAdapter:
         relayer_response = await cast(DefaultRelayerClient, self.relayer).get_validators(
             validators_start_index, validators_batch_size, validators_total
         )
-        validators: list[Validator] = []
+        validators: list[DepositDataValidator] = []
         for v in relayer_response.get('validators') or []:
             public_key = add_0x_prefix(v['public_key'])
             deposit_signature = add_0x_prefix(v['deposit_signature'])
             exit_signature = add_0x_prefix(v['exit_signature'])
 
-            validator = Validator(
+            validator = DepositDataValidator(
                 public_key=public_key,
                 amount_gwei=v['amount_gwei'],
                 signature=deposit_signature,
@@ -159,7 +159,7 @@ class RelayerAdapter:
         logger.debug('relayer_response %s', relayer_response)
 
         # handle response
-        validators: list[Validator] = []
+        validators: list[DepositDataValidator] = []
         for v in relayer_response['validators']:
             public_key = add_0x_prefix(v['public_key'])
 
