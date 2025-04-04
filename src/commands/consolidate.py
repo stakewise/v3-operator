@@ -9,16 +9,20 @@ from eth_typing import HexAddress, HexStr
 from web3 import Web3
 
 from src.common.clients import execution_client
-from src.common.consensus import fetch_registered_validators
+from src.common.consensus import fetch_registered_validators, get_chain_finalized_head
 from src.common.contracts import vault_contract
-from src.common.execution import get_protocol_config
+from src.common.execution import get_protocol_config, get_request_fee
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.typings import Validator
 from src.common.utils import format_error, log_verbose
 from src.common.validators import validate_eth_address
 from src.common.vault_config import VaultConfig
 from src.config.networks import AVAILABLE_NETWORKS
-from src.config.settings import PECTRA_MAX_EFFECTIVE_BALANCE, settings
+from src.config.settings import (
+    MAX_CONSOLIDATION_REQUEST_FEE,
+    PECTRA_MAX_EFFECTIVE_BALANCE_GWEI,
+    settings,
+)
 from src.validators.oracles import poll_consolidation_signature
 
 logger = logging.getLogger(__name__)
@@ -131,6 +135,17 @@ async def main(no_confirm: bool) -> None:
     if len(validators) == 1:
         raise click.ClickException('Wrong number of validators ЫЫЫ')
 
+    chain_head = await get_chain_finalized_head()
+    current_fee = await get_request_fee(
+        settings.network_config.WITHDRAWAL_CONTRACT_ADDRESS, block_number=chain_head.block_number
+    )
+    if current_fee > MAX_CONSOLIDATION_REQUEST_FEE:
+        logger.info(
+            'Partial withdrawals is skipped because high withdrawals fee, current fees is %s',
+            current_fee,
+        )
+        return
+
     total_validators = len(validators)
     if no_confirm:
         click.secho(
@@ -153,10 +168,10 @@ async def main(no_confirm: bool) -> None:
     )
     # get validatorsManagerSignature
     validators_bytes = _encode_validators(to_from_keys)
-    validators_manager_signature = ...
+    validators_manager_signature = HexStr('0x')
     await submit_consolidate_validators(
         validators=validators_bytes,
-        validators_manager_signature=validators_manager_signature,
+        validators_manager_signature=Web3.to_bytes(hexstr=validators_manager_signature),
         oracle_signatures=oracle_signatures,
     )
 
@@ -172,7 +187,7 @@ async def main(no_confirm: bool) -> None:
 
 def _split_validators(validators: list[Validator]) -> list[tuple[HexStr, HexStr]]:
     total_balance = sum(x.balance for x in validators)
-    new_validators_count = math.ceil(total_balance / PECTRA_MAX_EFFECTIVE_BALANCE)
+    new_validators_count = math.ceil(total_balance / PECTRA_MAX_EFFECTIVE_BALANCE_GWEI)
     new_validators = validators[:new_validators_count]
     compounded_validators = validators[new_validators_count:]
 
@@ -180,7 +195,7 @@ def _split_validators(validators: list[Validator]) -> list[tuple[HexStr, HexStr]
     current_to_index = 0
     for validator in compounded_validators:
         current_to_validator = new_validators[current_to_index]
-        if validator.balance + current_to_validator.balance <= PECTRA_MAX_EFFECTIVE_BALANCE:
+        if validator.balance + current_to_validator.balance <= PECTRA_MAX_EFFECTIVE_BALANCE_GWEI:
             current_to_validator.balance += validator.balance
             from_to_public_keys.append((current_to_validator.public_key, validator.public_key))
         else:

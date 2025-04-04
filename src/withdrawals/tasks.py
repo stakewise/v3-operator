@@ -8,7 +8,7 @@ from src.common.checks import wait_execution_catch_up_consensus
 from src.common.clients import execution_client
 from src.common.consensus import fetch_registered_validators, get_chain_finalized_head
 from src.common.contracts import vault_contract
-from src.common.execution import get_protocol_config
+from src.common.execution import get_protocol_config, get_request_fee
 from src.common.harvest import get_harvest_params
 from src.common.tasks import BaseTask
 from src.common.typings import Validator, ValidatorType
@@ -16,6 +16,7 @@ from src.common.utils import format_error
 from src.config.settings import (
     DEPOSIT_AMOUNT,
     DEPOSIT_AMOUNT_GWEI,
+    MAX_WITHDRAWAL_REQUEST_FEE,
     PARTIAL_WITHDRAWALS_INTERVAL,
     settings,
 )
@@ -62,11 +63,22 @@ class PartialWithdrawalsTask(BaseTask):
             logger.info('Partial withdrawals amount is less than queued assets')
             return
 
+        current_fee = await get_request_fee(
+            settings.network_config.WITHDRAWAL_CONTRACT_ADDRESS,
+            block_number=chain_head.block_number,
+        )
+        if current_fee > MAX_WITHDRAWAL_REQUEST_FEE:
+            logger.info(
+                'Partial withdrawals is skipped because high withdrawals fee, current fees is %s',
+                current_fee,
+            )
+            return
         withdrawals_data = _get_withdrawal_data(validators, partial_withdrawals_amount)
         validator_data = _endcode_validators(withdrawals_data)
-        validators_manager_signature = ...
+        validators_manager_signature = HexStr('0x')
         tx_hash = await submit_withdraw_validators(
-            validators=validator_data, validators_manager_signature=validators_manager_signature
+            validators=validator_data,
+            validators_manager_signature=Web3.to_bytes(hexstr=validators_manager_signature),
         )
         if not tx_hash:
             return

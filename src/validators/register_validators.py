@@ -20,7 +20,7 @@ from src.common.utils import format_error
 from src.config.settings import settings
 from src.harvest.execution import get_update_state_calls
 from src.validators.signing.common import encode_tx_validator_list
-from src.validators.typings import Validator
+from src.validators.typings import DepositDataValidator
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 async def register_validators(
     approval: OraclesApproval,
     multi_proof: MultiProof | None,
-    validators: Sequence[Validator],
+    validators: Sequence[DepositDataValidator],
     harvest_params: HarvestParams | None,
     validators_registry_root: Bytes32,
     validators_manager_signature: HexStr | None,
@@ -120,7 +120,7 @@ async def fund_validators(
         calls = []
 
     fund_validators_call = vault_contract.address, vault_contract.encode_abi(
-        fn_name='registerValidators',
+        fn_name='fundValidators',
         args=[validators, Web3.to_bytes(hexstr=validators_manager_signature)],
     )
     calls.append(fund_validators_call)

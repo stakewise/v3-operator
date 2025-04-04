@@ -11,12 +11,12 @@ from web3 import Web3
 from src.config.settings import settings
 from src.validators.keystores.base import BaseKeystore
 from src.validators.signing.key_shares import bls_signature_and_public_key_to_shares
-from src.validators.typings import ExitSignatureShards, Validator
+from src.validators.typings import DepositDataValidator, ExitSignatureShards
 
 
 def get_validators_proof(
     tree: StandardMerkleTree,
-    validators: Sequence[Validator],
+    validators: Sequence[DepositDataValidator],
 ) -> MultiProof[tuple[bytes, int]]:
     tx_validators = encode_tx_validator_list(validators)
     leaves = []
@@ -27,7 +27,7 @@ def get_validators_proof(
     return multi_proof
 
 
-def encode_tx_validator_list(validators: Sequence[Validator]) -> list[bytes]:
+def encode_tx_validator_list(validators: Sequence[DepositDataValidator]) -> list[bytes]:
     credentials = get_v1_withdrawal_credentials(settings.vault)
     tx_validators: list[bytes] = []
     for validator in validators:
@@ -36,7 +36,7 @@ def encode_tx_validator_list(validators: Sequence[Validator]) -> list[bytes]:
     return tx_validators
 
 
-def encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) -> bytes:
+def encode_tx_validator(withdrawal_credentials: bytes, validator: DepositDataValidator) -> bytes:
     public_key = Web3.to_bytes(hexstr=validator.public_key)
     signature = Web3.to_bytes(hexstr=validator.signature)
     deposit_root = compute_deposit_data(

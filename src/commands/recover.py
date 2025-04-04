@@ -200,7 +200,9 @@ async def main(
 
 
 # pylint: disable-next=too-many-locals
-async def _fetch_registered_validators() -> dict[HexStr, ValidatorStatus | None]:
+async def _fetch_registered_validators() -> (
+    dict[HexStr, ValidatorStatus | None]
+):  # todo: use common.consensus?
     """Fetch registered validators."""
     click.secho('Fetching registered validators...', bold=True)
     current_block = await execution_client.eth.get_block_number()

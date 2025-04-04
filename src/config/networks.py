@@ -19,6 +19,8 @@ class NetworkConfig(BaseNetworkConfig):
     VAULT_BALANCE_SYMBOL: str
     DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS: ChecksumAddress
     V2_POOL_ESCROW_CONTRACT_ADDRESS: ChecksumAddress
+    CONSOLIDATION_CONTRACT_ADDRESS: ChecksumAddress
+    WITHDRAWAL_CONTRACT_ADDRESS: ChecksumAddress
     HOT_WALLET_MIN_BALANCE: Wei
     STAKEWISE_API_URL: str
     RATED_API_URL: str
@@ -46,6 +48,8 @@ NETWORKS: dict[str, NetworkConfig] = {
         V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x2296e122c1a20Fca3CAc3371357BdAd3be0dF079'
         ),
+        CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        WITHDRAWAL_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
         STAKEWISE_API_URL='https://mainnet-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
@@ -58,6 +62,12 @@ NETWORKS: dict[str, NetworkConfig] = {
         VAULT_BALANCE_SYMBOL='HoodiETH',
         DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
+        ),
+        WITHDRAWAL_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x00000961Ef480Eb55e80D19ad83579A64c007002'
+        ),
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
         STAKEWISE_API_URL='https://hoodi-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
@@ -74,6 +84,8 @@ NETWORKS: dict[str, NetworkConfig] = {
         V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xfc9B67b6034F6B306EA9Bd8Ec1baf3eFA2490394'
         ),
+        CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        WITHDRAWAL_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
         STAKEWISE_API_URL='https://gnosis-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
@@ -89,6 +101,12 @@ NETWORKS: dict[str, NetworkConfig] = {
         ),
         V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x928F9a91E674C886Cae0c377670109aBeF7e19d6'
+        ),
+        CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
+        ),
+        WITHDRAWAL_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x00000961Ef480Eb55e80D19ad83579A64c007002'
         ),
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
         STAKEWISE_API_URL='https://chiado-api.stakewise.io/graphql',

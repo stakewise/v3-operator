@@ -39,15 +39,18 @@ from src.validators.execution import (
 )
 from src.validators.keystores.base import BaseKeystore
 from src.validators.signing.common import get_encrypted_exit_signature_shards
-from src.validators.typings import ApprovalRequest, ConsolidationRequest
-from src.validators.typings import Validator as Validator2
+from src.validators.typings import (
+    ApprovalRequest,
+    ConsolidationRequest,
+    DepositDataValidator,
+)
 
 logger = logging.getLogger(__name__)
 
 
 async def poll_validation_approval(
     keystore: BaseKeystore | None,
-    validators: Sequence[Validator2],
+    validators: Sequence[DepositDataValidator],
     multi_proof: MultiProof[tuple[bytes, int]] | None = None,
     validators_manager_signature: HexStr | None = None,
 ) -> tuple[ApprovalRequest, OraclesApproval]:
@@ -197,7 +200,7 @@ async def send_approval_requests(
 async def create_approval_request(
     protocol_config: ProtocolConfig,
     keystore: BaseKeystore | None,
-    validators: Sequence[Validator2],
+    validators: Sequence[DepositDataValidator],
     registry_root: Bytes32,
     multi_proof: MultiProof[tuple[bytes, int]] | None,
     deadline: int,

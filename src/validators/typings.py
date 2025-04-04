@@ -21,7 +21,7 @@ class ExitSignatureShards:
 
 
 @dataclass
-class Validator:
+class DepositDataValidator:
     public_key: HexStr
     signature: HexStr
     amount_gwei: int
@@ -29,8 +29,8 @@ class Validator:
     exit_signature: BLSSignature | None = None
     exit_signature_shards: ExitSignatureShards | None = None
 
-    def copy(self) -> 'Validator':
-        return Validator(
+    def copy(self) -> 'DepositDataValidator':
+        return DepositDataValidator(
             public_key=self.public_key,
             signature=self.signature,
             amount_gwei=self.amount_gwei,
@@ -41,14 +41,14 @@ class Validator:
 
 @dataclass
 class RelayerValidatorsResponse:
-    validators: list[Validator]
+    validators: list[DepositDataValidator]
     validators_manager_signature: HexStr | None = None
     multi_proof: MultiProof[tuple[bytes, int]] | None = None
 
 
 @dataclass
 class DepositData:
-    validators: Sequence[Validator]
+    validators: Sequence[DepositDataValidator]
     tree: StandardMerkleTree
 
     @property

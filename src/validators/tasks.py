@@ -7,7 +7,7 @@ from sw_utils import EventScanner, InterruptHandler, IpfsFetchClient, convert_to
 from sw_utils.networks import GNO_NETWORKS
 from sw_utils.typings import Bytes32
 from web3 import Web3
-from web3.types import BlockNumber, Wei
+from web3.types import BlockNumber
 
 from src.common.checks import wait_execution_catch_up_consensus
 from src.common.consensus import fetch_registered_validators, get_chain_finalized_head
@@ -36,9 +36,12 @@ from src.validators.oracles import poll_validation_approval
 from src.validators.register_validators import fund_validators, register_validators
 from src.validators.relayer import RelayerAdapter
 from src.validators.signing.common import get_validators_proof
-from src.validators.typings import DepositData, NetworkValidator
-from src.validators.typings import Validator as Validator2
-from src.validators.typings import ValidatorsRegistrationMode
+from src.validators.typings import (
+    DepositData,
+    DepositDataValidator,
+    NetworkValidator,
+    ValidatorsRegistrationMode,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +116,11 @@ async def process_validators(
             if val.validator_type == ValidatorType.TWO
         )
         if v2_validators_capacity > vault_assets:
-            await fund_v2_validators(vault_validators, vault_assets, harvest_params=harvest_params)
+            await fund_v2_validators(
+                vault_validators,
+                amount_gwei=int(Web3.from_wei(vault_assets, 'gwei')),
+                harvest_params=harvest_params,
+            )
         logger.info('Not enough capacity to fund v2 validators, registering new validators...')
 
     await register_new_validators(
@@ -126,9 +133,9 @@ async def process_validators(
 
 
 async def fund_v2_validators(
-    vault_validators: list[Validator], amount: Wei, harvest_params: HarvestParams | None
+    vault_validators: list[Validator], amount_gwei: int, harvest_params: HarvestParams | None
 ) -> HexStr | None:
-    topup_data = _get_topup_data(vault_validators, amount)
+    topup_data = _get_topup_data(vault_validators, amount_gwei)
     if not topup_data:
         return None
 
@@ -183,7 +190,7 @@ async def register_new_validators(
 
     validators_batch_size = min(protocol_config.validators_approval_batch_limit, validators_count)
     validators_manager_signature: HexStr | None = None
-    validators: Sequence[Validator2]
+    validators: Sequence[DepositDataValidator]
     multi_proof: MultiProof[tuple[bytes, int]] | None
 
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
@@ -310,22 +317,22 @@ async def load_genesis_validators() -> None:
     logger.info('Loaded %d genesis validators', len(genesis_validators))
 
 
-def _get_topup_data(vault_validators: list[Validator], amount: Wei) -> dict[str, Wei]:
+def _get_topup_data(vault_validators: list[Validator], amount_gwei: int) -> dict[HexStr, int]:
     v2_validators_capacity = sum(
         max(PECTRA_DEPOSIT_AMOUNT_GWEI - val.balance, 0)
         for val in vault_validators
         if val.validator_type == ValidatorType.TWO
     )
-    if v2_validators_capacity < amount:
+    if v2_validators_capacity < amount_gwei:
         return {}
 
     vault_validators.sort(key=lambda x: x.balance, reverse=True)
     result = {}
     for validator in vault_validators:
         if PECTRA_DEPOSIT_AMOUNT_GWEI - validator.balance > 0:
-            val_amount = min(PECTRA_DEPOSIT_AMOUNT_GWEI - validator.balance, amount)
+            val_amount = min(PECTRA_DEPOSIT_AMOUNT_GWEI - validator.balance, amount_gwei)
             result[validator.public_key] = val_amount
-            amount -= val_amount
-        if amount <= 0:
+            amount_gwei -= val_amount
+        if amount_gwei <= 0:
             break
     return result
