@@ -29,7 +29,7 @@ def create_validator(
     return Validator(
         public_key=public_key or faker.eth_address(),
         index=index or random.randint(1, 10000),
-        balance=balance or random.randint(1, 10000),
+        balance=balance or random.randint(1, 10000) * 10**9,
         status=status,
         withdrawal_credentials=withdrawal_credentials,
     )

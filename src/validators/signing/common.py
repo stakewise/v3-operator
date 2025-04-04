@@ -4,8 +4,13 @@ import ecies
 from eth_typing import BLSPubkey, BLSSignature, HexStr
 from multiproof import StandardMerkleTree
 from multiproof.standard import MultiProof
-from sw_utils import ConsensusFork, ProtocolConfig, get_exit_message_signing_root
-from sw_utils.signing import compute_deposit_data, get_v1_withdrawal_credentials
+from sw_utils import (
+    ConsensusFork,
+    ProtocolConfig,
+    get_exit_message_signing_root,
+    get_v1_withdrawal_credentials,
+)
+from sw_utils.signing import compute_deposit_data
 from web3 import Web3
 
 from src.config.settings import settings

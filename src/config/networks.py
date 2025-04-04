@@ -60,7 +60,9 @@ NETWORKS: dict[str, NetworkConfig] = {
         **asdict(BASE_NETWORKS[HOODI]),
         WALLET_BALANCE_SYMBOL='HoodiETH',
         VAULT_BALANCE_SYMBOL='HoodiETH',
-        DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
+        DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x93a3f880E07B27dacA6Ef2d3C23E77DBd6294487'
+        ),
         V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
@@ -71,7 +73,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
         STAKEWISE_API_URL='https://hoodi-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
-        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(0),
+        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(94090),
         DEFAULT_DVT_RELAYER_ENDPOINT='https://hoodi-dvt-relayer.stakewise.io',
     ),
     GNOSIS: NetworkConfig(
