@@ -83,7 +83,7 @@ class ValidatorsTask(BaseTask):
         )
 
 
-# pylint: disable-next=too-many-locals,too-many-return-statements
+# pylint: disable-next=too-many-locals,too-many-return-statements,too-many-branches
 async def process_validators(
     keystore: BaseKeystore | None,
     deposit_data: DepositData | None,
@@ -161,7 +161,8 @@ async def process_validators(
 
         validators = validators_response.validators
         if not validators:
-            logger.info('Waiting for relayer validators')
+            if not settings.disable_deposit_data_warnings:
+                logger.info('Waiting for relayer validators')
             return None
         validators_manager_signature = validators_response.validators_manager_signature
         multi_proof = validators_response.multi_proof
