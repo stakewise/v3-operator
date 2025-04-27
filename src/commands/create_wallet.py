@@ -4,12 +4,12 @@ from pathlib import Path
 
 import click
 from eth_account import Account
-from eth_typing import ChecksumAddress, HexAddress
+from eth_typing import ChecksumAddress
 
 from src.common.password import get_or_create_password_file
 from src.common.utils import greenify
-from src.common.validators import validate_eth_address, validate_mnemonic
-from src.common.vault_config import VaultConfig
+from src.common.validators import validate_mnemonic
+from src.common.vault_config import OperatorConfig
 
 
 @click.option(
@@ -27,18 +27,11 @@ from src.common.vault_config import VaultConfig
     hide_input=True,
     callback=validate_mnemonic,
 )
-@click.option(
-    '--vault',
-    help='The address of the vault.',
-    prompt='Enter the vault address',
-    type=str,
-    callback=validate_eth_address,
-)
 @click.command(help='Creates the encrypted hot wallet from the mnemonic.')
-def create_wallet(mnemonic: str, vault: HexAddress, data_dir: str) -> None:
-    vault_config = VaultConfig(vault, Path(data_dir))
+def create_wallet(mnemonic: str, data_dir: str) -> None:
+    vault_config = OperatorConfig(Path(data_dir))
     vault_config.load()
-    wallet_dir = vault_config.vault_dir / 'wallet'
+    wallet_dir = vault_config.config_dir / 'wallet'
 
     wallet_dir.mkdir(parents=True, exist_ok=True)
     address = _generate_encrypted_wallet(mnemonic, wallet_dir)

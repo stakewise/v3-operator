@@ -1,16 +1,14 @@
-import json
 from multiprocessing import Pool
 from os import makedirs, path
 from pathlib import Path
 
 import click
-from eth_typing import HexAddress
 
 from src.common.credentials import Credential, CredentialManager
 from src.common.password import generate_password, get_or_create_password_file
 from src.common.utils import greenify
-from src.common.validators import validate_eth_address, validate_mnemonic
-from src.common.vault_config import VaultConfig
+from src.common.validators import validate_mnemonic
+from src.common.vault_config import OperatorConfig
 
 
 @click.option(
@@ -41,13 +39,6 @@ from src.common.vault_config import VaultConfig
     type=click.IntRange(min=1),
 )
 @click.option(
-    '--vault',
-    help='The address of the vault.',
-    prompt='Enter the vault address',
-    type=str,
-    callback=validate_eth_address,
-)
-@click.option(
     '--pool-size',
     help='Number of processes in a pool.',
     envvar='POOL_SIZE',
@@ -58,21 +49,19 @@ from src.common.vault_config import VaultConfig
 def create_keys(
     mnemonic: str,
     count: int,
-    vault: HexAddress,
     data_dir: str,
     per_keystore_password: bool,
     pool_size: int | None,
 ) -> None:
-    vault_config = VaultConfig(vault, Path(data_dir))
+    vault_config = OperatorConfig(Path(data_dir))
     vault_config.load(mnemonic)
 
-    deposit_data_file = vault_config.vault_dir / 'deposit_data.json'
-    keystores_dir = vault_config.vault_dir / 'keystores'
+    validators_file = vault_config.config_dir / 'validators.txt'
+    keystores_dir = vault_config.config_dir / 'keystores'
     password_file = keystores_dir / 'password.txt'
 
     credentials = CredentialManager.generate_credentials(
         network=vault_config.network,
-        vault=vault,
         mnemonic=mnemonic,
         count=count,
         start_index=vault_config.mnemonic_next_index,
@@ -81,13 +70,9 @@ def create_keys(
 
     # first generate files in tmp directory
     vault_config.create_tmp_dir()
-    tmp_deposit_data_file = vault_config.tmp_vault_dir / 'deposit_data.json'
+    tmp_validators_file = vault_config.tmp_vault_dir / 'validators.txt'
     tmp_keystores_dir = vault_config.tmp_vault_dir / 'keystores'
     try:
-        _export_deposit_data_json(
-            credentials=credentials, filename=str(tmp_deposit_data_file), pool_size=pool_size
-        )
-
         _export_keystores(
             credentials=credentials,
             keystores_dir=tmp_keystores_dir,
@@ -95,12 +80,12 @@ def create_keys(
             per_keystore_password=per_keystore_password,
             pool_size=pool_size,
         )
-
+        _export_validators_keys(credentials=credentials, filename=str(tmp_validators_file))
         vault_config.increment_mnemonic_index(count)
 
         # move files from tmp dir
         keystores_dir.mkdir(exist_ok=True)
-        tmp_deposit_data_file.replace(deposit_data_file)
+        tmp_validators_file.replace(validators_file)
         for src_file in tmp_keystores_dir.glob('*'):
             src_file.rename(keystores_dir.joinpath(src_file.name))
 
@@ -108,38 +93,46 @@ def create_keys(
         vault_config.remove_tmp_dir()
 
     click.echo(
-        f'Done. Generated {greenify(count)} keys for {greenify(vault)} vault.\n'
+        f'Done. Generated {greenify(count)} keys for StakeWise operator.\n'
         f'Keystores saved to {greenify(keystores_dir)} file\n'
-        f'Deposit data saved to {greenify(path.abspath(deposit_data_file))} file'
+        f'Validators keys saved to {greenify(path.abspath(validators_file))} file'
     )
 
 
-def _export_deposit_data_json(
-    credentials: list[Credential], filename: str, pool_size: int | None = None
-) -> None:
-    with (
-        click.progressbar(  # type: ignore
-            length=len(credentials),
-            label='Generating deposit data JSON\t\t',
-            show_percent=False,
-            show_pos=True,
-        ) as progress_bar,
-        Pool(processes=pool_size) as pool,
-    ):
-        results = [
-            pool.apply_async(
-                cred.deposit_datum_dict,
-                callback=lambda x: progress_bar.update(1),
-            )
-            for cred in credentials
-        ]
-        for result in results:
-            result.wait()
-        deposit_data = [result.get() for result in results]
+#
+# def _export_deposit_data_json(
+#     credentials: list[Credential], filename: str, pool_size: int | None = None
+# ) -> None:
+#     with (
+#         click.progressbar(  # type: ignore
+#             length=len(credentials),
+#             label='Generating deposit data JSON\t\t',
+#             show_percent=False,
+#             show_pos=True,
+#         ) as progress_bar,
+#         Pool(processes=pool_size) as pool,
+#     ):
+#         results = [
+#             pool.apply_async(
+#                 cred.deposit_datum_dict,
+#                 callback=lambda x: progress_bar.update(1),
+#             )
+#             for cred in credentials
+#         ]
+#         for result in results:
+#             result.wait()
+#         deposit_data = [result.get() for result in results]
+#
+#     makedirs(path.dirname(path.abspath(filename)), exist_ok=True)
+#     with open(filename, 'w', encoding='utf-8') as f:
+#         json.dump(deposit_data, f, default=lambda x: x.hex())
 
+
+def _export_validators_keys(credentials: list[Credential], filename: str) -> None:
     makedirs(path.dirname(path.abspath(filename)), exist_ok=True)
     with open(filename, 'w', encoding='utf-8') as f:
-        json.dump(deposit_data, f, default=lambda x: x.hex())
+        for c in credentials:
+            f.write(f'{c.public_key}\n')
 
 
 def _export_keystores(

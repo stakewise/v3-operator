@@ -17,7 +17,7 @@ from src.commands.create_keys import create_keys
 from src.commands.create_wallet import create_wallet
 from src.commands.remote_signer_setup import remote_signer_setup
 from src.common.credentials import CredentialManager
-from src.common.vault_config import VaultConfig
+from src.common.vault_config import OperatorConfig
 from src.config.networks import HOODI
 from src.config.settings import settings
 from src.test_fixtures.hashi_vault import hashi_vault_url, mocked_hashi_vault  # noqa

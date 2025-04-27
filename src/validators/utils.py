@@ -1,15 +1,14 @@
 import asyncio
 import dataclasses
-import json
 import logging
 import random
 from pathlib import Path
+from typing import Sequence
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
-from eth_typing import ChecksumAddress, HexAddress
+from eth_typing import ChecksumAddress, HexStr
 from eth_utils import add_0x_prefix
-from multiproof import StandardMerkleTree
-from sw_utils import ProtocolConfig, get_v1_withdrawal_credentials
+from sw_utils import ProtocolConfig
 from sw_utils.decorators import retry_aiohttp_errors
 from web3 import Web3
 
@@ -23,8 +22,8 @@ from src.validators.exceptions import (
     ValidatorIndexChangedError,
 )
 from src.validators.execution import get_latest_network_validator_public_keys
-from src.validators.signing.common import encode_tx_validator
-from src.validators.typings import ApprovalRequest, DepositData, Validator
+from src.validators.keystores.base import BaseKeystore
+from src.validators.typings import ApprovalRequest, Validator
 
 logger = logging.getLogger(__name__)
 
@@ -133,31 +132,50 @@ async def send_approval_request(
     )
 
 
-def load_deposit_data(vault: HexAddress, deposit_data_file: Path) -> DepositData:
-    """Loads and verifies deposit data."""
-    with open(deposit_data_file, 'r', encoding='utf-8') as f:
-        deposit_data = json.load(f)
+async def get_validators_from_x(
+    keystore: BaseKeystore,
+    count: int,
+    vault_address: ChecksumAddress,
+    available_public_keys: list[HexStr],
+) -> Sequence[Validator]:
+    """move out execution.py"""
+    available_public_keys = filter_nonregistered_public_keys(
+        available_public_keys=available_public_keys,
+        count=count,
+    )
 
-    tree, validators = generate_validators_tree(vault, deposit_data)
-    return DepositData(validators=validators, tree=tree)
+    deposit_datas = keystore.get_deposit_datas(available_public_keys, vault_address)
 
-
-def generate_validators_tree(
-    vault: HexAddress, deposit_data: list[dict]
-) -> tuple[StandardMerkleTree, list[Validator]]:
-    """Generates validators tree."""
-    credentials = get_v1_withdrawal_credentials(vault)
-    leaves: list[tuple[bytes, int]] = []
-    validators: list[Validator] = []
-    for i, data in enumerate(deposit_data):
-        validator = Validator(
-            deposit_data_index=i,
-            public_key=add_0x_prefix(data['pubkey']),
-            signature=add_0x_prefix(data['signature']),
+    validators = [
+        Validator(
+            public_key=add_0x_prefix(Web3.to_hex(data['pubkey'])),
+            signature=add_0x_prefix(Web3.to_hex(data['signature'])),
             amount_gwei=int(data['amount']),
+            deposit_data_root=Web3.to_hex(data['deposit_data_root']),
         )
-        leaves.append((encode_tx_validator(credentials, validator), i))
-        validators.append(validator)
+        for data in deposit_datas
+    ]
+    return validators
 
-    tree = StandardMerkleTree.of(leaves, ['bytes', 'uint256'])
-    return tree, validators
+
+def filter_nonregistered_public_keys(
+    available_public_keys: list[HexStr],
+    count: int,
+) -> list[HexStr]:
+    public_keys: list[HexStr] = []
+    for public_key in public_keys:
+        if NetworkValidatorCrud().is_validator_registered(public_key):
+            continue
+        available_public_keys.append(public_key)
+        if len(available_public_keys) >= count:
+            break
+
+    return public_keys
+
+
+def load_validators_keys(validators_file: Path) -> list[HexStr]:
+    """Loads and verifies deposit data."""
+    with open(validators_file, 'r', encoding='utf-8') as f:
+        public_keys = [HexStr(line.rstrip()) for line in f]
+
+    return public_keys

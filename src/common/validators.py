@@ -26,6 +26,20 @@ def validate_eth_address(ctx, param, value):  # type: ignore
 
 
 # pylint: disable-next=unused-argument
+def validate_eth_addresses(ctx, param, value):  # type: ignore
+    if not value:
+        return None
+    try:
+        for address in value.split(','):
+            if not is_address(address):
+                raise click.BadParameter('Invalid Ethereum address')
+    except ValueError:
+        pass
+
+    return [to_checksum_address(address) for address in value.split(',')]
+
+
+# pylint: disable-next=unused-argument
 def validate_db_uri(ctx, param, value):  # type: ignore
     pattern = re.compile(r'.+:\/\/.+:.*@.+\/.+')
     if not pattern.match(value):

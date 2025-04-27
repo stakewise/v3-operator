@@ -9,8 +9,8 @@ from eth_typing import ChecksumAddress
 from src.commands.start_base import start_base
 from src.common.logging import LOG_LEVELS
 from src.common.utils import log_verbose
-from src.common.validators import validate_eth_address
-from src.common.vault_config import VaultConfig
+from src.common.validators import validate_eth_addresses
+from src.common.vault_config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS, NETWORKS
 from src.config.settings import (
     DEFAULT_MAX_FEE_PER_GAS_GWEI,
@@ -144,12 +144,12 @@ AUTO = 'AUTO'
     help='Comma separated list of API endpoints for consensus nodes.',
 )
 @click.option(
-    '--vault',
+    '--vaults',
     type=ChecksumAddress,
-    callback=validate_eth_address,
-    envvar='VAULT',
-    prompt='Enter the vault address',
-    help='Address of the vault to register validators for.',
+    callback=validate_eth_addresses,
+    envvar='VAULTS',
+    prompt='Enter the vault addresses',
+    help='Comma separated list of address of the vault to register validators for.',
 )
 @click.option(
     '--log-format',
@@ -192,7 +192,7 @@ AUTO = 'AUTO'
 @click.command(help='Start operator service')
 # pylint: disable-next=too-many-arguments,too-many-locals
 def start_api(
-    vault: ChecksumAddress,
+    vaults: list[ChecksumAddress],
     consensus_endpoints: str,
     execution_endpoints: str,
     execution_jwt_secret: str | None,
@@ -214,7 +214,7 @@ def start_api(
     relayer_type: str,
     relayer_endpoint: str,
 ) -> None:
-    vault_config = VaultConfig(vault, Path(data_dir))
+    vault_config = OperatorConfig(Path(data_dir))
     if network is None:
         vault_config.load()
         network = vault_config.network
@@ -229,8 +229,8 @@ def start_api(
     validators_registration_mode = ValidatorsRegistrationMode.API
 
     settings.set(
-        vault=vault,
-        vault_dir=vault_config.vault_dir,
+        vaults=vaults,
+        config_dir=vault_config.config_dir,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
         execution_jwt_secret=execution_jwt_secret,

@@ -3,11 +3,11 @@ from pathlib import Path
 
 import click
 import requests
-from eth_typing import HexAddress
+from eth_typing import ChecksumAddress
 
 from src.common.graph import GraphClient
-from src.common.validators import validate_eth_address
-from src.common.vault_config import VaultConfig
+from src.common.validators import validate_eth_addresses
+from src.common.vault_config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS, RATED_NETWORKS
 from src.config.settings import DEFAULT_NETWORK, settings
 
@@ -20,11 +20,11 @@ from src.config.settings import DEFAULT_NETWORK, settings
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
 )
 @click.option(
-    '--vault',
+    '--vaults',
     prompt='Enter your vault address',
-    help='The vault address.',
+    help='The vault addresses.',
     type=str,
-    callback=validate_eth_address,
+    callback=validate_eth_addresses,
 )
 @click.option(
     '--network',
@@ -51,7 +51,7 @@ from src.config.settings import DEFAULT_NETWORK, settings
 )
 @click.command(help='Self-report your validators to the Rated Network.')
 def rated_self_report(
-    vault: HexAddress,
+    vaults: list[ChecksumAddress],
     network: str,
     pool_tag: str,
     token: str,
@@ -61,19 +61,19 @@ def rated_self_report(
         click.secho(f'{network} network is not yet rated supported')
         return
 
-    vault_config = VaultConfig(vault, Path(data_dir))
+    vault_config = OperatorConfig(Path(data_dir))
     vault_config.load()
 
     settings.set(
-        vault=vault,
-        vault_dir=vault_config.vault_dir,
+        vaults=vaults,
+        config_dir=vault_config.config_dir,
         network=network,
         execution_endpoints='',
         consensus_endpoints='',
     )
     click.secho('Starting rated self report...')
-
-    asyncio.run(_report_validators(vault, pool_tag, token, network))
+    for vault in vaults:
+        asyncio.run(_report_validators(vault, pool_tag, token, network))
 
 
 async def _report_validators(

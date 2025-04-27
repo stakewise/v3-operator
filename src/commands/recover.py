@@ -3,19 +3,19 @@ import sys
 from pathlib import Path
 
 import click
-from eth_typing import BlockNumber, HexAddress, HexStr
+from eth_typing import BlockNumber, ChecksumAddress, HexStr
 from eth_utils import add_0x_prefix
 from sw_utils.consensus import EXITED_STATUSES, ValidatorStatus
 
 from src.common.clients import consensus_client, execution_client, setup_clients
-from src.common.contracts import v2_pool_contract, vault_contract
+from src.common.contracts import VaultContract, v2_pool_contract
 from src.common.credentials import CredentialManager
 from src.common.execution import SECONDS_PER_MONTH
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.password import generate_password, get_or_create_password_file
 from src.common.utils import greenify, log_verbose
-from src.common.validators import validate_eth_address, validate_mnemonic
-from src.common.vault_config import VaultConfig
+from src.common.validators import validate_eth_addresses, validate_mnemonic
+from src.common.vault_config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_NETWORK, settings
 
@@ -49,11 +49,11 @@ from src.config.settings import DEFAULT_NETWORK, settings
     callback=validate_mnemonic,
 )
 @click.option(
-    '--vault',
-    prompt='Enter your vault address',
-    help='Vault address',
+    '--vaults',
+    prompt='Enter your vault addresses',
+    help='Vault addresses',
     type=str,
-    callback=validate_eth_address,
+    callback=validate_eth_addresses,
 )
 @click.option(
     '--execution-endpoints',
@@ -92,7 +92,7 @@ from src.config.settings import DEFAULT_NETWORK, settings
 # pylint: disable-next=too-many-arguments
 def recover(
     data_dir: str,
-    vault: HexAddress,
+    vaults: list[ChecksumAddress],
     network: str,
     mnemonic: str,
     consensus_endpoints: str,
@@ -102,24 +102,23 @@ def recover(
     log_level: str,
 ) -> None:
     # pylint: disable=duplicate-code
-    config = VaultConfig(
-        vault=vault,
-        data_dir=Path(data_dir),
+    config = OperatorConfig(
+        Path(data_dir),
     )
-    if not config.vault_dir.exists():
+    if not config.config_dir.exists():
         # create vault dir if it does not exist
-        config.vault_dir.mkdir(parents=True)
-        click.secho(f'Vault directory {config.vault_dir} created.', bold=True, fg='green')
+        config.config_dir.mkdir(parents=True)
+        click.secho(f'Vault directory {config.config_dir} created.', bold=True, fg='green')
 
-    keystores_dir = config.vault_dir / 'keystores'
+    keystores_dir = config.config_dir / 'keystores'
     password_file = keystores_dir / 'password.txt'
 
     settings.set(
         execution_endpoints=execution_endpoints,
         consensus_endpoints=consensus_endpoints,
-        vault=vault,
+        vaults=vaults,
         network=network,
-        vault_dir=config.vault_dir,
+        config_dir=config.config_dir,
         log_level=log_level,
     )
 
@@ -146,12 +145,16 @@ async def main(
     password_file: Path,
     per_keystore_password: bool,
     no_confirm: bool,
-    config: VaultConfig,
+    config: OperatorConfig,
 ) -> None:
     setup_logging()
     await setup_clients()
 
-    validators = await _fetch_registered_validators()
+    validators: dict[HexStr, ValidatorStatus | None] = {}
+    for vault in settings.vaults:
+        vault_validators = await _fetch_registered_validators(vault)
+        validators = validators | vault_validators
+
     if not validators:
         raise click.ClickException('No registered validators')
 
@@ -194,21 +197,27 @@ async def main(
     config.save(settings.network, mnemonic, mnemonic_next_index)
     click.secho(
         f'Successfully recovered {greenify(mnemonic_next_index)} '
-        f'keystores for vault {greenify(settings.vault)}',
+        f'keystores for vaults {greenify(settings.vaults)}',
     )
 
 
 # pylint: disable-next=too-many-locals
-async def _fetch_registered_validators() -> dict[HexStr, ValidatorStatus | None]:
+async def _fetch_registered_validators(
+    vault: ChecksumAddress,
+) -> dict[HexStr, ValidatorStatus | None]:
     """Fetch registered validators."""
-    click.secho('Fetching registered validators...', bold=True)
+    click.secho(f'Fetching registered validators for vault {vault}...', bold=True)
     current_block = await execution_client.eth.get_block_number()
+    vault_contract = VaultContract(vault)
     public_keys = await vault_contract.get_registered_validators_public_keys(
         from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
         to_block=current_block,
     )
 
-    if settings.network_config.IS_SUPPORT_V2_MIGRATION and settings.is_genesis_vault:
+    if (
+        settings.network_config.IS_SUPPORT_V2_MIGRATION
+        and vault == settings.network_config.GENESIS_VAULT_CONTRACT_ADDRESS
+    ):
         # fetch registered validators from v2 pool contract
         # new validators won't be registered after upgrade to the v3,
         # no need to check up to the latest block
@@ -259,7 +268,6 @@ async def _generate_keystores(
         # generate credential
         credential = CredentialManager.generate_credential(
             network=settings.network,
-            vault=settings.vault,
             mnemonic=mnemonic,
             index=index,
         )

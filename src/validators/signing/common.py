@@ -1,9 +1,7 @@
 from typing import Sequence
 
 import ecies
-from eth_typing import BLSPubkey, BLSSignature, HexStr
-from multiproof import StandardMerkleTree
-from multiproof.standard import MultiProof
+from eth_typing import BLSPubkey, BLSSignature, ChecksumAddress, HexStr
 from sw_utils import (
     ConsensusFork,
     ProtocolConfig,
@@ -19,21 +17,10 @@ from src.validators.signing.key_shares import bls_signature_and_public_key_to_sh
 from src.validators.typings import ExitSignatureShards, Validator
 
 
-def get_validators_proof(
-    tree: StandardMerkleTree,
-    validators: Sequence[Validator],
-) -> MultiProof[tuple[bytes, int]]:
-    tx_validators = encode_tx_validator_list(validators)
-    leaves = []
-    for validator, tx_validator in zip(validators, tx_validators):
-        leaves.append((tx_validator, validator.deposit_data_index))
-
-    multi_proof = tree.get_multi_proof(leaves)
-    return multi_proof
-
-
-def encode_tx_validator_list(validators: Sequence[Validator]) -> list[bytes]:
-    credentials = get_v1_withdrawal_credentials(settings.vault)
+def encode_tx_validator_list(
+    validators: Sequence[Validator], vault_address: ChecksumAddress
+) -> list[bytes]:
+    credentials = get_v1_withdrawal_credentials(vault_address)
     tx_validators: list[bytes] = []
     for validator in validators:
         tx_validator = encode_tx_validator(credentials, validator)

@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 
-from eth_typing import BlockNumber
+from eth_typing import BlockNumber, ChecksumAddress
 
 from src.common.typings import Singleton
+from src.config.settings import settings
 
 
 @dataclass
@@ -21,5 +22,7 @@ class ExitSignatureUpdateCache:
 
 class AppState(metaclass=Singleton):
     def __init__(self) -> None:
-        self.exit_signature_update_cache = ExitSignatureUpdateCache()
+        self.exit_signature_update_cache: dict[ChecksumAddress, ExitSignatureUpdateCache] = {}
+        for vault in settings.vaults:
+            self.exit_signature_update_cache[vault] = ExitSignatureUpdateCache()
         self.oracles_cache: OraclesCache | None = None
