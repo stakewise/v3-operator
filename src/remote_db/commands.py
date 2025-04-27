@@ -9,7 +9,7 @@ from eth_typing import ChecksumAddress
 from src.common.clients import setup_clients
 from src.common.utils import greenify, log_verbose
 from src.common.validators import validate_db_uri, validate_eth_address
-from src.common.vault_config import OperatorConfig
+from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import settings
 from src.remote_db import tasks

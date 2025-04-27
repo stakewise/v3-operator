@@ -15,7 +15,7 @@ from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.password import generate_password, get_or_create_password_file
 from src.common.utils import greenify, log_verbose
 from src.common.validators import validate_eth_addresses, validate_mnemonic
-from src.common.vault_config import OperatorConfig
+from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_NETWORK, settings
 

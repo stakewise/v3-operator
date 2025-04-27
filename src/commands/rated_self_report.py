@@ -7,7 +7,7 @@ from eth_typing import ChecksumAddress
 
 from src.common.graph import GraphClient
 from src.common.validators import validate_eth_addresses
-from src.common.vault_config import OperatorConfig
+from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS, RATED_NETWORKS
 from src.config.settings import DEFAULT_NETWORK, settings
 

@@ -19,7 +19,7 @@ from src.common.validators import (
     validate_dappnode_execution_endpoints,
     validate_eth_address,
 )
-from src.common.vault_config import OperatorConfig
+from src.config.config import OperatorConfig
 from src.config.settings import (
     REMOTE_SIGNER_TIMEOUT,
     REMOTE_SIGNER_UPLOAD_CHUNK_SIZE,

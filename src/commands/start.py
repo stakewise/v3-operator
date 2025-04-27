@@ -10,7 +10,7 @@ from src.commands.start_base import start_base
 from src.common.logging import LOG_LEVELS
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_addresses
-from src.common.vault_config import OperatorConfig
+from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import (
     DEFAULT_HASHI_VAULT_PARALLELISM,

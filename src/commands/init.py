@@ -3,7 +3,7 @@ from pathlib import Path
 import click
 
 from src.common.language import LANGUAGES, create_new_mnemonic
-from src.common.vault_config import OperatorConfig
+from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_NETWORK
 

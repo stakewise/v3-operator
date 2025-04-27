@@ -8,7 +8,7 @@ from src.common.credentials import Credential, CredentialManager
 from src.common.password import generate_password, get_or_create_password_file
 from src.common.utils import greenify
 from src.common.validators import validate_mnemonic
-from src.common.vault_config import OperatorConfig
+from src.config.config import OperatorConfig
 
 
 @click.option(
@@ -97,35 +97,6 @@ def create_keys(
         f'Keystores saved to {greenify(keystores_dir)} file\n'
         f'Validators keys saved to {greenify(path.abspath(validators_file))} file'
     )
-
-
-#
-# def _export_deposit_data_json(
-#     credentials: list[Credential], filename: str, pool_size: int | None = None
-# ) -> None:
-#     with (
-#         click.progressbar(  # type: ignore
-#             length=len(credentials),
-#             label='Generating deposit data JSON\t\t',
-#             show_percent=False,
-#             show_pos=True,
-#         ) as progress_bar,
-#         Pool(processes=pool_size) as pool,
-#     ):
-#         results = [
-#             pool.apply_async(
-#                 cred.deposit_datum_dict,
-#                 callback=lambda x: progress_bar.update(1),
-#             )
-#             for cred in credentials
-#         ]
-#         for result in results:
-#             result.wait()
-#         deposit_data = [result.get() for result in results]
-#
-#     makedirs(path.dirname(path.abspath(filename)), exist_ok=True)
-#     with open(filename, 'w', encoding='utf-8') as f:
-#         json.dump(deposit_data, f, default=lambda x: x.hex())
 
 
 def _export_validators_keys(credentials: list[Credential], filename: str) -> None:

@@ -14,7 +14,7 @@ from src.common.credentials import Credential
 from src.common.password import get_or_create_password_file
 from src.common.utils import greenify
 from src.common.validators import validate_eth_address
-from src.common.vault_config import OperatorConfig
+from src.config.config import OperatorConfig
 from src.config.settings import settings
 
 

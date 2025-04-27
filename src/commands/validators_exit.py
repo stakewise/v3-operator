@@ -14,7 +14,7 @@ from web3 import Web3
 from src.common.clients import consensus_client
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import format_error, log_verbose
-from src.common.vault_config import OperatorConfig
+from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import (
     DEFAULT_HASHI_VAULT_ENGINE_NAME,
