@@ -15,7 +15,7 @@ from src.config.config import OperatorConfig
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
     envvar='DATA_DIR',
-    help='Path where the vault data will be placed. Default is ~/.stakewise.',
+    help='Path where the config data will be placed. Default is ~/.stakewise.',
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
 )
 @click.option(
@@ -70,8 +70,8 @@ def create_keys(
 
     # first generate files in tmp directory
     vault_config.create_tmp_dir()
-    tmp_validators_file = vault_config.tmp_vault_dir / 'validators.txt'
-    tmp_keystores_dir = vault_config.tmp_vault_dir / 'keystores'
+    tmp_validators_file = vault_config.tmp_config_dir / 'validators.txt'
+    tmp_keystores_dir = vault_config.tmp_config_dir / 'keystores'
     try:
         _export_keystores(
             credentials=credentials,

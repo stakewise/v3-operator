@@ -42,7 +42,7 @@ class TestValidatorsExit:
         vault_address: HexAddress,
         consensus_endpoints: str,
         data_dir: Path,
-        vault_dir: Path,
+        config_dir: Path,
         keystores_dir: Path,
         runner: CliRunner,
     ):
@@ -89,7 +89,7 @@ class TestValidatorsExit:
         vault_address: HexAddress,
         consensus_endpoints: str,
         data_dir: Path,
-        vault_dir: Path,
+        config_dir: Path,
         keystores_dir: Path,
         runner: CliRunner,
         remote_signer_url: str,

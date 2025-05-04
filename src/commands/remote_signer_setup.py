@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
     envvar='DATA_DIR',
-    help='Path where the vault data will be placed. Default is ~/.stakewise.',
+    help='Path where the config data will be placed. Default is ~/.stakewise.',
     type=click.Path(file_okay=False, dir_okay=True),
 )
 @click.option(

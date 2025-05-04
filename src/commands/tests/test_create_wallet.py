@@ -15,7 +15,7 @@ class TestCreateWallet:
         self,
         test_mnemonic: str,
         data_dir: Path,
-        vault_dir: Path,
+        config_dir: Path,
         vault_address: HexAddress,
         runner: CliRunner,
     ):
@@ -36,8 +36,8 @@ class TestCreateWallet:
         filename = 'wallet.json'
         output = 'Done. The wallet and password saved to'
         assert output.strip() in result.output.strip()
-        with open(f'{vault_dir}/wallet/{filename}', encoding='utf-8') as f:
+        with open(f'{config_dir}/wallet/{filename}', encoding='utf-8') as f:
             data = json.load(f)
             assert data.get('address').lower() == account.address.lower()[2:]
-        with open(f'{vault_dir}/wallet/password.txt', encoding='utf-8') as f:
+        with open(f'{config_dir}/wallet/password.txt', encoding='utf-8') as f:
             assert len(f.readline()) == 20

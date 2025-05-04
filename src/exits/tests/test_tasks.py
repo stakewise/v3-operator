@@ -47,7 +47,7 @@ class TestGetOraclesRequest:
 
     async def test_remote_signer(
         self,
-        vault_dir: Path,
+        config_dir: Path,
         vault_address: ChecksumAddress,
         mocked_protocol_config: ProtocolConfig,
         remote_signer_keystore: RemoteSignerKeystore,

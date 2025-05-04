@@ -26,14 +26,14 @@ class OperatorConfig:
         return self.config_path.is_file()
 
     @property
-    def tmp_vault_dir(self) -> Path:
+    def tmp_config_dir(self) -> Path:
         return self.config_dir / '.tmp'
 
     def create_tmp_dir(self) -> None:
-        self.tmp_vault_dir.mkdir(parents=True, exist_ok=True)
+        self.tmp_config_dir.mkdir(parents=True, exist_ok=True)
 
     def remove_tmp_dir(self) -> None:
-        shutil.rmtree(self.tmp_vault_dir)
+        shutil.rmtree(self.tmp_config_dir)
 
     def load(self, mnemonic: str | None = None) -> None:
         if self.config_path.is_file():

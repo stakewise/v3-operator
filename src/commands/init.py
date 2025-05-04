@@ -12,7 +12,7 @@ from src.config.settings import DEFAULT_NETWORK
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
     envvar='DATA_DIR',
-    help='Path where the vault data will be placed. Default is ~/.stakewise.',
+    help='Path where the config data will be placed. Default is ~/.stakewise.',
     type=click.Path(exists=False, file_okay=False, dir_okay=True),
 )
 @click.option(
@@ -39,7 +39,7 @@ from src.config.settings import DEFAULT_NETWORK
         case_sensitive=False,
     ),
 )
-@click.command(help='Initializes vault data directory and generates mnemonic.')
+@click.command(help='Initializes config data directory and generates mnemonic.')
 def init(
     language: str,
     no_verify: bool,

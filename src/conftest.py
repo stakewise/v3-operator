@@ -41,8 +41,8 @@ def data_dir(temp_dir: Path) -> Path:
 
 
 @pytest.fixture
-def keystores_dir(vault_dir: Path, _init_vault) -> Path:
-    keystores_dir = vault_dir / 'keystores'
+def keystores_dir(config_dir: Path, _init_vault) -> Path:
+    keystores_dir = config_dir / 'keystores'
     keystores_dir.mkdir(exist_ok=True)
     return keystores_dir
 
@@ -159,9 +159,9 @@ def vault_address() -> HexAddress:
 
 
 @pytest.fixture
-def vault_dir(data_dir: Path, vault_address: HexAddress) -> Path:
-    vault_dir = data_dir / vault_address.lower()
-    return vault_dir
+def config_dir(data_dir: Path, vault_address: HexAddress) -> Path:
+    config_dir = data_dir / vault_address.lower()
+    return config_dir
 
 
 @pytest.fixture
@@ -177,7 +177,7 @@ def execution_endpoints() -> str:
 @pytest.fixture
 def fake_settings(
     data_dir: Path,
-    vault_dir: Path,
+    config_dir: Path,
     keystores_dir: Path,
     vault_address: HexAddress,
     consensus_endpoints: str,
@@ -185,7 +185,7 @@ def fake_settings(
 ):
     settings.set(
         vault=vault_address,
-        vault_dir=vault_dir,
+        config_dir=config_dir,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
         network=HOODI,

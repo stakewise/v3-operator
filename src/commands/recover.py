@@ -20,12 +20,12 @@ from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_NETWORK, settings
 
 
-@click.command(help='Recover vault data directory and keystores.')
+@click.command(help='Recover config data directory and keystores.')
 @click.option(
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
     envvar='DATA_DIR',
-    help='Path where the vault data will be placed. Default is ~/.stakewise.',
+    help='Path where the config data will be placed. Default is ~/.stakewise.',
     type=click.Path(exists=False, file_okay=False, dir_okay=True),
 )
 @click.option(
