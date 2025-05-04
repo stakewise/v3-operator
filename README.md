@@ -15,17 +15,16 @@
    1. [Step 1. Create mnemonic](#step-1-create-mnemonic)
    2. [Step 2. Create validator keys](#step-2-create-validator-keys)
    3. [Step 3. Create hot wallet](#step-3-create-hot-wallet)
-   4. [Step 4. Upload deposit data file to Vault](#step-4-upload-deposit-data-file-to-vault)
+   4. [Step 4. Setup validators manager role to vaults](#step-4-setup-validators-manager-role-to-vaults)
    5. [Step 5. Start Operator Service](#step-5-start-operator-service)
 5. [Extra commands](#extra-commands)
    1. [Add validator keys to Vault](#add-validator-keys-to-vault)
    2. [Validators voluntary exit](#validators-voluntary-exit)
-   3. [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
-   4. [Merge deposit data files from multiple operators](#merge-deposit-data-files-from-multiple-operators)
-   5. [Recover validator keystores](#recover-validator-keystores)
-   6. [Max gas fee](#max-gas-fee)
-   7. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
-   8. [Self report to Rated](#rated-self-report)
+   3. [Update Vaults state (Harvest Vaults)](#update-vaults-state-harvest-vaults)
+   4. [Recover validator keystores](#recover-validator-keystores)
+   5. [Max gas fee](#max-gas-fee)
+   6. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
+   7. [Self report to Rated](#rated-self-report)
 6. [Contacts](#contacts)
 
 ## What is V3 Operator?
@@ -218,8 +217,7 @@ wallet, such as [MetaMask](https://metamask.io/)
 or [MyEtherWallet](https://help.myetherwallet.com/en/articles/6512619-using-mew-offline-current-mew-version-6).
 If you choose to use your own methods, you will need to generate public key file via `todo!` command.
 
-
-**The deposit data flow is deprecated and will no longer be supported after the v4 StakeWise Operator release. If you rely on this feature, please continue using an older version**
+**The deposit data flow is deprecated and will no longer be supported after the v4 StakeWise Operator release. If you rely on this feature, please continue using an older version.**
 
 The below steps walk you through this set-up using Operator Service:
 
@@ -298,7 +296,7 @@ Done. The wallet and password saved to /home/user/.stakewise/wallet directory. T
 0.01 ETH with 30 Gwei gas price. You must keep an eye on your wallet balance, otherwise validators will stop registering
 if the balance falls too low.**
 
-### Step 5. Setup validators manager address to vaults
+### Step 4. Setup validators manager role to vaults
 
 Once you have created your validator keys and hot wallet, you need to setup vaults to use wallet address as validators manager.
 Setup can be achieved either through the StakeWise UI and can only be done by the [Vault Admin](https://docs-v3.stakewise.io/protocol-overview-in-depth/vaults#governance-and-management).
@@ -312,7 +310,6 @@ Setup can be achieved either through the StakeWise UI and can only be done by th
 4. Enter wallet address to "Validators manager" field.
 5. Click Save and a transaction will be created to sign using your wallet. The Vault's validators manager role will be
    updated when the transaction is confirmed on the network.
-
 
 You are all set! Now it's time to run the Operator Service.
 
@@ -332,7 +329,6 @@ If you **did not** use Operator Service to generate validator keys, you will nee
 - `--keystores-dir` - The directory with validator keys in the EIP-2335 standard. The folder must contain either a
   single `password.txt` password file for all the keystores or separate password files for each keystore with the same
   name as keystore, but ending with `.txt`. For example, `keystore1.json`, `keystore1.txt`, etc.
-
 
 #### Using binary
 
@@ -377,9 +373,8 @@ within your Vault!**
 Operator Service has many different commands that are not mandatory but might come in handy:
 
 - [Validators voluntary exit](#validators-voluntary-exit)
-- [Update Vault state (Harvest Vault)](#vault-state-update-optional)
+- [Update Vaults state (Harvest Vaults)](#update-vaults-state-harvest-vaults)
 - [Add validator keys to Vault](#add-validator-keys-to-vault)
-- [Merge deposit data files from multiple operators](#merge-deposit-data-files-from-multiple-operators)
 - [Recover validator keystores](#recover-validator-keystores)
 - [Self report to Rated](#rated-self-report)
 
@@ -406,7 +401,7 @@ Are you sure you want to exit 3 validators with indexes: 513571, 513572, 513861?
 Validators 513571, 513572, 513861 exits successfully initiated
 ```
 
-### Update Vaults state (Harvest Vault)
+### Update Vaults state (Harvest Vaults)
 
 Updating the _Vault state_ distributes the Vault fee to the Vault fee address and updates each staker's position. If an
 ERC-20 token was chosen during Vault creation, the Vault specific ERC-20 reprices based on the rewards/penalties since
