@@ -8,7 +8,7 @@ from unittest import mock
 import milagro_bls_binding as bls
 import pytest
 from click.testing import CliRunner
-from eth_typing import ChecksumAddress, HexAddress
+from eth_typing import HexAddress
 from py_ecc.bls import G2ProofOfPossession
 from web3 import Web3
 
@@ -44,19 +44,15 @@ class TestRemoteDbSetup:
     ):
         db_url = 'postgresql://user:password@localhost:5432/dbname'
 
-        args = ['--db-url', db_url, '--vault', vault_address, '--data-dir', str(data_dir), 'setup']
+        args = ['--db-url', db_url, '--data-dir', str(data_dir), 'setup']
         with (
             mock.patch.object(
                 KeyPairsCrud, 'get_keypairs_count', return_value=0
             ) as get_keypairs_count_mock,
-            mock.patch.object(
-                ConfigsCrud, 'get_configs_count', return_value=0
-            ) as get_configs_count_mock,
             mock.patch('src.remote_db.tasks.get_random_bytes', return_value=b'1'),
         ):
             result = runner.invoke(remote_db_group, args)
             assert get_keypairs_count_mock.call_count == 1
-            assert get_configs_count_mock.call_count == 1
 
             output = (
                 'Successfully configured remote database.\n'
@@ -75,21 +71,15 @@ class TestRemoteDbSetup:
         args = [
             '--db-url',
             db_url,
-            '--vault',
-            vault_address,
             '--data-dir',
             str(data_dir),
             'cleanup',
         ]
-        with (
-            mock.patch.object(KeyPairsCrud, 'remove_keypairs') as remove_keypairs_mock,
-            mock.patch.object(ConfigsCrud, 'remove_configs') as remove_configs_mock,
-        ):
+        with (mock.patch.object(KeyPairsCrud, 'remove_keypairs') as remove_keypairs_mock,):
             result = runner.invoke(remote_db_group, args)
             assert remove_keypairs_mock.call_count == 1
-            assert remove_configs_mock.call_count == 1
 
-            output = 'Successfully removed all the entries for the ' f'{vault_address} vault.'
+            output = 'Successfully removed all the entries from the database.'
             assert output.strip() == result.output.strip()
 
     def test_setup_fails_when_keypairs_not_empty(
@@ -100,7 +90,7 @@ class TestRemoteDbSetup:
     ):
         db_url = 'postgresql://user:password@localhost:5432/dbname'
 
-        args = ['--db-url', db_url, '--vault', vault_address, '--data-dir', str(data_dir), 'setup']
+        args = ['--db-url', db_url, '--data-dir', str(data_dir), 'setup']
         with mock.patch.object(
             KeyPairsCrud, 'get_keypairs_count', return_value=1
         ) as get_keypairs_count_mock:
@@ -121,15 +111,9 @@ class TestRemoteDbSetup:
     ):
         db_url = 'postgresql://user:password@localhost:5432/dbname'
 
-        args = ['--db-url', db_url, '--vault', vault_address, '--data-dir', str(data_dir), 'setup']
-        with (
-            mock.patch.object(KeyPairsCrud, 'get_keypairs_count', return_value=0),
-            mock.patch.object(
-                ConfigsCrud, 'get_configs_count', return_value=1
-            ) as get_configs_count_mock,
-        ):
+        args = ['--db-url', db_url, '--data-dir', str(data_dir), 'setup']
+        with (mock.patch.object(KeyPairsCrud, 'get_keypairs_count', return_value=1),):
             result = runner.invoke(remote_db_group, args)
-            assert get_configs_count_mock.call_count == 1
 
             output = (
                 'Error: Error: the remote database is not empty. Please clean up with "clean" '
@@ -157,8 +141,6 @@ class TestRemoteDbUploadKeypairs:
         args = [
             '--db-url',
             db_url,
-            '--vault',
-            vault_address,
             '--data-dir',
             str(data_dir),
             'upload-keypairs',
@@ -170,7 +152,7 @@ class TestRemoteDbUploadKeypairs:
 
         with mock.patch.object(KeyPairsCrud, 'get_first_keypair', return_value=None):
             result = runner.invoke(remote_db_group, args)
-            output = f'Successfully uploaded keypairs for the {vault_address} vault.'
+            output = 'Successfully uploaded keypairs to the database.'
             assert output.strip() in result.output.strip()
 
 
@@ -193,8 +175,6 @@ class TestRemoteDbSetupWeb3Signer:
         args = [
             '--db-url',
             db_url,
-            '--vault',
-            vault_address,
             '--data-dir',
             str(data_dir),
             'setup-web3signer',
@@ -203,9 +183,7 @@ class TestRemoteDbSetupWeb3Signer:
             '--encrypt-key',
             encryption_key,
         ]
-        keypairs = _get_remote_db_keypairs(
-            base64.b64decode(encryption_key), vault_address, total_validators=3
-        )
+        keypairs = _get_remote_db_keypairs(base64.b64decode(encryption_key), total_validators=3)
 
         with (
             runner.isolated_filesystem(),
@@ -235,8 +213,6 @@ class TestRemoteDbSetupValidator:
         args = [
             '--db-url',
             db_url,
-            '--vault',
-            vault_address,
             '--data-dir',
             str(data_dir),
             'setup-validator',
@@ -251,9 +227,7 @@ class TestRemoteDbSetupValidator:
             '--fee-recipient',
             vault_address,
         ]
-        keypairs = _get_remote_db_keypairs(
-            base64.b64decode(encryption_key), vault_address, total_validators=3
-        )
+        keypairs = _get_remote_db_keypairs(base64.b64decode(encryption_key), total_validators=3)
 
         with (
             runner.isolated_filesystem(),
@@ -292,17 +266,13 @@ class TestRemoteDbSetupOperator:
         args = [
             '--db-url',
             db_url,
-            '--vault',
-            vault_address,
             '--data-dir',
             str(data_dir),
             'setup-operator',
             '--output-dir',
             './operator',
         ]
-        keypairs = _get_remote_db_keypairs(
-            base64.b64decode(encryption_key), vault_address, total_validators=3
-        )
+        keypairs = _get_remote_db_keypairs(base64.b64decode(encryption_key), total_validators=3)
         remote_config: dict[str, list[str]] = defaultdict(list)
         for keypair in keypairs:
             remote_config['public_key'].append(keypair.public_key)
@@ -311,7 +281,6 @@ class TestRemoteDbSetupOperator:
             runner.isolated_filesystem(),
             mock.patch.object(KeyPairsCrud, 'get_first_keypair', return_value=keypairs[0]),
             mock.patch.object(KeyPairsCrud, 'get_keypairs', return_value=keypairs),
-            mock.patch.object(ConfigsCrud, 'get_deposit_data', return_value=[]),
         ):
             result = runner.invoke(remote_db_group, args)
             output = 'Successfully created operator configuration file.\n'
@@ -319,7 +288,7 @@ class TestRemoteDbSetupOperator:
 
 
 def _get_remote_db_keypairs(
-    encryption_key: bytes, vault_address: HexAddress, total_validators: int
+    encryption_key: bytes, total_validators: int
 ) -> list[RemoteDatabaseKeyPair]:
     keystores = {}
     for _ in range(total_validators):
@@ -333,7 +302,6 @@ def _get_remote_db_keypairs(
         encrypted_priv_key, nonce = _encrypt_private_key(private_key, encryption_key)
         key_records.append(
             RemoteDatabaseKeyPair(
-                vault=ChecksumAddress(vault_address),
                 public_key=public_key,
                 private_key=Web3.to_hex(encrypted_priv_key),
                 nonce=Web3.to_hex(nonce),
