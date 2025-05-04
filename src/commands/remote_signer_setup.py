@@ -15,10 +15,7 @@ from src.common.contracts import VaultContract
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.startup_check import wait_for_execution_node
 from src.common.utils import chunkify, log_verbose
-from src.common.validators import (
-    validate_dappnode_execution_endpoints,
-    validate_eth_address,
-)
+from src.common.validators import validate_dappnode_execution_endpoints
 from src.config.config import OperatorConfig
 from src.config.settings import (
     REMOTE_SIGNER_TIMEOUT,
@@ -30,14 +27,6 @@ from src.validators.keystores.local import LocalKeystore
 logger = logging.getLogger(__name__)
 
 
-@click.option(
-    '--vault',
-    prompt='Enter your vault address',
-    help='Vault address',
-    type=str,
-    envvar='VAULT',
-    callback=validate_eth_address,
-)
 @click.option(
     '--remote-signer-url',
     type=str,

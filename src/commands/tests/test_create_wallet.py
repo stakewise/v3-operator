@@ -4,19 +4,17 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 from eth_account import Account
-from eth_typing import HexAddress
 
 from src.commands.create_wallet import create_wallet
 
 
 class TestCreateWallet:
-    @pytest.mark.usefixtures('_init_vault')
+    @pytest.mark.usefixtures('_init_config')
     def test_basic(
         self,
         test_mnemonic: str,
         data_dir: Path,
         config_dir: Path,
-        vault_address: HexAddress,
         runner: CliRunner,
     ):
         Account.enable_unaudited_hdwallet_features()
@@ -26,8 +24,6 @@ class TestCreateWallet:
             [
                 '--mnemonic',
                 f'"{test_mnemonic}"',
-                '--vault',
-                vault_address,
                 '--data-dir',
                 str(data_dir),
             ],

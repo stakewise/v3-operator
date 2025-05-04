@@ -12,7 +12,7 @@ from src.config.settings import settings
 
 class TestOperatorRemoteSignerSetup:
     @pytest.mark.usefixtures(
-        '_init_vault',
+        '_init_config',
         '_create_keys',
         'mocked_remote_signer',
     )
@@ -28,8 +28,6 @@ class TestOperatorRemoteSignerSetup:
         key_count = 3
 
         args = [
-            '--vault',
-            str(vault_address),
             '--remote-signer-url',
             remote_signer_url,
             '--data-dir',
@@ -54,7 +52,7 @@ class TestOperatorRemoteSignerSetup:
             pubkeys_remote_signer = {pubkey_dict.get('validating_pubkey') for pubkey_dict in data}
             assert len(pubkeys_remote_signer) == key_count
 
-    @pytest.mark.usefixtures('_init_vault', 'mocked_remote_signer')
+    @pytest.mark.usefixtures('_init_config', 'mocked_remote_signer')
     def test_add_more_keys_later(
         self,
         vault_address: HexAddress,
@@ -75,8 +73,6 @@ class TestOperatorRemoteSignerSetup:
                 test_mnemonic,
                 '--count',
                 str(key_count),
-                '--vault',
-                str(vault_address),
                 '--data-dir',
                 str(data_dir),
             ]
@@ -85,8 +81,6 @@ class TestOperatorRemoteSignerSetup:
             assert f'Done. Generated {key_count} keys' in result.output
 
             args = [
-                '--vault',
-                str(vault_address),
                 '--remote-signer-url',
                 remote_signer_url,
                 '--data-dir',

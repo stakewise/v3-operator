@@ -4,7 +4,6 @@ from unittest import mock
 
 import pytest
 from click.testing import CliRunner
-from eth_typing import HexAddress
 from sw_utils.typings import ConsensusFork
 
 from src.commands.validators_exit import validators_exit
@@ -34,12 +33,11 @@ def _patch_submit_voluntary_exit() -> Generator:
 
 
 @pytest.mark.usefixtures('_patch_get_consensus_fork', '_patch_submit_voluntary_exit')
-@pytest.mark.usefixtures('_init_vault', '_create_keys')
+@pytest.mark.usefixtures('_init_config', '_create_keys')
 class TestValidatorsExit:
     @pytest.mark.usefixtures('fake_settings')
     def test_local_keystores(
         self,
-        vault_address: HexAddress,
         consensus_endpoints: str,
         data_dir: Path,
         config_dir: Path,
@@ -54,8 +52,6 @@ class TestValidatorsExit:
             pubkeys.append(pubkey)
 
         args = [
-            '--vault',
-            str(vault_address),
             '--data-dir',
             str(data_dir),
             '--consensus-endpoints',
@@ -86,7 +82,6 @@ class TestValidatorsExit:
     @pytest.mark.usefixtures('_remote_signer_setup')
     async def test_remote_signer(
         self,
-        vault_address: HexAddress,
         consensus_endpoints: str,
         data_dir: Path,
         config_dir: Path,
@@ -99,8 +94,6 @@ class TestValidatorsExit:
         pubkeys = keystore.public_keys
 
         args = [
-            '--vault',
-            str(vault_address),
             '--data-dir',
             str(data_dir),
             '--consensus-endpoints',

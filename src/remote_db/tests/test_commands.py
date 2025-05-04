@@ -13,7 +13,7 @@ from py_ecc.bls import G2ProofOfPossession
 from web3 import Web3
 
 from src.remote_db.commands import remote_db_group
-from src.remote_db.database import ConfigsCrud, KeyPairsCrud
+from src.remote_db.database import KeyPairsCrud
 from src.remote_db.tasks import _encrypt_private_key
 from src.remote_db.typings import RemoteDatabaseKeyPair
 from src.validators.typings import BLSPrivkey
@@ -34,13 +34,7 @@ def _patch_get_db_connection() -> Generator:
         yield
 
 
-@pytest.fixture
-def _patch_check_deposit_data_root() -> Generator:
-    with mock.patch('src.remote_db.tasks.check_deposit_data_root'):
-        yield
-
-
-@pytest.mark.usefixtures('_init_vault', '_patch_check_db_connection', '_patch_get_db_connection')
+@pytest.mark.usefixtures('_init_config', '_patch_check_db_connection', '_patch_get_db_connection')
 class TestRemoteDbSetup:
     def test_setup_works(
         self,
@@ -147,9 +141,8 @@ class TestRemoteDbSetup:
 @pytest.mark.usefixtures(
     '_patch_check_db_connection',
     '_patch_get_db_connection',
-    '_patch_check_deposit_data_root',
 )
-@pytest.mark.usefixtures('_init_vault', '_create_keys')
+@pytest.mark.usefixtures('_init_config', '_create_keys')
 class TestRemoteDbUploadKeypairs:
     def test_upload_keypairs_works(
         self,
@@ -185,7 +178,7 @@ class TestRemoteDbUploadKeypairs:
     '_patch_check_db_connection',
     '_patch_get_db_connection',
 )
-@pytest.mark.usefixtures('_init_vault', '_create_keys')
+@pytest.mark.usefixtures('_init_config', '_create_keys')
 class TestRemoteDbSetupWeb3Signer:
     def test_setup_web3signer_works(
         self,
@@ -228,7 +221,7 @@ class TestRemoteDbSetupWeb3Signer:
     '_patch_check_db_connection',
     '_patch_get_db_connection',
 )
-@pytest.mark.usefixtures('_init_vault', '_create_keys')
+@pytest.mark.usefixtures('_init_config', '_create_keys')
 class TestRemoteDbSetupValidator:
     def test_setup_validator(
         self,
@@ -285,7 +278,7 @@ class TestRemoteDbSetupValidator:
     '_patch_check_db_connection',
     '_patch_get_db_connection',
 )
-@pytest.mark.usefixtures('_init_vault', '_create_keys')
+@pytest.mark.usefixtures('_init_config', '_create_keys')
 class TestRemoteDbSetupOperator:
     def test_setup_operator(
         self,
