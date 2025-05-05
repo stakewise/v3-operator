@@ -36,7 +36,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - OS: ubuntu-20.04
+          - OS: ubuntu-22.04
             PYTHON_VERSION: 3.12.8
             BUILD_CMD: |
               export PYTHONHASHSEED=42
