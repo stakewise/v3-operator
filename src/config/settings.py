@@ -313,6 +313,8 @@ REMOTE_SIGNER_TIMEOUT = decouple_config('REMOTE_SIGNER_TIMEOUT', cast=int, defau
 # Hashi vault timeout
 HASHI_VAULT_TIMEOUT = 10
 
+ATTEMPTS_WITH_DEFAULT_GAS: int = decouple_config('ATTEMPTS_WITH_DEFAULT_GAS', default=3, cast=int)
+
 # Graphql timeout
 GRAPH_API_TIMEOUT = 10
 
