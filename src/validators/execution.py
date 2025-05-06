@@ -21,7 +21,7 @@ from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.harvest.execution import get_update_state_calls
 from src.validators.database import NetworkValidatorCrud
 from src.validators.keystores.base import BaseKeystore
-from src.validators.typings import DepositData, NetworkValidator, Validator
+from src.validators.typings import DepositData, DepositDataValidator, NetworkValidator
 
 logger = logging.getLogger(__name__)
 
@@ -177,7 +177,7 @@ async def get_validators_from_deposit_data(
     deposit_data: DepositData,
     count: int,
     run_check_deposit_data_root: bool = True,
-) -> Sequence[Validator]:
+) -> Sequence[DepositDataValidator]:
     """Fetches vault's available validators."""
     if run_check_deposit_data_root:
         try:
@@ -188,7 +188,7 @@ async def get_validators_from_deposit_data(
             raise
 
     start_index = await Vault().get_validators_index()
-    validators: list[Validator] = []
+    validators: list[DepositDataValidator] = []
 
     for validator in deposit_data.validators[start_index : start_index + count]:
         if keystore and validator.public_key not in keystore:
