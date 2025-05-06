@@ -160,7 +160,7 @@ async def process_validators(
 
         validators = validators_response.validators
         if not validators:
-            logger.info('Waiting for relayer validators')
+            logger.debug('Waiting for relayer validators')
             return None
         relayer_validators_manager_signature = validators_response.validators_manager_signature
         if not relayer_validators_manager_signature:
