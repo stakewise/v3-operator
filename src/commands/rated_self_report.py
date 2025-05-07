@@ -21,7 +21,7 @@ from src.config.settings import DEFAULT_NETWORK, settings
 )
 @click.option(
     '--vaults',
-    prompt='Enter your vault address',
+    prompt='Enter comma separated list of your vault addresses',
     help='The vault addresses.',
     type=str,
     callback=validate_eth_addresses,

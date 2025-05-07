@@ -148,7 +148,7 @@ AUTO = 'AUTO'
     type=ChecksumAddress,
     callback=validate_eth_addresses,
     envvar='VAULTS',
-    prompt='Enter the vault addresses',
+    prompt='Enter comma separated list of your vault addresses',
     help='Comma separated list of address of the vault to register validators for.',
 )
 @click.option(

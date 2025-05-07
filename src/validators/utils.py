@@ -174,7 +174,7 @@ def filter_nonregistered_public_keys(
 
 
 def load_validators_keys(validators_file: Path) -> list[HexStr]:
-    """Loads and verifies deposit data."""
+    """Loads available public keys from file."""
     with open(validators_file, 'r', encoding='utf-8') as f:
         public_keys = [HexStr(line.rstrip()) for line in f]
 

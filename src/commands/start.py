@@ -158,8 +158,8 @@ logger = logging.getLogger(__name__)
     type=ChecksumAddress,
     callback=validate_eth_addresses,
     envvar='VAULT',
-    prompt='Enter the vault address',
-    help='Address of the vault to register validators for.',
+    prompt='Enter comma separated list of your vault addresses',
+    help='Addresses of the vaults to register validators for.',
 )
 @click.option(
     '--remote-signer-url',

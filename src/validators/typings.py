@@ -51,8 +51,6 @@ class ApprovalRequest:
 
     # legacy
     proof: list[HexStr] | None = None
-    # proof_flags: list[bool] | None = None
-    # proof_indexes: list[int] | None = None
 
 
 class ValidatorsRegistrationMode(Enum):

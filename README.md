@@ -41,7 +41,7 @@ The validator registration process consists of the following steps:
 
 1. Check whether Vault has accumulated enough assets to register a validator (e.g., 32 ETH for Ethereum)
 2. Get the next free validator public key from the `validators.txt` file attached to the operator. The validators are
-   registered in the same order as specified in the available public keys file.
+   registered in the same order as specified in the `validators.txt` file.
 3. Obtain BLS signature for exit message using local keystores or remote signer.
 4. Share the exit signature of the validator with StakeWise Oracles:
    1. Using [Shamir's secret sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing), split
@@ -207,7 +207,7 @@ the [Kubernetes setup](https://docs.stakewise.io/for-operators/kubernetes-stakin
 
 ## Usage
 
-In order to run Operator Service, you must first create keystores and file with list of available public keys for your Vault's validators, and
+In order to run Operator Service, you must first create keystores and a file with list of available public keys for your Vault's validators, and
 set up a hot wallet for Operator Service to handle validator registrations.
 
 Operator Service has in-built functionality to generate all of the above, or you are free to use your preferred methods
