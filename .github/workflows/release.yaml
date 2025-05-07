@@ -31,12 +31,11 @@ jobs:
           [ "`poetry version --short`" == "${{ github.ref_name }}" ]
 
   build:
-    needs: checks
     runs-on: ${{ matrix.OS }}
     strategy:
       matrix:
         include:
-          - OS: ubuntu-20.04
+          - OS: ubuntu-22.04
             PYTHON_VERSION: 3.12.8
             BUILD_CMD: |
               export PYTHONHASHSEED=42
@@ -170,8 +169,8 @@ jobs:
         with:
           fail_on_unmatched_files: true
           files: |
-            /tmp/artifacts/ubuntu-20.04/operator-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz
-            /tmp/artifacts/ubuntu-20.04/operator-${{ steps.get_version.outputs.VERSION }}-linux-amd64.sha256
+            /tmp/artifacts/ubuntu-22.04/operator-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz
+            /tmp/artifacts/ubuntu-22.04/operator-${{ steps.get_version.outputs.VERSION }}-linux-amd64.sha256
             /tmp/artifacts/linux-arm-runner/operator-${{ steps.get_version.outputs.VERSION }}-linux-arm64.tar.gz
             /tmp/artifacts/linux-arm-runner/operator-${{ steps.get_version.outputs.VERSION }}-linux-arm64.sha256
             /tmp/artifacts/macos-14/operator-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.tar.gz

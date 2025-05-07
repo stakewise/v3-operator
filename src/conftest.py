@@ -18,7 +18,7 @@ from src.commands.create_wallet import create_wallet
 from src.commands.remote_signer_setup import remote_signer_setup
 from src.common.credentials import CredentialManager
 from src.common.typings import ValidatorType
-from src.common.vault_config import VaultConfig
+from src.config.config import OperatorConfig
 from src.config.networks import HOODI
 from src.config.settings import settings
 from src.test_fixtures.hashi_vault import hashi_vault_url, mocked_hashi_vault  # noqa
@@ -42,8 +42,8 @@ def data_dir(temp_dir: Path) -> Path:
 
 
 @pytest.fixture
-def keystores_dir(vault_dir: Path, _init_vault) -> Path:
-    keystores_dir = vault_dir / 'keystores'
+def keystores_dir(config_dir: Path, _init_config) -> Path:
+    keystores_dir = config_dir / 'keystores'
     keystores_dir.mkdir(exist_ok=True)
     return keystores_dir
 
@@ -67,8 +67,8 @@ def test_mnemonic() -> str:
 
 
 @pytest.fixture
-def _init_vault(vault_address: HexAddress, data_dir: Path, test_mnemonic: str) -> None:
-    config = VaultConfig(vault=vault_address, data_dir=data_dir)
+def _init_config(data_dir: Path, test_mnemonic: str) -> None:
+    config = OperatorConfig(data_dir=data_dir)
     config.save(HOODI, test_mnemonic)
 
 
@@ -80,7 +80,6 @@ def runner() -> CliRunner:
 @pytest.fixture
 def _create_keys(
     test_mnemonic: str,
-    vault_address: HexAddress,
     data_dir: Path,
     _test_keystore_password_file: Path,
     runner: CliRunner,
@@ -94,8 +93,6 @@ def _create_keys(
             f'"{test_mnemonic}"',
             '--count',
             str(count),
-            '--vault',
-            str(vault_address),
             '--data-dir',
             str(data_dir),
             '--pool-size',
@@ -106,16 +103,12 @@ def _create_keys(
 
 
 @pytest.fixture
-def _create_wallet(
-    vault_address: HexAddress, data_dir: Path, test_mnemonic: str, runner: CliRunner
-) -> None:
+def _create_wallet(data_dir: Path, test_mnemonic: str, runner: CliRunner) -> None:
     result = runner.invoke(
         create_wallet,
         [
             '--mnemonic',
             f'"{test_mnemonic}"',
-            '--vault',
-            str(vault_address),
             '--data-dir',
             str(data_dir),
         ],
@@ -125,7 +118,6 @@ def _create_wallet(
 
 @pytest.fixture
 def _remote_signer_setup(
-    vault_address: HexAddress,
     data_dir: Path,
     keystores_dir: Path,
     remote_signer_url: str,
@@ -138,8 +130,6 @@ def _remote_signer_setup(
     result = runner.invoke(
         remote_signer_setup,
         [
-            '--vault',
-            str(vault_address),
             '--remote-signer-url',
             remote_signer_url,
             '--data-dir',
@@ -160,9 +150,9 @@ def vault_address() -> HexAddress:
 
 
 @pytest.fixture
-def vault_dir(data_dir: Path, vault_address: HexAddress) -> Path:
-    vault_dir = data_dir / vault_address.lower()
-    return vault_dir
+def config_dir(data_dir: Path) -> Path:
+    config_dir = data_dir
+    return config_dir
 
 
 @pytest.fixture
@@ -178,15 +168,15 @@ def execution_endpoints() -> str:
 @pytest.fixture
 def fake_settings(
     data_dir: Path,
-    vault_dir: Path,
+    config_dir: Path,
     keystores_dir: Path,
     vault_address: HexAddress,
     consensus_endpoints: str,
     execution_endpoints: str,
 ):
     settings.set(
-        vault=vault_address,
-        vault_dir=vault_dir,
+        vaults=[vault_address],
+        config_dir=config_dir,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
         network=HOODI,
@@ -243,14 +233,11 @@ def mocked_protocol_config(
 
 
 @pytest.fixture
-def create_validator_keypair(
-    test_mnemonic: str, vault_address: HexAddress
-) -> Callable[[], tuple[BLSPrivkey, HexStr]]:
+def create_validator_keypair(test_mnemonic: str) -> Callable[[], tuple[BLSPrivkey, HexStr]]:
     def _generate_keypair_function() -> tuple[BLSPrivkey, HexStr]:
         """Returns a random validator keypair"""
         credential = CredentialManager.generate_credential(
             network=HOODI,
-            vault=vault_address,
             mnemonic=test_mnemonic,
             index=randint(0, 100_000),
             validator_type=ValidatorType.TWO,

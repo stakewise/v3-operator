@@ -8,7 +8,7 @@ from secrets import randbits
 
 import click
 import milagro_bls_binding as bls
-from eth_typing import BLSPrivateKey, HexAddress, HexStr
+from eth_typing import BLSPrivateKey, ChecksumAddress, HexStr
 from py_ecc.bls import G2ProofOfPossession
 from staking_deposit.key_handling.key_derivation.mnemonic import get_seed
 from staking_deposit.key_handling.key_derivation.path import path_to_nodes
@@ -44,10 +44,11 @@ COIN_TYPE = '3600'
 @dataclass
 class Credential:
     private_key: BLSPrivateKey
-    path: str
     network: str
-    vault: HexAddress
     validator_type: ValidatorType
+
+    path: str | None = None
+    vault: ChecksumAddress | None = None
 
     @cached_property
     def public_key(self) -> HexStr:
@@ -130,7 +131,6 @@ class CredentialManager:
     # pylint: disable-next=too-many-arguments
     def generate_credentials(
         network: str,
-        vault: HexAddress,
         mnemonic: str,
         validator_type: ValidatorType,
         count: int,
@@ -157,7 +157,6 @@ class CredentialManager:
                         [
                             chunk_indexes,
                             network,
-                            vault,
                             mnemonic,
                             validator_type,
                         ],
@@ -176,7 +175,6 @@ class CredentialManager:
     def _generate_credentials_chunk(
         indexes: list[int],
         network: str,
-        vault: HexAddress,
         mnemonic: str,
         validator_type: ValidatorType,
     ) -> list[Credential]:
@@ -187,16 +185,15 @@ class CredentialManager:
         credentials: list[Credential] = []
         for index in indexes:
             credential = CredentialManager.generate_credential(
-                network, vault, mnemonic, index, validator_type
+                network, mnemonic, index, validator_type
             )
             credentials.append(credential)
         return credentials
 
     @staticmethod
-    def generate_credential_first_public_key(network: str, vault: HexAddress, mnemonic: str) -> str:
+    def generate_credential_first_public_key(network: str, mnemonic: str) -> str:
         return CredentialManager.generate_credential(
             network=network,
-            vault=vault,
             mnemonic=mnemonic,
             index=0,
             validator_type=ValidatorType.ONE,  # todo
@@ -204,7 +201,7 @@ class CredentialManager:
 
     @staticmethod
     def generate_credential(
-        network: str, vault: HexAddress, mnemonic: str, index: int, validator_type: ValidatorType
+        network: str, mnemonic: str, index: int, validator_type: ValidatorType
     ) -> Credential:
         """Returns the signing key of the mnemonic at a specific index."""
         seed = get_seed(mnemonic=mnemonic, password='')  # nosec
@@ -219,6 +216,11 @@ class CredentialManager:
             private_key=private_key,
             path=signing_key_path,
             network=network,
-            vault=vault,
             validator_type=validator_type,
         )
+
+    @staticmethod
+    def load_credential(
+        network: str, vault: ChecksumAddress, private_key: BLSPrivateKey
+    ) -> Credential:
+        return Credential(private_key=private_key, network=network, vault=vault)

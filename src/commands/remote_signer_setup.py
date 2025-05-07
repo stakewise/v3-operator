@@ -9,18 +9,14 @@ from pathlib import Path
 import aiohttp
 import click
 from aiohttp import ClientTimeout
-from eth_typing import HexAddress
 
 from src.common.clients import setup_clients
-from src.common.contracts import vault_contract
+from src.common.contracts import VaultContract
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.startup_check import wait_for_execution_node
 from src.common.utils import chunkify, log_verbose
-from src.common.validators import (
-    validate_dappnode_execution_endpoints,
-    validate_eth_address,
-)
-from src.common.vault_config import VaultConfig
+from src.common.validators import validate_dappnode_execution_endpoints
+from src.config.config import OperatorConfig
 from src.config.settings import (
     REMOTE_SIGNER_TIMEOUT,
     REMOTE_SIGNER_UPLOAD_CHUNK_SIZE,
@@ -32,14 +28,6 @@ logger = logging.getLogger(__name__)
 
 
 @click.option(
-    '--vault',
-    prompt='Enter your vault address',
-    help='Vault address',
-    type=str,
-    envvar='VAULT',
-    callback=validate_eth_address,
-)
-@click.option(
     '--remote-signer-url',
     type=str,
     envvar='REMOTE_SIGNER_URL',
@@ -50,7 +38,7 @@ logger = logging.getLogger(__name__)
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
     envvar='DATA_DIR',
-    help='Path where the vault data will be placed. Default is ~/.stakewise.',
+    help='Path where the config data will be placed. Default is ~/.stakewise.',
     type=click.Path(file_okay=False, dir_okay=True),
 )
 @click.option(
@@ -95,7 +83,6 @@ Used to retrieve vault validator fee recipient (only needed if flag --dappnode i
 @click.command(help='Uploads private keys to a remote signer.')
 # pylint: disable-next=too-many-arguments
 def remote_signer_setup(
-    vault: HexAddress,
     remote_signer_url: str,
     data_dir: str,
     keystores_dir: str | None,
@@ -104,11 +91,11 @@ def remote_signer_setup(
     dappnode: bool,
     execution_endpoints: str,
 ) -> None:
-    config = VaultConfig(vault, Path(data_dir))
+    config = OperatorConfig(Path(data_dir))
     config.load()
     settings.set(
-        vault=vault,
-        vault_dir=config.vault_dir,
+        vaults=[],
+        config_dir=config.config_dir,
         network=config.network,
         keystores_dir=keystores_dir,
         remote_signer_url=remote_signer_url,
@@ -164,7 +151,7 @@ async def main() -> None:
 
     if settings.dappnode:
         await wait_for_execution_node()
-
+        vault_contract = VaultContract(settings.vaults[0])  # todo
         fee_recipient = await vault_contract.mev_escrow()
         logger.info('Validator fee recipient retrieved from vault contract: %s', fee_recipient)
 

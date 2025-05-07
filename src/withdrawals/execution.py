@@ -7,12 +7,12 @@ from web3.types import ChecksumAddress, Wei
 
 from src.common.clients import execution_client
 from src.common.contracts import (
+    VaultContract,
+    VaultErc20Contract,
     gno_erc20_contract,
     keeper_contract,
     multicall_contract,
     validators_registry_contract,
-    vault_contract,
-    vault_erc20_contract,
 )
 from src.common.typings import HarvestParams
 from src.config.settings import settings
@@ -31,6 +31,8 @@ async def get_vault_assets(
     block_number: BlockNumber,
     harvest_params: HarvestParams | None,
 ) -> tuple[Wei, Wei]:
+    vault_contract = VaultContract(vault)
+    vault_erc20_contract = VaultErc20Contract(vault)
     # calculate storage position based on the type of the vault
     try:
         await vault_erc20_contract.symbol()
@@ -56,7 +58,10 @@ async def get_vault_assets(
     if harvest_params and await keeper_contract.can_harvest(vault):
         update_state_call = (
             vault,
-            _encode_update_state_call(harvest_params),
+            _encode_update_state_call(
+                vault_contract,
+                harvest_params,
+            ),
         )
 
     queued_shares_call = vault_contract.encode_abi('queuedShares')
@@ -172,7 +177,9 @@ def _get_encoded_gnosis_withdrawable_assets_call(
     )
 
 
-def _encode_update_state_call(harvest_params: HarvestParams) -> HexStr:
+def _encode_update_state_call(
+    vault_contract: VaultContract, harvest_params: HarvestParams
+) -> HexStr:
     return vault_contract.encode_abi(
         fn_name='updateState',
         args=[

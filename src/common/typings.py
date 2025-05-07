@@ -40,7 +40,7 @@ class ValidatorType(Enum):
 
 
 @dataclass
-class Validator:
+class ConsensusValidator:
     public_key: HexStr
     index: int
     balance: int  # gwei

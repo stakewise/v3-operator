@@ -1,6 +1,6 @@
 import logging
 
-from eth_typing import BlockNumber
+from eth_typing import BlockNumber, ChecksumAddress
 from eth_utils import add_0x_prefix
 from sw_utils import ValidatorStatus
 from sw_utils import get_chain_finalized_head as sw_get_chain_finalized_head
@@ -8,10 +8,10 @@ from sw_utils.consensus import EXITED_STATUSES
 from sw_utils.typings import ChainHead
 
 from src.common.clients import consensus_client, execution_client
-from src.common.contracts import v2_pool_contract, vault_contract
+from src.common.contracts import VaultContract, v2_pool_contract
 
 # from src.common.execution import SECONDS_PER_MONTH
-from src.common.typings import Validator
+from src.common.typings import ConsensusValidator
 from src.config.settings import settings
 
 EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
@@ -27,9 +27,10 @@ async def get_chain_finalized_head() -> ChainHead:
 
 
 # pylint: disable-next=too-many-locals
-async def fetch_registered_validators() -> list[Validator]:
+async def fetch_registered_validators(vault_address: ChecksumAddress) -> list[ConsensusValidator]:
     """Fetch registered validators."""
     logger.info('Fetching registered validators...')
+    vault_contract = VaultContract(vault_address)
     current_block = await execution_client.eth.get_block_number()
     public_keys = await vault_contract.get_registered_validators_public_keys(
         from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
@@ -67,7 +68,7 @@ async def fetch_registered_validators() -> list[Validator]:
                 continue
 
             validators.append(
-                Validator(
+                ConsensusValidator(
                     public_key=public_key,
                     index=int(beacon_validator['index']),
                     balance=int(beacon_validator['balance']),

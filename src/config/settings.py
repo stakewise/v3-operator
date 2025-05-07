@@ -25,8 +25,8 @@ DEFAULT_HASHI_VAULT_ENGINE_NAME = 'secret'
 
 # pylint: disable-next=too-many-public-methods,too-many-instance-attributes
 class Settings(metaclass=Singleton):
-    vault: ChecksumAddress
-    vault_dir: Path
+    vaults: list[ChecksumAddress]
+    config_dir: Path
     network: str
     consensus_endpoints: list[str]
     consensus_timeout: int
@@ -46,12 +46,12 @@ class Settings(metaclass=Singleton):
     metrics_prefix: str
     validator_type: str
     deposit_data_file: Path
+    validator_keys_file: Path
     keystores_dir: Path
     keystores_password_dir: Path
     keystores_password_file: Path
     remote_signer_url: str | None
     remote_signer_public_keys_url: str | None
-    remote_signer_use_deposit_data: bool
     dappnode: bool = False
     hashi_vault_key_paths: list[str] | None
     hashi_vault_key_prefixes: list[str] | None
@@ -99,8 +99,8 @@ class Settings(metaclass=Singleton):
     # pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements
     def set(
         self,
-        vault: str,
-        vault_dir: Path,
+        vaults: list[ChecksumAddress],
+        config_dir: Path,
         network: str,
         consensus_endpoints: str = '',
         execution_endpoints: str = '',
@@ -114,6 +114,7 @@ class Settings(metaclass=Singleton):
         validator_type: str = '0x02',
         max_fee_per_gas_gwei: int = DEFAULT_MAX_FEE_PER_GAS_GWEI,
         deposit_data_file: str | None = None,
+        validator_keys_file: str | None = None,
         keystores_dir: str | None = None,
         keystores_password_file: str | None = None,
         remote_signer_url: str | None = None,
@@ -135,9 +136,9 @@ class Settings(metaclass=Singleton):
         validators_registration_mode: ValidatorsRegistrationMode = ValidatorsRegistrationMode.AUTO,
         min_validators_registration: int = DEFAULT_MIN_VALIDATORS_REGISTRATION,
     ) -> None:
-        self.vault = Web3.to_checksum_address(vault)
-        vault_dir.mkdir(parents=True, exist_ok=True)
-        self.vault_dir = vault_dir
+        self.vaults = vaults
+        config_dir.mkdir(parents=True, exist_ok=True)
+        self.config_dir = config_dir
         self.network = network
 
         self.consensus_endpoints = [node.strip() for node in consensus_endpoints.split(',')]
@@ -154,29 +155,29 @@ class Settings(metaclass=Singleton):
         self.min_validators_registration = min_validators_registration
 
         self.deposit_data_file = (
-            Path(deposit_data_file) if deposit_data_file else vault_dir / 'deposit_data.json'
+            Path(deposit_data_file) if deposit_data_file else config_dir / 'deposit_data.json'
+        )
+        self.validator_keys_file = (
+            Path(validator_keys_file) if validator_keys_file else config_dir / 'validators.txt'
         )
 
         # keystores
-        self.keystores_dir = Path(keystores_dir) if keystores_dir else vault_dir / 'keystores'
+        self.keystores_dir = Path(keystores_dir) if keystores_dir else config_dir / 'keystores'
         self.keystores_password_dir = decouple_config(
             'KEYSTORES_PASSWORD_DIR',
             cast=Path,
-            default=vault_dir / 'keystores',
+            default=config_dir / 'keystores',
         )
         self.keystores_password_file = (
             Path(keystores_password_file)
             if keystores_password_file
-            else vault_dir / 'keystores' / 'password.txt'
+            else config_dir / 'keystores' / 'password.txt'
         )
 
         # remote signer configuration
         self.remote_signer_url = remote_signer_url
         self.remote_signer_public_keys_url: str = decouple_config(
             'REMOTE_SIGNER_PUBLIC_KEYS_URL', default=None
-        )
-        self.remote_signer_use_deposit_data: bool = decouple_config(
-            'REMOTE_SIGNER_USE_DEPOSIT_DATA', default=False, cast=bool
         )
         self.dappnode = dappnode
 
@@ -194,15 +195,15 @@ class Settings(metaclass=Singleton):
 
         # hot wallet
         self.hot_wallet_file = (
-            Path(hot_wallet_file) if hot_wallet_file else vault_dir / 'wallet' / 'wallet.json'
+            Path(hot_wallet_file) if hot_wallet_file else config_dir / 'wallet' / 'wallet.json'
         )
         self.hot_wallet_password_file = (
             Path(hot_wallet_password_file)
             if hot_wallet_password_file
-            else vault_dir / 'wallet' / 'password.txt'
+            else config_dir / 'wallet' / 'password.txt'
         )
 
-        db_dir = Path(database_dir) if database_dir else vault_dir
+        db_dir = Path(database_dir) if database_dir else config_dir
         self.database = db_dir / 'operator.db'
 
         self.log_level = log_level or 'INFO'
@@ -269,25 +270,6 @@ class Settings(metaclass=Singleton):
     def network_config(self) -> NetworkConfig:
         return NETWORKS[self.network]
 
-    @property
-    def is_genesis_vault(self) -> bool:
-        return self.vault == settings.network_config.GENESIS_VAULT_CONTRACT_ADDRESS
-
-    @property
-    def need_deposit_data_file(self) -> bool:
-        if self.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
-            return True
-
-        # At this point validators_registration_mode is API
-        if self.relayer_type == RelayerTypes.DVT:
-            # Validator registration data is taken from deposit data file.
-            # DVT Relayer provides exit signature.
-            return True
-
-        # Validator registration data is provided by Relayer.
-        # Validators manager signature is used instead of Merkle proof.
-        return False
-
 
 settings = Settings()
 
@@ -335,6 +317,8 @@ REMOTE_SIGNER_TIMEOUT = decouple_config('REMOTE_SIGNER_TIMEOUT', cast=int, defau
 
 # Hashi vault timeout
 HASHI_VAULT_TIMEOUT = 10
+
+ATTEMPTS_WITH_DEFAULT_GAS: int = decouple_config('ATTEMPTS_WITH_DEFAULT_GAS', default=3, cast=int)
 
 # Graphql timeout
 GRAPH_API_TIMEOUT = 10

@@ -10,13 +10,13 @@ from web3 import Web3
 
 from src.common.clients import execution_client
 from src.common.consensus import fetch_registered_validators, get_chain_finalized_head
-from src.common.contracts import vault_contract
+from src.common.contracts import VaultContract
 from src.common.execution import get_protocol_config, get_request_fee
 from src.common.logging import LOG_LEVELS, setup_logging
-from src.common.typings import Validator
+from src.common.typings import ConsensusValidator
 from src.common.utils import format_error, log_verbose
 from src.common.validators import validate_eth_address
-from src.common.vault_config import VaultConfig
+from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import (
     MAX_CONSOLIDATION_REQUEST_FEE,
@@ -99,15 +99,15 @@ def validators_exit(
     log_level: str,
 ) -> None:
     # pylint: disable=duplicate-code
-    vault_config = VaultConfig(vault, Path(data_dir))
+    vault_config = OperatorConfig(Path(data_dir))
     if network is None:
         vault_config.load()
         network = vault_config.network
 
     settings.set(
-        vault=vault,
+        vaults=[vault],
         network=network,
-        vault_dir=vault_config.vault_dir,
+        config_dir=vault_config.config_dir,
         execution_endpoints=execution_endpoints,
         consensus_endpoints=consensus_endpoints,
         verbose=verbose,
@@ -185,7 +185,7 @@ async def main(no_confirm: bool) -> None:
         )
 
 
-def _split_validators(validators: list[Validator]) -> list[tuple[HexStr, HexStr]]:
+def _split_validators(validators: list[ConsensusValidator]) -> list[tuple[HexStr, HexStr]]:
     total_balance = sum(x.balance for x in validators)
     new_validators_count = math.ceil(total_balance / PECTRA_MAX_EFFECTIVE_BALANCE_GWEI)
     new_validators = validators[:new_validators_count]
@@ -222,6 +222,7 @@ async def submit_consolidate_validators(
 ) -> HexStr | None:
     """Sends consolidateValidators transaction to vault contract"""
     logger.info('Submitting consolidateValidators transaction')
+    vault_contract = VaultContract(settings.vaults[0])
     try:
         tx = await vault_contract.functions.consolidateValidators(
             validators,

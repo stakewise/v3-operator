@@ -4,40 +4,36 @@ import shutil
 from pathlib import Path
 
 import click
-from eth_typing import HexAddress
-from web3 import Web3
 
 from src.common.credentials import CredentialManager
 from src.config.networks import AVAILABLE_NETWORKS
 
 
-class VaultConfig:
+class OperatorConfig:
     network: str = ''
     mnemonic_next_index: int = 0
     first_public_key: str | None = None
 
     def __init__(
         self,
-        vault: HexAddress,
         data_dir: Path,
     ):
-        self.vault = Web3.to_checksum_address(vault)
-        self.vault_dir = Path(data_dir) / vault.lower()
-        self.config_path = self.vault_dir / 'config.json'
+        self.config_dir = Path(data_dir)
+        self.config_path = self.config_dir / 'config.json'
 
     @property
     def exists(self) -> bool:
         return self.config_path.is_file()
 
     @property
-    def tmp_vault_dir(self) -> Path:
-        return self.vault_dir / '.tmp'
+    def tmp_config_dir(self) -> Path:
+        return self.config_dir / '.tmp'
 
     def create_tmp_dir(self) -> None:
-        self.tmp_vault_dir.mkdir(parents=True, exist_ok=True)
+        self.tmp_config_dir.mkdir(parents=True, exist_ok=True)
 
     def remove_tmp_dir(self) -> None:
-        shutil.rmtree(self.tmp_vault_dir)
+        shutil.rmtree(self.tmp_config_dir)
 
     def load(self, mnemonic: str | None = None) -> None:
         if self.config_path.is_file():
@@ -47,16 +43,14 @@ class VaultConfig:
             self.mnemonic_next_index = config.get('mnemonic_next_index')
             self.first_public_key = config.get('first_public_key')
         else:
-            raise click.ClickException(
-                f'Config for vault {self.vault} does not exist. Please run "init" command.'
-            )
+            raise click.ClickException('Config does not exist. Please run "init" command.')
         self._validate(mnemonic)
 
     def save(self, network: str, mnemonic: str, mnemonic_next_index: int = 0) -> None:
         self.network = network
         self.mnemonic_next_index = mnemonic_next_index
         self.first_public_key = CredentialManager.generate_credential_first_public_key(
-            self.network, self.vault, mnemonic
+            self.network, mnemonic
         )
 
         self._validate()
@@ -65,7 +59,7 @@ class VaultConfig:
             'mnemonic_next_index': self.mnemonic_next_index,
             'first_public_key': self.first_public_key,
         }
-        self.vault_dir.mkdir(parents=True, exist_ok=True)
+        self.config_dir.mkdir(parents=True, exist_ok=True)
         with self.config_path.open('w') as f:
             json.dump(config, f)
 
@@ -102,7 +96,7 @@ class VaultConfig:
 
         if mnemonic and self.first_public_key:
             first_public_key = CredentialManager.generate_credential_first_public_key(
-                self.network, self.vault, mnemonic
+                self.network, mnemonic
             )
             if first_public_key != self.first_public_key:
                 raise click.ClickException(

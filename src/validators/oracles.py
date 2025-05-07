@@ -26,7 +26,6 @@ from src.config.settings import (
     DEFAULT_RETRY_TIME,
     ORACLES_CONSOLIDATION_TIMEOUT,
     ORACLES_VALIDATORS_TIMEOUT,
-    settings,
 )
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import (
@@ -39,18 +38,15 @@ from src.validators.execution import (
 )
 from src.validators.keystores.base import BaseKeystore
 from src.validators.signing.common import get_encrypted_exit_signature_shards
-from src.validators.typings import (
-    ApprovalRequest,
-    ConsolidationRequest,
-    DepositDataValidator,
-)
+from src.validators.typings import ApprovalRequest, ConsolidationRequest, Validator
 
 logger = logging.getLogger(__name__)
 
 
 async def poll_validation_approval(
+    vault_address: ChecksumAddress,
     keystore: BaseKeystore | None,
-    validators: Sequence[DepositDataValidator],
+    validators: Sequence[Validator],
     multi_proof: MultiProof[tuple[bytes, int]] | None = None,
     validators_manager_signature: HexStr | None = None,
 ) -> tuple[ApprovalRequest, OraclesApproval]:
@@ -198,13 +194,13 @@ async def send_approval_requests(
 
 # pylint: disable-next=too-many-arguments,too-many-locals
 async def create_approval_request(
+    vault_address: ChecksumAddress,
     protocol_config: ProtocolConfig,
     keystore: BaseKeystore | None,
-    validators: Sequence[DepositDataValidator],
+    validators: Sequence[Validator],
     registry_root: Bytes32,
-    multi_proof: MultiProof[tuple[bytes, int]] | None,
     deadline: int,
-    validators_manager_signature: HexStr | None,
+    validators_manager_signature: HexStr,
 ) -> ApprovalRequest:
     """Generate validator registration request data"""
 
@@ -212,25 +208,15 @@ async def create_approval_request(
     validators_start_index = await get_validators_start_index()
     logger.debug('Next validator index for exit signature: %d', validators_start_index)
 
-    proof, proof_flags, proof_indexes = None, None, None
-
-    if multi_proof:
-        proof = multi_proof.proof
-        proof_flags = multi_proof.proof_flags
-        proof_indexes = [leaf[1] for leaf in multi_proof.leaves]
-
     # get exit signature shards
     request = ApprovalRequest(
         validator_index=validators_start_index,
-        vault_address=settings.vault,
+        vault_address=vault_address,
         validators_root=Web3.to_hex(registry_root),
         public_keys=[],
         deposit_signatures=[],
         public_key_shards=[],
         exit_signature_shards=[],
-        proof=proof,
-        proof_flags=proof_flags,
-        proof_indexes=proof_indexes,
         deadline=deadline,
         validators_manager_signature=validators_manager_signature,
     )

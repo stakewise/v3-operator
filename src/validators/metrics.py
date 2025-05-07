@@ -1,27 +1,21 @@
+from eth_typing import HexStr
+
 from src.common.metrics import metrics
 from src.config.settings import settings
 from src.validators.database import NetworkValidatorCrud
-from src.validators.execution import check_deposit_data_root
 from src.validators.keystores.base import BaseKeystore
-from src.validators.typings import DepositData
 
 
 async def update_unused_validator_keys_metric(
     keystore: BaseKeystore,
-    deposit_data: DepositData,
+    available_public_keys: list[HexStr],
 ) -> int:
-    try:
-        await check_deposit_data_root(deposit_data.tree.root)
-    except RuntimeError:
-        metrics.unused_validator_keys.labels(network=settings.network).set(0)
-        return 0
-
     validators: int = 0
-    for validator in deposit_data.validators:
-        if validator.public_key not in keystore:
+    for public_key in available_public_keys:
+        if public_key not in keystore:
             continue
 
-        if NetworkValidatorCrud().is_validator_registered(validator.public_key):
+        if NetworkValidatorCrud().is_validator_registered(public_key):
             continue
         validators += 1
 

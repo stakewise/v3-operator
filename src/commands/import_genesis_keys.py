@@ -6,7 +6,7 @@ from typing import Dict
 import click
 from Cryptodome.Cipher import AES, PKCS1_OAEP
 from Cryptodome.PublicKey import RSA
-from eth_typing import BLSPrivateKey, HexAddress, HexStr
+from eth_typing import BLSPrivateKey, ChecksumAddress, HexStr
 from py_ecc.bls import G2ProofOfPossession
 from web3 import Web3
 
@@ -15,7 +15,7 @@ from src.common.password import get_or_create_password_file
 from src.common.typings import ValidatorType
 from src.common.utils import greenify
 from src.common.validators import validate_eth_address
-from src.common.vault_config import VaultConfig
+from src.config.config import OperatorConfig
 from src.config.settings import settings
 
 
@@ -23,7 +23,7 @@ from src.config.settings import settings
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
     envvar='DATA_DIR',
-    help='Path where the vault data will be placed. Default is ~/.stakewise.',
+    help='Path where the config data will be placed. Default is ~/.stakewise.',
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
 )
 @click.option(
@@ -48,22 +48,22 @@ from src.config.settings import settings
 def import_genesis_keys(
     rsa_key: str,
     exported_keys_dir: str,
-    vault: HexAddress,
+    vault: ChecksumAddress,
     data_dir: str,
 ) -> None:
-    vault_config = VaultConfig(vault, Path(data_dir))
+    vault_config = OperatorConfig(Path(data_dir))
     vault_config.load()
     network = vault_config.network
 
     settings.set(
-        vault=vault,
+        vaults=[vault],
         network=network,
-        vault_dir=vault_config.vault_dir,
+        config_dir=vault_config.config_dir,
     )
     if settings.network_config.GENESIS_VAULT_CONTRACT_ADDRESS != vault:
         raise click.ClickException('The command is only for the genesis vault.')
 
-    keystores_dir = vault_config.vault_dir / 'keystores'
+    keystores_dir = vault_config.config_dir / 'keystores'
     password_file = keystores_dir / 'password.txt'
     password = get_or_create_password_file(password_file)
 
@@ -79,7 +79,6 @@ def import_genesis_keys(
     for private_key in transferred_keypairs.values():
         credential = Credential(
             private_key=BLSPrivateKey(private_key),
-            vault=vault,
             network=network,
             path=f'imported_{index}',
             validator_type=ValidatorType.ONE,
