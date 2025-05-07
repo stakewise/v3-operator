@@ -1,11 +1,10 @@
 from dataclasses import dataclass
 
-from eth_typing import ChecksumAddress, HexStr
+from eth_typing import HexStr
 
 
 @dataclass
 class RemoteDatabaseKeyPair:
-    vault: ChecksumAddress
     public_key: HexStr
     private_key: HexStr
     nonce: HexStr

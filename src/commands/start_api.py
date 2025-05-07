@@ -9,8 +9,8 @@ from eth_typing import ChecksumAddress
 from src.commands.start_base import start_base
 from src.common.logging import LOG_LEVELS
 from src.common.utils import log_verbose
-from src.common.validators import validate_eth_address
-from src.common.vault_config import VaultConfig
+from src.common.validators import validate_eth_addresses
+from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS, NETWORKS
 from src.config.settings import (
     DEFAULT_MAX_FEE_PER_GAS_GWEI,
@@ -34,7 +34,7 @@ AUTO = 'AUTO'
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
     envvar='DATA_DIR',
-    help='Path where the vault data will be placed. Default is ~/.stakewise.',
+    help='Path where the config data will be placed. Default is ~/.stakewise.',
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
 )
 @click.option(
@@ -42,7 +42,7 @@ AUTO = 'AUTO'
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
     envvar='DATABASE_DIR',
     help='The directory where the database will be created or read from. '
-    'Default is ~/.stakewise/<vault>.',
+    'Default is ~/.stakewise/.',
 )
 @click.option(
     '--max-fee-per-gas-gwei',
@@ -144,12 +144,12 @@ AUTO = 'AUTO'
     help='Comma separated list of API endpoints for consensus nodes.',
 )
 @click.option(
-    '--vault',
+    '--vaults',
     type=ChecksumAddress,
-    callback=validate_eth_address,
-    envvar='VAULT',
-    prompt='Enter the vault address',
-    help='Address of the vault to register validators for.',
+    callback=validate_eth_addresses,
+    envvar='VAULTS',
+    prompt='Enter comma separated list of your vault addresses',
+    help='Comma separated list of address of the vault to register validators for.',
 )
 @click.option(
     '--log-format',
@@ -192,7 +192,7 @@ AUTO = 'AUTO'
 @click.command(help='Start operator service')
 # pylint: disable-next=too-many-arguments,too-many-locals
 def start_api(
-    vault: ChecksumAddress,
+    vaults: list[ChecksumAddress],
     consensus_endpoints: str,
     execution_endpoints: str,
     execution_jwt_secret: str | None,
@@ -214,7 +214,7 @@ def start_api(
     relayer_type: str,
     relayer_endpoint: str,
 ) -> None:
-    vault_config = VaultConfig(vault, Path(data_dir))
+    vault_config = OperatorConfig(Path(data_dir))
     if network is None:
         vault_config.load()
         network = vault_config.network
@@ -229,8 +229,8 @@ def start_api(
     validators_registration_mode = ValidatorsRegistrationMode.API
 
     settings.set(
-        vault=vault,
-        vault_dir=vault_config.vault_dir,
+        vaults=vaults,
+        config_dir=vault_config.config_dir,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
         execution_jwt_secret=execution_jwt_secret,

@@ -7,12 +7,13 @@ from pathlib import Path
 from typing import NewType
 
 import milagro_bls_binding as bls
-from eth_typing import BLSSignature, HexStr
+from eth_typing import BLSPrivateKey, BLSSignature, ChecksumAddress, HexStr
 from staking_deposit.key_handling.keystore import ScryptKeystore
 from sw_utils.signing import get_exit_message_signing_root
 from sw_utils.typings import ConsensusFork
 from web3 import Web3
 
+from src.common.credentials import CredentialManager
 from src.config.settings import settings
 from src.validators.exceptions import KeystoreException
 from src.validators.keystores.base import BaseKeystore
@@ -76,6 +77,21 @@ class LocalKeystore(BaseKeystore):
 
     def __len__(self) -> int:
         return len(self.keys)
+
+    def get_deposit_datas(
+        self, public_keys: list[HexStr], vault_address: ChecksumAddress
+    ) -> list[dict]:
+        private_keys = [self.keys[public_key] for public_key in public_keys]
+        credentials = [
+            CredentialManager.load_credential(
+                network=settings.network,
+                private_key=BLSPrivateKey(Web3.to_int(pk)),
+                vault=vault_address,
+            )
+            for pk in private_keys
+        ]
+
+        return [cred.deposit_datum_dict() for cred in credentials]
 
     async def get_exit_signature(
         self, validator_index: int, public_key: HexStr, fork: ConsensusFork | None = None

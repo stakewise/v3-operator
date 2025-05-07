@@ -1,11 +1,9 @@
 import logging
 from typing import cast
 
-import click
 from eth_typing import BlockNumber
 from sw_utils import GasManager, InterruptHandler, ProtocolConfig, build_protocol_config
 from web3 import Web3
-from web3.exceptions import BadFunctionCallOutput
 from web3.types import Wei
 
 from src.common.app_state import AppState, OraclesCache
@@ -13,7 +11,6 @@ from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.contracts import keeper_contract, multicall_contract
 from src.common.metrics import metrics
 from src.common.tasks import BaseTask
-from src.common.vault import Vault
 from src.common.wallet import hot_wallet
 from src.config.settings import settings
 
@@ -29,13 +26,6 @@ def build_gas_manager() -> GasManager:
         priority_fee_num_blocks=settings.priority_fee_num_blocks,
         priority_fee_percentile=settings.priority_fee_percentile,
     )
-
-
-async def check_vault_address() -> None:
-    try:
-        await Vault().get_validators_root()
-    except BadFunctionCallOutput as e:
-        raise click.ClickException('Invalid vault contract address') from e
 
 
 async def get_protocol_config() -> ProtocolConfig:
@@ -81,8 +71,8 @@ async def update_oracles_cache() -> None:
     validators_threshold_call = keeper_contract.encode_abi(fn_name='validatorsMinOracles', args=[])
     _, multicall_response = await multicall_contract.aggregate(
         [
-            (keeper_contract.address, rewards_threshold_call),
-            (keeper_contract.address, validators_threshold_call),
+            (keeper_contract.contract_address, rewards_threshold_call),
+            (keeper_contract.contract_address, validators_threshold_call),
         ],
         block_number=to_block,
     )

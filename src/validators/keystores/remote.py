@@ -5,7 +5,7 @@ from typing import cast
 
 import milagro_bls_binding as bls
 from aiohttp import ClientSession, ClientTimeout
-from eth_typing import BLSPubkey, BLSSignature, HexStr
+from eth_typing import BLSPubkey, BLSSignature, ChecksumAddress, HexStr
 from sw_utils import get_exit_message_signing_root
 from sw_utils.common import urljoin
 from sw_utils.typings import ConsensusFork
@@ -13,7 +13,6 @@ from web3 import Web3
 
 from src.config.settings import REMOTE_SIGNER_TIMEOUT, settings
 from src.validators.keystores.base import BaseKeystore
-from src.validators.utils import load_deposit_data
 
 logger = logging.getLogger(__name__)
 
@@ -51,10 +50,6 @@ class RemoteSignerKeystore(BaseKeystore):
 
     @staticmethod
     async def load() -> 'BaseKeystore':
-        if settings.remote_signer_use_deposit_data:
-            deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
-            return RemoteSignerKeystore(deposit_data.public_keys)
-
         public_keys = await RemoteSignerKeystore._get_remote_signer_public_keys()
         return RemoteSignerKeystore(public_keys)
 
@@ -70,6 +65,11 @@ class RemoteSignerKeystore(BaseKeystore):
     @property
     def public_keys(self) -> list[HexStr]:
         return self._public_keys
+
+    def get_deposit_datas(
+        self, public_keys: list[HexStr], vault_address: ChecksumAddress
+    ) -> list[dict]:
+        return []
 
     async def get_exit_signature(
         self, validator_index: int, public_key: HexStr, fork: ConsensusFork | None = None

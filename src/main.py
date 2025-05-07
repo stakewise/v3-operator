@@ -10,7 +10,6 @@ import click
 import src
 from src.commands.create_keys import create_keys
 from src.commands.create_wallet import create_wallet
-from src.commands.get_validators_root import get_validators_root
 from src.commands.import_genesis_keys import import_genesis_keys
 from src.commands.init import init
 from src.commands.merge_deposit_data import merge_deposit_data
@@ -44,7 +43,6 @@ cli.add_command(validators_exit)
 cli.add_command(start)
 cli.add_command(start_api)
 cli.add_command(recover)
-cli.add_command(get_validators_root)
 cli.add_command(import_genesis_keys)
 cli.add_command(remote_db_group)
 cli.add_command(rated_self_report)

@@ -5,10 +5,11 @@ from functools import cached_property
 from multiprocessing import Pool
 from os import path
 from secrets import randbits
+from typing import cast
 
 import click
 import milagro_bls_binding as bls
-from eth_typing import BLSPrivateKey, HexAddress, HexStr
+from eth_typing import BLSPrivateKey, ChecksumAddress, HexAddress, HexStr
 from py_ecc.bls import G2ProofOfPossession
 from staking_deposit.key_handling.key_derivation.mnemonic import get_seed
 from staking_deposit.key_handling.key_derivation.path import path_to_nodes
@@ -42,9 +43,10 @@ COIN_TYPE = '3600'
 @dataclass
 class Credential:
     private_key: BLSPrivateKey
-    path: str
     network: str
-    vault: HexAddress
+
+    path: str | None = None
+    vault: ChecksumAddress | None = None
 
     @cached_property
     def public_key(self) -> HexStr:
@@ -60,7 +62,7 @@ class Credential:
 
     @cached_property
     def withdrawal_credentials(self) -> Bytes32:
-        return get_v1_withdrawal_credentials(self.vault)
+        return get_v1_withdrawal_credentials(cast(HexAddress, self.vault))
 
     def save_signing_keystore(
         self, password: str, folder: str, per_keystore_password: bool = False
@@ -123,7 +125,6 @@ class CredentialManager:
     # pylint: disable-next=too-many-arguments
     def generate_credentials(
         network: str,
-        vault: HexAddress,
         mnemonic: str,
         count: int,
         start_index: int,
@@ -149,7 +150,6 @@ class CredentialManager:
                         [
                             chunk_indexes,
                             network,
-                            vault,
                             mnemonic,
                         ],
                         callback=bar_updated,
@@ -167,7 +167,6 @@ class CredentialManager:
     def _generate_credentials_chunk(
         indexes: list[int],
         network: str,
-        vault: HexAddress,
         mnemonic: str,
     ) -> list[Credential]:
         # Hack to run web3 sessions in multiprocessing mode
@@ -176,23 +175,20 @@ class CredentialManager:
 
         credentials: list[Credential] = []
         for index in indexes:
-            credential = CredentialManager.generate_credential(network, vault, mnemonic, index)
+            credential = CredentialManager.generate_credential(network, mnemonic, index)
             credentials.append(credential)
         return credentials
 
     @staticmethod
-    def generate_credential_first_public_key(network: str, vault: HexAddress, mnemonic: str) -> str:
+    def generate_credential_first_public_key(network: str, mnemonic: str) -> str:
         return CredentialManager.generate_credential(
             network=network,
-            vault=vault,
             mnemonic=mnemonic,
             index=0,
         ).public_key
 
     @staticmethod
-    def generate_credential(
-        network: str, vault: HexAddress, mnemonic: str, index: int
-    ) -> Credential:
+    def generate_credential(network: str, mnemonic: str, index: int) -> Credential:
         """Returns the signing key of the mnemonic at a specific index."""
         seed = get_seed(mnemonic=mnemonic, password='')  # nosec
         private_key = BLSPrivateKey(derive_master_SK(seed))
@@ -202,6 +198,10 @@ class CredentialManager:
         for node in nodes:
             private_key = BLSPrivateKey(derive_child_SK(parent_SK=private_key, index=node))
 
-        return Credential(
-            private_key=private_key, path=signing_key_path, network=network, vault=vault
-        )
+        return Credential(private_key=private_key, path=signing_key_path, network=network)
+
+    @staticmethod
+    def load_credential(
+        network: str, vault: ChecksumAddress, private_key: BLSPrivateKey
+    ) -> Credential:
+        return Credential(private_key=private_key, network=network, vault=vault)
