@@ -59,7 +59,7 @@ class Metrics:
         )
         self.unused_validator_keys = Gauge(
             'unused_validator_keys',
-            'The number of unused validator keys in deposit data file',
+            'The number of unused validator keys in validators.txt file',
             namespace=settings.metrics_prefix,
             labelnames=['network'],
         )

@@ -119,13 +119,6 @@ def cleanup(ctx: Context) -> None:
     help='Comma separated list of API endpoints for execution nodes.',
 )
 @click.option(
-    '--deposit-data-file',
-    type=click.Path(exists=True, file_okay=True, dir_okay=False),
-    envvar='DEPOSIT_DATA_FILE',
-    help='Path to the deposit_data.json file. '
-    'Default is the file generated with "create-keys" command.',
-)
-@click.option(
     '--pool-size',
     help='Number of processes in a pool.',
     envvar='POOL_SIZE',
@@ -145,7 +138,6 @@ def upload_keypairs(
     encrypt_key: str,
     execution_endpoints: str,
     execution_jwt_secret: str | None,
-    deposit_data_file: str | None,
     pool_size: int | None,
 ) -> None:
     settings.set(
@@ -153,7 +145,6 @@ def upload_keypairs(
         config_dir=settings.config_dir,
         network=settings.network,
         keystores_dir=str(settings.keystores_dir),
-        deposit_data_file=deposit_data_file,
         verbose=settings.verbose,
         execution_endpoints=execution_endpoints,
         execution_jwt_secret=execution_jwt_secret,

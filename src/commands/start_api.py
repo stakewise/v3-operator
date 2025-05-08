@@ -67,13 +67,6 @@ AUTO = 'AUTO'
     'Default is the file generated with "create-wallet" command.',
 )
 @click.option(
-    '--deposit-data-file',
-    type=click.Path(exists=True, file_okay=True, dir_okay=False),
-    envvar='DEPOSIT_DATA_FILE',
-    help='Path to the deposit_data.json file. '
-    'Default is the file generated with "create-keys" command.',
-)
-@click.option(
     '--network',
     type=click.Choice(
         AVAILABLE_NETWORKS,
@@ -206,7 +199,6 @@ def start_api(
     log_level: str,
     log_format: str,
     network: str | None,
-    deposit_data_file: str | None,
     hot_wallet_file: str | None,
     hot_wallet_password_file: str | None,
     max_fee_per_gas_gwei: int,
@@ -214,10 +206,10 @@ def start_api(
     relayer_type: str,
     relayer_endpoint: str,
 ) -> None:
-    vault_config = OperatorConfig(Path(data_dir))
+    operator_config = OperatorConfig(Path(data_dir))
     if network is None:
-        vault_config.load()
-        network = vault_config.network
+        operator_config.load()
+        network = operator_config.network
 
     if relayer_endpoint == AUTO and relayer_type == RelayerTypes.DVT:
         network_config = NETWORKS[network]
@@ -230,7 +222,7 @@ def start_api(
 
     settings.set(
         vaults=vaults,
-        config_dir=vault_config.config_dir,
+        config_dir=operator_config.config_dir,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
         execution_jwt_secret=execution_jwt_secret,
@@ -241,7 +233,6 @@ def start_api(
         metrics_port=metrics_port,
         metrics_prefix=metrics_prefix,
         network=network,
-        deposit_data_file=deposit_data_file,
         hot_wallet_file=hot_wallet_file,
         hot_wallet_password_file=hot_wallet_password_file,
         max_fee_per_gas_gwei=max_fee_per_gas_gwei,

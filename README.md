@@ -458,7 +458,7 @@ This command allows you to self-report your validator keys to the Rated Network,
 To use the `rated-self-report` command, you will need to provide the following parameters:
 
 - `--data-dir`: Path where the vault data will be placed. Default is ~/.stakewise.
-- `--vaults`: The comma separated vault addresses.
+- `--vaults`:  The comma separated list of your vault addresses.
 - `--network`: The network of your vault (e.g., mainnet, hoodi).
 - `--pool-tag`: The pool name listed on the Explorer (optional).
 - `--token`: OAuth token for authorization.

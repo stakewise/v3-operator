@@ -33,7 +33,7 @@ from src.config.settings import (
     settings,
 )
 from src.validators.database import NetworkValidatorCrud
-from src.validators.exceptions import MissingDepositDataValidatorsException
+from src.validators.exceptions import MissingAvailableValidatorsException
 from src.validators.execution import (
     NetworkValidatorsProcessor,
     get_validators_start_index,
@@ -51,7 +51,7 @@ from src.validators.typings import (
     Validator,
     ValidatorsRegistrationMode,
 )
-from src.validators.utils import get_validators_from_x
+from src.validators.utils import get_available_validators, send_approval_requests
 from src.validators.validators_manager import get_validators_manager_signature
 
 logger = logging.getLogger(__name__)
@@ -208,7 +208,7 @@ async def register_new_validators(
     validators: Sequence[Validator]
 
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
-        validators = await get_validators_from_x(
+        validators = await get_available_validators(
             keystore=cast(BaseKeystore, keystore),
             available_public_keys=cast(list[HexStr], available_public_keys),
             count=validators_batch_size,
@@ -221,11 +221,11 @@ async def register_new_validators(
             validators=validators,
         )
         if not validators:
-            if not settings.disable_deposit_data_warnings:
+            if not settings.disable_available_validators_warnings:
                 logger.warning(
-                    'There are no available validators in the current deposit data '
+                    'There are no available public keys in the current validators.txt file '
                     'to proceed with registration. '
-                    'To register additional validators, you must upload new deposit data.'
+                    'To register additional validators, you must generate new keys.'
                 )
             return None
     else:
@@ -233,13 +233,12 @@ async def register_new_validators(
             validators_response = await cast(RelayerAdapter, relayer_adapter).get_validators(
                 validators_batch_size, validators_total=validators_count
             )
-        except MissingDepositDataValidatorsException:
-            # Deposit data validators are required when using DVT Relayer
-            if not settings.disable_deposit_data_warnings:
+        except MissingAvailableValidatorsException:
+            if not settings.disable_available_validators_warnings:
                 logger.warning(
-                    'There are no available validators in the current deposit data '
+                    'There are no available public keys in the current validators.txt file '
                     'to proceed with registration. '
-                    'To register additional validators, you must upload new deposit data.'
+                    'To register additional validators, you must generate new keys.'
                 )
             return None
 
