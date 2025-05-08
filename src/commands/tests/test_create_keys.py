@@ -36,7 +36,6 @@ class TestCreateKeys:
 
         output = (
             'Creating validator keys:\t\t\n'
-            'Generating deposit data JSON\t\t\n'
             'Exporting validator keystores\t\t\n'
             f'Done. Generated 5 keys for StakeWise operator.\n'
             f'Keystores saved to {config_dir}/keystores file\n'

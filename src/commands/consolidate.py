@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 import click
-from eth_typing import HexAddress, HexStr
+from eth_typing import ChecksumAddress, HexStr
 from web3 import Web3
 
 from src.common.clients import execution_client
@@ -88,9 +88,9 @@ logger = logging.getLogger(__name__)
 )
 @click.command(help='Performs a vault validators consolidation after pectra udpate.')
 # pylint: disable-next=too-many-arguments,too-many-locals
-def validators_exit(
+def consolidate(
     network: str,
-    vault: HexAddress,
+    vault: ChecksumAddress,
     execution_endpoints: str,
     consensus_endpoints: str,
     data_dir: str,
@@ -105,7 +105,7 @@ def validators_exit(
         network = vault_config.network
 
     settings.set(
-        vaults=[vault],
+        vaults=[],
         network=network,
         config_dir=vault_config.config_dir,
         execution_endpoints=execution_endpoints,
@@ -116,6 +116,7 @@ def validators_exit(
     try:
         asyncio.run(
             main(
+                vault_address=vault,
                 no_confirm=no_confirm,
             )
         )
@@ -124,11 +125,11 @@ def validators_exit(
         sys.exit(1)
 
 
-async def main(no_confirm: bool) -> None:
+async def main(vault_address: ChecksumAddress, no_confirm: bool) -> None:
     setup_logging()
     # SETTINGS:
     # - validators count
-    validators = await fetch_registered_validators()
+    validators = await fetch_registered_validators(vault_address)
     # filter active?
     if not validators:
         raise click.ClickException('No registered validators')
@@ -164,7 +165,7 @@ async def main(no_confirm: bool) -> None:
     protocol_config = await get_protocol_config()
 
     oracle_signatures = await poll_consolidation_signature(
-        from_to_keys=to_from_keys, vault=settings.vault, protocol_config=protocol_config
+        from_to_keys=to_from_keys, vault=vault_address, protocol_config=protocol_config
     )
     # get validatorsManagerSignature
     validators_bytes = _encode_validators(to_from_keys)

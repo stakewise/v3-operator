@@ -6,7 +6,6 @@ from typing import Sequence
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
 from eth_typing import ChecksumAddress, HexStr
-from multiproof.standard import MultiProof
 from sw_utils.decorators import retry_aiohttp_errors
 from sw_utils.typings import Bytes32, ProtocolConfig
 from web3 import Web3
@@ -47,8 +46,7 @@ async def poll_validation_approval(
     vault_address: ChecksumAddress,
     keystore: BaseKeystore | None,
     validators: Sequence[Validator],
-    multi_proof: MultiProof[tuple[bytes, int]] | None = None,
-    validators_manager_signature: HexStr | None = None,
+    validators_manager_signature: HexStr,
 ) -> tuple[ApprovalRequest, OraclesApproval]:
     """
     Polls oracles for approval of validator registration
@@ -80,11 +78,11 @@ async def poll_validation_approval(
             deadline = current_timestamp + protocol_config.signature_validity_period
 
             oracles_request = await create_approval_request(
+                vault_address=vault_address,
                 protocol_config=protocol_config,
                 keystore=keystore,
                 validators=validators,
                 registry_root=current_registry_root,
-                multi_proof=multi_proof,
                 deadline=deadline,
                 validators_manager_signature=validators_manager_signature,
             )

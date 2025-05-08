@@ -119,7 +119,7 @@ async def fund_validators(
         # aggregate all the calls into one multicall
         calls = []
     vault_contract = VaultContract(vault_address)
-    fund_validators_call = vault_contract.address, vault_contract.encode_abi(
+    fund_validators_call = vault_contract.contract_address, vault_contract.encode_abi(
         fn_name='fundValidators',
         args=[validators, Web3.to_bytes(hexstr=validators_manager_signature)],
     )

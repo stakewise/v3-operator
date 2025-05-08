@@ -43,7 +43,7 @@ async def get_vault_assets(
     # there is no way we can fetch unclaimed assets directly
     # from the contract as it's private variable, so we fetch through storage slot
     contract_slot = await execution_client.eth.get_storage_at(
-        account=vault_contract.address, position=storage_position, block_identifier=block_number
+        account=vault, position=storage_position, block_identifier=block_number
     )
     # queued shares and unclaimed assets are stored as uint128,
     # so first 16 bytes are for queued shares and next 16 bytes for the unclaimed assets
@@ -161,7 +161,7 @@ def _get_encoded_balance_call(address: ChecksumAddress) -> tuple[ChecksumAddress
     """Encodes the call to get the balance of the address."""
     if settings.network in ETH_NETWORKS:
         eth_balance_call = multicall_contract.encode_abi('getEthBalance', [address])
-        return multicall_contract.address, eth_balance_call
+        return multicall_contract.contract_address, eth_balance_call
 
     gno_addr = settings.network_config.GNO_TOKEN_CONTRACT_ADDRESS
     return gno_addr, gno_erc20_contract.encode_abi('balanceOf', [address])
@@ -172,7 +172,7 @@ def _get_encoded_gnosis_withdrawable_assets_call(
 ) -> tuple[ChecksumAddress, HexStr]:
     """Encodes the call to get the validators registry withdrawable amount."""
     return (
-        validators_registry_contract.address,
+        validators_registry_contract.contract_address,
         validators_registry_contract.encode_abi('withdrawableAmount', [address]),
     )
 

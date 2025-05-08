@@ -37,7 +37,10 @@ async def fetch_registered_validators(vault_address: ChecksumAddress) -> list[Co
         to_block=current_block,
     )
 
-    if settings.network_config.IS_SUPPORT_V2_MIGRATION and settings.is_genesis_vault:
+    if (
+        settings.network_config.IS_SUPPORT_V2_MIGRATION
+        and vault_address == settings.network_config.GENESIS_VAULT_CONTRACT_ADDRESS
+    ):
         # fetch registered validators from v2 pool contract
         # new validators won't be registered after upgrade to the v3,
         # no need to check up to the latest block

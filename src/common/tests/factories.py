@@ -4,7 +4,7 @@ import string
 from eth_typing import HexStr
 from sw_utils.tests import faker
 
-from src.common.typings import Validator, ValidatorType
+from src.common.typings import ConsensusValidator, ValidatorType
 
 
 def create_validator(
@@ -14,7 +14,7 @@ def create_validator(
     status: int | None = None,
     withdrawal_credentials: str | None = None,
     validator_type: ValidatorType | None = None,
-) -> Validator:
+) -> ConsensusValidator:
     # produce cid V1
     if not withdrawal_credentials:
         if validator_type == ValidatorType.ONE:
@@ -26,7 +26,7 @@ def create_validator(
                 random.choices('abcdef' + string.digits, k=62)
             )
 
-    return Validator(
+    return ConsensusValidator(
         public_key=public_key or faker.eth_address(),
         index=index or random.randint(1, 10000),
         balance=balance or random.randint(1, 10000) * 10**9,

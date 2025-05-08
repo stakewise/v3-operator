@@ -102,7 +102,7 @@ async def startup_checks() -> None:
 
     for vault_address in settings.vaults:
         await _check_validators_manager(vault_address)
-    await _check_validators_manager()
+
     await _check_validators_type()
 
     if (

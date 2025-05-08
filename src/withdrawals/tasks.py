@@ -1,17 +1,17 @@
 import logging
 
-from eth_typing import HexStr
-from sw_utils import InterruptHandler
+from eth_typing import ChecksumAddress, HexStr
+from sw_utils import ChainHead, InterruptHandler, ProtocolConfig
 from web3 import Web3
 
 from src.common.checks import wait_execution_catch_up_consensus
 from src.common.clients import execution_client
 from src.common.consensus import fetch_registered_validators, get_chain_finalized_head
-from src.common.contracts import vault_contract
+from src.common.contracts import VaultContract
 from src.common.execution import get_protocol_config, get_request_fee
 from src.common.harvest import get_harvest_params
 from src.common.tasks import BaseTask
-from src.common.typings import Validator, ValidatorType
+from src.common.typings import ConsensusValidator, ValidatorType
 from src.common.utils import format_error
 from src.config.settings import (
     DEPOSIT_AMOUNT,
@@ -36,6 +36,17 @@ class PartialWithdrawalsTask(BaseTask):
             chain_state=chain_head, interrupt_handler=interrupt_handler
         )
         protocol_config = await get_protocol_config()
+        for vault in settings.vaults:
+            await self.process_withdrawals(
+                vault,
+                chain_head=chain_head,
+                protocol_config=protocol_config,
+            )
+
+    async def process_withdrawals(
+        self, vault_address: ChecksumAddress, chain_head: ChainHead, protocol_config: ProtocolConfig
+    ) -> None:
+        vault_contract = VaultContract(vault_address)
         last_withdrawals_block = await vault_contract.get_last_partial_withdrawals_block()
         if (
             last_withdrawals_block
@@ -43,9 +54,9 @@ class PartialWithdrawalsTask(BaseTask):
         ):
             return
 
-        harvest_params = await get_harvest_params()
+        harvest_params = await get_harvest_params(vault_address)
         queued_assets, total_assets = await get_vault_assets(
-            vault=settings.vault,
+            vault=vault_address,
             block_number=chain_head.block_number,
             harvest_params=harvest_params,
         )
@@ -55,7 +66,7 @@ class PartialWithdrawalsTask(BaseTask):
         ):
             return
 
-        validators = await fetch_registered_validators()
+        validators = await fetch_registered_validators(vault_address)
         validators = [v for v in validators if v.validator_type == ValidatorType.TWO]
         partial_withdrawals_amount = sum(v.balance - DEPOSIT_AMOUNT for v in validators)
 
@@ -77,6 +88,7 @@ class PartialWithdrawalsTask(BaseTask):
         validator_data = _endcode_validators(withdrawals_data)
         validators_manager_signature = HexStr('0x')
         tx_hash = await submit_withdraw_validators(
+            vault_contract=vault_contract,
             validators=validator_data,
             validators_manager_signature=Web3.to_bytes(hexstr=validators_manager_signature),
         )
@@ -91,7 +103,9 @@ class PartialWithdrawalsTask(BaseTask):
         )
 
 
-def _get_withdrawal_data(validators: list[Validator], withdrawals_amount: int) -> dict[HexStr, int]:
+def _get_withdrawal_data(
+    validators: list[ConsensusValidator], withdrawals_amount: int
+) -> dict[HexStr, int]:
     """
     Returns withdrawal data for partial withdrawals
     withdrawals_amount - total amount of queued assets,
@@ -132,6 +146,7 @@ def _endcode_validators(validators: dict[HexStr, int]) -> bytes:
 
 
 async def submit_withdraw_validators(
+    vault_contract: VaultContract,
     validators: bytes,
     validators_manager_signature: bytes,
 ) -> HexStr | None:

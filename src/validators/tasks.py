@@ -2,13 +2,7 @@ import logging
 from typing import Sequence, cast
 
 from eth_typing import HexStr
-from sw_utils import (
-    EventScanner,
-    InterruptHandler,
-    IpfsFetchClient,
-    ProtocolConfig,
-    convert_to_mgno,
-)
+from sw_utils import EventScanner, InterruptHandler, IpfsFetchClient, convert_to_mgno
 from sw_utils.networks import GNO_NETWORKS
 from sw_utils.typings import Bytes32
 from web3 import Web3
@@ -34,24 +28,18 @@ from src.config.settings import (
 )
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import MissingAvailableValidatorsException
-from src.validators.execution import (
-    NetworkValidatorsProcessor,
-    get_validators_start_index,
-    get_withdrawable_assets,
-)
+from src.validators.execution import NetworkValidatorsProcessor, get_withdrawable_assets
 from src.validators.keystores.base import BaseKeystore
 from src.validators.metrics import update_unused_validator_keys_metric
 from src.validators.oracles import poll_validation_approval
 from src.validators.register_validators import fund_validators, register_validators
 from src.validators.relayer import RelayerAdapter
-from src.validators.signing.common import get_encrypted_exit_signature_shards
 from src.validators.typings import (
-    ApprovalRequest,
     NetworkValidator,
     Validator,
     ValidatorsRegistrationMode,
 )
-from src.validators.utils import get_available_validators, send_approval_requests
+from src.validators.utils import get_available_validators
 from src.validators.validators_manager import get_validators_manager_signature
 
 logger = logging.getLogger(__name__)
@@ -150,7 +138,9 @@ async def process_validators(
 
 
 async def fund_v2_validators(
-    vault_validators: list[Validator], amount_gwei: int, harvest_params: HarvestParams | None
+    vault_validators: list[ConsensusValidator],
+    amount_gwei: int,
+    harvest_params: HarvestParams | None,
 ) -> HexStr | None:
     topup_data = _get_topup_data(vault_validators, amount_gwei)
     if not topup_data:
@@ -296,60 +286,6 @@ async def get_vault_assets(
     metrics.stakeable_assets.labels(network=settings.network).set(int(vault_balance))
 
     return vault_balance
-
-
-# pylint: disable-next=too-many-arguments,too-many-locals
-async def create_approval_request(
-    vault_address: ChecksumAddress,
-    protocol_config: ProtocolConfig,
-    keystore: BaseKeystore | None,
-    validators: Sequence[Validator],
-    registry_root: Bytes32,
-    deadline: int,
-    validators_manager_signature: HexStr,
-) -> ApprovalRequest:
-    """Generate validator registration request data"""
-
-    # metrics.stakeable_assets.labels(network=settings.network).set(int(vault_assets))
-    # get next validator index for exit signature
-    validators_start_index = await get_validators_start_index()
-    # get exit signature shards
-    request = ApprovalRequest(
-        validator_index=validators_start_index,
-        vault_address=vault_address,
-        validators_root=Web3.to_hex(registry_root),
-        public_keys=[],
-        deposit_signatures=[],
-        public_key_shards=[],
-        exit_signature_shards=[],
-        deadline=deadline,
-        validators_manager_signature=validators_manager_signature,
-    )
-
-    for validator_index, validator in enumerate(validators, validators_start_index):
-        shards = validator.exit_signature_shards
-
-        if not shards:
-            shards = await get_encrypted_exit_signature_shards(
-                keystore=keystore,
-                public_key=validator.public_key,
-                validator_index=validator_index,
-                protocol_config=protocol_config,
-                exit_signature=validator.exit_signature,
-            )
-
-        if not shards:
-            logger.warning(
-                'Failed to get exit signature shards for validator %s', validator.public_key
-            )
-            break
-
-        request.public_keys.append(validator.public_key)
-        request.deposit_signatures.append(validator.signature)
-        request.public_key_shards.append(shards.public_keys)
-        request.exit_signature_shards.append(shards.exit_signatures)
-
-    return request
 
 
 async def load_genesis_validators() -> None:
