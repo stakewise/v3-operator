@@ -50,12 +50,11 @@ async def start_base() -> None:
     available_public_keys: list[HexStr] | None = None
     relayer_adapter: RelayerAdapter | None = None
 
-    # load keystore and deposit data
+    # load keystore and available public keys
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
         keystore = await load_keystore()
 
         available_public_keys = load_validators_keys(settings.validator_keys_file)
-        logger.info('Loaded deposit data file %s', settings.deposit_data_file)
     else:
         relayer_adapter = create_relayer_adapter()
 

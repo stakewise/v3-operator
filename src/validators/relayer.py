@@ -10,7 +10,7 @@ from sw_utils.common import urljoin
 from web3 import Web3
 
 from src.config.settings import DEPOSIT_AMOUNT_GWEI, settings
-from src.validators.exceptions import MissingDepositDataValidatorsException
+from src.validators.exceptions import MissingAvailableValidatorsException
 from src.validators.execution import get_validators_start_index
 from src.validators.typings import (
     ExitSignatureShards,
@@ -131,7 +131,7 @@ class RelayerAdapter:
     ) -> RelayerValidatorsResponse:
         # build request
         if not self.available_public_keys:
-            raise MissingDepositDataValidatorsException()
+            raise MissingAvailableValidatorsException()
 
         public_keys = filter_nonregistered_public_keys(
             available_public_keys=self.available_public_keys,
@@ -139,7 +139,7 @@ class RelayerAdapter:
         )
 
         if not public_keys:
-            raise MissingDepositDataValidatorsException()
+            raise MissingAvailableValidatorsException()
 
         # submit request
         logger.info('Waiting for validators from Relayer...')

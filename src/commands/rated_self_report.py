@@ -61,12 +61,12 @@ def rated_self_report(
         click.secho(f'{network} network is not yet rated supported')
         return
 
-    vault_config = OperatorConfig(Path(data_dir))
-    vault_config.load()
+    operator_config = OperatorConfig(Path(data_dir))
+    operator_config.load()
 
     settings.set(
         vaults=vaults,
-        config_dir=vault_config.config_dir,
+        config_dir=operator_config.config_dir,
         network=network,
         execution_endpoints='',
         consensus_endpoints='',

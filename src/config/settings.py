@@ -44,7 +44,6 @@ class Settings(metaclass=Singleton):
     metrics_host: str
     metrics_port: int
     metrics_prefix: str
-    deposit_data_file: Path
     validator_keys_file: Path
     keystores_dir: Path
     keystores_password_dir: Path
@@ -89,8 +88,8 @@ class Settings(metaclass=Singleton):
         'PRIORITY_FEE_PERCENTILE', default=80.0, cast=float
     )
 
-    disable_deposit_data_warnings: bool = decouple_config(
-        'DISABLE_DEPOSIT_DATA_WARNINGS', default=False, cast=bool
+    disable_available_validators_warnings: bool = decouple_config(
+        'DISABLE_AVAILABLE_VALIDATORS_WARNINGS', default=False, cast=bool
     )
 
     min_validators_registration: int
@@ -111,7 +110,6 @@ class Settings(metaclass=Singleton):
         metrics_host: str = DEFAULT_METRICS_HOST,
         metrics_prefix: str = DEFAULT_METRICS_PREFIX,
         max_fee_per_gas_gwei: int = DEFAULT_MAX_FEE_PER_GAS_GWEI,
-        deposit_data_file: str | None = None,
         validator_keys_file: str | None = None,
         keystores_dir: str | None = None,
         keystores_password_file: str | None = None,
@@ -151,9 +149,6 @@ class Settings(metaclass=Singleton):
         self.max_fee_per_gas_gwei = max_fee_per_gas_gwei
         self.min_validators_registration = min_validators_registration
 
-        self.deposit_data_file = (
-            Path(deposit_data_file) if deposit_data_file else config_dir / 'deposit_data.json'
-        )
         self.validator_keys_file = (
             Path(validator_keys_file) if validator_keys_file else config_dir / 'validators.txt'
         )

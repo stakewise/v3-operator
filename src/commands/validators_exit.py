@@ -144,15 +144,15 @@ def validators_exit(
     pool_size: int | None,
 ) -> None:
     # pylint: disable=duplicate-code
-    vault_config = OperatorConfig(Path(data_dir))
+    operator_config = OperatorConfig(Path(data_dir))
     if network is None:
-        vault_config.load()
-        network = vault_config.network
+        operator_config.load()
+        network = operator_config.network
 
     settings.set(
         vaults=[],
         network=network,
-        config_dir=vault_config.config_dir,
+        config_dir=operator_config.config_dir,
         consensus_endpoints=consensus_endpoints,
         remote_signer_url=remote_signer_url,
         hashi_vault_token=hashi_vault_token,

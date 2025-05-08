@@ -53,25 +53,25 @@ def create_keys(
     per_keystore_password: bool,
     pool_size: int | None,
 ) -> None:
-    vault_config = OperatorConfig(Path(data_dir))
-    vault_config.load(mnemonic)
+    operator_config = OperatorConfig(Path(data_dir))
+    operator_config.load(mnemonic)
 
-    validators_file = vault_config.config_dir / 'validators.txt'
-    keystores_dir = vault_config.config_dir / 'keystores'
+    validators_file = operator_config.config_dir / 'validators.txt'
+    keystores_dir = operator_config.config_dir / 'keystores'
     password_file = keystores_dir / 'password.txt'
 
     credentials = CredentialManager.generate_credentials(
-        network=vault_config.network,
+        network=operator_config.network,
         mnemonic=mnemonic,
         count=count,
-        start_index=vault_config.mnemonic_next_index,
+        start_index=operator_config.mnemonic_next_index,
         pool_size=pool_size,
     )
 
     # first generate files in tmp directory
-    vault_config.create_tmp_dir()
-    tmp_validators_file = vault_config.tmp_config_dir / 'validators.txt'
-    tmp_keystores_dir = vault_config.tmp_config_dir / 'keystores'
+    operator_config.create_tmp_dir()
+    tmp_validators_file = operator_config.tmp_config_dir / 'validators.txt'
+    tmp_keystores_dir = operator_config.tmp_config_dir / 'keystores'
     try:
         _export_keystores(
             credentials=credentials,
@@ -81,7 +81,7 @@ def create_keys(
             pool_size=pool_size,
         )
         _export_validators_keys(credentials=credentials, filename=str(tmp_validators_file))
-        vault_config.increment_mnemonic_index(count)
+        operator_config.increment_mnemonic_index(count)
 
         # move files from tmp dir
         keystores_dir.mkdir(exist_ok=True)
@@ -90,7 +90,7 @@ def create_keys(
             src_file.rename(keystores_dir.joinpath(src_file.name))
 
     finally:
-        vault_config.remove_tmp_dir()
+        operator_config.remove_tmp_dir()
 
     click.echo(
         f'Done. Generated {greenify(count)} keys for StakeWise operator.\n'

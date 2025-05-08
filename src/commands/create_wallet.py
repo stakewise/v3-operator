@@ -29,9 +29,9 @@ from src.config.config import OperatorConfig
 )
 @click.command(help='Creates the encrypted hot wallet from the mnemonic.')
 def create_wallet(mnemonic: str, data_dir: str) -> None:
-    vault_config = OperatorConfig(Path(data_dir))
-    vault_config.load()
-    wallet_dir = vault_config.config_dir / 'wallet'
+    operator_config = OperatorConfig(Path(data_dir))
+    operator_config.load()
+    wallet_dir = operator_config.config_dir / 'wallet'
 
     wallet_dir.mkdir(parents=True, exist_ok=True)
     address = _generate_encrypted_wallet(mnemonic, wallet_dir)

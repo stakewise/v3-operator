@@ -132,7 +132,7 @@ async def send_approval_request(
     )
 
 
-async def get_validators_from_x(
+async def get_available_validators(
     keystore: BaseKeystore,
     count: int,
     vault_address: ChecksumAddress,

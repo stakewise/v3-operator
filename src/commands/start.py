@@ -77,13 +77,6 @@ logger = logging.getLogger(__name__)
     'Default is the directory generated with "create-keys" command.',
 )
 @click.option(
-    '--deposit-data-file',
-    type=click.Path(exists=True, file_okay=True, dir_okay=False),
-    envvar='DEPOSIT_DATA_FILE',
-    help='Path to the deposit_data.json file. '
-    'Default is the file generated with "create-keys" command.',
-)
-@click.option(
     '--network',
     type=click.Choice(
         AVAILABLE_NETWORKS,
@@ -245,7 +238,6 @@ def start(
     log_level: str,
     log_format: str,
     network: str | None,
-    deposit_data_file: str | None,
     keystores_dir: str | None,
     keystores_password_file: str | None,
     remote_signer_url: str | None,
@@ -261,14 +253,14 @@ def start(
     pool_size: int | None,
     min_validators_registration: int,
 ) -> None:
-    vault_config = OperatorConfig(Path(data_dir))
+    operator_config = OperatorConfig(Path(data_dir))
     if network is None:
-        vault_config.load()
-        network = vault_config.network
+        operator_config.load()
+        network = operator_config.network
 
     settings.set(
         vaults=vaults,
-        config_dir=vault_config.config_dir,
+        config_dir=operator_config.config_dir,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
         execution_jwt_secret=execution_jwt_secret,
@@ -279,7 +271,6 @@ def start(
         metrics_port=metrics_port,
         metrics_prefix=metrics_prefix,
         network=network,
-        deposit_data_file=deposit_data_file,
         keystores_dir=keystores_dir,
         keystores_password_file=keystores_password_file,
         remote_signer_url=remote_signer_url,
