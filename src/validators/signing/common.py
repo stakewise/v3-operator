@@ -37,7 +37,7 @@ def encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) -> 
         amount_gwei=validator.amount_gwei,
         signature=signature,
     ).hash_tree_root
-    return public_key + signature + deposit_root
+    return public_key + signature + deposit_root  # amount?
 
 
 # pylint: disable-next=too-many-arguments

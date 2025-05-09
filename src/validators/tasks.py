@@ -2,6 +2,7 @@ import logging
 from typing import Sequence, cast
 
 from eth_typing import HexStr
+from eth_utils import add_0x_prefix
 from sw_utils import EventScanner, InterruptHandler, IpfsFetchClient, convert_to_mgno
 from sw_utils.networks import GNO_NETWORKS
 from sw_utils.typings import Bytes32
@@ -41,7 +42,10 @@ from src.validators.typings import (
     ValidatorsRegistrationMode,
 )
 from src.validators.utils import get_available_validators
-from src.validators.validators_manager import get_validators_manager_signature
+from src.validators.validators_manager import (
+    get_validators_manager_signature,
+    get_validators_manager_signature_fund,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -122,10 +126,13 @@ async def process_validators(
         )
         if v2_validators_capacity > vault_assets:
             await fund_v2_validators(
-                vault_validators,
+                vault_address=vault_address,
+                vault_validators=vault_validators,
+                keystore=keystore,
                 amount_gwei=int(Web3.from_wei(vault_assets, 'gwei')),
                 harvest_params=harvest_params,
             )
+            return
         logger.info('Not enough capacity to fund v2 validators, registering new validators...')
 
     await register_new_validators(
@@ -139,19 +146,31 @@ async def process_validators(
 
 
 async def fund_v2_validators(
+    vault_address: ChecksumAddress,
+    keystore: BaseKeystore | None,
     vault_validators: list[ConsensusValidator],
     amount_gwei: int,
     harvest_params: HarvestParams | None,
 ) -> HexStr | None:
     topup_data = _get_topup_data(vault_validators, amount_gwei)
     if not topup_data:
+        logger.info('Cannot topup validators')
         return None
 
     logger.info('Started fund of %d validator(s)', len(topup_data))
-
+    validators = _get_funded_validators(
+        topup_data=topup_data,
+        keystore=keystore,
+        vault_address=vault_address,
+    )
+    validators_manager_signature = get_validators_manager_signature_fund(
+        vault=vault_address,
+        validators=validators,
+    )
     tx_hash = await fund_validators(
+        vault_address=vault_address,
         harvest_params=harvest_params,
-        validators=validators_data,
+        validators=validators,
         validators_manager_signature=validators_manager_signature,
     )
     if tx_hash:
@@ -343,3 +362,27 @@ def _get_topup_data(
         if amount_gwei <= 0:
             break
     return result
+
+
+def _get_funded_validators(
+    vault_address: ChecksumAddress,
+    topup_data: dict[HexStr, int],
+    keystore: BaseKeystore,
+) -> list[Validator]:
+    public_keys = list(topup_data.keys())
+    for public_key in public_keys:
+        if public_key not in keystore:
+            raise RuntimeError(f'Public key {public_key} not found in keystore')
+
+    deposit_datas = keystore.get_deposit_datas(public_keys, vault_address)
+    validators = []
+    for deposit_data in deposit_datas:
+        validators.append(
+            Validator(
+                public_key=add_0x_prefix(Web3.to_hex(deposit_data['pubkey'])),
+                signature=add_0x_prefix(Web3.to_hex(deposit_data['signature'])),
+                amount_gwei=topup_data[Web3.to_hex(deposit_data['pubkey'])],
+                deposit_data_root=Web3.to_hex(deposit_data['deposit_data_root']),
+            )
+        )
+    return validators

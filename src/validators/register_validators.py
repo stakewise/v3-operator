@@ -106,10 +106,17 @@ async def register_validators(
 # pylint: disable=too-many-arguments,too-many-locals
 async def fund_validators(
     vault_address: ChecksumAddress,
-    validators: bytes,
+    validators: list[Validator],
     validators_manager_signature: HexStr | None,
     harvest_params: HarvestParams | None,
 ) -> HexStr | None:
+    tx_validators = [
+        Web3.to_bytes(tx_validator)
+        for tx_validator in encode_tx_validator_list(
+            validators=validators,
+            vault_address=vault_address,
+        )
+    ]
     if harvest_params is not None:
         # add update state calls before validator registration
         calls = await get_update_state_calls(
@@ -121,7 +128,7 @@ async def fund_validators(
     vault_contract = VaultContract(vault_address)
     fund_validators_call = vault_contract.contract_address, vault_contract.encode_abi(
         fn_name='fundValidators',
-        args=[validators, Web3.to_bytes(hexstr=validators_manager_signature)],
+        args=[tx_validators, Web3.to_bytes(hexstr=validators_manager_signature)],
     )
     calls.append(fund_validators_call)
 

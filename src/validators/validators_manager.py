@@ -67,6 +67,35 @@ def get_validators_manager_signature_consolidation(
     return HexStr(signed_msg.signature.hex())
 
 
+def get_validators_manager_signature_fund(
+    vault: ChecksumAddress, validators: Sequence[Validator]
+) -> HexStr:
+    encoded_validators = [_encode_validator(v) for v in validators]
+
+    full_message = {
+        'primaryType': 'VaultValidators',
+        'types': {
+            'VaultValidators': [
+                {'name': 'validators', 'type': 'bytes'},
+            ],
+        },
+        'domain': {
+            'name': 'VaultValidators',
+            'version': '1',
+            'chainId': settings.network_config.CHAIN_ID,
+            'verifyingContract': vault,
+        },
+        'message': {
+            'validators': encoded_validators,
+        },
+    }
+
+    encoded_message = encode_typed_data(full_message=full_message)
+    signed_msg = hot_wallet.sign_message(encoded_message)
+
+    return HexStr(signed_msg.signature.hex())
+
+
 def _encode_validator(v: Validator) -> bytes:
     return b''.join(
         [
