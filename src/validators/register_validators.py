@@ -26,7 +26,7 @@ async def register_validators(
     validators: Sequence[Validator],
     harvest_params: HarvestParams | None,
     validators_registry_root: Bytes32,
-    validators_manager_signature: HexStr | None,
+    validators_manager_signature: HexStr,
 ) -> HexStr | None:
     tx_validators = [
         Web3.to_bytes(tx_validator)

@@ -23,6 +23,7 @@ from src.common.typings import ConsensusValidator, HarvestParams, ValidatorType
 from src.config.settings import (
     DEPOSIT_AMOUNT,
     MIN_DEPOSIT_AMOUNT,
+    PECTRA_DEPOSIT_AMOUNT,
     PECTRA_DEPOSIT_AMOUNT_GWEI,
     settings,
 )
@@ -169,12 +170,7 @@ async def register_new_validators(
     available_public_keys: list[HexStr] | None,
     relayer_adapter: RelayerAdapter | None = None,
 ) -> HexStr | None:
-    # calculate number of validators that can be registered
-    if settings.validator_type == ValidatorType.TWO:
-        validators_count = vault_assets // PECTRA_DEPOSIT_AMOUNT_GWEI
-    else:
-        validators_count = vault_assets // DEPOSIT_AMOUNT
-
+    validators_count = _get_validators_count(vault_assets, settings.validator_type)
     if not validators_count:
         # not enough balance to register validators
         return None
@@ -315,6 +311,15 @@ async def load_genesis_validators() -> None:
 
     NetworkValidatorCrud().save_network_validators(genesis_validators)
     logger.info('Loaded %d genesis validators', len(genesis_validators))
+
+
+def _get_validators_count(vault_assets: int, validator_type: ValidatorType) -> int:
+    # calculate number of validators that can be registered
+    if vault_assets < DEPOSIT_AMOUNT:
+        return 0
+    if validator_type == ValidatorType.ONE:
+        return vault_assets // DEPOSIT_AMOUNT
+    return max(1, vault_assets // PECTRA_DEPOSIT_AMOUNT)
 
 
 def _get_topup_data(

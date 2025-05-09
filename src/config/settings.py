@@ -5,7 +5,7 @@ from decouple import config as decouple_config
 from web3 import Web3
 from web3.types import ChecksumAddress
 
-from src.common.typings import Singleton
+from src.common.typings import Singleton, ValidatorType
 from src.config.networks import MAINNET, NETWORKS, NetworkConfig
 from src.validators.typings import RelayerTypes, ValidatorsRegistrationMode
 
@@ -44,7 +44,7 @@ class Settings(metaclass=Singleton):
     metrics_host: str
     metrics_port: int
     metrics_prefix: str
-    validator_type: str
+    validator_type: ValidatorType
     validator_keys_file: Path
     keystores_dir: Path
     keystores_password_dir: Path
@@ -110,7 +110,7 @@ class Settings(metaclass=Singleton):
         metrics_port: int = DEFAULT_METRICS_PORT,
         metrics_host: str = DEFAULT_METRICS_HOST,
         metrics_prefix: str = DEFAULT_METRICS_PREFIX,
-        validator_type: str = '0x02',
+        validator_type: ValidatorType = ValidatorType.TWO,
         max_fee_per_gas_gwei: int = DEFAULT_MAX_FEE_PER_GAS_GWEI,
         validator_keys_file: str | None = None,
         keystores_dir: str | None = None,

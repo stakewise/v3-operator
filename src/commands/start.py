@@ -8,6 +8,7 @@ from eth_typing import ChecksumAddress
 
 from src.commands.start_base import start_base
 from src.common.logging import LOG_LEVELS
+from src.common.typings import ValidatorType
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_addresses
 from src.config.config import OperatorConfig
@@ -117,7 +118,7 @@ logger = logging.getLogger(__name__)
     help='Type of registered validator: 0x01 or 0x02.',
     envvar='VALIDATOR_TYPE',
     default='0x02',
-    type=int,
+    type=ValidatorType,
 )
 @click.option(
     '-v',
@@ -241,7 +242,7 @@ def start(
     metrics_host: str,
     metrics_port: int,
     metrics_prefix: str,
-    validator_type: str,
+    validator_type: ValidatorType,
     data_dir: str,
     log_level: str,
     log_format: str,
