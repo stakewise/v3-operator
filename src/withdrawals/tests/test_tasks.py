@@ -46,11 +46,6 @@ def test_get_withdrawal_data():
     result = _get_withdrawal_data(validators, withdrawals_amount)
     assert result == expected
 
-    # validators = [create_validator(balance=35, public_key="0x1")]
-    # withdrawals_amount = 10
-    # with pytest.raises(AssertionError):
-    #     _get_withdrawal_data(validators, withdrawals_amount)
-
 
 def _to_gwei(value):
     return value * 10**9

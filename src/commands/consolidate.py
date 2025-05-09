@@ -24,6 +24,9 @@ from src.config.settings import (
     settings,
 )
 from src.validators.oracles import poll_consolidation_signature
+from src.validators.validators_manager import (
+    get_validators_manager_signature_consolidation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +44,7 @@ logger = logging.getLogger(__name__)
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
     envvar='DATA_DIR',
-    help='Path where the vault data is placed. Default is ~/.stakewise.',
+    help='Path where the config data is placed. Default is ~/.stakewise.',
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
 )
 @click.option(
@@ -86,7 +89,7 @@ logger = logging.getLogger(__name__)
     envvar='LOG_LEVEL',
     help='The log level.',
 )
-@click.command(help='Performs a vault validators consolidation after pectra udpate.')
+@click.command(help='Performs a vault validators consolidation after pectra upgrade.')
 # pylint: disable-next=too-many-arguments,too-many-locals
 def consolidate(
     network: str,
@@ -98,7 +101,6 @@ def consolidate(
     no_confirm: bool,
     log_level: str,
 ) -> None:
-    # pylint: disable=duplicate-code
     vault_config = OperatorConfig(Path(data_dir))
     if network is None:
         vault_config.load()
@@ -127,14 +129,12 @@ def consolidate(
 
 async def main(vault_address: ChecksumAddress, no_confirm: bool) -> None:
     setup_logging()
-    # SETTINGS:
-    # - validators count
     validators = await fetch_registered_validators(vault_address)
     # filter active?
     if not validators:
-        raise click.ClickException('No registered validators')
+        raise click.ClickException(f'No registered validators for vault {vault_address}')
     if len(validators) == 1:
-        raise click.ClickException('Wrong number of validators ЫЫЫ')
+        raise click.ClickException('Single validator cannot be consolidated')
 
     chain_head = await get_chain_finalized_head()
     current_fee = await get_request_fee(
@@ -142,70 +142,82 @@ async def main(vault_address: ChecksumAddress, no_confirm: bool) -> None:
     )
     if current_fee > MAX_CONSOLIDATION_REQUEST_FEE:
         logger.info(
-            'Partial withdrawals is skipped because high withdrawals fee, current fees is %s',
+            'Consolidation is skipped because high consolidation fee, current fees is %s. '
+            'Increase MAX_CONSOLIDATION_REQUEST_FEE env var to allow it',
             current_fee,
         )
         return
-
-    total_validators = len(validators)
-    if no_confirm:
-        click.secho(
-            f'Vault has {total_validators} registered validator(s), '
-            f'recovering active keystores from provided mnemonic...',
-        )
-    else:
+    source_target_public_keys = _split_validators(validators)
+    click.secho(
+        f'Vault has {len(validators)} registered validator(s), ' f'Consolidating next validators: ',
+    )
+    for from_key, to_key in source_target_public_keys:
+        click.secho(f'    {from_key} -> {to_key}')
+    if not no_confirm:
         click.confirm(
-            f'Vault has {total_validators} registered validator(s), '
-            f'recover active keystores from provided mnemonic?',
+            'Proceed consolidation?',
             default=True,
             abort=True,
         )
 
-    to_from_keys = _split_validators(validators)
     protocol_config = await get_protocol_config()
 
     oracle_signatures = await poll_consolidation_signature(
-        from_to_keys=to_from_keys, vault=vault_address, protocol_config=protocol_config
+        source_target_public_keys=source_target_public_keys,
+        vault=vault_address,
+        protocol_config=protocol_config,
     )
     # get validatorsManagerSignature
-    validators_bytes = _encode_validators(to_from_keys)
-    validators_manager_signature = HexStr('0x')
-    await submit_consolidate_validators(
-        validators=validators_bytes,
+    encoded_validators = _encode_validators(source_target_public_keys)
+    validators_manager_signature = get_validators_manager_signature_consolidation(
+        vault=vault_address,
+        encoded_validators=encoded_validators,
+    )
+    tx_hash = await submit_consolidate_validators(
+        validators=encoded_validators,
         validators_manager_signature=Web3.to_bytes(hexstr=validators_manager_signature),
         oracle_signatures=oracle_signatures,
     )
 
-    if to_from_keys:
+    if tx_hash:
         click.secho(
-            f'Validators {', '.join(from_key for from_key, _ in to_from_keys)} was to'
-            f'({', '.join(to_key for _, to_key in to_from_keys)}) '
-            f'has been successfully consolidated',
+            'Validators has been successfully consolidated',
             bold=True,
             fg='green',
         )
 
 
 def _split_validators(validators: list[ConsensusValidator]) -> list[tuple[HexStr, HexStr]]:
+    """
+    Return list of tuples with public keys of validators to be consolidated.
+    Format [(target_public_key, source_public_key), ...]
+    """
     total_balance = sum(x.balance for x in validators)
-    new_validators_count = math.ceil(total_balance / PECTRA_MAX_EFFECTIVE_BALANCE_GWEI)
-    new_validators = validators[:new_validators_count]
-    compounded_validators = validators[new_validators_count:]
+    target_validators_count = math.ceil(total_balance / PECTRA_MAX_EFFECTIVE_BALANCE_GWEI)
+    target_validators = validators[:target_validators_count]
+    source_validators = validators[target_validators_count:]
 
-    from_to_public_keys = []
-    current_to_index = 0
-    for validator in compounded_validators:
-        current_to_validator = new_validators[current_to_index]
-        if validator.balance + current_to_validator.balance <= PECTRA_MAX_EFFECTIVE_BALANCE_GWEI:
-            current_to_validator.balance += validator.balance
-            from_to_public_keys.append((current_to_validator.public_key, validator.public_key))
+    source_target_public_keys = []
+    current_target_index = 0
+    for validator in source_validators:
+        current_target_validator = target_validators[current_target_index]
+        if (
+            validator.balance + current_target_validator.balance
+            <= PECTRA_MAX_EFFECTIVE_BALANCE_GWEI
+        ):
+            current_target_validator.balance += validator.balance
+            source_target_public_keys.append(
+                (current_target_validator.public_key, validator.public_key)
+            )
         else:
-            current_to_index += 1
-            current_to_validator = new_validators[current_to_index]
-            current_to_validator.balance += validator.balance
-            from_to_public_keys.append((current_to_validator.public_key, validator.public_key))
+            current_target_index += 1
+            current_target_validator = target_validators[current_target_index]
+            current_target_validator.balance += validator.balance
+            source_target_public_keys.append(
+                (current_target_validator.public_key, validator.public_key)
+            )
 
-    return from_to_public_keys
+    return source_target_public_keys
 
 
 def _encode_validators(from_to_public_keys: list[tuple[HexStr, HexStr]]) -> bytes:

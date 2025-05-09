@@ -36,9 +36,9 @@ class PartialWithdrawalsTask(BaseTask):
             chain_state=chain_head, interrupt_handler=interrupt_handler
         )
         protocol_config = await get_protocol_config()
-        for vault in settings.vaults:
+        for vault_address in settings.vaults:
             await self.process_withdrawals(
-                vault,
+                vault_address=vault_address,
                 chain_head=chain_head,
                 protocol_config=protocol_config,
             )
@@ -128,7 +128,6 @@ def _get_withdrawal_data(
             withdrawals_amount -= min(validators_amount, withdrawals_amount)
         if withdrawals_amount <= 0:
             break
-    # assert withdrawals_amount == 0
 
     return withdrawals_data
 
