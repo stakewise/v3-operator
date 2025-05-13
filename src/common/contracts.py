@@ -109,21 +109,6 @@ class VaultStateMixin:
         return update_state_call
 
 
-class VaultErc20Contract(ContractWrapper):
-    abi_path = 'abi/Erc20Token.json'
-
-    async def symbol(self) -> str:
-        return await self.contract.functions.symbol().call()
-
-
-class GnoErc20Contract(ContractWrapper):
-    abi_path = 'abi/Erc20Token.json'
-
-    @property
-    def contract_address(self) -> ChecksumAddress:
-        return settings.network_config.GNO_TOKEN_CONTRACT_ADDRESS
-
-
 class VaultContract(ContractWrapper, VaultStateMixin):
     abi_path = 'abi/IEthVault.json'
 
@@ -276,5 +261,3 @@ keeper_contract = KeeperContract()
 v2_pool_contract = V2PoolContract()
 v2_pool_escrow_contract = V2PoolEscrowContract()
 multicall_contract = MulticallContract()
-vault_erc20_contract = VaultErc20Contract()
-gno_erc20_contract = GnoErc20Contract()

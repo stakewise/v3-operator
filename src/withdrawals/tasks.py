@@ -21,6 +21,9 @@ from src.config.settings import (
     settings,
 )
 from src.withdrawals.execution import get_vault_assets
+from src.withdrawals.validators_manager import (
+    get_validators_manager_signature_withdrawals,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +46,7 @@ class PartialWithdrawalsTask(BaseTask):
                 protocol_config=protocol_config,
             )
 
+    # pylint: disable-next=too-many-locals
     async def process_withdrawals(
         self, vault_address: ChecksumAddress, chain_head: ChainHead, protocol_config: ProtocolConfig
     ) -> None:
@@ -56,8 +60,7 @@ class PartialWithdrawalsTask(BaseTask):
 
         harvest_params = await get_harvest_params(vault_address)
         queued_assets, total_assets = await get_vault_assets(
-            vault=vault_address,
-            block_number=chain_head.block_number,
+            vault_address=vault_address,
             harvest_params=harvest_params,
         )
         if (
@@ -86,7 +89,10 @@ class PartialWithdrawalsTask(BaseTask):
             return
         withdrawals_data = _get_withdrawal_data(validators, partial_withdrawals_amount)
         validator_data = _endcode_validators(withdrawals_data)
-        validators_manager_signature = HexStr('0x')
+        validators_manager_signature = get_validators_manager_signature_withdrawals(
+            vault=vault_address,
+            validator_data=validator_data,
+        )
         tx_hash = await submit_withdraw_validators(
             vault_contract=vault_contract,
             validators=validator_data,
