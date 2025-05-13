@@ -163,11 +163,11 @@ def filter_nonregistered_public_keys(
     count: int,
 ) -> list[HexStr]:
     public_keys: list[HexStr] = []
-    for public_key in public_keys:
+    for public_key in available_public_keys:
         if NetworkValidatorCrud().is_validator_registered(public_key):
             continue
-        available_public_keys.append(public_key)
-        if len(available_public_keys) >= count:
+        public_keys.append(public_key)
+        if len(public_keys) >= count:
             break
 
     return public_keys

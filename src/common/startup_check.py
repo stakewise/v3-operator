@@ -317,15 +317,12 @@ async def _check_ipfs_endpoints() -> list[str]:
 
 
 async def _check_validators_manager(vault_address: ChecksumAddress) -> None:
-
-    if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
-        vault_contract = VaultContract(vault_address)
-        if await vault_contract.version() > 1:
-            validators_manager = await vault_contract.validators_manager()
-            if validators_manager != settings.network_config.DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS:
-                raise RuntimeError(
-                    'validators manager address must equal to deposit data registry address'
-                )
+    if settings.validators_registration_mode != ValidatorsRegistrationMode.AUTO:
+        return
+    vault_contract = VaultContract(vault_address)
+    validators_manager = await vault_contract.validators_manager()
+    if validators_manager != hot_wallet.account.address:
+        raise RuntimeError('validators manager address must equal to hot wallet address')
 
 
 async def _check_events_logs() -> None:
