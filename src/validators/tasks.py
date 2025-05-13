@@ -157,7 +157,7 @@ async def fund_v2_validators(
         logger.info('Cannot topup validators')
         return None
 
-    logger.info('Started fund of %d validator(s)', len(topup_data))
+    logger.info('Started funding of %d validator(s)', len(topup_data))
     validators = _get_funded_validators(
         topup_data=topup_data,
         keystore=keystore,
@@ -180,7 +180,7 @@ async def fund_v2_validators(
     return tx_hash
 
 
-# pylint: disable-next=too-many-locals,too-many-return-statements,too-many-branches
+# pylint: disable-next=too-many-locals,too-many-return-statements,too-many-branches,disable-next=too-many-arguments
 async def register_new_validators(
     vault_address: ChecksumAddress,
     vault_assets: int,
@@ -367,8 +367,10 @@ def _get_topup_data(
 def _get_funded_validators(
     vault_address: ChecksumAddress,
     topup_data: dict[HexStr, int],
-    keystore: BaseKeystore,
+    keystore: BaseKeystore | None,
 ) -> list[Validator]:
+    if keystore is None:
+        raise RuntimeError('Keystore is not set')
     public_keys = list(topup_data.keys())
     for public_key in public_keys:
         if public_key not in keystore:

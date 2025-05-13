@@ -66,6 +66,8 @@ class Credential:
 
     @cached_property
     def withdrawal_credentials(self) -> Bytes32:
+        if not self.vault:
+            raise ValueError('Vault address for credential is not set')
         if self.validator_type == ValidatorType.ONE:
             return get_v1_withdrawal_credentials(self.vault)
         return get_v2_withdrawal_credentials(self.vault)
@@ -221,6 +223,11 @@ class CredentialManager:
 
     @staticmethod
     def load_credential(
-        network: str, vault: ChecksumAddress, private_key: BLSPrivateKey
+        network: str,
+        vault: ChecksumAddress,
+        private_key: BLSPrivateKey,
+        validator_type: ValidatorType,
     ) -> Credential:
-        return Credential(private_key=private_key, network=network, vault=vault)
+        return Credential(
+            private_key=private_key, network=network, vault=vault, validator_type=validator_type
+        )

@@ -87,6 +87,7 @@ class LocalKeystore(BaseKeystore):
                 network=settings.network,
                 private_key=BLSPrivateKey(Web3.to_int(pk)),
                 vault=vault_address,
+                validator_type=settings.validator_type,
             )
             for pk in private_keys
         ]
