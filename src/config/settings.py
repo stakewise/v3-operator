@@ -11,7 +11,7 @@ from src.validators.typings import RelayerTypes, ValidatorsRegistrationMode
 
 DATA_DIR = Path.home() / '.stakewise'
 
-DEFAULT_MAX_FEE_PER_GAS_GWEI = 100
+DEFAULT_MAX_FEE_PER_GAS_GWEI = 10
 
 DEFAULT_METRICS_HOST = '127.0.0.1'
 DEFAULT_METRICS_PORT = 9100
