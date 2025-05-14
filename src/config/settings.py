@@ -11,8 +11,6 @@ from src.validators.typings import RelayerTypes, ValidatorsRegistrationMode
 
 DATA_DIR = Path.home() / '.stakewise'
 
-DEFAULT_MAX_FEE_PER_GAS_GWEI = 10
-
 DEFAULT_METRICS_HOST = '127.0.0.1'
 DEFAULT_METRICS_PORT = 9100
 DEFAULT_METRICS_PREFIX = 'sw_operator'
@@ -110,7 +108,7 @@ class Settings(metaclass=Singleton):
         metrics_port: int = DEFAULT_METRICS_PORT,
         metrics_host: str = DEFAULT_METRICS_HOST,
         metrics_prefix: str = DEFAULT_METRICS_PREFIX,
-        max_fee_per_gas_gwei: int = DEFAULT_MAX_FEE_PER_GAS_GWEI,
+        max_fee_per_gas_gwei: int | None = None,
         deposit_data_file: str | None = None,
         keystores_dir: str | None = None,
         keystores_password_file: str | None = None,
@@ -147,6 +145,10 @@ class Settings(metaclass=Singleton):
         self.metrics_host = metrics_host
         self.metrics_port = metrics_port
         self.metrics_prefix = metrics_prefix
+
+        if max_fee_per_gas_gwei is None:
+            max_fee_per_gas_gwei = self.network_config.MAX_FEE_PER_GAS_GWEI
+
         self.max_fee_per_gas_gwei = max_fee_per_gas_gwei
         self.min_validators_registration = min_validators_registration
 
