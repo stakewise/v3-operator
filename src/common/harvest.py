@@ -11,11 +11,11 @@ from src.config.settings import settings
 
 
 async def get_harvest_params() -> HarvestParams | None:
-    last_rewards = await keeper_contract.get_last_rewards_update()
-    if last_rewards is None:
+    if not await keeper_contract.can_harvest(vault_contract.contract_address):
         return None
 
-    if not await keeper_contract.can_harvest(vault_contract.contract_address):
+    last_rewards = await keeper_contract.get_last_rewards_update()
+    if last_rewards is None:
         return None
 
     harvest_params = await _fetch_harvest_params_from_ipfs(
