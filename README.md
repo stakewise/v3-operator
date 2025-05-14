@@ -15,7 +15,7 @@
    1. [Step 1. Create mnemonic](#step-1-create-mnemonic)
    2. [Step 2. Create validator keys](#step-2-create-validator-keys)
    3. [Step 3. Create hot wallet](#step-3-create-hot-wallet)
-   4. [Step 4. Setup validators manager role to vaults](#step-4-setup-validators-manager-role-to-vaults)
+   4. [Step 4. Setup validators manager role for vaults](#step-4-setup-validators-manager-role-for-vaults)
    5. [Step 5. Start Operator Service](#step-5-start-operator-service)
 5. [Extra commands](#extra-commands)
    1. [Add validator keys to Vault](#add-validator-keys-to-vault)
@@ -296,7 +296,7 @@ Done. The wallet and password saved to /home/user/.stakewise/wallet directory. T
 0.01 ETH with 30 Gwei gas price. You must keep an eye on your wallet balance, otherwise validators will stop registering
 if the balance falls too low.**
 
-### Step 4. Setup validators manager role to vaults
+### Step 4. Setup validators manager role for vaults
 
 Once you have created your validator keys and hot wallet, you need to setup vaults to use wallet address as validators manager.
 Setup can be achieved either through the StakeWise UI and can only be done by the [Vault Admin](https://docs-v3.stakewise.io/protocol-overview-in-depth/vaults#governance-and-management).
