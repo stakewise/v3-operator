@@ -144,7 +144,7 @@ async def get_available_validators(
         count=count,
     )
 
-    deposit_datas = keystore.get_deposit_datas(available_public_keys, vault_address)
+    deposit_datas = await keystore.get_deposit_datas(available_public_keys, vault_address)
 
     validators = [
         Validator(

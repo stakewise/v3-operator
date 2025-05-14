@@ -25,6 +25,7 @@
    5. [Max gas fee](#max-gas-fee)
    6. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
    7. [Self report to Rated](#rated-self-report)
+   8. [Generate validators file](#generate-validators-file)
 6. [Contacts](#contacts)
 
 ## What is V3 Operator?
@@ -215,7 +216,7 @@ of generating keystores, such as via [Wagyu Keygen](https://github.com/stake-hou
 and your preferred tool for generating the hot
 wallet, such as [MetaMask](https://metamask.io/)
 or [MyEtherWallet](https://help.myetherwallet.com/en/articles/6512619-using-mew-offline-current-mew-version-6).
-If you choose to use your own methods, you will need to generate public key file via `todo!` command.
+If you choose to use your own methods, you will need to generate public key file via `generate-public-keys` command.
 
 **The deposit data flow is deprecated and will no longer be supported after the v4 StakeWise Operator release. If you rely on this feature, please continue using an older version.**
 
@@ -467,6 +468,21 @@ Here's an example of how to use the command:
 
 ```bash
 python src/main.py rated-self-report --vaults <your-vault-addresses> --network <network-name> --pool-tag <pool-tag> --token <your-oauth-token> --data-dir <path-to-data-dir>
+```
+
+### Generate validators file
+
+This command fetches available public keys from local keystores and exports them to a validators.txt file.
+
+To use the `generate-public-keys` command, you can provide the following parameters:
+
+- `--data-dir`: Path where the vault data will be placed. Default is ~/.stakewise.
+- `--keystores-dir` - The directory with validator keys in the EIP-2335 standard.
+
+Here's an example of how to use the command:
+
+```bash
+python src/main.py generate-public-keys --data-dir <path-to-data-dir>
 ```
 
 ## Contacts
