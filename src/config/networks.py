@@ -6,7 +6,7 @@ from sw_utils.networks import CHIADO, GNOSIS, HOODI, MAINNET
 from sw_utils.networks import NETWORKS as BASE_NETWORKS
 from sw_utils.networks import BaseNetworkConfig
 from web3 import Web3
-from web3.types import Wei
+from web3.types import Gwei, Wei
 
 AVAILABLE_NETWORKS = [MAINNET, HOODI, GNOSIS, CHIADO]
 RATED_NETWORKS = [MAINNET]
@@ -26,6 +26,7 @@ class NetworkConfig(BaseNetworkConfig):
     RATED_API_URL: str
     CONFIG_UPDATE_EVENT_BLOCK: BlockNumber
     DEFAULT_DVT_RELAYER_ENDPOINT: str
+    MAX_FEE_PER_GAS_GWEI: Gwei
 
     @property
     def IS_SUPPORT_V2_MIGRATION(self) -> bool:
@@ -55,6 +56,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(21471524),
         DEFAULT_DVT_RELAYER_ENDPOINT='https://mainnet-dvt-relayer.stakewise.io',
+        MAX_FEE_PER_GAS_GWEI=Gwei(10),
     ),
     HOODI: NetworkConfig(
         **asdict(BASE_NETWORKS[HOODI]),
@@ -75,6 +77,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(94090),
         DEFAULT_DVT_RELAYER_ENDPOINT='https://hoodi-dvt-relayer.stakewise.io',
+        MAX_FEE_PER_GAS_GWEI=Gwei(10),
     ),
     GNOSIS: NetworkConfig(
         **asdict(BASE_NETWORKS[GNOSIS]),
@@ -93,6 +96,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(37640206),
         DEFAULT_DVT_RELAYER_ENDPOINT='gnosis-dvt-relayer.stakewise.io',
+        MAX_FEE_PER_GAS_GWEI=Gwei(2),
     ),
     CHIADO: NetworkConfig(
         **asdict(BASE_NETWORKS[CHIADO]),
@@ -115,5 +119,6 @@ NETWORKS: dict[str, NetworkConfig] = {
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(12896244),
         DEFAULT_DVT_RELAYER_ENDPOINT='chiado-dvt-relayer.stakewise.io',
+        MAX_FEE_PER_GAS_GWEI=Gwei(2),
     ),
 }

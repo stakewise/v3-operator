@@ -9,13 +9,12 @@ from aiohttp import ClientError, ClientSession, ClientTimeout
 from eth_typing import ChecksumAddress, HexStr
 from eth_utils import add_0x_prefix
 from sw_utils import ProtocolConfig
-from sw_utils.decorators import retry_aiohttp_errors
 from web3 import Web3
 
 from src.common.contracts import validators_registry_contract
 from src.common.typings import OracleApproval, OraclesApproval
 from src.common.utils import format_error, process_oracles_approvals, warning_verbose
-from src.config.settings import DEFAULT_RETRY_TIME, ORACLES_VALIDATORS_TIMEOUT
+from src.config.settings import ORACLES_VALIDATORS_TIMEOUT
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import (
     RegistryRootChangedError,
@@ -80,7 +79,6 @@ async def send_approval_requests(
 
 
 # pylint: disable=duplicate-code
-@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def send_approval_request_to_replicas(
     session: ClientSession, replicas: list[str], payload: dict
 ) -> OracleApproval:
@@ -144,7 +142,7 @@ async def get_available_validators(
         count=count,
     )
 
-    deposit_datas = keystore.get_deposit_datas(available_public_keys, vault_address)
+    deposit_datas = await keystore.get_deposit_datas(available_public_keys, vault_address)
 
     validators = [
         Validator(

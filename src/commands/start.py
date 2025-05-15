@@ -12,10 +12,9 @@ from src.common.typings import ValidatorType
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_addresses
 from src.config.config import OperatorConfig
-from src.config.networks import AVAILABLE_NETWORKS
+from src.config.networks import AVAILABLE_NETWORKS, GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
     DEFAULT_HASHI_VAULT_PARALLELISM,
-    DEFAULT_MAX_FEE_PER_GAS_GWEI,
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
     DEFAULT_METRICS_PREFIX,
@@ -46,8 +45,8 @@ logger = logging.getLogger(__name__)
     type=int,
     envvar='MAX_FEE_PER_GAS_GWEI',
     help=f'Maximum fee per gas for transactions. '
-    f'Default is {DEFAULT_MAX_FEE_PER_GAS_GWEI} Gwei.',
-    default=DEFAULT_MAX_FEE_PER_GAS_GWEI,
+    f'Default is {NETWORKS[MAINNET].MAX_FEE_PER_GAS_GWEI} Gwei for Ethereum, '
+    f'{NETWORKS[GNOSIS].MAX_FEE_PER_GAS_GWEI} Gwei for Gnosis.',
 )
 @click.option(
     '--hot-wallet-password-file',
@@ -257,7 +256,7 @@ def start(
     hashi_vault_parallelism: int,
     hot_wallet_file: str | None,
     hot_wallet_password_file: str | None,
-    max_fee_per_gas_gwei: int,
+    max_fee_per_gas_gwei: int | None,
     database_dir: str | None,
     pool_size: int | None,
     min_validators_registration: int,

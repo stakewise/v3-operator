@@ -82,7 +82,6 @@ class TestCreateKeys:
         with open(f'{config_dir}/validators.txt', encoding='utf-8') as f:
             public_keys = [line.rstrip() for line in f]
             assert count == len(public_keys)
-            # todo
         with open(f'{config_dir}/keystores/password.txt', encoding='utf-8') as f:
             assert len(f.readline()) == 20
 
@@ -123,7 +122,6 @@ class TestCreateKeys:
         with open(f'{config_dir}/validators.txt', encoding='utf-8') as f:
             public_keys = [line.rstrip() for line in f]
             assert count == len(public_keys)
-            # todo
         password_files = glob.glob(os.path.join(keystores_dir / '*.txt'))
         assert len(password_files) == count
         for password_file in password_files:

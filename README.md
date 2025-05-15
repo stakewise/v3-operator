@@ -15,7 +15,7 @@
    1. [Step 1. Create mnemonic](#step-1-create-mnemonic)
    2. [Step 2. Create validator keys](#step-2-create-validator-keys)
    3. [Step 3. Create hot wallet](#step-3-create-hot-wallet)
-   4. [Step 4. Setup validators manager role to vaults](#step-4-setup-validators-manager-role-to-vaults)
+   4. [Step 4. Setup validators manager role for vaults](#step-4-setup-validators-manager-role-for-vaults)
    5. [Step 5. Start Operator Service](#step-5-start-operator-service)
 5. [Extra commands](#extra-commands)
    1. [Add validator keys to Vault](#add-validator-keys-to-vault)
@@ -25,6 +25,7 @@
    5. [Max gas fee](#max-gas-fee)
    6. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
    7. [Self report to Rated](#rated-self-report)
+   8. [Generate validators file](#generate-validators-file)
 6. [Contacts](#contacts)
 
 ## What is V3 Operator?
@@ -153,14 +154,14 @@ Head to [Usage](#usage) to launch your operator service.
 Pull the latest docker operator docker image:
 
 ```bash
-docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.4
+docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.6
 ```
 
 You can also build the docker image from source by cloning this repo and executing the following command from within
 the `v3-operator` folder:
 
 ```bash
-docker build --pull -t europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.4 .
+docker build --pull -t europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.6 .
 ```
 
 You will execute Operator Service commands using the format below (note the use of flags are optional):
@@ -169,7 +170,7 @@ You will execute Operator Service commands using the format below (note the use 
 docker run --rm -ti \
 -u $(id -u):$(id -g) \
 -v ~/.stakewise/:/data \
-europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.4 \
+europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.6 \
 src/main.py COMMAND \
 --flagA=123 \
 --flagB=xyz
@@ -215,7 +216,7 @@ of generating keystores, such as via [Wagyu Keygen](https://github.com/stake-hou
 and your preferred tool for generating the hot
 wallet, such as [MetaMask](https://metamask.io/)
 or [MyEtherWallet](https://help.myetherwallet.com/en/articles/6512619-using-mew-offline-current-mew-version-6).
-If you choose to use your own methods, you will need to generate public key file via `todo!` command.
+If you choose to use your own methods, you will need to generate public key file via `generate-public-keys` command.
 
 **The deposit data flow is deprecated and will no longer be supported after the v4 StakeWise Operator release. If you rely on this feature, please continue using an older version.**
 
@@ -296,7 +297,7 @@ Done. The wallet and password saved to /home/user/.stakewise/wallet directory. T
 0.01 ETH with 30 Gwei gas price. You must keep an eye on your wallet balance, otherwise validators will stop registering
 if the balance falls too low.**
 
-### Step 4. Setup validators manager role to vaults
+### Step 4. Setup validators manager role for vaults
 
 Once you have created your validator keys and hot wallet, you need to setup vaults to use wallet address as validators manager.
 Setup can be achieved either through the StakeWise UI and can only be done by the [Vault Admin](https://docs-v3.stakewise.io/protocol-overview-in-depth/vaults#governance-and-management).
@@ -348,7 +349,7 @@ below:
 docker run --restart on-failure:10 \
 -u $(id -u):$(id -g) \
 -v ~/.stakewise/:/data \
-europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.4 \
+europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.6 \
 src/main.py start \
 --vaults=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
 --data-dir=/data \
@@ -467,6 +468,21 @@ Here's an example of how to use the command:
 
 ```bash
 python src/main.py rated-self-report --vaults <your-vault-addresses> --network <network-name> --pool-tag <pool-tag> --token <your-oauth-token> --data-dir <path-to-data-dir>
+```
+
+### Generate validators file
+
+This command fetches available public keys from local keystores and exports them to a validators.txt file.
+
+To use the `generate-public-keys` command, you can provide the following parameters:
+
+- `--data-dir`: Path where the vault data will be placed. Default is ~/.stakewise.
+- `--keystores-dir` - The directory with validator keys in the EIP-2335 standard.
+
+Here's an example of how to use the command:
+
+```bash
+python src/main.py generate-public-keys --data-dir <path-to-data-dir>
 ```
 
 ## Contacts

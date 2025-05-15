@@ -158,7 +158,7 @@ async def fund_v2_validators(
         return None
 
     logger.info('Started funding of %d validator(s)', len(topup_data))
-    validators = _get_funded_validators(
+    validators = await _get_funded_validators(
         topup_data=topup_data,
         keystore=keystore,
         vault_address=vault_address,
@@ -364,7 +364,7 @@ def _get_topup_data(
     return result
 
 
-def _get_funded_validators(
+async def _get_funded_validators(
     vault_address: ChecksumAddress,
     topup_data: dict[HexStr, int],
     keystore: BaseKeystore | None,
@@ -376,7 +376,7 @@ def _get_funded_validators(
         if public_key not in keystore:
             raise RuntimeError(f'Public key {public_key} not found in keystore')
 
-    deposit_datas = keystore.get_deposit_datas(public_keys, vault_address)
+    deposit_datas = await keystore.get_deposit_datas(public_keys, vault_address)
     validators = []
     for deposit_data in deposit_datas:
         validators.append(

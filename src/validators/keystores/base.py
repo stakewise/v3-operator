@@ -29,7 +29,7 @@ class BaseKeystore(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def get_deposit_datas(
+    async def get_deposit_datas(
         self, public_keys: list[HexStr], vault_address: ChecksumAddress
     ) -> list[dict]:
         raise NotImplementedError
