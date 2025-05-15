@@ -33,12 +33,11 @@ logger = logging.getLogger(__name__)
 
 @click.option(
     '--vault',
-    prompt='Enter your vault address',
     help='Vault address',
     type=str,
     envvar='VAULT',
     callback=validate_eth_address,
-    required=False,
+    default='',
 )
 @click.option(
     '--remote-signer-url',
