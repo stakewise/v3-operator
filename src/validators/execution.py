@@ -1,9 +1,9 @@
 import logging
 import struct
 from multiprocessing import Pool
-from typing import Sequence, Set
+from typing import Set
 
-from eth_typing import BlockNumber, HexStr
+from eth_typing import BlockNumber, ChecksumAddress, HexStr
 from sw_utils import EventProcessor, is_valid_deposit_data_signature
 from web3 import Web3
 from web3.types import EventData, Wei
@@ -11,17 +11,15 @@ from web3.types import EventData, Wei
 from src.common.clients import execution_non_retry_client
 from src.common.contracts import (
     ValidatorsRegistryContract,
+    VaultContract,
     multicall_contract,
     validators_registry_contract,
-    vault_contract,
 )
 from src.common.typings import HarvestParams
-from src.common.vault import Vault
 from src.config.settings import DEPOSIT_AMOUNT, settings
 from src.harvest.execution import get_update_state_calls
 from src.validators.database import NetworkValidatorCrud
-from src.validators.keystores.base import BaseKeystore
-from src.validators.typings import DepositData, NetworkValidator, Validator
+from src.validators.typings import NetworkValidator
 
 logger = logging.getLogger(__name__)
 
@@ -150,16 +148,21 @@ def process_network_validator_event(
     return None
 
 
-async def get_withdrawable_assets(harvest_params: HarvestParams | None) -> Wei:
+async def get_withdrawable_assets(
+    vault_address: ChecksumAddress, harvest_params: HarvestParams | None
+) -> Wei:
     """Fetches vault's available assets for staking."""
+    vault_contract = VaultContract(vault_address)
     before_update_assets = await vault_contract.functions.withdrawableAssets().call()
 
     if harvest_params is None:
         return before_update_assets
 
-    calls = await get_update_state_calls(harvest_params)
+    calls = await get_update_state_calls(
+        vault_address=vault_contract.contract_address, harvest_params=harvest_params
+    )
     withdrawable_assets_call = vault_contract.encode_abi(fn_name='withdrawableAssets', args=[])
-    calls.append((vault_contract.address, withdrawable_assets_call))
+    calls.append((vault_contract.contract_address, withdrawable_assets_call))
 
     _, multicall = await multicall_contract.aggregate(calls)
     after_update_assets = Web3.to_int(multicall[-1])
@@ -170,54 +173,3 @@ async def get_withdrawable_assets(harvest_params: HarvestParams | None) -> Wei:
         return Wei(after_update_assets)
 
     return Wei(before_update_assets)
-
-
-async def get_validators_from_deposit_data(
-    keystore: BaseKeystore | None,
-    deposit_data: DepositData,
-    count: int,
-    run_check_deposit_data_root: bool = True,
-) -> Sequence[Validator]:
-    """Fetches vault's available validators."""
-    if run_check_deposit_data_root:
-        try:
-            await check_deposit_data_root(deposit_data.tree.root)
-        except RuntimeError:
-            if settings.disable_deposit_data_warnings:
-                return []
-            raise
-
-    start_index = await Vault().get_validators_index()
-    validators: list[Validator] = []
-
-    for validator in deposit_data.validators[start_index : start_index + count]:
-        if keystore and validator.public_key not in keystore:
-            if not settings.disable_deposit_data_warnings:
-                logger.warning(
-                    'Cannot find validator with public key %s in keystores.',
-                    validator.public_key,
-                )
-            break
-
-        if NetworkValidatorCrud().is_validator_registered(validator.public_key):
-            logger.warning(
-                'Validator with public key %s is already registered.'
-                ' You must upload new deposit data.',
-                validator.public_key,
-            )
-            break
-
-        validators.append(validator)
-
-    return validators
-
-
-async def check_deposit_data_root(deposit_data_root: str) -> None:
-    """Checks whether deposit data root matches validators root in Vault."""
-
-    vault_deposit_data_root = await Vault().get_validators_root()
-    if deposit_data_root != Web3.to_hex(vault_deposit_data_root):
-        raise RuntimeError(
-            "Deposit data tree root and vault's validators root don't match."
-            ' Have you updated vault deposit data?'
-        )
