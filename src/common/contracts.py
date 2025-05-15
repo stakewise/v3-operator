@@ -141,7 +141,7 @@ class VaultContract(ContractWrapper, VaultStateMixin):
         ):
             from_block = settings.network_config.PECTRA_BLOCK
         last_event = await self._get_last_event(
-            self.events.partialWithdrawal,  # type: ignore
+            self.events.ValidatorWithdrawalSubmitted,  # type: ignore
             from_block=from_block,
             to_block=await self.execution_client.eth.get_block_number(),
         )

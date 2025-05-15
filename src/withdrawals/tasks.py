@@ -4,6 +4,7 @@ from eth_typing import ChecksumAddress, HexStr
 from sw_utils import ChainHead, InterruptHandler, ProtocolConfig
 from web3 import Web3
 
+from src.common.app_state import AppState
 from src.common.checks import wait_execution_catch_up_consensus
 from src.common.clients import execution_client
 from src.common.consensus import fetch_registered_validators, get_chain_finalized_head
@@ -50,8 +51,11 @@ class PartialWithdrawalsTask(BaseTask):
     async def process_withdrawals(
         self, vault_address: ChecksumAddress, chain_head: ChainHead, protocol_config: ProtocolConfig
     ) -> None:
-        vault_contract = VaultContract(vault_address)
-        last_withdrawals_block = await vault_contract.get_last_partial_withdrawals_block()
+        app_state = AppState()
+        last_withdrawals_block = app_state.partial_withdrawal_cache[vault_address]
+        if not last_withdrawals_block:
+            vault_contract = VaultContract(vault_address)
+            last_withdrawals_block = await vault_contract.get_last_partial_withdrawals_block()
         if (
             last_withdrawals_block
             and last_withdrawals_block + PARTIAL_WITHDRAWALS_INTERVAL >= chain_head.block_number
@@ -94,13 +98,14 @@ class PartialWithdrawalsTask(BaseTask):
             validator_data=validator_data,
         )
         tx_hash = await submit_withdraw_validators(
-            vault_contract=vault_contract,
+            vault_address=vault_address,
             validators=validator_data,
             validators_manager_signature=Web3.to_bytes(hexstr=validators_manager_signature),
         )
         if not tx_hash:
             return
 
+        app_state.partial_withdrawal_cache[vault_address] = chain_head.block_number
         logger.info(
             'Successfully withrawned %s eth for validators with public keys %s, tx hash: %s',
             queued_assets,
@@ -151,12 +156,13 @@ def _endcode_validators(validators: dict[HexStr, int]) -> bytes:
 
 
 async def submit_withdraw_validators(
-    vault_contract: VaultContract,
+    vault_address: ChecksumAddress,
     validators: bytes,
     validators_manager_signature: bytes,
 ) -> HexStr | None:
     """Sends withdrawValidators transaction to vault contract"""
     logger.info('Submitting withdrawValidators transaction')
+    vault_contract = VaultContract(vault_address)
     try:
         tx = await vault_contract.functions.withdrawValidators(
             validators,
