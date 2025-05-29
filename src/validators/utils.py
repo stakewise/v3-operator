@@ -132,27 +132,29 @@ async def send_approval_request(
 
 async def get_available_validators(
     keystore: BaseKeystore,
-    count: int,
+    amounts: list[int],
     vault_address: ChecksumAddress,
     available_public_keys: list[HexStr],
 ) -> Sequence[Validator]:
     """move out execution.py"""
     available_public_keys = filter_nonregistered_public_keys(
         available_public_keys=available_public_keys,
-        count=count,
+        count=len(amounts),
     )
-
-    deposit_datas = await keystore.get_deposit_datas(available_public_keys, vault_address)
-
-    validators = [
-        Validator(
-            public_key=add_0x_prefix(Web3.to_hex(data['pubkey'])),
-            signature=add_0x_prefix(Web3.to_hex(data['signature'])),
-            amount_gwei=int(data['amount']),
-            deposit_data_root=Web3.to_hex(data['deposit_data_root']),
+    validators = []
+    for amount, public_key in zip(amounts, available_public_keys):
+        deposit_data = await keystore.get_deposit_data(
+            public_key=public_key, amount=amount, vault_address=vault_address
         )
-        for data in deposit_datas
-    ]
+        validators.append(
+            Validator(
+                public_key=add_0x_prefix(Web3.to_hex(deposit_data['pubkey'])),
+                signature=add_0x_prefix(Web3.to_hex(deposit_data['signature'])),
+                amount_gwei=int(deposit_data['amount']),
+                deposit_data_root=Web3.to_hex(deposit_data['deposit_data_root']),
+            )
+        )
+
     return validators
 
 

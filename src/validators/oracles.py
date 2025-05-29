@@ -6,14 +6,13 @@ from typing import Sequence
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
 from eth_typing import ChecksumAddress, HexStr
-from sw_utils.decorators import retry_aiohttp_errors
 from sw_utils.typings import Bytes32, ProtocolConfig
 from web3 import Web3
 
 from src.common.contracts import validators_registry_contract
 from src.common.exceptions import NotEnoughOracleApprovalsError
 from src.common.execution import get_protocol_config
-from src.common.typings import OracleApproval, OraclesApproval
+from src.common.typings import OracleApproval, OraclesApproval, ValidatorType
 from src.common.utils import (
     RateLimiter,
     format_error,
@@ -22,9 +21,9 @@ from src.common.utils import (
     warning_verbose,
 )
 from src.config.settings import (
-    DEFAULT_RETRY_TIME,
     ORACLES_CONSOLIDATION_TIMEOUT,
     ORACLES_VALIDATORS_TIMEOUT,
+    settings,
 )
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import (
@@ -76,6 +75,18 @@ async def poll_validation_approval(
             or deadline <= current_timestamp
         ):
             deadline = current_timestamp + protocol_config.signature_validity_period
+            #
+            # print('----------')
+            # from src.common.contracts import validators_checker_contract
+            # from src.validators.validators_manager import _encode_validator
+            # s = await validators_checker_contract.check_validators_manager_signature(
+            #     vault_address=vault_address,
+            #     validators_root=current_registry_root,
+            #     encoded_validators=b''.join([_encode_validator(v) for v in validators]),
+            # validators_manager_signature=validators_manager_signature,
+            # )
+            # print(s)
+            # exit()
 
             oracles_request = await create_approval_request(
                 vault_address=vault_address,
@@ -218,7 +229,8 @@ async def create_approval_request(
         deadline=deadline,
         validators_manager_signature=validators_manager_signature,
     )
-
+    if settings.validator_type == ValidatorType.TWO:
+        request.amounts = []
     for validator_index, validator in enumerate(validators, validators_start_index):
         shards = validator.exit_signature_shards
 
@@ -241,12 +253,13 @@ async def create_approval_request(
         request.deposit_signatures.append(validator.signature)
         request.public_key_shards.append(shards.public_keys)
         request.exit_signature_shards.append(shards.exit_signatures)
-
+        if request.amounts is not None:
+            request.amounts.append(validator.amount_gwei)
     return request
 
 
 # pylint: disable=duplicate-code
-@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
+# @retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def _send_approval_request_to_replicas(
     session: ClientSession, replicas: list[str], payload: dict
 ) -> OracleApproval:
@@ -347,7 +360,7 @@ async def _send_consolidation_requests(
 
 
 # pylint: disable=duplicate-code
-@retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
+# @retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def _send_consolidation_request_to_replicas(
     session: ClientSession, replicas: list[str], payload: dict
 ) -> bytes:

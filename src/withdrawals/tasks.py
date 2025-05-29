@@ -7,15 +7,17 @@ from web3 import Web3
 from src.common.app_state import AppState
 from src.common.checks import wait_execution_catch_up_consensus
 from src.common.clients import execution_client
-from src.common.consensus import fetch_registered_validators, get_chain_finalized_head
+from src.common.consensus import (
+    fetch_v2_registered_validators,
+    get_chain_finalized_head,
+)
 from src.common.contracts import VaultContract
 from src.common.execution import get_protocol_config, get_request_fee
 from src.common.harvest import get_harvest_params
 from src.common.tasks import BaseTask
-from src.common.typings import ConsensusValidator, ValidatorType
-from src.common.utils import format_error
+from src.common.typings import ConsensusValidator, HarvestParams, ValidatorType
+from src.common.utils import format_error, round_down
 from src.config.settings import (
-    DEPOSIT_AMOUNT,
     DEPOSIT_AMOUNT_GWEI,
     MAX_WITHDRAWAL_REQUEST_FEE,
     PARTIAL_WITHDRAWALS_INTERVAL,
@@ -52,7 +54,7 @@ class PartialWithdrawalsTask(BaseTask):
         self, vault_address: ChecksumAddress, chain_head: ChainHead, protocol_config: ProtocolConfig
     ) -> None:
         app_state = AppState()
-        last_withdrawals_block = app_state.partial_withdrawal_cache[vault_address]
+        last_withdrawals_block = app_state.partial_withdrawal_cache.get(vault_address)
         if not last_withdrawals_block:
             vault_contract = VaultContract(vault_address)
             last_withdrawals_block = await vault_contract.get_last_partial_withdrawals_block()
@@ -72,12 +74,13 @@ class PartialWithdrawalsTask(BaseTask):
             < (protocol_config.validators_exit_queued_assets_bps * total_assets) / 10000
         ):
             return
-
-        validators = await fetch_registered_validators(vault_address)
+        queued_assets_gwei = int(Web3.from_wei(queued_assets, 'gwei'))
+        validators = await fetch_v2_registered_validators(vault_address)
         validators = [v for v in validators if v.validator_type == ValidatorType.TWO]
-        partial_withdrawals_amount = sum(v.balance - DEPOSIT_AMOUNT for v in validators)
-
-        if partial_withdrawals_amount < queued_assets:
+        available_partial_withdrawals_amount = sum(
+            v.balance - DEPOSIT_AMOUNT_GWEI for v in validators
+        )
+        if available_partial_withdrawals_amount < queued_assets_gwei:
             logger.info('Partial withdrawals amount is less than queued assets')
             return
 
@@ -91,24 +94,29 @@ class PartialWithdrawalsTask(BaseTask):
                 current_fee,
             )
             return
-        withdrawals_data = _get_withdrawal_data(validators, partial_withdrawals_amount)
-        validator_data = _endcode_validators(withdrawals_data)
+        withdrawals_data = _get_withdrawal_data(validators, queued_assets_gwei)
+        validator_data = _encode_validators(withdrawals_data)
+        vault_contract = VaultContract(vault_address)
+        nonce = await vault_contract.validators_manager_nonce()
         validators_manager_signature = get_validators_manager_signature_withdrawals(
             vault=vault_address,
             validator_data=validator_data,
+            nonce=nonce,
         )
         tx_hash = await submit_withdraw_validators(
             vault_address=vault_address,
             validators=validator_data,
             validators_manager_signature=Web3.to_bytes(hexstr=validators_manager_signature),
+            harvest_params=harvest_params,
         )
         if not tx_hash:
             return
 
         app_state.partial_withdrawal_cache[vault_address] = chain_head.block_number
         logger.info(
-            'Successfully withrawned %s eth for validators with public keys %s, tx hash: %s',
-            queued_assets,
+            'Successfully withrawned %s %s for validators with public keys %s, tx hash: %s',
+            round_down(Web3.from_wei(queued_assets, 'ether'), 2),
+            settings.network_config.VAULT_BALANCE_SYMBOL,
             ', '.join([str(index) for index in withdrawals_data]),
             tx_hash,
         )
@@ -143,14 +151,14 @@ def _get_withdrawal_data(
     return withdrawals_data
 
 
-def _endcode_validators(validators: dict[HexStr, int]) -> bytes:
+def _encode_validators(validators: dict[HexStr, int]) -> bytes:
     """
     Encodes validators data for withdrawValidators contract call
     """
     data = b''
     for public_key, amount in validators.items():
         data += Web3.to_bytes(hexstr=public_key)
-        data += amount.to_bytes(32, 'big')
+        data += amount.to_bytes(8, byteorder='big')
 
     return data
 
@@ -159,15 +167,28 @@ async def submit_withdraw_validators(
     vault_address: ChecksumAddress,
     validators: bytes,
     validators_manager_signature: bytes,
+    harvest_params: HarvestParams | None,
 ) -> HexStr | None:
     """Sends withdrawValidators transaction to vault contract"""
     logger.info('Submitting withdrawValidators transaction')
     vault_contract = VaultContract(vault_address)
+
+    if harvest_params is not None:
+        # add update state calls before validator registration
+        calls = [vault_contract.get_update_state_call(harvest_params)]
+    else:
+        # aggregate all the calls into one multicall
+        calls = []
+
+    calls.append(
+        vault_contract.encode_abi(
+            fn_name='withdrawValidators',
+            args=[validators, validators_manager_signature],
+        )
+    )
+
     try:
-        tx = await vault_contract.functions.withdrawValidators(
-            validators,
-            validators_manager_signature,
-        ).transact()
+        tx = await vault_contract.functions.multicall(calls).transact()
     except Exception as e:
         logger.info('Failed to withdrawal validators: %s', format_error(e))
         return None

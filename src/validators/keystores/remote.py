@@ -14,7 +14,7 @@ from sw_utils.typings import ConsensusFork
 from web3 import Web3
 
 from src.config.networks import NETWORKS
-from src.config.settings import DEPOSIT_AMOUNT_GWEI, REMOTE_SIGNER_TIMEOUT, settings
+from src.config.settings import REMOTE_SIGNER_TIMEOUT, settings
 from src.validators.keystores.base import BaseKeystore
 
 logger = logging.getLogger(__name__)
@@ -84,39 +84,34 @@ class RemoteSignerKeystore(BaseKeystore):
     def public_keys(self) -> list[HexStr]:
         return self._public_keys
 
-    async def get_deposit_datas(
+    async def get_deposit_data(
         self,
-        public_keys: list[HexStr],
+        public_key: HexStr,
+        amount: int,
         vault_address: ChecksumAddress,
-    ) -> list[dict]:
+    ) -> dict:
         fork_version = NETWORKS[settings.network].GENESIS_FORK_VERSION
-        amount = DEPOSIT_AMOUNT_GWEI
         withdrawal_credentials = get_v1_withdrawal_credentials(cast(HexAddress, vault_address))
-        deposit_datas = []
-        for public_key in public_keys:
-            signing_root = self._get_deposit_signing_root(
-                public_key=BLSPubkey(Web3.to_bytes(hexstr=public_key)),
-                withdrawal_credentials=withdrawal_credentials,
-                amount=amount,
-                fork_version=fork_version,
-            )
-            signature = self._sign_deposit_data_request(
-                public_key=public_key,
-                withdrawal_credentials=withdrawal_credentials,
-                amount=amount,
-                signing_root=signing_root,
-                fork_version=fork_version,
-            )
-            # bls.Verify(BLSPubkey(Web3.to_bytes(hexstr=public_key)), message, exit_signature)
-            deposit_datas.append(
-                {
-                    'pubkey': public_key,
-                    'withdrawal_credentials': withdrawal_credentials,
-                    'amount': amount,
-                    'signature': signature,
-                }
-            )
-        return deposit_datas
+        signing_root = self._get_deposit_signing_root(
+            public_key=BLSPubkey(Web3.to_bytes(hexstr=public_key)),
+            withdrawal_credentials=withdrawal_credentials,
+            amount=amount,
+            fork_version=fork_version,
+        )
+        signature = self._sign_deposit_data_request(
+            public_key=public_key,
+            withdrawal_credentials=withdrawal_credentials,
+            amount=amount,
+            signing_root=signing_root,
+            fork_version=fork_version,
+        )
+        # bls.Verify(BLSPubkey(Web3.to_bytes(hexstr=public_key)), message, exit_signature)
+        return {
+            'pubkey': public_key,
+            'withdrawal_credentials': withdrawal_credentials,
+            'amount': amount,
+            'signature': signature,
+        }
 
     async def get_exit_signature(
         self, validator_index: int, public_key: HexStr, fork: ConsensusFork | None = None

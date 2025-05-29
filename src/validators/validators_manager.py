@@ -4,6 +4,7 @@ from eth_account.messages import encode_typed_data
 from eth_typing import ChecksumAddress, HexStr
 from web3 import Web3
 
+from src.common.typings import ValidatorType
 from src.common.wallet import hot_wallet
 from src.config.settings import settings
 from src.validators.typings import Validator
@@ -86,7 +87,7 @@ def get_validators_manager_signature_fund(
             'verifyingContract': vault,
         },
         'message': {
-            'validators': encoded_validators,
+            'validators': b''.join(encoded_validators),
         },
     }
 
@@ -97,10 +98,11 @@ def get_validators_manager_signature_fund(
 
 
 def _encode_validator(v: Validator) -> bytes:
-    return b''.join(
-        [
-            Web3.to_bytes(hexstr=v.public_key),
-            Web3.to_bytes(hexstr=v.signature),
-            Web3.to_bytes(hexstr=v.deposit_data_root),
-        ]
-    )
+    encoded_validator = [
+        Web3.to_bytes(hexstr=v.public_key),
+        Web3.to_bytes(hexstr=v.signature),
+        Web3.to_bytes(hexstr=v.deposit_data_root),
+    ]
+    if settings.validator_type == ValidatorType.TWO:
+        encoded_validator.append(v.amount_gwei.to_bytes(8, byteorder='big'))
+    return b''.join(encoded_validator)

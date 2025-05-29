@@ -78,21 +78,18 @@ class LocalKeystore(BaseKeystore):
     def __len__(self) -> int:
         return len(self.keys)
 
-    async def get_deposit_datas(
-        self, public_keys: list[HexStr], vault_address: ChecksumAddress
-    ) -> list[dict]:
-        private_keys = [self.keys[public_key] for public_key in public_keys]
-        credentials = [
-            CredentialManager.load_credential(
-                network=settings.network,
-                private_key=BLSPrivateKey(Web3.to_int(pk)),
-                vault=vault_address,
-                validator_type=settings.validator_type,
-            )
-            for pk in private_keys
-        ]
+    async def get_deposit_data(
+        self, public_key: HexStr, amount: int, vault_address: ChecksumAddress
+    ) -> dict:
+        private_key = self.keys[public_key]
+        credential = CredentialManager.load_credential(
+            network=settings.network,
+            private_key=BLSPrivateKey(Web3.to_int(private_key)),
+            vault=vault_address,
+            validator_type=settings.validator_type,
+        )
 
-        return [cred.deposit_datum_dict() for cred in credentials]
+        return credential.deposit_datum_dict(amount)
 
     async def get_exit_signature(
         self, validator_index: int, public_key: HexStr, fork: ConsensusFork | None = None

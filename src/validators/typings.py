@@ -46,8 +46,10 @@ class ApprovalRequest:
     deposit_signatures: list[HexStr]
     public_key_shards: list[list[HexStr]]
     exit_signature_shards: list[list[HexStr]]
-    validators_manager_signature: HexStr
     deadline: int
+    validators_manager_signature: HexStr | None = None
+
+    amounts: list[int] | None = None
 
     # legacy
     proof: list[HexStr] | None = None

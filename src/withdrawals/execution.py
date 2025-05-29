@@ -30,9 +30,8 @@ async def get_vault_assets(
         ]
     )
     _, multicall = await multicall_contract.aggregate(calls)
-    queued_shares = Web3.to_int(multicall[-1][0])
-    total_assets = Wei(Web3.to_int(multicall[-2][0]))
-
+    queued_shares = Web3.to_int(multicall[-1][:32])
+    total_assets = Wei(Web3.to_int(multicall[-2]))
     queued_assets = await _convert_shares_to_assets(
         shares=queued_shares,
         vault_address=vault_address,
@@ -60,7 +59,7 @@ async def _convert_shares_to_assets(
     else:
         # aggregate all the calls into one multicall
         calls = []
-    calls.append((vault_address, vault_contract.encode_abi('convertToAssets', args=[shares])))
+    calls.append((vault_address, vault_contract.encode_abi('convertToAssets', [shares])))
 
     _, multicall = await multicall_contract.aggregate(calls)
     return Wei(Web3.to_int(multicall[-1]))

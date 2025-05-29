@@ -123,6 +123,17 @@ class VaultContract(ContractWrapper, VaultStateMixin):
         )
         return [Web3.to_hex(event['args']['publicKey']) for event in events]
 
+    async def get_registered_v2_validators_public_keys(
+        self, from_block: BlockNumber, to_block: BlockNumber
+    ) -> list[HexStr]:
+        """Fetches the validator registered events."""
+        events = await self._get_events(
+            event=self.events.V2ValidatorRegistered,  # type: ignore
+            from_block=from_block,
+            to_block=to_block,
+        )
+        return [Web3.to_hex(event['args']['publicKey']) for event in events]
+
     async def mev_escrow(self) -> ChecksumAddress:
         return await self.contract.functions.mevEscrow().call()
 
@@ -131,6 +142,9 @@ class VaultContract(ContractWrapper, VaultStateMixin):
 
     async def validators_manager(self) -> ChecksumAddress:
         return await self.contract.functions.validatorsManager().call()
+
+    async def validators_manager_nonce(self) -> int:
+        return await self.contract.functions.validatorsManagerNonce().call()
 
     async def get_last_partial_withdrawals_block(self) -> BlockNumber | None:
         """Fetches the last partial withdrawal event block."""

@@ -6,12 +6,13 @@ from src.config.settings import settings
 
 
 def get_validators_manager_signature_withdrawals(
-    vault: ChecksumAddress, validator_data: bytes
+    vault: ChecksumAddress, validator_data: bytes, nonce: int
 ) -> HexStr:
     full_message = {
         'primaryType': 'VaultValidators',
         'types': {
             'VaultValidators': [
+                {'name': 'validatorsRegistryRoot', 'type': 'bytes32'},
                 {'name': 'validators', 'type': 'bytes'},
             ],
         },
@@ -22,6 +23,7 @@ def get_validators_manager_signature_withdrawals(
             'verifyingContract': vault,
         },
         'message': {
+            'validatorsRegistryRoot': nonce.to_bytes(32, byteorder='big'),
             'validators': validator_data,
         },
     }

@@ -8,8 +8,11 @@ import click
 from eth_typing import ChecksumAddress, HexStr
 from web3 import Web3
 
-from src.common.clients import execution_client
-from src.common.consensus import fetch_registered_validators, get_chain_finalized_head
+from src.common.clients import execution_client, setup_clients
+from src.common.consensus import (
+    fetch_v1_registered_validators,
+    get_chain_finalized_head,
+)
 from src.common.contracts import VaultContract
 from src.common.execution import get_protocol_config, get_request_fee
 from src.common.logging import LOG_LEVELS, setup_logging
@@ -56,8 +59,9 @@ logger = logging.getLogger(__name__)
 )
 @click.option(
     '--count',
-    help='The number of validators to exit.',
+    help='The maximum number of validators to consolidate.',
     type=click.IntRange(min=1),
+    default=None,
 )
 @click.option(
     '--consensus-endpoints',
@@ -65,6 +69,13 @@ logger = logging.getLogger(__name__)
     prompt='Enter the comma separated list of API endpoints for consensus nodes',
     envvar='CONSENSUS_ENDPOINTS',
     type=str,
+)
+@click.option(
+    '--execution-endpoints',
+    type=str,
+    envvar='EXECUTION_ENDPOINTS',
+    prompt='Enter comma separated list of API endpoints for execution nodes',
+    help='Comma separated list of API endpoints for execution nodes.',
 )
 @click.option(
     '-v',
@@ -100,6 +111,7 @@ def consolidate(
     verbose: bool,
     no_confirm: bool,
     log_level: str,
+    count: int | None = None,
 ) -> None:
     vault_config = OperatorConfig(Path(data_dir))
     if network is None:
@@ -107,7 +119,7 @@ def consolidate(
         network = vault_config.network
 
     settings.set(
-        vaults=[],
+        vaults=[vault],
         network=network,
         config_dir=vault_config.config_dir,
         execution_endpoints=execution_endpoints,
@@ -119,6 +131,7 @@ def consolidate(
         asyncio.run(
             main(
                 vault_address=vault,
+                count=count,
                 no_confirm=no_confirm,
             )
         )
@@ -127,9 +140,11 @@ def consolidate(
         sys.exit(1)
 
 
-async def main(vault_address: ChecksumAddress, no_confirm: bool) -> None:
+async def main(vault_address: ChecksumAddress, count: int | None, no_confirm: bool) -> None:
     setup_logging()
-    validators = await fetch_registered_validators(vault_address)
+    await setup_clients()
+
+    validators = await fetch_v1_registered_validators(vault_address)
     # filter active?
     if not validators:
         raise click.ClickException(f'No registered validators for vault {vault_address}')
@@ -148,6 +163,9 @@ async def main(vault_address: ChecksumAddress, no_confirm: bool) -> None:
         )
         return
     source_target_public_keys = _split_validators(validators)
+    if count is not None:
+        source_target_public_keys = source_target_public_keys[:count]
+
     click.secho(
         f'Vault has {len(validators)} registered validator(s), ' f'Consolidating next validators: ',
     )
