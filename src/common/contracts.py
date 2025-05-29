@@ -1,4 +1,3 @@
-import functools
 import json
 import os
 from functools import cached_property
@@ -26,12 +25,15 @@ class ContractWrapper:
     abi_path: str = ''
     settings_key: str = ''
 
-    def __init__(self, execution_client: AsyncWeb3 | None = None):
+    def __init__(
+        self, address: ChecksumAddress | None = None, execution_client: AsyncWeb3 | None = None
+    ):
+        self.address = address
         self.execution_client = execution_client or default_execution_client
 
     @property
     def contract_address(self) -> ChecksumAddress:
-        return getattr(settings.network_config, self.settings_key)
+        return self.address or getattr(settings.network_config, self.settings_key)
 
     @cached_property
     def contract(self) -> AsyncContract:
@@ -39,10 +41,6 @@ class ContractWrapper:
         with open(os.path.join(current_dir, self.abi_path), encoding='utf-8') as f:
             abi = json.load(f)
         return self.execution_client.eth.contract(abi=abi, address=self.contract_address)
-
-    @property
-    def address(self) -> ChecksumAddress:
-        return self.contract.address
 
     @property
     def functions(self) -> AsyncContractFunctions:
@@ -111,28 +109,8 @@ class VaultStateMixin:
         return update_state_call
 
 
-class VaultV1Contract(ContractWrapper, VaultStateMixin):
-    abi_path = 'abi/IEthVaultV1.json'
-
-    @property
-    def contract_address(self) -> ChecksumAddress:
-        return settings.vault
-
-    async def get_validators_root(self) -> Bytes32:
-        """Fetches vault's validators root."""
-        return await self.contract.functions.validatorsRoot().call()
-
-    async def get_validators_index(self) -> int:
-        """Fetches vault's current validators index."""
-        return await self.contract.functions.validatorIndex().call()
-
-
 class VaultContract(ContractWrapper, VaultStateMixin):
     abi_path = 'abi/IEthVault.json'
-
-    @property
-    def contract_address(self) -> ChecksumAddress:
-        return settings.vault
 
     async def get_registered_validators_public_keys(
         self, from_block: BlockNumber, to_block: BlockNumber
@@ -157,10 +135,6 @@ class VaultContract(ContractWrapper, VaultStateMixin):
 
 class GnoVaultContract(ContractWrapper, VaultStateMixin):
     abi_path = 'abi/IGnoVault.json'
-
-    @property
-    def contract_address(self) -> ChecksumAddress:
-        return settings.vault
 
     def get_swap_xdai_call(self) -> HexStr:
         return self.encode_abi(fn_name='swapXdaiToGno', args=[])
@@ -252,19 +226,6 @@ class KeeperContract(ContractWrapper):
         return await self.contract.functions.canHarvest(vault_address).call()
 
 
-class DepositDataRegistryContract(ContractWrapper):
-    abi_path = 'abi/IDepositDataRegistry.json'
-    settings_key = 'DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS'
-
-    async def get_validators_root(self) -> Bytes32:
-        """Fetches vault's validators root."""
-        return await self.contract.functions.depositDataRoots(settings.vault).call()
-
-    async def get_validators_index(self) -> int:
-        """Fetches vault's current validators index."""
-        return await self.contract.functions.depositDataIndexes(settings.vault).call()
-
-
 class MulticallContract(ContractWrapper):
     abi_path = 'abi/Multicall.json'
     settings_key = 'MULTICALL_CONTRACT_ADDRESS'
@@ -277,16 +238,8 @@ class MulticallContract(ContractWrapper):
         return await self.contract.functions.aggregate(data).call(block_identifier=block_number)
 
 
-@functools.cache
-def get_gno_vault_contract() -> GnoVaultContract:
-    return GnoVaultContract()
-
-
-vault_contract = VaultContract()
-vault_v1_contract = VaultV1Contract()
 validators_registry_contract = ValidatorsRegistryContract()
 keeper_contract = KeeperContract()
 v2_pool_contract = V2PoolContract()
 v2_pool_escrow_contract = V2PoolEscrowContract()
 multicall_contract = MulticallContract()
-deposit_data_registry_contract = DepositDataRegistryContract()
