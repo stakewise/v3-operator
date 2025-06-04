@@ -39,14 +39,12 @@ def encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) -> 
     deposit_root = compute_deposit_data(
         public_key=public_key,
         withdrawal_credentials=withdrawal_credentials,
-        amount_gwei=validator.amount_gwei,
+        amount_gwei=validator.amount,
         signature=signature,
     ).hash_tree_root
     if settings.validator_type == ValidatorType.ONE:
         return public_key + signature + deposit_root
-    return (
-        public_key + signature + deposit_root + validator.amount_gwei.to_bytes(8, byteorder='big')
-    )
+    return public_key + signature + deposit_root + validator.amount.to_bytes(8, byteorder='big')
 
 
 # pylint: disable-next=too-many-arguments

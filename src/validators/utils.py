@@ -10,6 +10,7 @@ from eth_typing import ChecksumAddress, HexStr
 from eth_utils import add_0x_prefix
 from sw_utils import ProtocolConfig
 from web3 import Web3
+from web3.types import Gwei
 
 from src.common.contracts import validators_registry_contract
 from src.common.typings import OracleApproval, OraclesApproval
@@ -150,7 +151,7 @@ async def get_available_validators(
             Validator(
                 public_key=add_0x_prefix(Web3.to_hex(deposit_data['pubkey'])),
                 signature=add_0x_prefix(Web3.to_hex(deposit_data['signature'])),
-                amount_gwei=int(deposit_data['amount']),
+                amount=Gwei(int(deposit_data['amount'])),
                 deposit_data_root=Web3.to_hex(deposit_data['deposit_data_root']),
             )
         )

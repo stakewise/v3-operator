@@ -104,5 +104,5 @@ def _encode_validator(v: Validator) -> bytes:
         Web3.to_bytes(hexstr=v.deposit_data_root),
     ]
     if settings.validator_type == ValidatorType.TWO:
-        encoded_validator.append(v.amount_gwei.to_bytes(8, byteorder='big'))
+        encoded_validator.append(v.amount.to_bytes(8, byteorder='big'))
     return b''.join(encoded_validator)

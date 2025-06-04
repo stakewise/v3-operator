@@ -6,6 +6,7 @@ from typing import Sequence
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
 from eth_typing import ChecksumAddress, HexStr
+from sw_utils.common import urljoin
 from sw_utils.typings import Bytes32, ProtocolConfig
 from web3 import Web3
 
@@ -75,18 +76,6 @@ async def poll_validation_approval(
             or deadline <= current_timestamp
         ):
             deadline = current_timestamp + protocol_config.signature_validity_period
-            #
-            # print('----------')
-            # from src.common.contracts import validators_checker_contract
-            # from src.validators.validators_manager import _encode_validator
-            # s = await validators_checker_contract.check_validators_manager_signature(
-            #     vault_address=vault_address,
-            #     validators_root=current_registry_root,
-            #     encoded_validators=b''.join([_encode_validator(v) for v in validators]),
-            # validators_manager_signature=validators_manager_signature,
-            # )
-            # print(s)
-            # exit()
 
             oracles_request = await create_approval_request(
                 vault_address=vault_address,
@@ -122,9 +111,16 @@ async def poll_consolidation_signature(
     approvals_min_interval = 1
     rate_limiter = RateLimiter(approvals_min_interval)
     votes_threshold = protocol_config.validators_threshold
+    from_public_keys = []
+    to_public_keys = []
+    for from_key, to_key in source_target_public_keys:
+        from_public_keys.append(from_key)
+        to_public_keys.append(to_key)
+
     consolidation_request = ConsolidationRequest(
-        public_keys=source_target_public_keys,
-        vault=vault,
+        from_public_keys=from_public_keys,
+        to_public_keys=to_public_keys,
+        vault_address=vault,
     )
     while True:
         # Keep min interval between requests
@@ -138,10 +134,10 @@ async def poll_consolidation_signature(
         if len(consolidation_signatures) < votes_threshold:
             logger.error(
                 'Not enough oracle approvals for validator consolidation: %d. Threshold is %d.',
-                consolidation_signatures,
+                len(consolidation_signatures),
                 votes_threshold,
             )
-
+            continue
         signatures = b''
         for _, signature in sorted(
             consolidation_signatures, key=lambda x: Web3.to_int(hexstr=x[0])
@@ -254,7 +250,7 @@ async def create_approval_request(
         request.public_key_shards.append(shards.public_keys)
         request.exit_signature_shards.append(shards.exit_signatures)
         if request.amounts is not None:
-            request.amounts.append(validator.amount_gwei)
+            request.amounts.append(validator.amount)
     return request
 
 
@@ -386,6 +382,7 @@ async def _send_consolidation_request(
     session: ClientSession, endpoint: str, payload: dict
 ) -> bytes:
     """Requests consolidation signature from single oracle."""
+    endpoint = urljoin(endpoint, 'consolidate-validators/')
     logger.debug('send_consolidation_request to %s', endpoint)
     try:
         async with session.post(url=endpoint, json=payload) as response:

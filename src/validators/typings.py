@@ -3,6 +3,7 @@ from enum import Enum
 from typing import NewType
 
 from eth_typing import BlockNumber, BLSSignature, ChecksumAddress, HexStr
+from web3.types import Gwei
 
 BLSPrivkey = NewType('BLSPrivkey', bytes)
 
@@ -23,7 +24,7 @@ class ExitSignatureShards:
 class Validator:
     public_key: HexStr
     signature: HexStr
-    amount_gwei: int
+    amount: Gwei
     exit_signature: BLSSignature | None = None
     exit_signature_shards: ExitSignatureShards | None = None
 
@@ -72,5 +73,6 @@ class RelayerTypes:
 
 @dataclass
 class ConsolidationRequest:
-    public_keys: list[tuple[HexStr, HexStr]]
-    vault: ChecksumAddress
+    from_public_keys: list[HexStr]
+    to_public_keys: list[HexStr]
+    vault_address: ChecksumAddress

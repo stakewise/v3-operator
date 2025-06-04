@@ -4,7 +4,7 @@ from typing import cast
 from eth_typing import BlockNumber, ChecksumAddress
 from sw_utils import GasManager, InterruptHandler, ProtocolConfig, build_protocol_config
 from web3 import Web3
-from web3.types import TxParams, Wei
+from web3.types import Gwei, TxParams, Wei
 
 from src.common.app_state import AppState, OraclesCache
 from src.common.clients import execution_client, ipfs_fetch_client
@@ -116,11 +116,11 @@ async def get_hot_wallet_balance() -> Wei:
     return await execution_client.eth.get_balance(hot_wallet.address)
 
 
-async def get_request_fee(address: ChecksumAddress, block_number: BlockNumber) -> Wei:
+async def get_request_fee(address: ChecksumAddress, block_number: BlockNumber) -> Gwei:
     tx_data: TxParams = {
         'to': address,
         'data': b'',
     }
 
     fee = await execution_client.eth.call(tx_data, block_identifier=block_number)
-    return Wei(Web3.to_int(fee))
+    return Gwei(Web3.to_int(fee))

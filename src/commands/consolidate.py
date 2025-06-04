@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 from eth_typing import ChecksumAddress, HexStr
 from web3 import Web3
+from web3.types import Gwei
 
 from src.common.clients import execution_client, setup_clients
 from src.common.consensus import (
@@ -195,6 +196,7 @@ async def main(vault_address: ChecksumAddress, count: int | None, no_confirm: bo
         validators=encoded_validators,
         validators_manager_signature=Web3.to_bytes(hexstr=validators_manager_signature),
         oracle_signatures=oracle_signatures,
+        current_fee=current_fee,
     )
 
     if tx_hash:
@@ -250,6 +252,7 @@ async def submit_consolidate_validators(
     validators: bytes,
     validators_manager_signature: bytes,
     oracle_signatures: bytes,
+    current_fee: Gwei,
 ) -> HexStr | None:
     """Sends consolidateValidators transaction to vault contract"""
     logger.info('Submitting consolidateValidators transaction')
@@ -259,7 +262,7 @@ async def submit_consolidate_validators(
             validators,
             validators_manager_signature,
             oracle_signatures,
-        ).transact()
+        ).transact({'value': Web3.to_wei(current_fee, 'gwei')})
     except Exception as e:
         logger.info('Failed to update exit signatures: %s', format_error(e))
         return None

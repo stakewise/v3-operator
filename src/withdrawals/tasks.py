@@ -3,6 +3,7 @@ import logging
 from eth_typing import ChecksumAddress, HexStr
 from sw_utils import ChainHead, InterruptHandler, ProtocolConfig
 from web3 import Web3
+from web3.types import Gwei
 
 from src.common.app_state import AppState
 from src.common.checks import wait_execution_catch_up_consensus
@@ -108,6 +109,7 @@ class PartialWithdrawalsTask(BaseTask):
             validators=validator_data,
             validators_manager_signature=Web3.to_bytes(hexstr=validators_manager_signature),
             harvest_params=harvest_params,
+            current_fee=current_fee,
         )
         if not tx_hash:
             return
@@ -168,6 +170,7 @@ async def submit_withdraw_validators(
     validators: bytes,
     validators_manager_signature: bytes,
     harvest_params: HarvestParams | None,
+    current_fee: Gwei,
 ) -> HexStr | None:
     """Sends withdrawValidators transaction to vault contract"""
     logger.info('Submitting withdrawValidators transaction')
@@ -188,7 +191,9 @@ async def submit_withdraw_validators(
     )
 
     try:
-        tx = await vault_contract.functions.multicall(calls).transact()
+        tx = await vault_contract.functions.multicall(calls).transact(
+            {'value': Web3.to_wei(current_fee, 'gwei')}
+        )
     except Exception as e:
         logger.info('Failed to withdrawal validators: %s', format_error(e))
         return None

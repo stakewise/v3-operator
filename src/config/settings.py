@@ -3,7 +3,7 @@ from pathlib import Path
 from decouple import Csv
 from decouple import config as decouple_config
 from web3 import Web3
-from web3.types import ChecksumAddress
+from web3.types import ChecksumAddress, Gwei
 
 from src.common.typings import Singleton, ValidatorType
 from src.config.networks import MAINNET, NETWORKS, NetworkConfig
@@ -289,13 +289,13 @@ PARTIAL_WITHDRAWALS_INTERVAL: int = decouple_config(
 MIN_DEPOSIT_AMOUNT = Web3.to_wei(1, 'ether')
 
 DEPOSIT_AMOUNT = Web3.to_wei(32, 'ether')
-DEPOSIT_AMOUNT_GWEI = int(Web3.from_wei(DEPOSIT_AMOUNT, 'gwei'))
+DEPOSIT_AMOUNT_GWEI = Gwei(int(Web3.from_wei(DEPOSIT_AMOUNT, 'gwei')))
 
 PECTRA_DEPOSIT_AMOUNT = Web3.to_wei(2048, 'ether')
-PECTRA_DEPOSIT_AMOUNT_GWEI = int(Web3.from_wei(PECTRA_DEPOSIT_AMOUNT, 'gwei'))
+PECTRA_DEPOSIT_AMOUNT_GWEI = Gwei(int(Web3.from_wei(PECTRA_DEPOSIT_AMOUNT, 'gwei')))
 
 PECTRA_MAX_EFFECTIVE_BALANCE = PECTRA_DEPOSIT_AMOUNT
-PECTRA_MAX_EFFECTIVE_BALANCE_GWEI = int(Web3.from_wei(PECTRA_MAX_EFFECTIVE_BALANCE, 'gwei'))
+PECTRA_MAX_EFFECTIVE_BALANCE_GWEI = Gwei(int(Web3.from_wei(PECTRA_MAX_EFFECTIVE_BALANCE, 'gwei')))
 
 
 MAX_CONSOLIDATION_REQUEST_FEE = decouple_config(

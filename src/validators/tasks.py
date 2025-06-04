@@ -7,7 +7,7 @@ from sw_utils import EventScanner, InterruptHandler, IpfsFetchClient, convert_to
 from sw_utils.networks import GNO_NETWORKS
 from sw_utils.typings import Bytes32
 from web3 import Web3
-from web3.types import BlockNumber, ChecksumAddress
+from web3.types import BlockNumber, ChecksumAddress, Gwei
 
 from src.common.checks import wait_execution_catch_up_consensus
 from src.common.consensus import (
@@ -131,7 +131,7 @@ async def process_validators(
                 vault_address=vault_address,
                 vault_validators=vault_v2_validators,
                 keystore=keystore,
-                amount_gwei=int(Web3.from_wei(vault_assets, 'gwei')),
+                amount=Gwei(int(Web3.from_wei(vault_assets, 'gwei'))),
                 harvest_params=harvest_params,
             )
             return
@@ -151,11 +151,10 @@ async def fund_v2_validators(
     vault_address: ChecksumAddress,
     keystore: BaseKeystore | None,
     vault_validators: list[ConsensusValidator],
-    amount_gwei: int,
+    amount: Gwei,
     harvest_params: HarvestParams | None,
 ) -> HexStr | None:
-    amount_gwei = 1000000000
-    topup_data = _get_topup_data(vault_validators, amount_gwei)
+    topup_data = _get_topup_data(vault_validators, amount)
     if not topup_data:
         logger.info('Cannot topup validators')
         return None
@@ -352,32 +351,30 @@ def _get_validators_amount(vault_assets: int, validator_type: ValidatorType) -> 
     return amounts
 
 
-def _get_topup_data(
-    vault_validators: list[ConsensusValidator], amount_gwei: int
-) -> dict[HexStr, int]:
+def _get_topup_data(vault_validators: list[ConsensusValidator], amount: Gwei) -> dict[HexStr, Gwei]:
     v2_validators_capacity = sum(
         max(PECTRA_DEPOSIT_AMOUNT_GWEI - val.balance, 0)
         for val in vault_validators
         if val.validator_type == ValidatorType.TWO
     )
-    if v2_validators_capacity < amount_gwei:
+    if v2_validators_capacity < amount:
         return {}
 
     vault_validators.sort(key=lambda x: x.balance, reverse=True)
     result = {}
     for validator in vault_validators:
         if PECTRA_DEPOSIT_AMOUNT_GWEI - validator.balance > 0:
-            val_amount = min(PECTRA_DEPOSIT_AMOUNT_GWEI - validator.balance, amount_gwei)
-            result[validator.public_key] = val_amount
-            amount_gwei -= val_amount
-        if amount_gwei <= 0:
+            val_amount = min(PECTRA_DEPOSIT_AMOUNT_GWEI - validator.balance, amount)
+            result[validator.public_key] = Gwei(val_amount)
+            amount = Gwei(amount - val_amount)
+        if amount <= 0:
             break
     return result
 
 
 async def _get_funded_validators(
     vault_address: ChecksumAddress,
-    topup_data: dict[HexStr, int],
+    topup_data: dict[HexStr, Gwei],
     keystore: BaseKeystore | None,
 ) -> list[Validator]:
     if keystore is None:
@@ -395,7 +392,7 @@ async def _get_funded_validators(
             Validator(
                 public_key=add_0x_prefix(Web3.to_hex(deposit_data['pubkey'])),
                 signature=add_0x_prefix(Web3.to_hex(deposit_data['signature'])),
-                amount_gwei=amount,
+                amount=amount,
                 deposit_data_root=Web3.to_hex(deposit_data['deposit_data_root']),
             )
         )
