@@ -8,7 +8,7 @@ package-mode = false
 [tool.poetry.dependencies]
 python = ">=3.12,<3.13"
 python-decouple = "==3.8"
-sentry-sdk = "==1.32.0"
+sentry-sdk = "==1.45.1"
 py-ecc = "==6.0.0"
 gql = {extras = ["aiohttp"], version = "==3.5.0"}
 multiproof = { git = "https://github.com/stakewise/multiproof.git", rev = "v0.1.8" }

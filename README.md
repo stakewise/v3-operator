@@ -15,7 +15,7 @@
    1. [Step 1. Create mnemonic](#step-1-create-mnemonic)
    2. [Step 2. Create validator keys](#step-2-create-validator-keys)
    3. [Step 3. Create hot wallet](#step-3-create-hot-wallet)
-   4. [Step 4. Setup validators manager role for vaults](#step-4-setup-validators-manager-role-for-vaults)
+   4. [Step 4. Setup validators manager role](#step-4-setup-validators-manager-role)
    5. [Step 5. Start Operator Service](#step-5-start-operator-service)
 5. [Extra commands](#extra-commands)
    1. [Add validator keys to Vault](#add-validator-keys-to-vault)
@@ -24,7 +24,7 @@
    4. [Recover validator keystores](#recover-validator-keystores)
    5. [Max gas fee](#max-gas-fee)
    6. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
-   7. [Self report to Rated Network](#rated-self-report-network)
+   7. [Self report to Rated Network](#self-report-to-rated-network)
    8. [Export validators file](#export-validators-file)
 6. [Contacts](#contacts)
 
@@ -246,6 +246,7 @@ Successfully initialized configuration for StakeWise Operator
 ```
 
 ### Step 2. Create validator keys
+
 Next, run the `create-keys` command to derive validator keystores from the mnemonic:
 
 ```bash
@@ -370,7 +371,7 @@ Operator Service has many different commands that are not mandatory but might co
 - [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
 - [Add validator keys to Vault](#add-validator-keys-to-vault)
 - [Recover validator keystores](#recover-validator-keystores)
-- [Self report to Rated Network](#rated-self-report-network)
+- [Self report to Rated Network](#self-report-to-rated-network)
 
 ### Add validator keys to Vault
 
@@ -445,7 +446,7 @@ cores.
 Setting `--pool-size` to (number of CPU cores) / 2 is a safe way to ensure that Operator Service does not take up too
 much CPU load and impact node performance during the creation and loading of keystores.
 
-### Rated self report
+### Self report to Rated Network
 
 This command allows you to self-report your validator keys to the Rated Network, ensuring that your validator set is tracked and updated on the Rated Explorer.
 
