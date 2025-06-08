@@ -95,7 +95,7 @@ def create_keys(
     click.echo(
         f'Done. Generated {greenify(count)} keys for StakeWise operator.\n'
         f'Keystores saved to {greenify(keystores_dir)} file\n'
-        f'Validators keys saved to {greenify(path.abspath(validators_file))} file'
+        f'Validator public keys saved to {greenify(path.abspath(validators_file))} file'
     )
 
 

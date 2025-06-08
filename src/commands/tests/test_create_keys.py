@@ -37,7 +37,7 @@ class TestCreateKeys:
             'Exporting validator keystores\t\t\n'
             f'Done. Generated 5 keys for StakeWise operator.\n'
             f'Keystores saved to {config_dir}/keystores file\n'
-            f'Validators keys saved to {config_dir}/validators.txt file'
+            f'Validator public keys saved to {config_dir}/validators.txt file'
         )
         assert output.strip() == result.output.strip()
         with open(f'{config_dir}/validators.txt', encoding='utf-8') as f:
@@ -77,7 +77,7 @@ class TestCreateKeys:
             'Exporting validator keystores\t\t\n'
             f'Done. Generated 5 keys for StakeWise operator.\n'
             f'Keystores saved to {config_dir}/keystores file\n'
-            f'Validators keys saved to {config_dir}/validators.txt file'
+            f'Validator public keys saved to {config_dir}/validators.txt file'
         )
         assert output.strip() == result.output.strip()
         with open(f'{config_dir}/validators.txt', encoding='utf-8') as f:

@@ -142,7 +142,7 @@ async def get_available_validators(
         count=count,
     )
 
-    deposit_datas = await keystore.get_deposit_datas(available_public_keys, vault_address)
+    deposit_datum = await keystore.get_deposit_datum(available_public_keys, vault_address)
 
     validators = [
         Validator(
@@ -151,7 +151,7 @@ async def get_available_validators(
             amount_gwei=int(data['amount']),
             deposit_data_root=Web3.to_hex(data['deposit_data_root']),
         )
-        for data in deposit_datas
+        for data in deposit_datum
     ]
     return validators
 

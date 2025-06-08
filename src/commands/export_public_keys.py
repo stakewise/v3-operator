@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
     help='Fetch available public keys from local keystores and export them to validators.txt.'
 )
 # pylint: disable-next=too-many-arguments
-def generate_public_keys(
+def export_public_keys(
     verbose: bool,
     data_dir: str,
     keystores_dir: str | None,
@@ -64,7 +64,7 @@ async def main() -> None:
     keystore_files = LocalKeystore.list_keystore_files()
     logger.info('Loading keystores from %s...', settings.keystores_dir)
     keys = [
-        _process_keystore_file(keystore_file, settings.keystores_dir)
+        _read_keystore_file(keystore_file, settings.keystores_dir)
         for keystore_file in keystore_files
     ]
     keys.sort(key=lambda x: x[0])
@@ -72,7 +72,8 @@ async def main() -> None:
     logger.info('Saved %d public keys to validators.txt', len(keys))
 
 
-def _process_keystore_file(keystore_file: KeystoreFile, keystore_path: Path) -> tuple[int, HexStr]:
+def _read_keystore_file(keystore_file: KeystoreFile, keystore_path: Path) -> tuple[int, HexStr]:
+    """Return tuple of keystore index and public key."""
     file_name = keystore_file.name
     file_path = keystore_path / file_name
     try:

@@ -84,7 +84,7 @@ class RemoteSignerKeystore(BaseKeystore):
     def public_keys(self) -> list[HexStr]:
         return self._public_keys
 
-    async def get_deposit_datas(
+    async def get_deposit_datum(
         self,
         public_keys: list[HexStr],
         vault_address: ChecksumAddress,
@@ -92,7 +92,7 @@ class RemoteSignerKeystore(BaseKeystore):
         fork_version = NETWORKS[settings.network].GENESIS_FORK_VERSION
         amount = DEPOSIT_AMOUNT_GWEI
         withdrawal_credentials = get_v1_withdrawal_credentials(cast(HexAddress, vault_address))
-        deposit_datas = []
+        deposit_datum = []
         for public_key in public_keys:
             signing_root = self._get_deposit_signing_root(
                 public_key=BLSPubkey(Web3.to_bytes(hexstr=public_key)),
@@ -107,8 +107,7 @@ class RemoteSignerKeystore(BaseKeystore):
                 signing_root=signing_root,
                 fork_version=fork_version,
             )
-            # bls.Verify(BLSPubkey(Web3.to_bytes(hexstr=public_key)), message, exit_signature)
-            deposit_datas.append(
+            deposit_datum.append(
                 {
                     'pubkey': public_key,
                     'withdrawal_credentials': withdrawal_credentials,
@@ -116,7 +115,7 @@ class RemoteSignerKeystore(BaseKeystore):
                     'signature': signature,
                 }
             )
-        return deposit_datas
+        return deposit_datum
 
     async def get_exit_signature(
         self, validator_index: int, public_key: HexStr, fork: ConsensusFork | None = None

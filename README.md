@@ -20,12 +20,12 @@
 5. [Extra commands](#extra-commands)
    1. [Add validator keys to Vault](#add-validator-keys-to-vault)
    2. [Validators voluntary exit](#validators-voluntary-exit)
-   3. [Update Vaults state (Harvest Vaults)](#update-vaults-state-harvest-vaults)
+   3. [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
    4. [Recover validator keystores](#recover-validator-keystores)
    5. [Max gas fee](#max-gas-fee)
    6. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
-   7. [Self report to Rated](#rated-self-report)
-   8. [Generate validators file](#generate-validators-file)
+   7. [Self report to Rated Network](#rated-self-report-network)
+   8. [Export validators file](#export-validators-file)
 6. [Contacts](#contacts)
 
 ## What is V3 Operator?
@@ -35,13 +35,13 @@ tasks:
 
 ### Validator registration
 
-The operator periodically checks whether Vault has accumulated enough assets for registering new validator(s) and sends
+The Operator periodically checks whether Vault has accumulated enough assets for registering new validator(s) and sends
 a registration transaction to the Vault.
 
 The validator registration process consists of the following steps:
 
 1. Check whether Vault has accumulated enough assets to register a validator (e.g., 32 ETH for Ethereum)
-2. Get the next free validator public key from the `validators.txt` file attached to the operator. The validators are
+2. Get the next free validator public key from the `validators.txt` file attached to the Operator. The validators are
    registered in the same order as specified in the `validators.txt` file.
 3. Obtain BLS signature for exit message using local keystores or remote signer.
 4. Share the exit signature of the validator with StakeWise Oracles:
@@ -56,14 +56,14 @@ The validator registration process consists of the following steps:
 Exit signatures from the previous section can become invalid if the oracles' set changes. For example, if oracles'
 private key gets compromised, the DAO will have to propose an update of the oracles set that will trigger exit signature
 rotation.
-The operator periodically checks active validators of the Vault and if some exit signatures become outdated, the
-operator will submit a signature update transaction to the Vault.
+The Operator periodically checks active validators of the Vault and if some exit signatures become outdated, the
+Operator will submit a signature update transaction to the Vault.
 
 ### Vault state update (optional)
 
 The oracles periodically submit consensus rewards of all the vaults to the Keeper contract.
 By default, every vault pulls these updates on the user interaction with the vault (deposit, withdraw, etc.), but it
-also can be done by the vault operator by passing the `--harvest-vault` flag to the `start` command. Harvesting vault
+also can be done by the vault Operator by passing the `--harvest-vault` flag to the `start` command. Harvesting vault
 rewards simplifies calls to the vault contracts, e.g., you don't need to sync rewards before calling deposit.
 
 ## Prerequisites
@@ -119,7 +119,7 @@ use of flags is optional):
 ./operator COMMAND --flagA=123 --flagB=xyz
 ```
 
-Head to [Usage](#usage) to launch your operator service.
+Head to [Usage](#usage) to launch your Operator service.
 
 ### Install script (Linux and macOS)
 
@@ -147,11 +147,11 @@ You will execute Operator Service commands using the below format (note that the
 operator COMMAND --flagA=123 --flagB=xyz
 ```
 
-Head to [Usage](#usage) to launch your operator service.
+Head to [Usage](#usage) to launch your Operator service.
 
 ### Docker Image
 
-Pull the latest docker operator docker image:
+Pull the latest docker Operator docker image:
 
 ```bash
 docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.6
@@ -176,7 +176,7 @@ src/main.py COMMAND \
 --flagB=xyz
 ```
 
-Head to [Usage](#usage) to launch your operator service.
+Head to [Usage](#usage) to launch your Operator service.
 
 ### Source Files
 
@@ -198,7 +198,7 @@ use of flags is optional):
 PYTHONPATH=. poetry run python src/main.py COMMAND --flagA=123 --flagB=xyz
 ```
 
-Head to [Usage](#usage) to launch your operator service.
+Head to [Usage](#usage) to launch your Operator service.
 
 ### Kubernetes (advanced)
 
@@ -208,17 +208,13 @@ the [Kubernetes setup](https://docs.stakewise.io/for-operators/kubernetes-stakin
 
 ## Usage
 
-In order to run Operator Service, you must first create keystores and a file with list of available public keys for your Vault's validators, and
+To run the Operator Service, you must first create keystores and a file containing the list of available validator public keys for your Vault. You must also
 set up a hot wallet for Operator Service to handle validator registrations.
 
-Operator Service has in-built functionality to generate all of the above, or you are free to use your preferred methods
-of generating keystores, such as via [Wagyu Keygen](https://github.com/stake-house/wagyu-key-gen)
-and your preferred tool for generating the hot
-wallet, such as [MetaMask](https://metamask.io/)
-or [MyEtherWallet](https://help.myetherwallet.com/en/articles/6512619-using-mew-offline-current-mew-version-6).
-If you choose to use your own methods, you will need to generate public key file via `generate-public-keys` command.
-
-**The deposit data flow is deprecated and will no longer be supported after the v4 StakeWise Operator release. If you rely on this feature, please continue using an older version.**
+The Operator Service includes built-in functionality to generate all of the above.
+Alternatively, you may use your preferred methods to generate keystores (e.g., [Wagyu Keygen](https://github.com/stake-house/wagyu-key-gen))
+and create the hot wallet (e.g., [MetaMask](https://metamask.io/) or [MyEtherWallet](https://help.myetherwallet.com/en/articles/6512619-using-mew-offline-current-mew-version-6)).
+If you choose to use your own methods, you will need to generate the public key file using the `export-public-keys` command.
 
 The below steps walk you through this set-up using Operator Service:
 
@@ -246,7 +242,7 @@ Please type your mnemonic (separated by spaces) to confirm you have written it d
 : pumpkin anxiety private salon inquiry ....
 
 done.
-Successfully initialized configuration for StakeWise operator
+Successfully initialized configuration for StakeWise Operator
 ```
 
 ### Step 2. Create validator keys
@@ -262,16 +258,15 @@ you have your newly created mnemonic to hand:
 Enter the number of the validator keys to generate: 10
 Enter the mnemonic for generating the validator keys: pumpkin anxiety private salon inquiry ....
 Creating validator keys:    [####################################]  10/10
-Generating deposit data JSON    [####################################]  10/10
 Exporting validator keystores    [####################################]  10/10
 
-Done. Generated 10 keys for StakeWise operator.
+Done. Generated 10 keys for StakeWise Operator.
 Keystores saved to /home/user/.stakewise/keystores file
-Validators keys saved to /home/user/.stakewise/validators.txt file
+Validator public keys saved to /home/user/.stakewise/validators.txt file
 ```
 
-You may not want the operator service to have direct access to the validator keys. Validator keystores do not need to be
-present directly in the operator. You can check
+You may not want the Operator service to have direct access to the validator keys. Validator keystores do not need to be
+present directly in the Operator. You can check
 the [remote signer](https://docs.stakewise.io/for-operators/operator-service/running-with-remote-signer)
 or [Hashicorp Vault](https://docs.stakewise.io/for-operators/operator-service/running-with-hashi-vault) guides on how to
 run Operator Service with them.
@@ -297,20 +292,20 @@ Done. The wallet and password saved to /home/user/.stakewise/wallet directory. T
 0.01 ETH with 30 Gwei gas price. You must keep an eye on your wallet balance, otherwise validators will stop registering
 if the balance falls too low.**
 
-### Step 4. Setup validators manager role for vaults
+### Step 4. Setup validators manager role
 
-Once you have created your validator keys and hot wallet, you need to setup vaults to use wallet address as validators manager.
-Setup can be achieved either through the StakeWise UI and can only be done by the [Vault Admin](https://docs-v3.stakewise.io/protocol-overview-in-depth/vaults#governance-and-management).
+You must assign the Validators Manager role to the wallet address created in the previous step.
+This setup can be completed via the StakeWise UI and must be performed by the [Vault Admin](https://docs-v3.stakewise.io/protocol-overview-in-depth/vaults#governance-and-management).
 
 #### StakeWise UI
 
 1. Connect with your wallet and head to the Operate page.
-2. Select the Vault you want to change validators manager role to.
+2. Select the Vault for which you want to change the validators manager role.
 3. In the upper right corner, click on "Settings" and open the "Roles" tab. The "Settings" button is only visible
-   to the Vault Admin or Keys Manager.
-4. Enter wallet address to "Validators manager" field.
-5. Click Save and a transaction will be created to sign using your wallet. The Vault's validators manager role will be
-   updated when the transaction is confirmed on the network.
+   to the Vault Admin or Validators Manager.
+4. Enter the wallet address in the "Validators manager" field.
+5. Click "Save" to create a transaction that you will need to sign with your wallet. The Validators Manager role will be
+   updated once the transaction is confirmed on the network.
 
 You are all set! Now it's time to run the Operator Service.
 
@@ -333,7 +328,7 @@ If you **did not** use Operator Service to generate validator keys, you will nee
 
 #### Using binary
 
-You can start the operator service using binary with the following command:
+You can start the Operator service using binary with the following command:
 
 ```bash
 ./operator start --vaults=0x000...,0x111... --consensus-endpoints=http://localhost:5052 --execution-endpoints=http://localhost:8545
@@ -374,10 +369,10 @@ within your Vault!**
 Operator Service has many different commands that are not mandatory but might come in handy:
 
 - [Validators voluntary exit](#validators-voluntary-exit)
-- [Update Vaults state (Harvest Vaults)](#update-vaults-state-harvest-vaults)
+- [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
 - [Add validator keys to Vault](#add-validator-keys-to-vault)
 - [Recover validator keystores](#recover-validator-keystores)
-- [Self report to Rated](#rated-self-report)
+- [Self report to Rated Network](#rated-self-report-network)
 
 ### Add validator keys to Vault
 
@@ -402,14 +397,14 @@ Are you sure you want to exit 3 validators with indexes: 513571, 513572, 513861?
 Validators 513571, 513572, 513861 exits successfully initiated
 ```
 
-### Update Vaults state (Harvest Vaults)
+### Update Vault state (Harvest Vault)
 
 Updating the _Vault state_ distributes the Vault fee to the Vault fee address and updates each staker's position. If an
 ERC-20 token was chosen during Vault creation, the Vault specific ERC-20 reprices based on the rewards/penalties since
 the previous update and the Vault fees are distributed in newly minted ERC-20 tokens.
 
 By default, each _Vault state_ gets updated whenever a user interacts with the Vault (deposit, withdraw, etc.), with a
-12 hours cooldown. Vault state can also be updated by the Vault operator(s) by passing the `--harvest-vault` flag to the
+12 hours cooldown. Vault state can also be updated by the Vault Operator(s) by passing the `--harvest-vault` flag to the
 Operator Service `start` command. Harvest occurs every 12 hours and the gas fees are paid by the hot wallet linked to
 the Operator Service.
 
@@ -470,11 +465,11 @@ Here's an example of how to use the command:
 python src/main.py rated-self-report --vaults <your-vault-addresses> --network <network-name> --pool-tag <pool-tag> --token <your-oauth-token> --data-dir <path-to-data-dir>
 ```
 
-### Generate validators file
+### Export validators file
 
 This command fetches available public keys from local keystores and exports them to a validators.txt file.
 
-To use the `generate-public-keys` command, you can provide the following parameters:
+To use the `export-public-keys` command, you can provide the following parameters:
 
 - `--data-dir`: Path where the vault data will be placed. Default is ~/.stakewise.
 - `--keystores-dir` - The directory with validator keys in the EIP-2335 standard.
@@ -482,7 +477,7 @@ To use the `generate-public-keys` command, you can provide the following paramet
 Here's an example of how to use the command:
 
 ```bash
-python src/main.py generate-public-keys --data-dir <path-to-data-dir>
+python src/main.py export-public-keys --data-dir <path-to-data-dir>
 ```
 
 ## Contacts
