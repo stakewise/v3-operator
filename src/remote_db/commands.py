@@ -75,7 +75,7 @@ def remote_db_group(
 
     settings.set(
         vaults=[],
-        config_dir=config.config_dir,
+        data_dir=config.data_dir,
         network=network,
         keystores_dir=keystores_dir,
         verbose=verbose,
@@ -142,7 +142,7 @@ def upload_keypairs(
 ) -> None:
     settings.set(
         vaults=[],
-        config_dir=settings.config_dir,
+        data_dir=settings.data_dir,
         network=settings.network,
         keystores_dir=str(settings.keystores_dir),
         verbose=settings.verbose,
@@ -261,7 +261,7 @@ def setup_validator(
 )
 @click.pass_context
 def setup_operator(ctx: Context, output_dir: str | None) -> None:
-    dest_dir = Path(output_dir) if output_dir is not None else settings.config_dir
+    dest_dir = Path(output_dir) if output_dir is not None else settings.data_dir
     tasks.setup_operator(
         db_url=ctx.obj['db_url'],
         output_dir=dest_dir,

@@ -24,7 +24,7 @@ DEFAULT_HASHI_VAULT_ENGINE_NAME = 'secret'
 # pylint: disable-next=too-many-public-methods,too-many-instance-attributes
 class Settings(metaclass=Singleton):
     vaults: list[ChecksumAddress]
-    config_dir: Path
+    data_dir: Path
     network: str
     consensus_endpoints: list[str]
     consensus_timeout: int
@@ -96,7 +96,7 @@ class Settings(metaclass=Singleton):
     def set(
         self,
         vaults: list[ChecksumAddress],
-        config_dir: Path,
+        data_dir: Path,
         network: str,
         consensus_endpoints: str = '',
         execution_endpoints: str = '',
@@ -131,8 +131,8 @@ class Settings(metaclass=Singleton):
         min_validators_registration: int = DEFAULT_MIN_VALIDATORS_REGISTRATION,
     ) -> None:
         self.vaults = vaults
-        config_dir.mkdir(parents=True, exist_ok=True)
-        self.config_dir = config_dir
+        data_dir.mkdir(parents=True, exist_ok=True)
+        self.data_dir = data_dir
         self.network = network
 
         self.consensus_endpoints = [node.strip() for node in consensus_endpoints.split(',')]
@@ -152,20 +152,20 @@ class Settings(metaclass=Singleton):
         self.min_validators_registration = min_validators_registration
 
         self.validator_keys_file = (
-            Path(validator_keys_file) if validator_keys_file else config_dir / 'validators.txt'
+            Path(validator_keys_file) if validator_keys_file else data_dir / 'validators.txt'
         )
 
         # keystores
-        self.keystores_dir = Path(keystores_dir) if keystores_dir else config_dir / 'keystores'
+        self.keystores_dir = Path(keystores_dir) if keystores_dir else data_dir / 'keystores'
         self.keystores_password_dir = decouple_config(
             'KEYSTORES_PASSWORD_DIR',
             cast=Path,
-            default=config_dir / 'keystores',
+            default=data_dir / 'keystores',
         )
         self.keystores_password_file = (
             Path(keystores_password_file)
             if keystores_password_file
-            else config_dir / 'keystores' / 'password.txt'
+            else data_dir / 'keystores' / 'password.txt'
         )
 
         # remote signer configuration
@@ -189,15 +189,15 @@ class Settings(metaclass=Singleton):
 
         # hot wallet
         self.hot_wallet_file = (
-            Path(hot_wallet_file) if hot_wallet_file else config_dir / 'wallet' / 'wallet.json'
+            Path(hot_wallet_file) if hot_wallet_file else data_dir / 'wallet' / 'wallet.json'
         )
         self.hot_wallet_password_file = (
             Path(hot_wallet_password_file)
             if hot_wallet_password_file
-            else config_dir / 'wallet' / 'password.txt'
+            else data_dir / 'wallet' / 'password.txt'
         )
 
-        db_dir = Path(database_dir) if database_dir else config_dir
+        db_dir = Path(database_dir) if database_dir else data_dir
         self.database = db_dir / 'operator.db'
 
         self.log_level = log_level or 'INFO'

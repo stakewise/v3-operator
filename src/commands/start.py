@@ -259,7 +259,7 @@ def start(
 
     settings.set(
         vaults=vaults,
-        config_dir=operator_config.config_dir,
+        data_dir=operator_config.data_dir,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
         execution_jwt_secret=execution_jwt_secret,

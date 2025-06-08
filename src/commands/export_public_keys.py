@@ -6,14 +6,11 @@ from pathlib import Path
 
 import click
 from eth_typing import HexStr
-from eth_utils import add_0x_prefix
-from staking_deposit.key_handling.keystore import ScryptKeystore
 
 from src.common.utils import log_verbose
 from src.config.config import OperatorConfig
 from src.config.settings import settings
-from src.validators.exceptions import KeystoreException
-from src.validators.keystores.local import KeystoreFile, LocalKeystore
+from src.validators.keystores.local import LocalKeystore
 
 logger = logging.getLogger(__name__)
 
@@ -32,14 +29,21 @@ logger = logging.getLogger(__name__)
     help='Absolute path to the directory with all the encrypted keystores. '
     'Default is the directory generated with "create-keys" command.',
 )
+@click.option(
+    '-v',
+    '--verbose',
+    help='Enable debug mode. Default is false.',
+    envvar='VERBOSE',
+    is_flag=True,
+)
 @click.command(
     help='Fetch available public keys from local keystores and export them to validators.txt.'
 )
 # pylint: disable-next=too-many-arguments
 def export_public_keys(
-    verbose: bool,
     data_dir: str,
     keystores_dir: str | None,
+    verbose: bool,
 ) -> None:
     operator_config = OperatorConfig(Path(data_dir))
     operator_config.load()
@@ -47,10 +51,10 @@ def export_public_keys(
 
     settings.set(
         vaults=[],
-        config_dir=operator_config.config_dir,
-        verbose=verbose,
         network=network,
+        data_dir=operator_config.data_dir,
         keystores_dir=keystores_dir,
+        verbose=verbose,
     )
 
     try:
@@ -61,31 +65,14 @@ def export_public_keys(
 
 
 async def main() -> None:
-    keystore_files = LocalKeystore.list_keystore_files()
     logger.info('Loading keystores from %s...', settings.keystores_dir)
-    keys = [
-        _read_keystore_file(keystore_file, settings.keystores_dir)
-        for keystore_file in keystore_files
-    ]
-    keys.sort(key=lambda x: x[0])
-    _export_validators_keys(public_keys=[x[1] for x in keys])
-    logger.info('Saved %d public keys to validators.txt', len(keys))
-
-
-def _read_keystore_file(keystore_file: KeystoreFile, keystore_path: Path) -> tuple[int, HexStr]:
-    """Return tuple of keystore index and public key."""
-    file_name = keystore_file.name
-    file_path = keystore_path / file_name
-    try:
-        keystore = ScryptKeystore.from_file(file_path)
-        index = keystore.path.split('/')[-3]
-        return int(index), add_0x_prefix(HexStr(keystore.pubkey))
-    except BaseException as e:
-        raise KeystoreException(f'Invalid keystore format in file "{file_name}"') from e
+    public_keys = LocalKeystore.get_exported_public_keys()
+    _export_validators_keys(public_keys)
+    logger.info('Saved %d public keys to validators.txt', len(public_keys))
 
 
 def _export_validators_keys(public_keys: list[HexStr]) -> None:
-    filename = settings.config_dir / 'validators.txt'
+    filename = settings.data_dir / 'validators.txt'
     if filename.exists():
         click.confirm(
             'Remove existing validators.txt file?',

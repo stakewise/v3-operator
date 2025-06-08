@@ -49,9 +49,6 @@ class ApprovalRequest:
     validators_manager_signature: HexStr
     deadline: int
 
-    # legacy
-    proof: list[HexStr] | None = None
-
 
 class ValidatorsRegistrationMode(Enum):
     """

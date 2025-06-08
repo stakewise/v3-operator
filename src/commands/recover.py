@@ -105,12 +105,12 @@ def recover(
     config = OperatorConfig(
         Path(data_dir),
     )
-    if not config.config_dir.exists():
+    if not config.data_dir.exists():
         # create vault dir if it does not exist
-        config.config_dir.mkdir(parents=True)
-        click.secho(f'Vault directory {config.config_dir} created.', bold=True, fg='green')
+        config.data_dir.mkdir(parents=True)
+        click.secho(f'Vault directory {config.data_dir} created.', bold=True, fg='green')
 
-    keystores_dir = config.config_dir / 'keystores'
+    keystores_dir = config.data_dir / 'keystores'
     password_file = keystores_dir / 'password.txt'
 
     settings.set(
@@ -118,7 +118,7 @@ def recover(
         consensus_endpoints=consensus_endpoints,
         vaults=vaults,
         network=network,
-        config_dir=config.config_dir,
+        data_dir=config.data_dir,
         log_level=log_level,
     )
 
@@ -153,7 +153,7 @@ async def main(
     validators: dict[HexStr, ValidatorStatus | None] = {}
     for vault in settings.vaults:
         vault_validators = await _fetch_registered_validators(vault)
-        validators = validators | vault_validators
+        validators.update(vault_validators)
 
     if not validators:
         raise click.ClickException('No registered validators')

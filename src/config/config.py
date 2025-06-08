@@ -18,22 +18,22 @@ class OperatorConfig:
         self,
         data_dir: Path,
     ):
-        self.config_dir = Path(data_dir)
-        self.config_path = self.config_dir / 'config.json'
+        self.data_dir = Path(data_dir)
+        self.config_path = self.data_dir / 'config.json'
 
     @property
     def exists(self) -> bool:
         return self.config_path.is_file()
 
     @property
-    def tmp_config_dir(self) -> Path:
-        return self.config_dir / '.tmp'
+    def tmp_data_dir(self) -> Path:
+        return self.data_dir / '.tmp'
 
     def create_tmp_dir(self) -> None:
-        self.tmp_config_dir.mkdir(parents=True, exist_ok=True)
+        self.tmp_data_dir.mkdir(parents=True, exist_ok=True)
 
     def remove_tmp_dir(self) -> None:
-        shutil.rmtree(self.tmp_config_dir)
+        shutil.rmtree(self.tmp_data_dir)
 
     def load(self, mnemonic: str | None = None) -> None:
         if self.config_path.is_file():
@@ -59,7 +59,7 @@ class OperatorConfig:
             'mnemonic_next_index': self.mnemonic_next_index,
             'first_public_key': self.first_public_key,
         }
-        self.config_dir.mkdir(parents=True, exist_ok=True)
+        self.data_dir.mkdir(parents=True, exist_ok=True)
         with self.config_path.open('w') as f:
             json.dump(config, f)
 

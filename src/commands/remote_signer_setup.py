@@ -111,7 +111,7 @@ def remote_signer_setup(
     config.load()
     settings.set(
         vaults=[],
-        config_dir=config.config_dir,
+        data_dir=config.data_dir,
         network=config.network,
         keystores_dir=keystores_dir,
         remote_signer_url=remote_signer_url,

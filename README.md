@@ -246,9 +246,7 @@ Successfully initialized configuration for StakeWise Operator
 ```
 
 ### Step 2. Create validator keys
-
-Next, run the `create-keys` command to kickstart the deposit data and validator keystores creation process, making sure
-you have your newly created mnemonic to hand:
+Next, run the `create-keys` command to derive validator keystores from the mnemonic:
 
 ```bash
 ./operator create-keys

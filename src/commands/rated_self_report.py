@@ -66,7 +66,7 @@ def rated_self_report(
 
     settings.set(
         vaults=vaults,
-        config_dir=operator_config.config_dir,
+        data_dir=operator_config.data_dir,
         network=network,
         execution_endpoints='',
         consensus_endpoints='',

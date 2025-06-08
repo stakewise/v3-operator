@@ -57,12 +57,12 @@ def import_genesis_keys(
     settings.set(
         vaults=[vault],
         network=network,
-        config_dir=operator_config.config_dir,
+        data_dir=operator_config.data_dir,
     )
     if settings.network_config.GENESIS_VAULT_CONTRACT_ADDRESS != vault:
         raise click.ClickException('The command is only for the genesis vault.')
 
-    keystores_dir = operator_config.config_dir / 'keystores'
+    keystores_dir = operator_config.data_dir / 'keystores'
     password_file = keystores_dir / 'password.txt'
     password = get_or_create_password_file(password_file)
 

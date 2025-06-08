@@ -152,7 +152,7 @@ def validators_exit(
     settings.set(
         vaults=[],
         network=network,
-        config_dir=operator_config.config_dir,
+        data_dir=operator_config.data_dir,
         consensus_endpoints=consensus_endpoints,
         remote_signer_url=remote_signer_url,
         hashi_vault_token=hashi_vault_token,

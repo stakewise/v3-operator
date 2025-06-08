@@ -175,7 +175,7 @@ def fake_settings(
 ):
     settings.set(
         vaults=[vault_address],
-        config_dir=config_dir,
+        data_dir=config_dir,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
         network=HOODI,

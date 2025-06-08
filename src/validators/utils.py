@@ -136,7 +136,7 @@ async def get_available_validators(
     vault_address: ChecksumAddress,
     available_public_keys: list[HexStr],
 ) -> Sequence[Validator]:
-    """move out execution.py"""
+    """Returns list of available validators for registration."""
     available_public_keys = filter_nonregistered_public_keys(
         available_public_keys=available_public_keys,
         count=count,

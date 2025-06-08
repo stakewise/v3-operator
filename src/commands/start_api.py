@@ -141,7 +141,7 @@ AUTO = 'AUTO'
     callback=validate_eth_addresses,
     envvar='VAULTS',
     prompt='Enter comma separated list of your vault addresses',
-    help='Comma separated list of address of the vault to register validators for.',
+    help='Addresses of the vaults to register validators for.',
 )
 @click.option(
     '--log-format',
@@ -221,7 +221,7 @@ def start_api(
 
     settings.set(
         vaults=vaults,
-        config_dir=operator_config.config_dir,
+        data_dir=operator_config.data_dir,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
         execution_jwt_secret=execution_jwt_secret,

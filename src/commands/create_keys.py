@@ -3,12 +3,15 @@ from os import makedirs, path
 from pathlib import Path
 
 import click
+from eth_typing import HexStr
 
 from src.common.credentials import Credential, CredentialManager
 from src.common.password import generate_password, get_or_create_password_file
 from src.common.utils import greenify
 from src.common.validators import validate_mnemonic
 from src.config.config import OperatorConfig
+from src.config.settings import settings
+from src.validators.keystores.local import LocalKeystore
 
 
 @click.option(
@@ -56,8 +59,14 @@ def create_keys(
     operator_config = OperatorConfig(Path(data_dir))
     operator_config.load(mnemonic)
 
-    validators_file = operator_config.config_dir / 'validators.txt'
-    keystores_dir = operator_config.config_dir / 'keystores'
+    settings.set(
+        vaults=[],
+        network=operator_config.network,
+        data_dir=operator_config.data_dir,
+    )
+
+    validators_file = operator_config.data_dir / 'validators.txt'
+    keystores_dir = operator_config.data_dir / 'keystores'
     password_file = keystores_dir / 'password.txt'
 
     credentials = CredentialManager.generate_credentials(
@@ -70,8 +79,8 @@ def create_keys(
 
     # first generate files in tmp directory
     operator_config.create_tmp_dir()
-    tmp_validators_file = operator_config.tmp_config_dir / 'validators.txt'
-    tmp_keystores_dir = operator_config.tmp_config_dir / 'keystores'
+    tmp_validators_file = operator_config.tmp_data_dir / 'validators.txt'
+    tmp_keystores_dir = operator_config.tmp_data_dir / 'keystores'
     try:
         _export_keystores(
             credentials=credentials,
@@ -80,7 +89,9 @@ def create_keys(
             per_keystore_password=per_keystore_password,
             pool_size=pool_size,
         )
-        _export_validators_keys(credentials=credentials, filename=str(tmp_validators_file))
+        public_keys = LocalKeystore.get_exported_public_keys()
+        public_keys.extend([c.public_key for c in credentials])
+        _export_validators_keys(public_keys=public_keys, filename=str(tmp_validators_file))
         operator_config.increment_mnemonic_index(count)
 
         # move files from tmp dir
@@ -99,11 +110,11 @@ def create_keys(
     )
 
 
-def _export_validators_keys(credentials: list[Credential], filename: str) -> None:
+def _export_validators_keys(public_keys: list[HexStr], filename: str) -> None:
     makedirs(path.dirname(path.abspath(filename)), exist_ok=True)
     with open(filename, 'w', encoding='utf-8') as f:
-        for c in credentials:
-            f.write(f'{c.public_key}\n')
+        for public_key in public_keys:
+            f.write(f'{public_key}\n')
 
 
 def _export_keystores(

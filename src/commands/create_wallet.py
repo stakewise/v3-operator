@@ -31,7 +31,7 @@ from src.config.config import OperatorConfig
 def create_wallet(mnemonic: str, data_dir: str) -> None:
     operator_config = OperatorConfig(Path(data_dir))
     operator_config.load()
-    wallet_dir = operator_config.config_dir / 'wallet'
+    wallet_dir = operator_config.data_dir / 'wallet'
 
     wallet_dir.mkdir(parents=True, exist_ok=True)
     address = _generate_encrypted_wallet(mnemonic, wallet_dir)
