@@ -18,7 +18,7 @@ from src.common.metrics import metrics
 from src.common.tasks import BaseTask
 from src.common.typings import HarvestParams, OraclesApproval
 from src.common.utils import RateLimiter, get_current_timestamp
-from src.config.settings import DEPOSIT_AMOUNT, settings
+from src.config.settings import DEPOSIT_AMOUNT, PUBLIC_KEYS_FILENAME, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import MissingAvailableValidatorsException
 from src.validators.execution import (
@@ -138,9 +138,11 @@ async def process_validators(
         if not validators:
             if not settings.disable_available_validators_warnings:
                 logger.warning(
-                    'There are no available public keys in the current validators.txt file '
+                    'There are no available public keys '
+                    'in the current %s file '
                     'to proceed with registration. '
-                    'To register additional validators, you must generate new keys.'
+                    'To register additional validators, you must generate new keys.',
+                    PUBLIC_KEYS_FILENAME,
                 )
             return None
     else:
@@ -151,9 +153,11 @@ async def process_validators(
         except MissingAvailableValidatorsException:
             if not settings.disable_available_validators_warnings:
                 logger.warning(
-                    'There are no available public keys in the current validators.txt file '
+                    'There are no available public keys '
+                    'in the current %s file '
                     'to proceed with registration. '
-                    'To register additional validators, you must generate new keys.'
+                    'To register additional validators, you must generate new keys.',
+                    PUBLIC_KEYS_FILENAME,
                 )
             return None
 

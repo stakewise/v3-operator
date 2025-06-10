@@ -84,7 +84,7 @@ class RemoteSignerKeystore(BaseKeystore):
     def public_keys(self) -> list[HexStr]:
         return self._public_keys
 
-    async def get_deposit_datum(
+    async def get_validator_deposits(
         self,
         public_keys: list[HexStr],
         vault_address: ChecksumAddress,

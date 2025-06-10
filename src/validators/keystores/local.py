@@ -79,7 +79,7 @@ class LocalKeystore(BaseKeystore):
     def __len__(self) -> int:
         return len(self.keys)
 
-    async def get_deposit_datum(
+    async def get_validator_deposits(
         self, public_keys: list[HexStr], vault_address: ChecksumAddress
     ) -> list[dict]:
         private_keys = [self.keys[public_key] for public_key in public_keys]

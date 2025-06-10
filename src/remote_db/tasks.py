@@ -11,7 +11,7 @@ from eth_typing import ChecksumAddress, HexStr
 from web3 import Web3
 
 from src.common.utils import greenify
-from src.config.settings import settings
+from src.config.settings import PUBLIC_KEYS_FILENAME, settings
 from src.remote_db.database import KeyPairsCrud, get_db_connection
 from src.remote_db.typings import RemoteDatabaseKeyPair
 from src.validators.keystores.local import LocalKeystore
@@ -187,12 +187,12 @@ def setup_operator(db_url: str, output_dir: Path) -> None:
     if not output_dir.exists():
         output_dir.mkdir(parents=True, exist_ok=True)
 
-    output_file = output_dir / 'validators.txt'
+    output_file = output_dir / PUBLIC_KEYS_FILENAME
     with open(output_file, 'w', encoding='utf-8') as f:
         for public_key in public_keys:
             f.write(f'{public_key}\n')
 
-    click.secho(f'Operator validators saved to {greenify(output_file)} file.')
+    click.secho(f'Public keys saved to {greenify(output_file)} file.')
 
 
 def _check_encryption_key(db_url: str, b64_encrypt_key: str) -> bytes:

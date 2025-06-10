@@ -23,7 +23,7 @@ from src.validators.keystores.load import load_keystore
 from src.validators.relayer import RelayerAdapter, create_relayer_adapter
 from src.validators.tasks import ValidatorsTask, load_genesis_validators
 from src.validators.typings import ValidatorsRegistrationMode
-from src.validators.utils import load_validators_keys
+from src.validators.utils import load_public_keys
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ async def start_base() -> None:
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
         keystore = await load_keystore()
 
-        available_public_keys = load_validators_keys(settings.validator_keys_file)
+        available_public_keys = load_public_keys(settings.public_keys_file)
     else:
         relayer_adapter = create_relayer_adapter()
 

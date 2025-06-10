@@ -9,7 +9,7 @@ from eth_typing import HexStr
 
 from src.common.utils import log_verbose
 from src.config.config import OperatorConfig
-from src.config.settings import settings
+from src.config.settings import PUBLIC_KEYS_FILENAME, settings
 from src.validators.keystores.local import LocalKeystore
 
 logger = logging.getLogger(__name__)
@@ -67,15 +67,15 @@ def export_public_keys(
 async def main() -> None:
     logger.info('Loading keystores from %s...', settings.keystores_dir)
     public_keys = LocalKeystore.get_exported_public_keys()
-    _export_validators_keys(public_keys)
+    _export_public_keys(public_keys)
     logger.info('Saved %d public keys to validators.txt', len(public_keys))
 
 
-def _export_validators_keys(public_keys: list[HexStr]) -> None:
-    filename = settings.data_dir / 'validators.txt'
+def _export_public_keys(public_keys: list[HexStr]) -> None:
+    filename = settings.data_dir / PUBLIC_KEYS_FILENAME
     if filename.exists():
         click.confirm(
-            'Remove existing validators.txt file?',
+            f'Remove existing {PUBLIC_KEYS_FILENAME} file?',
             default=True,
             abort=True,
         )

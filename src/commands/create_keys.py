@@ -10,7 +10,7 @@ from src.common.password import generate_password, get_or_create_password_file
 from src.common.utils import greenify
 from src.common.validators import validate_mnemonic
 from src.config.config import OperatorConfig
-from src.config.settings import settings
+from src.config.settings import PUBLIC_KEYS_FILENAME, settings
 from src.validators.keystores.local import LocalKeystore
 
 
@@ -65,7 +65,7 @@ def create_keys(
         data_dir=operator_config.data_dir,
     )
 
-    validators_file = operator_config.data_dir / 'validators.txt'
+    public_keys_file = operator_config.data_dir / PUBLIC_KEYS_FILENAME
     keystores_dir = operator_config.data_dir / 'keystores'
     password_file = keystores_dir / 'password.txt'
 
@@ -79,7 +79,7 @@ def create_keys(
 
     # first generate files in tmp directory
     operator_config.create_tmp_dir()
-    tmp_validators_file = operator_config.tmp_data_dir / 'validators.txt'
+    tmp_public_keys_file = operator_config.tmp_data_dir / PUBLIC_KEYS_FILENAME
     tmp_keystores_dir = operator_config.tmp_data_dir / 'keystores'
     try:
         _export_keystores(
@@ -91,12 +91,12 @@ def create_keys(
         )
         public_keys = LocalKeystore.get_exported_public_keys()
         public_keys.extend([c.public_key for c in credentials])
-        _export_validators_keys(public_keys=public_keys, filename=str(tmp_validators_file))
+        _export_public_keys(public_keys=public_keys, filename=str(tmp_public_keys_file))
         operator_config.increment_mnemonic_index(count)
 
         # move files from tmp dir
         keystores_dir.mkdir(exist_ok=True)
-        tmp_validators_file.replace(validators_file)
+        tmp_public_keys_file.replace(public_keys_file)
         for src_file in tmp_keystores_dir.glob('*'):
             src_file.rename(keystores_dir.joinpath(src_file.name))
 
@@ -106,11 +106,11 @@ def create_keys(
     click.echo(
         f'Done. Generated {greenify(count)} keys for StakeWise operator.\n'
         f'Keystores saved to {greenify(keystores_dir)} file\n'
-        f'Validator public keys saved to {greenify(path.abspath(validators_file))} file'
+        f'Validator public keys saved to {greenify(path.abspath(public_keys_file))} file'
     )
 
 
-def _export_validators_keys(public_keys: list[HexStr], filename: str) -> None:
+def _export_public_keys(public_keys: list[HexStr], filename: str) -> None:
     makedirs(path.dirname(path.abspath(filename)), exist_ok=True)
     with open(filename, 'w', encoding='utf-8') as f:
         for public_key in public_keys:

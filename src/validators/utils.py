@@ -142,7 +142,7 @@ async def get_available_validators(
         count=count,
     )
 
-    deposit_datum = await keystore.get_deposit_datum(available_public_keys, vault_address)
+    deposit_datum = await keystore.get_validator_deposits(available_public_keys, vault_address)
 
     validators = [
         Validator(
@@ -171,9 +171,9 @@ def filter_nonregistered_public_keys(
     return public_keys
 
 
-def load_validators_keys(validators_file: Path) -> list[HexStr]:
+def load_public_keys(public_keys_file: Path) -> list[HexStr]:
     """Loads available public keys from file."""
-    with open(validators_file, 'r', encoding='utf-8') as f:
+    with open(public_keys_file, 'r', encoding='utf-8') as f:
         public_keys = [HexStr(line.rstrip()) for line in f]
 
     return public_keys

@@ -10,6 +10,7 @@ from src.config.networks import MAINNET, NETWORKS, NetworkConfig
 from src.validators.typings import RelayerTypes, ValidatorsRegistrationMode
 
 DATA_DIR = Path.home() / '.stakewise'
+PUBLIC_KEYS_FILENAME = 'public_keys.txt'
 
 DEFAULT_METRICS_HOST = '127.0.0.1'
 DEFAULT_METRICS_PORT = 9100
@@ -42,7 +43,7 @@ class Settings(metaclass=Singleton):
     metrics_host: str
     metrics_port: int
     metrics_prefix: str
-    validator_keys_file: Path
+    public_keys_file: Path
     keystores_dir: Path
     keystores_password_dir: Path
     keystores_password_file: Path
@@ -108,7 +109,7 @@ class Settings(metaclass=Singleton):
         metrics_host: str = DEFAULT_METRICS_HOST,
         metrics_prefix: str = DEFAULT_METRICS_PREFIX,
         max_fee_per_gas_gwei: int | None = None,
-        validator_keys_file: str | None = None,
+        public_keys_file: str | None = None,
         keystores_dir: str | None = None,
         keystores_password_file: str | None = None,
         remote_signer_url: str | None = None,
@@ -151,8 +152,8 @@ class Settings(metaclass=Singleton):
         self.max_fee_per_gas_gwei = max_fee_per_gas_gwei
         self.min_validators_registration = min_validators_registration
 
-        self.validator_keys_file = (
-            Path(validator_keys_file) if validator_keys_file else data_dir / 'validators.txt'
+        self.public_keys_file = (
+            Path(public_keys_file) if public_keys_file else data_dir / PUBLIC_KEYS_FILENAME
         )
 
         # keystores
