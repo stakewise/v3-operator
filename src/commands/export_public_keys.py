@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 from eth_typing import HexStr
 
+from src.common.logging import setup_logging
 from src.common.utils import log_verbose
 from src.config.config import OperatorConfig
 from src.config.settings import PUBLIC_KEYS_FILENAME, settings
@@ -19,7 +20,7 @@ logger = logging.getLogger(__name__)
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
     envvar='DATA_DIR',
-    help='Path where the config data will be placed. Default is ~/.stakewise.',
+    help='Path where the keystores and config data will be placed. Default is ~/.stakewise.',
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
 )
 @click.option(
@@ -45,6 +46,7 @@ def export_public_keys(
     keystores_dir: str | None,
     verbose: bool,
 ) -> None:
+    setup_logging()
     operator_config = OperatorConfig(Path(data_dir))
     operator_config.load()
     network = operator_config.network
@@ -66,7 +68,7 @@ def export_public_keys(
 
 async def main() -> None:
     logger.info('Loading keystores from %s...', settings.keystores_dir)
-    public_keys = LocalKeystore.get_exported_public_keys()
+    public_keys = LocalKeystore.get_public_keys_from_keystore_files()
     _export_public_keys(public_keys)
     logger.info('Saved %d public keys to validators.txt', len(public_keys))
 

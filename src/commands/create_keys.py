@@ -18,7 +18,7 @@ from src.validators.keystores.local import LocalKeystore
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
     envvar='DATA_DIR',
-    help='Path where the config data will be placed. Default is ~/.stakewise.',
+    help='Path where the keystores and config data will be placed. Default is ~/.stakewise.',
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
 )
 @click.option(
@@ -89,7 +89,7 @@ def create_keys(
             per_keystore_password=per_keystore_password,
             pool_size=pool_size,
         )
-        public_keys = LocalKeystore.get_exported_public_keys()
+        public_keys = LocalKeystore.get_public_keys_from_keystore_files()
         public_keys.extend([c.public_key for c in credentials])
         _export_public_keys(public_keys=public_keys, filename=str(tmp_public_keys_file))
         operator_config.increment_mnemonic_index(count)

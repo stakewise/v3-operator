@@ -25,7 +25,7 @@ from src.config.settings import DEFAULT_NETWORK, settings
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
     envvar='DATA_DIR',
-    help='Path where the config data will be placed. Default is ~/.stakewise.',
+    help='Path where the keystores and config data will be placed. Default is ~/.stakewise.',
     type=click.Path(exists=False, file_okay=False, dir_okay=True),
 )
 @click.option(
@@ -197,7 +197,7 @@ async def main(
     config.save(settings.network, mnemonic, mnemonic_next_index)
     click.secho(
         f'Successfully recovered {greenify(mnemonic_next_index)} '
-        f'keystores for vaults {greenify(settings.vaults)}',
+        f'keystores for vaults {greenify(', '.join(settings.vaults))}',
     )
 
 

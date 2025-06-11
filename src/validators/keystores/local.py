@@ -114,7 +114,7 @@ class LocalKeystore(BaseKeystore):
         return list(self.keys.keys())
 
     @staticmethod
-    def get_exported_public_keys() -> list[HexStr]:
+    def get_public_keys_from_keystore_files() -> list[HexStr]:
         """Returns a list of public keys from the keystore files."""
         keystore_files = LocalKeystore.list_keystore_files()
         keys = [
