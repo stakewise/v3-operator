@@ -207,7 +207,7 @@ def start_api(
 ) -> None:
     operator_config = OperatorConfig(Path(data_dir))
     if network is None:
-        operator_config.load()
+        operator_config.load(network=network)
         network = operator_config.network
 
     if relayer_endpoint == AUTO and relayer_type == RelayerTypes.DVT:

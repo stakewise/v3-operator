@@ -21,6 +21,7 @@ from src.common.validators import (
     validate_eth_address,
 )
 from src.config.config import OperatorConfig
+from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import (
     REMOTE_SIGNER_TIMEOUT,
     REMOTE_SIGNER_UPLOAD_CHUNK_SIZE,
@@ -92,6 +93,14 @@ Used to retrieve vault validator fee recipient (only needed if flag --dappnode i
     callback=validate_dappnode_execution_endpoints,
     default='',
 )
+@click.option(
+    '--network',
+    help='The network of your vault.',
+    type=click.Choice(
+        AVAILABLE_NETWORKS,
+        case_sensitive=False,
+    ),
+)
 @click.command(help='Uploads private keys to a remote signer.')
 # pylint: disable-next=too-many-arguments
 def remote_signer_setup(
@@ -103,12 +112,13 @@ def remote_signer_setup(
     log_level: str,
     dappnode: bool,
     execution_endpoints: str,
+    network: str | None,
 ) -> None:
     if dappnode and not vault:
         raise click.ClickException('Enter your vault address for dappnode setup.')
 
     config = OperatorConfig(Path(data_dir))
-    config.load()
+    config.load(network=network)
     settings.set(
         vaults=[],
         data_dir=config.data_dir,

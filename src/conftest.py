@@ -150,7 +150,7 @@ def vault_address() -> HexAddress:
 
 @pytest.fixture
 def config_dir(data_dir: Path) -> Path:
-    config_dir = data_dir
+    config_dir = data_dir / HOODI
     return config_dir
 
 

@@ -62,7 +62,7 @@ def rated_self_report(
         return
 
     operator_config = OperatorConfig(Path(data_dir))
-    operator_config.load()
+    operator_config.load(network=network)
 
     settings.set(
         vaults=vaults,

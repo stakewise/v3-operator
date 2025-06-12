@@ -10,6 +10,7 @@ from src.common.password import get_or_create_password_file
 from src.common.utils import greenify
 from src.common.validators import validate_mnemonic
 from src.config.config import OperatorConfig
+from src.config.networks import AVAILABLE_NETWORKS
 
 
 @click.option(
@@ -27,10 +28,18 @@ from src.config.config import OperatorConfig
     hide_input=True,
     callback=validate_mnemonic,
 )
+@click.option(
+    '--network',
+    help='The network of your vault.',
+    type=click.Choice(
+        AVAILABLE_NETWORKS,
+        case_sensitive=False,
+    ),
+)
 @click.command(help='Creates the encrypted hot wallet from the mnemonic.')
-def create_wallet(mnemonic: str, data_dir: str) -> None:
+def create_wallet(mnemonic: str, data_dir: str, network: str | None) -> None:
     operator_config = OperatorConfig(Path(data_dir))
-    operator_config.load()
+    operator_config.load(network=network)
     wallet_dir = operator_config.data_dir / 'wallet'
 
     wallet_dir.mkdir(parents=True, exist_ok=True)

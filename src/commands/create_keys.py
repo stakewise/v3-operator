@@ -10,6 +10,7 @@ from src.common.password import generate_password, get_or_create_password_file
 from src.common.utils import greenify
 from src.common.validators import validate_mnemonic
 from src.config.config import OperatorConfig
+from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import PUBLIC_KEYS_FILENAME, settings
 from src.validators.keystores.local import LocalKeystore
 
@@ -47,6 +48,14 @@ from src.validators.keystores.local import LocalKeystore
     envvar='POOL_SIZE',
     type=int,
 )
+@click.option(
+    '--network',
+    help='The network of your vault.',
+    type=click.Choice(
+        AVAILABLE_NETWORKS,
+        case_sensitive=False,
+    ),
+)
 @click.command(help='Creates the validator keys from the mnemonic.')
 # pylint: disable-next=too-many-arguments
 def create_keys(
@@ -55,9 +64,10 @@ def create_keys(
     data_dir: str,
     per_keystore_password: bool,
     pool_size: int | None,
+    network: str | None,
 ) -> None:
     operator_config = OperatorConfig(Path(data_dir))
-    operator_config.load(mnemonic)
+    operator_config.load(network, mnemonic)
 
     settings.set(
         vaults=[],

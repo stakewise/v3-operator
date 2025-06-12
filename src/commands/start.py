@@ -253,10 +253,7 @@ def start(
     min_validators_registration: int,
 ) -> None:
     operator_config = OperatorConfig(Path(data_dir))
-    if network is None:
-        operator_config.load()
-        network = operator_config.network
-
+    operator_config.load(network=network)
     settings.set(
         vaults=vaults,
         data_dir=operator_config.data_dir,
@@ -269,7 +266,7 @@ def start(
         metrics_host=metrics_host,
         metrics_port=metrics_port,
         metrics_prefix=metrics_prefix,
-        network=network,
+        network=operator_config.network,
         keystores_dir=keystores_dir,
         keystores_password_file=keystores_password_file,
         remote_signer_url=remote_signer_url,

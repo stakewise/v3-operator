@@ -10,6 +10,7 @@ from eth_typing import HexStr
 from src.common.logging import setup_logging
 from src.common.utils import log_verbose
 from src.config.config import OperatorConfig
+from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import PUBLIC_KEYS_FILENAME, settings
 from src.validators.keystores.local import LocalKeystore
 
@@ -31,6 +32,14 @@ logger = logging.getLogger(__name__)
     'Default is the directory generated with "create-keys" command.',
 )
 @click.option(
+    '--network',
+    help='The network of your vault.',
+    type=click.Choice(
+        AVAILABLE_NETWORKS,
+        case_sensitive=False,
+    ),
+)
+@click.option(
     '-v',
     '--verbose',
     help='Enable debug mode. Default is false.',
@@ -44,11 +53,12 @@ logger = logging.getLogger(__name__)
 def export_public_keys(
     data_dir: str,
     keystores_dir: str | None,
+    network: str | None,
     verbose: bool,
 ) -> None:
     setup_logging()
     operator_config = OperatorConfig(Path(data_dir))
-    operator_config.load()
+    operator_config.load(network=network)
     network = operator_config.network
 
     settings.set(
