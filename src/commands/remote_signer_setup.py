@@ -9,10 +9,10 @@ from pathlib import Path
 import aiohttp
 import click
 from aiohttp import ClientTimeout
-from eth_typing import HexAddress
+from eth_typing import ChecksumAddress
 
 from src.common.clients import setup_clients
-from src.common.contracts import vault_contract
+from src.common.contracts import VaultContract
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.startup_check import wait_for_execution_node
 from src.common.utils import chunkify, log_verbose
@@ -20,7 +20,7 @@ from src.common.validators import (
     validate_dappnode_execution_endpoints,
     validate_eth_address,
 )
-from src.common.vault_config import VaultConfig
+from src.config.config import OperatorConfig
 from src.config.settings import (
     REMOTE_SIGNER_TIMEOUT,
     REMOTE_SIGNER_UPLOAD_CHUNK_SIZE,
@@ -33,11 +33,11 @@ logger = logging.getLogger(__name__)
 
 @click.option(
     '--vault',
-    prompt='Enter your vault address',
     help='Vault address',
     type=str,
     envvar='VAULT',
     callback=validate_eth_address,
+    default='',
 )
 @click.option(
     '--remote-signer-url',
@@ -50,7 +50,7 @@ logger = logging.getLogger(__name__)
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
     envvar='DATA_DIR',
-    help='Path where the vault data will be placed. Default is ~/.stakewise.',
+    help='Path where the keystores and config data will be placed. Default is ~/.stakewise.',
     type=click.Path(file_okay=False, dir_okay=True),
 )
 @click.option(
@@ -95,7 +95,7 @@ Used to retrieve vault validator fee recipient (only needed if flag --dappnode i
 @click.command(help='Uploads private keys to a remote signer.')
 # pylint: disable-next=too-many-arguments
 def remote_signer_setup(
-    vault: HexAddress,
+    vault: ChecksumAddress | None,
     remote_signer_url: str,
     data_dir: str,
     keystores_dir: str | None,
@@ -104,11 +104,14 @@ def remote_signer_setup(
     dappnode: bool,
     execution_endpoints: str,
 ) -> None:
-    config = VaultConfig(vault, Path(data_dir))
+    if dappnode and not vault:
+        raise click.ClickException('Enter your vault address for dappnode setup.')
+
+    config = OperatorConfig(Path(data_dir))
     config.load()
     settings.set(
-        vault=vault,
-        vault_dir=config.vault_dir,
+        vaults=[],
+        data_dir=config.data_dir,
         network=config.network,
         keystores_dir=keystores_dir,
         remote_signer_url=remote_signer_url,
@@ -125,11 +128,11 @@ def remote_signer_setup(
             asyncio.get_running_loop()
             # we need to create a separate thread so we can block before returning
             with ThreadPoolExecutor(1) as pool:
-                pool.submit(lambda: asyncio.run(main())).result()
+                pool.submit(lambda: asyncio.run(main(vault))).result()
         except RuntimeError as e:
             if 'no running event loop' == e.args[0]:
                 # no event loop running
-                asyncio.run(main())
+                asyncio.run(main(vault))
             else:
                 raise e
     except Exception as e:
@@ -137,7 +140,8 @@ def remote_signer_setup(
         sys.exit(1)
 
 
-async def main() -> None:
+# pylint: disable-next=too-many-locals
+async def main(vault: ChecksumAddress | None) -> None:
     setup_logging()
     await setup_clients()
 
@@ -164,7 +168,7 @@ async def main() -> None:
 
     if settings.dappnode:
         await wait_for_execution_node()
-
+        vault_contract = VaultContract(vault)
         fee_recipient = await vault_contract.mev_escrow()
         logger.info('Validator fee recipient retrieved from vault contract: %s', fee_recipient)
 

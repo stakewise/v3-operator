@@ -2,18 +2,12 @@ import logging
 from typing import Sequence
 
 from eth_typing import ChecksumAddress, HexStr
-from multiproof import MultiProof
 from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.exceptions import ContractLogicError
 
 from src.common.clients import execution_client
-from src.common.contracts import (
-    deposit_data_registry_contract,
-    multicall_contract,
-    vault_contract,
-    vault_v1_contract,
-)
+from src.common.contracts import VaultContract, multicall_contract
 from src.common.execution import build_gas_manager
 from src.common.typings import HarvestParams, OraclesApproval
 from src.common.utils import format_error
@@ -27,19 +21,25 @@ logger = logging.getLogger(__name__)
 
 # pylint: disable=too-many-arguments,too-many-locals
 async def register_validators(
+    vault_address: ChecksumAddress,
     approval: OraclesApproval,
-    multi_proof: MultiProof | None,
     validators: Sequence[Validator],
     harvest_params: HarvestParams | None,
     validators_registry_root: Bytes32,
     validators_manager_signature: HexStr | None,
 ) -> HexStr | None:
     tx_validators = [
-        Web3.to_bytes(tx_validator) for tx_validator in encode_tx_validator_list(validators)
+        Web3.to_bytes(tx_validator)
+        for tx_validator in encode_tx_validator_list(
+            validators=validators,
+            vault_address=vault_address,
+        )
     ]
     if harvest_params is not None:
         # add update state calls before validator registration
-        calls = await get_update_state_calls(harvest_params)
+        calls = await get_update_state_calls(
+            vault_address=vault_address, harvest_params=harvest_params
+        )
     else:
         # aggregate all the calls into one multicall
         calls = []
@@ -53,19 +53,16 @@ async def register_validators(
     )
 
     # add validators registration call
-    vault_version = await vault_contract.version()
     if len(tx_validators) == 1:
         validators_registration_call = _get_single_validator_registration_call(
-            vault_version=vault_version,
+            vault_address=vault_address,
             keeper_approval_params=keeper_approval_params,
-            multi_proof=multi_proof,
             validators_manager_signature=validators_manager_signature,
         )
     else:
         validators_registration_call = _get_multiple_validators_registration_call(
-            vault_version=vault_version,
+            vault_address=vault_address,
             keeper_approval_params=keeper_approval_params,
-            multi_proof=multi_proof,
             validators_manager_signature=validators_manager_signature,
         )
 
@@ -107,75 +104,24 @@ async def register_validators(
 
 
 def _get_single_validator_registration_call(
-    vault_version: int,
+    vault_address: ChecksumAddress,
     keeper_approval_params: tuple,
-    multi_proof: MultiProof | None,
     validators_manager_signature: HexStr | None,
 ) -> tuple[ChecksumAddress, HexStr]:
-    if validators_manager_signature:
-        return vault_contract.address, vault_contract.encode_abi(
-            fn_name='registerValidators',
-            args=[keeper_approval_params, Web3.to_bytes(hexstr=validators_manager_signature)],
-        )
-
-    if multi_proof is None:
-        raise RuntimeError('multi_proof required')
-
-    if vault_version == 1:
-        return vault_v1_contract.address, vault_v1_contract.encode_abi(
-            fn_name='registerValidator', args=[keeper_approval_params, multi_proof.proof]
-        )
-
-    return deposit_data_registry_contract.address, deposit_data_registry_contract.encode_abi(
-        fn_name='registerValidator',
-        args=[settings.vault, keeper_approval_params, multi_proof.proof],
+    vault_contract = VaultContract(vault_address)
+    return vault_address, vault_contract.encode_abi(
+        fn_name='registerValidators',
+        args=[keeper_approval_params, Web3.to_bytes(hexstr=validators_manager_signature)],
     )
 
 
 def _get_multiple_validators_registration_call(
-    vault_version: int,
+    vault_address: ChecksumAddress,
     keeper_approval_params: tuple,
-    multi_proof: MultiProof | None,
     validators_manager_signature: HexStr | None,
 ) -> tuple[ChecksumAddress, HexStr]:
-    if validators_manager_signature:
-        return vault_contract.address, vault_contract.encode_abi(
-            fn_name='registerValidators',
-            args=[keeper_approval_params, Web3.to_bytes(hexstr=validators_manager_signature)],
-        )
-
-    if multi_proof is None:
-        raise RuntimeError('multi_proof required')
-
-    deposit_data_indexes = [leaf[1] for leaf in multi_proof.leaves]
-    leaf_indexes = _calc_leaf_indexes(deposit_data_indexes)
-
-    if vault_version == 1:
-        return vault_v1_contract.address, vault_v1_contract.encode_abi(
-            fn_name='registerValidators',
-            args=[
-                keeper_approval_params,
-                leaf_indexes,
-                multi_proof.proof_flags,
-                multi_proof.proof,
-            ],
-        )
-
-    return deposit_data_registry_contract.address, deposit_data_registry_contract.encode_abi(
+    vault_contract = VaultContract(vault_address)
+    return vault_address, vault_contract.encode_abi(
         fn_name='registerValidators',
-        args=[
-            settings.vault,
-            keeper_approval_params,
-            leaf_indexes,
-            multi_proof.proof_flags,
-            multi_proof.proof,
-        ],
+        args=[keeper_approval_params, Web3.to_bytes(hexstr=validators_manager_signature)],
     )
-
-
-def _calc_leaf_indexes(deposit_data_indexes: list[int]) -> list[int]:
-    if not deposit_data_indexes:
-        return []
-
-    sorted_indexes = sorted(deposit_data_indexes)
-    return [deposit_data_indexes.index(index) for index in sorted_indexes]

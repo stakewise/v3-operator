@@ -9,8 +9,8 @@ from eth_typing import ChecksumAddress
 from src.commands.start_base import start_base
 from src.common.logging import LOG_LEVELS
 from src.common.utils import log_verbose
-from src.common.validators import validate_eth_address
-from src.common.vault_config import VaultConfig
+from src.common.validators import validate_eth_addresses
+from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS, GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
     DEFAULT_HASHI_VAULT_PARALLELISM,
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
     envvar='DATA_DIR',
-    help='Path where the vault data will be placed. Default is ~/.stakewise.',
+    help='Path where the keystores and config data will be placed. Default is ~/.stakewise.',
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
 )
 @click.option(
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
     envvar='DATABASE_DIR',
     help='The directory where the database will be created or read from. '
-    'Default is ~/.stakewise/<vault>.',
+    'Default is ~/.stakewise/.',
 )
 @click.option(
     '--max-fee-per-gas-gwei',
@@ -74,13 +74,6 @@ logger = logging.getLogger(__name__)
     envvar='KEYSTORES_DIR',
     help='Absolute path to the directory with all the encrypted keystores. '
     'Default is the directory generated with "create-keys" command.',
-)
-@click.option(
-    '--deposit-data-file',
-    type=click.Path(exists=True, file_okay=True, dir_okay=False),
-    envvar='DEPOSIT_DATA_FILE',
-    help='Path to the deposit_data.json file. '
-    'Default is the file generated with "create-keys" command.',
 )
 @click.option(
     '--network',
@@ -153,12 +146,12 @@ logger = logging.getLogger(__name__)
     help='Comma separated list of API endpoints for consensus nodes.',
 )
 @click.option(
-    '--vault',
+    '--vaults',
     type=ChecksumAddress,
-    callback=validate_eth_address,
+    callback=validate_eth_addresses,
     envvar='VAULT',
-    prompt='Enter the vault address',
-    help='Address of the vault to register validators for.',
+    prompt='Enter comma separated list of your vault addresses',
+    help='Addresses of the vaults to register validators for.',
 )
 @click.option(
     '--remote-signer-url',
@@ -230,7 +223,7 @@ logger = logging.getLogger(__name__)
 @click.command(help='Start operator service')
 # pylint: disable-next=too-many-arguments,too-many-locals
 def start(
-    vault: ChecksumAddress,
+    vaults: list[ChecksumAddress],
     consensus_endpoints: str,
     execution_endpoints: str,
     execution_jwt_secret: str | None,
@@ -244,7 +237,6 @@ def start(
     log_level: str,
     log_format: str,
     network: str | None,
-    deposit_data_file: str | None,
     keystores_dir: str | None,
     keystores_password_file: str | None,
     remote_signer_url: str | None,
@@ -260,14 +252,14 @@ def start(
     pool_size: int | None,
     min_validators_registration: int,
 ) -> None:
-    vault_config = VaultConfig(vault, Path(data_dir))
+    operator_config = OperatorConfig(Path(data_dir))
     if network is None:
-        vault_config.load()
-        network = vault_config.network
+        operator_config.load()
+        network = operator_config.network
 
     settings.set(
-        vault=vault,
-        vault_dir=vault_config.vault_dir,
+        vaults=vaults,
+        data_dir=operator_config.data_dir,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
         execution_jwt_secret=execution_jwt_secret,
@@ -278,7 +270,6 @@ def start(
         metrics_port=metrics_port,
         metrics_prefix=metrics_prefix,
         network=network,
-        deposit_data_file=deposit_data_file,
         keystores_dir=keystores_dir,
         keystores_password_file=keystores_password_file,
         remote_signer_url=remote_signer_url,

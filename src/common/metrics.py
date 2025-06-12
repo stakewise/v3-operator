@@ -8,7 +8,7 @@ import src
 from src.common.clients import execution_client
 from src.common.consensus import get_chain_finalized_head
 from src.common.tasks import BaseTask
-from src.config.settings import settings
+from src.config.settings import PUBLIC_KEYS_FILENAME, settings
 
 
 # pylint: disable=too-few-public-methods
@@ -59,7 +59,7 @@ class Metrics:
         )
         self.unused_validator_keys = Gauge(
             'unused_validator_keys',
-            'The number of unused validator keys in deposit data file',
+            f'The number of unused validator keys in {PUBLIC_KEYS_FILENAME} file',
             namespace=settings.metrics_prefix,
             labelnames=['network'],
         )

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import click
 from aiohttp import ClientResponseError
-from eth_typing import HexAddress, HexStr
+from eth_typing import HexStr
 from sw_utils import ValidatorStatus
 from sw_utils.consensus import EXITED_STATUSES
 from web3 import Web3
@@ -14,8 +14,7 @@ from web3 import Web3
 from src.common.clients import consensus_client
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import format_error, log_verbose
-from src.common.validators import validate_eth_address
-from src.common.vault_config import VaultConfig
+from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import (
     DEFAULT_HASHI_VAULT_ENGINE_NAME,
@@ -48,15 +47,8 @@ EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
     envvar='DATA_DIR',
-    help='Path where the vault data is placed. Default is ~/.stakewise.',
+    help='Path where the config data is placed. Default is ~/.stakewise.',
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
-)
-@click.option(
-    '--vault',
-    prompt='Enter your vault address',
-    help='Vault address',
-    type=str,
-    callback=validate_eth_address,
 )
 @click.option(
     '--count',
@@ -137,7 +129,6 @@ EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
 # pylint: disable-next=too-many-arguments,too-many-locals
 def validators_exit(
     network: str,
-    vault: HexAddress,
     count: int | None,
     consensus_endpoints: str,
     remote_signer_url: str,
@@ -153,15 +144,15 @@ def validators_exit(
     pool_size: int | None,
 ) -> None:
     # pylint: disable=duplicate-code
-    vault_config = VaultConfig(vault, Path(data_dir))
+    operator_config = OperatorConfig(Path(data_dir))
     if network is None:
-        vault_config.load()
-        network = vault_config.network
+        operator_config.load()
+        network = operator_config.network
 
     settings.set(
-        vault=vault,
+        vaults=[],
         network=network,
-        vault_dir=vault_config.vault_dir,
+        data_dir=operator_config.data_dir,
         consensus_endpoints=consensus_endpoints,
         remote_signer_url=remote_signer_url,
         hashi_vault_token=hashi_vault_token,

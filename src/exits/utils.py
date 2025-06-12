@@ -17,7 +17,6 @@ from src.config.settings import (
     DEFAULT_RETRY_TIME,
     OUTDATED_SIGNATURES_URL_PATH,
     UPDATE_SIGNATURES_URL_PATH,
-    settings,
 )
 from src.exits.typings import SignatureRotationRequest
 
@@ -115,7 +114,9 @@ async def send_signature_rotation_request(
 
 
 @retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
-async def get_oracle_outdated_signatures_response(oracle_endpoint: str) -> dict:
+async def get_oracle_outdated_signatures_response(
+    oracle_endpoint: str, vault: ChecksumAddress
+) -> dict:
     """
     :param oracle_endpoint:
     :return: Example response
@@ -126,7 +127,7 @@ async def get_oracle_outdated_signatures_response(oracle_endpoint: str) -> dict:
     }
     ```
     """
-    path = OUTDATED_SIGNATURES_URL_PATH.format(vault=settings.vault)
+    path = OUTDATED_SIGNATURES_URL_PATH.format(vault=vault)
     url = urljoin(oracle_endpoint, path)
 
     async with aiohttp.ClientSession() as session:

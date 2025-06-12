@@ -1,6 +1,7 @@
 import asyncio
 import logging
 
+from eth_typing import HexStr
 from sw_utils import EventScanner, InterruptHandler
 
 import src
@@ -21,8 +22,8 @@ from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
 from src.validators.relayer import RelayerAdapter, create_relayer_adapter
 from src.validators.tasks import ValidatorsTask, load_genesis_validators
-from src.validators.typings import DepositData, ValidatorsRegistrationMode
-from src.validators.utils import load_deposit_data
+from src.validators.typings import ValidatorsRegistrationMode
+from src.validators.utils import load_public_keys
 
 logger = logging.getLogger(__name__)
 
@@ -46,15 +47,14 @@ async def start_base() -> None:
     await load_genesis_validators()
 
     keystore: BaseKeystore | None = None
-    deposit_data: DepositData | None = None
+    available_public_keys: list[HexStr] | None = None
     relayer_adapter: RelayerAdapter | None = None
 
-    # load keystore and deposit data
+    # load keystore and available public keys
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
         keystore = await load_keystore()
 
-        deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
-        logger.info('Loaded deposit data file %s', settings.deposit_data_file)
+        available_public_keys = load_public_keys(settings.public_keys_file)
     else:
         relayer_adapter = create_relayer_adapter()
 
@@ -81,7 +81,7 @@ async def start_base() -> None:
         tasks = [
             ValidatorsTask(
                 keystore=keystore,
-                deposit_data=deposit_data,
+                available_public_keys=available_public_keys,
                 relayer_adapter=relayer_adapter,
             ).run(interrupt_handler),
             ExitSignatureTask(
@@ -117,5 +117,4 @@ def setup_sentry() -> None:
             environment=settings.sentry_environment or settings.network,
         )
         sentry_sdk.set_tag('network', settings.network)
-        sentry_sdk.set_tag('vault', settings.vault)
         sentry_sdk.set_tag('project_version', src.__version__)

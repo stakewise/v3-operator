@@ -1,11 +1,9 @@
 from pathlib import Path
 
 import click
-from eth_typing import HexAddress
 
 from src.common.language import LANGUAGES, create_new_mnemonic
-from src.common.validators import validate_eth_address
-from src.common.vault_config import VaultConfig
+from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_NETWORK
 
@@ -14,7 +12,7 @@ from src.config.settings import DEFAULT_NETWORK
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
     envvar='DATA_DIR',
-    help='Path where the vault data will be placed. Default is ~/.stakewise.',
+    help='Path where the keystores and config data will be placed. Default is ~/.stakewise.',
     type=click.Path(exists=False, file_okay=False, dir_okay=True),
 )
 @click.option(
@@ -32,13 +30,6 @@ from src.config.settings import DEFAULT_NETWORK
     ),
 )
 @click.option(
-    '--vault',
-    prompt='Enter your vault address',
-    help='The vault address.',
-    type=str,
-    callback=validate_eth_address,
-)
-@click.option(
     '--network',
     default=DEFAULT_NETWORK,
     help='The network of your vault.',
@@ -48,20 +39,18 @@ from src.config.settings import DEFAULT_NETWORK
         case_sensitive=False,
     ),
 )
-@click.command(help='Initializes vault data directory and generates mnemonic.')
+@click.command(help='Initializes config data directory and generates mnemonic.')
 def init(
     language: str,
     no_verify: bool,
-    vault: HexAddress,
     network: str,
     data_dir: str,
 ) -> None:
-    config = VaultConfig(
-        vault=vault,
+    config = OperatorConfig(
         data_dir=Path(data_dir),
     )
-    if config.vault_dir.exists():
-        raise click.ClickException(f'Vault directory {config.vault_dir} already exists.')
+    if config.exists:
+        raise click.ClickException(f'Config directory {config.data_dir} already exists.')
 
     if not language:
         language = click.prompt(
@@ -74,5 +63,5 @@ def init(
     config.save(network, mnemonic)
     if not no_verify:
         click.secho(
-            f'Successfully initialized configuration for vault {vault}', bold=True, fg='green'
+            'Successfully initialized configuration for StakeWise operator', bold=True, fg='green'
         )

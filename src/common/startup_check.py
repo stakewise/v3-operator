@@ -4,31 +4,29 @@ import socket
 import time
 from os import path
 
+import click
 from aiohttp import ClientSession, ClientTimeout
+from eth_typing import ChecksumAddress
 from sw_utils import IpfsFetchClient, get_consensus_client, get_execution_client
 from web3 import Web3
+from web3.exceptions import BadFunctionCallOutput
 
 from src.common.clients import db_client
 from src.common.contracts import (
+    VaultContract,
     keeper_contract,
     validators_registry_contract,
-    vault_contract,
 )
-from src.common.execution import (
-    check_hot_wallet_balance,
-    check_vault_address,
-    get_protocol_config,
-)
+from src.common.execution import check_hot_wallet_balance, get_protocol_config
 from src.common.harvest import get_harvest_params
 from src.common.utils import format_error, round_down, warning_verbose
 from src.common.wallet import hot_wallet
 from src.config.networks import NETWORKS
 from src.config.settings import settings
-from src.validators.execution import check_deposit_data_root, get_withdrawable_assets
+from src.validators.execution import get_withdrawable_assets
 from src.validators.keystores.local import LocalKeystore
 from src.validators.relayer import DvtRelayerClient
 from src.validators.typings import RelayerTypes, ValidatorsRegistrationMode
-from src.validators.utils import load_deposit_data
 
 logger = logging.getLogger(__name__)
 
@@ -59,20 +57,23 @@ async def startup_checks() -> None:
     logger.info('Checking oracles config...')
     await _check_events_logs()
 
-    logger.info('Checking vault address %s...', settings.vault)
-    await check_vault_address()
+    for vault_address in settings.vaults:
+        logger.info('Checking vault address %s...', vault_address)
+        await _check_vault_address(vault_address)
 
-    harvest_params = await get_harvest_params()
-    withdrawable_assets = await get_withdrawable_assets(harvest_params)
+        harvest_params = await get_harvest_params(vault_address=vault_address)
+        withdrawable_assets = await get_withdrawable_assets(
+            harvest_params=harvest_params, vault_address=vault_address
+        )
 
-    # Note. We round down assets in the log message because of the case when assets
-    # is slightly less than required amount to register validator.
-    # Standard rounding will show that we have enough assets, but in fact we don't.
-    logger.info(
-        'Vault withdrawable assets: %s %s',
-        round_down(Web3.from_wei(withdrawable_assets, 'ether'), 2),
-        settings.network_config.VAULT_BALANCE_SYMBOL,
-    )
+        # Note. We round down assets in the log message because of the case when assets
+        # is slightly less than required amount to register validator.
+        # Standard rounding will show that we have enough assets, but in fact we don't.
+        logger.info(
+            'Vault withdrawable assets: %s %s',
+            round_down(Web3.from_wei(withdrawable_assets, 'ether'), 2),
+            settings.network_config.VAULT_BALANCE_SYMBOL,
+        )
 
     logger.info('Checking hot wallet balance %s...', hot_wallet.address)
     await check_hot_wallet_balance()
@@ -90,10 +91,6 @@ async def startup_checks() -> None:
         logger.info('Checking metrics server...')
         check_metrics_port()
 
-    if settings.need_deposit_data_file:
-        logger.info('Checking deposit data file...')
-        await wait_for_deposit_data_file()
-
     if (
         settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO
         and settings.keystore_cls_str == LocalKeystore.__name__
@@ -102,7 +99,8 @@ async def startup_checks() -> None:
         wait_for_keystores_dir()
         logger.info('Found keystores dir')
 
-    await _check_validators_manager()
+    for vault_address in settings.vaults:
+        await _check_validators_manager(vault_address)
 
     if (
         settings.validators_registration_mode == ValidatorsRegistrationMode.API
@@ -254,23 +252,6 @@ def wait_for_keystores_dir() -> None:
         time.sleep(15)
 
 
-async def wait_for_deposit_data_file() -> None:
-    while not path.exists(settings.deposit_data_file):
-        logger.warning("Can't find deposit data file (%s)", settings.deposit_data_file)
-        time.sleep(15)
-    deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
-    logger.info('Found deposit data file %s', settings.deposit_data_file)
-
-    if not settings.disable_deposit_data_warnings:
-        while True:
-            try:
-                await check_deposit_data_root(deposit_data.tree.root)
-                break
-            except RuntimeError as e:
-                logger.warning(e)
-                time.sleep(15)
-
-
 async def _check_consensus_nodes_network() -> None:
     """
     Checks that consensus node network is the same as settings.network
@@ -335,14 +316,13 @@ async def _check_ipfs_endpoints() -> list[str]:
     return healthy_ipfs_endpoints
 
 
-async def _check_validators_manager() -> None:
-    if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
-        if await vault_contract.version() > 1:
-            validators_manager = await vault_contract.validators_manager()
-            if validators_manager != settings.network_config.DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS:
-                raise RuntimeError(
-                    'validators manager address must equal to deposit data registry address'
-                )
+async def _check_validators_manager(vault_address: ChecksumAddress) -> None:
+    if settings.validators_registration_mode != ValidatorsRegistrationMode.AUTO:
+        return
+    vault_contract = VaultContract(vault_address)
+    validators_manager = await vault_contract.validators_manager()
+    if validators_manager != hot_wallet.account.address:
+        raise RuntimeError('validators manager address must equal to hot wallet address')
 
 
 async def _check_events_logs() -> None:
@@ -376,3 +356,10 @@ async def _check_dvt_relayer_endpoint() -> None:
             f'Relayer network "{relayer_network}" does not match '
             f'Operator network "{settings.network}"'
         )
+
+
+async def _check_vault_address(vault_address: ChecksumAddress) -> None:
+    try:
+        await VaultContract(address=vault_address).version()
+    except BadFunctionCallOutput as e:
+        raise click.ClickException('Invalid vault contract address') from e
