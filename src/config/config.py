@@ -18,8 +18,15 @@ class OperatorConfig:
         self,
         data_dir: Path,
     ):
-        self.data_dir = Path(data_dir)
-        self.config_path = self.data_dir / 'config.json'
+        self.root_dir = Path(data_dir)
+
+    @property
+    def data_dir(self) -> Path:
+        return self.root_dir / self.network
+
+    @property
+    def config_path(self) -> Path:
+        return self.data_dir / 'config.json'
 
     @property
     def exists(self) -> bool:
@@ -35,7 +42,17 @@ class OperatorConfig:
     def remove_tmp_dir(self) -> None:
         shutil.rmtree(self.tmp_data_dir)
 
-    def load(self, mnemonic: str | None = None) -> None:
+    def load(self, network: str | None = None, mnemonic: str | None = None) -> None:
+        if network:
+            self.network = network
+        else:
+            # trying to guess network from root_dir
+            dirs = [f for f in self.root_dir.iterdir() if f.is_dir()]
+            if len(dirs) == 1 and dirs[0].name in AVAILABLE_NETWORKS:
+                self.network = dirs[0].name
+            else:
+                raise click.ClickException('Specify the `network` parameter')
+
         if self.config_path.is_file():
             with self.config_path.open('r') as f:
                 config = json.load(f)
@@ -43,7 +60,9 @@ class OperatorConfig:
             self.mnemonic_next_index = config.get('mnemonic_next_index')
             self.first_public_key = config.get('first_public_key')
         else:
-            raise click.ClickException('Config does not exist. Please run "init" command.')
+            raise click.ClickException(
+                'Config for selected network does not exist. Please run "init" command.'
+            )
         self._validate(mnemonic)
 
     def save(self, network: str, mnemonic: str, mnemonic_next_index: int = 0) -> None:

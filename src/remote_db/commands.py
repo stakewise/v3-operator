@@ -38,7 +38,7 @@ from src.remote_db.database import check_db_connection
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
     envvar='DATA_DIR',
-    help='Path where the config data will be placed. Default is ~/.stakewise.',
+    help='Path where the keystores and config data will be placed. Default is ~/.stakewise.',
     type=click.Path(file_okay=False, dir_okay=True),
 )
 @click.option(
@@ -70,7 +70,7 @@ def remote_db_group(
 
     config = OperatorConfig(Path(data_dir))
     if network is None:
-        config.load()
+        config.load(network=network)
         network = config.network
 
     settings.set(
