@@ -46,8 +46,8 @@ class OperatorConfig:
         if network:
             self.network = network
         else:
-            # trying to guess network from data_dir
-            dirs = [f for f in self.data_dir.iterdir() if f.is_dir()]
+            # trying to guess network from root_dir
+            dirs = [f for f in self.root_dir.iterdir() if f.is_dir()]
             if len(dirs) == 1 and dirs[0].name in AVAILABLE_NETWORKS:
                 self.network = dirs[0].name
             else:
