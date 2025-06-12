@@ -8,6 +8,7 @@ from eth_typing import ChecksumAddress
 
 from src.commands.start_base import start_base
 from src.common.logging import LOG_LEVELS
+from src.common.migrate import migrate_to_multivault
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_addresses
 from src.config.config import OperatorConfig
@@ -220,6 +221,12 @@ logger = logging.getLogger(__name__)
     help='Minimum number of validators required to start registration.',
     default=1,
 )
+@click.option(
+    '--no-confirm',
+    is_flag=True,
+    default=False,
+    help='Skips confirmation messages when provided.',
+)
 @click.command(help='Start operator service')
 # pylint: disable-next=too-many-arguments,too-many-locals
 def start(
@@ -251,9 +258,32 @@ def start(
     database_dir: str | None,
     pool_size: int | None,
     min_validators_registration: int,
+    no_confirm: bool,
 ) -> None:
-    operator_config = OperatorConfig(Path(data_dir))
-    operator_config.load(network=network)
+
+    # migrate
+    try:
+        operator_config = OperatorConfig(Path(data_dir))
+        operator_config.load(network=network)
+    except click.ClickException as e:
+        # trying to migrate from single vault setup to multivault
+        vault = vaults[0].lower()
+        vault_dir = Path(data_dir) / vault
+        if Path(vault_dir).exists():
+            if not no_confirm:
+                click.confirm(
+                    f'There is vault directory {vault_dir} already. '
+                    'Do you want to migrate to multivault setup?',
+                    default=True,
+                    abort=True,
+                )
+            migrate_to_multivault(
+                vault_dir=vault_dir,
+                data_dir=Path(data_dir),
+            )
+        else:
+            raise e
+
     settings.set(
         vaults=vaults,
         data_dir=operator_config.data_dir,
