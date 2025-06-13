@@ -10,7 +10,7 @@ from src.commands.start_base import start_base
 from src.common.logging import LOG_LEVELS
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_addresses
-from src.config.config import OperatorConfig
+from src.config.config import OperatorConfig, OperatorConfigException
 from src.config.networks import AVAILABLE_NETWORKS, GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
     DEFAULT_METRICS_HOST,
@@ -207,7 +207,10 @@ def start_api(
 ) -> None:
     operator_config = OperatorConfig(Path(data_dir))
     if network is None:
-        operator_config.load(network=network)
+        try:
+            operator_config.load(network=network)
+        except OperatorConfigException as e:
+            raise click.ClickException(str(e))
         network = operator_config.network
 
     if relayer_endpoint == AUTO and relayer_type == RelayerTypes.DVT:

@@ -9,7 +9,7 @@ from eth_typing import ChecksumAddress
 from src.common.clients import setup_clients
 from src.common.utils import greenify, log_verbose
 from src.common.validators import validate_db_uri, validate_eth_address
-from src.config.config import OperatorConfig
+from src.config.config import OperatorConfig, OperatorConfigException
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import settings
 from src.remote_db import tasks
@@ -70,7 +70,10 @@ def remote_db_group(
 
     config = OperatorConfig(Path(data_dir))
     if network is None:
-        config.load(network=network)
+        try:
+            config.load(network=network)
+        except OperatorConfigException as e:
+            raise click.ClickException(str(e))
         network = config.network
 
     settings.set(

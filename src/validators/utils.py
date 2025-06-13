@@ -177,3 +177,10 @@ def load_public_keys(public_keys_file: Path) -> list[HexStr]:
         public_keys = [HexStr(line.rstrip()) for line in f]
 
     return public_keys
+
+
+def save_public_keys(filename: Path, public_keys: list[HexStr]) -> None:
+    filename.parent.mkdir(parents=True, exist_ok=True)
+    with open(filename, 'w', encoding='utf-8') as f:
+        for public_key in public_keys:
+            f.write(f'{public_key}\n')
