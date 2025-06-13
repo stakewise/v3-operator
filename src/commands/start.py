@@ -11,7 +11,7 @@ from src.common.logging import LOG_LEVELS
 from src.common.migrate import migrate_to_multivault
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_addresses
-from src.config.config import OperatorConfig
+from src.config.config import OperatorConfig, OperatorConfigException
 from src.config.networks import AVAILABLE_NETWORKS, GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
     DEFAULT_HASHI_VAULT_PARALLELISM,
@@ -265,24 +265,27 @@ def start(
     try:
         operator_config = OperatorConfig(Path(data_dir))
         operator_config.load(network=network)
-    except click.ClickException as e:
-        # trying to migrate from single vault setup to multivault
-        vault = vaults[0].lower()
-        vault_dir = Path(data_dir) / vault
-        if Path(vault_dir).exists():
-            if not no_confirm:
-                click.confirm(
-                    f'There is vault directory {vault_dir} already. '
-                    'Do you want to migrate to multivault setup?',
-                    default=True,
-                    abort=True,
+    except OperatorConfigException as e:
+        if e.can_be_migrated:
+            # trying to migrate from single vault setup to multivault
+            vault = vaults[0].lower()
+            root_dir = Path(data_dir)
+            vault_dir = root_dir / vault
+            if Path(vault_dir).exists() and not (root_dir / 'config.json').exists():
+                if not no_confirm:
+                    click.confirm(
+                        f'There is vault directory {vault_dir} already. '
+                        'Do you want to migrate to multivault setup?',
+                        default=True,
+                    )
+                migrate_to_multivault(
+                    vault_dir=vault_dir,
+                    root_dir=root_dir,
                 )
-            migrate_to_multivault(
-                vault_dir=vault_dir,
-                data_dir=Path(data_dir),
-            )
+            operator_config = OperatorConfig(Path(data_dir))
+            operator_config.load()
         else:
-            raise e
+            raise click.ClickException(str(e))
 
     settings.set(
         vaults=vaults,

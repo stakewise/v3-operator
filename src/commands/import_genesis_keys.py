@@ -14,7 +14,7 @@ from src.common.credentials import Credential
 from src.common.password import get_or_create_password_file
 from src.common.utils import greenify
 from src.common.validators import validate_eth_address
-from src.config.config import OperatorConfig
+from src.config.config import OperatorConfig, OperatorConfigException
 from src.config.settings import settings
 
 
@@ -50,8 +50,11 @@ def import_genesis_keys(
     vault: ChecksumAddress,
     data_dir: str,
 ) -> None:
-    operator_config = OperatorConfig(Path(data_dir))
-    operator_config.load()
+    try:
+        operator_config = OperatorConfig(Path(data_dir))
+        operator_config.load()
+    except OperatorConfigException as e:
+        raise click.ClickException(str(e))
     network = operator_config.network
 
     settings.set(

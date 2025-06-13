@@ -1,18 +1,18 @@
 from multiprocessing import Pool
-from os import makedirs, path
+from os import path
 from pathlib import Path
 
 import click
-from eth_typing import HexStr
 
 from src.common.credentials import Credential, CredentialManager
 from src.common.password import generate_password, get_or_create_password_file
 from src.common.utils import greenify
 from src.common.validators import validate_mnemonic
-from src.config.config import OperatorConfig
+from src.config.config import OperatorConfig, OperatorConfigException
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import PUBLIC_KEYS_FILENAME, settings
 from src.validators.keystores.local import LocalKeystore
+from src.validators.utils import save_public_keys
 
 
 @click.option(
@@ -57,7 +57,7 @@ from src.validators.keystores.local import LocalKeystore
     ),
 )
 @click.command(help='Creates the validator keys from the mnemonic.')
-# pylint: disable-next=too-many-arguments
+# pylint: disable-next=too-many-arguments,too-many-locals
 def create_keys(
     mnemonic: str,
     count: int,
@@ -66,9 +66,11 @@ def create_keys(
     pool_size: int | None,
     network: str | None,
 ) -> None:
-    operator_config = OperatorConfig(Path(data_dir))
-    operator_config.load(network, mnemonic)
-
+    try:
+        operator_config = OperatorConfig(Path(data_dir))
+        operator_config.load(network, mnemonic)
+    except OperatorConfigException as e:
+        raise click.ClickException(str(e))
     settings.set(
         vaults=[],
         network=operator_config.network,
@@ -101,7 +103,7 @@ def create_keys(
         )
         public_keys = LocalKeystore.get_public_keys_from_keystore_files()
         public_keys.extend([c.public_key for c in credentials])
-        _export_public_keys(public_keys=public_keys, filename=str(tmp_public_keys_file))
+        save_public_keys(public_keys=public_keys, filename=tmp_public_keys_file)
         operator_config.increment_mnemonic_index(count)
 
         # move files from tmp dir
@@ -118,13 +120,6 @@ def create_keys(
         f'Keystores saved to {greenify(keystores_dir)} file\n'
         f'Validator public keys saved to {greenify(path.abspath(public_keys_file))} file'
     )
-
-
-def _export_public_keys(public_keys: list[HexStr], filename: str) -> None:
-    makedirs(path.dirname(path.abspath(filename)), exist_ok=True)
-    with open(filename, 'w', encoding='utf-8') as f:
-        for public_key in public_keys:
-            f.write(f'{public_key}\n')
 
 
 def _export_keystores(

@@ -1,18 +1,17 @@
 import asyncio
 import logging
 import sys
-from os import makedirs, path
 from pathlib import Path
 
 import click
-from eth_typing import HexStr
 
 from src.common.logging import setup_logging
 from src.common.utils import log_verbose
-from src.config.config import OperatorConfig
+from src.config.config import OperatorConfig, OperatorConfigException
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import PUBLIC_KEYS_FILENAME, settings
 from src.validators.keystores.local import LocalKeystore
+from src.validators.utils import save_public_keys
 
 logger = logging.getLogger(__name__)
 
@@ -57,8 +56,11 @@ def export_public_keys(
     verbose: bool,
 ) -> None:
     setup_logging()
-    operator_config = OperatorConfig(Path(data_dir))
-    operator_config.load(network=network)
+    try:
+        operator_config = OperatorConfig(Path(data_dir))
+        operator_config.load(network)
+    except OperatorConfigException as e:
+        raise click.ClickException(str(e))
     network = operator_config.network
 
     settings.set(
@@ -79,11 +81,6 @@ def export_public_keys(
 async def main() -> None:
     logger.info('Loading keystores from %s...', settings.keystores_dir)
     public_keys = LocalKeystore.get_public_keys_from_keystore_files()
-    _export_public_keys(public_keys)
-    logger.info('Saved %d public keys to validators.txt', len(public_keys))
-
-
-def _export_public_keys(public_keys: list[HexStr]) -> None:
     filename = settings.data_dir / PUBLIC_KEYS_FILENAME
     if filename.exists():
         click.confirm(
@@ -91,8 +88,5 @@ def _export_public_keys(public_keys: list[HexStr]) -> None:
             default=True,
             abort=True,
         )
-
-    makedirs(path.dirname(path.abspath(filename)), exist_ok=True)
-    with open(filename, 'w', encoding='utf-8') as f:
-        for public_key in public_keys:
-            f.write(f'{public_key}\n')
+    save_public_keys(public_keys=public_keys, filename=filename)
+    logger.info('Saved %d public keys to validators.txt', len(public_keys))

@@ -20,7 +20,7 @@ from src.common.validators import (
     validate_dappnode_execution_endpoints,
     validate_eth_address,
 )
-from src.config.config import OperatorConfig
+from src.config.config import OperatorConfig, OperatorConfigException
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import (
     REMOTE_SIGNER_TIMEOUT,
@@ -117,8 +117,11 @@ def remote_signer_setup(
     if dappnode and not vault:
         raise click.ClickException('Enter your vault address for dappnode setup.')
 
-    config = OperatorConfig(Path(data_dir))
-    config.load(network=network)
+    try:
+        config = OperatorConfig(Path(data_dir))
+        config.load(network=network)
+    except OperatorConfigException as e:
+        raise click.ClickException(str(e))
     settings.set(
         vaults=[],
         data_dir=config.data_dir,

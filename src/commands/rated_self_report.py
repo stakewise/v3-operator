@@ -7,7 +7,7 @@ from eth_typing import ChecksumAddress
 
 from src.common.graph import GraphClient
 from src.common.validators import validate_eth_addresses
-from src.config.config import OperatorConfig
+from src.config.config import OperatorConfig, OperatorConfigException
 from src.config.networks import AVAILABLE_NETWORKS, RATED_NETWORKS
 from src.config.settings import DEFAULT_NETWORK, settings
 
@@ -61,8 +61,11 @@ def rated_self_report(
         click.secho(f'{network} network is not yet rated supported')
         return
 
-    operator_config = OperatorConfig(Path(data_dir))
-    operator_config.load(network=network)
+    try:
+        operator_config = OperatorConfig(Path(data_dir))
+        operator_config.load(network=network)
+    except OperatorConfigException as e:
+        raise click.ClickException(str(e))
 
     settings.set(
         vaults=vaults,

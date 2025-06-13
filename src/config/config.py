@@ -3,10 +3,16 @@ import re
 import shutil
 from pathlib import Path
 
-import click
-
 from src.common.credentials import CredentialManager
 from src.config.networks import AVAILABLE_NETWORKS
+
+
+class OperatorConfigException(ValueError):
+    can_be_migrated = False
+
+    def __init__(self, message: str, can_be_migrated: bool = False):
+        super().__init__(message)
+        self.can_be_migrated = can_be_migrated
 
 
 class OperatorConfig:
@@ -48,10 +54,16 @@ class OperatorConfig:
         else:
             # trying to guess network from root_dir
             dirs = [f for f in self.root_dir.iterdir() if f.is_dir()]
-            if len(dirs) == 1 and dirs[0].name in AVAILABLE_NETWORKS:
-                self.network = dirs[0].name
+            # if there is only one network directory, use it
+            if len(dirs) and len([d.name for d in dirs if d.name in AVAILABLE_NETWORKS]) == 1:
+                self.network = [d.name for d in dirs if d.name in AVAILABLE_NETWORKS][0]
+            # if there are vault directories, trying to migratate to multivault
+            elif len(dirs) and any(d.name.startswith('0x') for d in dirs):
+                raise OperatorConfigException(
+                    'Specify the `network` parameter', can_be_migrated=True
+                )
             else:
-                raise click.ClickException('Specify the `network` parameter')
+                raise OperatorConfigException('Specify the `network` parameter')
 
         if self.config_path.is_file():
             with self.config_path.open('r') as f:
@@ -60,7 +72,7 @@ class OperatorConfig:
             self.mnemonic_next_index = config.get('mnemonic_next_index')
             self.first_public_key = config.get('first_public_key')
         else:
-            raise click.ClickException(
+            raise OperatorConfigException(
                 'Config for selected network does not exist. Please run "init" command.'
             )
         self._validate(mnemonic)
@@ -96,19 +108,19 @@ class OperatorConfig:
     def _validate(self, mnemonic: str | None = None) -> None:
         """Validates the loaded configuration data."""
         if not self.network:
-            raise click.ClickException('Network is not set in vault configuration.')
+            raise OperatorConfigException('Network is not set in vault configuration.')
 
         if self.network not in AVAILABLE_NETWORKS:
-            raise click.ClickException(
+            raise OperatorConfigException(
                 "Invalid 'network' in config."
                 f'Expected one of {AVAILABLE_NETWORKS}, got {self.network}.'
             )
 
         if self.mnemonic_next_index is None:
-            raise click.ClickException('mnemonic_next_index is not set in vault configuration.')
+            raise OperatorConfigException('mnemonic_next_index is not set in vault configuration.')
 
         if not isinstance(self.mnemonic_next_index, int):
-            raise click.ClickException(
+            raise OperatorConfigException(
                 'Expected "mnemonic_next_index" to be int, '
                 f'got {type(self.mnemonic_next_index).__name__}.'
             )
@@ -118,20 +130,20 @@ class OperatorConfig:
                 self.network, mnemonic
             )
             if first_public_key != self.first_public_key:
-                raise click.ClickException(
+                raise OperatorConfigException(
                     'Invalid mnemonic. Please use mnemonic generated with "init" command.'
                 )
 
         if not self.first_public_key:
-            raise click.ClickException('first_public_key is not set in vault configuration.')
+            raise OperatorConfigException('first_public_key is not set in vault configuration.')
 
         if not isinstance(self.first_public_key, str):
-            raise click.ClickException(
+            raise OperatorConfigException(
                 'Expected "first_public_key" to be str, '
                 f'got {type(self.first_public_key).__name__}.'
             )
 
         if not re.match('^0x[0-9a-fA-F]{96}$', self.first_public_key):
-            raise click.ClickException(
+            raise OperatorConfigException(
                 "Invalid 'first_public_key'. Expected a 98-character hexadecimal string."
             )

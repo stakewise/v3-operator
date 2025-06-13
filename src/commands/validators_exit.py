@@ -14,7 +14,7 @@ from web3 import Web3
 from src.common.clients import consensus_client
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import format_error, log_verbose
-from src.config.config import OperatorConfig
+from src.config.config import OperatorConfig, OperatorConfigException
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import (
     DEFAULT_HASHI_VAULT_ENGINE_NAME,
@@ -146,7 +146,10 @@ def validators_exit(
     # pylint: disable=duplicate-code
     operator_config = OperatorConfig(Path(data_dir))
     if network is None:
-        operator_config.load(network=network)
+        try:
+            operator_config.load(network=network)
+        except OperatorConfigException as e:
+            raise click.ClickException(str(e))
         network = operator_config.network
 
     settings.set(
