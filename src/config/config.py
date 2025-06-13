@@ -55,9 +55,10 @@ class OperatorConfig:
             # trying to guess network from root_dir
             dirs = [f for f in self.root_dir.iterdir() if f.is_dir()]
             # if there is only one network directory, use it
-            if len(dirs) and len([d.name for d in dirs if d.name in AVAILABLE_NETWORKS]) == 1:
-                self.network = [d.name for d in dirs if d.name in AVAILABLE_NETWORKS][0]
-            # if there are vault directories, trying to migratate to multivault
+            network_directory_names = [d.name for d in dirs if d.name in AVAILABLE_NETWORKS]
+            if len(dirs) and len(network_directory_names) == 1:
+                self.network = network_directory_names[0]
+            # if there is vault directory from single setup, trying to migrate to multivault
             elif len(dirs) and any(d.name.startswith('0x') for d in dirs):
                 raise OperatorConfigException(
                     'Specify the `network` parameter', can_be_migrated=True

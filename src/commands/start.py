@@ -266,26 +266,26 @@ def start(
         operator_config = OperatorConfig(Path(data_dir))
         operator_config.load(network=network)
     except OperatorConfigException as e:
-        if e.can_be_migrated:
-            # trying to migrate from single vault setup to multivault
-            vault = vaults[0].lower()
-            root_dir = Path(data_dir)
-            vault_dir = root_dir / vault
-            if Path(vault_dir).exists() and not (root_dir / 'config.json').exists():
-                if not no_confirm:
-                    click.confirm(
-                        f'There is vault directory {vault_dir} already. '
-                        'Do you want to migrate to multivault setup?',
-                        default=True,
-                    )
-                migrate_to_multivault(
-                    vault_dir=vault_dir,
-                    root_dir=root_dir,
-                )
-            operator_config = OperatorConfig(Path(data_dir))
-            operator_config.load()
-        else:
+        if not e.can_be_migrated:
             raise click.ClickException(str(e))
+
+        # trying to migrate from single vault setup to multivault
+        vault = vaults[0].lower()
+        root_dir = Path(data_dir)
+        vault_dir = root_dir / vault
+        if Path(vault_dir).exists() and not (root_dir / 'config.json').exists():
+            if not no_confirm:
+                click.confirm(
+                    f'There is vault directory {vault_dir} already. '
+                    'Do you want to migrate to multivault setup?',
+                    default=True,
+                )
+            migrate_to_multivault(
+                vault_dir=vault_dir,
+                root_dir=root_dir,
+            )
+        operator_config = OperatorConfig(Path(data_dir))
+        operator_config.load()
 
     settings.set(
         vaults=vaults,
