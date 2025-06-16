@@ -12,6 +12,7 @@ from web3 import Web3
 
 from src.common.credentials import Credential
 from src.common.password import get_or_create_password_file
+from src.common.typings import ValidatorType
 from src.common.utils import greenify
 from src.common.validators import validate_eth_address
 from src.config.config import OperatorConfig, OperatorConfigException
@@ -83,6 +84,7 @@ def import_genesis_keys(
             private_key=BLSPrivateKey(private_key),
             network=network,
             path=f'imported_{index}',
+            validator_type=ValidatorType.ONE,
         )
         credential.save_signing_keystore(password=password, folder=str(keystores_dir))
         index += 1

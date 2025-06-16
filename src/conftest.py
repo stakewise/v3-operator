@@ -17,6 +17,7 @@ from src.commands.create_keys import create_keys
 from src.commands.create_wallet import create_wallet
 from src.commands.remote_signer_setup import remote_signer_setup
 from src.common.credentials import CredentialManager
+from src.common.typings import ValidatorType
 from src.config.config import OperatorConfig
 from src.config.networks import HOODI
 from src.config.settings import settings
@@ -239,6 +240,7 @@ def create_validator_keypair(test_mnemonic: str) -> Callable[[], tuple[BLSPrivke
             network=HOODI,
             mnemonic=test_mnemonic,
             index=randint(0, 100_000),
+            validator_type=ValidatorType.TWO,
         )
 
         return (BLSPrivkey(credential.private_key.to_bytes(32, 'big')), credential.public_key)

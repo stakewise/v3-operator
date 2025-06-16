@@ -137,10 +137,10 @@ def process_network_validator_event(
     """
     public_key = event['args']['pubkey']
     withdrawal_creds = event['args']['withdrawal_credentials']
-    amount_gwei = struct.unpack('<Q', event['args']['amount'])[0]
+    amount = struct.unpack('<Q', event['args']['amount'])[0]
     signature = event['args']['signature']
     if is_valid_deposit_data_signature(
-        public_key, withdrawal_creds, signature, amount_gwei, fork_version
+        public_key, withdrawal_creds, signature, amount, fork_version
     ):
         return NetworkValidator(
             public_key=Web3.to_hex(public_key), block_number=BlockNumber(event['blockNumber'])

@@ -10,6 +10,7 @@ from eth_typing import ChecksumAddress, HexStr
 from eth_utils import add_0x_prefix
 from sw_utils import ProtocolConfig
 from web3 import Web3
+from web3.types import Gwei
 
 from src.common.contracts import validators_registry_contract
 from src.common.typings import OracleApproval, OraclesApproval
@@ -132,27 +133,29 @@ async def send_approval_request(
 
 async def get_available_validators(
     keystore: BaseKeystore,
-    count: int,
+    amounts: list[Gwei],
     vault_address: ChecksumAddress,
     available_public_keys: list[HexStr],
 ) -> Sequence[Validator]:
     """Returns list of available validators for registration."""
     available_public_keys = filter_nonregistered_public_keys(
         available_public_keys=available_public_keys,
-        count=count,
+        count=len(amounts),
     )
-
-    deposit_data = await keystore.get_validator_deposits(available_public_keys, vault_address)
-
-    validators = [
-        Validator(
-            public_key=add_0x_prefix(Web3.to_hex(data['pubkey'])),
-            signature=add_0x_prefix(Web3.to_hex(data['signature'])),
-            amount_gwei=int(data['amount']),
-            deposit_data_root=Web3.to_hex(data['deposit_data_root']),
+    validators = []
+    for amount, public_key in zip(amounts, available_public_keys):
+        deposit_data = await keystore.get_deposit_data(
+            public_key=public_key, amount=amount, vault_address=vault_address
         )
-        for data in deposit_data
-    ]
+        validators.append(
+            Validator(
+                public_key=add_0x_prefix(Web3.to_hex(deposit_data['pubkey'])),
+                signature=add_0x_prefix(Web3.to_hex(deposit_data['signature'])),
+                amount=Gwei(int(deposit_data['amount'])),
+                deposit_data_root=Web3.to_hex(deposit_data['deposit_data_root']),
+            )
+        )
+
     return validators
 
 

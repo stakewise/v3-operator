@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import Enum
 
 from hexbytes import HexBytes
 from web3.types import Wei
@@ -30,6 +31,11 @@ class OraclesApproval:
     signatures: bytes
     ipfs_hash: str
     deadline: int
+
+
+class ValidatorType(Enum):
+    ONE = '0x01'
+    TWO = '0x02'
 
 
 class Singleton(type):

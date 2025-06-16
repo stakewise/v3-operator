@@ -8,6 +8,7 @@ import click
 from aiohttp import ClientSession, ClientTimeout
 from eth_typing import ChecksumAddress
 from sw_utils import IpfsFetchClient, get_consensus_client, get_execution_client
+from sw_utils.pectra import get_pectra_vault_version
 from web3 import Web3
 from web3.exceptions import BadFunctionCallOutput
 
@@ -19,6 +20,7 @@ from src.common.contracts import (
 )
 from src.common.execution import check_hot_wallet_balance, get_protocol_config
 from src.common.harvest import get_harvest_params
+from src.common.typings import ValidatorType
 from src.common.utils import format_error, round_down, warning_verbose
 from src.common.wallet import hot_wallet
 from src.config.networks import NETWORKS
@@ -101,6 +103,8 @@ async def startup_checks() -> None:
 
     for vault_address in settings.vaults:
         await _check_validators_manager(vault_address)
+
+    await _check_validators_type()
 
     if (
         settings.validators_registration_mode == ValidatorsRegistrationMode.API
@@ -323,6 +327,19 @@ async def _check_validators_manager(vault_address: ChecksumAddress) -> None:
     validators_manager = await vault_contract.validators_manager()
     if validators_manager != hot_wallet.account.address:
         raise RuntimeError('validators manager address must equal to hot wallet address')
+
+
+async def _check_validators_type() -> None:
+    if not settings.validator_type:
+        return
+    for vault_address in settings.vaults:
+        vault_contract = VaultContract(vault_address)
+        if (
+            await vault_contract.version()
+            < get_pectra_vault_version(settings.network, vault_address)
+            and settings.validator_type == ValidatorType.TWO
+        ):
+            raise RuntimeError('Validator type 0x02 is not supported pre pectra vaults')
 
 
 async def _check_events_logs() -> None:

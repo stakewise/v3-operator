@@ -112,7 +112,7 @@ class RelayerAdapter:
 
             validator = Validator(
                 public_key=public_key,
-                amount_gwei=v['amount_gwei'],
+                amount=v['amount_gwei'],
                 signature=deposit_signature,
                 exit_signature=BLSSignature(Web3.to_bytes(hexstr=exit_signature)),
             )
@@ -171,7 +171,7 @@ class RelayerAdapter:
             validator = Validator(
                 public_key=public_key,
                 signature=add_0x_prefix(v['deposit_signature']),
-                amount_gwei=DEPOSIT_AMOUNT_GWEI,
+                amount=DEPOSIT_AMOUNT_GWEI,
                 exit_signature_shards=exit_signature_shards,
             )
             validators.append(validator)

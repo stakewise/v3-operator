@@ -5,11 +5,10 @@ from functools import cached_property
 from multiprocessing import Pool
 from os import path
 from secrets import randbits
-from typing import cast
 
 import click
 import milagro_bls_binding as bls
-from eth_typing import BLSPrivateKey, ChecksumAddress, HexAddress, HexStr
+from eth_typing import BLSPrivateKey, ChecksumAddress, HexStr
 from py_ecc.bls import G2ProofOfPossession
 from staking_deposit.key_handling.key_derivation.mnemonic import get_seed
 from staking_deposit.key_handling.key_derivation.path import path_to_nodes
@@ -19,20 +18,21 @@ from staking_deposit.key_handling.key_derivation.tree import (
 )
 from staking_deposit.key_handling.keystore import Keystore, ScryptKeystore
 from staking_deposit.settings import DEPOSIT_CLI_VERSION
-from sw_utils import get_v1_withdrawal_credentials
 from sw_utils.signing import (
     DepositData,
     DepositMessage,
     compute_deposit_domain,
     compute_signing_root,
+    get_v1_withdrawal_credentials,
+    get_v2_withdrawal_credentials,
 )
 from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3._utils import request
 
+from src.common.typings import ValidatorType
 from src.common.utils import chunkify
 from src.config.networks import NETWORKS
-from src.config.settings import DEPOSIT_AMOUNT_GWEI
 
 # Set path as EIP-2334 format
 # https://eips.ethereum.org/EIPS/eip-2334
@@ -44,7 +44,9 @@ COIN_TYPE = '3600'
 class Credential:
     private_key: BLSPrivateKey
     network: str
+    validator_type: ValidatorType
 
+    amount: int | None = None
     path: str | None = None
     vault: ChecksumAddress | None = None
 
@@ -57,12 +59,12 @@ class Credential:
         return self.private_key.to_bytes(32, 'big')
 
     @cached_property
-    def amount(self) -> int:
-        return DEPOSIT_AMOUNT_GWEI
-
-    @cached_property
     def withdrawal_credentials(self) -> Bytes32:
-        return get_v1_withdrawal_credentials(cast(HexAddress, self.vault))
+        if not self.vault:
+            raise ValueError('Vault address for credential is not set')
+        if self.validator_type == ValidatorType.ONE:
+            return get_v1_withdrawal_credentials(self.vault)
+        return get_v2_withdrawal_credentials(self.vault)
 
     def save_signing_keystore(
         self, password: str, folder: str, per_keystore_password: bool = False
@@ -88,36 +90,36 @@ class Credential:
             aes_iv=randbits(128).to_bytes(16, 'big'),
         )
 
-    @property
-    def deposit_message(self) -> DepositMessage:
-        return DepositMessage(
-            pubkey=Web3.to_bytes(hexstr=self.public_key),
-            withdrawal_credentials=self.withdrawal_credentials,
-            amount=self.amount,
-        )
-
-    @property
-    def signed_deposit(self) -> DepositData:
-        fork_version = NETWORKS[self.network].GENESIS_FORK_VERSION
-        domain = compute_deposit_domain(fork_version)
-        signing_root = compute_signing_root(self.deposit_message, domain)
-        signed_deposit = DepositData(
-            **self.deposit_message.as_dict(),
-            # pylint: disable-next=no-member
-            signature=bls.Sign(self.private_key_bytes, signing_root),
-        )
-        return signed_deposit
-
-    def deposit_datum_dict(self) -> dict[str, bytes]:
-        signed_deposit_datum = self.signed_deposit
+    def get_deposit_datum_dict(self, amount: int) -> dict[str, bytes]:
+        signed_deposit_datum = self.get_signed_deposit(amount)
         fork_version = NETWORKS[self.network].GENESIS_FORK_VERSION
         datum_dict = signed_deposit_datum.as_dict()
-        datum_dict.update({'deposit_message_root': self.deposit_message.hash_tree_root})
+        deposit_message = self.get_deposit_message(amount)
+        datum_dict.update({'deposit_message_root': deposit_message.hash_tree_root})
         datum_dict.update({'deposit_data_root': signed_deposit_datum.hash_tree_root})
         datum_dict.update({'fork_version': fork_version})
         datum_dict.update({'network_name': self.network})
         datum_dict.update({'deposit_cli_version': DEPOSIT_CLI_VERSION})
         return datum_dict
+
+    def get_signed_deposit(self, amount: int) -> DepositData:
+        fork_version = NETWORKS[self.network].GENESIS_FORK_VERSION
+        domain = compute_deposit_domain(fork_version)
+        deposit_message = self.get_deposit_message(amount)
+        signing_root = compute_signing_root(deposit_message, domain)
+        signed_deposit = DepositData(
+            **deposit_message.as_dict(),
+            # pylint: disable-next=no-member
+            signature=bls.Sign(self.private_key_bytes, signing_root),
+        )
+        return signed_deposit
+
+    def get_deposit_message(self, amount: int) -> DepositMessage:
+        return DepositMessage(
+            pubkey=Web3.to_bytes(hexstr=self.public_key),
+            withdrawal_credentials=self.withdrawal_credentials,
+            amount=amount,
+        )
 
 
 class CredentialManager:
@@ -126,6 +128,7 @@ class CredentialManager:
     def generate_credentials(
         network: str,
         mnemonic: str,
+        validator_type: ValidatorType,
         count: int,
         start_index: int,
         pool_size: int | None = None,
@@ -151,6 +154,7 @@ class CredentialManager:
                             chunk_indexes,
                             network,
                             mnemonic,
+                            validator_type,
                         ],
                         callback=bar_updated,
                     )
@@ -168,6 +172,7 @@ class CredentialManager:
         indexes: list[int],
         network: str,
         mnemonic: str,
+        validator_type: ValidatorType,
     ) -> list[Credential]:
         # Hack to run web3 sessions in multiprocessing mode
         # pylint: disable-next=protected-access
@@ -175,7 +180,9 @@ class CredentialManager:
 
         credentials: list[Credential] = []
         for index in indexes:
-            credential = CredentialManager.generate_credential(network, mnemonic, index)
+            credential = CredentialManager.generate_credential(
+                network, mnemonic, index, validator_type
+            )
             credentials.append(credential)
         return credentials
 
@@ -185,10 +192,13 @@ class CredentialManager:
             network=network,
             mnemonic=mnemonic,
             index=0,
+            validator_type=ValidatorType.TWO,
         ).public_key
 
     @staticmethod
-    def generate_credential(network: str, mnemonic: str, index: int) -> Credential:
+    def generate_credential(
+        network: str, mnemonic: str, index: int, validator_type: ValidatorType
+    ) -> Credential:
         """Returns the signing key of the mnemonic at a specific index."""
         seed = get_seed(mnemonic=mnemonic, password='')  # nosec
         private_key = BLSPrivateKey(derive_master_SK(seed))
@@ -198,10 +208,20 @@ class CredentialManager:
         for node in nodes:
             private_key = BLSPrivateKey(derive_child_SK(parent_SK=private_key, index=node))
 
-        return Credential(private_key=private_key, path=signing_key_path, network=network)
+        return Credential(
+            private_key=private_key,
+            path=signing_key_path,
+            network=network,
+            validator_type=validator_type,
+        )
 
     @staticmethod
     def load_credential(
-        network: str, vault: ChecksumAddress, private_key: BLSPrivateKey
+        network: str,
+        vault: ChecksumAddress,
+        private_key: BLSPrivateKey,
+        validator_type: ValidatorType,
     ) -> Credential:
-        return Credential(private_key=private_key, network=network, vault=vault)
+        return Credential(
+            private_key=private_key, network=network, vault=vault, validator_type=validator_type
+        )
