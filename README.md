@@ -325,7 +325,8 @@ If you **did not** use Operator Service to generate validator keys, you will nee
   single `password.txt` password file for all the keystores or separate password files for each keystore with the same
   name as keystore, but ending with `.txt`. For example, `keystore1.json`, `keystore1.txt`, etc.
 
-To register a pre Pectra 0x01 validator, add the `--validator-type 0x01` flag
+To register a Pre-Pectra validator using the 0x01 (ETH1_ADDRESS_WITHDRAWAL_PREFIX) credential type,
+include the `--validator-type 0x01` flag in your command.
 
 #### Using binary
 

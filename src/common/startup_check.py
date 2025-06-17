@@ -339,7 +339,9 @@ async def _check_validators_type() -> None:
             < get_pectra_vault_version(settings.network, vault_address)
             and settings.validator_type == ValidatorType.TWO
         ):
-            raise RuntimeError('Validator type 0x02 is not supported pre pectra vaults')
+            raise RuntimeError(
+                'Pre-Pectra vaults do not support validators with 0x02 credential type.'
+            )
 
 
 async def _check_events_logs() -> None:
