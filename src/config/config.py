@@ -35,10 +35,6 @@ class OperatorConfig:
         return self.data_dir / 'config.json'
 
     @property
-    def exists(self) -> bool:
-        return self.config_path.is_file()
-
-    @property
     def tmp_data_dir(self) -> Path:
         return self.data_dir / '.tmp'
 
@@ -105,6 +101,10 @@ class OperatorConfig:
         }
         with self.config_path.open('w') as f:
             json.dump(config, f)
+
+    def is_network_config_exists(self, network: str) -> bool:
+        config_path = self.root_dir / network / 'config.json'
+        return config_path.is_file()
 
     def _validate(self, mnemonic: str | None = None) -> None:
         """Validates the loaded configuration data."""

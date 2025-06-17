@@ -6,7 +6,6 @@ import click
 
 from src.common.credentials import Credential, CredentialManager
 from src.common.password import generate_password, get_or_create_password_file
-from src.common.typings import ValidatorType
 from src.common.utils import greenify
 from src.common.validators import validate_mnemonic
 from src.config.config import OperatorConfig, OperatorConfigException
@@ -44,13 +43,6 @@ from src.validators.utils import save_public_keys
     type=click.IntRange(min=1),
 )
 @click.option(
-    '--validator-type',
-    help='Type of registered validator: 0x01 or 0x02.',
-    envvar='VALIDATOR_TYPE',
-    default='0x02',
-    type=ValidatorType,
-)
-@click.option(
     '--pool-size',
     help='Number of processes in a pool.',
     envvar='POOL_SIZE',
@@ -71,7 +63,6 @@ def create_keys(
     count: int,
     data_dir: str,
     per_keystore_password: bool,
-    validator_type: ValidatorType,
     pool_size: int | None,
     network: str | None,
 ) -> None:
@@ -93,7 +84,6 @@ def create_keys(
     credentials = CredentialManager.generate_credentials(
         network=operator_config.network,
         mnemonic=mnemonic,
-        validator_type=validator_type,
         count=count,
         start_index=operator_config.mnemonic_next_index,
         pool_size=pool_size,

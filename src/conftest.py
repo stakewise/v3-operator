@@ -240,7 +240,6 @@ def create_validator_keypair(test_mnemonic: str) -> Callable[[], tuple[BLSPrivke
             network=HOODI,
             mnemonic=test_mnemonic,
             index=randint(0, 100_000),
-            validator_type=ValidatorType.TWO,
         )
 
         return (BLSPrivkey(credential.private_key.to_bytes(32, 'big')), credential.public_key)

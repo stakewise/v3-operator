@@ -282,7 +282,6 @@ async def _generate_keystores(
             network=settings.network,
             mnemonic=mnemonic,
             index=index,
-            validator_type=ValidatorType.TWO,
         )
         public_key = add_0x_prefix(credential.public_key)
         # increase index for next iteration
@@ -310,7 +309,6 @@ async def _generate_keystores(
                 network=settings.network,
                 mnemonic=mnemonic,
                 index=index,
-                validator_type=ValidatorType.ONE,
             )
         # generate password and save keystore
         password = (

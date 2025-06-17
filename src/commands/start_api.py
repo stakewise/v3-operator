@@ -8,6 +8,7 @@ from eth_typing import ChecksumAddress
 
 from src.commands.start_base import start_base
 from src.common.logging import LOG_LEVELS
+from src.common.typings import ValidatorType
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_addresses
 from src.config.config import OperatorConfig, OperatorConfigException
@@ -102,6 +103,13 @@ AUTO = 'AUTO'
     default=DEFAULT_METRICS_PREFIX,
 )
 @click.option(
+    '--validator-type',
+    help='Type of registered validators: 0x01 or 0x02.',
+    envvar='VALIDATOR_TYPE',
+    default='0x02',
+    type=ValidatorType,
+)
+@click.option(
     '-v',
     '--verbose',
     help='Enable debug mode. Default is false.',
@@ -194,6 +202,7 @@ def start_api(
     metrics_host: str,
     metrics_port: int,
     metrics_prefix: str,
+    validator_type: ValidatorType,
     data_dir: str,
     log_level: str,
     log_format: str,
@@ -234,6 +243,7 @@ def start_api(
         metrics_host=metrics_host,
         metrics_port=metrics_port,
         metrics_prefix=metrics_prefix,
+        validator_type=validator_type,
         network=network,
         hot_wallet_file=hot_wallet_file,
         hot_wallet_password_file=hot_wallet_password_file,

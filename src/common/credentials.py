@@ -44,7 +44,9 @@ COIN_TYPE = '3600'
 class Credential:
     private_key: BLSPrivateKey
     network: str
-    validator_type: ValidatorType
+
+    # used only for deposit data generation
+    validator_type: ValidatorType = ValidatorType.TWO
 
     amount: int | None = None
     path: str | None = None
@@ -128,7 +130,6 @@ class CredentialManager:
     def generate_credentials(
         network: str,
         mnemonic: str,
-        validator_type: ValidatorType,
         count: int,
         start_index: int,
         pool_size: int | None = None,
@@ -154,7 +155,6 @@ class CredentialManager:
                             chunk_indexes,
                             network,
                             mnemonic,
-                            validator_type,
                         ],
                         callback=bar_updated,
                     )
@@ -172,7 +172,6 @@ class CredentialManager:
         indexes: list[int],
         network: str,
         mnemonic: str,
-        validator_type: ValidatorType,
     ) -> list[Credential]:
         # Hack to run web3 sessions in multiprocessing mode
         # pylint: disable-next=protected-access
@@ -180,9 +179,7 @@ class CredentialManager:
 
         credentials: list[Credential] = []
         for index in indexes:
-            credential = CredentialManager.generate_credential(
-                network, mnemonic, index, validator_type
-            )
+            credential = CredentialManager.generate_credential(network, mnemonic, index)
             credentials.append(credential)
         return credentials
 
@@ -192,13 +189,10 @@ class CredentialManager:
             network=network,
             mnemonic=mnemonic,
             index=0,
-            validator_type=ValidatorType.TWO,
         ).public_key
 
     @staticmethod
-    def generate_credential(
-        network: str, mnemonic: str, index: int, validator_type: ValidatorType
-    ) -> Credential:
+    def generate_credential(network: str, mnemonic: str, index: int) -> Credential:
         """Returns the signing key of the mnemonic at a specific index."""
         seed = get_seed(mnemonic=mnemonic, password='')  # nosec
         private_key = BLSPrivateKey(derive_master_SK(seed))
@@ -212,7 +206,6 @@ class CredentialManager:
             private_key=private_key,
             path=signing_key_path,
             network=network,
-            validator_type=validator_type,
         )
 
     @staticmethod
