@@ -25,7 +25,6 @@ async def register_validators(
     validators: Sequence[Validator],
     harvest_params: HarvestParams | None,
     validators_registry_root: Bytes32,
-    validators_manager_signature: HexStr,
 ) -> HexStr | None:
     tx_validators = [
         Web3.to_bytes(tx_validator)
@@ -54,7 +53,7 @@ async def register_validators(
     calls.append(
         vault_contract.encode_abi(
             fn_name='registerValidators',
-            args=[keeper_approval_params, validators_manager_signature],
+            args=[keeper_approval_params, b''],  # send empty validators_manager_signature
         )
     )
 

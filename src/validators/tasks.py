@@ -217,7 +217,6 @@ async def register_new_validators(
         validators=validators,
         harvest_params=harvest_params,
         validators_registry_root=validators_registry_root,
-        validators_manager_signature=validators_manager_signature,
     )
     if tx_hash:
         pub_keys = ', '.join([val.public_key for val in validators])
