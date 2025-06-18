@@ -17,10 +17,10 @@ from src.common.metrics import metrics
 from src.common.tasks import BaseTask
 from src.common.typings import HarvestParams, ValidatorType
 from src.config.settings import (
-    DEPOSIT_AMOUNT,
-    DEPOSIT_AMOUNT_GWEI,
-    PECTRA_DEPOSIT_AMOUNT,
-    PECTRA_DEPOSIT_AMOUNT_GWEI,
+    MAX_EFFECTIVE_BALANCE,
+    MAX_EFFECTIVE_BALANCE_GWEI,
+    MIN_ACTIVATION_BALANCE,
+    MIN_ACTIVATION_BALANCE_GWEI,
     PUBLIC_KEYS_FILENAME,
     settings,
 )
@@ -104,7 +104,7 @@ async def process_validators(
     vault_assets = await get_vault_assets(
         vault_address=vault_address, harvest_params=harvest_params
     )
-    if vault_assets < DEPOSIT_AMOUNT:
+    if vault_assets < MIN_ACTIVATION_BALANCE:
         return None
 
     await register_new_validators(
@@ -272,14 +272,14 @@ async def load_genesis_validators() -> None:
 
 def _get_validators_amount(vault_assets: int, validator_type: ValidatorType) -> list[Gwei]:
     """Returns a list of amounts in Gwei for each validator to be registered."""
-    if vault_assets < DEPOSIT_AMOUNT:
+    if vault_assets < MIN_ACTIVATION_BALANCE:
         return []
     if validator_type == ValidatorType.ONE:
-        return [DEPOSIT_AMOUNT_GWEI] * (vault_assets // DEPOSIT_AMOUNT)
+        return [MIN_ACTIVATION_BALANCE_GWEI] * (vault_assets // MIN_ACTIVATION_BALANCE)
     amounts = []
-    while vault_assets >= PECTRA_DEPOSIT_AMOUNT:
-        amounts.append(PECTRA_DEPOSIT_AMOUNT_GWEI)
-        vault_assets -= PECTRA_DEPOSIT_AMOUNT
-    if vault_assets >= DEPOSIT_AMOUNT:
+    while vault_assets >= MAX_EFFECTIVE_BALANCE:
+        amounts.append(MAX_EFFECTIVE_BALANCE_GWEI)
+        vault_assets -= MAX_EFFECTIVE_BALANCE
+    if vault_assets >= MIN_ACTIVATION_BALANCE:
         amounts.append(Gwei(int(Web3.from_wei(vault_assets, 'gwei'))))
     return amounts

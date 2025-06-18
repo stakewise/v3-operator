@@ -340,7 +340,7 @@ async def _check_validators_type() -> None:
             and settings.validator_type == ValidatorType.TWO
         ):
             raise RuntimeError(
-                'Pre-Pectra vaults do not support validators with 0x02 credential type.'
+                'Please upgrade your Vault to the latest version to use 0x02 validators.'
             )
 
 

@@ -2,13 +2,7 @@ from typing import Sequence
 
 import ecies
 from eth_typing import BLSPubkey, BLSSignature, ChecksumAddress, HexStr
-from sw_utils import (
-    ConsensusFork,
-    ProtocolConfig,
-    get_exit_message_signing_root,
-    get_v1_withdrawal_credentials,
-    get_v2_withdrawal_credentials,
-)
+from sw_utils import ConsensusFork, ProtocolConfig, get_exit_message_signing_root
 from sw_utils.signing import compute_deposit_data
 from web3 import Web3
 
@@ -17,15 +11,13 @@ from src.config.settings import settings
 from src.validators.keystores.base import BaseKeystore
 from src.validators.signing.key_shares import bls_signature_and_public_key_to_shares
 from src.validators.typings import ExitSignatureShards, Validator
+from src.validators.utils import get_withdrawal_credentials
 
 
 def encode_tx_validator_list(
     validators: Sequence[Validator], vault_address: ChecksumAddress
 ) -> list[bytes]:
-    if settings.validator_type == ValidatorType.ONE:
-        credentials = get_v1_withdrawal_credentials(vault_address)
-    else:
-        credentials = get_v2_withdrawal_credentials(vault_address)
+    credentials = get_withdrawal_credentials(vault_address)
     tx_validators: list[bytes] = []
     for validator in validators:
         tx_validator = encode_tx_validator(credentials, validator)

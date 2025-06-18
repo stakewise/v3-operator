@@ -282,12 +282,11 @@ ORACLES_VALIDATORS_TIMEOUT: int = decouple_config(
     'ORACLES_VALIDATORS_TIMEOUT', default=10, cast=int
 )
 # common
-DEPOSIT_AMOUNT = Web3.to_wei(32, 'ether')
-DEPOSIT_AMOUNT_GWEI = Gwei(int(Web3.from_wei(DEPOSIT_AMOUNT, 'gwei')))
+MIN_ACTIVATION_BALANCE = Web3.to_wei(32, 'ether')
+MIN_ACTIVATION_BALANCE_GWEI = Gwei(int(Web3.from_wei(MIN_ACTIVATION_BALANCE, 'gwei')))
 
-PECTRA_DEPOSIT_AMOUNT = Web3.to_wei(2048, 'ether')
-PECTRA_DEPOSIT_AMOUNT_GWEI = Gwei(int(Web3.from_wei(PECTRA_DEPOSIT_AMOUNT, 'gwei')))
-
+MAX_EFFECTIVE_BALANCE = Web3.to_wei(2048, 'ether')
+MAX_EFFECTIVE_BALANCE_GWEI = Gwei(int(Web3.from_wei(MAX_EFFECTIVE_BALANCE, 'gwei')))
 
 # Backoff retries
 DEFAULT_RETRY_TIME = 60

@@ -6,7 +6,7 @@ from typing import cast
 import milagro_bls_binding as bls
 from aiohttp import ClientSession, ClientTimeout
 from eth_typing import BLSPubkey, BLSSignature, ChecksumAddress, HexAddress, HexStr
-from sw_utils import get_exit_message_signing_root, get_v1_withdrawal_credentials
+from sw_utils import get_exit_message_signing_root
 from sw_utils.common import urljoin
 from sw_utils.signing import DepositMessage as SerializableDepositMessage
 from sw_utils.signing import compute_deposit_domain, compute_signing_root
@@ -16,6 +16,7 @@ from web3 import Web3
 from src.config.networks import NETWORKS
 from src.config.settings import REMOTE_SIGNER_TIMEOUT, settings
 from src.validators.keystores.base import BaseKeystore
+from src.validators.utils import get_withdrawal_credentials
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +92,7 @@ class RemoteSignerKeystore(BaseKeystore):
         vault_address: ChecksumAddress,
     ) -> dict:
         fork_version = NETWORKS[settings.network].GENESIS_FORK_VERSION
-        withdrawal_credentials = get_v1_withdrawal_credentials(cast(HexAddress, vault_address))
+        withdrawal_credentials = get_withdrawal_credentials(cast(HexAddress, vault_address))
         signing_root = self._get_deposit_signing_root(
             public_key=BLSPubkey(Web3.to_bytes(hexstr=public_key)),
             withdrawal_credentials=withdrawal_credentials,

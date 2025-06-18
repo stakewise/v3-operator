@@ -6,16 +6,20 @@ from pathlib import Path
 from typing import Sequence
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
-from eth_typing import ChecksumAddress, HexStr
-from eth_utils import add_0x_prefix
-from sw_utils import ProtocolConfig
+from eth_typing import ChecksumAddress, HexAddress, HexStr
+from sw_utils import (
+    ProtocolConfig,
+    get_v1_withdrawal_credentials,
+    get_v2_withdrawal_credentials,
+)
+from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.types import Gwei
 
 from src.common.contracts import validators_registry_contract
-from src.common.typings import OracleApproval, OraclesApproval
+from src.common.typings import OracleApproval, OraclesApproval, ValidatorType
 from src.common.utils import format_error, process_oracles_approvals, warning_verbose
-from src.config.settings import ORACLES_VALIDATORS_TIMEOUT
+from src.config.settings import ORACLES_VALIDATORS_TIMEOUT, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import (
     RegistryRootChangedError,
@@ -149,8 +153,8 @@ async def get_available_validators(
         )
         validators.append(
             Validator(
-                public_key=add_0x_prefix(Web3.to_hex(deposit_data['pubkey'])),
-                signature=add_0x_prefix(Web3.to_hex(deposit_data['signature'])),
+                public_key=Web3.to_hex(deposit_data['pubkey']),
+                signature=Web3.to_hex(deposit_data['signature']),
                 amount=Gwei(int(deposit_data['amount'])),
                 deposit_data_root=Web3.to_hex(deposit_data['deposit_data_root']),
             )
@@ -187,3 +191,10 @@ def save_public_keys(filename: Path, public_keys: list[HexStr]) -> None:
     with open(filename, 'w', encoding='utf-8') as f:
         for public_key in public_keys:
             f.write(f'{public_key}\n')
+
+
+def get_withdrawal_credentials(vault_address: HexAddress) -> Bytes32:
+    """Returns withdrawal credentials based on the vault address and validator type."""
+    if settings.validator_type == ValidatorType.ONE:
+        return get_v1_withdrawal_credentials(vault_address)
+    return get_v2_withdrawal_credentials(vault_address)

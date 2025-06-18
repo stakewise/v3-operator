@@ -1,6 +1,5 @@
 import asyncio
 import sys
-from dataclasses import dataclass
 from pathlib import Path
 
 import click
@@ -14,18 +13,11 @@ from src.common.credentials import CredentialManager
 from src.common.execution import SECONDS_PER_MONTH
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.password import generate_password, get_or_create_password_file
-from src.common.typings import ValidatorType
 from src.common.utils import greenify, log_verbose
 from src.common.validators import validate_eth_addresses, validate_mnemonic
 from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_NETWORK, settings
-
-
-@dataclass
-class ValidatorData:
-    status: ValidatorStatus
-    type: ValidatorType
 
 
 @click.command(help='Recover config data directory and keystores.')
@@ -158,7 +150,7 @@ async def main(
     setup_logging()
     await setup_clients()
 
-    validators: dict[HexStr, ValidatorData] = {}
+    validators: dict[HexStr, ValidatorStatus | None] = {}
     for vault in settings.vaults:
         vault_validators = await _fetch_registered_validators(vault)
         validators.update(vault_validators)
@@ -198,7 +190,7 @@ async def main(
         mnemonic=mnemonic,
         keystores_dir=keystores_dir,
         password_file=password_file,
-        validators_data=validators,
+        validator_statuses=validators,
         per_keystore_password=per_keystore_password,
     )
 
@@ -212,7 +204,7 @@ async def main(
 # pylint: disable-next=too-many-locals
 async def _fetch_registered_validators(
     vault: ChecksumAddress,
-) -> dict[HexStr, ValidatorData]:
+) -> dict[HexStr, ValidatorStatus | None]:
     """Fetch registered validators."""
     click.secho(f'Fetching registered validators for vault {vault}...', bold=True)
     current_block = await execution_client.eth.get_block_number()
@@ -244,23 +236,19 @@ async def _fetch_registered_validators(
     click.secho(f'Fetched {len(public_keys)} registered validators', bold=True)
 
     click.secho('Fetching validators statuses...', bold=True)
-    validators_data: dict[HexStr, ValidatorData] = {}
+    validator_statuses: dict[HexStr, ValidatorStatus | None] = {
+        public_key: None for public_key in public_keys
+    }
     for i in range(0, len(public_keys), settings.validators_fetch_chunk_size):
         validators = await consensus_client.get_validators_by_ids(
             public_keys[i : i + settings.validators_fetch_chunk_size]
         )
         for beacon_validator in validators['data']:
             public_key = add_0x_prefix(beacon_validator['validator']['pubkey'])
-            validator_type = ValidatorType.ONE
-            if beacon_validator['validator']['withdrawal_credentials'].startswith('0x02'):
-                validator_type = ValidatorType.TWO
-            validators_data[public_key] = ValidatorData(
-                status=ValidatorStatus(beacon_validator['status']),
-                type=validator_type,
-            )
-    click.secho('Fetched consensus data for registered validators', bold=True)
+            validator_statuses[public_key] = ValidatorStatus(beacon_validator['status'])
+    click.secho('Fetched statuses for registered validators', bold=True)
 
-    return validators_data
+    return validator_statuses
 
 
 # pylint: disable-next=too-many-arguments,too-many-locals
@@ -268,13 +256,13 @@ async def _generate_keystores(
     mnemonic: str,
     keystores_dir: Path,
     password_file: Path,
-    validators_data: dict[HexStr, ValidatorData],
+    validator_statuses: dict[HexStr, ValidatorStatus | None],
     per_keystore_password: bool,
 ) -> int:
     index = 0
     failed_attempts = 0
 
-    validators_count = len(validators_data)
+    validators_count = len(validator_statuses)
     # stop once failed 1000 times
     while failed_attempts != 1000:
         # generate credential
@@ -288,28 +276,21 @@ async def _generate_keystores(
         index += 1
 
         # check whether public key is registered
-        if public_key not in validators_data:
+        if public_key not in validator_statuses:
             failed_attempts += 1
             continue
 
         # get validator status
-        validator_data = validators_data.pop(public_key)
+        validator_status = validator_statuses.pop(public_key)
         validators_count -= 1
 
         # update progress, reset failed attempts
         failed_attempts = 0
 
         # skip if validator is already exited
-        if validator_data.status in EXITED_STATUSES:
+        if validator_status in EXITED_STATUSES:
             continue
 
-        if validator_data.type == ValidatorType.ONE:
-            # Regenerate credential for type one validator
-            credential = CredentialManager.generate_credential(
-                network=settings.network,
-                mnemonic=mnemonic,
-                index=index,
-            )
         # generate password and save keystore
         password = (
             generate_password()

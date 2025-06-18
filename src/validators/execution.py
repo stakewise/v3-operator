@@ -16,7 +16,7 @@ from src.common.contracts import (
     validators_registry_contract,
 )
 from src.common.typings import HarvestParams
-from src.config.settings import DEPOSIT_AMOUNT, settings
+from src.config.settings import MIN_ACTIVATION_BALANCE, settings
 from src.harvest.execution import get_update_state_calls
 from src.validators.database import NetworkValidatorCrud
 from src.validators.typings import NetworkValidator
@@ -167,8 +167,8 @@ async def get_withdrawable_assets(
     _, multicall = await multicall_contract.aggregate(calls)
     after_update_assets = Web3.to_int(multicall[-1])
 
-    before_update_validators = before_update_assets // DEPOSIT_AMOUNT
-    after_update_validators = after_update_assets // DEPOSIT_AMOUNT
+    before_update_validators = before_update_assets // MIN_ACTIVATION_BALANCE
+    after_update_validators = after_update_assets // MIN_ACTIVATION_BALANCE
     if before_update_validators != after_update_validators:
         return Wei(after_update_assets)
 
