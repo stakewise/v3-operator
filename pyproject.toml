@@ -15,7 +15,7 @@ multiproof = { git = "https://github.com/stakewise/multiproof.git", rev = "v0.1.
 sw-utils = {git = "https://github.com/stakewise/sw-utils.git", rev = "v0.9.11"}
 staking-deposit = { git = "https://github.com/ethereum/staking-deposit-cli.git", rev = "v2.8.0" }
 pycryptodomex = "3.19.1"
-click = "==8.1.7"
+click = "==8.2.1"
 tomli = "~2"
 eciespy = "==0.4.3"
 prometheus-client = "==0.17.1"

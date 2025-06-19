@@ -106,12 +106,11 @@ AUTO = 'AUTO'
     '--validator-type',
     help=f'Type of registered validators: {ValidatorType.V1.value} or {ValidatorType.V2.value}.',
     envvar='VALIDATOR_TYPE',
-    default=ValidatorType.V2.value,
+    default=ValidatorType.V2,
     type=click.Choice(
-        [ValidatorType.V1.value, ValidatorType.V2.value],
+        ValidatorType,
         case_sensitive=False,
     ),
-    callback=lambda ctx, param, value: ValidatorType(value),
 )
 @click.option(
     '-v',
