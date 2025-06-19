@@ -10,14 +10,13 @@ from sw_utils.consensus import EXITED_STATUSES, ValidatorStatus
 from src.common.clients import consensus_client, execution_client, setup_clients
 from src.common.contracts import VaultContract, v2_pool_contract
 from src.common.credentials import CredentialManager
-from src.common.execution import SECONDS_PER_MONTH
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.password import generate_password, get_or_create_password_file
 from src.common.utils import greenify, log_verbose
 from src.common.validators import validate_eth_addresses, validate_mnemonic
 from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
-from src.config.settings import DEFAULT_NETWORK, settings
+from src.config.settings import DEFAULT_NETWORK, SECONDS_PER_MONTH, settings
 
 
 @click.command(help='Recover config data directory and keystores.')

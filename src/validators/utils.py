@@ -135,7 +135,7 @@ async def send_approval_request(
     )
 
 
-async def get_available_validators(
+async def get_registered_validators(
     keystore: BaseKeystore,
     amounts: list[Gwei],
     vault_address: ChecksumAddress,
@@ -160,6 +160,31 @@ async def get_available_validators(
             )
         )
 
+    return validators
+
+
+async def get_funded_validators(
+    keystore: BaseKeystore,
+    funding_amounts: dict[HexStr, Gwei],
+    vault_address: ChecksumAddress,
+) -> list[Validator]:
+    public_keys = list(funding_amounts.keys())
+    for public_key in public_keys:
+        if public_key not in keystore:
+            raise RuntimeError(f'Public key {public_key} not found in keystore')
+    validators = []
+    for public_key, amount in funding_amounts.items():
+        deposit_data = await keystore.get_deposit_data(
+            public_key=public_key, amount=amount, vault_address=vault_address
+        )
+        validators.append(
+            Validator(
+                public_key=Web3.to_hex(deposit_data['pubkey']),
+                signature=Web3.to_hex(deposit_data['signature']),
+                amount=amount,
+                deposit_data_root=Web3.to_hex(deposit_data['deposit_data_root']),
+            )
+        )
     return validators
 
 

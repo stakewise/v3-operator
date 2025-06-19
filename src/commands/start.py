@@ -5,6 +5,7 @@ from pathlib import Path
 
 import click
 from eth_typing import ChecksumAddress
+from web3.types import Gwei
 
 from src.commands.start_base import start_base
 from src.common.logging import LOG_LEVELS
@@ -19,6 +20,8 @@ from src.config.settings import (
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
     DEFAULT_METRICS_PREFIX,
+    DEFAULT_MIN_DEPOSIT_AMOUNT,
+    DEFAULT_MIN_VALIDATORS_REGISTRATION,
     LOG_FORMATS,
     LOG_PLAIN,
     settings,
@@ -230,7 +233,14 @@ logger = logging.getLogger(__name__)
     type=int,
     envvar='MIN_VALIDATORS_REGISTRATION',
     help='Minimum number of validators required to start registration.',
-    default=1,
+    default=DEFAULT_MIN_VALIDATORS_REGISTRATION,
+)
+@click.option(
+    '--min-deposit-amount-gwei',
+    type=int,
+    envvar='MIN_DEPOSIT_AMOUNT_GWEI',
+    help='Minimum amount of gwei to fund into validators',
+    default=DEFAULT_MIN_DEPOSIT_AMOUNT,
 )
 @click.option(
     '--no-confirm',
@@ -270,6 +280,7 @@ def start(
     database_dir: str | None,
     pool_size: int | None,
     min_validators_registration: int,
+    min_deposit_amount_gwei: int,
     no_confirm: bool,
 ) -> None:
 
@@ -329,6 +340,7 @@ def start(
         log_format=log_format,
         pool_size=pool_size,
         min_validators_registration=min_validators_registration,
+        min_deposit_amount=Gwei(min_deposit_amount_gwei),
     )
 
     try:
