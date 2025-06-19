@@ -337,10 +337,11 @@ async def _check_validators_type() -> None:
         if (
             await vault_contract.version()
             < get_pectra_vault_version(settings.network, vault_address)
-            and settings.validator_type == ValidatorType.TWO
+            and settings.validator_type == ValidatorType.V2
         ):
             raise RuntimeError(
-                'Please upgrade your Vault to the latest version to use 0x02 validators.'
+                f'Please upgrade your Vault to the latest version '
+                f'to use {ValidatorType.V2.value} validators.'
             )
 
 

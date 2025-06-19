@@ -115,10 +115,14 @@ logger = logging.getLogger(__name__)
 )
 @click.option(
     '--validator-type',
-    help='Type of registered validators: 0x01 or 0x02.',
+    help=f'Type of registered validators: {ValidatorType.V1.value} or {ValidatorType.V2.value}.',
     envvar='VALIDATOR_TYPE',
-    default='0x02',
-    type=ValidatorType,
+    default=ValidatorType.V2.value,
+    type=click.Choice(
+        [ValidatorType.V1.value, ValidatorType.V2.value],
+        case_sensitive=False,
+    ),
+    callback=lambda ctx, param, value: ValidatorType(value),
 )
 @click.option(
     '-v',

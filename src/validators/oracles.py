@@ -174,7 +174,7 @@ async def create_approval_request(
         deadline=deadline,
         validators_manager_signature=validators_manager_signature,
     )
-    if settings.validator_type == ValidatorType.TWO:
+    if settings.validator_type == ValidatorType.V2:
         request.amounts = []
     for validator_index, validator in enumerate(validators, validators_start_index):
         shards = validator.exit_signature_shards

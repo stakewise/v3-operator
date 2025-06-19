@@ -34,7 +34,7 @@ def encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) -> 
         amount_gwei=validator.amount,
         signature=signature,
     ).hash_tree_root
-    if settings.validator_type == ValidatorType.ONE:
+    if settings.validator_type == ValidatorType.V1:
         return public_key + signature + deposit_root
     return public_key + signature + deposit_root + validator.amount.to_bytes(8, byteorder='big')
 

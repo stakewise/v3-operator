@@ -46,7 +46,7 @@ class Credential:
     network: str
 
     # used only for deposit data generation
-    validator_type: ValidatorType = ValidatorType.TWO
+    validator_type: ValidatorType = ValidatorType.V2
 
     amount: int | None = None
     path: str | None = None
@@ -64,7 +64,7 @@ class Credential:
     def withdrawal_credentials(self) -> Bytes32:
         if not self.vault:
             raise ValueError('Vault address for credential is not set')
-        if self.validator_type == ValidatorType.ONE:
+        if self.validator_type == ValidatorType.V1:
             return get_v1_withdrawal_credentials(self.vault)
         return get_v2_withdrawal_credentials(self.vault)
 

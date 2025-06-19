@@ -47,6 +47,6 @@ def _encode_validator(v: Validator) -> bytes:
         Web3.to_bytes(hexstr=v.signature),
         Web3.to_bytes(hexstr=v.deposit_data_root),
     ]
-    if settings.validator_type == ValidatorType.TWO:
+    if settings.validator_type == ValidatorType.V2:
         encoded_validator.append(v.amount.to_bytes(8, byteorder='big'))
     return b''.join(encoded_validator)

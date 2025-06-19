@@ -126,7 +126,7 @@ async def register_new_validators(
     available_public_keys: list[HexStr] | None,
     relayer_adapter: RelayerAdapter | None = None,
 ) -> HexStr | None:
-    validators_amounts = _get_validators_amount(vault_assets, settings.validator_type)
+    validators_amounts = _get_validators_amounts(vault_assets, settings.validator_type)
     validators_count = len(validators_amounts)
     if not validators_amounts:
         # not enough balance to register validators
@@ -217,6 +217,7 @@ async def register_new_validators(
         validators=validators,
         harvest_params=harvest_params,
         validators_registry_root=validators_registry_root,
+        validators_manager_signature=validators_manager_signature,
     )
     if tx_hash:
         pub_keys = ', '.join([val.public_key for val in validators])
@@ -269,11 +270,11 @@ async def load_genesis_validators() -> None:
     logger.info('Loaded %d genesis validators', len(genesis_validators))
 
 
-def _get_validators_amount(vault_assets: int, validator_type: ValidatorType) -> list[Gwei]:
+def _get_validators_amounts(vault_assets: int, validator_type: ValidatorType) -> list[Gwei]:
     """Returns a list of amounts in Gwei for each validator to be registered."""
     if vault_assets < MIN_ACTIVATION_BALANCE:
         return []
-    if validator_type == ValidatorType.ONE:
+    if validator_type == ValidatorType.V1:
         return [MIN_ACTIVATION_BALANCE_GWEI] * (vault_assets // MIN_ACTIVATION_BALANCE)
     amounts = []
     while vault_assets >= MAX_EFFECTIVE_BALANCE:

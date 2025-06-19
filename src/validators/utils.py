@@ -195,6 +195,6 @@ def save_public_keys(filename: Path, public_keys: list[HexStr]) -> None:
 
 def get_withdrawal_credentials(vault_address: HexAddress) -> Bytes32:
     """Returns withdrawal credentials based on the vault address and validator type."""
-    if settings.validator_type == ValidatorType.ONE:
+    if settings.validator_type == ValidatorType.V1:
         return get_v1_withdrawal_credentials(vault_address)
     return get_v2_withdrawal_credentials(vault_address)

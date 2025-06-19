@@ -34,8 +34,8 @@ class OraclesApproval:
 
 
 class ValidatorType(Enum):
-    ONE = '0x01'
-    TWO = '0x02'
+    V1 = '0x01'
+    V2 = '0x02'
 
 
 class Singleton(type):
