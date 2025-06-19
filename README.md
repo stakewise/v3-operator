@@ -41,8 +41,8 @@ a registration transaction to the Vault.
 The validator registration process consists of the following steps:
 
 1. Check whether Vault has accumulated enough assets to register a validator (e.g., 32 ETH for Ethereum)
-2. Get the next free validator public key from the `validators.txt` file attached to the Operator. The validators are
-   registered in the same order as specified in the `validators.txt` file.
+2. Get the next free validator public key from the `public_keys.txt` file attached to the Operator. The validators are
+   registered in the same order as specified in the `public_keys.txt` file.
 3. Obtain BLS signature for exit message using local keystores or remote signer.
 4. Share the exit signature of the validator with StakeWise Oracles:
    1. Using [Shamir's secret sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing), split
@@ -324,6 +324,9 @@ If you **did not** use Operator Service to generate validator keys, you will nee
 - `--keystores-dir` - The directory with validator keys in the EIP-2335 standard. The folder must contain either a
   single `password.txt` password file for all the keystores or separate password files for each keystore with the same
   name as keystore, but ending with `.txt`. For example, `keystore1.json`, `keystore1.txt`, etc.
+
+To register a validator using the 0x01 (ETH1_ADDRESS_WITHDRAWAL_PREFIX) credential type,
+include the `--validator-type 0x01` flag in your command.
 
 #### Using binary
 

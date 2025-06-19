@@ -7,12 +7,11 @@ from web3 import Web3
 from web3.exceptions import ContractLogicError
 
 from src.common.clients import execution_client
-from src.common.contracts import VaultContract, multicall_contract
+from src.common.contracts import VaultContract
 from src.common.execution import build_gas_manager
 from src.common.typings import HarvestParams, OraclesApproval
 from src.common.utils import format_error
 from src.config.settings import settings
-from src.harvest.execution import get_update_state_calls
 from src.validators.signing.common import encode_tx_validator_list
 from src.validators.typings import Validator
 
@@ -26,7 +25,7 @@ async def register_validators(
     validators: Sequence[Validator],
     harvest_params: HarvestParams | None,
     validators_registry_root: Bytes32,
-    validators_manager_signature: HexStr | None,
+    validators_manager_signature: HexStr,
 ) -> HexStr | None:
     tx_validators = [
         Web3.to_bytes(tx_validator)
@@ -35,11 +34,10 @@ async def register_validators(
             vault_address=vault_address,
         )
     ]
+    vault_contract = VaultContract(vault_address)
     if harvest_params is not None:
         # add update state calls before validator registration
-        calls = await get_update_state_calls(
-            vault_address=vault_address, harvest_params=harvest_params
-        )
+        calls = [vault_contract.get_update_state_call(harvest_params)]
     else:
         # aggregate all the calls into one multicall
         calls = []
@@ -53,24 +51,16 @@ async def register_validators(
     )
 
     # add validators registration call
-    if len(tx_validators) == 1:
-        validators_registration_call = _get_single_validator_registration_call(
-            vault_address=vault_address,
-            keeper_approval_params=keeper_approval_params,
-            validators_manager_signature=validators_manager_signature,
+    calls.append(
+        vault_contract.encode_abi(
+            fn_name='registerValidators',
+            args=[keeper_approval_params, validators_manager_signature],
         )
-    else:
-        validators_registration_call = _get_multiple_validators_registration_call(
-            vault_address=vault_address,
-            keeper_approval_params=keeper_approval_params,
-            validators_manager_signature=validators_manager_signature,
-        )
-
-    calls.append(validators_registration_call)
+    )
 
     logger.info('Submitting registration transaction')
     try:
-        await multicall_contract.functions.aggregate(calls).estimate_gas()
+        await vault_contract.functions.multicall(calls).estimate_gas()
     except (ValueError, ContractLogicError) as e:
         logger.error(
             'Failed to register validator(s): %s. '
@@ -84,7 +74,7 @@ async def register_validators(
     try:
         gas_manager = build_gas_manager()
         tx_params = await gas_manager.get_high_priority_tx_params()
-        tx = await multicall_contract.functions.aggregate(calls).transact(tx_params)
+        tx = await vault_contract.functions.multicall(calls).transact(tx_params)
     except Exception as e:
         logger.error('Failed to register validator(s): %s', format_error(e))
         if settings.verbose:
@@ -101,27 +91,3 @@ async def register_validators(
         return None
 
     return tx_hash
-
-
-def _get_single_validator_registration_call(
-    vault_address: ChecksumAddress,
-    keeper_approval_params: tuple,
-    validators_manager_signature: HexStr | None,
-) -> tuple[ChecksumAddress, HexStr]:
-    vault_contract = VaultContract(vault_address)
-    return vault_address, vault_contract.encode_abi(
-        fn_name='registerValidators',
-        args=[keeper_approval_params, Web3.to_bytes(hexstr=validators_manager_signature)],
-    )
-
-
-def _get_multiple_validators_registration_call(
-    vault_address: ChecksumAddress,
-    keeper_approval_params: tuple,
-    validators_manager_signature: HexStr | None,
-) -> tuple[ChecksumAddress, HexStr]:
-    vault_contract = VaultContract(vault_address)
-    return vault_address, vault_contract.encode_abi(
-        fn_name='registerValidators',
-        args=[keeper_approval_params, Web3.to_bytes(hexstr=validators_manager_signature)],
-    )

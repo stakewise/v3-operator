@@ -1,0 +1,72 @@
+from web3 import Web3
+
+from src.common.typings import ValidatorType
+from src.config.settings import MAX_EFFECTIVE_BALANCE_GWEI, MIN_ACTIVATION_BALANCE_GWEI
+from src.validators.tasks import _get_validators_amounts
+
+
+def test_get_validators_amounts():
+
+    assert _get_validators_amounts(0, ValidatorType.V1) == []
+    assert _get_validators_amounts(0, ValidatorType.V2) == []
+
+    assert _get_validators_amounts(Web3.to_wei(32, 'ether'), ValidatorType.V1) == [
+        MIN_ACTIVATION_BALANCE_GWEI
+    ]
+    assert _get_validators_amounts(Web3.to_wei(32, 'ether'), ValidatorType.V2) == [
+        MIN_ACTIVATION_BALANCE_GWEI
+    ]
+
+    assert _get_validators_amounts(Web3.to_wei(33, 'ether'), ValidatorType.V1) == [
+        MIN_ACTIVATION_BALANCE_GWEI,
+    ]
+    assert _get_validators_amounts(Web3.to_wei(33, 'ether'), ValidatorType.V2) == [_to_gwei(33)]
+
+    assert _get_validators_amounts(Web3.to_wei(64, 'ether'), ValidatorType.V1) == [
+        MIN_ACTIVATION_BALANCE_GWEI,
+        MIN_ACTIVATION_BALANCE_GWEI,
+    ]
+    assert _get_validators_amounts(Web3.to_wei(64, 'ether'), ValidatorType.V2) == [_to_gwei(64)]
+
+    assert _get_validators_amounts(Web3.to_wei(66, 'ether'), ValidatorType.V1) == [
+        MIN_ACTIVATION_BALANCE_GWEI,
+        MIN_ACTIVATION_BALANCE_GWEI,
+    ]
+    assert _get_validators_amounts(Web3.to_wei(66, 'ether'), ValidatorType.V2) == [_to_gwei(66)]
+
+    assert (
+        _get_validators_amounts(Web3.to_wei(2048, 'ether'), ValidatorType.V1)
+        == [MIN_ACTIVATION_BALANCE_GWEI] * 64
+    )
+    assert _get_validators_amounts(Web3.to_wei(2048, 'ether'), ValidatorType.V2) == [
+        MAX_EFFECTIVE_BALANCE_GWEI
+    ]
+
+    assert (
+        _get_validators_amounts(Web3.to_wei(2050, 'ether'), ValidatorType.V1)
+        == [MIN_ACTIVATION_BALANCE_GWEI] * 64
+    )
+    assert (
+        _get_validators_amounts(Web3.to_wei(2081, 'ether'), ValidatorType.V1)
+        == [MIN_ACTIVATION_BALANCE_GWEI] * 65
+    )
+    assert _get_validators_amounts(Web3.to_wei(2050, 'ether'), ValidatorType.V2) == [
+        MAX_EFFECTIVE_BALANCE_GWEI
+    ]
+
+    assert _get_validators_amounts(Web3.to_wei(2081, 'ether'), ValidatorType.V2) == [
+        MAX_EFFECTIVE_BALANCE_GWEI,
+        _to_gwei(33),
+    ]
+    assert (
+        _get_validators_amounts(Web3.to_wei(4096, 'ether'), ValidatorType.V1)
+        == [MIN_ACTIVATION_BALANCE_GWEI] * 128
+    )
+    assert _get_validators_amounts(Web3.to_wei(4096, 'ether'), ValidatorType.V2) == [
+        MAX_EFFECTIVE_BALANCE_GWEI,
+        MAX_EFFECTIVE_BALANCE_GWEI,
+    ]
+
+
+def _to_gwei(value):
+    return value * 10**9

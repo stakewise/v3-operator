@@ -3,9 +3,9 @@ from pathlib import Path
 from decouple import Csv
 from decouple import config as decouple_config
 from web3 import Web3
-from web3.types import ChecksumAddress
+from web3.types import ChecksumAddress, Gwei
 
-from src.common.typings import Singleton
+from src.common.typings import Singleton, ValidatorType
 from src.config.networks import MAINNET, NETWORKS, NetworkConfig
 from src.validators.typings import RelayerTypes, ValidatorsRegistrationMode
 
@@ -43,6 +43,7 @@ class Settings(metaclass=Singleton):
     metrics_host: str
     metrics_port: int
     metrics_prefix: str
+    validator_type: ValidatorType
     public_keys_file: Path
     keystores_dir: Path
     keystores_password_dir: Path
@@ -110,6 +111,7 @@ class Settings(metaclass=Singleton):
         metrics_prefix: str = DEFAULT_METRICS_PREFIX,
         max_fee_per_gas_gwei: int | None = None,
         public_keys_file: str | None = None,
+        validator_type: ValidatorType = ValidatorType.V2,
         keystores_dir: str | None = None,
         keystores_password_file: str | None = None,
         remote_signer_url: str | None = None,
@@ -145,6 +147,7 @@ class Settings(metaclass=Singleton):
         self.metrics_host = metrics_host
         self.metrics_port = metrics_port
         self.metrics_prefix = metrics_prefix
+        self.validator_type = validator_type
 
         if max_fee_per_gas_gwei is None:
             max_fee_per_gas_gwei = self.network_config.MAX_FEE_PER_GAS_GWEI
@@ -278,10 +281,12 @@ OUTDATED_SIGNATURES_URL_PATH = '/signatures/{vault}'
 ORACLES_VALIDATORS_TIMEOUT: int = decouple_config(
     'ORACLES_VALIDATORS_TIMEOUT', default=10, cast=int
 )
-
 # common
-DEPOSIT_AMOUNT = Web3.to_wei(32, 'ether')
-DEPOSIT_AMOUNT_GWEI = int(Web3.from_wei(DEPOSIT_AMOUNT, 'gwei'))
+MIN_ACTIVATION_BALANCE = Web3.to_wei(32, 'ether')
+MIN_ACTIVATION_BALANCE_GWEI = Gwei(int(Web3.from_wei(MIN_ACTIVATION_BALANCE, 'gwei')))
+
+MAX_EFFECTIVE_BALANCE = Web3.to_wei(2048, 'ether')
+MAX_EFFECTIVE_BALANCE_GWEI = Gwei(int(Web3.from_wei(MAX_EFFECTIVE_BALANCE, 'gwei')))
 
 # Backoff retries
 DEFAULT_RETRY_TIME = 60
