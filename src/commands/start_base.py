@@ -16,6 +16,7 @@ from src.common.utils import get_build_version
 from src.config.settings import settings
 from src.exits.tasks import ExitSignatureTask
 from src.harvest.tasks import HarvestTask
+from src.reward_splitter.tasks import SplitRewardTask
 from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import NetworkValidatorsStartupProcessor
 from src.validators.keystores.base import BaseKeystore
@@ -92,6 +93,8 @@ async def start_base() -> None:
         ]
         if settings.harvest_vault:
             tasks.append(HarvestTask().run(interrupt_handler))
+        if settings.split_reward:
+            tasks.append(SplitRewardTask().run(interrupt_handler))
 
         await asyncio.gather(*tasks)
 

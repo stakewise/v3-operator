@@ -126,6 +126,13 @@ logger = logging.getLogger(__name__)
     help='Whether to submit vault harvest transactions. Default is false.',
 )
 @click.option(
+    '--split-reward',
+    is_flag=True,
+    envvar='SPLIT_REWARD',
+    help='withdraw and claim shareholders rewards in reward splitter '
+         'on behalf of shareholders. Default is false.',
+)
+@click.option(
     '--execution-endpoints',
     type=str,
     envvar='EXECUTION_ENDPOINTS',
@@ -235,6 +242,7 @@ def start(
     execution_endpoints: str,
     execution_jwt_secret: str | None,
     harvest_vault: bool,
+    split_reward: bool,
     verbose: bool,
     enable_metrics: bool,
     metrics_host: str,
@@ -294,6 +302,7 @@ def start(
         execution_endpoints=execution_endpoints,
         execution_jwt_secret=execution_jwt_secret,
         harvest_vault=harvest_vault,
+        split_reward=split_reward,
         verbose=verbose,
         enable_metrics=enable_metrics,
         metrics_host=metrics_host,
