@@ -5,6 +5,7 @@ from pathlib import Path
 
 import click
 from eth_typing import ChecksumAddress
+from web3.types import Gwei
 
 from src.commands.start_base import start_base
 from src.common.logging import LOG_LEVELS
@@ -17,6 +18,7 @@ from src.config.settings import (
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
     DEFAULT_METRICS_PREFIX,
+    DEFAULT_MIN_DEPOSIT_AMOUNT,
     LOG_FORMATS,
     LOG_PLAIN,
     settings,
@@ -113,6 +115,13 @@ AUTO = 'AUTO'
     ),
 )
 @click.option(
+    '--min-deposit-amount-gwei',
+    type=int,
+    envvar='MIN_DEPOSIT_AMOUNT_GWEI',
+    help='Minimum amount of gwei to fund into validators',
+    default=DEFAULT_MIN_DEPOSIT_AMOUNT,
+)
+@click.option(
     '-v',
     '--verbose',
     help='Enable debug mode. Default is false.',
@@ -206,6 +215,7 @@ def start_api(
     metrics_port: int,
     metrics_prefix: str,
     validator_type: ValidatorType,
+    min_deposit_amount_gwei: int,
     data_dir: str,
     log_level: str,
     log_format: str,
@@ -257,6 +267,7 @@ def start_api(
         relayer_type=relayer_type,
         relayer_endpoint=relayer_endpoint,
         validators_registration_mode=validators_registration_mode,
+        min_deposit_amount=Gwei(min_deposit_amount_gwei),
     )
 
     try:

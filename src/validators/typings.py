@@ -3,7 +3,10 @@ from enum import Enum
 from typing import NewType
 
 from eth_typing import BlockNumber, BLSSignature, ChecksumAddress, HexStr
+from sw_utils import ValidatorStatus
 from web3.types import Gwei
+
+from src.common.typings import ValidatorType
 
 BLSPrivkey = NewType('BLSPrivkey', bytes)
 
@@ -29,6 +32,21 @@ class Validator:
     exit_signature_shards: ExitSignatureShards | None = None
 
     deposit_data_root: HexStr | None = None
+
+
+@dataclass
+class ConsensusValidator:
+    public_key: HexStr
+    index: int
+    balance: Gwei
+    withdrawal_credentials: str
+    status: ValidatorStatus
+
+    @property
+    def validator_type(self) -> ValidatorType:
+        if self.withdrawal_credentials.startswith('0x02'):
+            return ValidatorType.V2
+        return ValidatorType.V1
 
 
 @dataclass

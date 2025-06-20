@@ -17,6 +17,7 @@ DEFAULT_METRICS_PORT = 9100
 DEFAULT_METRICS_PREFIX = 'sw_operator'
 
 DEFAULT_MIN_VALIDATORS_REGISTRATION = 1
+DEFAULT_MIN_DEPOSIT_AMOUNT = Gwei(1_000_000)
 
 DEFAULT_HASHI_VAULT_PARALLELISM = 8
 DEFAULT_HASHI_VAULT_ENGINE_NAME = 'secret'
@@ -93,6 +94,7 @@ class Settings(metaclass=Singleton):
     )
 
     min_validators_registration: int
+    min_deposit_amount: Gwei
 
     # pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements
     def set(
@@ -132,6 +134,7 @@ class Settings(metaclass=Singleton):
         relayer_endpoint: str | None = None,
         validators_registration_mode: ValidatorsRegistrationMode = ValidatorsRegistrationMode.AUTO,
         min_validators_registration: int = DEFAULT_MIN_VALIDATORS_REGISTRATION,
+        min_deposit_amount: Gwei = DEFAULT_MIN_DEPOSIT_AMOUNT,
     ) -> None:
         self.vaults = vaults
         data_dir.mkdir(parents=True, exist_ok=True)
@@ -154,6 +157,7 @@ class Settings(metaclass=Singleton):
 
         self.max_fee_per_gas_gwei = max_fee_per_gas_gwei
         self.min_validators_registration = min_validators_registration
+        self.min_deposit_amount = min_deposit_amount
 
         self.public_keys_file = (
             Path(public_keys_file) if public_keys_file else data_dir / PUBLIC_KEYS_FILENAME
@@ -310,3 +314,6 @@ LOG_PLAIN = 'plain'
 LOG_JSON = 'json'
 LOG_FORMATS = [LOG_PLAIN, LOG_JSON]
 LOG_DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
+
+# constants
+SECONDS_PER_MONTH: int = 2628000

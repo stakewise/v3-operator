@@ -18,8 +18,6 @@ from src.common.clients import execution_client as default_execution_client
 from src.common.typings import HarvestParams, RewardVoteInfo
 from src.config.settings import settings
 
-SECONDS_PER_MONTH: int = 2628000
-
 
 class ContractWrapper:
     abi_path: str = ''
@@ -118,6 +116,16 @@ class VaultContract(ContractWrapper, VaultStateMixin):
         """Fetches the validator registered events."""
         events = await self._get_events(
             event=self.events.ValidatorRegistered,  # type: ignore
+            from_block=from_block,
+            to_block=to_block,
+        )
+        return [Web3.to_hex(event['args']['publicKey']) for event in events]
+
+    async def get_registered_post_pectra_validators_public_keys(
+        self, from_block: BlockNumber, to_block: BlockNumber
+    ) -> list[HexStr]:
+        events = await self._get_events(
+            event=self.events.V2ValidatorRegistered,  # type: ignore
             from_block=from_block,
             to_block=to_block,
         )

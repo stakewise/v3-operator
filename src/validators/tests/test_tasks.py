@@ -1,8 +1,9 @@
 from web3 import Web3
 
+from src.common.tests.factories import create_validator
 from src.common.typings import ValidatorType
 from src.config.settings import MAX_EFFECTIVE_BALANCE_GWEI, MIN_ACTIVATION_BALANCE_GWEI
-from src.validators.tasks import _get_validators_amounts
+from src.validators.tasks import _get_funding_amounts, _get_validators_amounts
 
 
 def test_get_validators_amounts():
@@ -66,6 +67,24 @@ def test_get_validators_amounts():
         MAX_EFFECTIVE_BALANCE_GWEI,
         MAX_EFFECTIVE_BALANCE_GWEI,
     ]
+
+
+def test_get_funding_amounts():
+    validator_1 = create_validator(balance=_to_gwei(32), validator_type=ValidatorType.V2)
+    validator_2 = create_validator(balance=_to_gwei(33), validator_type=ValidatorType.V2)
+    create_validator(balance=_to_gwei(35), validator_type=ValidatorType.V1)
+
+    data = _get_funding_amounts([validator_1], amount=_to_gwei(1))
+    assert data == {validator_1.public_key: _to_gwei(1)}
+
+    data = _get_funding_amounts([validator_1], amount=_to_gwei(100))
+    assert data == {validator_1.public_key: _to_gwei(100)}
+
+    data = _get_funding_amounts([validator_1, validator_2], amount=_to_gwei(2100))
+    assert data == {
+        validator_2.public_key: _to_gwei(2015),
+        validator_1.public_key: _to_gwei(85),
+    }
 
 
 def _to_gwei(value):
