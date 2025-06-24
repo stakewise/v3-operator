@@ -39,7 +39,7 @@ class ConsensusValidator:
     public_key: HexStr
     index: int
     balance: Gwei
-    withdrawal_credentials: str
+    withdrawal_credentials: HexStr
     status: ValidatorStatus
 
     @property

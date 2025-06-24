@@ -2,7 +2,7 @@ import logging
 
 from eth_typing import ChecksumAddress, HexStr
 from eth_utils import add_0x_prefix
-from sw_utils import ValidatorStatus
+from sw_utils import ValidatorStatus, chunkify
 from sw_utils.consensus import EXITED_STATUSES
 from web3.types import Gwei
 
@@ -25,15 +25,15 @@ async def fetch_post_pectra_validators(
         from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
         to_block=current_block,
     )
-    return await _fetch_consensus_validators(public_keys)
+    return await _fetch_non_exiting_consensus_validators(public_keys)
 
 
-async def _fetch_consensus_validators(public_keys: list[HexStr]) -> list[ConsensusValidator]:
+async def _fetch_non_exiting_consensus_validators(
+    public_keys: list[HexStr],
+) -> list[ConsensusValidator]:
     validators = []
-    for i in range(0, len(public_keys), settings.validators_fetch_chunk_size):
-        beacon_validators = await consensus_client.get_validators_by_ids(
-            public_keys[i : i + settings.validators_fetch_chunk_size]
-        )
+    for chunk_keys in chunkify(public_keys, settings.validators_fetch_chunk_size):
+        beacon_validators = await consensus_client.get_validators_by_ids(chunk_keys)
         for beacon_validator in beacon_validators['data']:
             status = ValidatorStatus(beacon_validator['status'])
             if status in EXITING_STATUSES:

@@ -13,7 +13,7 @@ def create_validator(
     index: int | None = None,
     balance: int | None = None,
     status: int | None = None,
-    withdrawal_credentials: str | None = None,
+    withdrawal_credentials: HexStr | None = None,
     validator_type: ValidatorType | None = None,
 ) -> ConsensusValidator:
     if not withdrawal_credentials:

@@ -174,7 +174,7 @@ async def fund_post_pectra_validators(
 
         validators = validators_response.validators
         if not validators:
-            logger.info('Waiting for relayer validators')
+            logger.debug('Waiting for relayer validators')
             return None
         if validators_response.validators_manager_signature:
             validators_manager_signature = validators_response.validators_manager_signature
@@ -186,7 +186,7 @@ async def fund_post_pectra_validators(
         validators_manager_signature=validators_manager_signature,
     )
     if tx_hash:
-        pub_keys = ', '.join(funding_amounts)
+        pub_keys = ', '.join(funding_amounts.keys())
         logger.info('Successfully funded validator(s) with public key(s) %s', pub_keys)
 
     return tx_hash
