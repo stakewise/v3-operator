@@ -29,7 +29,7 @@ from src.config.settings import (
     PUBLIC_KEYS_FILENAME,
     settings,
 )
-from src.validators.consensus import fetch_post_pectra_validators
+from src.validators.consensus import fetch_post_pectra_validators_balances
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import (
     EmptyRelayerResponseException,
@@ -42,7 +42,6 @@ from src.validators.oracles import poll_validation_approval
 from src.validators.register_validators import fund_validators, register_validators
 from src.validators.relayer import RelayerAdapter
 from src.validators.typings import (
-    ConsensusValidator,
     NetworkValidator,
     Validator,
     ValidatorsRegistrationMode,
@@ -120,11 +119,11 @@ async def process_validators(
     vault_contract = VaultContract(vault_address)
     vault_version = await vault_contract.version()
     if vault_version >= get_pectra_vault_version(settings.network, vault_address):
-        post_pectra_validators = await fetch_post_pectra_validators(vault_address)
+        validators_balances = await fetch_post_pectra_validators_balances(vault_address)
         try:
             vault_assets = await fund_post_pectra_validators(
                 vault_address=vault_address,
-                vault_validators=post_pectra_validators,
+                validators_balances=validators_balances,
                 keystore=keystore,
                 amount=Gwei(int(Web3.from_wei(vault_assets, 'gwei'))),
                 harvest_params=harvest_params,
@@ -152,7 +151,7 @@ async def process_validators(
 async def fund_post_pectra_validators(
     vault_address: ChecksumAddress,
     keystore: BaseKeystore | None,
-    vault_validators: list[ConsensusValidator],
+    validators_balances: dict[HexStr, Gwei],
     amount: Gwei,
     harvest_params: HarvestParams | None,
     relayer_adapter: RelayerAdapter | None = None,
@@ -160,7 +159,7 @@ async def fund_post_pectra_validators(
     """Funds post-Pectra vault validators with the specified amount.
     Returns the remaining amount after funding.
     """
-    funding_amounts = _get_funding_amounts(vault_validators, amount)
+    funding_amounts = _get_funding_amounts(validators_balances, amount)
     if not funding_amounts:
         raise ValueError('Can not fund validators')
 
@@ -368,15 +367,16 @@ def _get_validators_amounts(vault_assets: int, validator_type: ValidatorType) ->
 
 
 def _get_funding_amounts(
-    vault_validators: list[ConsensusValidator], amount: Gwei
+    vault_validators: dict[HexStr, Gwei], funding_amount: Gwei
 ) -> dict[HexStr, Gwei]:
-    vault_validators.sort(key=lambda x: x.balance, reverse=True)
     result = {}
-    for validator in vault_validators:
-        if MAX_EFFECTIVE_BALANCE_GWEI - validator.balance > 0:
-            val_amount = min(MAX_EFFECTIVE_BALANCE_GWEI - validator.balance, amount)
-            result[validator.public_key] = Gwei(val_amount)
-            amount = Gwei(amount - val_amount)
-        if amount <= 0:
+    for public_key, balance in sorted(
+        vault_validators.items(), key=lambda item: item[1], reverse=True
+    ):
+        if MAX_EFFECTIVE_BALANCE_GWEI - balance > 0:
+            val_amount = min(MAX_EFFECTIVE_BALANCE_GWEI - balance, funding_amount)
+            result[public_key] = Gwei(val_amount)
+            funding_amount = Gwei(funding_amount - val_amount)
+        if funding_amount <= 0:
             break
     return result
