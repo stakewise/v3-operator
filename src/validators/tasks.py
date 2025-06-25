@@ -114,7 +114,7 @@ async def process_validators(
     vault_assets = await get_vault_assets(
         vault_address=vault_address, harvest_params=harvest_params
     )
-    vault_assets = vault_assets // 34
+
     if vault_assets < Web3.to_wei(settings.min_deposit_amount, 'gwei'):
         return None
     vault_contract = VaultContract(vault_address)
