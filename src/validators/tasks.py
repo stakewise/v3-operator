@@ -156,7 +156,7 @@ async def fund_compounding_validators(
     harvest_params: HarvestParams | None,
     relayer_adapter: RelayerAdapter | None = None,
 ) -> Gwei:
-    """Funds post-Pectra vault validators with the specified amount.
+    """Funds vault compounding validators with the specified amount.
     Returns the remaining amount after funding.
     """
     funding_amounts = _get_funding_amounts(validators_balances, amount)

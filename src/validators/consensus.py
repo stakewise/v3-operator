@@ -21,7 +21,7 @@ async def fetch_compounding_validators_balances(
     vault_address: ChecksumAddress,
 ) -> dict[HexStr, Gwei]:
     """
-    Retrieves the actual balances of can be funded validators in the vault.
+    Retrieves the actual balances of can be compounding validators in the vault.
     """
     vault_contract = VaultContract(vault_address)
     current_block = await execution_client.eth.get_block_number()
@@ -31,7 +31,7 @@ async def fetch_compounding_validators_balances(
     )
     registered_public_keys = [key.public_key for key in validators_event_data]
     active_validator_balances, non_activated_public_keys = (
-        await _fetch_non_exiting_consensus_validators(registered_public_keys)
+        await _fetch_active_balances_and_non_registered_keys(registered_public_keys)
     )
     min_funding_block = min(
         cast(BlockNumber, v.block_number)
@@ -63,7 +63,7 @@ async def fetch_compounding_validators_balances(
     return result_balances
 
 
-async def _fetch_non_exiting_consensus_validators(
+async def _fetch_active_balances_and_non_registered_keys(
     public_keys: list[HexStr],
 ) -> tuple[dict[HexStr, Gwei], list[HexStr]]:
     """
