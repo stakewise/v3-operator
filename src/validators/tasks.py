@@ -29,7 +29,7 @@ from src.config.settings import (
     PUBLIC_KEYS_FILENAME,
     settings,
 )
-from src.validators.consensus import fetch_post_pectra_validators_balances
+from src.validators.consensus import fetch_compounding_validators_balances
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import (
     EmptyRelayerResponseException,
@@ -119,9 +119,9 @@ async def process_validators(
     vault_contract = VaultContract(vault_address)
     vault_version = await vault_contract.version()
     if vault_version >= get_pectra_vault_version(settings.network, vault_address):
-        validators_balances = await fetch_post_pectra_validators_balances(vault_address)
+        validators_balances = await fetch_compounding_validators_balances(vault_address)
         try:
-            vault_assets = await fund_post_pectra_validators(
+            vault_assets = await fund_compounding_validators(
                 vault_address=vault_address,
                 validators_balances=validators_balances,
                 keystore=keystore,
@@ -133,7 +133,7 @@ async def process_validators(
         if not vault_assets:
             return
         logger.info(
-            'Not enough capacity to fund post-Pectra validators, '
+            'Not enough capacity to fund compounding validators, '
             'trying to register new validators...'
         )
 
@@ -148,7 +148,7 @@ async def process_validators(
 
 
 # pylint: disable-next=too-many-arguments
-async def fund_post_pectra_validators(
+async def fund_compounding_validators(
     vault_address: ChecksumAddress,
     keystore: BaseKeystore | None,
     validators_balances: dict[HexStr, Gwei],
@@ -373,10 +373,10 @@ def _get_funding_amounts(
     for public_key, balance in sorted(
         vault_validators.items(), key=lambda item: item[1], reverse=True
     ):
-        if MAX_EFFECTIVE_BALANCE_GWEI - balance > 0:
+        if MAX_EFFECTIVE_BALANCE_GWEI - balance >= settings.min_deposit_amount:
             val_amount = min(MAX_EFFECTIVE_BALANCE_GWEI - balance, funding_amount)
             result[public_key] = Gwei(val_amount)
             funding_amount = Gwei(funding_amount - val_amount)
-        if funding_amount <= 0:
+        if funding_amount < settings.min_deposit_amount:
             break
     return result

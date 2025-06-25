@@ -118,7 +118,7 @@ AUTO = 'AUTO'
     '--min-deposit-amount-gwei',
     type=int,
     envvar='MIN_DEPOSIT_AMOUNT_GWEI',
-    help='Minimum amount of gwei to fund into validators',
+    help='Minimum amount in gwei to deposit into validator.',
     default=DEFAULT_MIN_DEPOSIT_AMOUNT,
 )
 @click.option(

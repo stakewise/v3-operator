@@ -122,7 +122,7 @@ class VaultContract(ContractWrapper, VaultStateMixin):
         )
         return [Web3.to_hex(event['args']['publicKey']) for event in events]
 
-    async def get_post_pectra_validators_events(
+    async def get_compounding_validators_events(
         self, from_block: BlockNumber, to_block: BlockNumber
     ) -> list[V2ValidatorEventData]:
         events = await self._get_events(

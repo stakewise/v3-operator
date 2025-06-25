@@ -2,12 +2,16 @@ from sw_utils.tests import faker
 from web3 import Web3
 
 from src.common.typings import ValidatorType
-from src.config.settings import MAX_EFFECTIVE_BALANCE_GWEI, MIN_ACTIVATION_BALANCE_GWEI
+from src.config.networks import HOODI
+from src.config.settings import (
+    MAX_EFFECTIVE_BALANCE_GWEI,
+    MIN_ACTIVATION_BALANCE_GWEI,
+    settings,
+)
 from src.validators.tasks import _get_funding_amounts, _get_validators_amounts
 
 
 def test_get_validators_amounts():
-
     assert _get_validators_amounts(0, ValidatorType.V1) == []
     assert _get_validators_amounts(0, ValidatorType.V2) == []
 
@@ -69,7 +73,8 @@ def test_get_validators_amounts():
     ]
 
 
-def test_get_funding_amounts():
+def test_get_funding_amounts(data_dir):
+    settings.set(vaults=[], data_dir=data_dir, network=HOODI)
     public_key_1 = faker.eth_address()
     public_key_2 = faker.eth_address()
 
@@ -85,6 +90,21 @@ def test_get_funding_amounts():
     assert data == {
         public_key_2: _to_gwei(2015),
         public_key_1: _to_gwei(85),
+    }
+
+    data = _get_funding_amounts(
+        {public_key_1: _to_gwei(2038), public_key_2: _to_gwei(32)}, funding_amount=_to_gwei(10.5)
+    )
+    assert data == {
+        public_key_1: _to_gwei(10),
+    }
+
+    data = _get_funding_amounts(
+        {public_key_1: _to_gwei(32), public_key_2: _to_gwei(33)}, funding_amount=_to_gwei(2100.5)
+    )
+    assert data == {
+        public_key_2: _to_gwei(2015),
+        public_key_1: _to_gwei(85.5),
     }
 
 

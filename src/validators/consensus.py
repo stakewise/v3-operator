@@ -17,7 +17,7 @@ EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
 logger = logging.getLogger(__name__)
 
 
-async def fetch_post_pectra_validators_balances(
+async def fetch_compounding_validators_balances(
     vault_address: ChecksumAddress,
 ) -> dict[HexStr, Gwei]:
     """
@@ -25,7 +25,7 @@ async def fetch_post_pectra_validators_balances(
     """
     vault_contract = VaultContract(vault_address)
     current_block = await execution_client.eth.get_block_number()
-    validators_event_data = await vault_contract.get_post_pectra_validators_events(
+    validators_event_data = await vault_contract.get_compounding_validators_events(
         from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
         to_block=current_block,
     )
