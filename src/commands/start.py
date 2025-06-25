@@ -12,7 +12,7 @@ from src.common.logging import LOG_LEVELS
 from src.common.migrate import migrate_to_multivault
 from src.common.typings import ValidatorType
 from src.common.utils import log_verbose
-from src.common.validators import validate_eth_addresses
+from src.common.validators import validate_eth_addresses, validate_min_deposit_amount
 from src.config.config import OperatorConfig, OperatorConfigException
 from src.config.networks import AVAILABLE_NETWORKS, GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
@@ -241,6 +241,7 @@ logger = logging.getLogger(__name__)
     envvar='MIN_DEPOSIT_AMOUNT_GWEI',
     help='Minimum amount of gwei to fund into validators',
     default=DEFAULT_MIN_DEPOSIT_AMOUNT,
+    callback=validate_min_deposit_amount,
 )
 @click.option(
     '--no-confirm',

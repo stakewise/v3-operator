@@ -17,10 +17,11 @@ DEFAULT_METRICS_PORT = 9100
 DEFAULT_METRICS_PREFIX = 'sw_operator'
 
 DEFAULT_MIN_VALIDATORS_REGISTRATION = 1
-DEFAULT_MIN_DEPOSIT_AMOUNT = Gwei(10_000_000)
 
 DEFAULT_HASHI_VAULT_PARALLELISM = 8
 DEFAULT_HASHI_VAULT_ENGINE_NAME = 'secret'
+
+DEFAULT_MIN_DEPOSIT_AMOUNT = Gwei(int(Web3.from_wei(Web3.to_wei(1, 'ether'), 'gwei')))
 
 
 # pylint: disable-next=too-many-public-methods,too-many-instance-attributes

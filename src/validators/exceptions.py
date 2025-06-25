@@ -16,3 +16,6 @@ class ValidatorIndexChangedError(ValueError):
 
 
 class MissingAvailableValidatorsException(Exception): ...
+
+
+class EmptyRelayerResponseException(Exception): ...

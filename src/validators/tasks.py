@@ -31,7 +31,10 @@ from src.config.settings import (
 )
 from src.validators.consensus import fetch_post_pectra_validators
 from src.validators.database import NetworkValidatorCrud
-from src.validators.exceptions import MissingAvailableValidatorsException
+from src.validators.exceptions import (
+    EmptyRelayerResponseException,
+    MissingAvailableValidatorsException,
+)
 from src.validators.execution import NetworkValidatorsProcessor, get_withdrawable_assets
 from src.validators.keystores.base import BaseKeystore
 from src.validators.metrics import update_unused_validator_keys_metric
@@ -111,23 +114,24 @@ async def process_validators(
     vault_assets = await get_vault_assets(
         vault_address=vault_address, harvest_params=harvest_params
     )
-    if vault_assets < settings.min_deposit_amount:
+    vault_assets = vault_assets // 34
+    if vault_assets < Web3.to_wei(settings.min_deposit_amount, 'gwei'):
         return None
     vault_contract = VaultContract(vault_address)
     vault_version = await vault_contract.version()
     if vault_version >= get_pectra_vault_version(settings.network, vault_address):
         post_pectra_validators = await fetch_post_pectra_validators(vault_address)
-        post_pectra_validators_capacity = sum(
-            max(MAX_EFFECTIVE_BALANCE_GWEI - val.balance, 0) for val in post_pectra_validators
-        )
-        if Web3.to_wei(post_pectra_validators_capacity, 'gwei') > vault_assets:
-            await fund_post_pectra_validators(
+        try:
+            vault_assets = await fund_post_pectra_validators(
                 vault_address=vault_address,
                 vault_validators=post_pectra_validators,
                 keystore=keystore,
                 amount=Gwei(int(Web3.from_wei(vault_assets, 'gwei'))),
                 harvest_params=harvest_params,
             )
+        except EmptyRelayerResponseException:
+            return
+        if not vault_assets:
             return
         logger.info(
             'Not enough capacity to fund post-Pectra validators, '
@@ -152,11 +156,13 @@ async def fund_post_pectra_validators(
     amount: Gwei,
     harvest_params: HarvestParams | None,
     relayer_adapter: RelayerAdapter | None = None,
-) -> HexStr | None:
+) -> Gwei:
+    """Funds post-Pectra vault validators with the specified amount.
+    Returns the remaining amount after funding.
+    """
     funding_amounts = _get_funding_amounts(vault_validators, amount)
     if not funding_amounts:
-        logger.error('Can not fund validators')
-        return None
+        raise ValueError('Can not fund validators')
 
     logger.info('Started funding of %d validator(s)', len(funding_amounts))
     validators_manager_signature = HexStr('0x')
@@ -175,7 +181,7 @@ async def fund_post_pectra_validators(
         validators = validators_response.validators
         if not validators:
             logger.debug('Waiting for relayer validators')
-            return None
+            raise EmptyRelayerResponseException()
         if validators_response.validators_manager_signature:
             validators_manager_signature = validators_response.validators_manager_signature
 
@@ -189,7 +195,8 @@ async def fund_post_pectra_validators(
         pub_keys = ', '.join(funding_amounts.keys())
         logger.info('Successfully funded validator(s) with public key(s) %s', pub_keys)
 
-    return tx_hash
+    left_amount = max(amount - sum(funding_amounts.values()), 0)
+    return Gwei(left_amount)
 
 
 # pylint: disable-next=too-many-locals,too-many-return-statements,too-many-branches,disable-next=too-many-arguments
