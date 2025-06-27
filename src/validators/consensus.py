@@ -77,12 +77,6 @@ async def _fetch_active_balances_and_non_registered_keys(
         for beacon_validator in beacon_validators['data']:
             public_key = add_0x_prefix(beacon_validator['validator']['pubkey'])
             consensus_public_keys.append(public_key)
-            if not beacon_validator['status']:
-                logger.warning(
-                    'Validator %s has no status in consensus client response',
-                    public_key,
-                )
-                continue
             status = ValidatorStatus(beacon_validator['status'])
             if status in EXITING_STATUSES:
                 continue
