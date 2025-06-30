@@ -286,12 +286,19 @@ OUTDATED_SIGNATURES_URL_PATH = '/signatures/{vault}'
 ORACLES_VALIDATORS_TIMEOUT: int = decouple_config(
     'ORACLES_VALIDATORS_TIMEOUT', default=10, cast=int
 )
+ORACLES_CONSOLIDATION_TIMEOUT: int = decouple_config(
+    'ORACLES_CONSOLIDATION_TIMEOUT', default=10, cast=int
+)
 # common
 MIN_ACTIVATION_BALANCE = Web3.to_wei(32, 'ether')
 MIN_ACTIVATION_BALANCE_GWEI = Gwei(int(Web3.from_wei(MIN_ACTIVATION_BALANCE, 'gwei')))
 
 MAX_EFFECTIVE_BALANCE = Web3.to_wei(2048, 'ether')
 MAX_EFFECTIVE_BALANCE_GWEI = Gwei(int(Web3.from_wei(MAX_EFFECTIVE_BALANCE, 'gwei')))
+
+MAX_CONSOLIDATION_REQUEST_FEE = decouple_config(
+    'MAX_CONSOLIDATION_REQUEST_FEE', default=10, cast=int
+)
 
 # Backoff retries
 DEFAULT_RETRY_TIME = 60

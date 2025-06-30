@@ -2,12 +2,12 @@ import asyncio
 import logging
 from typing import cast
 
-from eth_typing import BlockNumber
+from eth_typing import BlockNumber, ChecksumAddress
 from hexbytes import HexBytes
 from sw_utils import GasManager, InterruptHandler, ProtocolConfig, build_protocol_config
 from web3 import Web3
 from web3.contract.async_contract import AsyncContractFunction
-from web3.types import TxParams, Wei
+from web3.types import Gwei, TxParams, Wei
 
 from src.common.app_state import AppState, OraclesCache
 from src.common.clients import execution_client, ipfs_fetch_client
@@ -144,3 +144,14 @@ def build_gas_manager() -> GasManager:
         priority_fee_percentile=settings.priority_fee_percentile,
         min_effective_priority_fee_per_gas=min_effective_priority_fee_per_gas,
     )
+
+
+async def get_request_fee(address: ChecksumAddress, block_number: BlockNumber) -> Gwei:
+    """Retrieves the current fee for a transaction with an execution layer request."""
+    tx_data: TxParams = {
+        'to': address,
+        'data': b'',
+    }
+
+    fee = await execution_client.eth.call(tx_data, block_identifier=block_number)
+    return Gwei(Web3.to_int(fee))

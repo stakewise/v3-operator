@@ -100,3 +100,20 @@ async def _get_non_activated_balances(
         public_key: Gwei(int(Web3.from_wei(amount_wei, 'gwei')))
         for public_key, amount_wei in non_activated_balances.items()
     }
+
+
+async def fetch_active_validators_balances(
+    public_keys: list[HexStr],
+) -> dict[HexStr, Gwei]:
+    balances = {}
+    for chunk_keys in chunkify(public_keys, settings.validators_fetch_chunk_size):
+        beacon_validators = await consensus_client.get_validators_by_ids(chunk_keys)
+        for beacon_validator in beacon_validators['data']:
+            status = ValidatorStatus(beacon_validator['status'])
+            if status in EXITING_STATUSES:
+                continue
+
+            public_key = add_0x_prefix(beacon_validator['validator']['pubkey'])
+            balances[public_key] = Gwei(int(beacon_validator['balance']))
+
+    return balances
