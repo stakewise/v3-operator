@@ -12,13 +12,12 @@ from web3.contract.async_contract import (
     AsyncContractEvents,
     AsyncContractFunctions,
 )
-from web3.types import BlockNumber, ChecksumAddress, EventData
+from web3.types import BlockNumber, ChecksumAddress, EventData, Wei
 
 from src.common.clients import execution_client as default_execution_client
 from src.common.typings import HarvestParams, RewardVoteInfo
 from src.config.settings import settings
-
-SECONDS_PER_MONTH: int = 2628000
+from src.validators.typings import V2ValidatorEventData
 
 
 class ContractWrapper:
@@ -122,6 +121,40 @@ class VaultContract(ContractWrapper, VaultStateMixin):
             to_block=to_block,
         )
         return [Web3.to_hex(event['args']['publicKey']) for event in events]
+
+    async def get_compounding_validators_events(
+        self, from_block: BlockNumber, to_block: BlockNumber
+    ) -> list[V2ValidatorEventData]:
+        events = await self._get_events(
+            event=self.events.V2ValidatorRegistered,  # type: ignore
+            from_block=from_block,
+            to_block=to_block,
+        )
+        return [
+            V2ValidatorEventData(
+                public_key=Web3.to_hex(event['args']['publicKey']),
+                amount=Wei(event['args']['amount']),
+                block_number=BlockNumber(event['blockNumber']),
+            )
+            for event in events
+        ]
+
+    async def get_funding_events(
+        self, from_block: BlockNumber, to_block: BlockNumber
+    ) -> list[V2ValidatorEventData]:
+        events = await self._get_events(
+            event=self.events.ValidatorFunded,  # type: ignore
+            from_block=from_block,
+            to_block=to_block,
+        )
+        return [
+            V2ValidatorEventData(
+                public_key=Web3.to_hex(event['args']['publicKey']),
+                amount=Wei(event['args']['amount']),
+                block_number=BlockNumber(event['blockNumber']),
+            )
+            for event in events
+        ]
 
     async def mev_escrow(self) -> ChecksumAddress:
         return await self.contract.functions.mevEscrow().call()

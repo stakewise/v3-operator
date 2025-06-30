@@ -3,7 +3,7 @@ from enum import Enum
 from typing import NewType
 
 from eth_typing import BlockNumber, BLSSignature, ChecksumAddress, HexStr
-from web3.types import Gwei
+from web3.types import Gwei, Wei
 
 BLSPrivkey = NewType('BLSPrivkey', bytes)
 
@@ -29,6 +29,13 @@ class Validator:
     exit_signature_shards: ExitSignatureShards | None = None
 
     deposit_data_root: HexStr | None = None
+
+
+@dataclass
+class V2ValidatorEventData:
+    public_key: HexStr
+    amount: Wei
+    block_number: BlockNumber
 
 
 @dataclass

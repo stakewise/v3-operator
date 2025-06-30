@@ -5,13 +5,14 @@ from pathlib import Path
 
 import click
 from eth_typing import ChecksumAddress
+from web3.types import Gwei
 
 from src.commands.start_base import start_base
 from src.common.logging import LOG_LEVELS
 from src.common.migrate import migrate_to_multivault
 from src.common.typings import ValidatorType
 from src.common.utils import log_verbose
-from src.common.validators import validate_eth_addresses
+from src.common.validators import validate_eth_addresses, validate_min_deposit_amount
 from src.config.config import OperatorConfig, OperatorConfigException
 from src.config.networks import AVAILABLE_NETWORKS, GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
@@ -19,6 +20,8 @@ from src.config.settings import (
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
     DEFAULT_METRICS_PREFIX,
+    DEFAULT_MIN_DEPOSIT_AMOUNT,
+    DEFAULT_MIN_VALIDATORS_REGISTRATION,
     LOG_FORMATS,
     LOG_PLAIN,
     settings,
@@ -230,7 +233,15 @@ logger = logging.getLogger(__name__)
     type=int,
     envvar='MIN_VALIDATORS_REGISTRATION',
     help='Minimum number of validators required to start registration.',
-    default=1,
+    default=DEFAULT_MIN_VALIDATORS_REGISTRATION,
+)
+@click.option(
+    '--min-deposit-amount-gwei',
+    type=int,
+    envvar='MIN_DEPOSIT_AMOUNT_GWEI',
+    help='Minimum amount in gwei to deposit into validator.',
+    default=DEFAULT_MIN_DEPOSIT_AMOUNT,
+    callback=validate_min_deposit_amount,
 )
 @click.option(
     '--no-confirm',
@@ -270,6 +281,7 @@ def start(
     database_dir: str | None,
     pool_size: int | None,
     min_validators_registration: int,
+    min_deposit_amount_gwei: int,
     no_confirm: bool,
 ) -> None:
 
@@ -329,6 +341,7 @@ def start(
         log_format=log_format,
         pool_size=pool_size,
         min_validators_registration=min_validators_registration,
+        min_deposit_amount=Gwei(min_deposit_amount_gwei),
     )
 
     try:
