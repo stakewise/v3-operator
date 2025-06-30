@@ -373,8 +373,9 @@ def _get_funding_amounts(
     for public_key, balance in sorted(
         vault_validators.items(), key=lambda item: item[1], reverse=True
     ):
-        if MAX_EFFECTIVE_BALANCE_GWEI - balance >= settings.min_deposit_amount:
-            val_amount = min(MAX_EFFECTIVE_BALANCE_GWEI - balance, funding_amount)
+        remaining_capacity = MAX_EFFECTIVE_BALANCE_GWEI - balance
+        if remaining_capacity >= settings.min_deposit_amount:
+            val_amount = min(remaining_capacity, funding_amount)
             result[public_key] = Gwei(val_amount)
             funding_amount = Gwei(funding_amount - val_amount)
         if funding_amount < settings.min_deposit_amount:

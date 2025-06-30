@@ -35,7 +35,7 @@ class Validator:
 class V2ValidatorEventData:
     public_key: HexStr
     amount: Wei
-    block_number: BlockNumber | None = None
+    block_number: BlockNumber
 
 
 @dataclass
