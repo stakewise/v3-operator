@@ -74,7 +74,7 @@ async def _get_non_activated_balances(
     vault_contract: VaultContract,
     block_number: BlockNumber,
 ) -> dict[HexStr, Gwei]:
-    """Fetches the funding amounts for non-activated validators."""
+    """Fetches the start balances for validators not yet registered in the consensus client."""
     if non_activated_public_keys:
         return {}
 
