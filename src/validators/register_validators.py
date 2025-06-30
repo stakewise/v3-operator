@@ -8,7 +8,7 @@ from web3.exceptions import ContractLogicError
 
 from src.common.clients import execution_client
 from src.common.contracts import VaultContract
-from src.common.execution import build_gas_manager
+from src.common.execution import build_gas_manager, transaction_gas_wrapper
 from src.common.typings import HarvestParams, OraclesApproval
 from src.common.utils import format_error
 from src.config.settings import settings
@@ -88,6 +88,52 @@ async def register_validators(
     )
     if not tx_receipt['status']:
         logger.error('Registration transaction failed')
+        return None
+
+    return tx_hash
+
+
+async def fund_validators(
+    vault_address: ChecksumAddress,
+    validators: list[Validator],
+    validators_manager_signature: HexStr,
+    harvest_params: HarvestParams | None,
+) -> HexStr | None:
+    tx_validators = [
+        Web3.to_bytes(tx_validator)
+        for tx_validator in encode_tx_validator_list(
+            validators=validators,
+            vault_address=vault_address,
+        )
+    ]
+    calls = []
+    vault_contract = VaultContract(vault_address)
+    if harvest_params is not None:
+        # add update state calls before validator funding
+        calls.append(vault_contract.get_update_state_call(harvest_params))
+    fund_validators_call = vault_contract.encode_abi(
+        fn_name='fundValidators',
+        args=[b''.join(tx_validators), validators_manager_signature],
+    )
+    calls.append(fund_validators_call)
+
+    logger.info('Submitting fund validators transaction')
+    try:
+        tx_function = vault_contract.functions.multicall(calls)
+        tx = await transaction_gas_wrapper(tx_function=tx_function)
+    except Exception as e:
+        logger.error('Failed to fund validator(s): %s', format_error(e))
+        if settings.verbose:
+            logger.exception(e)
+        return None
+
+    tx_hash = Web3.to_hex(tx)
+    logger.info('Waiting for transaction %s confirmation', tx_hash)
+    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
+        tx, timeout=settings.execution_transaction_timeout
+    )
+    if not tx_receipt['status']:
+        logger.error('Funding transaction failed')
         return None
 
     return tx_hash

@@ -4,6 +4,7 @@ import click
 from eth_utils import is_address, to_checksum_address
 
 from src.common.language import validate_mnemonic as verify_mnemonic
+from src.config.settings import DEFAULT_MIN_DEPOSIT_AMOUNT
 
 
 # pylint: disable-next=unused-argument
@@ -52,6 +53,16 @@ def validate_dappnode_execution_endpoints(ctx, param, value):  # type: ignore
     if dappnode and not value:
         raise click.MissingParameter(
             ctx=ctx, param=param, message='Execution endpoints are required when --dappnode is set.'
+        )
+
+    return value
+
+
+# pylint: disable-next=unused-argument
+def validate_min_deposit_amount(ctx, param, value):  # type: ignore
+    if value < DEFAULT_MIN_DEPOSIT_AMOUNT:
+        raise click.BadParameter(
+            f'min-deposit-amount must be greater than or equal to {DEFAULT_MIN_DEPOSIT_AMOUNT} GWEI'
         )
 
     return value
