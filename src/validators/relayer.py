@@ -165,7 +165,7 @@ class RelayerAdapter:
         if not self.available_public_keys:
             raise MissingAvailableValidatorsException()
 
-        public_keys = filter_nonregistered_public_keys(
+        public_keys = await filter_nonregistered_public_keys(
             available_public_keys=self.available_public_keys,
             count=validators_batch_size,
         )

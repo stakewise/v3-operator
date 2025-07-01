@@ -207,7 +207,7 @@ async def register_new_validators(
     available_public_keys: list[HexStr] | None,
     relayer_adapter: RelayerAdapter | None = None,
 ) -> HexStr | None:
-    validators_amounts = _get_validators_amounts(vault_assets, settings.validator_type)
+    validators_amounts = _get_deposits_amounts(vault_assets, settings.validator_type)
     validators_count = len(validators_amounts)
     if not validators_amounts:
         # not enough balance to register validators
@@ -351,7 +351,7 @@ async def load_genesis_validators() -> None:
     logger.info('Loaded %d genesis validators', len(genesis_validators))
 
 
-def _get_validators_amounts(vault_assets: int, validator_type: ValidatorType) -> list[Gwei]:
+def _get_deposits_amounts(vault_assets: int, validator_type: ValidatorType) -> list[Gwei]:
     """Returns a list of amounts in Gwei for each validator to be registered."""
     if vault_assets < MIN_ACTIVATION_BALANCE:
         return []
