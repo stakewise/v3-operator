@@ -231,6 +231,7 @@ async def _get_all_target_source_public_keys(
     Fetch all available public keys pairs for consolidation.
     Can be limited via count parameter.
     """
+    logger.info('Fetching available validators for consolidation...')
     vault_contract = VaultContract(vault_address)
     public_keys = await vault_contract.get_registered_validators_public_keys(
         from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
@@ -253,6 +254,7 @@ async def _get_selected_target_source_public_keys(
     to_key: HexStr,
 ) -> list[tuple[HexStr, HexStr]]:
     """Validate that provided public keys can be consolidated."""
+    logger.info('Checking selected validators for consolidation...')
     active_balances = await fetch_active_validators_balances(from_keys + [to_key])
     for key in from_keys + [to_key]:
         if key not in active_balances:
