@@ -142,7 +142,7 @@ async def get_registered_validators(
     available_public_keys: list[HexStr],
 ) -> Sequence[Validator]:
     """Returns list of available validators for registration."""
-    available_public_keys = filter_nonregistered_public_keys(
+    available_public_keys = await filter_nonregistered_public_keys(
         available_public_keys=available_public_keys,
         count=len(amounts),
     )
@@ -186,13 +186,16 @@ async def get_funded_validators(
     return validators
 
 
-def filter_nonregistered_public_keys(
+async def filter_nonregistered_public_keys(
     available_public_keys: list[HexStr],
     count: int,
 ) -> list[HexStr]:
     public_keys: list[HexStr] = []
+    latest_network_validator_public_keys = await get_latest_network_validator_public_keys()
     for public_key in available_public_keys:
         if NetworkValidatorCrud().is_validator_registered(public_key):
+            continue
+        if public_key in latest_network_validator_public_keys:
             continue
         public_keys.append(public_key)
         if len(public_keys) >= count:

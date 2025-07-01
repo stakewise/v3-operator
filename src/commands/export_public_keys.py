@@ -5,7 +5,7 @@ from pathlib import Path
 
 import click
 
-from src.common.logging import setup_logging
+from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import log_verbose
 from src.config.config import OperatorConfig, OperatorConfigException
 from src.config.networks import AVAILABLE_NETWORKS
@@ -39,6 +39,16 @@ logger = logging.getLogger(__name__)
     ),
 )
 @click.option(
+    '--log-level',
+    type=click.Choice(
+        LOG_LEVELS,
+        case_sensitive=False,
+    ),
+    default='INFO',
+    envvar='LOG_LEVEL',
+    help='The log level.',
+)
+@click.option(
     '-v',
     '--verbose',
     help='Enable debug mode. Default is false.',
@@ -54,6 +64,7 @@ def export_public_keys(
     keystores_dir: str | None,
     network: str | None,
     verbose: bool,
+    log_level: str,
 ) -> None:
     setup_logging()
     try:
@@ -69,6 +80,7 @@ def export_public_keys(
         data_dir=operator_config.data_dir,
         keystores_dir=keystores_dir,
         verbose=verbose,
+        log_level=log_level,
     )
 
     try:
