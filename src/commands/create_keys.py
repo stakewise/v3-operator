@@ -118,7 +118,7 @@ def _export_deposit_data_json(
     credentials: list[Credential], filename: str, pool_size: int | None = None
 ) -> None:
     with (
-        click.progressbar(  # type: ignore
+        click.progressbar(
             length=len(credentials),
             label='Generating deposit data JSON\t\t',
             show_percent=False,

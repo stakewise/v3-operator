@@ -144,6 +144,7 @@ def _remote_signer_setup(
             '--data-dir',
             str(data_dir),
         ],
+        input='y\n',
     )
     assert result.exit_code == 0
 

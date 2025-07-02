@@ -8,7 +8,7 @@ from aiohttp import ClientSession, ClientTimeout
 from sw_utils import IpfsFetchClient, get_consensus_client, get_execution_client
 from web3 import Web3
 
-from src.common.clients import db_client
+from src.common.clients import OPERATOR_USER_AGENT, db_client
 from src.common.contracts import (
     keeper_contract,
     validators_registry_contract,
@@ -128,7 +128,10 @@ async def wait_for_consensus_node() -> None:
     while True:
         for consensus_endpoint in settings.consensus_endpoints:
             try:
-                consensus_client = get_consensus_client([consensus_endpoint])
+                consensus_client = get_consensus_client(
+                    [consensus_endpoint],
+                    user_agent=OPERATOR_USER_AGENT,
+                )
                 syncing = await consensus_client.get_syncing()
                 if syncing['data']['is_syncing'] is True:
                     logger.warning(
@@ -168,6 +171,7 @@ async def wait_for_execution_node() -> None:
                 execution_client = get_execution_client(
                     [execution_endpoint],
                     jwt_secret=settings.execution_jwt_secret,
+                    user_agent=OPERATOR_USER_AGENT,
                 )
 
                 syncing = await execution_client.eth.syncing
@@ -277,7 +281,9 @@ async def _check_consensus_nodes_network() -> None:
     """
     chain_id_to_network = get_chain_id_to_network_dict()
     for consensus_endpoint in settings.consensus_endpoints:
-        consensus_client = get_consensus_client([consensus_endpoint])
+        consensus_client = get_consensus_client(
+            [consensus_endpoint], user_agent=OPERATOR_USER_AGENT
+        )
         deposit_contract_data = (await consensus_client.get_deposit_contract())['data']
         consensus_chain_id = int(deposit_contract_data['chain_id'])
         consensus_network = chain_id_to_network.get(consensus_chain_id)
@@ -297,6 +303,7 @@ async def _check_execution_nodes_network() -> None:
         execution_client = get_execution_client(
             [execution_endpoint],
             jwt_secret=settings.execution_jwt_secret,
+            user_agent=OPERATOR_USER_AGENT,
         )
         execution_chain_id = await execution_client.eth.chain_id
         execution_network = chain_id_to_network.get(execution_chain_id)
