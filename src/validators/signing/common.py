@@ -12,6 +12,7 @@ from sw_utils import (
 )
 from sw_utils.signing import compute_deposit_data
 from web3 import Web3
+from web3.types import Gwei
 
 from src.config.settings import settings
 from src.validators.keystores.base import BaseKeystore
@@ -47,7 +48,7 @@ def encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) -> 
     deposit_root = compute_deposit_data(
         public_key=public_key,
         withdrawal_credentials=withdrawal_credentials,
-        amount_gwei=validator.amount_gwei,
+        amount=Gwei(validator.amount_gwei),
         signature=signature,
     ).hash_tree_root
     return public_key + signature + deposit_root

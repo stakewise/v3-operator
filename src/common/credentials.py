@@ -130,7 +130,7 @@ class CredentialManager:
         pool_size: int | None = None,
     ) -> list[Credential]:
         credentials: list[Credential] = []
-        with click.progressbar(  # type: ignore
+        with click.progressbar(
             length=count,
             label='Creating validator keys:\t\t',
             show_percent=False,
