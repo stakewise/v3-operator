@@ -88,17 +88,16 @@ async def _get_non_activated_balances(
         from_block=min_funding_block,
         to_block=block_number,
     )
-
+    non_activated_balances = {
+        v.public_key: v.amount
+        for v in compounding_event_data
+        if v.public_key in non_activated_public_keys
+    }
     funding_event_data = await vault_contract.get_funding_events(
         from_block=min_funding_block,
         to_block=block_number,
     )
 
-    non_activated_balances = {
-        v.public_key: v.amount
-        for v in compounding_event_data + funding_event_data
-        if v.public_key in non_activated_public_keys
-    }
     for funding in funding_event_data:
         if funding.public_key in non_activated_balances:
             non_activated_balances[funding.public_key] = Wei(
