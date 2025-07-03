@@ -91,5 +91,5 @@ def validate_public_keys(ctx, param, value):  # type: ignore
 
 
 def _is_public_key(value: str) -> bool:
-    public_key_length = 100
+    public_key_length = 98
     return is_hexstr(value) and len(value) == public_key_length

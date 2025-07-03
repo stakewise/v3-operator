@@ -64,7 +64,7 @@ logger = logging.getLogger(__name__)
 )
 @click.option(
     '--from-keys',
-    type=list[HexStr],
+    type=HexStr,
     callback=validate_public_keys,
     help='Public keys of validators to consolidate from.',
 )
@@ -87,6 +87,20 @@ logger = logging.getLogger(__name__)
     envvar='EXECUTION_ENDPOINTS',
     prompt='Enter comma separated list of API endpoints for execution nodes',
     help='Comma separated list of API endpoints for execution nodes.',
+)
+@click.option(
+    '--hot-wallet-password-file',
+    type=click.Path(exists=True, file_okay=True, dir_okay=False),
+    envvar='HOT_WALLET_PASSWORD_FILE',
+    help='Absolute path to the hot wallet password file. '
+    'Default is the file generated with "create-wallet" command.',
+)
+@click.option(
+    '--hot-wallet-file',
+    type=click.Path(exists=True, file_okay=True, dir_okay=False),
+    envvar='HOT_WALLET_FILE',
+    help='Absolute path to the hot wallet. '
+    'Default is the file generated with "create-wallet" command.',
 )
 @click.option(
     '-v',
@@ -119,6 +133,8 @@ def consolidate(
     execution_endpoints: str,
     consensus_endpoints: str,
     data_dir: str,
+    hot_wallet_file: str | None,
+    hot_wallet_password_file: str | None,
     verbose: bool,
     no_confirm: bool,
     log_level: str,
@@ -127,16 +143,16 @@ def consolidate(
     to_key: HexStr | None = None,
 ) -> None:
     operator_config = OperatorConfig(Path(data_dir))
-    if network is None:
-        operator_config.load()
-        network = operator_config.network
+    operator_config.load(network=network)
 
     settings.set(
         vaults=[vault],
-        network=network,
+        network=operator_config.network,
         data_dir=operator_config.data_dir,
         execution_endpoints=execution_endpoints,
         consensus_endpoints=consensus_endpoints,
+        hot_wallet_file=hot_wallet_file,
+        hot_wallet_password_file=hot_wallet_password_file,
         verbose=verbose,
         log_level=log_level,
     )
@@ -181,7 +197,7 @@ async def main(
         )
 
     click.secho(
-        'Consolidating next validators: ',
+        f'Consolidating {len(target_source_public_keys)} validators: ',
     )
     for target_key, source_key in target_source_public_keys:
         click.secho(f'    {source_key} -> {target_key}')
@@ -266,7 +282,7 @@ async def _get_selected_target_source_public_keys(
             f' total balance exceed {MAX_EFFECTIVE_BALANCE_GWEI} Gwei'
         )
 
-    return [(from_key, to_key) for from_key in from_keys]
+    return [(to_key, from_key) for from_key in from_keys]
 
 
 def _split_validators(validators: dict[HexStr, Gwei]) -> list[tuple[HexStr, HexStr]]:
