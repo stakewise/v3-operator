@@ -65,7 +65,6 @@ async def _fetch_compounding_balances_and_non_activated_keys(
             if status in EXITING_STATUSES:
                 continue
 
-            public_key = add_0x_prefix(beacon_validator['validator']['pubkey'])
             validators[public_key] = Gwei(int(beacon_validator['balance']))
 
     return validators, list(set(public_keys) - set(consensus_public_keys))

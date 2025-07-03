@@ -83,14 +83,17 @@ class VaultCrud:
         with db_client.get_db_connection() as conn:
             conn.executemany(
                 f'INSERT INTO {self.VAULTS_TABLE} '
-                ' VALUES(:vault_address,:block_number) ON CONFLICT DO NOTHING',
-                [(vault_address, 0) for vault_address in vaults],
+                ' VALUES(:vault_address,:block_number,:block_number) ON CONFLICT DO NOTHING',
+                [
+                    (vault_address, settings.network_config.KEEPER_GENESIS_BLOCK)
+                    for vault_address in vaults
+                ],
             )
 
-    def get_vault_checkpoint(self, vault_address: ChecksumAddress) -> BlockNumber | None:
+    def get_vault_validators_checkpoint(self, vault_address: ChecksumAddress) -> BlockNumber | None:
         with db_client.get_db_connection() as conn:
             results = conn.execute(
-                f'''SELECT checkpoint_block_number
+                f'''SELECT checkpoint_validators
                     FROM {self.VAULTS_TABLE}
                     WHERE (vault_address = ?)
                     ''',
@@ -98,15 +101,28 @@ class VaultCrud:
             ).fetchone()
             return BlockNumber(results[0]) if results else None
 
-    def update_vault_checkpoint(
+    def get_vault_v2_validators_checkpoint(
+        self, vault_address: ChecksumAddress
+    ) -> BlockNumber | None:
+        with db_client.get_db_connection() as conn:
+            results = conn.execute(
+                f'''SELECT checkpoint_v2_validators
+                    FROM {self.VAULTS_TABLE}
+                    WHERE (vault_address = ?)
+                    ''',
+                (vault_address,),
+            ).fetchone()
+            return BlockNumber(results[0]) if results else None
+
+    def update_vault_checkpoints(
         self, vault_address: ChecksumAddress, block_number: BlockNumber
     ) -> None:
         with db_client.get_db_connection() as conn:
             conn.execute(
                 f'''INSERT INTO {self.VAULTS_TABLE}
-                   VALUES (:vault_address, :block_number)
+                   VALUES (:vault_address, :block_number, :block_number)
                    ON CONFLICT (vault_address) DO UPDATE
-                   SET checkpoint_block_number = :block_number
+                   SET checkpoint_validators = :block_number, checkpoint_v2_validators = :block_number
                     ''',
                 (vault_address, block_number),
             )
@@ -118,7 +134,8 @@ class VaultCrud:
                 f"""
                         CREATE TABLE IF NOT EXISTS {self.VAULTS_TABLE} (
                             vault_address VARCHAR(42) UNIQUE NOT NULL,
-                            checkpoint_block_number INTEGER NOT NULL
+                            checkpoint_validators INTEGER NOT NULL,
+                            checkpoint_v2_validators INTEGER NOT NULL
                         )
                         """
             )
