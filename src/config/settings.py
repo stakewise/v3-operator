@@ -38,7 +38,7 @@ class Settings(metaclass=Singleton):
     execution_retry_timeout: int
     events_blocks_range_interval: int
     execution_jwt_secret: str | None
-    graph_api_url: str | None
+    graph_api_url: str
     graph_request_timeout: int
     graph_retry_timeout: int
     graph_page_size: int
@@ -111,7 +111,7 @@ class Settings(metaclass=Singleton):
         consensus_endpoints: str = '',
         execution_endpoints: str = '',
         execution_jwt_secret: str | None = None,
-        graph_api_url: str | None = None,
+        graph_api_url: str = '',
         harvest_vault: bool = False,
         split_reward: bool = False,
         verbose: bool = False,
@@ -318,6 +318,13 @@ REMOTE_SIGNER_TIMEOUT = decouple_config('REMOTE_SIGNER_TIMEOUT', cast=int, defau
 HASHI_VAULT_TIMEOUT = 10
 
 ATTEMPTS_WITH_DEFAULT_GAS: int = decouple_config('ATTEMPTS_WITH_DEFAULT_GAS', default=3, cast=int)
+
+MULTICALL_BATCH_SIZE: int = decouple_config('MULTICALL_BATCH_SIZE', default='20', cast=int)
+
+# Minimum amount of rewards to process reward splitter
+REWARD_SPLITTER_MIN_ASSETS: int = decouple_config(
+    'REWARD_SPLITTER_MIN_ASSETS', default=Web3.to_wei('0.001', 'ether'), cast=int
+)
 
 # Graphql timeout
 GRAPH_API_TIMEOUT = 10

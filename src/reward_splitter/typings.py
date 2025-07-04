@@ -22,7 +22,6 @@ class RewardSplitter:
 
 @dataclass
 class ExitRequest:
-    id: str
     position_ticket: int
     timestamp: int
     exit_queue_index: int | None
@@ -41,7 +40,6 @@ class ExitRequest:
             int(data['exitQueueIndex']) if data.get('exitQueueIndex') is not None else None
         )
         return ExitRequest(
-            id=data['id'],
             position_ticket=int(data['positionTicket']),
             timestamp=int(data['timestamp']),
             exit_queue_index=exit_queue_index,

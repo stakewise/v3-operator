@@ -12,6 +12,8 @@ SOLIDITY_UINT256_MAX = 2**256 - 1
 
 
 class RewardSplitterContract(ContractWrapper):
+    abi_path = 'abi/IRewardSplitter.json'
+
     def encoder(self) -> 'RewardSplitterEncoder':
         return RewardSplitterEncoder(self)
 

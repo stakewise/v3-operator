@@ -139,7 +139,7 @@ AUTO = 'AUTO'
     is_flag=True,
     envvar='SPLIT_REWARD',
     help='withdraw and claim shareholders rewards in reward splitter '
-         'on behalf of shareholders. Default is false.',
+    'on behalf of shareholders. Default is false.',
 )
 @click.option(
     '--execution-endpoints',
