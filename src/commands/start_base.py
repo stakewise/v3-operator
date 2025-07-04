@@ -2,7 +2,7 @@ import asyncio
 import logging
 
 from eth_typing import HexStr
-from sw_utils import EventScanner, InterruptHandler
+from sw_utils import InterruptHandler
 
 import src
 from src.common.checks import wait_execution_catch_up_consensus
@@ -16,8 +16,8 @@ from src.common.utils import get_build_version
 from src.config.settings import settings
 from src.exits.tasks import ExitSignatureTask
 from src.harvest.tasks import HarvestTask
-from src.validators.database import NetworkValidatorCrud
-from src.validators.execution import NetworkValidatorsStartupProcessor
+from src.validators.database import NetworkValidatorCrud, VaultCrud, VaultValidatorCrud
+from src.validators.execution import scan_validators_events
 from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
 from src.validators.relayer import RelayerAdapter, create_relayer_adapter
@@ -42,6 +42,8 @@ async def start_base() -> None:
         await metrics_server()
 
     NetworkValidatorCrud().setup()
+    VaultValidatorCrud().setup()
+    VaultCrud().setup()
 
     # load network validators from ipfs dump
     await load_genesis_validators()
@@ -59,15 +61,12 @@ async def start_base() -> None:
         relayer_adapter = create_relayer_adapter()
 
     # start operator tasks
-
-    # scan network validator updates
-    network_validators_startup_processor = NetworkValidatorsStartupProcessor()
-    network_validators_scanner = EventScanner(network_validators_startup_processor)
-
-    logger.info('Syncing network validator events...')
     chain_state = await get_chain_finalized_head()
     await wait_execution_catch_up_consensus(chain_state)
-    await network_validators_scanner.process_new_events(chain_state.block_number)
+
+    VaultCrud().save_vaults(settings.vaults)
+    logger.info('Syncing validator events...')
+    await scan_validators_events(chain_state.block_number, is_startup=True)
 
     logger.info('Updating oracles cache...')
     await update_oracles_cache()

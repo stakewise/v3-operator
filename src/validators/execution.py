@@ -4,7 +4,7 @@ from multiprocessing import Pool
 from typing import Set
 
 from eth_typing import BlockNumber, ChecksumAddress, HexStr
-from sw_utils import EventProcessor, is_valid_deposit_data_signature
+from sw_utils import EventProcessor, EventScanner, is_valid_deposit_data_signature
 from web3 import Web3
 from web3.types import EventData, Wei
 
@@ -18,8 +18,8 @@ from src.common.contracts import (
 from src.common.typings import HarvestParams
 from src.config.settings import MIN_ACTIVATION_BALANCE, settings
 from src.harvest.execution import get_update_state_calls
-from src.validators.database import NetworkValidatorCrud
-from src.validators.typings import NetworkValidator
+from src.validators.database import NetworkValidatorCrud, VaultCrud, VaultValidatorCrud
+from src.validators.typings import NetworkValidator, VaultValidator
 
 logger = logging.getLogger(__name__)
 
@@ -32,17 +32,15 @@ class NetworkValidatorsProcessor(EventProcessor):
             execution_client=execution_non_retry_client
         ).contract
 
-    @staticmethod
-    async def get_from_block() -> BlockNumber:
+    async def get_from_block(self) -> BlockNumber:
         last_validator = NetworkValidatorCrud().get_last_network_validator()
         if not last_validator:
             return settings.network_config.VALIDATORS_REGISTRY_GENESIS_BLOCK
 
         return BlockNumber(last_validator.block_number + 1)
 
-    @staticmethod
     # pylint: disable-next=unused-argument
-    async def process_events(events: list[EventData], to_block: BlockNumber) -> None:
+    async def process_events(self, events: list[EventData], to_block: BlockNumber) -> None:
         validators = process_network_validator_events(events)
         NetworkValidatorCrud().save_network_validators(validators)
 
@@ -50,9 +48,8 @@ class NetworkValidatorsProcessor(EventProcessor):
 class NetworkValidatorsStartupProcessor(NetworkValidatorsProcessor):
     """Use multiprocessing event processor"""
 
-    @staticmethod
     # pylint: disable-next=unused-argument
-    async def process_events(events: list[EventData], to_block: BlockNumber) -> None:
+    async def process_events(self, events: list[EventData], to_block: BlockNumber) -> None:
         validators = process_network_validator_events_multiprocessing(events)
         NetworkValidatorCrud().save_network_validators(validators)
 
@@ -96,6 +93,47 @@ def process_network_validator_events(events: list[EventData]) -> list[NetworkVal
         result.append(validator)
 
     return result
+
+
+class VaultValidatorsProcessor(EventProcessor):
+    contract_event = 'ValidatorRegistered'
+    vault_address: ChecksumAddress
+
+    def __init__(self, vault_address: ChecksumAddress) -> None:
+        self.vault_address = vault_address
+        self.contract = VaultContract(
+            address=vault_address, execution_client=execution_non_retry_client
+        ).contract
+
+    async def get_from_block(self) -> BlockNumber:
+        checkpoint = VaultCrud().get_vault_validators_checkpoint(self.vault_address)
+        if not checkpoint:
+            return settings.network_config.KEEPER_GENESIS_BLOCK
+
+        return BlockNumber(checkpoint + 1)
+
+    # pylint: disable-next=unused-argument
+    async def process_events(self, events: list[EventData], to_block: BlockNumber) -> None:
+        validators = [
+            VaultValidator(
+                vault_address=self.vault_address,
+                public_key=Web3.to_hex(event['args']['publicKey']),
+                block_number=BlockNumber(event['blockNumber']),
+            )
+            for event in events
+        ]
+        VaultValidatorCrud().save_vault_validators(validators)
+
+
+class VaultV2ValidatorsProcessor(VaultValidatorsProcessor):
+    contract_event = 'V2ValidatorRegistered'
+
+    async def get_from_block(self) -> BlockNumber:
+        checkpoint = VaultCrud().get_vault_v2_validators_checkpoint(self.vault_address)
+        if not checkpoint:
+            return settings.network_config.KEEPER_GENESIS_BLOCK
+
+        return BlockNumber(checkpoint + 1)
 
 
 async def get_validators_start_index() -> int:
@@ -173,3 +211,25 @@ async def get_withdrawable_assets(
         return Wei(after_update_assets)
 
     return Wei(before_update_assets)
+
+
+async def scan_validators_events(block_number: BlockNumber, is_startup: bool) -> None:
+    """Scans new vault and network validators for the given block number."""
+    network_validators_processor: NetworkValidatorsStartupProcessor | NetworkValidatorsProcessor
+    if is_startup:
+        network_validators_processor = NetworkValidatorsStartupProcessor()
+    else:
+        network_validators_processor = NetworkValidatorsProcessor()
+
+    network_validators_scanner = EventScanner(network_validators_processor)
+    await network_validators_scanner.process_new_events(block_number)
+    for vault in settings.vaults:
+        vault_validators_processor = VaultValidatorsProcessor(vault_address=vault)
+        vault_validators_scanner = EventScanner(vault_validators_processor)
+        await vault_validators_scanner.process_new_events(block_number)
+
+        vault_v2_validators_processor = VaultV2ValidatorsProcessor(vault_address=vault)
+        vault_v2_validators_scanner = EventScanner(vault_v2_validators_processor)
+        await vault_v2_validators_scanner.process_new_events(block_number)
+
+        VaultCrud().update_vault_checkpoints(vault_address=vault, block_number=block_number)
