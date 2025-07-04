@@ -6,15 +6,20 @@ from pathlib import Path
 from typing import Sequence
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
-from eth_typing import ChecksumAddress, HexStr
-from eth_utils import add_0x_prefix
-from sw_utils import ProtocolConfig
+from eth_typing import ChecksumAddress, HexAddress, HexStr
+from sw_utils import (
+    ProtocolConfig,
+    get_v1_withdrawal_credentials,
+    get_v2_withdrawal_credentials,
+)
+from sw_utils.typings import Bytes32
 from web3 import Web3
+from web3.types import Gwei
 
 from src.common.contracts import validators_registry_contract
-from src.common.typings import OracleApproval, OraclesApproval
+from src.common.typings import OracleApproval, OraclesApproval, ValidatorType
 from src.common.utils import format_error, process_oracles_approvals, warning_verbose
-from src.config.settings import ORACLES_VALIDATORS_TIMEOUT
+from src.config.settings import ORACLES_VALIDATORS_TIMEOUT, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import (
     RegistryRootChangedError,
@@ -130,39 +135,67 @@ async def send_approval_request(
     )
 
 
-async def get_available_validators(
+async def get_registered_validators(
     keystore: BaseKeystore,
-    count: int,
+    amounts: list[Gwei],
     vault_address: ChecksumAddress,
     available_public_keys: list[HexStr],
 ) -> Sequence[Validator]:
     """Returns list of available validators for registration."""
-    available_public_keys = filter_nonregistered_public_keys(
+    available_public_keys = await filter_nonregistered_public_keys(
         available_public_keys=available_public_keys,
-        count=count,
+        count=len(amounts),
     )
-
-    deposit_data = await keystore.get_validator_deposits(available_public_keys, vault_address)
-
-    validators = [
-        Validator(
-            public_key=add_0x_prefix(Web3.to_hex(data['pubkey'])),
-            signature=add_0x_prefix(Web3.to_hex(data['signature'])),
-            amount_gwei=int(data['amount']),
-            deposit_data_root=Web3.to_hex(data['deposit_data_root']),
+    validators = []
+    for amount, public_key in zip(amounts, available_public_keys):
+        deposit_data = await keystore.get_deposit_data(
+            public_key=public_key, amount=amount, vault_address=vault_address
         )
-        for data in deposit_data
-    ]
+        validators.append(
+            Validator(
+                public_key=Web3.to_hex(deposit_data['pubkey']),
+                signature=Web3.to_hex(deposit_data['signature']),
+                amount=Gwei(int(deposit_data['amount'])),
+                deposit_data_root=Web3.to_hex(deposit_data['deposit_data_root']),
+            )
+        )
+
     return validators
 
 
-def filter_nonregistered_public_keys(
+async def get_funded_validators(
+    keystore: BaseKeystore,
+    funding_amounts: dict[HexStr, Gwei],
+    vault_address: ChecksumAddress,
+) -> list[Validator]:
+    validators = []
+    for public_key, amount in funding_amounts.items():
+        if public_key not in keystore:
+            raise RuntimeError(f'Public key {public_key} not found in keystore')
+        deposit_data = await keystore.get_deposit_data(
+            public_key=public_key, amount=amount, vault_address=vault_address
+        )
+        validators.append(
+            Validator(
+                public_key=Web3.to_hex(deposit_data['pubkey']),
+                signature=Web3.to_hex(deposit_data['signature']),
+                amount=amount,
+                deposit_data_root=Web3.to_hex(deposit_data['deposit_data_root']),
+            )
+        )
+    return validators
+
+
+async def filter_nonregistered_public_keys(
     available_public_keys: list[HexStr],
     count: int,
 ) -> list[HexStr]:
     public_keys: list[HexStr] = []
+    latest_network_validator_public_keys = await get_latest_network_validator_public_keys()
     for public_key in available_public_keys:
         if NetworkValidatorCrud().is_validator_registered(public_key):
+            continue
+        if public_key in latest_network_validator_public_keys:
             continue
         public_keys.append(public_key)
         if len(public_keys) >= count:
@@ -184,3 +217,10 @@ def save_public_keys(filename: Path, public_keys: list[HexStr]) -> None:
     with open(filename, 'w', encoding='utf-8') as f:
         for public_key in public_keys:
             f.write(f'{public_key}\n')
+
+
+def get_withdrawal_credentials(vault_address: HexAddress) -> Bytes32:
+    """Returns withdrawal credentials based on the vault address and validator type."""
+    if settings.validator_type == ValidatorType.V1:
+        return get_v1_withdrawal_credentials(vault_address)
+    return get_v2_withdrawal_credentials(vault_address)

@@ -14,10 +14,13 @@ from sw_utils.graph.client import GraphClient as SWGraphClient
 from web3 import AsyncWeb3
 from web3.middleware.signing import async_construct_sign_and_send_raw_middleware
 
+import src
 from src.common.wallet import hot_wallet
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
+
+OPERATOR_USER_AGENT = f'StakeWise Operator {src.__version__}'
 
 
 class Database:
@@ -48,6 +51,7 @@ class ExecutionClient:
             timeout=settings.execution_timeout,
             retry_timeout=retry_timeout,
             jwt_secret=settings.execution_jwt_secret,
+            user_agent=OPERATOR_USER_AGENT,
         )
         # Account is required when emitting transactions.
         # For read-only queries account may be omitted.
@@ -74,6 +78,7 @@ class ConsensusClient:
             settings.consensus_endpoints,
             timeout=settings.consensus_timeout,
             retry_timeout=settings.consensus_retry_timeout,
+            user_agent=OPERATOR_USER_AGENT,
         )
 
     def __getattr__(self, item):  # type: ignore

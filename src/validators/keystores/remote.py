@@ -6,7 +6,7 @@ from typing import cast
 import milagro_bls_binding as bls
 from aiohttp import ClientSession, ClientTimeout
 from eth_typing import BLSPubkey, BLSSignature, ChecksumAddress, HexAddress, HexStr
-from sw_utils import get_exit_message_signing_root, get_v1_withdrawal_credentials
+from sw_utils import get_exit_message_signing_root
 from sw_utils.common import urljoin
 from sw_utils.signing import DepositMessage as SerializableDepositMessage
 from sw_utils.signing import compute_deposit_domain, compute_signing_root
@@ -14,8 +14,9 @@ from sw_utils.typings import ConsensusFork
 from web3 import Web3
 
 from src.config.networks import NETWORKS
-from src.config.settings import DEPOSIT_AMOUNT_GWEI, REMOTE_SIGNER_TIMEOUT, settings
+from src.config.settings import REMOTE_SIGNER_TIMEOUT, settings
 from src.validators.keystores.base import BaseKeystore
+from src.validators.utils import get_withdrawal_credentials
 
 logger = logging.getLogger(__name__)
 
@@ -84,38 +85,33 @@ class RemoteSignerKeystore(BaseKeystore):
     def public_keys(self) -> list[HexStr]:
         return self._public_keys
 
-    async def get_validator_deposits(
+    async def get_deposit_data(
         self,
-        public_keys: list[HexStr],
+        public_key: HexStr,
+        amount: int,
         vault_address: ChecksumAddress,
-    ) -> list[dict]:
+    ) -> dict:
         fork_version = NETWORKS[settings.network].GENESIS_FORK_VERSION
-        amount = DEPOSIT_AMOUNT_GWEI
-        withdrawal_credentials = get_v1_withdrawal_credentials(cast(HexAddress, vault_address))
-        deposit_data = []
-        for public_key in public_keys:
-            signing_root = self._get_deposit_signing_root(
-                public_key=BLSPubkey(Web3.to_bytes(hexstr=public_key)),
-                withdrawal_credentials=withdrawal_credentials,
-                amount=amount,
-                fork_version=fork_version,
-            )
-            signature = self._sign_deposit_data_request(
-                public_key=public_key,
-                withdrawal_credentials=withdrawal_credentials,
-                amount=amount,
-                signing_root=signing_root,
-                fork_version=fork_version,
-            )
-            deposit_data.append(
-                {
-                    'pubkey': public_key,
-                    'withdrawal_credentials': withdrawal_credentials,
-                    'amount': amount,
-                    'signature': signature,
-                }
-            )
-        return deposit_data
+        withdrawal_credentials = get_withdrawal_credentials(cast(HexAddress, vault_address))
+        signing_root = self._get_deposit_signing_root(
+            public_key=BLSPubkey(Web3.to_bytes(hexstr=public_key)),
+            withdrawal_credentials=withdrawal_credentials,
+            amount=amount,
+            fork_version=fork_version,
+        )
+        signature = self._sign_deposit_data_request(
+            public_key=public_key,
+            withdrawal_credentials=withdrawal_credentials,
+            amount=amount,
+            signing_root=signing_root,
+            fork_version=fork_version,
+        )
+        return {
+            'pubkey': public_key,
+            'withdrawal_credentials': withdrawal_credentials,
+            'amount': amount,
+            'signature': signature,
+        }
 
     async def get_exit_signature(
         self, validator_index: int, public_key: HexStr, fork: ConsensusFork | None = None

@@ -41,8 +41,8 @@ a registration transaction to the Vault.
 The validator registration process consists of the following steps:
 
 1. Check whether Vault has accumulated enough assets to register a validator (e.g., 32 ETH for Ethereum)
-2. Get the next free validator public key from the `validators.txt` file attached to the Operator. The validators are
-   registered in the same order as specified in the `validators.txt` file.
+2. Get the next free validator public key from the `public_keys.txt` file attached to the Operator. The validators are
+   registered in the same order as specified in the `public_keys.txt` file.
 3. Obtain BLS signature for exit message using local keystores or remote signer.
 4. Share the exit signature of the validator with StakeWise Oracles:
    1. Using [Shamir's secret sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing), split
@@ -154,14 +154,14 @@ Head to [Usage](#usage) to launch your Operator service.
 Pull the latest docker Operator docker image:
 
 ```bash
-docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.8
+docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.9
 ```
 
 You can also build the docker image from source by cloning this repo and executing the following command from within
 the `v3-operator` folder:
 
 ```bash
-docker build --pull -t europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.8 .
+docker build --pull -t europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.9 .
 ```
 
 You will execute Operator Service commands using the format below (note the use of flags are optional):
@@ -170,7 +170,7 @@ You will execute Operator Service commands using the format below (note the use 
 docker run --rm -ti \
 -u $(id -u):$(id -g) \
 -v ~/.stakewise/:/data \
-europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.8 \
+europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.9 \
 src/main.py COMMAND \
 --flagA=123 \
 --flagB=xyz
@@ -325,6 +325,9 @@ If you **did not** use Operator Service to generate validator keys, you will nee
   single `password.txt` password file for all the keystores or separate password files for each keystore with the same
   name as keystore, but ending with `.txt`. For example, `keystore1.json`, `keystore1.txt`, etc.
 
+To register a validator using the 0x01 (ETH1_ADDRESS_WITHDRAWAL_PREFIX) credential type,
+include the `--validator-type 0x01` flag in your command.
+
 #### Using binary
 
 You can start the Operator service using binary with the following command:
@@ -343,7 +346,7 @@ below:
 docker run --restart on-failure:10 \
 -u $(id -u):$(id -g) \
 -v ~/.stakewise/:/data \
-europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.8 \
+europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.9 \
 src/main.py start \
 --vaults=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
 --data-dir=/data \

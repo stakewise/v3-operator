@@ -8,10 +8,11 @@ import click
 from aiohttp import ClientSession, ClientTimeout
 from eth_typing import ChecksumAddress
 from sw_utils import IpfsFetchClient, get_consensus_client, get_execution_client
+from sw_utils.pectra import get_pectra_vault_version
 from web3 import Web3
 from web3.exceptions import BadFunctionCallOutput
 
-from src.common.clients import db_client
+from src.common.clients import OPERATOR_USER_AGENT, db_client
 from src.common.contracts import (
     VaultContract,
     keeper_contract,
@@ -19,6 +20,7 @@ from src.common.contracts import (
 )
 from src.common.execution import check_hot_wallet_balance, get_protocol_config
 from src.common.harvest import get_harvest_params
+from src.common.typings import ValidatorType
 from src.common.utils import format_error, round_down, warning_verbose
 from src.common.wallet import hot_wallet
 from src.config.networks import NETWORKS
@@ -102,6 +104,8 @@ async def startup_checks() -> None:
     for vault_address in settings.vaults:
         await _check_validators_manager(vault_address)
 
+    await _check_validators_type()
+
     if (
         settings.validators_registration_mode == ValidatorsRegistrationMode.API
         and settings.relayer_type == RelayerTypes.DVT
@@ -126,7 +130,10 @@ async def wait_for_consensus_node() -> None:
     while True:
         for consensus_endpoint in settings.consensus_endpoints:
             try:
-                consensus_client = get_consensus_client([consensus_endpoint])
+                consensus_client = get_consensus_client(
+                    [consensus_endpoint],
+                    user_agent=OPERATOR_USER_AGENT,
+                )
                 syncing = await consensus_client.get_syncing()
                 if syncing['data']['is_syncing'] is True:
                     logger.warning(
@@ -166,6 +173,7 @@ async def wait_for_execution_node() -> None:
                 execution_client = get_execution_client(
                     [execution_endpoint],
                     jwt_secret=settings.execution_jwt_secret,
+                    user_agent=OPERATOR_USER_AGENT,
                 )
 
                 syncing = await execution_client.eth.syncing
@@ -258,7 +266,9 @@ async def _check_consensus_nodes_network() -> None:
     """
     chain_id_to_network = get_chain_id_to_network_dict()
     for consensus_endpoint in settings.consensus_endpoints:
-        consensus_client = get_consensus_client([consensus_endpoint])
+        consensus_client = get_consensus_client(
+            [consensus_endpoint], user_agent=OPERATOR_USER_AGENT
+        )
         deposit_contract_data = (await consensus_client.get_deposit_contract())['data']
         consensus_chain_id = int(deposit_contract_data['chain_id'])
         consensus_network = chain_id_to_network.get(consensus_chain_id)
@@ -278,6 +288,7 @@ async def _check_execution_nodes_network() -> None:
         execution_client = get_execution_client(
             [execution_endpoint],
             jwt_secret=settings.execution_jwt_secret,
+            user_agent=OPERATOR_USER_AGENT,
         )
         execution_chain_id = await execution_client.eth.chain_id
         execution_network = chain_id_to_network.get(execution_chain_id)
@@ -323,6 +334,22 @@ async def _check_validators_manager(vault_address: ChecksumAddress) -> None:
     validators_manager = await vault_contract.validators_manager()
     if validators_manager != hot_wallet.account.address:
         raise RuntimeError('validators manager address must equal to hot wallet address')
+
+
+async def _check_validators_type() -> None:
+    if not settings.validator_type:
+        return
+    for vault_address in settings.vaults:
+        vault_contract = VaultContract(vault_address)
+        if (
+            await vault_contract.version()
+            < get_pectra_vault_version(settings.network, vault_address)
+            and settings.validator_type == ValidatorType.V2
+        ):
+            raise RuntimeError(
+                f'Please upgrade your Vault to the latest version '
+                f'to use {ValidatorType.V2.value} validators.'
+            )
 
 
 async def _check_events_logs() -> None:

@@ -5,9 +5,11 @@ from pathlib import Path
 
 import click
 from eth_typing import ChecksumAddress
+from web3.types import Gwei
 
 from src.commands.start_base import start_base
 from src.common.logging import LOG_LEVELS
+from src.common.typings import ValidatorType
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_addresses
 from src.config.config import OperatorConfig, OperatorConfigException
@@ -16,6 +18,7 @@ from src.config.settings import (
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
     DEFAULT_METRICS_PREFIX,
+    DEFAULT_MIN_DEPOSIT_AMOUNT,
     LOG_FORMATS,
     LOG_PLAIN,
     settings,
@@ -100,6 +103,23 @@ AUTO = 'AUTO'
     help=f'The prometheus metrics prefix. Default is {DEFAULT_METRICS_PREFIX}.',
     envvar='METRICS_PREFIX',
     default=DEFAULT_METRICS_PREFIX,
+)
+@click.option(
+    '--validator-type',
+    help=f'Type of registered validators: {ValidatorType.V1.value} or {ValidatorType.V2.value}.',
+    envvar='VALIDATOR_TYPE',
+    default=ValidatorType.V2,
+    type=click.Choice(
+        ValidatorType,
+        case_sensitive=False,
+    ),
+)
+@click.option(
+    '--min-deposit-amount-gwei',
+    type=int,
+    envvar='MIN_DEPOSIT_AMOUNT_GWEI',
+    help='Minimum amount in gwei to deposit into validator.',
+    default=DEFAULT_MIN_DEPOSIT_AMOUNT,
 )
 @click.option(
     '-v',
@@ -202,6 +222,8 @@ def start_api(
     metrics_host: str,
     metrics_port: int,
     metrics_prefix: str,
+    validator_type: ValidatorType,
+    min_deposit_amount_gwei: int,
     data_dir: str,
     log_level: str,
     log_format: str,
@@ -243,6 +265,7 @@ def start_api(
         metrics_host=metrics_host,
         metrics_port=metrics_port,
         metrics_prefix=metrics_prefix,
+        validator_type=validator_type,
         network=network,
         hot_wallet_file=hot_wallet_file,
         hot_wallet_password_file=hot_wallet_password_file,
@@ -253,6 +276,7 @@ def start_api(
         relayer_type=relayer_type,
         relayer_endpoint=relayer_endpoint,
         validators_registration_mode=validators_registration_mode,
+        min_deposit_amount=Gwei(min_deposit_amount_gwei),
     )
 
     try:
