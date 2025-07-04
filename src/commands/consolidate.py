@@ -8,12 +8,12 @@ from eth_typing import ChecksumAddress, HexStr
 from web3 import Web3
 from web3.types import BlockNumber, Gwei
 
-from src.common.clients import execution_client, setup_clients
+from src.common.clients import setup_clients
 from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import VaultContract
 from src.common.execution import get_protocol_config, get_request_fee
 from src.common.logging import LOG_LEVELS, setup_logging
-from src.common.utils import format_error, log_verbose
+from src.common.utils import log_verbose
 from src.common.validators import (
     validate_eth_address,
     validate_public_key,
@@ -29,6 +29,7 @@ from src.config.settings import (
 )
 from src.validators.consensus import fetch_active_validators_balances
 from src.validators.oracles import poll_consolidation_signature
+from src.validators.register_validators import submit_consolidate_validators
 
 logger = logging.getLogger(__name__)
 
@@ -226,7 +227,8 @@ async def main(
     )
 
     encoded_validators = _encode_validators(target_source_public_keys)
-    tx_hash = await _submit_consolidate_validators(
+    tx_hash = await submit_consolidate_validators(
+        vault_address=vault_address,
         validators=encoded_validators,
         oracle_signatures=oracle_signatures,
         current_fee=current_fee,
@@ -318,34 +320,6 @@ def _encode_validators(target_source_public_keys: list[tuple[HexStr, HexStr]]) -
         validators_data += Web3.to_bytes(hexstr=from_key)
         validators_data += Web3.to_bytes(hexstr=to_key)
     return validators_data
-
-
-async def _submit_consolidate_validators(
-    validators: bytes,
-    oracle_signatures: bytes,
-    current_fee: Gwei,
-) -> HexStr | None:
-    """Sends consolidate validators transaction to vault contract"""
-    logger.info('Submitting consolidate validators transaction')
-    vault_contract = VaultContract(settings.vaults[0])
-    try:
-        tx = await vault_contract.functions.consolidateValidators(
-            validators,
-            b'',
-            oracle_signatures,
-        ).transact({'value': Web3.to_wei(current_fee, 'gwei')})
-    except Exception as e:
-        logger.info('Failed to submit consolidate validators transaction: %s', format_error(e))
-        return None
-
-    logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
-    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
-        tx, timeout=settings.execution_transaction_timeout
-    )
-    if not tx_receipt['status']:
-        logger.info('Consolidate validators transaction failed')
-        return None
-    return Web3.to_hex(tx)
 
 
 async def _check_validators_manager() -> None:
