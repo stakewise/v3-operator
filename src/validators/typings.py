@@ -15,6 +15,13 @@ class NetworkValidator:
 
 
 @dataclass
+class VaultValidator:
+    vault_address: HexStr
+    public_key: HexStr
+    block_number: BlockNumber
+
+
+@dataclass
 class ExitSignatureShards:
     public_keys: list[HexStr]
     exit_signatures: list[HexStr]
@@ -35,7 +42,6 @@ class Validator:
 class V2ValidatorEventData:
     public_key: HexStr
     amount: Wei
-    block_number: BlockNumber
 
 
 @dataclass

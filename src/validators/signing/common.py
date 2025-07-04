@@ -31,7 +31,7 @@ def encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) -> 
     deposit_root = compute_deposit_data(
         public_key=public_key,
         withdrawal_credentials=withdrawal_credentials,
-        amount_gwei=validator.amount,
+        amount=validator.amount,
         signature=signature,
     ).hash_tree_root
     if settings.validator_type == ValidatorType.V1:

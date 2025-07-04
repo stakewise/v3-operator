@@ -141,7 +141,6 @@ class VaultContract(ContractWrapper, VaultStateMixin):
             V2ValidatorEventData(
                 public_key=Web3.to_hex(event['args']['publicKey']),
                 amount=Wei(event['args']['amount']),
-                block_number=BlockNumber(event['blockNumber']),
             )
             for event in events
         ]
@@ -158,7 +157,6 @@ class VaultContract(ContractWrapper, VaultStateMixin):
             V2ValidatorEventData(
                 public_key=Web3.to_hex(event['args']['publicKey']),
                 amount=Wei(event['args']['amount']),
-                block_number=BlockNumber(event['blockNumber']),
             )
             for event in events
         ]
