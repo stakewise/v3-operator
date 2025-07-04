@@ -120,7 +120,14 @@ class VaultContract(ContractWrapper, VaultStateMixin):
             from_block=from_block,
             to_block=to_block,
         )
-        return [Web3.to_hex(event['args']['publicKey']) for event in events]
+        result = [Web3.to_hex(event['args']['publicKey']) for event in events]
+        events = await self._get_events(
+            event=self.events.V2ValidatorRegistered,  # type: ignore
+            from_block=from_block,
+            to_block=to_block,
+        )
+        result.extend([Web3.to_hex(event['args']['publicKey']) for event in events])
+        return result
 
     async def get_compounding_validators_events(
         self, from_block: BlockNumber, to_block: BlockNumber

@@ -8,6 +8,7 @@ from importlib.metadata import metadata
 import click
 
 import src
+from src.commands.consolidate import consolidate
 from src.commands.create_keys import create_keys
 from src.commands.create_wallet import create_wallet
 from src.commands.export_public_keys import export_public_keys
@@ -36,6 +37,7 @@ def cli() -> None:
 
 cli.add_command(init)
 cli.add_command(create_keys)
+cli.add_command(consolidate)
 cli.add_command(export_public_keys)
 cli.add_command(remote_signer_setup)
 cli.add_command(create_wallet)
