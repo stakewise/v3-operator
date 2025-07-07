@@ -56,8 +56,6 @@ async def startup_checks() -> None:
     logger.info('Checking consensus nodes network...')
     await _check_consensus_nodes_network()
 
-    logger.info('Checking execution nodes network...')
-    await _check_execution_nodes_network()
     if settings.split_reward:
         logger.info('Checking graph nodes network for split reward feature...')
         await wait_for_graph_node()
@@ -224,7 +222,7 @@ async def wait_for_execution_node() -> None:
 
 async def wait_for_graph_node() -> None:
     """
-    Waits until at graph node is available and synced to the finalized head of the chain.
+    Waits until graph node is available and synced to the finalized head of the chain.
     """
     chain_state = await get_chain_finalized_head()
     graph_client = SWGraphClient(
