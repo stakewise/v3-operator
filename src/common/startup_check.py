@@ -7,12 +7,15 @@ from os import path
 import click
 from aiohttp import ClientSession, ClientTimeout
 from eth_typing import ChecksumAddress
+from gql import gql
 from sw_utils import IpfsFetchClient, get_consensus_client, get_execution_client
+from sw_utils.graph.client import GraphClient as SWGraphClient
 from sw_utils.pectra import get_pectra_vault_version
 from web3 import Web3
 from web3.exceptions import BadFunctionCallOutput
 
 from src.common.clients import OPERATOR_USER_AGENT, db_client
+from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import (
     VaultContract,
     keeper_contract,
@@ -52,6 +55,12 @@ async def startup_checks() -> None:
 
     logger.info('Checking consensus nodes network...')
     await _check_consensus_nodes_network()
+
+    logger.info('Checking execution nodes network...')
+    await _check_execution_nodes_network()
+    if settings.split_reward:
+        logger.info('Checking graph nodes network for split reward feature...')
+        await wait_for_graph_node()
 
     logger.info('Checking execution nodes network...')
     await _check_execution_nodes_network()
@@ -120,6 +129,9 @@ def validate_settings() -> None:
 
     if not settings.consensus_endpoints:
         raise ValueError('CONSENSUS_ENDPOINTS is missing')
+
+    if not settings.graph_api_url and settings.split_reward:
+        raise ValueError('GRAPH_API_URL is missing')
 
 
 async def wait_for_consensus_node() -> None:
@@ -208,6 +220,43 @@ async def wait_for_execution_node() -> None:
             return
         logger.warning('Failed to connect to execution nodes. Retrying in 10 seconds...')
         await asyncio.sleep(10)
+
+
+async def wait_for_graph_node() -> None:
+    """
+    Waits until at graph node is available and synced to the finalized head of the chain.
+    """
+    chain_state = await get_chain_finalized_head()
+    graph_client = SWGraphClient(
+        endpoint=settings.graph_api_url,
+        request_timeout=settings.graph_request_timeout,
+        retry_timeout=0,
+        page_size=settings.graph_page_size,
+    )
+    query = gql(
+        '''
+        query Meta {
+          _meta {
+            block {
+              number
+            }
+          }
+        }
+    '''
+    )
+    while True:
+        response = await graph_client.run_query(query)
+        graph_block_number = response['_meta']['block']['number']
+        if graph_block_number < chain_state.block_number:
+            logger.warning(
+                'The graph node node located at %s has not completed synchronization yet.',
+                settings.graph_api_url,
+            )
+            await asyncio.sleep(10)
+            continue
+        return
+
+    return
 
 
 async def collect_healthy_oracles() -> list:

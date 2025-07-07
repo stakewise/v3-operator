@@ -72,6 +72,7 @@ class Settings(metaclass=Singleton):
     log_level: str
     log_format: str
     web3_log_level: str
+    gql_log_level: str
 
     ipfs_fetch_endpoints: list[str]
     ipfs_timeout: int
@@ -221,6 +222,7 @@ class Settings(metaclass=Singleton):
         self.log_level = log_level or 'INFO'
         self.log_format = log_format or LOG_PLAIN
         self.web3_log_level = decouple_config('WEB3_LOG_LEVEL', default='INFO')
+        self.gql_log_level = decouple_config('GQL_LOG_LEVEL', default='WARNING')
 
         self.sentry_dsn = decouple_config('SENTRY_DSN', default='')
         self.sentry_environment = decouple_config('SENTRY_ENVIRONMENT', default='')
@@ -325,9 +327,6 @@ MULTICALL_BATCH_SIZE: int = decouple_config('MULTICALL_BATCH_SIZE', default='20'
 REWARD_SPLITTER_MIN_ASSETS: int = decouple_config(
     'REWARD_SPLITTER_MIN_ASSETS', default=Web3.to_wei('0.001', 'ether'), cast=int
 )
-
-# Graphql timeout
-GRAPH_API_TIMEOUT = 10
 
 # logging
 LOG_PLAIN = 'plain'

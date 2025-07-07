@@ -2,7 +2,8 @@ import logging
 from typing import cast
 
 from sw_utils import InterruptHandler, chunkify
-from web3.types import ChecksumAddress, HexBytes, HexStr, Web3, Wei
+from web3 import Web3
+from web3.types import ChecksumAddress, HexBytes, HexStr, Wei
 
 from src.common.clients import execution_client
 from src.common.contracts import multicall_contract

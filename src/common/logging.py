@@ -38,3 +38,4 @@ def setup_logging() -> None:
         warnings.simplefilter('ignore')
 
     logging.getLogger('web3').setLevel(settings.web3_log_level)
+    logging.getLogger('gql.transport.aiohttp').setLevel(settings.gql_log_level)

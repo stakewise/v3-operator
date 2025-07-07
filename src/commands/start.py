@@ -143,7 +143,7 @@ logger = logging.getLogger(__name__)
     '--split-reward',
     is_flag=True,
     envvar='SPLIT_REWARD',
-    help='withdraw and claim shareholders rewards in reward splitter '
+    help='Withdraw and claim shareholders rewards in reward splitter '
     'on behalf of shareholders. Default is false.',
 )
 @click.option(
@@ -166,6 +166,13 @@ logger = logging.getLogger(__name__)
     envvar='CONSENSUS_ENDPOINTS',
     prompt='Enter comma separated list of API endpoints for consensus nodes',
     help='Comma separated list of API endpoints for consensus nodes.',
+)
+@click.option(
+    '--graph-api-url',
+    type=str,
+    envvar='GRAPH_API_URL',
+    prompt='Enter API endpoint for graph node',
+    help='API endpoint for graph nodes.',
 )
 @click.option(
     '--vaults',
@@ -263,6 +270,7 @@ def start(
     consensus_endpoints: str,
     execution_endpoints: str,
     execution_jwt_secret: str | None,
+    graph_api_url: str,
     harvest_vault: bool,
     split_reward: bool,
     verbose: bool,
@@ -325,6 +333,7 @@ def start(
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
         execution_jwt_secret=execution_jwt_secret,
+        graph_api_url=graph_api_url,
         harvest_vault=harvest_vault,
         split_reward=split_reward,
         verbose=verbose,
