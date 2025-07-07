@@ -170,6 +170,24 @@ class VaultContract(ContractWrapper, VaultStateMixin):
     async def validators_manager(self) -> ChecksumAddress:
         return await self.contract.functions.validatorsManager().call()
 
+    async def get_last_partial_withdrawals_block(self) -> BlockNumber | None:
+        """Fetches the last partial withdrawal event block."""
+        from_block = settings.network_config.KEEPER_GENESIS_BLOCK
+        if (
+            settings.network_config.PECTRA_BLOCK
+            and settings.network_config.PECTRA_BLOCK > settings.network_config.KEEPER_GENESIS_BLOCK
+        ):
+            from_block = settings.network_config.PECTRA_BLOCK
+        last_event = await self._get_last_event(
+            self.events.ValidatorWithdrawalSubmitted,  # type: ignore
+            from_block=from_block,
+            to_block=await self.execution_client.eth.get_block_number(),
+        )
+        if not last_event:
+            return None
+
+        return BlockNumber(last_event['blockNumber'])
+
 
 class GnoVaultContract(ContractWrapper, VaultStateMixin):
     abi_path = 'abi/IGnoVault.json'
