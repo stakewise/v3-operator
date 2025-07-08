@@ -197,7 +197,7 @@ async def main(
 ) -> None:
     setup_logging()
     await setup_clients()
-    await _check_validators_manager()
+    await _check_validators_manager(vault_address)
     chain_head = await get_chain_finalized_head()
 
     target_source_public_keys = await _validate_public_keys(
@@ -287,7 +287,7 @@ async def _validate_public_keys(
     for public_keys in source_public_keys + [target_public_key]:
         if public_keys not in vault_validators:
             raise click.ClickException(
-                f'Validator {public_keys} is not registered in the vault {settings.vaults[0]}.'
+                f'Validator {public_keys} is not registered in the vault {vault_address}.'
             )
     if sum(val.balance for val in active_validators) > MAX_EFFECTIVE_BALANCE_GWEI:
         raise click.ClickException(
@@ -306,8 +306,7 @@ def _encode_validators(target_source_public_keys: list[tuple[HexStr, HexStr]]) -
     return validators_data
 
 
-async def _check_validators_manager() -> None:
-    vault_address = settings.vaults[0]
+async def _check_validators_manager(vault_address: ChecksumAddress) -> None:
     vault_contract = VaultContract(vault_address)
     validators_manager = await vault_contract.validators_manager()
     if validators_manager != hot_wallet.account.address:
