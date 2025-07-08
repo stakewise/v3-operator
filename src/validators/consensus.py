@@ -11,7 +11,7 @@ from src.common.clients import consensus_client, execution_client
 from src.common.contracts import VaultContract
 from src.config.settings import settings
 from src.validators.database import VaultValidatorCrud
-from src.validators.typings import VaultValidator
+from src.validators.typings import ConsensusValidator, VaultValidator
 
 EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
 
@@ -108,18 +108,22 @@ async def _get_non_activated_balances(
     }
 
 
-async def fetch_active_validators_balances(
+async def fetch_active_validators(
     public_keys: list[HexStr],
-) -> dict[HexStr, Gwei]:
-    balances = {}
+) -> list[ConsensusValidator]:
+    validators = []
     for chunk_keys in chunkify(public_keys, settings.validators_fetch_chunk_size):
         beacon_validators = await consensus_client.get_validators_by_ids(chunk_keys)
         for beacon_validator in beacon_validators['data']:
             status = ValidatorStatus(beacon_validator['status'])
             if status in EXITING_STATUSES:
                 continue
+            validators.append(
+                ConsensusValidator(
+                    public_key=add_0x_prefix(beacon_validator['validator']['pubkey']),
+                    balance=Gwei(int(beacon_validator['balance'])),
+                    withdrawal_credentials=beacon_validator['validator']['withdrawal_credentials'],
+                )
+            )
 
-            public_key = add_0x_prefix(beacon_validator['validator']['pubkey'])
-            balances[public_key] = Gwei(int(beacon_validator['balance']))
-
-    return balances
+    return validators

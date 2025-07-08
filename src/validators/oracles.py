@@ -106,7 +106,7 @@ async def poll_consolidation_signature(
     vault: ChecksumAddress,
 ) -> bytes:
     """
-    Polls oracles for approval of validator consolidation signature
+    Polls oracles for validator consolidation signature
     """
     approvals_min_interval = 1
     rate_limiter = RateLimiter(approvals_min_interval)
@@ -330,7 +330,7 @@ async def _send_consolidation_requests(
     for (address, replicas), result in zip(endpoints, results):
         if isinstance(result, BaseException):
             warning_verbose(
-                'All endpoints for oracle %s failed to fetch consolidate validators request. '
+                'All endpoints for oracle %s failed to return consolidate validators request. '
                 'Last error: %s',
                 address,
                 format_error(result),
@@ -389,7 +389,6 @@ async def _send_consolidation_request(
             response.raise_for_status()
             data = await response.json()
     except (ClientError, asyncio.TimeoutError) as e:
-
         raise e
     logger.debug('Received response from oracle %s: %s', endpoint, data)
     return Web3.to_bytes(hexstr=data['signature'])

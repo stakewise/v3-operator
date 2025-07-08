@@ -39,6 +39,17 @@ class Validator:
 
 
 @dataclass
+class ConsensusValidator:
+    public_key: HexStr
+    balance: Gwei
+    withdrawal_credentials: HexStr
+
+    @property
+    def is_compounding(self) -> bool:
+        return self.withdrawal_credentials.startswith('0x02')
+
+
+@dataclass
 class V2ValidatorEventData:
     public_key: HexStr
     amount: Wei
