@@ -405,6 +405,7 @@ Validators 513571, 513572, 513861 exits successfully initiated
 
 Converts 0x01 validators to compound validators (0x02) using the consolidate command.
 The wallet executing this command must be set as the Validators Manager in the vault settings.
+
 - Specify `--source-keys` and `--target-key` parameters to consolidate selected validators.
 
 ```bash
@@ -421,12 +422,14 @@ Submitting consolidate validators transaction
 Waiting for transaction 0x00000... confirmation
 Validators has been successfully consolidated
 ```
--  More convenient way to consolidate multiple validators is to specify `--source-keys-file` parameter with path to a file containing validator public keys.
+
+- More convenient way to consolidate multiple validators is to specify `--source-keys-file` parameter with path to a file containing validator public keys.
 
 ```bash
 ./operator consolidate --vault=0x000...  --source-keys-file=public_keys.txt --target-key=0x003
 ...
 ```
+
 - `--target-key` is a target validator public key to which the source validators will be consolidated. It must be a compounding validator. If you want to convert 0x01 validators to 0x02 compound validators, you can use the `consolidate` with same key in `--source-keys` and `--target-key` parameters.
 
 ```bash
