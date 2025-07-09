@@ -6,6 +6,7 @@ from typing import Sequence
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
 from eth_typing import ChecksumAddress, HexStr
+from sw_utils.common import urljoin
 from sw_utils.typings import Bytes32, ProtocolConfig
 from web3 import Web3
 
@@ -20,7 +21,11 @@ from src.common.utils import (
     process_oracles_approvals,
     warning_verbose,
 )
-from src.config.settings import ORACLES_VALIDATORS_TIMEOUT, settings
+from src.config.settings import (
+    ORACLES_CONSOLIDATION_TIMEOUT,
+    ORACLES_VALIDATORS_TIMEOUT,
+    settings,
+)
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import (
     RegistryRootChangedError,
@@ -32,7 +37,7 @@ from src.validators.execution import (
 )
 from src.validators.keystores.base import BaseKeystore
 from src.validators.signing.common import get_encrypted_exit_signature_shards
-from src.validators.typings import ApprovalRequest, Validator
+from src.validators.typings import ApprovalRequest, ConsolidationRequest, Validator
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +98,52 @@ async def poll_validation_approval(
                 e.num_votes,
                 e.threshold,
             )
+
+
+async def poll_consolidation_signature(
+    protocol_config: ProtocolConfig,
+    target_source_public_keys: list[tuple[HexStr, HexStr]],
+    vault: ChecksumAddress,
+) -> bytes:
+    """
+    Polls oracles for validator consolidation signature
+    """
+    approvals_min_interval = 1
+    rate_limiter = RateLimiter(approvals_min_interval)
+    votes_threshold = protocol_config.validators_threshold
+    from_public_keys = []
+    to_public_keys = []
+    for to_key, from_key in target_source_public_keys:
+        from_public_keys.append(from_key)
+        to_public_keys.append(to_key)
+
+    consolidation_request = ConsolidationRequest(
+        from_public_keys=from_public_keys,
+        to_public_keys=to_public_keys,
+        vault_address=vault,
+    )
+    while True:
+        # Keep min interval between requests
+        await rate_limiter.ensure_interval()
+
+        # Send approval requests
+        consolidation_signatures = await _send_consolidation_requests(
+            protocol_config, consolidation_request
+        )
+
+        if len(consolidation_signatures) < votes_threshold:
+            logger.error(
+                'Not enough oracle approvals for validator consolidation: %d. Threshold is %d.',
+                len(consolidation_signatures),
+                votes_threshold,
+            )
+            continue
+        signatures = b''
+        for _, signature in sorted(
+            consolidation_signatures, key=lambda x: Web3.to_int(hexstr=x[0])
+        )[:votes_threshold]:
+            signatures += signature
+        return signatures
 
 
 async def send_approval_requests(
@@ -204,7 +255,6 @@ async def create_approval_request(
 
 
 # pylint: disable=duplicate-code
-# @retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def _send_approval_request_to_replicas(
     session: ClientSession, replicas: list[str], payload: dict
 ) -> OracleApproval:
@@ -254,3 +304,91 @@ async def _send_approval_request(
         signature=Web3.to_bytes(hexstr=data['signature']),
         deadline=data['deadline'],
     )
+
+
+async def _send_consolidation_requests(
+    protocol_config: ProtocolConfig, request: ConsolidationRequest
+) -> list[tuple[ChecksumAddress, bytes]]:
+    """Requests consolidation signature from all oracles."""
+    payload = dataclasses.asdict(request)
+    endpoints = [(oracle.address, oracle.endpoints) for oracle in protocol_config.oracles]
+
+    async with ClientSession(timeout=ClientTimeout(ORACLES_CONSOLIDATION_TIMEOUT)) as session:
+        results = await asyncio.gather(
+            *[
+                _send_consolidation_request_to_replicas(
+                    session=session, replicas=replicas, payload=payload
+                )
+                for address, replicas in endpoints
+            ],
+            return_exceptions=True,
+        )
+
+    signatures = []
+    failed_endpoints: list[str] = []
+
+    for (address, replicas), result in zip(endpoints, results):
+        if isinstance(result, BaseException):
+            warning_verbose(
+                'All endpoints for oracle %s failed to return consolidate validators request. '
+                'Last error: %s',
+                address,
+                format_error(result),
+            )
+            failed_endpoints.extend(replicas)
+            continue
+
+        signatures.append((address, result))
+
+    logger.info(
+        'Fetched signatures for validator consolidation: Received %d out of %d approvals.',
+        len(signatures),
+        len(protocol_config.oracles),
+    )
+
+    if failed_endpoints:
+        logger.error(
+            'The oracles with endpoints %s have failed to respond.', ', '.join(failed_endpoints)
+        )
+
+    return signatures
+
+
+# pylint: disable=duplicate-code
+async def _send_consolidation_request_to_replicas(
+    session: ClientSession, replicas: list[str], payload: dict
+) -> bytes:
+    last_error = None
+
+    # Shuffling may help if the first endpoint is slower than others
+    replicas = random.sample(replicas, len(replicas))
+
+    for endpoint in replicas:
+        try:
+            return await _send_consolidation_request(session, endpoint, payload)
+        except (ClientError, asyncio.TimeoutError) as e:
+            warning_verbose('%s for endpoint %s', format_error(e), endpoint)
+            last_error = e
+
+    if last_error:
+        raise last_error
+
+    raise RuntimeError('Failed to get response from replicas')
+
+
+async def _send_consolidation_request(
+    session: ClientSession, endpoint: str, payload: dict
+) -> bytes:
+    """Requests consolidation signature from single oracle."""
+    endpoint = urljoin(endpoint, 'consolidate-validators/')
+    logger.debug('send_consolidation_request to %s', endpoint)
+    try:
+        async with session.post(url=endpoint, json=payload) as response:
+            if response.status == 400:
+                logger.warning('%s response: %s', endpoint, await response.json())
+            response.raise_for_status()
+            data = await response.json()
+    except (ClientError, asyncio.TimeoutError) as e:
+        raise e
+    logger.debug('Received response from oracle %s: %s', endpoint, data)
+    return Web3.to_bytes(hexstr=data['signature'])

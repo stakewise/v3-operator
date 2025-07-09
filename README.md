@@ -20,12 +20,13 @@
 5. [Extra commands](#extra-commands)
    1. [Add validator keys to Vault](#add-validator-keys-to-vault)
    2. [Validators voluntary exit](#validators-voluntary-exit)
-   3. [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
-   4. [Recover validator keystores](#recover-validator-keystores)
-   5. [Max gas fee](#max-gas-fee)
-   6. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
-   7. [Self report to Rated Network](#self-report-to-rated-network)
-   8. [Export validators file](#export-validators-file)
+   3. [Validators consolidation](#validators-consolidation)
+   4. [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
+   5. [Recover validator keystores](#recover-validator-keystores)
+   6. [Max gas fee](#max-gas-fee)
+   7. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
+   8. [Self report to Rated Network](#self-report-to-rated-network)
+   9. [Export validators file](#export-validators-file)
 6. [Contacts](#contacts)
 
 ## What is V3 Operator?
@@ -371,6 +372,7 @@ within your Vault!**
 Operator Service has many different commands that are not mandatory but might come in handy:
 
 - [Validators voluntary exit](#validators-voluntary-exit)
+- [Validators consolidation](#validators-consolidation)
 - [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
 - [Add validator keys to Vault](#add-validator-keys-to-vault)
 - [Recover validator keystores](#recover-validator-keystores)
@@ -397,6 +399,42 @@ Enter the comma separated list of API endpoints for consensus nodes: https://exa
 Enter your vault address: 0x3320ad928c20187602a2b2c04eeaa813fa899468
 Are you sure you want to exit 3 validators with indexes: 513571, 513572, 513861? [y/N]: y
 Validators 513571, 513572, 513861 exits successfully initiated
+```
+
+### Validators consolidation
+
+Converts 0x01 validators to compound validators (0x02) using the consolidate command.
+The wallet executing this command must be set as the Validators Manager in the vault settings.
+
+- Specify `--source-public-keys` and `--target-public-key` parameters to consolidate selected validators.
+
+```bash
+./operator consolidate --vault=0x000...  --source-public-keys=0x001,0x002 --target-public-key=0x003
+Enter comma separated list of API endpoints for execution nodes: : https://example.com
+Enter the comma separated list of API endpoints for consensus nodes: https://example.com
+Enter your vault address: 0x3320ad928c20187602a2b2c04eeaa813fa899468
+Consolidating 2 validators:
+    0x001 -> 0x003
+    0x002 -> 0x003
+Proceed consolidation? [Y/n]: y
+Fetched signatures for validator consolidation: Received 11 out of 11 approvals
+Submitting consolidate validators transaction
+Waiting for transaction 0x00000... confirmation
+Validators has been successfully consolidated
+```
+
+- More convenient way to consolidate multiple validators is to specify `--source-public-keys-file` parameter with path to a file containing validator public keys.
+
+```bash
+./operator consolidate --vault=0x000...  --source-public-keys-file=public_keys.txt --target-public-key=0x003
+...
+```
+
+- `--target-public-key` is a target validator public key to which the source validators will be consolidated. It must be a compounding validator. If you want to convert 0x01 validators to 0x02 compound validators, you can use the `consolidate` with same key in `--source-public-keys` and `--target-public-key` parameters.
+
+```bash
+./operator consolidate --vault=0x000...  --source-public-keys=0x001 --target-public-key=0x001
+...
 ```
 
 ### Update Vault state (Harvest Vault)
