@@ -117,6 +117,10 @@ async def process_validators(
     vault_contract = VaultContract(vault_address)
     vault_version = await vault_contract.version()
     if vault_version >= get_pectra_vault_version(settings.network, vault_address):
+        gas_manager = build_gas_manager()
+        if not await gas_manager.check_gas_price():
+            return None
+
         validators_balances = await fetch_compounding_validators_balances(vault_address)
         try:
             vault_assets = await fund_compounding_validators(
