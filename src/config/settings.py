@@ -3,7 +3,7 @@ from pathlib import Path
 from decouple import Csv
 from decouple import config as decouple_config
 from web3 import Web3
-from web3.types import ChecksumAddress, Gwei
+from web3.types import ChecksumAddress, Gwei, Wei
 
 from src.common.typings import Singleton, ValidatorType
 from src.config.networks import MAINNET, NETWORKS, NetworkConfig
@@ -290,13 +290,13 @@ ORACLES_CONSOLIDATION_TIMEOUT: int = decouple_config(
     'ORACLES_CONSOLIDATION_TIMEOUT', default=10, cast=int
 )
 # common
-MIN_ACTIVATION_BALANCE = Web3.to_wei(32, 'ether')
-MIN_ACTIVATION_BALANCE_GWEI = Gwei(int(Web3.from_wei(MIN_ACTIVATION_BALANCE, 'gwei')))
+MIN_ACTIVATION_BALANCE: Wei = Web3.to_wei(32, 'ether')
+MIN_ACTIVATION_BALANCE_GWEI: Gwei = Gwei(int(Web3.from_wei(MIN_ACTIVATION_BALANCE, 'gwei')))
 
-MAX_EFFECTIVE_BALANCE = Web3.to_wei(2048, 'ether')
-MAX_EFFECTIVE_BALANCE_GWEI = Gwei(int(Web3.from_wei(MAX_EFFECTIVE_BALANCE, 'gwei')))
+MAX_EFFECTIVE_BALANCE: Wei = Web3.to_wei(2048, 'ether')
+MAX_EFFECTIVE_BALANCE_GWEI: Gwei = Gwei(int(Web3.from_wei(MAX_EFFECTIVE_BALANCE, 'gwei')))
 
-MAX_CONSOLIDATION_REQUEST_FEE = decouple_config(
+MAX_CONSOLIDATION_REQUEST_FEE: Gwei = decouple_config(
     'MAX_CONSOLIDATION_REQUEST_FEE', default=10, cast=int
 )
 

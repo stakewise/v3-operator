@@ -9,12 +9,12 @@ from eth_typing import ChecksumAddress, HexStr
 from web3 import Web3
 from web3.types import BlockNumber
 
-from src.common.clients import setup_clients
+from src.common.clients import execution_client, setup_clients
 from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import VaultContract
-from src.common.execution import get_protocol_config, get_request_fee
+from src.common.execution import get_consolidation_request_fee, get_protocol_config
 from src.common.logging import LOG_LEVELS, setup_logging
-from src.common.utils import log_verbose
+from src.common.utils import find_first, log_verbose
 from src.common.validators import (
     validate_eth_address,
     validate_public_key,
@@ -29,7 +29,7 @@ from src.config.settings import (
     MAX_EFFECTIVE_BALANCE_GWEI,
     settings,
 )
-from src.validators.consensus import fetch_active_validators
+from src.validators.consensus import fetch_non_exiting_validators
 from src.validators.oracles import poll_consolidation_signature
 from src.validators.register_validators import submit_consolidate_validators
 from src.validators.utils import load_public_keys
@@ -68,7 +68,7 @@ logger = logging.getLogger(__name__)
 )
 @click.option(
     '--source-public-keys-file',
-    type=click.Path(exists=True, file_okay=True, dir_okay=False),
+    type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
     callback=validate_public_keys_file,
     help='File with public keys of validators to consolidate from.',
 )
@@ -145,7 +145,7 @@ def consolidate(
     no_confirm: bool,
     log_level: str,
     source_public_keys: list[HexStr] | None,
-    source_public_keys_file: str | None,
+    source_public_keys_file: Path | None,
     target_public_key: HexStr,
 ) -> None:
     if all([source_public_keys, source_public_keys_file]):
@@ -159,7 +159,7 @@ def consolidate(
         )
 
     if source_public_keys_file:
-        source_public_keys = load_public_keys(Path(source_public_keys_file))
+        source_public_keys = load_public_keys(source_public_keys_file)
     source_public_keys = cast(list[HexStr], source_public_keys)
     operator_config = OperatorConfig(Path(data_dir))
     operator_config.load(network=network)
@@ -218,8 +218,10 @@ async def main(
             default=True,
             abort=True,
         )
-    current_fee = await get_request_fee(
-        settings.network_config.CONSOLIDATION_CONTRACT_ADDRESS, block_number=chain_head.block_number
+
+    current_fee = await get_consolidation_request_fee(
+        settings.network_config.CONSOLIDATION_CONTRACT_ADDRESS,
+        block_number=await execution_client.eth.get_block_number(),
     )
     if current_fee > MAX_CONSOLIDATION_REQUEST_FEE:
         logger.info(
@@ -248,7 +250,7 @@ async def main(
 
     if tx_hash:
         click.secho(
-            'Validators has been successfully consolidated',
+            'Validators have been successfully consolidated',
             bold=True,
             fg='green',
         )
@@ -262,19 +264,20 @@ async def _validate_public_keys(
 ) -> list[tuple[HexStr, HexStr]]:
     """Validate that provided public keys can be consolidated."""
     logger.info('Checking selected validators for consolidation...')
-    active_validators = await fetch_active_validators(source_public_keys + [target_public_key])
-    active_validators_public_keys = [key.public_key for key in active_validators]
-    for key in source_public_keys + [target_public_key]:
-        if key not in active_validators_public_keys:
-            raise click.ClickException(f'Trying to consolidate non-active validator {key}.')
+    all_public_keys = source_public_keys + [target_public_key]
+    active_validators = await fetch_non_exiting_validators(source_public_keys + [target_public_key])
+    active_public_keys = {key.public_key for key in active_validators}
+    non_active_public_keys = set(all_public_keys) - active_public_keys
+    for key in non_active_public_keys:
+        raise click.ClickException(f'Trying to consolidate non-active validator {key}.')
 
     # validate that target_public_key is a compounding validator.
     # Not required for a single validator consolidation
-    if not len(source_public_keys) == 1 and source_public_keys[0] != target_public_key:
-        target_validator = [
-            val for val in active_validators if val.public_key == target_public_key
-        ][0]
-        if not target_validator.is_compounding:
+    if not _is_switch_to_compounding(source_public_keys, target_public_key):
+        target_validator = find_first(
+            active_validators, lambda val: val.public_key == target_public_key
+        )
+        if target_validator and not target_validator.is_compounding:
             raise click.ClickException(
                 f'The target validator {target_public_key} is not a compounding validator.'
             )
@@ -311,3 +314,7 @@ async def _check_validators_manager(vault_address: ChecksumAddress) -> None:
     validators_manager = await vault_contract.validators_manager()
     if validators_manager != hot_wallet.account.address:
         raise RuntimeError('validators manager address must equal to hot wallet address')
+
+
+def _is_switch_to_compounding(source_public_keys: list[HexStr], target_public_key: HexStr) -> bool:
+    return len(source_public_keys) == 1 and source_public_keys[0] == target_public_key

@@ -5,7 +5,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from decimal import ROUND_FLOOR, Decimal, localcontext
 from pathlib import Path
-from typing import Any, Iterator, TypeVar, overload
+from typing import Any, Callable, Iterable, Iterator, TypeVar, overload
 
 import click
 import tenacity
@@ -149,3 +149,7 @@ def round_down(d: int | Decimal, precision: int) -> Decimal:
     with localcontext() as ctx:
         ctx.rounding = ROUND_FLOOR
         return round(d, precision)
+
+
+def find_first(iterable: Iterable[T], predicate: Callable[[T], bool]) -> T | None:
+    return next((item for item in iterable if predicate(item)), None)

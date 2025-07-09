@@ -108,7 +108,7 @@ async def _get_non_activated_balances(
     }
 
 
-async def fetch_active_validators(
+async def fetch_non_exiting_validators(
     public_keys: list[HexStr],
 ) -> list[ConsensusValidator]:
     validators = []
