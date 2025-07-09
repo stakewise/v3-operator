@@ -26,7 +26,7 @@ def build_gas_manager() -> GasManager:
     min_effective_priority_fee_per_gas = settings.network_config.MIN_EFFECTIVE_PRIORITY_FEE_PER_GAS
     return GasManager(
         execution_client=execution_client,
-        max_fee_per_gas=Wei(settings.max_fee_per_gas_gwei),
+        max_fee_per_gas=Web3.to_wei(settings.max_fee_per_gas_gwei, 'gwei'),
         priority_fee_num_blocks=settings.priority_fee_num_blocks,
         priority_fee_percentile=settings.priority_fee_percentile,
         min_effective_priority_fee_per_gas=min_effective_priority_fee_per_gas,

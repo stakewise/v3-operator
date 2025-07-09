@@ -3,7 +3,7 @@ from pathlib import Path
 from decouple import Csv
 from decouple import config as decouple_config
 from web3 import Web3
-from web3.types import ChecksumAddress
+from web3.types import ChecksumAddress, Gwei
 
 from src.common.typings import Singleton
 from src.config.networks import MAINNET, NETWORKS, NetworkConfig
@@ -58,7 +58,7 @@ class Settings(metaclass=Singleton):
     hashi_vault_parallelism: int
     hot_wallet_file: Path
     hot_wallet_password_file: Path
-    max_fee_per_gas_gwei: int
+    max_fee_per_gas_gwei: Gwei
     database: Path
 
     log_level: str
@@ -149,7 +149,7 @@ class Settings(metaclass=Singleton):
         if max_fee_per_gas_gwei is None:
             max_fee_per_gas_gwei = self.network_config.MAX_FEE_PER_GAS_GWEI
 
-        self.max_fee_per_gas_gwei = max_fee_per_gas_gwei
+        self.max_fee_per_gas_gwei = Gwei(max_fee_per_gas_gwei)
         self.min_validators_registration = min_validators_registration
 
         self.deposit_data_file = (
