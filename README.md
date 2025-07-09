@@ -430,7 +430,7 @@ Validators has been successfully consolidated
 ...
 ```
 
-- `--target-key` is a target validator public key to which the source validators will be consolidated. It must be a compounding validator. If you want to convert 0x01 validators to 0x02 compound validators, you can use the `consolidate` with same key in `--source-public-keys` and `--target-key` parameters.
+- `--target-public-key` is a target validator public key to which the source validators will be consolidated. It must be a compounding validator. If you want to convert 0x01 validators to 0x02 compound validators, you can use the `consolidate` with same key in `--source-public-keys` and `--target-public-key` parameters.
 
 ```bash
 ./operator consolidate --vault=0x000...  --source-public-keys=0x001 --target-public-key=0x001
