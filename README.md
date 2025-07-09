@@ -406,10 +406,10 @@ Validators 513571, 513572, 513861 exits successfully initiated
 Converts 0x01 validators to compound validators (0x02) using the consolidate command.
 The wallet executing this command must be set as the Validators Manager in the vault settings.
 
-- Specify `--source-keys` and `--target-key` parameters to consolidate selected validators.
+- Specify `--source-public-keys` and `--target-public-key` parameters to consolidate selected validators.
 
 ```bash
-./operator consolidate --vault=0x000...  --source-keys=0x001,0x002 --target-key=0x003
+./operator consolidate --vault=0x000...  --source-public-keys=0x001,0x002 --target-public-key=0x003
 Enter comma separated list of API endpoints for execution nodes: : https://example.com
 Enter the comma separated list of API endpoints for consensus nodes: https://example.com
 Enter your vault address: 0x3320ad928c20187602a2b2c04eeaa813fa899468
@@ -423,17 +423,17 @@ Waiting for transaction 0x00000... confirmation
 Validators has been successfully consolidated
 ```
 
-- More convenient way to consolidate multiple validators is to specify `--source-keys-file` parameter with path to a file containing validator public keys.
+- More convenient way to consolidate multiple validators is to specify `--source-public-keys-file` parameter with path to a file containing validator public keys.
 
 ```bash
-./operator consolidate --vault=0x000...  --source-keys-file=public_keys.txt --target-key=0x003
+./operator consolidate --vault=0x000...  --source-public-keys-file=public_keys.txt --target-public-key=0x003
 ...
 ```
 
-- `--target-key` is a target validator public key to which the source validators will be consolidated. It must be a compounding validator. If you want to convert 0x01 validators to 0x02 compound validators, you can use the `consolidate` with same key in `--source-keys` and `--target-key` parameters.
+- `--target-key` is a target validator public key to which the source validators will be consolidated. It must be a compounding validator. If you want to convert 0x01 validators to 0x02 compound validators, you can use the `consolidate` with same key in `--source-public-keys` and `--target-key` parameters.
 
 ```bash
-./operator consolidate --vault=0x000...  --source-keys=0x001 --target-key=0x001
+./operator consolidate --vault=0x000...  --source-public-keys=0x001 --target-public-key=0x001
 ...
 ```
 
