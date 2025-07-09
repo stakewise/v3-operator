@@ -131,7 +131,8 @@ logger = logging.getLogger(__name__)
     help='The log level.',
 )
 @click.command(
-    help='Performs a vault validators consolidation from 0x01 validators to 0x02 validator.'
+    help='Performs a vault validators consolidation from 0x01 validators to 0x02 validator. '
+    'Switches to a compounding validator if the source and target keys are identical.'
 )
 # pylint: disable-next=too-many-arguments,too-many-locals
 def consolidate(
@@ -151,11 +152,11 @@ def consolidate(
 ) -> None:
     if all([source_public_keys, source_public_keys_file]):
         raise click.ClickException(
-            'Provide only ony option: --from-public-keys-file or --from-public-keys.'
+            'Provide only one option: either --from-public-keys-file or --from-public-keys.'
         )
     if not any([source_public_keys, source_public_keys_file]):
         raise click.ClickException(
-            'Provide from public keys via one of options: '
+            'Provide from public keys using one of these options: '
             '--from-public-keys-file or --from-public-keys.'
         )
 
