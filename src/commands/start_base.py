@@ -93,7 +93,7 @@ async def start_base() -> None:
         ]
         if settings.harvest_vault:
             tasks.append(HarvestTask().run(interrupt_handler))
-        if settings.split_reward:
+        if settings.split_rewards:
             tasks.append(SplitRewardTask().run(interrupt_handler))
 
         await asyncio.gather(*tasks)

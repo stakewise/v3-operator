@@ -135,9 +135,9 @@ AUTO = 'AUTO'
     help='Whether to submit vault harvest transactions. Default is false.',
 )
 @click.option(
-    '--split-reward',
+    '--split-rewards',
     is_flag=True,
-    envvar='SPLIT_REWARD',
+    envvar='split_rewards',
     help='Withdraw and claim shareholders rewards in reward splitter '
     'on behalf of shareholders. Default is false.',
 )
@@ -224,7 +224,7 @@ def start_api(
     execution_jwt_secret: str | None,
     graph_api_url: str,
     harvest_vault: bool,
-    split_reward: bool,
+    split_rewards: bool,
     verbose: bool,
     enable_metrics: bool,
     metrics_host: str,
@@ -268,7 +268,7 @@ def start_api(
         execution_jwt_secret=execution_jwt_secret,
         graph_api_url=graph_api_url,
         harvest_vault=harvest_vault,
-        split_reward=split_reward,
+        split_rewards=split_rewards,
         verbose=verbose,
         enable_metrics=enable_metrics,
         metrics_host=metrics_host,

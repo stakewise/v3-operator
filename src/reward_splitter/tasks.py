@@ -41,9 +41,6 @@ class SplitRewardTask(BaseTask):
         4. Retrieves claimable exit requests for the reward splitters.
         5. Generates multicall contract calls for each reward splitter.
         6. Processes the multicall batches and waits for transaction confirmations.
-
-        Raises:
-            RuntimeError: If a transaction fails to confirm.
         """
 
         # check current gas prices
@@ -100,7 +97,9 @@ class SplitRewardTask(BaseTask):
             logger.warning('No calls to process')
             return
 
-        for calls_batch in chunkify(calls, MULTICALL_BATCH_SIZE):
+        for calls_batch in chunkify(
+            calls, MULTICALL_BATCH_SIZE
+        ):  # todo check что не разделиться с update state
             logger.info('Processing multicall batch')
             tx = await _multicall(calls_batch)
 
@@ -195,7 +194,6 @@ async def _multicall(calls: list[tuple[ChecksumAddress, HexStr]]) -> HexBytes | 
     Helper function to execute multicall:
     - Calls the original contract if all calls are to the same address.
     - Calls multicall contract otherwise.
-    - Simulates the transaction if DRY_RUN is enabled.
     - Sends the transaction otherwise.
     """
     if not calls:

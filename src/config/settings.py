@@ -44,7 +44,7 @@ class Settings(metaclass=Singleton):
     graph_page_size: int
 
     harvest_vault: bool
-    split_reward: bool
+    split_rewards: bool
     verbose: bool
     enable_metrics: bool
     metrics_host: str
@@ -114,7 +114,7 @@ class Settings(metaclass=Singleton):
         execution_jwt_secret: str | None = None,
         graph_api_url: str = '',
         harvest_vault: bool = False,
-        split_reward: bool = False,
+        split_rewards: bool = False,
         verbose: bool = False,
         enable_metrics: bool = False,
         metrics_port: int = DEFAULT_METRICS_PORT,
@@ -155,7 +155,7 @@ class Settings(metaclass=Singleton):
         self.execution_jwt_secret = execution_jwt_secret
         self.graph_api_url = graph_api_url
         self.harvest_vault = harvest_vault
-        self.split_reward = split_reward
+        self.split_rewards = split_rewards
         self.verbose = verbose
         self.enable_metrics = enable_metrics
         self.metrics_host = metrics_host

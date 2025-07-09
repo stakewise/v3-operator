@@ -56,8 +56,8 @@ async def startup_checks() -> None:
     logger.info('Checking consensus nodes network...')
     await _check_consensus_nodes_network()
 
-    if settings.split_reward:
-        logger.info('Checking graph nodes network for split reward feature...')
+    if settings.split_rewards:
+        logger.info('Checking graph nodes network for split rewards feature...')
         await wait_for_graph_node()
 
     logger.info('Checking execution nodes network...')
@@ -128,7 +128,7 @@ def validate_settings() -> None:
     if not settings.consensus_endpoints:
         raise ValueError('CONSENSUS_ENDPOINTS is missing')
 
-    if not settings.graph_api_url and settings.split_reward:
+    if not settings.graph_api_url and settings.split_rewards:
         raise ValueError('GRAPH_API_URL is missing')
 
 
@@ -224,7 +224,6 @@ async def wait_for_graph_node() -> None:
     """
     Waits until graph node is available and synced to the finalized head of the chain.
     """
-    chain_state = await get_chain_finalized_head()
     graph_client = SWGraphClient(
         endpoint=settings.graph_api_url,
         request_timeout=settings.graph_request_timeout,
@@ -245,6 +244,7 @@ async def wait_for_graph_node() -> None:
     while True:
         response = await graph_client.run_query(query)
         graph_block_number = response['_meta']['block']['number']
+        chain_state = await get_chain_finalized_head()
         if graph_block_number < chain_state.block_number:
             logger.warning(
                 'The graph node node located at %s has not completed synchronization yet.',
