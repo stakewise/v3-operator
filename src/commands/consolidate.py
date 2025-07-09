@@ -32,6 +32,7 @@ from src.config.settings import (
 from src.validators.consensus import fetch_non_exiting_validators
 from src.validators.oracles import poll_consolidation_signature
 from src.validators.register_validators import submit_consolidate_validators
+from src.validators.typings import ConsensusValidator
 from src.validators.utils import load_public_keys
 
 logger = logging.getLogger(__name__)
@@ -277,7 +278,9 @@ async def _validate_public_keys(
         target_validator = find_first(
             active_validators, lambda val: val.public_key == target_public_key
         )
-        if target_validator and not target_validator.is_compounding:
+        # `target_validator` is not None, because of validation above
+        target_validator = cast(ConsensusValidator, target_validator)
+        if not target_validator.is_compounding:
             raise click.ClickException(
                 f'The target validator {target_public_key} is not a compounding validator.'
             )
