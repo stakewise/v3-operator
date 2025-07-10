@@ -3,14 +3,13 @@ import sys
 from pathlib import Path
 
 import click
-from eth_typing import BlockNumber, HexAddress, HexStr
+from eth_typing import HexAddress, HexStr
 from eth_utils import add_0x_prefix
 from sw_utils.consensus import EXITED_STATUSES, ValidatorStatus
 
 from src.common.clients import consensus_client, execution_client, setup_clients
-from src.common.contracts import v2_pool_contract, vault_contract
+from src.common.contracts import vault_contract
 from src.common.credentials import CredentialManager
-from src.common.execution import SECONDS_PER_MONTH
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.password import generate_password, get_or_create_password_file
 from src.common.utils import greenify, log_verbose
@@ -207,23 +206,6 @@ async def _fetch_registered_validators() -> dict[HexStr, ValidatorStatus | None]
         from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
         to_block=current_block,
     )
-
-    if settings.network_config.IS_SUPPORT_V2_MIGRATION and settings.is_genesis_vault:
-        # fetch registered validators from v2 pool contract
-        # new validators won't be registered after upgrade to the v3,
-        # no need to check up to the latest block
-        blocks_per_month = int(SECONDS_PER_MONTH // settings.network_config.SECONDS_PER_BLOCK)
-        to_block = BlockNumber(
-            min(
-                settings.network_config.KEEPER_GENESIS_BLOCK + blocks_per_month,
-                current_block,
-            )
-        )
-        public_keys.extend(
-            await v2_pool_contract.get_registered_validators_public_keys(
-                from_block=settings.network_config.V2_POOL_GENESIS_BLOCK, to_block=to_block
-            )
-        )
     click.secho(f'Fetched {len(public_keys)} registered validators', bold=True)
 
     click.secho('Fetching validators statuses...', bold=True)
