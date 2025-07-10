@@ -13,7 +13,7 @@ from src.common.credentials import CredentialManager
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.password import generate_password, get_or_create_password_file
 from src.common.utils import greenify, log_verbose
-from src.common.validators import validate_eth_addresses, validate_mnemonic
+from src.common.validators import validate_eth_address, validate_mnemonic
 from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_NETWORK, SECONDS_PER_MONTH, settings
@@ -48,11 +48,11 @@ from src.config.settings import DEFAULT_NETWORK, SECONDS_PER_MONTH, settings
     callback=validate_mnemonic,
 )
 @click.option(
-    '--vaults',
-    prompt='Enter comma separated list of your vault addresses',
+    '--vault',
+    prompt='Enter your vault address',
     help='Vault addresses',
     type=str,
-    callback=validate_eth_addresses,
+    callback=validate_eth_address,
 )
 @click.option(
     '--execution-endpoints',
@@ -91,7 +91,7 @@ from src.config.settings import DEFAULT_NETWORK, SECONDS_PER_MONTH, settings
 # pylint: disable-next=too-many-arguments
 def recover(
     data_dir: str,
-    vaults: list[ChecksumAddress],
+    vault: ChecksumAddress,
     network: str,
     mnemonic: str,
     consensus_endpoints: str,
@@ -101,23 +101,20 @@ def recover(
     log_level: str,
 ) -> None:
     # pylint: disable=duplicate-code
-    config = OperatorConfig(
+    operator_config = OperatorConfig(
         Path(data_dir),
     )
-    if not config.data_dir.exists():
-        # create vault dir if it does not exist
-        config.data_dir.mkdir(parents=True)
-        click.secho(f'Vault directory {config.data_dir} created.', bold=True, fg='green')
-
-    keystores_dir = config.data_dir / 'keystores'
-    password_file = keystores_dir / 'password.txt'
+    if operator_config.is_network_config_exists(network):
+        raise click.ClickException(
+            f'Config directory {operator_config.data_dir / network} already exists.'
+        )
 
     settings.set(
         execution_endpoints=execution_endpoints,
         consensus_endpoints=consensus_endpoints,
-        vaults=vaults,
+        vaults=[vault],
         network=network,
-        data_dir=config.data_dir,
+        data_dir=operator_config.data_dir,
         log_level=log_level,
     )
 
@@ -125,11 +122,10 @@ def recover(
         asyncio.run(
             main(
                 mnemonic=mnemonic,
-                keystores_dir=keystores_dir,
-                password_file=password_file,
                 per_keystore_password=per_keystore_password,
                 no_confirm=no_confirm,
-                config=config,
+                operator_config=operator_config,
+                network=network,
             )
         )
     except Exception as e:
@@ -140,11 +136,10 @@ def recover(
 # pylint: disable-next=too-many-arguments
 async def main(
     mnemonic: str,
-    keystores_dir: Path,
-    password_file: Path,
     per_keystore_password: bool,
     no_confirm: bool,
-    config: OperatorConfig,
+    operator_config: OperatorConfig,
+    network: str,
 ) -> None:
     setup_logging()
     await setup_clients()
@@ -171,6 +166,8 @@ async def main(
             abort=True,
         )
 
+    keystores_dir = operator_config.data_dir / network / 'keystores'
+    password_file = keystores_dir / 'password.txt'
     if keystores_dir.exists():
         if no_confirm:
             click.secho(f'Removing existing {keystores_dir} keystores directory...')
@@ -193,7 +190,7 @@ async def main(
         per_keystore_password=per_keystore_password,
     )
 
-    config.save(settings.network, mnemonic, mnemonic_next_index)
+    operator_config.save(settings.network, mnemonic, mnemonic_next_index)
     click.secho(
         f'Successfully recovered {greenify(mnemonic_next_index)} '
         f'keystores for vaults {greenify(', '.join(settings.vaults))}',

@@ -12,7 +12,11 @@ from web3.types import BlockNumber
 from src.common.clients import execution_client, setup_clients
 from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import VaultContract
-from src.common.execution import get_consolidation_request_fee, get_protocol_config
+from src.common.execution import (
+    build_gas_manager,
+    get_consolidation_request_fee,
+    get_protocol_config,
+)
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import find_first, log_verbose
 from src.common.validators import (
@@ -234,6 +238,11 @@ async def main(
             MAX_CONSOLIDATION_REQUEST_FEE,
         )
         return
+
+    gas_manager = build_gas_manager()
+    if not await gas_manager.check_gas_price():
+        return
+
     protocol_config = await get_protocol_config()
 
     oracle_signatures = await poll_consolidation_signature(
