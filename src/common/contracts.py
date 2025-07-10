@@ -178,6 +178,22 @@ class GnoVaultContract(ContractWrapper, VaultStateMixin):
         return self.encode_abi(fn_name='swapXdaiToGno', args=[])
 
 
+class V2PoolContract(ContractWrapper):
+    abi_path = 'abi/IV2Pool.json'
+    settings_key = 'V2_POOL_CONTRACT_ADDRESS'
+
+    async def get_registered_validators_public_keys(
+        self, from_block: BlockNumber, to_block: BlockNumber
+    ) -> list[HexStr]:
+        """Fetches the validator registered events."""
+        events = await self._get_events(
+            event=self.events.ValidatorRegistered,  # type: ignore
+            from_block=from_block,
+            to_block=to_block,
+        )
+        return [Web3.to_hex(event['args']['publicKey']) for event in events]
+
+
 class V2PoolEscrowContract(ContractWrapper):
     abi_path = 'abi/IV2PoolEscrow.json'
     settings_key = 'V2_POOL_ESCROW_CONTRACT_ADDRESS'
@@ -262,5 +278,6 @@ class MulticallContract(ContractWrapper):
 
 validators_registry_contract = ValidatorsRegistryContract()
 keeper_contract = KeeperContract()
+v2_pool_contract = V2PoolContract()
 v2_pool_escrow_contract = V2PoolEscrowContract()
 multicall_contract = MulticallContract()
