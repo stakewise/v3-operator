@@ -17,8 +17,6 @@ from src.common.vault import Vault
 from src.common.wallet import hot_wallet
 from src.config.settings import settings
 
-SECONDS_PER_MONTH: int = 2628000
-
 logger = logging.getLogger(__name__)
 
 

@@ -11,7 +11,7 @@ from web3.types import BlockNumber
 
 from src.common.checks import wait_execution_catch_up_consensus
 from src.common.consensus import get_chain_finalized_head
-from src.common.contracts import v2_pool_escrow_contract, validators_registry_contract
+from src.common.contracts import validators_registry_contract
 from src.common.exceptions import NotEnoughOracleApprovalsError
 from src.common.execution import build_gas_manager, get_protocol_config
 from src.common.harvest import get_harvest_params
@@ -92,16 +92,6 @@ async def process_validators(
     """
     Calculates vault assets, requests oracles approval, submits registration tx
     """
-    if (
-        settings.network_config.IS_SUPPORT_V2_MIGRATION
-        and settings.is_genesis_vault
-        and await v2_pool_escrow_contract.get_owner() != settings.vault
-    ):
-        logger.info(
-            'Waiting for vault to become owner of v2 pool escrow to start registering validators...'
-        )
-        return None
-
     harvest_params = await get_harvest_params()
     validators_count = await get_validators_count_from_vault_assets(harvest_params)
 

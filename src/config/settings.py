@@ -271,10 +271,6 @@ class Settings(metaclass=Singleton):
         return NETWORKS[self.network]
 
     @property
-    def is_genesis_vault(self) -> bool:
-        return self.vault == settings.network_config.GENESIS_VAULT_CONTRACT_ADDRESS
-
-    @property
     def need_deposit_data_file(self) -> bool:
         if self.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
             return True
