@@ -14,7 +14,7 @@ from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import VaultContract
 from src.common.execution import (
     build_gas_manager,
-    get_consolidation_request_fee,
+    get_execution_request_fee,
     get_protocol_config,
 )
 from src.common.logging import LOG_LEVELS, setup_logging
@@ -225,7 +225,7 @@ async def main(
             abort=True,
         )
 
-    current_fee = await get_consolidation_request_fee(
+    current_fee = await get_execution_request_fee(
         settings.network_config.CONSOLIDATION_CONTRACT_ADDRESS,
         block_number=await execution_client.eth.get_block_number(),
     )

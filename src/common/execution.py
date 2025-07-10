@@ -146,11 +146,9 @@ def build_gas_manager() -> GasManager:
     )
 
 
-async def get_consolidation_request_fee(
-    address: ChecksumAddress, block_number: BlockNumber
-) -> Gwei:
+async def get_execution_request_fee(address: ChecksumAddress, block_number: BlockNumber) -> Gwei:
     """
-    Retrieves the current fee for a consolidation transaction with an execution layer request.
+    Retrieves the current fee for an execution layer request.
     """
     tx_data: TxParams = {
         'to': address,

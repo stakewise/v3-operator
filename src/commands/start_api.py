@@ -135,6 +135,12 @@ AUTO = 'AUTO'
     help='Whether to submit vault harvest transactions. Default is false.',
 )
 @click.option(
+    '--disable-withdrawals',
+    is_flag=True,
+    envvar='DISABLE_WITHDRAWALS',
+    help='Whether to disable submit vault partial withdrawals. Default is false.',
+)
+@click.option(
     '--execution-endpoints',
     type=str,
     envvar='EXECUTION_ENDPOINTS',
@@ -209,6 +215,7 @@ def start_api(
     execution_endpoints: str,
     execution_jwt_secret: str | None,
     harvest_vault: bool,
+    disable_withdrawals: bool,
     verbose: bool,
     enable_metrics: bool,
     metrics_host: str,
@@ -251,6 +258,7 @@ def start_api(
         execution_endpoints=execution_endpoints,
         execution_jwt_secret=execution_jwt_secret,
         harvest_vault=harvest_vault,
+        disable_withdrawals=disable_withdrawals,
         verbose=verbose,
         enable_metrics=enable_metrics,
         metrics_host=metrics_host,

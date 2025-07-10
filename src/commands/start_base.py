@@ -24,6 +24,7 @@ from src.validators.relayer import RelayerAdapter, create_relayer_adapter
 from src.validators.tasks import ValidatorsTask, load_genesis_validators
 from src.validators.typings import ValidatorsRegistrationMode
 from src.validators.utils import load_public_keys
+from src.withdrawals.tasks import PartialWithdrawalsTask
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,8 @@ async def start_base() -> None:
             MetricsTask().run(interrupt_handler),
             WalletTask().run(interrupt_handler),
         ]
+        if not settings.disable_withdrawals:
+            tasks.append(PartialWithdrawalsTask().run(interrupt_handler))
         if settings.harvest_vault:
             tasks.append(HarvestTask().run(interrupt_handler))
 

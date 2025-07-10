@@ -40,6 +40,7 @@ class Settings(metaclass=Singleton):
     execution_jwt_secret: str | None
 
     harvest_vault: bool
+    disable_withdrawals: bool
     verbose: bool
     enable_metrics: bool
     metrics_host: str
@@ -107,6 +108,7 @@ class Settings(metaclass=Singleton):
         execution_endpoints: str = '',
         execution_jwt_secret: str | None = None,
         harvest_vault: bool = False,
+        disable_withdrawals: bool = False,
         verbose: bool = False,
         enable_metrics: bool = False,
         metrics_port: int = DEFAULT_METRICS_PORT,
@@ -146,6 +148,7 @@ class Settings(metaclass=Singleton):
         self.execution_endpoints = [node.strip() for node in execution_endpoints.split(',')]
         self.execution_jwt_secret = execution_jwt_secret
         self.harvest_vault = harvest_vault
+        self.disable_withdrawals = disable_withdrawals
         self.verbose = verbose
         self.enable_metrics = enable_metrics
         self.metrics_host = metrics_host
@@ -289,6 +292,10 @@ ORACLES_VALIDATORS_TIMEOUT: int = decouple_config(
 ORACLES_CONSOLIDATION_TIMEOUT: int = decouple_config(
     'ORACLES_CONSOLIDATION_TIMEOUT', default=10, cast=int
 )
+# partial withdrawals
+PARTIAL_WITHDRAWALS_INTERVAL: int = decouple_config(
+    'PARTIAL_WITHDRAWALS_INTERVAL', default=666, cast=int
+)
 # common
 MIN_ACTIVATION_BALANCE: Wei = Web3.to_wei(32, 'ether')
 MIN_ACTIVATION_BALANCE_GWEI: Gwei = Gwei(int(Web3.from_wei(MIN_ACTIVATION_BALANCE, 'gwei')))
@@ -299,6 +306,7 @@ MAX_EFFECTIVE_BALANCE_GWEI: Gwei = Gwei(int(Web3.from_wei(MAX_EFFECTIVE_BALANCE,
 MAX_CONSOLIDATION_REQUEST_FEE: Gwei = decouple_config(
     'MAX_CONSOLIDATION_REQUEST_FEE', default=10, cast=int
 )
+MAX_WITHDRAWAL_REQUEST_FEE = decouple_config('MAX_WITHDRAWAL_REQUEST_FEE', default=10, cast=int)
 
 # Backoff retries
 DEFAULT_RETRY_TIME = 60
