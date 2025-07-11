@@ -1,6 +1,6 @@
 import abc
 
-from eth_typing import BLSSignature, HexStr
+from eth_typing import BLSSignature, ChecksumAddress, HexStr
 from sw_utils.typings import ConsensusFork
 
 
@@ -26,6 +26,12 @@ class BaseKeystore(abc.ABC):
     async def get_exit_signature(
         self, validator_index: int, public_key: HexStr, fork: ConsensusFork | None = None
     ) -> BLSSignature:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    async def get_deposit_data(
+        self, public_key: HexStr, amount: int, vault_address: ChecksumAddress
+    ) -> dict:
         raise NotImplementedError
 
     @property

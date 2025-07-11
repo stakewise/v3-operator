@@ -15,17 +15,18 @@
    1. [Step 1. Create mnemonic](#step-1-create-mnemonic)
    2. [Step 2. Create validator keys](#step-2-create-validator-keys)
    3. [Step 3. Create hot wallet](#step-3-create-hot-wallet)
-   4. [Step 4. Upload deposit data file to Vault](#step-4-upload-deposit-data-file-to-vault)
+   4. [Step 4. Setup validators manager role](#step-4-setup-validators-manager-role)
    5. [Step 5. Start Operator Service](#step-5-start-operator-service)
 5. [Extra commands](#extra-commands)
    1. [Add validator keys to Vault](#add-validator-keys-to-vault)
    2. [Validators voluntary exit](#validators-voluntary-exit)
-   3. [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
-   4. [Merge deposit data files from multiple operators](#merge-deposit-data-files-from-multiple-operators)
+   3. [Validators consolidation](#validators-consolidation)
+   4. [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
    5. [Recover validator keystores](#recover-validator-keystores)
    6. [Max gas fee](#max-gas-fee)
    7. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
-   8. [Self report to Rated](#rated-self-report)
+   8. [Self report to Rated Network](#self-report-to-rated-network)
+   9. [Export validators file](#export-validators-file)
 6. [Contacts](#contacts)
 
 ## What is V3 Operator?
@@ -35,14 +36,14 @@ tasks:
 
 ### Validator registration
 
-The operator periodically checks whether Vault has accumulated enough assets for registering new validator(s) and sends
+The Operator periodically checks whether Vault has accumulated enough assets for registering new validator(s) and sends
 a registration transaction to the Vault.
 
 The validator registration process consists of the following steps:
 
 1. Check whether Vault has accumulated enough assets to register a validator (e.g., 32 ETH for Ethereum)
-2. Get the next free validator public key from the deposit data file attached to the operator. The validators are
-   registered in the same order as specified in the deposit data file.
+2. Get the next free validator public key from the `public_keys.txt` file attached to the Operator. The validators are
+   registered in the same order as specified in the `public_keys.txt` file.
 3. Obtain BLS signature for exit message using local keystores or remote signer.
 4. Share the exit signature of the validator with StakeWise Oracles:
    1. Using [Shamir's secret sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing), split
@@ -56,14 +57,14 @@ The validator registration process consists of the following steps:
 Exit signatures from the previous section can become invalid if the oracles' set changes. For example, if oracles'
 private key gets compromised, the DAO will have to propose an update of the oracles set that will trigger exit signature
 rotation.
-The operator periodically checks active validators of the Vault and if some exit signatures become outdated, the
-operator will submit a signature update transaction to the Vault.
+The Operator periodically checks active validators of the Vault and if some exit signatures become outdated, the
+Operator will submit a signature update transaction to the Vault.
 
 ### Vault state update (optional)
 
 The oracles periodically submit consensus rewards of all the vaults to the Keeper contract.
 By default, every vault pulls these updates on the user interaction with the vault (deposit, withdraw, etc.), but it
-also can be done by the vault operator by passing the `--harvest-vault` flag to the `start` command. Harvesting vault
+also can be done by the vault Operator by passing the `--harvest-vault` flag to the `start` command. Harvesting vault
 rewards simplifies calls to the vault contracts, e.g., you don't need to sync rewards before calling deposit.
 
 ## Prerequisites
@@ -119,7 +120,7 @@ use of flags is optional):
 ./operator COMMAND --flagA=123 --flagB=xyz
 ```
 
-Head to [Usage](#usage) to launch your operator service.
+Head to [Usage](#usage) to launch your Operator service.
 
 ### Install script (Linux and macOS)
 
@@ -147,11 +148,11 @@ You will execute Operator Service commands using the below format (note that the
 operator COMMAND --flagA=123 --flagB=xyz
 ```
 
-Head to [Usage](#usage) to launch your operator service.
+Head to [Usage](#usage) to launch your Operator service.
 
 ### Docker Image
 
-Pull the latest docker operator docker image:
+Pull the latest docker Operator docker image:
 
 ```bash
 docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.9
@@ -176,7 +177,7 @@ src/main.py COMMAND \
 --flagB=xyz
 ```
 
-Head to [Usage](#usage) to launch your operator service.
+Head to [Usage](#usage) to launch your Operator service.
 
 ### Source Files
 
@@ -198,7 +199,7 @@ use of flags is optional):
 PYTHONPATH=. poetry run python src/main.py COMMAND --flagA=123 --flagB=xyz
 ```
 
-Head to [Usage](#usage) to launch your operator service.
+Head to [Usage](#usage) to launch your Operator service.
 
 ### Kubernetes (advanced)
 
@@ -208,18 +209,13 @@ the [Kubernetes setup](https://docs.stakewise.io/for-operators/kubernetes-stakin
 
 ## Usage
 
-In order to run Operator Service, you must first create keystores and deposit data file for your Vault's validators, and
+To run the Operator Service, you must first create keystores and a file containing the list of available validator public keys for your Vault. You must also
 set up a hot wallet for Operator Service to handle validator registrations.
 
-Operator Service has in-built functionality to generate all of the above, or you are free to use your preferred methods
-of generating keystores and deposit data file, such as via [Wagyu Keygen](https://github.com/stake-house/wagyu-key-gen),
-and your preferred tool for generating the hot
-wallet, such as [MetaMask](https://metamask.io/)
-or [MyEtherWallet](https://help.myetherwallet.com/en/articles/6512619-using-mew-offline-current-mew-version-6).
-
-**Note, the deposit data file must be created using the Vault contract as the withdrawal address. You can find the Vault
-address either via the URL bar of your Vault page or in the "Contract address" field by scrolling to the "Details"
-section at the bottom of the Vault page.**
+The Operator Service includes built-in functionality to generate all of the above.
+Alternatively, you may use your preferred methods to generate keystores (e.g., [Wagyu Keygen](https://github.com/stake-house/wagyu-key-gen))
+and create the hot wallet (e.g., [MetaMask](https://metamask.io/) or [MyEtherWallet](https://help.myetherwallet.com/en/articles/6512619-using-mew-offline-current-mew-version-6)).
+If you choose to use your own methods, you will need to generate the public key file using the `export-public-keys` command.
 
 The below steps walk you through this set-up using Operator Service:
 
@@ -234,7 +230,6 @@ running Operator Service from binary, you would use:
 
 ```text
 Enter the network name (mainnet, hoodi, gnosis, chiado) [mainnet]:
-Enter your vault address: 0x3320a...68
 Choose your mnemonic language (chinese_simplified, chinese_traditional, czech, english, italian, korean, portuguese, spanish) [english]:
 This is your seed phrase. Write it down and store it safely, it is the ONLY way to recover your validator keys.
 
@@ -248,33 +243,30 @@ Please type your mnemonic (separated by spaces) to confirm you have written it d
 : pumpkin anxiety private salon inquiry ....
 
 done.
-Successfully initialized configuration for vault 0x3320a...68
+Successfully initialized configuration for StakeWise Operator
 ```
 
 ### Step 2. Create validator keys
 
-Next, run the `create-keys` command to kickstart the deposit data and validator keystores creation process, making sure
-you have your newly created mnemonic to hand:
+Next, run the `create-keys` command to derive validator keystores from the mnemonic:
 
 ```bash
 ./operator create-keys
 ```
 
 ```text
-Enter the vault address: 0x3320a...68
 Enter the number of the validator keys to generate: 10
 Enter the mnemonic for generating the validator keys: pumpkin anxiety private salon inquiry ....
 Creating validator keys:    [####################################]  10/10
-Generating deposit data JSON    [####################################]  10/10
 Exporting validator keystores    [####################################]  10/10
 
-Done. Generated 10 keys for 0x3320a...68 vault.
-Keystores saved to /home/user/.stakewise/0x3320a...68/keystores file
-Deposit data saved to /home/user/.stakewise/0x3320a...68/keystores/deposit_data.json file
+Done. Generated 10 keys for StakeWise Operator.
+Keystores saved to /home/user/.stakewise/keystores file
+Validator public keys saved to /home/user/.stakewise/validators.txt file
 ```
 
-You may not want the operator service to have direct access to the validator keys. Validator keystores do not need to be
-present directly in the operator. You can check
+You may not want the Operator service to have direct access to the validator keys. Validator keystores do not need to be
+present directly in the Operator. You can check
 the [remote signer](https://docs.stakewise.io/for-operators/operator-service/running-with-remote-signer)
 or [Hashicorp Vault](https://docs.stakewise.io/for-operators/operator-service/running-with-hashi-vault) guides on how to
 run Operator Service with them.
@@ -292,64 +284,28 @@ the one used to generate the validator keys, or a new mnemonic if you desire).
 ```
 
 ```text
-Enter the vault address: 0x3320a...68
 Enter the mnemonic for generating the wallet: pumpkin anxiety private salon inquiry ...
-Done. The wallet and password saved to /home/user/.stakewise/0x3320a...68/wallet directory. The wallet address is: 0x239B...e3Cc
+Done. The wallet and password saved to /home/user/.stakewise/wallet directory. The wallet address is: 0x239B...e3Cc
 ```
 
 **Note, you must send some ETH (xDAI for Gnosis) to the wallet for gas expenses. Each validator registration costs around
 0.01 ETH with 30 Gwei gas price. You must keep an eye on your wallet balance, otherwise validators will stop registering
 if the balance falls too low.**
 
-### Step 4. Upload deposit data file to Vault
+### Step 4. Setup validators manager role
 
-Once you have created your validator keys, deposit data file, and hot wallet, you need to upload the deposit data
-file to the Vault. This process connects your node to the Vault. Note, if there is more than one node operator in a
-Vault, you first need to merge all operator deposit data files into a single file (use
-the [merge-deposit-data](#merge-deposit-data-files-from-multiple-operators) command).
-Uploading the deposit data file can be achieved either through the StakeWise UI or via Operator Service and can only be
-done by
-the [Vault Admin or Keys Manager](https://docs-v3.stakewise.io/protocol-overview-in-depth/vaults#governance-and-management).
+You must assign the Validators Manager role to the wallet address created in the previous step.
+This setup can be completed via the StakeWise UI and must be performed by the [Vault Admin](https://docs-v3.stakewise.io/protocol-overview-in-depth/vaults#governance-and-management).
 
 #### StakeWise UI
 
 1. Connect with your wallet and head to the Operate page.
-2. Select the Vault you want to upload the deposit data file to.
-3. In the upper right corner, click on "Settings" and open the "Deposit Data" tab. The "Settings" button is only visible
-   to the Vault Admin or Keys Manager.
-4. Upload the deposit data file either by dragging and dropping the file, or clicking to choose the file via your file
-   browser.
-5. Click Save and a transaction will be created to sign using your wallet. The Vault's deposit data file will be
-   uploaded when the transaction is confirmed on the network.
-
-#### Operator Service
-
-If for some reason uploading deposit data using UI is not an option. You can calculate deposit data Merkle tree root
-with the
-following command:
-
-```bash
-./operator get-validators-root
-```
-
-```text
-Enter the vault address: 0xeEFFFD4C23D2E8c845870e273861e7d60Df49663
-The validator deposit data Merkle tree root: 0x50437ed72066c1a09ee85978f168ac7c58fbc9cd4beb7962c13e68e7faac26d7
-```
-
-Finally, upload the Merkle tree root to your Vault contract by calling `setValidatorsRoot`. Below shows the steps to do
-this via Etherscan, but the same can be achieved via CLI if you prefer (
-using [eth-cli](https://github.com/protofire/eth-cli) and `eth contract:send` for example). Note, the ABI of the
-contract can be found [here](https://github.com/stakewise/v3-core/blob/v1.0.0/abi/IVaultValidators.json).
-
-1. Head to your Vault's contract address page on Etherscan in your browser (e.g. replacing 0x000 with your Vault
-   contract address: `https://etherscan.io/address/0x000...`).
-2. Select the Contract tab and then Write as Proxy. If you don't have Write As Proxy option, click on the Code tab, then
-   More Options, Is this a Proxy?, Verify, Save. Now you should have Write As Proxy option.
-3. Connect your wallet to Etherscan (note this must be either the Vault Admin or Keys Manager).
-4. Find the `setValidatorsRoot` function and click to reveal the drop-down.
-5. Enter your Merkle tree root returned from the command and click Write.
-6. Confirm the transaction in your wallet to finalize the deposit data upload to your Vault.
+2. Select the Vault for which you want to change the validators manager role.
+3. In the upper right corner, click on "Settings" and open the "Roles" tab. The "Settings" button is only visible
+   to the Vault Admin or Validators Manager.
+4. Enter the wallet address in the "Validators manager" field.
+5. Click "Save" to create a transaction that you will need to sign with your wallet. The Validators Manager role will be
+   updated once the transaction is confirmed on the network.
 
 You are all set! Now it's time to run the Operator Service.
 
@@ -370,17 +326,15 @@ If you **did not** use Operator Service to generate validator keys, you will nee
   single `password.txt` password file for all the keystores or separate password files for each keystore with the same
   name as keystore, but ending with `.txt`. For example, `keystore1.json`, `keystore1.txt`, etc.
 
-If you **did not** use Operator Service to generate deposit data file, or you use combined deposit data file from
-multiple operators, you will need to add the following flag:
-
-- `--deposit-data-file` - Path to the deposit data file (Vault directory is default).
+To register a validator using the 0x01 (ETH1_ADDRESS_WITHDRAWAL_PREFIX) credential type,
+include the `--validator-type 0x01` flag in your command.
 
 #### Using binary
 
-You can start the operator service using binary with the following command:
+You can start the Operator service using binary with the following command:
 
 ```bash
-./operator start --vault=0x000... --consensus-endpoints=http://localhost:5052 --execution-endpoints=http://localhost:8545
+./operator start --vaults=0x000...,0x111... --consensus-endpoints=http://localhost:5052 --execution-endpoints=http://localhost:8545
 ```
 
 #### Using docker
@@ -395,7 +349,7 @@ docker run --restart on-failure:10 \
 -v ~/.stakewise/:/data \
 europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.9 \
 src/main.py start \
---vault=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
+--vaults=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
 --data-dir=/data \
 --consensus-endpoints=http://localhost:5052 \
 --execution-endpoints=http://localhost:8545
@@ -405,7 +359,7 @@ src/main.py start \
 
 ```bash
 PYTHONPATH=. poetry run python src/main.py start \
---vault=0x000... \
+--vaults=0x000... \
 --consensus-endpoints=http://localhost:5052 \
 --execution-endpoints=http://localhost:8545
 ```
@@ -418,19 +372,16 @@ within your Vault!**
 Operator Service has many different commands that are not mandatory but might come in handy:
 
 - [Validators voluntary exit](#validators-voluntary-exit)
-- [Update Vault state (Harvest Vault)](#vault-state-update-optional)
+- [Validators consolidation](#validators-consolidation)
+- [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
 - [Add validator keys to Vault](#add-validator-keys-to-vault)
-- [Merge deposit data files from multiple operators](#merge-deposit-data-files-from-multiple-operators)
 - [Recover validator keystores](#recover-validator-keystores)
-- [Self report to Rated](#rated-self-report)
+- [Self report to Rated Network](#self-report-to-rated-network)
 
 ### Add validator keys to Vault
 
-You can always add more validator keys to your Vault. For that, you need to generate new validator keys and deposit data
-as described in [Step 2. Create validator keys](#step-2-create-validator-keys) and upload the deposit data file to your
-Vault as described in [Step 3. Upload deposit data file to Vault](#step-4-upload-deposit-data-file-to-vault). Note,
-uploading a new deposit data file will overwrite the existing file and consequently overwrite previously un-used
-validator keys. It can be done at any point, but only by the Vault Admin or Keys Manager.
+You can always add more validator keys to your Vault. For that, you need to generate new validator keys
+as described in [Step 2. Create validator keys](#step-2-create-validator-keys).
 
 ### Validators voluntary exit
 
@@ -450,6 +401,42 @@ Are you sure you want to exit 3 validators with indexes: 513571, 513572, 513861?
 Validators 513571, 513572, 513861 exits successfully initiated
 ```
 
+### Validators consolidation
+
+Converts 0x01 validators to compound validators (0x02) using the consolidate command.
+The wallet executing this command must be set as the Validators Manager in the vault settings.
+
+- Specify `--source-public-keys` and `--target-public-key` parameters to consolidate selected validators.
+
+```bash
+./operator consolidate --vault=0x000...  --source-public-keys=0x001,0x002 --target-public-key=0x003
+Enter comma separated list of API endpoints for execution nodes: : https://example.com
+Enter the comma separated list of API endpoints for consensus nodes: https://example.com
+Enter your vault address: 0x3320ad928c20187602a2b2c04eeaa813fa899468
+Consolidating 2 validators:
+    0x001 -> 0x003
+    0x002 -> 0x003
+Proceed consolidation? [Y/n]: y
+Fetched signatures for validator consolidation: Received 11 out of 11 approvals
+Submitting consolidate validators transaction
+Waiting for transaction 0x00000... confirmation
+Validators has been successfully consolidated
+```
+
+- More convenient way to consolidate multiple validators is to specify `--source-public-keys-file` parameter with path to a file containing validator public keys.
+
+```bash
+./operator consolidate --vault=0x000...  --source-public-keys-file=public_keys.txt --target-public-key=0x003
+...
+```
+
+- `--target-public-key` is a target validator public key to which the source validators will be consolidated. It must be a compounding validator. If you want to convert 0x01 validators to 0x02 compound validators, you can use the `consolidate` with same key in `--source-public-keys` and `--target-public-key` parameters.
+
+```bash
+./operator consolidate --vault=0x000...  --source-public-keys=0x001 --target-public-key=0x001
+...
+```
+
 ### Update Vault state (Harvest Vault)
 
 Updating the _Vault state_ distributes the Vault fee to the Vault fee address and updates each staker's position. If an
@@ -457,20 +444,12 @@ ERC-20 token was chosen during Vault creation, the Vault specific ERC-20 reprice
 the previous update and the Vault fees are distributed in newly minted ERC-20 tokens.
 
 By default, each _Vault state_ gets updated whenever a user interacts with the Vault (deposit, withdraw, etc.), with a
-12 hours cooldown. Vault state can also be updated by the Vault operator(s) by passing the `--harvest-vault` flag to the
+12 hours cooldown. Vault state can also be updated by the Vault Operator(s) by passing the `--harvest-vault` flag to the
 Operator Service `start` command. Harvest occurs every 12 hours and the gas fees are paid by the hot wallet linked to
 the Operator Service.
 
 Harvesting the Vault rewards simplifies the contract calls to the Vault contract and reduces the gas fees for stakers,
 for example, the Vault does not need to sync rewards before calling deposit when a user stakes.
-
-### Merge deposit data files from multiple operators
-
-You can use the following command to merge deposit data file:
-
-```bash
-./operator merge-deposit-data
-```
 
 ### Recover validator keystores
 
@@ -508,14 +487,14 @@ cores.
 Setting `--pool-size` to (number of CPU cores) / 2 is a safe way to ensure that Operator Service does not take up too
 much CPU load and impact node performance during the creation and loading of keystores.
 
-### Rated self report
+### Self report to Rated Network
 
 This command allows you to self-report your validator keys to the Rated Network, ensuring that your validator set is tracked and updated on the Rated Explorer.
 
 To use the `rated-self-report` command, you will need to provide the following parameters:
 
 - `--data-dir`: Path where the vault data will be placed. Default is ~/.stakewise.
-- `--vault`: The vault address.
+- `--vaults`:  The comma separated list of your vault addresses.
 - `--network`: The network of your vault (e.g., mainnet, hoodi).
 - `--pool-tag`: The pool name listed on the Explorer (optional).
 - `--token`: OAuth token for authorization.
@@ -523,7 +502,22 @@ To use the `rated-self-report` command, you will need to provide the following p
 Here's an example of how to use the command:
 
 ```bash
-python src/main.py rated-self-report --vault <your-vault-address> --network <network-name> --pool-tag <pool-tag> --token <your-oauth-token> --data-dir <path-to-data-dir>
+python src/main.py rated-self-report --vaults <your-vault-addresses> --network <network-name> --pool-tag <pool-tag> --token <your-oauth-token> --data-dir <path-to-data-dir>
+```
+
+### Export validators file
+
+This command fetches available public keys from local keystores and exports them to a validators.txt file.
+
+To use the `export-public-keys` command, you can provide the following parameters:
+
+- `--data-dir`: Path where the vault data will be placed. Default is ~/.stakewise.
+- `--keystores-dir` - The directory with validator keys in the EIP-2335 standard.
+
+Here's an example of how to use the command:
+
+```bash
+python src/main.py export-public-keys --data-dir <path-to-data-dir>
 ```
 
 ## Contacts

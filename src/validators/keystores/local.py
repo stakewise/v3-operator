@@ -7,12 +7,14 @@ from pathlib import Path
 from typing import NewType
 
 import milagro_bls_binding as bls
-from eth_typing import BLSSignature, HexStr
+from eth_typing import BLSPrivateKey, BLSSignature, ChecksumAddress, HexStr
+from eth_utils import add_0x_prefix
 from staking_deposit.key_handling.keystore import ScryptKeystore
 from sw_utils.signing import get_exit_message_signing_root
 from sw_utils.typings import ConsensusFork
 from web3 import Web3
 
+from src.common.credentials import CredentialManager
 from src.config.settings import settings
 from src.validators.exceptions import KeystoreException
 from src.validators.keystores.base import BaseKeystore
@@ -77,6 +79,19 @@ class LocalKeystore(BaseKeystore):
     def __len__(self) -> int:
         return len(self.keys)
 
+    async def get_deposit_data(
+        self, public_key: HexStr, amount: int, vault_address: ChecksumAddress
+    ) -> dict:
+        private_key = self.keys[public_key]
+        credential = CredentialManager.load_credential(
+            network=settings.network,
+            private_key=BLSPrivateKey(Web3.to_int(private_key)),
+            vault=vault_address,
+            validator_type=settings.validator_type,
+        )
+
+        return credential.get_deposit_datum_dict(amount)
+
     async def get_exit_signature(
         self, validator_index: int, public_key: HexStr, fork: ConsensusFork | None = None
     ) -> BLSSignature:
@@ -97,6 +112,17 @@ class LocalKeystore(BaseKeystore):
         return list(self.keys.keys())
 
     @staticmethod
+    def get_public_keys_from_keystore_files() -> list[HexStr]:
+        """Returns a list of public keys from the keystore files."""
+        keystore_files = LocalKeystore.list_keystore_files()
+        keys = [
+            LocalKeystore._read_keystore_file(keystore_file, settings.keystores_dir)
+            for keystore_file in keystore_files
+        ]
+        keys.sort(key=lambda x: x[0])
+        return [x[1] for x in keys]
+
+    @staticmethod
     def list_keystore_files() -> list[KeystoreFile]:
         keystores_dir = settings.keystores_dir
         keystores_password_dir = settings.keystores_password_dir
@@ -115,6 +141,18 @@ class LocalKeystore(BaseKeystore):
             res.append(KeystoreFile(name=f, password=password, password_file=password_file))
 
         return res
+
+    @staticmethod
+    def _read_keystore_file(keystore_file: KeystoreFile, keystore_path: Path) -> tuple[int, HexStr]:
+        """Light keystore reading. Return tuple of keystore index and public key."""
+        file_name = keystore_file.name
+        file_path = keystore_path / file_name
+        try:
+            keystore = ScryptKeystore.from_file(file_path)
+            index = keystore.path.split('/')[-3]
+            return int(index), add_0x_prefix(HexStr(keystore.pubkey))
+        except BaseException as e:
+            raise KeystoreException(f'Invalid keystore format in file "{file_name}"') from e
 
     @staticmethod
     def _process_keystore_file(

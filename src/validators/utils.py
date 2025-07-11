@@ -1,29 +1,33 @@
 import asyncio
 import dataclasses
-import json
 import logging
 import random
 from pathlib import Path
+from typing import Sequence
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
-from eth_typing import ChecksumAddress, HexAddress
-from eth_utils import add_0x_prefix
-from multiproof import StandardMerkleTree
-from sw_utils import ProtocolConfig, get_v1_withdrawal_credentials
+from eth_typing import ChecksumAddress, HexAddress, HexStr
+from sw_utils import (
+    ProtocolConfig,
+    get_v1_withdrawal_credentials,
+    get_v2_withdrawal_credentials,
+)
+from sw_utils.typings import Bytes32
 from web3 import Web3
+from web3.types import Gwei
 
 from src.common.contracts import validators_registry_contract
-from src.common.typings import OracleApproval, OraclesApproval
+from src.common.typings import OracleApproval, OraclesApproval, ValidatorType
 from src.common.utils import format_error, process_oracles_approvals, warning_verbose
-from src.config.settings import ORACLES_VALIDATORS_TIMEOUT
+from src.config.settings import ORACLES_VALIDATORS_TIMEOUT, settings
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import (
     RegistryRootChangedError,
     ValidatorIndexChangedError,
 )
 from src.validators.execution import get_latest_network_validator_public_keys
-from src.validators.signing.common import encode_tx_validator
-from src.validators.typings import ApprovalRequest, DepositData, Validator
+from src.validators.keystores.base import BaseKeystore
+from src.validators.typings import ApprovalRequest, Validator
 
 logger = logging.getLogger(__name__)
 
@@ -131,31 +135,92 @@ async def send_approval_request(
     )
 
 
-def load_deposit_data(vault: HexAddress, deposit_data_file: Path) -> DepositData:
-    """Loads and verifies deposit data."""
-    with open(deposit_data_file, 'r', encoding='utf-8') as f:
-        deposit_data = json.load(f)
-
-    tree, validators = generate_validators_tree(vault, deposit_data)
-    return DepositData(validators=validators, tree=tree)
-
-
-def generate_validators_tree(
-    vault: HexAddress, deposit_data: list[dict]
-) -> tuple[StandardMerkleTree, list[Validator]]:
-    """Generates validators tree."""
-    credentials = get_v1_withdrawal_credentials(vault)
-    leaves: list[tuple[bytes, int]] = []
-    validators: list[Validator] = []
-    for i, data in enumerate(deposit_data):
-        validator = Validator(
-            deposit_data_index=i,
-            public_key=add_0x_prefix(data['pubkey']),
-            signature=add_0x_prefix(data['signature']),
-            amount_gwei=int(data['amount']),
+async def get_registered_validators(
+    keystore: BaseKeystore,
+    amounts: list[Gwei],
+    vault_address: ChecksumAddress,
+    available_public_keys: list[HexStr],
+) -> Sequence[Validator]:
+    """Returns list of available validators for registration."""
+    available_public_keys = await filter_nonregistered_public_keys(
+        available_public_keys=available_public_keys,
+        count=len(amounts),
+    )
+    validators = []
+    for amount, public_key in zip(amounts, available_public_keys):
+        deposit_data = await keystore.get_deposit_data(
+            public_key=public_key, amount=amount, vault_address=vault_address
         )
-        leaves.append((encode_tx_validator(credentials, validator), i))
-        validators.append(validator)
+        validators.append(
+            Validator(
+                public_key=Web3.to_hex(deposit_data['pubkey']),
+                signature=Web3.to_hex(deposit_data['signature']),
+                amount=Gwei(int(deposit_data['amount'])),
+                deposit_data_root=Web3.to_hex(deposit_data['deposit_data_root']),
+            )
+        )
 
-    tree = StandardMerkleTree.of(leaves, ['bytes', 'uint256'])
-    return tree, validators
+    return validators
+
+
+async def get_funded_validators(
+    keystore: BaseKeystore,
+    funding_amounts: dict[HexStr, Gwei],
+    vault_address: ChecksumAddress,
+) -> list[Validator]:
+    validators = []
+    for public_key, amount in funding_amounts.items():
+        if public_key not in keystore:
+            raise RuntimeError(f'Public key {public_key} not found in keystore')
+        deposit_data = await keystore.get_deposit_data(
+            public_key=public_key, amount=amount, vault_address=vault_address
+        )
+        validators.append(
+            Validator(
+                public_key=Web3.to_hex(deposit_data['pubkey']),
+                signature=Web3.to_hex(deposit_data['signature']),
+                amount=amount,
+                deposit_data_root=Web3.to_hex(deposit_data['deposit_data_root']),
+            )
+        )
+    return validators
+
+
+async def filter_nonregistered_public_keys(
+    available_public_keys: list[HexStr],
+    count: int,
+) -> list[HexStr]:
+    public_keys: list[HexStr] = []
+    latest_network_validator_public_keys = await get_latest_network_validator_public_keys()
+    for public_key in available_public_keys:
+        if NetworkValidatorCrud().is_validator_registered(public_key):
+            continue
+        if public_key in latest_network_validator_public_keys:
+            continue
+        public_keys.append(public_key)
+        if len(public_keys) >= count:
+            break
+
+    return public_keys
+
+
+def load_public_keys(public_keys_file: Path) -> list[HexStr]:
+    """Loads available public keys from file."""
+    with open(public_keys_file, 'r', encoding='utf-8') as f:
+        public_keys = [HexStr(line.rstrip()) for line in f]
+
+    return public_keys
+
+
+def save_public_keys(filename: Path, public_keys: list[HexStr]) -> None:
+    filename.parent.mkdir(parents=True, exist_ok=True)
+    with open(filename, 'w', encoding='utf-8') as f:
+        for public_key in public_keys:
+            f.write(f'{public_key}\n')
+
+
+def get_withdrawal_credentials(vault_address: HexAddress) -> Bytes32:
+    """Returns withdrawal credentials based on the vault address and validator type."""
+    if settings.validator_type == ValidatorType.V1:
+        return get_v1_withdrawal_credentials(vault_address)
+    return get_v2_withdrawal_credentials(vault_address)

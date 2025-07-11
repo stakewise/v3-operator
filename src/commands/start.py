@@ -5,18 +5,23 @@ from pathlib import Path
 
 import click
 from eth_typing import ChecksumAddress
+from web3.types import Gwei
 
 from src.commands.start_base import start_base
 from src.common.logging import LOG_LEVELS
+from src.common.migrate import migrate_to_multivault
+from src.common.typings import ValidatorType
 from src.common.utils import log_verbose
-from src.common.validators import validate_eth_address
-from src.common.vault_config import VaultConfig
+from src.common.validators import validate_eth_addresses, validate_min_deposit_amount
+from src.config.config import OperatorConfig, OperatorConfigException
 from src.config.networks import AVAILABLE_NETWORKS, GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
     DEFAULT_HASHI_VAULT_PARALLELISM,
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
     DEFAULT_METRICS_PREFIX,
+    DEFAULT_MIN_DEPOSIT_AMOUNT,
+    DEFAULT_MIN_VALIDATORS_REGISTRATION,
     LOG_FORMATS,
     LOG_PLAIN,
     settings,
@@ -29,7 +34,7 @@ logger = logging.getLogger(__name__)
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
     envvar='DATA_DIR',
-    help='Path where the vault data will be placed. Default is ~/.stakewise.',
+    help='Path where the keystores and config data will be placed. Default is ~/.stakewise.',
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
 )
 @click.option(
@@ -37,7 +42,7 @@ logger = logging.getLogger(__name__)
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
     envvar='DATABASE_DIR',
     help='The directory where the database will be created or read from. '
-    'Default is ~/.stakewise/<vault>.',
+    'Default is ~/.stakewise/.',
 )
 @click.option(
     '--max-fee-per-gas-gwei',
@@ -76,13 +81,6 @@ logger = logging.getLogger(__name__)
     'Default is the directory generated with "create-keys" command.',
 )
 @click.option(
-    '--deposit-data-file',
-    type=click.Path(exists=True, file_okay=True, dir_okay=False),
-    envvar='DEPOSIT_DATA_FILE',
-    help='Path to the deposit_data.json file. '
-    'Default is the file generated with "create-keys" command.',
-)
-@click.option(
     '--network',
     type=click.Choice(
         AVAILABLE_NETWORKS,
@@ -119,6 +117,16 @@ logger = logging.getLogger(__name__)
     default=DEFAULT_METRICS_PORT,
 )
 @click.option(
+    '--validator-type',
+    help=f'Type of registered validators: {ValidatorType.V1.value} or {ValidatorType.V2.value}.',
+    envvar='VALIDATOR_TYPE',
+    default=ValidatorType.V2,
+    type=click.Choice(
+        ValidatorType,
+        case_sensitive=False,
+    ),
+)
+@click.option(
     '-v',
     '--verbose',
     help='Enable debug mode. Default is false.',
@@ -153,12 +161,12 @@ logger = logging.getLogger(__name__)
     help='Comma separated list of API endpoints for consensus nodes.',
 )
 @click.option(
-    '--vault',
+    '--vaults',
     type=ChecksumAddress,
-    callback=validate_eth_address,
+    callback=validate_eth_addresses,
     envvar='VAULT',
-    prompt='Enter the vault address',
-    help='Address of the vault to register validators for.',
+    prompt='Enter comma separated list of your vault addresses',
+    help='Addresses of the vaults to register validators for.',
 )
 @click.option(
     '--remote-signer-url',
@@ -225,12 +233,26 @@ logger = logging.getLogger(__name__)
     type=int,
     envvar='MIN_VALIDATORS_REGISTRATION',
     help='Minimum number of validators required to start registration.',
-    default=1,
+    default=DEFAULT_MIN_VALIDATORS_REGISTRATION,
+)
+@click.option(
+    '--min-deposit-amount-gwei',
+    type=int,
+    envvar='MIN_DEPOSIT_AMOUNT_GWEI',
+    help='Minimum amount in gwei to deposit into validator.',
+    default=DEFAULT_MIN_DEPOSIT_AMOUNT,
+    callback=validate_min_deposit_amount,
+)
+@click.option(
+    '--no-confirm',
+    is_flag=True,
+    default=False,
+    help='Skips confirmation messages when provided.',
 )
 @click.command(help='Start operator service')
 # pylint: disable-next=too-many-arguments,too-many-locals
 def start(
-    vault: ChecksumAddress,
+    vaults: list[ChecksumAddress],
     consensus_endpoints: str,
     execution_endpoints: str,
     execution_jwt_secret: str | None,
@@ -240,11 +262,11 @@ def start(
     metrics_host: str,
     metrics_port: int,
     metrics_prefix: str,
+    validator_type: ValidatorType,
     data_dir: str,
     log_level: str,
     log_format: str,
     network: str | None,
-    deposit_data_file: str | None,
     keystores_dir: str | None,
     keystores_password_file: str | None,
     remote_signer_url: str | None,
@@ -259,15 +281,39 @@ def start(
     database_dir: str | None,
     pool_size: int | None,
     min_validators_registration: int,
+    min_deposit_amount_gwei: int,
+    no_confirm: bool,
 ) -> None:
-    vault_config = VaultConfig(vault, Path(data_dir))
-    if network is None:
-        vault_config.load()
-        network = vault_config.network
+
+    # migrate
+    try:
+        operator_config = OperatorConfig(Path(data_dir))
+        operator_config.load(network=network)
+    except OperatorConfigException as e:
+        if not e.can_be_migrated:
+            raise click.ClickException(str(e))
+
+        # trying to migrate from single vault setup to multivault
+        vault = vaults[0].lower()
+        root_dir = Path(data_dir)
+        vault_dir = root_dir / vault
+        if Path(vault_dir).exists() and not (root_dir / 'config.json').exists():
+            if not no_confirm:
+                click.confirm(
+                    f'There is vault directory {vault_dir} already. '
+                    'Do you want to migrate to multivault setup?',
+                    default=True,
+                )
+            migrate_to_multivault(
+                vault_dir=vault_dir,
+                root_dir=root_dir,
+            )
+        operator_config = OperatorConfig(Path(data_dir))
+        operator_config.load()
 
     settings.set(
-        vault=vault,
-        vault_dir=vault_config.vault_dir,
+        vaults=vaults,
+        data_dir=operator_config.data_dir,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
         execution_jwt_secret=execution_jwt_secret,
@@ -277,8 +323,8 @@ def start(
         metrics_host=metrics_host,
         metrics_port=metrics_port,
         metrics_prefix=metrics_prefix,
-        network=network,
-        deposit_data_file=deposit_data_file,
+        network=operator_config.network,
+        validator_type=validator_type,
         keystores_dir=keystores_dir,
         keystores_password_file=keystores_password_file,
         remote_signer_url=remote_signer_url,
@@ -295,6 +341,7 @@ def start(
         log_format=log_format,
         pool_size=pool_size,
         min_validators_registration=min_validators_registration,
+        min_deposit_amount=Gwei(min_deposit_amount_gwei),
     )
 
     try:

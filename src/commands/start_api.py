@@ -5,17 +5,20 @@ from pathlib import Path
 
 import click
 from eth_typing import ChecksumAddress
+from web3.types import Gwei
 
 from src.commands.start_base import start_base
 from src.common.logging import LOG_LEVELS
+from src.common.typings import ValidatorType
 from src.common.utils import log_verbose
-from src.common.validators import validate_eth_address
-from src.common.vault_config import VaultConfig
+from src.common.validators import validate_eth_addresses
+from src.config.config import OperatorConfig, OperatorConfigException
 from src.config.networks import AVAILABLE_NETWORKS, GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
     DEFAULT_METRICS_PREFIX,
+    DEFAULT_MIN_DEPOSIT_AMOUNT,
     LOG_FORMATS,
     LOG_PLAIN,
     settings,
@@ -33,7 +36,7 @@ AUTO = 'AUTO'
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
     envvar='DATA_DIR',
-    help='Path where the vault data will be placed. Default is ~/.stakewise.',
+    help='Path where the keystores and config data will be placed. Default is ~/.stakewise.',
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
 )
 @click.option(
@@ -41,7 +44,7 @@ AUTO = 'AUTO'
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
     envvar='DATABASE_DIR',
     help='The directory where the database will be created or read from. '
-    'Default is ~/.stakewise/<vault>.',
+    'Default is ~/.stakewise/.',
 )
 @click.option(
     '--max-fee-per-gas-gwei',
@@ -64,13 +67,6 @@ AUTO = 'AUTO'
     envvar='HOT_WALLET_FILE',
     help='Absolute path to the hot wallet. '
     'Default is the file generated with "create-wallet" command.',
-)
-@click.option(
-    '--deposit-data-file',
-    type=click.Path(exists=True, file_okay=True, dir_okay=False),
-    envvar='DEPOSIT_DATA_FILE',
-    help='Path to the deposit_data.json file. '
-    'Default is the file generated with "create-keys" command.',
 )
 @click.option(
     '--network',
@@ -109,6 +105,23 @@ AUTO = 'AUTO'
     default=DEFAULT_METRICS_PREFIX,
 )
 @click.option(
+    '--validator-type',
+    help=f'Type of registered validators: {ValidatorType.V1.value} or {ValidatorType.V2.value}.',
+    envvar='VALIDATOR_TYPE',
+    default=ValidatorType.V2,
+    type=click.Choice(
+        ValidatorType,
+        case_sensitive=False,
+    ),
+)
+@click.option(
+    '--min-deposit-amount-gwei',
+    type=int,
+    envvar='MIN_DEPOSIT_AMOUNT_GWEI',
+    help='Minimum amount in gwei to deposit into validator.',
+    default=DEFAULT_MIN_DEPOSIT_AMOUNT,
+)
+@click.option(
     '-v',
     '--verbose',
     help='Enable debug mode. Default is false.',
@@ -143,12 +156,12 @@ AUTO = 'AUTO'
     help='Comma separated list of API endpoints for consensus nodes.',
 )
 @click.option(
-    '--vault',
+    '--vaults',
     type=ChecksumAddress,
-    callback=validate_eth_address,
-    envvar='VAULT',
-    prompt='Enter the vault address',
-    help='Address of the vault to register validators for.',
+    callback=validate_eth_addresses,
+    envvar='VAULTS',
+    prompt='Enter comma separated list of your vault addresses',
+    help='Addresses of the vaults to register validators for.',
 )
 @click.option(
     '--log-format',
@@ -191,7 +204,7 @@ AUTO = 'AUTO'
 @click.command(help='Start operator service')
 # pylint: disable-next=too-many-arguments,too-many-locals
 def start_api(
-    vault: ChecksumAddress,
+    vaults: list[ChecksumAddress],
     consensus_endpoints: str,
     execution_endpoints: str,
     execution_jwt_secret: str | None,
@@ -201,11 +214,12 @@ def start_api(
     metrics_host: str,
     metrics_port: int,
     metrics_prefix: str,
+    validator_type: ValidatorType,
+    min_deposit_amount_gwei: int,
     data_dir: str,
     log_level: str,
     log_format: str,
     network: str | None,
-    deposit_data_file: str | None,
     hot_wallet_file: str | None,
     hot_wallet_password_file: str | None,
     max_fee_per_gas_gwei: int | None,
@@ -213,10 +227,13 @@ def start_api(
     relayer_type: str,
     relayer_endpoint: str,
 ) -> None:
-    vault_config = VaultConfig(vault, Path(data_dir))
+    operator_config = OperatorConfig(Path(data_dir))
     if network is None:
-        vault_config.load()
-        network = vault_config.network
+        try:
+            operator_config.load(network=network)
+        except OperatorConfigException as e:
+            raise click.ClickException(str(e))
+        network = operator_config.network
 
     if relayer_endpoint == AUTO and relayer_type == RelayerTypes.DVT:
         network_config = NETWORKS[network]
@@ -228,8 +245,8 @@ def start_api(
     validators_registration_mode = ValidatorsRegistrationMode.API
 
     settings.set(
-        vault=vault,
-        vault_dir=vault_config.vault_dir,
+        vaults=vaults,
+        data_dir=operator_config.data_dir,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
         execution_jwt_secret=execution_jwt_secret,
@@ -239,8 +256,8 @@ def start_api(
         metrics_host=metrics_host,
         metrics_port=metrics_port,
         metrics_prefix=metrics_prefix,
+        validator_type=validator_type,
         network=network,
-        deposit_data_file=deposit_data_file,
         hot_wallet_file=hot_wallet_file,
         hot_wallet_password_file=hot_wallet_password_file,
         max_fee_per_gas_gwei=max_fee_per_gas_gwei,
@@ -250,6 +267,7 @@ def start_api(
         relayer_type=relayer_type,
         relayer_endpoint=relayer_endpoint,
         validators_registration_mode=validators_registration_mode,
+        min_deposit_amount=Gwei(min_deposit_amount_gwei),
     )
 
     try:

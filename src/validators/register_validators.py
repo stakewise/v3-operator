@@ -2,23 +2,17 @@ import logging
 from typing import Sequence
 
 from eth_typing import ChecksumAddress, HexStr
-from multiproof import MultiProof
 from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.exceptions import ContractLogicError
+from web3.types import Gwei
 
 from src.common.clients import execution_client
-from src.common.contracts import (
-    deposit_data_registry_contract,
-    multicall_contract,
-    vault_contract,
-    vault_v1_contract,
-)
-from src.common.execution import build_gas_manager
+from src.common.contracts import VaultContract
+from src.common.execution import build_gas_manager, transaction_gas_wrapper
 from src.common.typings import HarvestParams, OraclesApproval
 from src.common.utils import format_error
 from src.config.settings import settings
-from src.harvest.execution import get_update_state_calls
 from src.validators.signing.common import encode_tx_validator_list
 from src.validators.typings import Validator
 
@@ -27,19 +21,24 @@ logger = logging.getLogger(__name__)
 
 # pylint: disable=too-many-arguments,too-many-locals
 async def register_validators(
+    vault_address: ChecksumAddress,
     approval: OraclesApproval,
-    multi_proof: MultiProof | None,
     validators: Sequence[Validator],
     harvest_params: HarvestParams | None,
     validators_registry_root: Bytes32,
-    validators_manager_signature: HexStr | None,
+    validators_manager_signature: HexStr,
 ) -> HexStr | None:
     tx_validators = [
-        Web3.to_bytes(tx_validator) for tx_validator in encode_tx_validator_list(validators)
+        Web3.to_bytes(tx_validator)
+        for tx_validator in encode_tx_validator_list(
+            validators=validators,
+            vault_address=vault_address,
+        )
     ]
+    vault_contract = VaultContract(vault_address)
     if harvest_params is not None:
         # add update state calls before validator registration
-        calls = await get_update_state_calls(harvest_params)
+        calls = [vault_contract.get_update_state_call(harvest_params)]
     else:
         # aggregate all the calls into one multicall
         calls = []
@@ -53,27 +52,16 @@ async def register_validators(
     )
 
     # add validators registration call
-    vault_version = await vault_contract.version()
-    if len(tx_validators) == 1:
-        validators_registration_call = _get_single_validator_registration_call(
-            vault_version=vault_version,
-            keeper_approval_params=keeper_approval_params,
-            multi_proof=multi_proof,
-            validators_manager_signature=validators_manager_signature,
+    calls.append(
+        vault_contract.encode_abi(
+            fn_name='registerValidators',
+            args=[keeper_approval_params, validators_manager_signature],
         )
-    else:
-        validators_registration_call = _get_multiple_validators_registration_call(
-            vault_version=vault_version,
-            keeper_approval_params=keeper_approval_params,
-            multi_proof=multi_proof,
-            validators_manager_signature=validators_manager_signature,
-        )
-
-    calls.append(validators_registration_call)
+    )
 
     logger.info('Submitting registration transaction')
     try:
-        await multicall_contract.functions.aggregate(calls).estimate_gas()
+        await vault_contract.functions.multicall(calls).estimate_gas()
     except (ValueError, ContractLogicError) as e:
         logger.error(
             'Failed to register validator(s): %s. '
@@ -87,7 +75,7 @@ async def register_validators(
     try:
         gas_manager = build_gas_manager()
         tx_params = await gas_manager.get_high_priority_tx_params()
-        tx = await multicall_contract.functions.aggregate(calls).transact(tx_params)
+        tx = await vault_contract.functions.multicall(calls).transact(tx_params)
     except Exception as e:
         logger.error('Failed to register validator(s): %s', format_error(e))
         if settings.verbose:
@@ -106,76 +94,76 @@ async def register_validators(
     return tx_hash
 
 
-def _get_single_validator_registration_call(
-    vault_version: int,
-    keeper_approval_params: tuple,
-    multi_proof: MultiProof | None,
-    validators_manager_signature: HexStr | None,
-) -> tuple[ChecksumAddress, HexStr]:
-    if validators_manager_signature:
-        return vault_contract.address, vault_contract.encode_abi(
-            fn_name='registerValidators',
-            args=[keeper_approval_params, Web3.to_bytes(hexstr=validators_manager_signature)],
+async def fund_validators(
+    vault_address: ChecksumAddress,
+    validators: list[Validator],
+    validators_manager_signature: HexStr,
+    harvest_params: HarvestParams | None,
+) -> HexStr | None:
+    tx_validators = [
+        Web3.to_bytes(tx_validator)
+        for tx_validator in encode_tx_validator_list(
+            validators=validators,
+            vault_address=vault_address,
         )
-
-    if multi_proof is None:
-        raise RuntimeError('multi_proof required')
-
-    if vault_version == 1:
-        return vault_v1_contract.address, vault_v1_contract.encode_abi(
-            fn_name='registerValidator', args=[keeper_approval_params, multi_proof.proof]
-        )
-
-    return deposit_data_registry_contract.address, deposit_data_registry_contract.encode_abi(
-        fn_name='registerValidator',
-        args=[settings.vault, keeper_approval_params, multi_proof.proof],
+    ]
+    calls = []
+    vault_contract = VaultContract(vault_address)
+    if harvest_params is not None:
+        # add update state calls before validator funding
+        calls.append(vault_contract.get_update_state_call(harvest_params))
+    fund_validators_call = vault_contract.encode_abi(
+        fn_name='fundValidators',
+        args=[b''.join(tx_validators), validators_manager_signature],
     )
+    calls.append(fund_validators_call)
 
+    logger.info('Submitting fund validators transaction')
+    try:
+        tx_function = vault_contract.functions.multicall(calls)
+        tx = await transaction_gas_wrapper(tx_function=tx_function)
+    except Exception as e:
+        logger.error('Failed to fund validator(s): %s', format_error(e))
+        if settings.verbose:
+            logger.exception(e)
+        return None
 
-def _get_multiple_validators_registration_call(
-    vault_version: int,
-    keeper_approval_params: tuple,
-    multi_proof: MultiProof | None,
-    validators_manager_signature: HexStr | None,
-) -> tuple[ChecksumAddress, HexStr]:
-    if validators_manager_signature:
-        return vault_contract.address, vault_contract.encode_abi(
-            fn_name='registerValidators',
-            args=[keeper_approval_params, Web3.to_bytes(hexstr=validators_manager_signature)],
-        )
-
-    if multi_proof is None:
-        raise RuntimeError('multi_proof required')
-
-    deposit_data_indexes = [leaf[1] for leaf in multi_proof.leaves]
-    leaf_indexes = _calc_leaf_indexes(deposit_data_indexes)
-
-    if vault_version == 1:
-        return vault_v1_contract.address, vault_v1_contract.encode_abi(
-            fn_name='registerValidators',
-            args=[
-                keeper_approval_params,
-                leaf_indexes,
-                multi_proof.proof_flags,
-                multi_proof.proof,
-            ],
-        )
-
-    return deposit_data_registry_contract.address, deposit_data_registry_contract.encode_abi(
-        fn_name='registerValidators',
-        args=[
-            settings.vault,
-            keeper_approval_params,
-            leaf_indexes,
-            multi_proof.proof_flags,
-            multi_proof.proof,
-        ],
+    tx_hash = Web3.to_hex(tx)
+    logger.info('Waiting for transaction %s confirmation', tx_hash)
+    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
+        tx, timeout=settings.execution_transaction_timeout
     )
+    if not tx_receipt['status']:
+        logger.error('Funding transaction failed')
+        return None
+
+    return tx_hash
 
 
-def _calc_leaf_indexes(deposit_data_indexes: list[int]) -> list[int]:
-    if not deposit_data_indexes:
-        return []
+async def submit_consolidate_validators(
+    vault_address: ChecksumAddress,
+    validators: bytes,
+    oracle_signatures: bytes,
+    current_fee: Gwei,
+) -> HexStr | None:
+    """Sends consolidate validators transaction to vault contract"""
+    logger.info('Submitting consolidate validators transaction')
+    vault_contract = VaultContract(vault_address)
+    try:
+        tx = await vault_contract.functions.consolidateValidators(
+            validators,
+            b'',
+            oracle_signatures,
+        ).transact({'value': Web3.to_wei(current_fee, 'gwei')})
+    except Exception as e:
+        logger.info('Failed to submit consolidate validators transaction: %s', format_error(e))
+        return None
 
-    sorted_indexes = sorted(deposit_data_indexes)
-    return [deposit_data_indexes.index(index) for index in sorted_indexes]
+    logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
+    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
+        tx, timeout=settings.execution_transaction_timeout
+    )
+    if not tx_receipt['status']:
+        logger.info('Consolidate validators transaction failed')
+        return None
+    return Web3.to_hex(tx)

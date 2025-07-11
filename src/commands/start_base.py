@@ -1,7 +1,8 @@
 import asyncio
 import logging
 
-from sw_utils import EventScanner, InterruptHandler
+from eth_typing import HexStr
+from sw_utils import InterruptHandler
 
 import src
 from src.common.checks import wait_execution_catch_up_consensus
@@ -15,14 +16,14 @@ from src.common.utils import get_build_version
 from src.config.settings import settings
 from src.exits.tasks import ExitSignatureTask
 from src.harvest.tasks import HarvestTask
-from src.validators.database import NetworkValidatorCrud
-from src.validators.execution import NetworkValidatorsStartupProcessor
+from src.validators.database import NetworkValidatorCrud, VaultCrud, VaultValidatorCrud
+from src.validators.execution import scan_validators_events
 from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
 from src.validators.relayer import RelayerAdapter, create_relayer_adapter
 from src.validators.tasks import ValidatorsTask, load_genesis_validators
-from src.validators.typings import DepositData, ValidatorsRegistrationMode
-from src.validators.utils import load_deposit_data
+from src.validators.typings import ValidatorsRegistrationMode
+from src.validators.utils import load_public_keys
 
 logger = logging.getLogger(__name__)
 
@@ -41,33 +42,31 @@ async def start_base() -> None:
         await metrics_server()
 
     NetworkValidatorCrud().setup()
+    VaultValidatorCrud().setup()
+    VaultCrud().setup()
 
     # load network validators from ipfs dump
     await load_genesis_validators()
 
     keystore: BaseKeystore | None = None
-    deposit_data: DepositData | None = None
+    available_public_keys: list[HexStr] | None = None
     relayer_adapter: RelayerAdapter | None = None
 
-    # load keystore and deposit data
+    # load keystore and available public keys
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
         keystore = await load_keystore()
 
-        deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
-        logger.info('Loaded deposit data file %s', settings.deposit_data_file)
+        available_public_keys = load_public_keys(settings.public_keys_file)
     else:
         relayer_adapter = create_relayer_adapter()
 
     # start operator tasks
-
-    # scan network validator updates
-    network_validators_startup_processor = NetworkValidatorsStartupProcessor()
-    network_validators_scanner = EventScanner(network_validators_startup_processor)
-
-    logger.info('Syncing network validator events...')
     chain_state = await get_chain_finalized_head()
     await wait_execution_catch_up_consensus(chain_state)
-    await network_validators_scanner.process_new_events(chain_state.block_number)
+
+    VaultCrud().save_vaults(settings.vaults)
+    logger.info('Syncing validator events...')
+    await scan_validators_events(chain_state.block_number, is_startup=True)
 
     logger.info('Updating oracles cache...')
     await update_oracles_cache()
@@ -81,7 +80,7 @@ async def start_base() -> None:
         tasks = [
             ValidatorsTask(
                 keystore=keystore,
-                deposit_data=deposit_data,
+                available_public_keys=available_public_keys,
                 relayer_adapter=relayer_adapter,
             ).run(interrupt_handler),
             ExitSignatureTask(
@@ -117,5 +116,4 @@ def setup_sentry() -> None:
             environment=settings.sentry_environment or settings.network,
         )
         sentry_sdk.set_tag('network', settings.network)
-        sentry_sdk.set_tag('vault', settings.vault)
         sentry_sdk.set_tag('project_version', src.__version__)

@@ -1,15 +1,22 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import NewType, Sequence
+from typing import NewType
 
 from eth_typing import BlockNumber, BLSSignature, ChecksumAddress, HexStr
-from multiproof import MultiProof, StandardMerkleTree
+from web3.types import Gwei, Wei
 
 BLSPrivkey = NewType('BLSPrivkey', bytes)
 
 
 @dataclass
 class NetworkValidator:
+    public_key: HexStr
+    block_number: BlockNumber
+
+
+@dataclass
+class VaultValidator:
+    vault_address: HexStr
     public_key: HexStr
     block_number: BlockNumber
 
@@ -24,36 +31,34 @@ class ExitSignatureShards:
 class Validator:
     public_key: HexStr
     signature: HexStr
-    amount_gwei: int
-    deposit_data_index: int | None = None
+    amount: Gwei
     exit_signature: BLSSignature | None = None
     exit_signature_shards: ExitSignatureShards | None = None
 
-    def copy(self) -> 'Validator':
-        return Validator(
-            public_key=self.public_key,
-            signature=self.signature,
-            amount_gwei=self.amount_gwei,
-            deposit_data_index=self.deposit_data_index,
-            exit_signature_shards=self.exit_signature_shards,
-        )
+    deposit_data_root: HexStr | None = None
+
+
+@dataclass
+class ConsensusValidator:
+    public_key: HexStr
+    balance: Gwei
+    withdrawal_credentials: HexStr
+
+    @property
+    def is_compounding(self) -> bool:
+        return self.withdrawal_credentials.startswith('0x02')
+
+
+@dataclass
+class V2ValidatorEventData:
+    public_key: HexStr
+    amount: Wei
 
 
 @dataclass
 class RelayerValidatorsResponse:
     validators: list[Validator]
     validators_manager_signature: HexStr | None = None
-    multi_proof: MultiProof[tuple[bytes, int]] | None = None
-
-
-@dataclass
-class DepositData:
-    validators: Sequence[Validator]
-    tree: StandardMerkleTree
-
-    @property
-    def public_keys(self) -> list[HexStr]:
-        return [v.public_key for v in self.validators]
 
 
 @dataclass
@@ -66,11 +71,9 @@ class ApprovalRequest:
     deposit_signatures: list[HexStr]
     public_key_shards: list[list[HexStr]]
     exit_signature_shards: list[list[HexStr]]
+    validators_manager_signature: HexStr
     deadline: int
-    proof: list[HexStr] | None
-    proof_flags: list[bool] | None
-    proof_indexes: list[int] | None
-    validators_manager_signature: HexStr | None = None
+    amounts: list[int] | None = None
 
 
 class ValidatorsRegistrationMode(Enum):
@@ -86,3 +89,10 @@ class ValidatorsRegistrationMode(Enum):
 class RelayerTypes:
     DVT = 'DVT'
     DEFAULT = 'DEFAULT'
+
+
+@dataclass
+class ConsolidationRequest:
+    from_public_keys: list[HexStr]
+    to_public_keys: list[HexStr]
+    vault_address: ChecksumAddress

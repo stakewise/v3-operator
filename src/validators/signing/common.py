@@ -1,40 +1,23 @@
 from typing import Sequence
 
 import ecies
-from eth_typing import BLSPubkey, BLSSignature, HexStr
-from multiproof import StandardMerkleTree
-from multiproof.standard import MultiProof
-from sw_utils import (
-    ConsensusFork,
-    ProtocolConfig,
-    get_exit_message_signing_root,
-    get_v1_withdrawal_credentials,
-)
+from eth_typing import BLSPubkey, BLSSignature, ChecksumAddress, HexStr
+from sw_utils import ConsensusFork, ProtocolConfig, get_exit_message_signing_root
 from sw_utils.signing import compute_deposit_data
 from web3 import Web3
-from web3.types import Gwei
 
+from src.common.typings import ValidatorType
 from src.config.settings import settings
 from src.validators.keystores.base import BaseKeystore
 from src.validators.signing.key_shares import bls_signature_and_public_key_to_shares
 from src.validators.typings import ExitSignatureShards, Validator
+from src.validators.utils import get_withdrawal_credentials
 
 
-def get_validators_proof(
-    tree: StandardMerkleTree,
-    validators: Sequence[Validator],
-) -> MultiProof[tuple[bytes, int]]:
-    tx_validators = encode_tx_validator_list(validators)
-    leaves = []
-    for validator, tx_validator in zip(validators, tx_validators):
-        leaves.append((tx_validator, validator.deposit_data_index))
-
-    multi_proof = tree.get_multi_proof(leaves)
-    return multi_proof
-
-
-def encode_tx_validator_list(validators: Sequence[Validator]) -> list[bytes]:
-    credentials = get_v1_withdrawal_credentials(settings.vault)
+def encode_tx_validator_list(
+    validators: Sequence[Validator], vault_address: ChecksumAddress
+) -> list[bytes]:
+    credentials = get_withdrawal_credentials(vault_address)
     tx_validators: list[bytes] = []
     for validator in validators:
         tx_validator = encode_tx_validator(credentials, validator)
@@ -48,10 +31,12 @@ def encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) -> 
     deposit_root = compute_deposit_data(
         public_key=public_key,
         withdrawal_credentials=withdrawal_credentials,
-        amount=Gwei(validator.amount_gwei),
+        amount=validator.amount,
         signature=signature,
     ).hash_tree_root
-    return public_key + signature + deposit_root
+    if settings.validator_type == ValidatorType.V1:
+        return public_key + signature + deposit_root
+    return public_key + signature + deposit_root + validator.amount.to_bytes(8, byteorder='big')
 
 
 # pylint: disable-next=too-many-arguments

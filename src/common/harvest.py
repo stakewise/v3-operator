@@ -5,21 +5,22 @@ from web3 import Web3
 from web3.types import Wei
 
 from src.common.clients import ipfs_fetch_client
-from src.common.contracts import keeper_contract, vault_contract
+from src.common.contracts import VaultContract, keeper_contract
 from src.common.typings import HarvestParams
 from src.config.settings import settings
 
 
-async def get_harvest_params() -> HarvestParams | None:
-    if not await keeper_contract.can_harvest(vault_contract.contract_address):
+async def get_harvest_params(vault_address: ChecksumAddress) -> HarvestParams | None:
+    if not await keeper_contract.can_harvest(vault_address):
         return None
 
     last_rewards = await keeper_contract.get_last_rewards_update()
     if last_rewards is None:
         return None
 
+    vault_contract = VaultContract(vault_address)
     harvest_params = await _fetch_harvest_params_from_ipfs(
-        vault_address=settings.vault,
+        vault_contract=vault_contract,
         ipfs_hash=last_rewards.ipfs_hash,
         rewards_root=last_rewards.rewards_root,
     )
@@ -27,13 +28,13 @@ async def get_harvest_params() -> HarvestParams | None:
 
 
 async def _fetch_harvest_params_from_ipfs(
-    vault_address: ChecksumAddress, ipfs_hash: str, rewards_root: bytes
+    vault_contract: VaultContract, ipfs_hash: str, rewards_root: bytes
 ) -> HarvestParams | None:
     ipfs_data = await ipfs_fetch_client.fetch_json(ipfs_hash)
     mev_escrow = await vault_contract.mev_escrow()
 
     for vault_data in ipfs_data['vaults']:  # type: ignore
-        if vault_address != Web3.to_checksum_address(vault_data['vault']):
+        if vault_contract.contract_address != Web3.to_checksum_address(vault_data['vault']):
             continue
 
         if mev_escrow == settings.network_config.SHARED_MEV_ESCROW_CONTRACT_ADDRESS:

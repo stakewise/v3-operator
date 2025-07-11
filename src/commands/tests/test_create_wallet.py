@@ -4,19 +4,17 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 from eth_account import Account
-from eth_typing import HexAddress
 
 from src.commands.create_wallet import create_wallet
 
 
 class TestCreateWallet:
-    @pytest.mark.usefixtures('_init_vault')
+    @pytest.mark.usefixtures('_init_config')
     def test_basic(
         self,
         test_mnemonic: str,
         data_dir: Path,
-        vault_dir: Path,
-        vault_address: HexAddress,
+        config_dir: Path,
         runner: CliRunner,
     ):
         Account.enable_unaudited_hdwallet_features()
@@ -26,8 +24,6 @@ class TestCreateWallet:
             [
                 '--mnemonic',
                 f'"{test_mnemonic}"',
-                '--vault',
-                vault_address,
                 '--data-dir',
                 str(data_dir),
             ],
@@ -36,8 +32,8 @@ class TestCreateWallet:
         filename = 'wallet.json'
         output = 'Done. The wallet and password saved to'
         assert output.strip() in result.output.strip()
-        with open(f'{vault_dir}/wallet/{filename}', encoding='utf-8') as f:
+        with open(f'{config_dir}/wallet/{filename}', encoding='utf-8') as f:
             data = json.load(f)
             assert data.get('address').lower() == account.address.lower()[2:]
-        with open(f'{vault_dir}/wallet/password.txt', encoding='utf-8') as f:
+        with open(f'{config_dir}/wallet/password.txt', encoding='utf-8') as f:
             assert len(f.readline()) == 20
