@@ -2,9 +2,7 @@ from dataclasses import dataclass
 
 from eth_typing import ChecksumAddress
 from web3 import Web3
-from web3.types import HexBytes, Wei
-
-from src.common.typings import HarvestParams
+from web3.types import Wei
 
 
 @dataclass
@@ -47,23 +45,4 @@ class ExitRequest:
             receiver=Web3.to_checksum_address(data['receiver']),
             exited_assets=Wei(int(data['exitedAssets'])),
             total_assets=Wei(int(data['totalAssets'])),
-        )
-
-
-@dataclass
-class Vault:
-    address: ChecksumAddress
-    can_harvest: bool
-    rewards_root: HexBytes
-    proof_reward: Wei
-    proof_unlocked_mev_reward: Wei
-    proof: list[HexBytes]
-
-    @property
-    def harvest_params(self) -> HarvestParams:
-        return HarvestParams(
-            rewards_root=self.rewards_root,
-            reward=self.proof_reward,
-            unlocked_mev_reward=self.proof_unlocked_mev_reward,
-            proof=self.proof,
         )

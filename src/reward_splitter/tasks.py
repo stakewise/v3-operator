@@ -1,13 +1,14 @@
 import logging
 from typing import cast
 
-from sw_utils import InterruptHandler, chunkify
+from sw_utils import InterruptHandler
 from web3 import Web3
 from web3.types import ChecksumAddress, HexBytes, HexStr, Wei
 
 from src.common.clients import execution_client
 from src.common.contracts import multicall_contract
 from src.common.execution import build_gas_manager
+from src.common.harvest import get_harvest_params
 from src.common.tasks import BaseTask
 from src.common.typings import HarvestParams
 from src.config.networks import ZERO_CHECKSUM_ADDRESS
@@ -20,7 +21,6 @@ from src.reward_splitter.contracts import RewardSplitterContract, RewardSplitter
 from src.reward_splitter.graph import (
     graph_get_claimable_exit_requests,
     graph_get_reward_splitters,
-    graph_get_vaults,
 )
 from src.reward_splitter.typings import ExitRequest, RewardSplitter
 
@@ -35,12 +35,10 @@ class SplitRewardTask(BaseTask):
         Processes reward splitters for the vaults specified in settings.
 
         This function performs the following steps:
-        1. Fetches the list of vaults from Subgraph.
-        2. Retrieves reward splitters associated with the vaults from Subgraph.
-        3. Maps the vaults to their harvest params.
-        4. Retrieves claimable exit requests for the reward splitters.
-        5. Generates multicall contract calls for each reward splitter.
-        6. Processes the multicall batches and waits for transaction confirmations.
+        - Retrieves reward splitters associated with the vaults from Subgraph.
+        - Retrieves claimable exit requests for the reward splitters.
+        - Generates multicall contract calls for each reward splitter.
+        - Processes the multicall batches and waits for transaction confirmations.
         """
 
         # check current gas prices
@@ -59,16 +57,12 @@ class SplitRewardTask(BaseTask):
             logger.info('No reward splitters found for given vaults')
             return
 
-        vaults = [rs.vault for rs in reward_splitters]
-
-        graph_vaults_map = await graph_get_vaults(vaults=vaults)
-
         splitter_to_exit_requests = await graph_get_claimable_exit_requests(
             block_number=block['number'], receivers=[rs.address for rs in reward_splitters]
         )
 
-        # Multicall contract calls
-        calls: list[tuple[ChecksumAddress, HexStr]] = []
+        # Multicall contract calls per address
+        calls: dict[ChecksumAddress, list[HexStr]] = {}
 
         for reward_splitter in reward_splitters:
             logger.info(
@@ -78,29 +72,32 @@ class SplitRewardTask(BaseTask):
             )
             vault = reward_splitter.vault
 
-            graph_vault = graph_vaults_map[vault]
-            can_harvest = graph_vault.can_harvest
-            harvest_params = graph_vault.harvest_params
+            harvest_params = await get_harvest_params(vault)
             exit_requests = splitter_to_exit_requests.get(reward_splitter.address, [])  # nosec
 
             reward_splitter_calls = await _get_reward_splitter_calls(
                 reward_splitter=reward_splitter,
-                can_harvest=can_harvest,
                 harvest_params=harvest_params,
                 exit_requests=exit_requests,
             )
 
-            # Add up to multicall format calls
-            calls.extend([(reward_splitter.address, call) for call in reward_splitter_calls])
-
+            calls[reward_splitter.address] = reward_splitter_calls
         if not calls:
             logger.warning('No calls to process')
             return
 
-        for calls_batch in chunkify(
-            calls, MULTICALL_BATCH_SIZE
-        ):  # todo check что не разделиться с update state
-            logger.info('Processing multicall batch')
+        calls_batches = []
+        calls_batch: list[tuple[ChecksumAddress, HexStr]] = []
+        for address, address_calls in calls.items():
+            if len(calls_batch) + len(address_calls) <= MULTICALL_BATCH_SIZE:
+                calls_batch.extend([(address, call) for call in address_calls])
+            else:
+                calls_batches.append(calls_batch)
+                calls_batch = [(address, call) for call in address_calls]
+        calls_batches.append(calls_batch)
+
+        for calls_batch in calls_batches:
+            logger.info('Processing reward splitter multicall batch')
             tx = await _multicall(calls_batch)
 
             tx = cast(HexBytes, tx)
@@ -121,7 +118,6 @@ class SplitRewardTask(BaseTask):
 
 async def _get_reward_splitter_calls(
     reward_splitter: RewardSplitter,
-    can_harvest: bool,
     harvest_params: HarvestParams | None,
     exit_requests: list[ExitRequest],
 ) -> list[HexStr]:
@@ -146,7 +142,7 @@ async def _get_reward_splitter_calls(
         logger.info('Reward splitter %s has not enough assets to withdraw', reward_splitter.address)
     else:
         # Append update state call
-        if can_harvest and harvest_params:
+        if harvest_params:
             reward_splitter_calls.append(
                 reward_splitter_encoder.update_vault_state(harvest_params=harvest_params)
             )
