@@ -12,28 +12,51 @@ from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_NETWORK
 from src.nodes.typings import Release
 
-REQUESTS_TIMEOUT = 60
+DEFAULT_REQUESTS_TIMEOUT = 60
+
+LATEST_RETH_VERSION = 'v1.5.1'
+LATEST_LIGHTHOUSE_VERSION = 'v7.0.1'
 
 
 @click.option(
     '--data-dir',
     default=Path.home() / '.stakewise',
     envvar='DATA_DIR',
-    help='Path where the nodes data will be placed. Default is ~/.stakewise.',
+    help='Path where the nodes data will be placed',
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    show_default=True,
 )
 @click.option(
     '--network',
     default=DEFAULT_NETWORK,
+    envvar='NETWORK',
     help='The network of your nodes.',
     prompt='Enter the network name',
     type=click.Choice(
         AVAILABLE_NETWORKS,
         case_sensitive=False,
     ),
+    show_default=True,
 )
-@click.command(help='Installs execution node and consensus node to the data dir.')
-def node_install(data_dir: Path, network: str) -> None:
+@click.option(
+    '--reth-version',
+    default=LATEST_RETH_VERSION,
+    help='Version of the Reth binary to install.',
+    type=str,
+    show_default=True,
+)
+@click.option(
+    '--lighthouse-version',
+    default=LATEST_LIGHTHOUSE_VERSION,
+    envvar='LIGHTHOUSE_VERSION',
+    help='Version of the Lighthouse binary to install.',
+    type=str,
+    show_default=True,
+)
+@click.command(
+    help='Installs execution node and consensus node to the data dir.',
+)
+def node_install(data_dir: Path, network: str, reth_version: str, lighthouse_version: str) -> None:
     """
     Downloads and unpacks pre-built binaries for both execution and consensus clients.
     """
@@ -47,16 +70,15 @@ def node_install(data_dir: Path, network: str) -> None:
     makedirs(lighthouse_dir, exist_ok=True)
 
     # Installing Reth and Lighthouse binaries
-    install_reth_binary(reth_dir)
-    install_lighthouse_binary(lighthouse_dir)
+    install_reth_binary(reth_dir, app_version=reth_version)
+    install_lighthouse_binary(lighthouse_dir, app_version=lighthouse_version)
 
 
-def install_reth_binary(dir_to_install: Path) -> None:
+def install_reth_binary(dir_to_install: Path, app_version: str) -> None:
     """
     Installs the Reth binary.
     """
     repo_url = 'https://github.com/paradigmxyz/reth'
-    app_version = 'v1.5.1'
 
     release = Release(
         repo_url=repo_url,
@@ -74,12 +96,11 @@ def install_reth_binary(dir_to_install: Path) -> None:
     )
 
 
-def install_lighthouse_binary(dir_to_install: Path) -> None:
+def install_lighthouse_binary(dir_to_install: Path, app_version: str) -> None:
     """
     Installs the Lighthouse binary.
     """
     repo_url = 'https://github.com/sigp/lighthouse'
-    app_version = 'v7.0.1'
 
     release = Release(
         repo_url=repo_url,
@@ -100,7 +121,9 @@ def install_binary_release(release: Release, dir_to_install: Path) -> None:
     click.echo(f'Downloading {release.app_name.capitalize()} binary from {release.binary_url}...')
 
     # Download the binary, displaying a progress bar
-    with requests.get(release.binary_url, timeout=REQUESTS_TIMEOUT, stream=True) as response:
+    with requests.get(
+        release.binary_url, timeout=DEFAULT_REQUESTS_TIMEOUT, stream=True
+    ) as response:
         response.raise_for_status()
         total = int(response.headers.get('content-length', 0))
         chunks = []
