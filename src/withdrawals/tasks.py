@@ -19,8 +19,10 @@ from src.config.settings import (
     PARTIAL_WITHDRAWALS_INTERVAL,
     settings,
 )
-from src.validators.consensus import fetch_compounding_validators_balances
-from src.withdrawals.assets import get_vault_assets
+from src.validators.consensus import fetch_consensus_validators
+from src.validators.database import VaultValidatorCrud
+from src.validators.typings import ConsensusValidator
+from src.withdrawals.assets import CAN_BE_EXITED_STATUSES, get_vault_assets
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +54,15 @@ class PartialWithdrawalsTask(BaseTask):
             return
 
         harvest_params = await get_harvest_params(vault_address)
+        vault_validators = VaultValidatorCrud().get_vault_validators(
+            vault_address=vault_address,
+        )
+        consensus_validators = await fetch_consensus_validators(
+            [val.public_key for val in vault_validators]
+        )
         total_assets, queued_assets = await get_vault_assets(
             vault_address=vault_address,
+            consensus_validators=consensus_validators,
             harvest_params=harvest_params,
             protocol_config=protocol_config,
             chain_head=chain_head,
@@ -63,9 +72,16 @@ class PartialWithdrawalsTask(BaseTask):
             < (protocol_config.validators_exit_queued_assets_bps * total_assets) / 10000
         ):
             return
-        validators = await fetch_compounding_validators_balances(vault_address)
+
+        # filter active validators
+        active_validators = [
+            val
+            for val in consensus_validators
+            if _is_withdrawable_validators(val, chain_head.epoch)
+        ]
+
         available_partial_withdrawals_capacity = sum(
-            balance - MIN_ACTIVATION_BALANCE_GWEI for balance in validators.values()
+            val.balance - MIN_ACTIVATION_BALANCE_GWEI for val in active_validators
         )
         if available_partial_withdrawals_capacity < queued_assets:
             logger.info('Available partial withdrawals capacity is less than queued assets')
@@ -77,11 +93,15 @@ class PartialWithdrawalsTask(BaseTask):
         )
         if current_fee > MAX_WITHDRAWAL_REQUEST_FEE:
             logger.info(
-                'Partial withdrawals is skipped because high withdrawals fee, current fees is %s',
+                'Partial withdrawals are skipped due to high withdrawal fees, '
+                'the current fee is %s.',
                 current_fee,
             )
             return
-        withdrawable_validators = _get_withdrawable_validators(validators, queued_assets)
+        withdrawable_validators = _get_withdrawable_validators(
+            validator_balances={val.public_key: val.balance for val in active_validators},
+            queued_assets=queued_assets,
+        )
         tx_hash = await submit_withdraw_validators(
             vault_address=vault_address,
             validators=_encode_validators(withdrawable_validators),
@@ -118,27 +138,27 @@ class PartialWithdrawalsTask(BaseTask):
 
 
 def _get_withdrawable_validators(
-    vault_validators: dict[HexStr, Gwei], withdrawals_amount: int
+    validator_balances: dict[HexStr, Gwei], queued_assets: int
 ) -> dict[HexStr, int]:
     withdrawals_data = {}
 
     # can be executed in single request
     for public_key, balance in sorted(
-        vault_validators.items(), key=lambda item: item[1], reverse=False
+        validator_balances.items(), key=lambda item: item[1], reverse=False
     ):
-        if balance - MIN_ACTIVATION_BALANCE_GWEI >= withdrawals_amount:
-            withdrawals_data[public_key] = withdrawals_amount
+        if balance - MIN_ACTIVATION_BALANCE_GWEI >= queued_assets:
+            withdrawals_data[public_key] = queued_assets
             return withdrawals_data
 
     # need to split withdrawal amount between validators
     for public_key, balance in sorted(
-        vault_validators.items(), key=lambda item: item[1], reverse=True
+        validator_balances.items(), key=lambda item: item[1], reverse=True
     ):
         validators_amount = balance - MIN_ACTIVATION_BALANCE_GWEI
         if validators_amount > 0:
-            withdrawals_data[public_key] = min(validators_amount, withdrawals_amount)
-            withdrawals_amount -= min(validators_amount, withdrawals_amount)
-        if withdrawals_amount <= 0:
+            withdrawals_data[public_key] = min(validators_amount, queued_assets)
+            queued_assets -= min(validators_amount, queued_assets)
+        if queued_assets <= 0:
             break
 
     return withdrawals_data
@@ -188,3 +208,12 @@ async def submit_withdraw_validators(
         logger.info('Withdraw validators transaction failed')
         return None
     return Web3.to_hex(tx)
+
+
+def _is_withdrawable_validators(validator: ConsensusValidator, epoch: int) -> bool:
+    if validator.status not in CAN_BE_EXITED_STATUSES:
+        return False
+    # filter validator that was active long enough
+    if epoch < validator.activation_epoch + settings.network_config.SHARD_COMMITTEE_PERIOD:
+        return False
+    return True

@@ -46,6 +46,7 @@ class ConsensusValidator:
     balance: Gwei
     withdrawal_credentials: HexStr
     status: ValidatorStatus
+    activation_epoch: int
 
     @property
     def is_compounding(self) -> bool:

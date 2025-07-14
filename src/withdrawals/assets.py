@@ -12,8 +12,6 @@ from src.common.contracts import (
 from src.common.typings import ExitQueueMissingAssetsParams, HarvestParams
 from src.config.settings import settings
 from src.harvest.execution import get_update_state_calls
-from src.validators.consensus import fetch_consensus_validators
-from src.validators.database import VaultValidatorCrud
 from src.validators.oracles import poll_active_exits
 from src.validators.typings import ConsensusValidator
 
@@ -38,6 +36,7 @@ EXITING_STATUSES = [
 
 async def get_vault_assets(
     vault_address: ChecksumAddress,
+    consensus_validators: list[ConsensusValidator],
     harvest_params: HarvestParams | None,
     chain_head: ChainHead,
     protocol_config: ProtocolConfig,
@@ -49,6 +48,7 @@ async def get_vault_assets(
     )
     queued_assets = await _get_queued_assets(
         vault_address=vault_address,
+        consensus_validators=consensus_validators,
         harvest_params=harvest_params,
         chain_head=chain_head,
         protocol_config=protocol_config,
@@ -60,6 +60,7 @@ async def get_vault_assets(
 
 async def _get_queued_assets(
     vault_address: ChecksumAddress,
+    consensus_validators: list[ConsensusValidator],
     harvest_params: HarvestParams | None,
     protocol_config: ProtocolConfig,
     chain_head: ChainHead,
@@ -72,28 +73,21 @@ async def _get_queued_assets(
             block_number=chain_head.block_number,
         )
     )
-    vault_validators = VaultValidatorCrud().get_vault_validators(
-        vault_address=vault_address,
-    )
 
-    consensus_validators = await fetch_consensus_validators(
-        [v.public_key for v in vault_validators]
-    )
-
-    pending_partial_withdrawals_sum = await _get_pending_partial_withdrawals_sum(
+    pending_partial_withdrawals_amount = await _get_pending_partial_withdrawals_amount(
         validator_indexes=[
             str(v.index) for v in consensus_validators if v.status in CAN_BE_EXITED_STATUSES
         ],
         slot=chain_head.slot,
     )
-    validators_exits_sum = await _get_validators_sum(
+    validators_exits_amount = await _get_validators_exits_amount(
         consensus_validators=consensus_validators,
         protocol_config=protocol_config,
     )
 
     # Withdrawing assets are assets that are ready to cover the exit requests
     # but not yet used to fulfill exit requests.
-    withdrawing_assets = Wei(pending_partial_withdrawals_sum + validators_exits_sum)
+    withdrawing_assets = Wei(pending_partial_withdrawals_amount + validators_exits_amount)
 
     # Missing assets express how much assets are needed to cover the exit requests
     # until the exit queue cumulative ticket is reached
@@ -109,31 +103,30 @@ async def _get_queued_assets(
     return missing_assets
 
 
-async def _get_pending_partial_withdrawals_sum(
+async def _get_pending_partial_withdrawals_amount(
     validator_indexes: list[str],
     slot: int,
 ) -> Wei:
     """
-    Calculate the sum of pending partial withdrawals for current moment
+    Calculate the sum of pending partial withdrawals at the current moment
     """
     pending_partial_withdrawals_sum = 0
     pending_withdrawals_data = await consensus_client.get_pending_partial_withdrawals(str(slot))
     for pending_withdrawal_item in pending_withdrawals_data:
         index = pending_withdrawal_item['validator_index']
-
         if index not in validator_indexes:
             continue
 
-        amount = Web3.to_wei(pending_withdrawal_item['amount'], 'gwei')
-        pending_partial_withdrawals_sum += amount
+        pending_partial_withdrawals_sum += int(pending_withdrawal_item['amount'])
+
     return Web3.to_wei(pending_partial_withdrawals_sum, 'gwei')
 
 
-async def _get_validators_sum(
+async def _get_validators_exits_amount(
     consensus_validators: list[ConsensusValidator], protocol_config: ProtocolConfig
 ) -> Wei:
     """
-    Calculate the sum of active validators exits. Consists of two parts:
+    Calculate the sum of exiting validators balances. Consists of two parts:
     1. fetch active exits from oracles.
     2. fetch manually exited validators.
     """

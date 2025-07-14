@@ -125,6 +125,7 @@ async def fetch_non_exiting_validators(
                     balance=Gwei(int(beacon_validator['balance'])),
                     withdrawal_credentials=beacon_validator['validator']['withdrawal_credentials'],
                     status=ValidatorStatus(beacon_validator['status']),
+                    activation_epoch=int(beacon_validator['validator']['activation_epoch']),
                 )
             )
 
@@ -145,6 +146,7 @@ async def fetch_consensus_validators(
                     balance=Gwei(int(beacon_validator['balance'])),
                     withdrawal_credentials=beacon_validator['validator']['withdrawal_credentials'],
                     status=ValidatorStatus(beacon_validator['status']),
+                    activation_epoch=int(beacon_validator['validator']['activation_epoch']),
                 )
             )
 

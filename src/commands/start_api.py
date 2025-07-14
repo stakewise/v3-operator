@@ -138,7 +138,7 @@ AUTO = 'AUTO'
     '--disable-withdrawals',
     is_flag=True,
     envvar='DISABLE_WITHDRAWALS',
-    help='Whether to disable submit vault partial withdrawals. Default is false.',
+    help='Whether to disable submitting partial vault withdrawals. Default is false.',
 )
 @click.option(
     '--execution-endpoints',
