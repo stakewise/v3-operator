@@ -334,7 +334,9 @@ MULTICALL_BATCH_SIZE: int = decouple_config('MULTICALL_BATCH_SIZE', default='20'
 REWARD_SPLITTER_MIN_ASSETS: int = decouple_config(
     'REWARD_SPLITTER_MIN_ASSETS', default=Web3.to_wei('0.001', 'ether'), cast=int
 )
-
+REWARD_SPLITTER_INTERVAL: int = decouple_config(
+    'REWARD_SPLITTER_INTERVAL', default=86400, cast=int  # every 6 hr
+)
 # logging
 LOG_PLAIN = 'plain'
 LOG_JSON = 'json'

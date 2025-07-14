@@ -3,8 +3,9 @@ from typing import cast
 
 from sw_utils import InterruptHandler
 from web3 import Web3
-from web3.types import ChecksumAddress, HexBytes, HexStr, Wei
+from web3.types import BlockNumber, ChecksumAddress, HexBytes, HexStr, Wei
 
+from src.common.app_state import AppState
 from src.common.clients import execution_client
 from src.common.contracts import multicall_contract
 from src.common.execution import build_gas_manager
@@ -14,6 +15,7 @@ from src.common.typings import HarvestParams
 from src.config.networks import ZERO_CHECKSUM_ADDRESS
 from src.config.settings import (
     MULTICALL_BATCH_SIZE,
+    REWARD_SPLITTER_INTERVAL,
     REWARD_SPLITTER_MIN_ASSETS,
     settings,
 )
@@ -40,13 +42,16 @@ class SplitRewardTask(BaseTask):
         - Generates multicall contract calls for each reward splitter.
         - Processes the multicall batches and waits for transaction confirmations.
         """
+        block = await execution_client.eth.get_block('finalized')
+
+        app_state = AppState()
+        if not await _check_reward_splitter_block(app_state, block['number']):
+            return
 
         # check current gas prices
         gas_manager = build_gas_manager()
         if not await gas_manager.check_gas_price():
             return
-
-        block = await execution_client.eth.get_block('finalized')
 
         logger.info('Fetching reward splitters')
         reward_splitters = await graph_get_reward_splitters(
@@ -113,7 +118,21 @@ class SplitRewardTask(BaseTask):
                 )
             logger.info('Transaction %s confirmed', tx_hash)
 
+        app_state.reward_splitter_block = block['number']
         logger.info('All multicall batches processed')
+
+
+async def _check_reward_splitter_block(app_state: AppState, block_number: BlockNumber) -> bool:
+    last_processed_block = app_state.reward_splitter_block
+    reward_splitter_blocks_interval = (
+        REWARD_SPLITTER_INTERVAL // settings.network_config.SECONDS_PER_BLOCK
+    )
+    if (
+        last_processed_block
+        and last_processed_block + reward_splitter_blocks_interval >= block_number
+    ):
+        return False
+    return True
 
 
 async def _get_reward_splitter_calls(

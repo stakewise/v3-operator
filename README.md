@@ -22,11 +22,12 @@
    2. [Validators voluntary exit](#validators-voluntary-exit)
    3. [Validators consolidation](#validators-consolidation)
    4. [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
-   5. [Recover validator keystores](#recover-validator-keystores)
-   6. [Max gas fee](#max-gas-fee)
-   7. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
-   8. [Self report to Rated Network](#self-report-to-rated-network)
-   9. [Export validators file](#export-validators-file)
+   5. [Automated withdrawals (Reward splitter)](#automated-withdrawals-reward-splitter)
+   6. [Recover validator keystores](#recover-validator-keystores)
+   7. [Max gas fee](#max-gas-fee)
+   8. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
+   9. [Self report to Rated Network](#self-report-to-rated-network)
+   10. [Export validators file](#export-validators-file)
 6. [Contacts](#contacts)
 
 ## What is V3 Operator?
@@ -374,6 +375,7 @@ Operator Service has many different commands that are not mandatory but might co
 - [Validators voluntary exit](#validators-voluntary-exit)
 - [Validators consolidation](#validators-consolidation)
 - [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
+- [Automated withdrawals (Reward splitter)](#automated-withdrawals-reward-splitter)
 - [Add validator keys to Vault](#add-validator-keys-to-vault)
 - [Recover validator keystores](#recover-validator-keystores)
 - [Self report to Rated Network](#self-report-to-rated-network)
@@ -450,6 +452,18 @@ the Operator Service.
 
 Harvesting the Vault rewards simplifies the contract calls to the Vault contract and reduces the gas fees for stakers,
 for example, the Vault does not need to sync rewards before calling deposit when a user stakes.
+
+### Automated withdrawals (Reward splitter)
+
+It is possible to set up automatic withdrawals of Vault staking rewards. To enable automated withdrawals pass `--split-rewards`  flag to the Operator Service start command.
+
+Periodic withdrawal task relies on Reward Splitter contract. The task combines the following contract calls into a multicall:
+
+- Harvest vault rewards from Keeper
+- Withdraw Splitter rewards on behalf of each shareholder. Rewards withdrawn will go to exit queue.
+- Claim exited assets on behalf of each shareholder. Assets claimed will go directly to shareholder address.
+
+The automated withdrawals interval can be adjusted via the `REWARD_SPLITTER_INTERVAL` env variable, with every 6 hours being the default.
 
 ### Recover validator keystores
 
