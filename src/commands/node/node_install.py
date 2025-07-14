@@ -1,5 +1,6 @@
 import io
 import os
+import platform
 import tarfile
 from os import makedirs
 from pathlib import Path
@@ -118,12 +119,39 @@ def install_lighthouse_binary(dir_to_install: Path, app_version: str) -> None:
 
 
 def install_binary_release(release: Release, dir_to_install: Path) -> None:
-    click.echo(f'Downloading {release.app_name.capitalize()} binary from {release.binary_url}...')
+    # Get environment details
+    os_name = platform.system()
+    arch = platform.machine()
+
+    binary_url = release.get_binary_url(os_name=os_name, arch=arch)
+    click.echo(f'Downloading {release.app_name.capitalize()} binary from {binary_url}...')
 
     # Download the binary, displaying a progress bar
-    with requests.get(
-        release.binary_url, timeout=DEFAULT_REQUESTS_TIMEOUT, stream=True
-    ) as response:
+    content = download_binary_with_progress(binary_url)
+    response_len_mb = round(len(content) / 1024 / 1024, 1)
+    click.echo(f'Download complete. {response_len_mb} MB. Extracting...')
+
+    # Extract the binary from tar.gz
+    # Extract only targeted file because of security reasons
+    # Normally the archive contains only one file, but we check it anyway
+    binary_name = release.get_binary_name(os_name)
+    with tarfile.open(fileobj=io.BytesIO(content), mode='r:gz') as tar:
+        members = [m for m in tar.getmembers() if m.name == binary_name]
+        if not members:
+            raise click.ClickException(f'Binary {binary_name} not found in the archive.')
+        tar.extractall(path=dir_to_install, members=members)  # nosec
+
+    # Check permissions of the extracted binary
+    binary_path = dir_to_install / binary_name
+    ensure_executable_permissions(binary_path)
+
+
+def download_binary_with_progress(url: str) -> bytes:
+    """
+    Downloads a binary file from the given URL and returns its content.
+    Displays a progress bar during the download.
+    """
+    with requests.get(url, timeout=DEFAULT_REQUESTS_TIMEOUT, stream=True) as response:
         response.raise_for_status()
         total = int(response.headers.get('content-length', 0))
         chunks = []
@@ -134,23 +162,8 @@ def install_binary_release(release: Release, dir_to_install: Path) -> None:
                 if chunk:
                     chunks.append(chunk)
                     bar.update(len(chunk))
-        content = b''.join(chunks)
 
-    response_len_mb = round(len(content) / 1024 / 1024, 1)
-    click.echo(f'Download complete. {response_len_mb} MB. Extracting...')
-
-    # Extract the binary from tar.gz
-    # Extract only targeted file because of security reasons
-    # Normally the archive contains only one file, but we check it anyway
-    with tarfile.open(fileobj=io.BytesIO(content), mode='r:gz') as tar:
-        members = [m for m in tar.getmembers() if m.name == release.binary_name]
-        if not members:
-            raise click.ClickException(f'Binary {release.binary_name} not found in the archive.')
-        tar.extractall(path=dir_to_install, members=members)  # nosec
-
-    # Check permissions of the extracted binary
-    binary_path = dir_to_install / release.binary_name
-    ensure_executable_permissions(binary_path)
+    return b''.join(chunks)
 
 
 def ensure_executable_permissions(binary_path: Path) -> None:

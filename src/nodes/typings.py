@@ -1,6 +1,4 @@
-import platform
 from dataclasses import dataclass
-from functools import cached_property
 
 
 @dataclass
@@ -21,21 +19,23 @@ class Release:
         self.app_name = app_name
         self.app_version = app_version
 
-    @property
-    def binary_name(self) -> str:
+    def get_binary_name(self, os_name: str) -> str:
         """
+        :param os_name: The name of the operating system as returned by `platform.system()`
         Returns the OS-specific binary name.
         """
         # On Windows, we need to to include .exe extension
-        if platform.system() == 'Windows':
+        if os_name == 'Windows':
             return f'{self.app_name}.exe'
 
         return self.app_name
 
-    @cached_property
-    def binary_url(self) -> str:
+    def get_binary_url(self, os_name: str, arch: str) -> str:
         """
-        Returns the URL of binary based on the current OS and architecture.
+        :param os_name: The name of the operating system as returned by `platform.system()`
+        :param arch: The architecture of the system as returned by `platform.machine()`
+
+        Returns the URL of binary based on the OS and architecture.
 
         Full URL example:
         https://github.com/paradigmxyz/reth/releases/download/v1.5.1/reth-v1.5.1-aarch64-unknown-linux-gnu.tar.gz
@@ -50,10 +50,6 @@ class Release:
         * reth-v1.5.1-aarch64-apple-darwin.tar.gz
         * reth-v1.5.1-x86_64-apple-darwin.tar.gz
         """
-
-        # Get environment details
-        os_name = platform.system()
-        arch = platform.machine()
 
         # Map OS names to the expected format for Github
         os_map = {
