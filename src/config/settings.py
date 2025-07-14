@@ -3,7 +3,7 @@ from pathlib import Path
 from decouple import Csv
 from decouple import config as decouple_config
 from web3 import Web3
-from web3.types import ChecksumAddress, Gwei
+from web3.types import ChecksumAddress, Gwei, Wei
 
 from src.common.typings import Singleton, ValidatorType
 from src.config.networks import MAINNET, NETWORKS, NetworkConfig
@@ -66,7 +66,7 @@ class Settings(metaclass=Singleton):
     hashi_vault_parallelism: int
     hot_wallet_file: Path
     hot_wallet_password_file: Path
-    max_fee_per_gas_gwei: int
+    max_fee_per_gas_gwei: Gwei
     database: Path
 
     log_level: str
@@ -166,7 +166,7 @@ class Settings(metaclass=Singleton):
         if max_fee_per_gas_gwei is None:
             max_fee_per_gas_gwei = self.network_config.MAX_FEE_PER_GAS_GWEI
 
-        self.max_fee_per_gas_gwei = max_fee_per_gas_gwei
+        self.max_fee_per_gas_gwei = Gwei(max_fee_per_gas_gwei)
         self.min_validators_registration = min_validators_registration
         self.min_deposit_amount = min_deposit_amount
 
@@ -300,12 +300,19 @@ OUTDATED_SIGNATURES_URL_PATH = '/signatures/{vault}'
 ORACLES_VALIDATORS_TIMEOUT: int = decouple_config(
     'ORACLES_VALIDATORS_TIMEOUT', default=10, cast=int
 )
+ORACLES_CONSOLIDATION_TIMEOUT: int = decouple_config(
+    'ORACLES_CONSOLIDATION_TIMEOUT', default=10, cast=int
+)
 # common
-MIN_ACTIVATION_BALANCE = Web3.to_wei(32, 'ether')
-MIN_ACTIVATION_BALANCE_GWEI = Gwei(int(Web3.from_wei(MIN_ACTIVATION_BALANCE, 'gwei')))
+MIN_ACTIVATION_BALANCE: Wei = Web3.to_wei(32, 'ether')
+MIN_ACTIVATION_BALANCE_GWEI: Gwei = Gwei(int(Web3.from_wei(MIN_ACTIVATION_BALANCE, 'gwei')))
 
-MAX_EFFECTIVE_BALANCE = Web3.to_wei(2048, 'ether')
-MAX_EFFECTIVE_BALANCE_GWEI = Gwei(int(Web3.from_wei(MAX_EFFECTIVE_BALANCE, 'gwei')))
+MAX_EFFECTIVE_BALANCE: Wei = Web3.to_wei(2048, 'ether')
+MAX_EFFECTIVE_BALANCE_GWEI: Gwei = Gwei(int(Web3.from_wei(MAX_EFFECTIVE_BALANCE, 'gwei')))
+
+MAX_CONSOLIDATION_REQUEST_FEE: Gwei = decouple_config(
+    'MAX_CONSOLIDATION_REQUEST_FEE', default=10, cast=int
+)
 
 # Backoff retries
 DEFAULT_RETRY_TIME = 60
@@ -333,6 +340,3 @@ LOG_PLAIN = 'plain'
 LOG_JSON = 'json'
 LOG_FORMATS = [LOG_PLAIN, LOG_JSON]
 LOG_DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
-
-# constants
-SECONDS_PER_MONTH: int = 2628000

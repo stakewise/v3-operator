@@ -2,12 +2,12 @@ import asyncio
 import logging
 from typing import cast
 
-from eth_typing import BlockNumber
+from eth_typing import BlockNumber, ChecksumAddress
 from hexbytes import HexBytes
 from sw_utils import GasManager, InterruptHandler, ProtocolConfig, build_protocol_config
 from web3 import Web3
 from web3.contract.async_contract import AsyncContractFunction
-from web3.types import TxParams, Wei
+from web3.types import Gwei, TxParams, Wei
 
 from src.common.app_state import AppState, OraclesCache
 from src.common.clients import execution_client, ipfs_fetch_client
@@ -139,8 +139,23 @@ def build_gas_manager() -> GasManager:
     min_effective_priority_fee_per_gas = settings.network_config.MIN_EFFECTIVE_PRIORITY_FEE_PER_GAS
     return GasManager(
         execution_client=execution_client,
-        max_fee_per_gas=Wei(settings.max_fee_per_gas_gwei),
+        max_fee_per_gas=Web3.to_wei(settings.max_fee_per_gas_gwei, 'gwei'),
         priority_fee_num_blocks=settings.priority_fee_num_blocks,
         priority_fee_percentile=settings.priority_fee_percentile,
         min_effective_priority_fee_per_gas=min_effective_priority_fee_per_gas,
     )
+
+
+async def get_consolidation_request_fee(
+    address: ChecksumAddress, block_number: BlockNumber
+) -> Gwei:
+    """
+    Retrieves the current fee for a consolidation transaction with an execution layer request.
+    """
+    tx_data: TxParams = {
+        'to': address,
+        'data': b'',
+    }
+
+    fee = await execution_client.eth.call(tx_data, block_identifier=block_number)
+    return Gwei(Web3.to_int(fee))

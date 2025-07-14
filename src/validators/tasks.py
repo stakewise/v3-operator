@@ -2,7 +2,7 @@ import logging
 from typing import Sequence, cast
 
 from eth_typing import HexStr
-from sw_utils import EventScanner, InterruptHandler, IpfsFetchClient, convert_to_mgno
+from sw_utils import InterruptHandler, IpfsFetchClient, convert_to_mgno
 from sw_utils.networks import GNO_NETWORKS
 from sw_utils.pectra import get_pectra_vault_version
 from sw_utils.typings import Bytes32
@@ -11,11 +11,7 @@ from web3.types import BlockNumber, ChecksumAddress, Gwei
 
 from src.common.checks import wait_execution_catch_up_consensus
 from src.common.consensus import get_chain_finalized_head
-from src.common.contracts import (
-    VaultContract,
-    v2_pool_escrow_contract,
-    validators_registry_contract,
-)
+from src.common.contracts import VaultContract, validators_registry_contract
 from src.common.execution import build_gas_manager, get_protocol_config
 from src.common.harvest import get_harvest_params
 from src.common.metrics import metrics
@@ -35,7 +31,7 @@ from src.validators.exceptions import (
     EmptyRelayerResponseException,
     MissingAvailableValidatorsException,
 )
-from src.validators.execution import NetworkValidatorsProcessor, get_withdrawable_assets
+from src.validators.execution import get_withdrawable_assets, scan_validators_events
 from src.validators.keystores.base import BaseKeystore
 from src.validators.metrics import update_unused_validator_keys_metric
 from src.validators.oracles import poll_validation_approval
@@ -61,8 +57,6 @@ class ValidatorsTask(BaseTask):
     ):
         self.keystore = keystore
         self.available_public_keys = available_public_keys
-        network_validators_processor = NetworkValidatorsProcessor()
-        self.network_validators_scanner = EventScanner(network_validators_processor)
         self.relayer_adapter = relayer_adapter
 
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
@@ -72,7 +66,7 @@ class ValidatorsTask(BaseTask):
         )
 
         # process new network validators
-        await self.network_validators_scanner.process_new_events(chain_state.block_number)
+        await scan_validators_events(block_number=chain_state.block_number, is_startup=False)
 
         if self.keystore and self.available_public_keys:
             await update_unused_validator_keys_metric(
@@ -98,16 +92,6 @@ async def process_validators(
     """
     Calculates vault assets, requests oracles approval, submits registration tx
     """
-    if (
-        settings.network_config.IS_SUPPORT_V2_MIGRATION
-        and vault_address == settings.network_config.GENESIS_VAULT_CONTRACT_ADDRESS
-        and await v2_pool_escrow_contract.get_owner() != vault_address
-    ):
-        logger.info(
-            'Waiting for vault to become owner of v2 pool escrow to start registering validators...'
-        )
-        return None
-
     harvest_params = await get_harvest_params(vault_address)
 
     vault_assets = await get_vault_assets(
@@ -119,6 +103,10 @@ async def process_validators(
     vault_contract = VaultContract(vault_address)
     vault_version = await vault_contract.version()
     if vault_version >= get_pectra_vault_version(settings.network, vault_address):
+        gas_manager = build_gas_manager()
+        if not await gas_manager.check_gas_price():
+            return None
+
         validators_balances = await fetch_compounding_validators_balances(vault_address)
         try:
             vault_assets = await fund_compounding_validators(
@@ -156,7 +144,8 @@ async def fund_compounding_validators(
     harvest_params: HarvestParams | None,
     relayer_adapter: RelayerAdapter | None = None,
 ) -> Gwei:
-    """Funds vault compounding validators with the specified amount.
+    """
+    Funds vault compounding validators with the specified amount.
     Returns the remaining amount after funding.
     """
     funding_amounts = _get_funding_amounts(validators_balances, amount)

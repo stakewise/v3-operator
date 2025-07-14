@@ -66,7 +66,6 @@ def export_public_keys(
     verbose: bool,
     log_level: str,
 ) -> None:
-    setup_logging()
     try:
         operator_config = OperatorConfig(Path(data_dir))
         operator_config.load(network)
@@ -91,6 +90,7 @@ def export_public_keys(
 
 
 async def main() -> None:
+    setup_logging()
     logger.info('Loading keystores from %s...', settings.keystores_dir)
     public_keys = LocalKeystore.get_public_keys_from_keystore_files()
     filename = settings.data_dir / PUBLIC_KEYS_FILENAME

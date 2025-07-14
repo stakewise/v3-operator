@@ -15,6 +15,13 @@ class NetworkValidator:
 
 
 @dataclass
+class VaultValidator:
+    vault_address: HexStr
+    public_key: HexStr
+    block_number: BlockNumber
+
+
+@dataclass
 class ExitSignatureShards:
     public_keys: list[HexStr]
     exit_signatures: list[HexStr]
@@ -32,10 +39,20 @@ class Validator:
 
 
 @dataclass
+class ConsensusValidator:
+    public_key: HexStr
+    balance: Gwei
+    withdrawal_credentials: HexStr
+
+    @property
+    def is_compounding(self) -> bool:
+        return self.withdrawal_credentials.startswith('0x02')
+
+
+@dataclass
 class V2ValidatorEventData:
     public_key: HexStr
     amount: Wei
-    block_number: BlockNumber
 
 
 @dataclass
@@ -72,3 +89,10 @@ class ValidatorsRegistrationMode(Enum):
 class RelayerTypes:
     DVT = 'DVT'
     DEFAULT = 'DEFAULT'
+
+
+@dataclass
+class ConsolidationRequest:
+    from_public_keys: list[HexStr]
+    to_public_keys: list[HexStr]
+    vault_address: ChecksumAddress
