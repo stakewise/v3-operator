@@ -61,7 +61,7 @@ class Settings(metaclass=Singleton):
     hashi_vault_parallelism: int
     hot_wallet_file: Path
     hot_wallet_password_file: Path
-    max_fee_per_gas_gwei: int
+    max_fee_per_gas_gwei: Gwei
     database: Path
 
     log_level: str
@@ -156,7 +156,7 @@ class Settings(metaclass=Singleton):
         if max_fee_per_gas_gwei is None:
             max_fee_per_gas_gwei = self.network_config.MAX_FEE_PER_GAS_GWEI
 
-        self.max_fee_per_gas_gwei = max_fee_per_gas_gwei
+        self.max_fee_per_gas_gwei = Gwei(max_fee_per_gas_gwei)
         self.min_validators_registration = min_validators_registration
         self.min_deposit_amount = min_deposit_amount
 
@@ -322,6 +322,3 @@ LOG_PLAIN = 'plain'
 LOG_JSON = 'json'
 LOG_FORMATS = [LOG_PLAIN, LOG_JSON]
 LOG_DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
-
-# constants
-SECONDS_PER_MONTH: int = 2628000
