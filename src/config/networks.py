@@ -18,6 +18,7 @@ class NetworkConfig(BaseNetworkConfig):
     WALLET_BALANCE_SYMBOL: str
     VAULT_BALANCE_SYMBOL: str
     DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS: ChecksumAddress
+    VALIDATORS_CHECKER_CONTRACT_ADDRESS: ChecksumAddress
     V2_POOL_ESCROW_CONTRACT_ADDRESS: ChecksumAddress
     CONSOLIDATION_CONTRACT_ADDRESS: ChecksumAddress
     WITHDRAWAL_CONTRACT_ADDRESS: ChecksumAddress
@@ -46,6 +47,9 @@ NETWORKS: dict[str, NetworkConfig] = {
         DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x75AB6DdCe07556639333d3Df1eaa684F5735223e'
         ),
+        VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0xaC9125646185Cb58e86E77d5f402eFa3fAfAFc84'
+        ),
         V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x2296e122c1a20Fca3CAc3371357BdAd3be0dF079'
         ),
@@ -69,6 +73,9 @@ NETWORKS: dict[str, NetworkConfig] = {
         DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x93a3f880E07B27dacA6Ef2d3C23E77DBd6294487'
         ),
+        VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0xf3921225B35FFd294C655c4B84fc4dfcDA1d5ABF'
+        ),
         V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(EMPTY_ADDR_HEX),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
@@ -89,6 +96,9 @@ NETWORKS: dict[str, NetworkConfig] = {
         VAULT_BALANCE_SYMBOL='GNO',
         DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x58e16621B5c0786D6667D2d54E28A20940269E16'
+        ),
+        VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x3E2CC1584a2fB4FB2D4f4aF68AE47B57BE76dC65'
         ),
         V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xfc9B67b6034F6B306EA9Bd8Ec1baf3eFA2490394'
@@ -112,6 +122,9 @@ NETWORKS: dict[str, NetworkConfig] = {
         VAULT_BALANCE_SYMBOL='GNO',
         DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xFAce8504462AEb9BB6ae7Ecb206BD7B1EdF7956D'
+        ),
+        VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0xE84db38440D105e300ff1E30Ea790Ac324d68829'
         ),
         V2_POOL_ESCROW_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x928F9a91E674C886Cae0c377670109aBeF7e19d6'

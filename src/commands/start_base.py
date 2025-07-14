@@ -78,6 +78,12 @@ async def start_base() -> None:
     logger.info('Started operator service')
     metrics.service_started.labels(network=settings.network).set(1)
     with InterruptHandler() as interrupt_handler:
+        chain_state = await get_chain_finalized_head()
+        await wait_execution_catch_up_consensus(
+            chain_state=chain_state, interrupt_handler=interrupt_handler
+        )
+        await scan_validators_events(block_number=chain_state.block_number, is_startup=False)
+
         tasks = [
             ValidatorsTask(
                 keystore=keystore,

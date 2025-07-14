@@ -9,8 +9,6 @@ from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.types import BlockNumber, ChecksumAddress, Gwei
 
-from src.common.checks import wait_execution_catch_up_consensus
-from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import (
     VaultContract,
     v2_pool_escrow_contract,
@@ -35,7 +33,7 @@ from src.validators.exceptions import (
     EmptyRelayerResponseException,
     MissingAvailableValidatorsException,
 )
-from src.validators.execution import get_withdrawable_assets, scan_validators_events
+from src.validators.execution import get_withdrawable_assets
 from src.validators.keystores.base import BaseKeystore
 from src.validators.metrics import update_unused_validator_keys_metric
 from src.validators.oracles import poll_validation_approval
@@ -64,14 +62,6 @@ class ValidatorsTask(BaseTask):
         self.relayer_adapter = relayer_adapter
 
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
-        chain_state = await get_chain_finalized_head()
-        await wait_execution_catch_up_consensus(
-            chain_state=chain_state, interrupt_handler=interrupt_handler
-        )
-
-        # process new network validators
-        await scan_validators_events(block_number=chain_state.block_number, is_startup=False)
-
         if self.keystore and self.available_public_keys:
             await update_unused_validator_keys_metric(
                 keystore=self.keystore, available_public_keys=self.available_public_keys

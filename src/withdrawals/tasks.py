@@ -3,10 +3,9 @@ import logging
 from eth_typing import ChecksumAddress, HexStr
 from sw_utils import ChainHead, InterruptHandler, ProtocolConfig
 from web3 import Web3
-from web3.types import Gwei
+from web3.types import BlockNumber, Gwei
 
 from src.common.app_state import AppState
-from src.common.checks import wait_execution_catch_up_consensus
 from src.common.clients import execution_client
 from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import VaultContract
@@ -21,7 +20,7 @@ from src.config.settings import (
     settings,
 )
 from src.validators.consensus import fetch_compounding_validators_balances
-from src.withdrawals.execution import get_vault_assets
+from src.withdrawals.assets import get_vault_assets
 
 logger = logging.getLogger(__name__)
 
@@ -29,12 +28,9 @@ logger = logging.getLogger(__name__)
 class PartialWithdrawalsTask(BaseTask):
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         """
-        Every N hours check the exit queue and submit partial withdrawals for deposits.
+        Every N hours check the exit queue and submit partial withdrawals if needed.
         """
         chain_head = await get_chain_finalized_head()
-        await wait_execution_catch_up_consensus(
-            chain_state=chain_head, interrupt_handler=interrupt_handler
-        )
         protocol_config = await get_protocol_config()
         for vault_address in settings.vaults:
             await self.process_withdrawals(
@@ -44,16 +40,23 @@ class PartialWithdrawalsTask(BaseTask):
             )
 
     async def process_withdrawals(
-        self, vault_address: ChecksumAddress, chain_head: ChainHead, protocol_config: ProtocolConfig
+        self,
+        vault_address: ChecksumAddress,
+        chain_head: ChainHead,
+        protocol_config: ProtocolConfig,
     ) -> None:
         app_state = AppState()
-        if not await self._check_withdrawals_block(app_state, vault_address, chain_head):
+        if not await self._check_withdrawals_block(
+            app_state, vault_address, chain_head.block_number
+        ):
             return
 
         harvest_params = await get_harvest_params(vault_address)
-        queued_assets, total_assets = await get_vault_assets(
+        total_assets, queued_assets = await get_vault_assets(
             vault_address=vault_address,
             harvest_params=harvest_params,
+            protocol_config=protocol_config,
+            chain_head=chain_head,
         )
         if (
             queued_assets
@@ -61,11 +64,11 @@ class PartialWithdrawalsTask(BaseTask):
         ):
             return
         validators = await fetch_compounding_validators_balances(vault_address)
-        available_partial_withdrawals_amount = sum(
+        available_partial_withdrawals_capacity = sum(
             balance - MIN_ACTIVATION_BALANCE_GWEI for balance in validators.values()
         )
-        if available_partial_withdrawals_amount < queued_assets:
-            logger.info('Available partial withdrawals amount is less than queued assets')
+        if available_partial_withdrawals_capacity < queued_assets:
+            logger.info('Available partial withdrawals capacity is less than queued assets')
             return
 
         current_fee = await get_execution_request_fee(
@@ -78,10 +81,10 @@ class PartialWithdrawalsTask(BaseTask):
                 current_fee,
             )
             return
-        withdrawals_data = _get_withdrawal_data(validators, queued_assets)
+        withdrawable_validators = _get_withdrawable_validators(validators, queued_assets)
         tx_hash = await submit_withdraw_validators(
             vault_address=vault_address,
-            validators=_encode_validators(withdrawals_data),
+            validators=_encode_validators(withdrawable_validators),
             current_fee=current_fee,
         )
         if not tx_hash:
@@ -90,35 +93,33 @@ class PartialWithdrawalsTask(BaseTask):
         app_state.partial_withdrawal_cache[vault_address] = chain_head.block_number
         logger.info(
             'Successfully withrawned %s %s for validators with public keys %s, tx hash: %s',
-            round_down(Web3.from_wei(queued_assets, 'ether'), 2),
+            round_down(Web3.from_wei(Web3.to_wei(queued_assets, 'gwei'), 'ether'), 2),
             settings.network_config.VAULT_BALANCE_SYMBOL,
-            ', '.join([str(index) for index in withdrawals_data]),
+            ', '.join([str(index) for index in withdrawable_validators]),
             tx_hash,
         )
 
     async def _check_withdrawals_block(
-        self, app_state: AppState, vault_address: ChecksumAddress, chain_head: ChainHead
+        self, app_state: AppState, vault_address: ChecksumAddress, block_number: BlockNumber
     ) -> bool:
         last_withdrawals_block = app_state.partial_withdrawal_cache.get(vault_address)
+        partial_withdrawals_blocks_interval = (
+            PARTIAL_WITHDRAWALS_INTERVAL // settings.network_config.SECONDS_PER_BLOCK
+        )
         if not last_withdrawals_block:
             vault_contract = VaultContract(vault_address)
             last_withdrawals_block = await vault_contract.get_last_partial_withdrawals_block()
         if (
             last_withdrawals_block
-            and last_withdrawals_block + PARTIAL_WITHDRAWALS_INTERVAL >= chain_head.block_number
+            and last_withdrawals_block + partial_withdrawals_blocks_interval >= block_number
         ):
             return False
         return True
 
 
-def _get_withdrawal_data(
+def _get_withdrawable_validators(
     vault_validators: dict[HexStr, Gwei], withdrawals_amount: int
 ) -> dict[HexStr, int]:
-    """
-    Returns withdrawal data for partial withdrawals
-    withdrawals_amount - total amount of queued assets,
-    more than available for partial withdrawals assets
-    """
     withdrawals_data = {}
 
     # can be executed in single request

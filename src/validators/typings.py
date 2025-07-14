@@ -3,6 +3,7 @@ from enum import Enum
 from typing import NewType
 
 from eth_typing import BlockNumber, BLSSignature, ChecksumAddress, HexStr
+from sw_utils import ValidatorStatus
 from web3.types import Gwei, Wei
 
 BLSPrivkey = NewType('BLSPrivkey', bytes)
@@ -40,9 +41,11 @@ class Validator:
 
 @dataclass
 class ConsensusValidator:
+    index: int
     public_key: HexStr
     balance: Gwei
     withdrawal_credentials: HexStr
+    status: ValidatorStatus
 
     @property
     def is_compounding(self) -> bool:

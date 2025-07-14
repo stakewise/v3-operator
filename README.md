@@ -451,6 +451,18 @@ the Operator Service.
 Harvesting the Vault rewards simplifies the contract calls to the Vault contract and reduces the gas fees for stakers,
 for example, the Vault does not need to sync rewards before calling deposit when a user stakes.
 
+### Withdraw Vault queued assets
+
+Another operator task is to trigger partial ETH/GNO withdrawals from validators.
+
+Every 24 hours the operator checks the current exit queue.
+If the requested amount can be processed via partial withdrawals, it submits them through the execution layer.
+Withdrawals are only triggered if the amount exceeds given amount(`validators_exit_queued_assets_bps` from protocol_config) of vault assets by default.
+
+You can disable this behavior with the `--disable-withdrawals` parameter. In this case, assets withdrawals will be processed by oracles, but oracles will exit the entire validator, which may negatively impact the vault's APR if most of the validator's assets remains in the vault.
+
+The partial withdrawals interval can be adjusted via the `PARTIAL_WITHDRAWALS_INTERVAL` env variable, with every 24 hours being the default.
+
 ### Recover validator keystores
 
 You can recover validator keystores that are active.

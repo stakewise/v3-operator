@@ -292,9 +292,10 @@ ORACLES_VALIDATORS_TIMEOUT: int = decouple_config(
 ORACLES_CONSOLIDATION_TIMEOUT: int = decouple_config(
     'ORACLES_CONSOLIDATION_TIMEOUT', default=10, cast=int
 )
+ORACLES_EXITS_TIMEOUT: int = decouple_config('ORACLES_EXITS_TIMEOUT', default=10, cast=int)
 # partial withdrawals
 PARTIAL_WITHDRAWALS_INTERVAL: int = decouple_config(
-    'PARTIAL_WITHDRAWALS_INTERVAL', default=666, cast=int
+    'PARTIAL_WITHDRAWALS_INTERVAL', default=86400, cast=int  # every 24 hr
 )
 # common
 MIN_ACTIVATION_BALANCE: Wei = Web3.to_wei(32, 'ether')
