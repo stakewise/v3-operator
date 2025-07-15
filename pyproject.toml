@@ -71,7 +71,7 @@ ignore-paths=["src/.*/tests/.*", "src/test_fixtures/.*"]
 ignore=["conftest.py"]
 
 [tool.pylint."BASIC"]
-good-names = ["db", "i", "w3"]
+good-names = ["db", "i", "w3", "bar"]
 ignored-modules=["milagro_bls_binding"]
 
 [tool.flake8]
