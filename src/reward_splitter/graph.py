@@ -33,7 +33,6 @@ async def graph_get_reward_splitters(
                 }
                 shareHolders(where: {earnedVaultAssets_gt: 0}) {
                     address
-                    shares
                     earnedVaultAssets
                 }
             }

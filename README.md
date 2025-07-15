@@ -463,7 +463,10 @@ Periodic withdrawal task relies on Reward Splitter contract. The task combines t
 - Withdraw Splitter rewards on behalf of each shareholder. Rewards withdrawn will go to exit queue.
 - Claim exited assets on behalf of each shareholder. Assets claimed will go directly to shareholder address.
 
-The automated withdrawals interval can be adjusted via the `REWARD_SPLITTER_INTERVAL` env variable, with every 24 hours being the default.
+Notes:
+
+- To avoid unnecessary gas fees from the operator's wallet, withdrawals are processed only if their total amount exceeds a minimum threshold. This can be adjusted via the `REWARD_SPLITTER_MIN_ASSETS` environment variable. The value is specified in Wei.
+- The automated withdrawals interval can be adjusted via the `REWARD_SPLITTER_INTERVAL` env variable, with every 24 hours being the default.
 
 ### Recover validator keystores
 
