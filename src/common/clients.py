@@ -89,7 +89,7 @@ class GraphClient:
     @cached_property
     def client(self) -> SWGraphClient:
         return SWGraphClient(
-            endpoint=settings.graph_api_url,
+            endpoint=settings.graph_endpoint,
             request_timeout=settings.graph_request_timeout,
             retry_timeout=settings.graph_retry_timeout,
             page_size=settings.graph_page_size,

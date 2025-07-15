@@ -137,9 +137,8 @@ AUTO = 'AUTO'
 @click.option(
     '--split-rewards',
     is_flag=True,
-    envvar='split_rewards',
-    help='Withdraw and claim shareholders rewards in reward splitter '
-    'on behalf of shareholders. Default is false.',
+    envvar='SPLIT_REWARDS',
+    help='Claim fee rewards periodically on behalf of the shareholders. Default is false.',
 )
 @click.option(
     '--execution-endpoints',
@@ -163,11 +162,10 @@ AUTO = 'AUTO'
     help='Comma separated list of API endpoints for consensus nodes.',
 )
 @click.option(
-    '--graph-api-url',
+    '--graph-endpoint',
     type=str,
-    envvar='GRAPH_API_URL',
-    prompt='Enter API endpoint for graph node',
-    help='API endpoint for graph nodes.',
+    envvar='GRAPH_ENDPOINT',
+    help='API endpoint for graph node.',
 )
 @click.option(
     '--vaults',
@@ -222,7 +220,7 @@ def start_api(
     consensus_endpoints: str,
     execution_endpoints: str,
     execution_jwt_secret: str | None,
-    graph_api_url: str,
+    graph_endpoint: str,
     harvest_vault: bool,
     split_rewards: bool,
     verbose: bool,
@@ -266,7 +264,7 @@ def start_api(
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
         execution_jwt_secret=execution_jwt_secret,
-        graph_api_url=graph_api_url,
+        graph_endpoint=graph_endpoint,
         harvest_vault=harvest_vault,
         split_rewards=split_rewards,
         verbose=verbose,

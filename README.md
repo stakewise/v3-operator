@@ -455,7 +455,7 @@ for example, the Vault does not need to sync rewards before calling deposit when
 
 ### Automated withdrawals (Reward splitter)
 
-It is possible to set up automatic withdrawals of Vault staking rewards. To enable automated withdrawals pass `--split-rewards`  flag to the Operator Service start command.
+It is possible to periodically withdraw rewards for the vault’s fee shareholders. To enable this, set the wallet address connected to the operator as the `Fee Claimer` in the `Roles` tab under the vault’s Settings. Additionally, you must pass the --split-rewards flag when starting the Operator Service.
 
 Periodic withdrawal task relies on Reward Splitter contract. The task combines the following contract calls into a multicall:
 
@@ -463,7 +463,7 @@ Periodic withdrawal task relies on Reward Splitter contract. The task combines t
 - Withdraw Splitter rewards on behalf of each shareholder. Rewards withdrawn will go to exit queue.
 - Claim exited assets on behalf of each shareholder. Assets claimed will go directly to shareholder address.
 
-The automated withdrawals interval can be adjusted via the `REWARD_SPLITTER_INTERVAL` env variable, with every 6 hours being the default.
+The automated withdrawals interval can be adjusted via the `REWARD_SPLITTER_INTERVAL` env variable, with every 24 hours being the default.
 
 ### Recover validator keystores
 

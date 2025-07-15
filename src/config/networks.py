@@ -23,6 +23,7 @@ class NetworkConfig(BaseNetworkConfig):
     CONSOLIDATION_CONTRACT_ADDRESS: ChecksumAddress
     HOT_WALLET_MIN_BALANCE: Wei
     STAKEWISE_API_URL: str
+    STAKEWISE_GRAPH_ENDPOINT: str
     RATED_API_URL: str
     CONFIG_UPDATE_EVENT_BLOCK: BlockNumber
     DEFAULT_DVT_RELAYER_ENDPOINT: str
@@ -42,6 +43,9 @@ NETWORKS: dict[str, NetworkConfig] = {
         ),
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
         STAKEWISE_API_URL='https://mainnet-api.stakewise.io/graphql',
+        STAKEWISE_GRAPH_ENDPOINT=(
+            'https://graphs.stakewise.io/mainnet/subgraphs/name/stakewise/prod'
+        ),
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(21471524),
         DEFAULT_DVT_RELAYER_ENDPOINT='https://mainnet-dvt-relayer.stakewise.io',
@@ -59,6 +63,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         ),
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
         STAKEWISE_API_URL='https://hoodi-api.stakewise.io/graphql',
+        STAKEWISE_GRAPH_ENDPOINT='https://graphs.stakewise.io/hoodi/subgraphs/name/stakewise/prod',
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(94090),
         DEFAULT_DVT_RELAYER_ENDPOINT='https://hoodi-dvt-relayer.stakewise.io',
@@ -76,6 +81,9 @@ NETWORKS: dict[str, NetworkConfig] = {
         ),
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
         STAKEWISE_API_URL='https://gnosis-api.stakewise.io/graphql',
+        STAKEWISE_GRAPH_ENDPOINT=(
+            'https://graphs.stakewise.io/gnosis/subgraphs/name/stakewise/prod'
+        ),
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(37640206),
         DEFAULT_DVT_RELAYER_ENDPOINT='gnosis-dvt-relayer.stakewise.io',
@@ -93,6 +101,9 @@ NETWORKS: dict[str, NetworkConfig] = {
         ),
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
         STAKEWISE_API_URL='https://chiado-api.stakewise.io/graphql',
+        STAKEWISE_GRAPH_ENDPOINT=(
+            'https://graphs.stakewise.io/chiado/subgraphs/name/stakewise/prod'
+        ),
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(12896244),
         DEFAULT_DVT_RELAYER_ENDPOINT='chiado-dvt-relayer.stakewise.io',

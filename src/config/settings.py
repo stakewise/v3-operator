@@ -38,7 +38,7 @@ class Settings(metaclass=Singleton):
     execution_retry_timeout: int
     events_blocks_range_interval: int
     execution_jwt_secret: str | None
-    graph_api_url: str
+    graph_endpoint: str
     graph_request_timeout: int
     graph_retry_timeout: int
     graph_page_size: int
@@ -112,7 +112,7 @@ class Settings(metaclass=Singleton):
         consensus_endpoints: str = '',
         execution_endpoints: str = '',
         execution_jwt_secret: str | None = None,
-        graph_api_url: str = '',
+        graph_endpoint: str = '',
         harvest_vault: bool = False,
         split_rewards: bool = False,
         verbose: bool = False,
@@ -153,7 +153,7 @@ class Settings(metaclass=Singleton):
         self.consensus_endpoints = [node.strip() for node in consensus_endpoints.split(',')]
         self.execution_endpoints = [node.strip() for node in execution_endpoints.split(',')]
         self.execution_jwt_secret = execution_jwt_secret
-        self.graph_api_url = graph_api_url
+        self.graph_endpoint = graph_endpoint or self.network_config.STAKEWISE_GRAPH_ENDPOINT
         self.harvest_vault = harvest_vault
         self.split_rewards = split_rewards
         self.verbose = verbose
@@ -335,7 +335,7 @@ REWARD_SPLITTER_MIN_ASSETS: int = decouple_config(
     'REWARD_SPLITTER_MIN_ASSETS', default=Web3.to_wei('0.001', 'ether'), cast=int
 )
 REWARD_SPLITTER_INTERVAL: int = decouple_config(
-    'REWARD_SPLITTER_INTERVAL', default=86400, cast=int  # every 6 hr
+    'REWARD_SPLITTER_INTERVAL', default=86400, cast=int  # every 24 hr
 )
 # logging
 LOG_PLAIN = 'plain'

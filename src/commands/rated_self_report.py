@@ -74,7 +74,7 @@ def rated_self_report(
         network=network,
         execution_endpoints='',
         consensus_endpoints='',
-        graph_api_url=NETWORKS[network].STAKEWISE_API_URL,
+        graph_endpoint=NETWORKS[network].STAKEWISE_API_URL,
     )
     click.secho('Starting rated self report...')
     for vault in vaults:
