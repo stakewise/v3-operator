@@ -22,6 +22,7 @@ from src.common.typings import (
 )
 from src.config.settings import settings
 from src.validators.typings import V2ValidatorEventData
+from src.withdrawals.typings import WithdrawalEvent
 
 
 class ContractWrapper:
@@ -174,23 +175,26 @@ class VaultContract(ContractWrapper, VaultStateMixin):
     async def validators_manager(self) -> ChecksumAddress:
         return await self.contract.functions.validatorsManager().call()
 
-    async def get_last_partial_withdrawals_block(self) -> BlockNumber | None:
-        """Fetches the last partial withdrawal event block."""
-        from_block = settings.network_config.KEEPER_GENESIS_BLOCK
-        if (
-            settings.network_config.PECTRA_BLOCK
-            and settings.network_config.PECTRA_BLOCK > settings.network_config.KEEPER_GENESIS_BLOCK
-        ):
-            from_block = settings.network_config.PECTRA_BLOCK
-        last_event = await self._get_last_event(
+    async def get_validator_withdrawal_submitted_events(
+        self,
+        from_block: BlockNumber,
+    ) -> list[WithdrawalEvent]:
+        from_block = max(from_block, settings.network_config.KEEPER_GENESIS_BLOCK)
+        if settings.network_config.PECTRA_BLOCK:
+            from_block = max(from_block, settings.network_config.PECTRA_BLOCK)
+        events = await self._get_events(
             self.events.ValidatorWithdrawalSubmitted,  # type: ignore
             from_block=from_block,
             to_block=await self.execution_client.eth.get_block_number(),
         )
-        if not last_event:
-            return None
-
-        return BlockNumber(last_event['blockNumber'])
+        return [
+            WithdrawalEvent(
+                public_key=Web3.to_hex(event['args']['publicKey']),
+                amount=event['args']['amount'],
+                block_number=BlockNumber(event['blockNumber']),
+            )
+            for event in events
+        ]
 
 
 class GnoVaultContract(ContractWrapper, VaultStateMixin):

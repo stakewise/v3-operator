@@ -6,13 +6,13 @@ from web3 import Web3
 from web3.types import BlockNumber, Gwei
 
 from src.common.app_state import AppState
-from src.common.clients import execution_client
+from src.common.clients import consensus_client, execution_client
 from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import VaultContract
 from src.common.execution import get_execution_request_fee, get_protocol_config
 from src.common.harvest import get_harvest_params
 from src.common.tasks import BaseTask
-from src.common.utils import format_error, round_down
+from src.common.utils import calc_slot_by_block_number, format_error, round_down
 from src.config.settings import (
     MAX_WITHDRAWAL_REQUEST_FEE,
     MIN_ACTIVATION_BALANCE_GWEI,
@@ -123,18 +123,54 @@ class PartialWithdrawalsTask(BaseTask):
         self, app_state: AppState, vault_address: ChecksumAddress, block_number: BlockNumber
     ) -> bool:
         last_withdrawals_block = app_state.partial_withdrawal_cache.get(vault_address)
+
         partial_withdrawals_blocks_interval = (
             PARTIAL_WITHDRAWALS_INTERVAL // settings.network_config.SECONDS_PER_BLOCK
         )
+        from_block = BlockNumber(block_number - partial_withdrawals_blocks_interval)
         if not last_withdrawals_block:
-            vault_contract = VaultContract(vault_address)
-            last_withdrawals_block = await vault_contract.get_last_partial_withdrawals_block()
+            last_withdrawals_block = await self._fetch_last_withdrawals_block(
+                vault_address, from_block
+            )
+            app_state.partial_withdrawal_cache[vault_address] = last_withdrawals_block
+
         if (
             last_withdrawals_block
             and last_withdrawals_block + partial_withdrawals_blocks_interval >= block_number
         ):
             return False
         return True
+
+    async def _fetch_last_withdrawals_block(
+        self, vault_address: ChecksumAddress, from_block: BlockNumber
+    ) -> BlockNumber | None:
+        """
+        Fetch withdrawal events for the required interval.
+        Validate that the withdrawal was successful via a consensus request.
+        Return the last event block number.
+        """
+        vault_contract = VaultContract(vault_address)
+        withdrawals_events = await vault_contract.get_validator_withdrawal_submitted_events(
+            from_block
+        )
+        consensus_validators = await fetch_consensus_validators(
+            [event.public_key for event in withdrawals_events]
+        )
+        public_key_to_index = {val.public_key: val.index for val in consensus_validators}
+
+        for event in withdrawals_events:
+            slot = await calc_slot_by_block_number(event.block_number)
+            pending_partial_withdrawals = await consensus_client.get_pending_partial_withdrawals(
+                slot
+            )
+            for withdrawal in pending_partial_withdrawals:
+                if (
+                    int(withdrawal['validator_index']) == public_key_to_index[event.public_key]
+                    and Web3.to_wei(withdrawal['amount'], 'gwei') == event.amount
+                ):
+                    return event.block_number
+
+        return None
 
 
 def _get_withdrawable_validators(
