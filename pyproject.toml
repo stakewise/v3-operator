@@ -53,7 +53,10 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.bandit]
 exclude_dirs = ["*/tests/*", "src/config/networks.py", "conftest.py"]
-skips = ["B608"]
+skips = [
+    "B608",  # test for SQL injection
+    "B404"   # import subprocess module
+]
 
 [tool.pylint."pre-commit-hook"]
 disable = [
@@ -67,7 +70,7 @@ disable = [
     "R0903",  # too-few-public-methods
     "R0917"   # Too many positional arguments
 ]
-ignore-paths=["src/.*/tests/.*", "src/test_fixtures/.*"]
+ignore-paths=["src/.*/tests/.*", "src/test_fixtures/.*", "src/_vulture_whitelist.py"]
 ignore=["conftest.py"]
 
 [tool.pylint."BASIC"]
@@ -80,10 +83,10 @@ extend-ignore = [
     "E501",  # Line too long
     "E701"   # Multiple statements on one line (colon)
 ]
-exclude = ["conftest.py"]
+exclude = ["conftest.py", "src/_vulture_whitelist.py"]
 
 [tool.mypy]
-exclude = ["test"]
+exclude = ["test", "src/_vulture_whitelist.py"]
 ignore_missing_imports = true
 python_version = "3.12"
 disallow_untyped_defs = true

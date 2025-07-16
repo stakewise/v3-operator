@@ -14,7 +14,8 @@ from src.commands.create_wallet import create_wallet
 from src.commands.export_public_keys import export_public_keys
 from src.commands.import_genesis_keys import import_genesis_keys
 from src.commands.init import init
-from src.commands.node.node_install import node_install
+from src.commands.nodes.node_install import node_install
+from src.commands.nodes.node_start import node_start
 from src.commands.rated_self_report import rated_self_report
 from src.commands.recover import recover
 from src.commands.remote_signer_setup import remote_signer_setup
@@ -50,6 +51,7 @@ cli.add_command(import_genesis_keys)
 cli.add_command(remote_db_group)
 cli.add_command(rated_self_report)
 cli.add_command(node_install)
+cli.add_command(node_start)
 
 
 if __name__ == '__main__':

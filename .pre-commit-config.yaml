@@ -57,7 +57,7 @@ repos:
         language: system
         types: [ python ]
         require_serial: true
-        exclude: "test"
+        exclude: "test|_vulture_whitelist.py"
 
   - repo: local
     hooks:
