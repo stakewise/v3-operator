@@ -6,7 +6,9 @@ import click
 
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_NETWORK, LOG_DATE_FORMAT
-from src.nodes.process import RethProcess
+from src.nodes.process import LighthouseProcess, RethProcess, shutdown_processes
+
+logger = logging.getLogger(__name__)
 
 
 @click.option(
@@ -40,17 +42,25 @@ def node_start(data_dir: Path, network: str) -> None:
     )
 
     reth_process = RethProcess(network=network, data_dir=data_dir)
+    lighthouse_process = LighthouseProcess(network=network, data_dir=data_dir)
 
     reth_process.start()
+    lighthouse_process.start()
+
     try:
-        # Wait for keyboard interrupt to stop the process
         while True:
+            # todo: what to do if processes are not alive?
             if not reth_process.is_alive:
                 click.echo(f'{reth_process.name} is terminated')
                 break
 
+            if not lighthouse_process.is_alive:
+                click.echo(f'{lighthouse_process.name} is terminated')
+                break
+
             time.sleep(1)
     finally:
-        if reth_process.is_alive:
-            click.echo(f'Stopping {reth_process.name}')
-            reth_process.stop()
+        # We get here in the case of Ctrl+C
+        # Shut down the processes gracefully
+        click.echo('Shut down nodes...')
+        shutdown_processes([reth_process, lighthouse_process])

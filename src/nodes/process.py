@@ -2,9 +2,10 @@ import logging
 import subprocess
 from pathlib import Path
 
+from src.config.networks import NETWORKS
 from src.nodes.exceptions import NodeException
 from src.nodes.typings import IO_Any
-from src.nodes.utils.proc import kill_proc
+from src.nodes.utils.proc import kill_proc_list
 
 logger = logging.getLogger(__name__)
 
@@ -37,14 +38,6 @@ class BaseProcess:
             stdout=self.stdout,
             stderr=self.stderr,
         )
-
-    def stop(self) -> None:
-        if self.proc is None:
-            raise NodeException('Not running')
-
-        if self.proc.poll() is None:
-            kill_proc(self.proc, self.name)
-            self.proc = None
 
     @property
     def is_alive(self) -> bool:
@@ -80,12 +73,57 @@ class RethProcess(BaseProcess):
             '8545',
             '--http.api',
             'all',
-            '--log.file.directory',
-            reth_dir / 'logs',
             '--max-outbound-peers',
             '25',
             '--max-inbound-peers',
             '25',
             '--authrpc.jwtsecret',
-            reth_dir / 'jwt.hex',
+            reth_dir.parent / 'jwt.hex',
+            '--log.file.directory',
+            reth_dir / 'logs',
         ]
+
+
+class LighthouseProcess(BaseProcess):
+    name = 'Lighthouse'
+
+    def __init__(self, network: str, data_dir: Path):
+        super().__init__()
+
+        lighthouse_dir = data_dir / network / 'nodes' / 'lighthouse'
+        binary_path = lighthouse_dir / 'lighthouse'
+
+        self.command = [
+            binary_path,
+            'bn',
+            '--network',
+            network,
+            '--datadir',
+            lighthouse_dir,
+            '--staking',
+            '--validator-monitor-auto',
+            '--checkpoint-sync-url',
+            NETWORKS[network].CONSENSUS_NODE_CHECKPOINT_SYNC_URL,
+            '--port',
+            '9000',
+            '--quic-port',
+            '9001',
+            '--http-port',
+            '5052',
+            '--execution-endpoint',
+            'http://127.0.0.1:8551',
+            '--execution-jwt',
+            lighthouse_dir.parent / 'jwt.hex',
+            '--logfile-dir',
+            lighthouse_dir / 'logs',
+        ]
+
+
+def shutdown_processes(processes: list[BaseProcess]) -> None:
+    """
+    Gracefully shuts down the provided processes
+    and waits for their termination in parallel.
+    """
+    proc_list = [proc.proc for proc in processes if proc.proc is not None]
+
+    kill_proc_list(proc_list)

@@ -26,6 +26,7 @@ class NetworkConfig(BaseNetworkConfig):
     CONFIG_UPDATE_EVENT_BLOCK: BlockNumber
     DEFAULT_DVT_RELAYER_ENDPOINT: str
     MAX_FEE_PER_GAS_GWEI: Gwei
+    CONSENSUS_NODE_CHECKPOINT_SYNC_URL: str
 
     @property
     def IS_SUPPORT_V2_MIGRATION(self) -> bool:
@@ -57,6 +58,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(21471524),
         DEFAULT_DVT_RELAYER_ENDPOINT='https://mainnet-dvt-relayer.stakewise.io',
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
+        CONSENSUS_NODE_CHECKPOINT_SYNC_URL='https://beaconstate.ethstaker.cc/',
     ),
     HOODI: NetworkConfig(
         **asdict(BASE_NETWORKS[HOODI]),
@@ -75,6 +77,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(94090),
         DEFAULT_DVT_RELAYER_ENDPOINT='https://hoodi-dvt-relayer.stakewise.io',
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
+        CONSENSUS_NODE_CHECKPOINT_SYNC_URL='https://hoodi.beaconstate.ethstaker.cc/',
     ),
     GNOSIS: NetworkConfig(
         **asdict(BASE_NETWORKS[GNOSIS]),
@@ -95,6 +98,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(37640206),
         DEFAULT_DVT_RELAYER_ENDPOINT='gnosis-dvt-relayer.stakewise.io',
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
+        CONSENSUS_NODE_CHECKPOINT_SYNC_URL='',
     ),
     CHIADO: NetworkConfig(
         **asdict(BASE_NETWORKS[CHIADO]),
@@ -115,5 +119,6 @@ NETWORKS: dict[str, NetworkConfig] = {
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(12896244),
         DEFAULT_DVT_RELAYER_ENDPOINT='chiado-dvt-relayer.stakewise.io',
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
+        CONSENSUS_NODE_CHECKPOINT_SYNC_URL='',
     ),
 }
