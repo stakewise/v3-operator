@@ -7,7 +7,11 @@ from web3.types import BlockNumber, ChecksumAddress, HexBytes, HexStr, Wei
 
 from src.common.app_state import AppState
 from src.common.clients import execution_client
-from src.common.contracts import multicall_contract
+from src.common.contracts import (
+    RewardSplitterContract,
+    RewardSplitterEncoder,
+    multicall_contract,
+)
 from src.common.execution import build_gas_manager
 from src.common.harvest import get_harvest_params
 from src.common.tasks import BaseTask
@@ -19,7 +23,6 @@ from src.config.settings import (
     REWARD_SPLITTER_MIN_ASSETS,
     settings,
 )
-from src.reward_splitter.contracts import RewardSplitterContract, RewardSplitterEncoder
 from src.reward_splitter.graph import (
     graph_get_claimable_exit_requests,
     graph_get_reward_splitters,
