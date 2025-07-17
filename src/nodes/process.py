@@ -81,6 +81,8 @@ class RethProcess(BaseProcess):
             reth_dir.parent / 'jwt.hex',
             '--log.file.directory',
             reth_dir / 'logs',
+            '--nat',
+            'upnp',
         ]
 
 

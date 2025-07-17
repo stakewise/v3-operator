@@ -98,7 +98,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(37640206),
         DEFAULT_DVT_RELAYER_ENDPOINT='gnosis-dvt-relayer.stakewise.io',
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
-        CONSENSUS_NODE_CHECKPOINT_SYNC_URL='',
+        CONSENSUS_NODE_CHECKPOINT_SYNC_URL='https://checkpoint.gnosischain.com/',
     ),
     CHIADO: NetworkConfig(
         **asdict(BASE_NETWORKS[CHIADO]),
@@ -119,6 +119,6 @@ NETWORKS: dict[str, NetworkConfig] = {
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(12896244),
         DEFAULT_DVT_RELAYER_ENDPOINT='chiado-dvt-relayer.stakewise.io',
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
-        CONSENSUS_NODE_CHECKPOINT_SYNC_URL='',
+        CONSENSUS_NODE_CHECKPOINT_SYNC_URL='https://checkpoint.chiadochain.net/',
     ),
 }

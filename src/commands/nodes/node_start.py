@@ -31,9 +31,7 @@ logger = logging.getLogger(__name__)
     ),
     show_default=True,
 )
-@click.command(
-    help='Starts execution node and consensus node.',
-)
+@click.command(help='Starts execution and consensus nodes.')
 def node_start(data_dir: Path, network: str) -> None:
     logging.basicConfig(
         format='%(asctime)s %(levelname)-8s %(message)s',
@@ -62,5 +60,5 @@ def node_start(data_dir: Path, network: str) -> None:
     finally:
         # We get here in the case of Ctrl+C
         # Shut down the processes gracefully
-        click.echo('Shut down nodes...')
+        click.echo('Shutting down nodes...')
         shutdown_processes([reth_process, lighthouse_process])
