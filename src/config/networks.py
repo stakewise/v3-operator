@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import asdict, dataclass
 
 from ens.constants import EMPTY_ADDR_HEX
@@ -26,7 +28,7 @@ class NetworkConfig(BaseNetworkConfig):
     CONFIG_UPDATE_EVENT_BLOCK: BlockNumber
     DEFAULT_DVT_RELAYER_ENDPOINT: str
     MAX_FEE_PER_GAS_GWEI: Gwei
-    CONSENSUS_NODE_CHECKPOINT_SYNC_URL: str
+    NODE_CONFIG: NodeConfig
 
     @property
     def IS_SUPPORT_V2_MIGRATION(self) -> bool:
@@ -36,6 +38,12 @@ class NetworkConfig(BaseNetworkConfig):
             self.V2_POOL_ESCROW_CONTRACT_ADDRESS,
             self.GENESIS_VAULT_CONTRACT_ADDRESS,
         ]
+
+
+@dataclass
+class NodeConfig:
+    CONSENSUS_CHECKPOINT_SYNC_URL: str
+    ERA_URL: str
 
 
 NETWORKS: dict[str, NetworkConfig] = {
@@ -58,7 +66,10 @@ NETWORKS: dict[str, NetworkConfig] = {
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(21471524),
         DEFAULT_DVT_RELAYER_ENDPOINT='https://mainnet-dvt-relayer.stakewise.io',
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
-        CONSENSUS_NODE_CHECKPOINT_SYNC_URL='https://beaconstate.ethstaker.cc/',
+        NODE_CONFIG=NodeConfig(
+            CONSENSUS_CHECKPOINT_SYNC_URL='https://beaconstate.ethstaker.cc/',
+            ERA_URL='https://data.ethpandaops.io/era1/mainnet/',
+        ),
     ),
     HOODI: NetworkConfig(
         **asdict(BASE_NETWORKS[HOODI]),
@@ -77,7 +88,10 @@ NETWORKS: dict[str, NetworkConfig] = {
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(94090),
         DEFAULT_DVT_RELAYER_ENDPOINT='https://hoodi-dvt-relayer.stakewise.io',
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
-        CONSENSUS_NODE_CHECKPOINT_SYNC_URL='https://hoodi.beaconstate.ethstaker.cc/',
+        NODE_CONFIG=NodeConfig(
+            CONSENSUS_CHECKPOINT_SYNC_URL='https://hoodi.beaconstate.ethstaker.cc/',
+            ERA_URL='https://hoodi.era.nimbus.team/',
+        ),
     ),
     GNOSIS: NetworkConfig(
         **asdict(BASE_NETWORKS[GNOSIS]),
@@ -98,7 +112,10 @@ NETWORKS: dict[str, NetworkConfig] = {
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(37640206),
         DEFAULT_DVT_RELAYER_ENDPOINT='gnosis-dvt-relayer.stakewise.io',
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
-        CONSENSUS_NODE_CHECKPOINT_SYNC_URL='https://checkpoint.gnosischain.com/',
+        NODE_CONFIG=NodeConfig(
+            CONSENSUS_CHECKPOINT_SYNC_URL='https://beacon.gnosischain.com/',
+            ERA_URL='',
+        ),
     ),
     CHIADO: NetworkConfig(
         **asdict(BASE_NETWORKS[CHIADO]),
@@ -119,6 +136,9 @@ NETWORKS: dict[str, NetworkConfig] = {
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(12896244),
         DEFAULT_DVT_RELAYER_ENDPOINT='chiado-dvt-relayer.stakewise.io',
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
-        CONSENSUS_NODE_CHECKPOINT_SYNC_URL='https://checkpoint.chiadochain.net/',
+        NODE_CONFIG=NodeConfig(
+            CONSENSUS_CHECKPOINT_SYNC_URL='https://beacon.chiadochain.net/',
+            ERA_URL='',
+        ),
     ),
 }

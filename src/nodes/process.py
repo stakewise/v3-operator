@@ -85,6 +85,9 @@ class RethProcess(BaseProcess):
             'upnp',
         ]
 
+        if era_url := NETWORKS[network].NODE_CONFIG.ERA_URL:
+            self.command.extend(['--era.enable', '--era.url', era_url])
+
 
 class LighthouseProcess(BaseProcess):
     name = 'Lighthouse'
@@ -105,7 +108,7 @@ class LighthouseProcess(BaseProcess):
             '--staking',
             '--validator-monitor-auto',
             '--checkpoint-sync-url',
-            NETWORKS[network].CONSENSUS_NODE_CHECKPOINT_SYNC_URL,
+            NETWORKS[network].NODE_CONFIG.CONSENSUS_CHECKPOINT_SYNC_URL,
             '--port',
             '9000',
             '--quic-port',
