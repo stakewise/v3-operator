@@ -90,7 +90,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
         NODE_CONFIG=NodeConfig(
             CONSENSUS_CHECKPOINT_SYNC_URL='https://hoodi.beaconstate.ethstaker.cc/',
-            ERA_URL='https://hoodi.era.nimbus.team/',
+            ERA_URL='',
         ),
     ),
     GNOSIS: NetworkConfig(
