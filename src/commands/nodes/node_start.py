@@ -47,18 +47,28 @@ def node_start(data_dir: Path, network: str) -> None:
 
     try:
         while True:
-            # todo: what to do if processes are not alive?
+            # Keep the processes alive
             if not reth_process.is_alive:
-                click.echo(f'{reth_process.name} is terminated')
-                break
+                click.echo(f'{reth_process.name} is terminated. Restarting...')
+                reth_process = RethProcess(network=network, data_dir=data_dir)
+                reth_process.start()
 
             if not lighthouse_process.is_alive:
-                click.echo(f'{lighthouse_process.name} is terminated')
-                break
+                click.echo(f'{lighthouse_process.name} is terminated. Restarting...')
+                lighthouse_process = LighthouseProcess(network=network, data_dir=data_dir)
+                lighthouse_process.start()
 
             time.sleep(1)
-    finally:
-        # We get here in the case of Ctrl+C
+    except KeyboardInterrupt:
+        # Handle Ctrl+C
         # Shut down the processes gracefully
+        # Do not reraise
         click.echo('Shutting down nodes...')
         shutdown_processes([reth_process, lighthouse_process])
+    finally:
+        # Handle unexpected error
+        # Shut down the processes gracefully
+        # Reraise the exception
+        if reth_process.is_alive or lighthouse_process.is_alive:
+            click.echo('Shutting down nodes...')
+            shutdown_processes([reth_process, lighthouse_process])
