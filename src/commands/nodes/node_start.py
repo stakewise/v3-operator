@@ -106,9 +106,9 @@ def _check_hardware_requirements(data_dir: Path, network: str, no_confirm: bool)
 
     if mem_total_gb < min_memory_gb:
         if not no_confirm and not click.confirm(
-            f"At least {min_memory_gb} GB of RAM is recommended to run the nodes.\n"
+            f'At least {min_memory_gb} GB of RAM is recommended to run the nodes.\n'
             f'You have {mem_total_gb:.1f} GB of RAM in total.\n'
-            f"Do you want to continue anyway?",
+            f'Do you want to continue anyway?',
             default=False,
         ):
             raise click.Abort()
@@ -120,9 +120,9 @@ def _check_hardware_requirements(data_dir: Path, network: str, no_confirm: bool)
 
     if disk_total_tb < min_disk_tb:
         if not no_confirm and not click.confirm(
-            f"At least {min_disk_tb} TB of disk space is recommended in the data directory.\n"
-            f"You have {disk_total_tb:.1f} TB available at {data_dir}.\n"
-            f"Do you want to continue anyway?",
+            f'At least {min_disk_tb} TB of disk space is recommended in the data directory.\n'
+            f'You have {disk_total_tb:.1f} TB available at {data_dir}.\n'
+            f'Do you want to continue anyway?',
             default=False,
         ):
             raise click.Abort()
