@@ -314,20 +314,58 @@ You are all set! Now it's time to run the Operator Service.
 You are ready to run the Operator Service using the `start` command, optionally passing your Vault address and consensus
 and execution endpoints as flags.
 
-If you **did not** use Operator Service to generate hot wallet, you will need to add the following flags:
+There are several ways to run the Operator Service, depending on how you store private keys.
 
-- `--hot-wallet-file` - path to the password-protected _.txt_ file containing your hot wallet private key.
-- `--hot-wallet-password-file` - path to a _.txt_ file containing the password to open the protected hot wallet private
-  key file.
+#### Locally stored keystores
+
+By default, the Operator Service runs with locally stored keystores.
+
+```./operator start-local --vaults=0x3320a...68 --consensus-endpoints=http://localhost:5052 --execution-endpoints=http://localhost:8545```
 
 If you **did not** use Operator Service to generate validator keys, you will need to add the following flag:
 
 - `--keystores-dir` - The directory with validator keys in the EIP-2335 standard. The folder must contain either a
   single `password.txt` password file for all the keystores or separate password files for each keystore with the same
   name as keystore, but ending with `.txt`. For example, `keystore1.json`, `keystore1.txt`, etc.
+- `--keystores-password-file`: Absolute path to the password file for decrypting keystores.
 
-To register a validator using the 0x01 (ETH1_ADDRESS_WITHDRAWAL_PREFIX) credential type,
-include the `--validator-type 0x01` flag in your command.
+#### Hashi vault
+
+Operator supports loading signing keys from remote Hashi Vault instance, avoiding storage of keystores on the filesystem. This approach is best suited for node operators who already have most of Stakewise Operator functionality implemented in their systems, and only need integration for validator registration or pooling support. Regular users should only employ this functionality on their own risk, if they already manage a deployment of hashi vault.
+
+```./operator start-hashi-vault ...```
+
+Hashi vault options:
+
+- `--hashi-vault-url`: The base URL of the vault service, e.g. `http://vault:8200`.
+- `--hashi-vault-token`: Authentication token for accessing Hashi vault.
+- `--hashi-vault-key-path`: Key path(s) in the K/V secret engine where validator signing keys are stored.
+- `--hashi-vault-key-prefix`: Key prefix(es) in the K/V secret engine under which validator signing keys are stored.
+- `--hashi-vault-parallelism`: How much requests to K/V secrets engine to do in parallel.
+
+Check [Hashi Vault guide](https://docs.stakewise.io/for-operators/operator-service/running-with-hashi-vault) for more details.
+
+##### Remote signer
+
+You may not want the operator service to have direct access to the validator keys. Validator keystores do not need to be present directly in the operator. The operator can query a remote signer to get signatures for validator exit messages.
+
+```./operator start-remote-signer ...```
+
+Remote signer options:
+
+- `--remote-signer-url`: The base URL of the remote signer, e.g. `http://signer:9000`
+
+Check [Remote signer guide](https://docs.stakewise.io/for-operators/operator-service/running-with-remote-signer) for more details.
+
+#### Relayer(API mode)
+
+The Operator API facilitates the initiation of validator registrations via API calls, proving particularly useful in cases where the operator independently oversees the creation and storage of validator keys. Within this framework, keystores are generated and preserved externally from the operator. Similarly, exit signatures are produced outside the operator. In essence, the operator acts as an intermediary for communication with the vault contract.
+
+```./operator start-relayer```
+
+Check [API mode guide](https://docs.stakewise.io/for-operators/operator-service/running-as-api-service) for more details.
+
+### Running Operator options
 
 #### Using binary
 
@@ -337,7 +375,7 @@ You can start the Operator service using binary with the following command:
 ./operator start --vaults=0x000...,0x111... --consensus-endpoints=http://localhost:5052 --execution-endpoints=http://localhost:8545
 ```
 
-#### Using docker
+##### Using docker
 
 For docker, you first need to mount the folder containing validator keystores and deposit data file generated
 into the docker container. You then need to also include the `--data-dir` flag alongside the `start` command as per the
@@ -355,7 +393,7 @@ src/main.py start \
 --execution-endpoints=http://localhost:8545
 ```
 
-#### Using Source Files
+##### Using Source Files
 
 ```bash
 PYTHONPATH=. poetry run python src/main.py start \
