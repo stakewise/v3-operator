@@ -6,7 +6,7 @@ import click
 
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_NETWORK, LOG_DATE_FORMAT
-from src.nodes.process import LighthouseProcess, RethProcess, shutdown_processes
+from src.nodes.process import ProcessBuilder, shutdown_processes
 
 logger = logging.getLogger(__name__)
 
@@ -76,32 +76,3 @@ def node_start(data_dir: Path, network: str) -> None:
         if reth_process.is_alive or lighthouse_process.is_alive:
             click.echo('Shutting down nodes...')
             shutdown_processes([reth_process, lighthouse_process])
-
-
-class ProcessBuilder:
-    def __init__(self, network: str, data_dir: Path):
-        self.network = network
-        self.data_dir = data_dir
-
-    @property
-    def nodes_dir(self) -> Path:
-        return self.data_dir / self.network / 'nodes'
-
-    def get_reth_process(self) -> RethProcess:
-        reth_dir = self.nodes_dir / 'reth'
-
-        return RethProcess(network=self.network, reth_dir=reth_dir)
-
-    def get_lighthouse_process(self) -> LighthouseProcess:
-        lighthouse_dir = self.nodes_dir / 'lighthouse'
-
-        # Let Reth create the JWT secret file on first run
-        jwt_secret_path = self.get_default_jwt_secret_path()
-
-        return LighthouseProcess(
-            network=self.network, lighthouse_dir=lighthouse_dir, jwt_secret_path=jwt_secret_path
-        )
-
-    def get_default_jwt_secret_path(self) -> Path:
-        """Returns the default JWT secret path for Reth."""
-        return self.nodes_dir / 'reth' / 'jwt.hex'

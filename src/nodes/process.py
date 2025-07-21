@@ -129,9 +129,41 @@ class LighthouseProcess(BaseProcess):
 
 def shutdown_processes(processes: list[BaseProcess]) -> None:
     """
-    Gracefully shuts down the provided processes
-    and waits for their termination in parallel.
+    Wrapper around `kill_proc_list` accepting `BaseProcess` list
     """
     proc_list = [proc.proc for proc in processes if proc.proc is not None]
 
     kill_proc_list(proc_list)
+
+
+class ProcessBuilder:
+    """
+    Helper class for constructing Execution and Consensus node instances.
+    """
+
+    def __init__(self, network: str, data_dir: Path):
+        self.network = network
+        self.data_dir = data_dir
+
+    @property
+    def nodes_dir(self) -> Path:
+        return self.data_dir / self.network / 'nodes'
+
+    def get_reth_process(self) -> RethProcess:
+        reth_dir = self.nodes_dir / 'reth'
+
+        return RethProcess(network=self.network, reth_dir=reth_dir)
+
+    def get_lighthouse_process(self) -> LighthouseProcess:
+        lighthouse_dir = self.nodes_dir / 'lighthouse'
+
+        # Let Reth create the JWT secret file on first run
+        jwt_secret_path = self.get_default_jwt_secret_path()
+
+        return LighthouseProcess(
+            network=self.network, lighthouse_dir=lighthouse_dir, jwt_secret_path=jwt_secret_path
+        )
+
+    def get_default_jwt_secret_path(self) -> Path:
+        """Returns the default JWT secret path created by Reth."""
+        return self.nodes_dir / 'reth' / 'jwt.hex'
