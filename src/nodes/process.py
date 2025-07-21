@@ -47,12 +47,17 @@ class BaseProcess:
 class RethProcess(BaseProcess):
     name = 'Reth'
 
-    def __init__(self, network: str, data_dir: Path):
+    def __init__(self, network: str, reth_dir: Path):
+        """
+        :param network: The network name
+        :param reth_dir: The directory where Reth data will be stored
+        """
         super().__init__()
+        self.reth_dir = reth_dir
 
-        reth_dir = data_dir / network / 'nodes' / 'reth'
         binary_path = reth_dir / 'reth'
 
+        # Port numbers are set according to Reth's defaults
         self.command = [
             binary_path,
             'node',
@@ -77,8 +82,6 @@ class RethProcess(BaseProcess):
             '25',
             '--max-inbound-peers',
             '25',
-            '--authrpc.jwtsecret',
-            reth_dir.parent / 'jwt.hex',
             '--log.file.directory',
             reth_dir / 'logs',
             '--nat',
@@ -92,12 +95,12 @@ class RethProcess(BaseProcess):
 class LighthouseProcess(BaseProcess):
     name = 'Lighthouse'
 
-    def __init__(self, network: str, data_dir: Path):
+    def __init__(self, network: str, lighthouse_dir: Path, jwt_secret_path: Path):
         super().__init__()
 
-        lighthouse_dir = data_dir / network / 'nodes' / 'lighthouse'
         binary_path = lighthouse_dir / 'lighthouse'
 
+        # Port numbers are set according to Lighthouse's defaults
         self.command = [
             binary_path,
             'bn',
@@ -118,7 +121,7 @@ class LighthouseProcess(BaseProcess):
             '--execution-endpoint',
             'http://127.0.0.1:8551',
             '--execution-jwt',
-            lighthouse_dir.parent / 'jwt.hex',
+            jwt_secret_path,
             '--logfile-dir',
             lighthouse_dir / 'logs',
         ]

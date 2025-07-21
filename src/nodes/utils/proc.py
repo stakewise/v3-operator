@@ -4,7 +4,6 @@ import logging
 import signal
 import subprocess
 import time
-from typing import AnyStr
 
 from src.nodes.utils.timeout import Timeout
 
@@ -50,7 +49,7 @@ def kill_proc_list(proc_list: list[subprocess.Popen]) -> None:
                 proc.kill()
 
 
-def wait_for_proc_exit(proc_list: list[subprocess.Popen[AnyStr]], timeout: int = 30) -> None:
+def wait_for_proc_exit(proc_list: list[subprocess.Popen], timeout: int = 30) -> None:
     try:
         with Timeout(timeout) as _timeout:
             while any(proc.poll() is None for proc in proc_list):

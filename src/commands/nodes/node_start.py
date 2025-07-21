@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
     default=Path.home() / '.stakewise',
     envvar='DATA_DIR',
     help='Path where the nodes data will be placed',
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    type=click.Path(exists=False, file_okay=False, dir_okay=True, path_type=Path),
     show_default=True,
 )
 @click.option(
@@ -38,9 +38,13 @@ def node_start(data_dir: Path, network: str) -> None:
         datefmt=LOG_DATE_FORMAT,
         level='INFO',
     )
+    # Create the data directory if it does not exist
+    # Also the data directory could be created by the `init` command
+    data_dir.mkdir(parents=True, exist_ok=True)
 
-    reth_process = RethProcess(network=network, data_dir=data_dir)
-    lighthouse_process = LighthouseProcess(network=network, data_dir=data_dir)
+    process_builder = ProcessBuilder(network=network, data_dir=data_dir)
+    reth_process = process_builder.get_reth_process()
+    lighthouse_process = process_builder.get_lighthouse_process()
 
     reth_process.start()
     lighthouse_process.start()
@@ -50,12 +54,12 @@ def node_start(data_dir: Path, network: str) -> None:
             # Keep the processes alive
             if not reth_process.is_alive:
                 click.echo(f'{reth_process.name} is terminated. Restarting...')
-                reth_process = RethProcess(network=network, data_dir=data_dir)
+                reth_process = process_builder.get_reth_process()
                 reth_process.start()
 
             if not lighthouse_process.is_alive:
                 click.echo(f'{lighthouse_process.name} is terminated. Restarting...')
-                lighthouse_process = LighthouseProcess(network=network, data_dir=data_dir)
+                lighthouse_process = process_builder.get_lighthouse_process()
                 lighthouse_process.start()
 
             time.sleep(1)
@@ -72,3 +76,32 @@ def node_start(data_dir: Path, network: str) -> None:
         if reth_process.is_alive or lighthouse_process.is_alive:
             click.echo('Shutting down nodes...')
             shutdown_processes([reth_process, lighthouse_process])
+
+
+class ProcessBuilder:
+    def __init__(self, network: str, data_dir: Path):
+        self.network = network
+        self.data_dir = data_dir
+
+    @property
+    def nodes_dir(self) -> Path:
+        return self.data_dir / self.network / 'nodes'
+
+    def get_reth_process(self) -> RethProcess:
+        reth_dir = self.nodes_dir / 'reth'
+
+        return RethProcess(network=self.network, reth_dir=reth_dir)
+
+    def get_lighthouse_process(self) -> LighthouseProcess:
+        lighthouse_dir = self.nodes_dir / 'lighthouse'
+
+        # Let Reth create the JWT secret file on first run
+        jwt_secret_path = self.get_default_jwt_secret_path()
+
+        return LighthouseProcess(
+            network=self.network, lighthouse_dir=lighthouse_dir, jwt_secret_path=jwt_secret_path
+        )
+
+    def get_default_jwt_secret_path(self) -> Path:
+        """Returns the default JWT secret path for Reth."""
+        return self.nodes_dir / 'reth' / 'jwt.hex'
