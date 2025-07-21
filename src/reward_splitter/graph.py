@@ -24,7 +24,6 @@ async def graph_get_reward_splitters(
                 where: {
                     vault_in: $vaults,
                     version_gte: 3,
-                    isClaimOnBehalfEnabled: true
                 }
             ) {
                 id
