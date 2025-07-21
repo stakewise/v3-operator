@@ -1,12 +1,16 @@
+import asyncio
 import logging
-import time
 from pathlib import Path
 
 import click
 
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_NETWORK, LOG_DATE_FORMAT
-from src.nodes.process import ProcessBuilder, shutdown_processes
+from src.nodes.process import (
+    LighthouseProcessBuilder,
+    ProcessRunner,
+    RethProcessBuilder,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,37 +46,43 @@ def node_start(data_dir: Path, network: str) -> None:
     # Also the data directory could be created by the `init` command
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    process_builder = ProcessBuilder(network=network, data_dir=data_dir)
-    reth_process = process_builder.get_reth_process()
-    lighthouse_process = process_builder.get_lighthouse_process()
+    asyncio.run(main(data_dir=data_dir, network=network))
 
-    reth_process.start()
-    lighthouse_process.start()
+
+async def main(data_dir: Path, network: str) -> None:
+    reth_process_builder = RethProcessBuilder(network=network, data_dir=data_dir)
+    lighthouse_process_builder = LighthouseProcessBuilder(network=network, data_dir=data_dir)
+
+    reth_runner = ProcessRunner(
+        process_builder=reth_process_builder,
+        min_restart_interval=60,  # seconds
+    )
+    lighthouse_runner = ProcessRunner(
+        process_builder=lighthouse_process_builder,
+        min_restart_interval=60,  # seconds
+    )
 
     try:
-        while True:
-            # Keep the processes alive
-            if not reth_process.is_alive:
-                click.echo(f'{reth_process.name} is terminated. Restarting...')
-                reth_process = process_builder.get_reth_process()
-                reth_process.start()
-
-            if not lighthouse_process.is_alive:
-                click.echo(f'{lighthouse_process.name} is terminated. Restarting...')
-                lighthouse_process = process_builder.get_lighthouse_process()
-                lighthouse_process.start()
-
-            time.sleep(1)
-    except KeyboardInterrupt:
+        await asyncio.gather(
+            reth_runner.run(),
+            lighthouse_runner.run(),
+        )
+    except (KeyboardInterrupt, asyncio.CancelledError):
         # Handle Ctrl+C
         # Shut down the processes gracefully
         # Do not reraise
         click.echo('Shutting down nodes...')
-        shutdown_processes([reth_process, lighthouse_process])
+        await asyncio.gather(
+            reth_runner.stop(),
+            lighthouse_runner.stop(),
+        )
     finally:
         # Handle unexpected error
         # Shut down the processes gracefully
         # Reraise the exception
-        if reth_process.is_alive or lighthouse_process.is_alive:
+        if reth_runner.is_alive or lighthouse_runner.is_alive:
             click.echo('Shutting down nodes...')
-            shutdown_processes([reth_process, lighthouse_process])
+            await asyncio.gather(
+                reth_runner.stop(),
+                lighthouse_runner.stop(),
+            )

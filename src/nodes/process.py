@@ -1,11 +1,13 @@
+import asyncio
 import logging
 import subprocess
+import time
 from pathlib import Path
 
 from src.config.networks import NETWORKS
 from src.nodes.exceptions import NodeException
 from src.nodes.typings import IO_Any
-from src.nodes.utils.proc import kill_proc_list
+from src.nodes.utils.proc import kill_proc
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +44,18 @@ class BaseProcess:
     @property
     def is_alive(self) -> bool:
         return self.proc is not None and self.proc.poll() is None
+
+    async def stop(self) -> None:
+        if not self.proc:
+            # Process is not started
+            return
+
+        logger.info('Stopping %s...', self.name)
+        await kill_proc(self.proc)
+
+    @property
+    def is_stopped(self) -> bool:
+        return self.proc is not None and self.proc.poll() is not None
 
 
 class RethProcess(BaseProcess):
@@ -127,15 +141,6 @@ class LighthouseProcess(BaseProcess):
         ]
 
 
-def shutdown_processes(processes: list[BaseProcess]) -> None:
-    """
-    Wrapper around `kill_proc_list` accepting `BaseProcess` list
-    """
-    proc_list = [proc.proc for proc in processes if proc.proc is not None]
-
-    kill_proc_list(proc_list)
-
-
 class ProcessBuilder:
     """
     Helper class for constructing Execution and Consensus node instances.
@@ -149,12 +154,19 @@ class ProcessBuilder:
     def nodes_dir(self) -> Path:
         return self.data_dir / self.network / 'nodes'
 
-    def get_reth_process(self) -> RethProcess:
+    def get_process(self) -> BaseProcess:
+        raise NotImplementedError()
+
+
+class RethProcessBuilder(ProcessBuilder):
+    def get_process(self) -> RethProcess:
         reth_dir = self.nodes_dir / 'reth'
 
         return RethProcess(network=self.network, reth_dir=reth_dir)
 
-    def get_lighthouse_process(self) -> LighthouseProcess:
+
+class LighthouseProcessBuilder(ProcessBuilder):
+    def get_process(self) -> LighthouseProcess:
         lighthouse_dir = self.nodes_dir / 'lighthouse'
 
         # Let Reth create the JWT secret file on first run
@@ -167,3 +179,51 @@ class ProcessBuilder:
     def get_default_jwt_secret_path(self) -> Path:
         """Returns the default JWT secret path created by Reth."""
         return self.nodes_dir / 'reth' / 'jwt.hex'
+
+
+class ProcessRunner:
+    """
+    Helper class for running a node process and keeping it alive.
+    """
+
+    def __init__(self, process_builder: ProcessBuilder, min_restart_interval: int):
+        self.process_builder = process_builder
+        self.min_restart_interval = min_restart_interval
+        self.process: BaseProcess | None = None
+
+    @property
+    def is_alive(self) -> bool:
+        return self.process is not None and self.process.is_alive
+
+    async def run(self) -> None:
+        """
+        Starts the process and keeps it running.
+        """
+        self.process = self.process_builder.get_process()
+        self.process.start()
+        last_restart = time.time()
+
+        while True:
+            # Check if the process is stopped by another task
+            if self.process.is_stopped:
+                break
+
+            # If the process is not alive, restart it if the minimum restart interval has passed
+            if not self.process.is_alive:
+                if time.time() - last_restart >= self.min_restart_interval:
+                    logger.info('%s is terminated. Restarting...', self.process.name)
+                    self.process = self.process_builder.get_process()
+                    self.process.start()
+                    last_restart = time.time()
+                else:
+                    logger.info(
+                        '%s is not alive, but waiting for restart interval %d sec to pass...',
+                        self.process.name,
+                        self.min_restart_interval,
+                    )
+
+            await asyncio.sleep(1)
+
+    async def stop(self) -> None:
+        if self.process:
+            await self.process.stop()
