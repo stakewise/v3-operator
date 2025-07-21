@@ -3,8 +3,9 @@ import logging
 from pathlib import Path
 
 import click
+import psutil
 
-from src.config.networks import AVAILABLE_NETWORKS
+from src.config.networks import AVAILABLE_NETWORKS, NETWORKS
 from src.config.settings import DEFAULT_NETWORK, LOG_DATE_FORMAT
 from src.nodes.process import (
     LighthouseProcessBuilder,
@@ -35,8 +36,14 @@ logger = logging.getLogger(__name__)
     ),
     show_default=True,
 )
+@click.option(
+    '--no-confirm',
+    is_flag=True,
+    default=False,
+    help='Skips confirmation messages when provided.',
+)
 @click.command(help='Starts execution and consensus nodes.')
-def node_start(data_dir: Path, network: str) -> None:
+def node_start(data_dir: Path, network: str, no_confirm: bool) -> None:
     logging.basicConfig(
         format='%(asctime)s %(levelname)-8s %(message)s',
         datefmt=LOG_DATE_FORMAT,
@@ -45,6 +52,9 @@ def node_start(data_dir: Path, network: str) -> None:
     # Create the data directory if it does not exist
     # Also the data directory could be created by the `init` command
     data_dir.mkdir(parents=True, exist_ok=True)
+
+    click.echo('Checking hardware requirements...')
+    _check_hardware_requirements(data_dir=data_dir, network=network, no_confirm=no_confirm)
 
     asyncio.run(main(data_dir=data_dir, network=network))
 
@@ -86,3 +96,33 @@ async def main(data_dir: Path, network: str) -> None:
                 reth_runner.stop(),
                 lighthouse_runner.stop(),
             )
+
+
+def _check_hardware_requirements(data_dir: Path, network: str, no_confirm: bool) -> None:
+    # Check memory requirements
+    mem = psutil.virtual_memory()
+    mem_total_gb = mem.total / (1024**3)
+    min_memory_gb = NETWORKS[network].NODE_CONFIG.MIN_MEMORY_GB
+
+    if mem_total_gb < min_memory_gb:
+        if not no_confirm and not click.confirm(
+            f"At least {min_memory_gb} GB of RAM is recommended to run the nodes.\n"
+            f'You have {mem_total_gb:.1f} GB of RAM in total.\n'
+            f"Do you want to continue anyway?",
+            default=False,
+        ):
+            raise click.Abort()
+
+    # Check disk space requirements
+    disk_usage = psutil.disk_usage(str(data_dir))
+    disk_total_tb = disk_usage.total / (1024**4)
+    min_disk_tb = NETWORKS[network].NODE_CONFIG.MIN_DISK_SPACE_TB
+
+    if disk_total_tb < min_disk_tb:
+        if not no_confirm and not click.confirm(
+            f"At least {min_disk_tb} TB of disk space is recommended in the data directory.\n"
+            f"You have {disk_total_tb:.1f} TB available at {data_dir}.\n"
+            f"Do you want to continue anyway?",
+            default=False,
+        ):
+            raise click.Abort()

@@ -44,6 +44,8 @@ class NetworkConfig(BaseNetworkConfig):
 class NodeConfig:
     CONSENSUS_CHECKPOINT_SYNC_URL: str
     ERA_URL: str
+    MIN_MEMORY_GB: int
+    MIN_DISK_SPACE_TB: float
 
 
 NETWORKS: dict[str, NetworkConfig] = {
@@ -69,6 +71,8 @@ NETWORKS: dict[str, NetworkConfig] = {
         NODE_CONFIG=NodeConfig(
             CONSENSUS_CHECKPOINT_SYNC_URL='https://beaconstate.ethstaker.cc/',
             ERA_URL='https://data.ethpandaops.io/era1/mainnet/',
+            MIN_MEMORY_GB=16,
+            MIN_DISK_SPACE_TB=2,
         ),
     ),
     HOODI: NetworkConfig(
@@ -91,6 +95,8 @@ NETWORKS: dict[str, NetworkConfig] = {
         NODE_CONFIG=NodeConfig(
             CONSENSUS_CHECKPOINT_SYNC_URL='https://hoodi.beaconstate.ethstaker.cc/',
             ERA_URL='',
+            MIN_MEMORY_GB=16,
+            MIN_DISK_SPACE_TB=0.1,  # 100 GB
         ),
     ),
     GNOSIS: NetworkConfig(
@@ -115,6 +121,8 @@ NETWORKS: dict[str, NetworkConfig] = {
         NODE_CONFIG=NodeConfig(
             CONSENSUS_CHECKPOINT_SYNC_URL='https://beacon.gnosischain.com/',
             ERA_URL='',
+            MIN_MEMORY_GB=16,
+            MIN_DISK_SPACE_TB=2,
         ),
     ),
     CHIADO: NetworkConfig(
@@ -139,6 +147,8 @@ NETWORKS: dict[str, NetworkConfig] = {
         NODE_CONFIG=NodeConfig(
             CONSENSUS_CHECKPOINT_SYNC_URL='https://beacon.chiadochain.net/',
             ERA_URL='',
+            MIN_MEMORY_GB=16,
+            MIN_DISK_SPACE_TB=0.1,  # 100 GB
         ),
     ),
 }
