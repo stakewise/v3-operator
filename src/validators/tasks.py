@@ -112,7 +112,7 @@ async def process_validators(
         vault_address=vault_address, harvest_params=harvest_params
     )
 
-    if vault_assets < Web3.to_wei(settings.min_deposit_amount, 'gwei'):
+    if vault_assets < Web3.to_wei(settings.min_deposit_amount_gwei, 'gwei'):
         return None
     vault_contract = VaultContract(vault_address)
     vault_version = await vault_contract.version()
@@ -377,10 +377,10 @@ def _get_funding_amounts(
         vault_validators.items(), key=lambda item: item[1], reverse=True
     ):
         remaining_capacity = MAX_EFFECTIVE_BALANCE_GWEI - balance
-        if remaining_capacity >= settings.min_deposit_amount:
+        if remaining_capacity >= settings.min_deposit_amount_gwei:
             val_amount = min(remaining_capacity, funding_amount)
             result[public_key] = Gwei(val_amount)
             funding_amount = Gwei(funding_amount - val_amount)
-        if funding_amount < settings.min_deposit_amount:
+        if funding_amount < settings.min_deposit_amount_gwei:
             break
     return result

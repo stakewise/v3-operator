@@ -5,7 +5,7 @@ from eth_typing import HexStr
 from eth_utils import is_address, is_hexstr, to_checksum_address
 
 from src.common.language import validate_mnemonic as verify_mnemonic
-from src.config.settings import DEFAULT_MIN_DEPOSIT_AMOUNT
+from src.config.settings import DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI
 
 
 # pylint: disable-next=unused-argument
@@ -60,10 +60,11 @@ def validate_dappnode_execution_endpoints(ctx, param, value):  # type: ignore
 
 
 # pylint: disable-next=unused-argument
-def validate_min_deposit_amount(ctx, param, value):  # type: ignore
-    if value < DEFAULT_MIN_DEPOSIT_AMOUNT:
+def validate_min_deposit_amount_gwei(ctx, param, value):  # type: ignore
+    if value < DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI:
         raise click.BadParameter(
-            f'min-deposit-amount must be greater than or equal to {DEFAULT_MIN_DEPOSIT_AMOUNT} GWEI'
+            f'min-deposit-amount-gwei must be greater than or equal to '
+            f'{DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI} Gwei'
         )
 
     return value
