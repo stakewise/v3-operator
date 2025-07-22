@@ -167,7 +167,7 @@ logger = logging.getLogger(__name__)
     '--vaults',
     type=ChecksumAddress,
     callback=validate_eth_addresses,
-    envvar='VAULT',
+    envvar='VAULTS',
     prompt='Enter comma separated list of your vault addresses',
     help='Addresses of the vaults to register validators for.',
 )
