@@ -95,6 +95,9 @@ class Settings(metaclass=Singleton):
     disable_available_validators_warnings: bool = decouple_config(
         'DISABLE_AVAILABLE_VALIDATORS_WARNINGS', default=False, cast=bool
     )
+    disable_full_withdrawals: bool = decouple_config(
+        'DISABLE_FULL_WITHDRAWALS', default=False, cast=bool
+    )
 
     min_validators_registration: int
     min_deposit_amount_gwei: Gwei
@@ -298,6 +301,8 @@ ORACLES_EXITS_TIMEOUT: int = decouple_config('ORACLES_EXITS_TIMEOUT', default=10
 PARTIAL_WITHDRAWALS_INTERVAL: int = decouple_config(
     'PARTIAL_WITHDRAWALS_INTERVAL', default=86400, cast=int  # every 24 hr
 )
+MIN_WITHDRAWAL_AMOUNT_GWEI: Gwei = Gwei(1)
+
 # common
 MIN_ACTIVATION_BALANCE: Wei = Web3.to_wei(32, 'ether')
 MIN_ACTIVATION_BALANCE_GWEI: Gwei = Gwei(int(Web3.from_wei(MIN_ACTIVATION_BALANCE, 'gwei')))

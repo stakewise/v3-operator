@@ -1,18 +1,11 @@
-from sw_utils import ChainHead, ProtocolConfig, ValidatorStatus, convert_to_mgno
-from sw_utils.networks import GNO_NETWORKS
+from sw_utils import ChainHead, ValidatorStatus
 from web3 import Web3
 from web3.types import ChecksumAddress, Gwei, Wei
 
 from src.common.clients import consensus_client
-from src.common.contracts import (
-    VaultContract,
-    multicall_contract,
-    validators_checker_contract,
-)
-from src.common.typings import ExitQueueMissingAssetsParams, HarvestParams
-from src.config.settings import settings
-from src.harvest.execution import get_update_state_calls
-from src.validators.oracles import poll_active_exits
+from src.common.contracts import validators_checker_contract
+from src.common.harvest import get_harvest_params
+from src.common.typings import ExitQueueMissingAssetsParams
 from src.validators.typings import ConsensusValidator
 
 CAN_BE_EXITED_STATUSES = [
@@ -34,37 +27,14 @@ EXITING_STATUSES = [
 ]
 
 
-async def get_vault_assets(
+async def get_queued_assets(
     vault_address: ChecksumAddress,
     consensus_validators: list[ConsensusValidator],
-    harvest_params: HarvestParams | None,
+    oracle_exiting_validators: list[ConsensusValidator],
     chain_head: ChainHead,
-    protocol_config: ProtocolConfig,
-) -> tuple[Gwei, Gwei]:
-    """Get the total assets and queued assets in the vault."""
-    total_assets = await _get_total_assets(
-        vault_address=vault_address,
-        harvest_params=harvest_params,
-    )
-    queued_assets = await _get_queued_assets(
-        vault_address=vault_address,
-        consensus_validators=consensus_validators,
-        harvest_params=harvest_params,
-        chain_head=chain_head,
-        protocol_config=protocol_config,
-    )
-    return Gwei(int(Web3.from_wei(total_assets, 'gwei'))), Gwei(
-        int(Web3.from_wei(queued_assets, 'gwei'))
-    )
+) -> Gwei:
+    harvest_params = await get_harvest_params(vault_address)
 
-
-async def _get_queued_assets(
-    vault_address: ChecksumAddress,
-    consensus_validators: list[ConsensusValidator],
-    harvest_params: HarvestParams | None,
-    protocol_config: ProtocolConfig,
-    chain_head: ChainHead,
-) -> Wei:
     # Get exit queue cumulative tickets
     exit_queue_cumulative_ticket = (
         await validators_checker_contract.get_exit_queue_cumulative_tickets(
@@ -73,16 +43,17 @@ async def _get_queued_assets(
             block_number=chain_head.block_number,
         )
     )
-
+    # fetch current pending partial withdrawals from consensus client
     pending_partial_withdrawals_amount = await _get_pending_partial_withdrawals_amount(
         validator_indexes=[
             str(v.index) for v in consensus_validators if v.status in CAN_BE_EXITED_STATUSES
         ],
         slot=chain_head.slot,
     )
+    # fetch active validators exits
     validators_exits_amount = await _get_validators_exits_amount(
         consensus_validators=consensus_validators,
-        protocol_config=protocol_config,
+        oracle_exiting_validators=oracle_exiting_validators,
     )
 
     # Withdrawing assets are assets that are ready to cover the exit requests
@@ -100,7 +71,7 @@ async def _get_queued_assets(
         harvest_params=harvest_params,
         block_number=chain_head.block_number,
     )
-    return missing_assets
+    return Gwei(int(Web3.from_wei(missing_assets, 'gwei')))
 
 
 async def _get_pending_partial_withdrawals_amount(
@@ -123,54 +94,22 @@ async def _get_pending_partial_withdrawals_amount(
 
 
 async def _get_validators_exits_amount(
-    consensus_validators: list[ConsensusValidator], protocol_config: ProtocolConfig
+    consensus_validators: list[ConsensusValidator],
+    oracle_exiting_validators: list[ConsensusValidator],
 ) -> Wei:
     """
     Calculate the sum of exiting validators balances. Consists of two parts:
-    1. fetch active exits from oracles.
-    2. fetch manually exited validators.
+    1. Active exits from oracles.
+    2. Manually exited validators.
     """
     # 1. Validator exits
-    # validator status can be not changed yet, so fetch active exits from oracles
-    vault_indexes = {val.index for val in consensus_validators}
-    oracles_exits_indexes = await poll_active_exits(protocol_config=protocol_config)
-    vault_oracles_exiting_indexes = [
-        index for index in oracles_exits_indexes if index in vault_indexes
-    ]
-    vault_oracles_exiting_validators = [
-        val for val in consensus_validators if val.index in vault_oracles_exiting_indexes
-    ]
-    oracle_exiting_balance = sum(val.balance for val in vault_oracles_exiting_validators)
+    # validator status can be not changed yet, so use active exits from oracles
+    oracle_exiting_balance = sum(val.balance for val in oracle_exiting_validators)
     # 2. Validator manually exits
     manually_exiting_balance = sum(
         val.balance
         for val in consensus_validators
-        if val.status in EXITING_STATUSES and val.index not in vault_oracles_exiting_indexes
+        if val.status in EXITING_STATUSES and val.index not in oracle_exiting_validators
     )
 
     return Web3.to_wei(oracle_exiting_balance + manually_exiting_balance, 'gwei')
-
-
-async def _get_total_assets(
-    vault_address: ChecksumAddress,
-    harvest_params: HarvestParams | None = None,
-) -> Wei:
-    vault_contract = VaultContract(vault_address)
-    if harvest_params is not None:
-        calls = await get_update_state_calls(
-            vault_address=vault_address, harvest_params=harvest_params
-        )
-    else:
-        calls = []
-    calls.extend(
-        [
-            (vault_address, vault_contract.encode_abi('totalAssets')),
-        ]
-    )
-    _, multicall = await multicall_contract.aggregate(calls)
-    total_assets = Wei(Web3.to_int(multicall[-1]))
-
-    if settings.network in GNO_NETWORKS:
-        total_assets = convert_to_mgno(Wei(total_assets))
-
-    return total_assets
