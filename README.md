@@ -375,7 +375,7 @@ You can start the Operator service using binary with the following command:
 ./operator start --vaults=0x000...,0x111... --consensus-endpoints=http://localhost:5052 --execution-endpoints=http://localhost:8545
 ```
 
-##### Using docker
+#### Using docker
 
 For docker, you first need to mount the folder containing validator keystores and deposit data file generated
 into the docker container. You then need to also include the `--data-dir` flag alongside the `start` command as per the
@@ -393,7 +393,7 @@ src/main.py start \
 --execution-endpoints=http://localhost:8545
 ```
 
-##### Using Source Files
+#### Using Source Files
 
 ```bash
 PYTHONPATH=. poetry run python src/main.py start \

@@ -3,7 +3,6 @@ from typing import Callable
 
 import click
 from click.decorators import FC
-from eth_typing import ChecksumAddress
 
 from src.common.logging import LOG_LEVELS
 from src.common.typings import ValidatorType
@@ -142,9 +141,8 @@ start_common_options = [
     ),
     click.option(
         '--vaults',
-        type=ChecksumAddress,
         callback=validate_eth_addresses,
-        envvar='VAULT',
+        envvar='VAULTS',
         prompt='Enter comma separated list of your vault addresses',
         help='Addresses of the vaults to register validators for.',
     ),

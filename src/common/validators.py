@@ -4,6 +4,7 @@ import re
 import click
 from eth_typing import ChecksumAddress, HexStr
 from eth_utils import is_address, is_hexstr, to_checksum_address
+from web3.types import Gwei
 
 from src.common.language import validate_mnemonic as verify_mnemonic
 from src.config.settings import DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI
@@ -28,8 +29,9 @@ def validate_eth_address(
     raise click.BadParameter('Invalid Ethereum address')
 
 
-# pylint: disable-next=unused-argument
-def validate_eth_addresses(ctx, param, value):  # type: ignore
+def validate_eth_addresses(
+    ctx: click.Context, param: click.Parameter, value: str | None
+) -> list[ChecksumAddress] | None:
     if not value:
         return None
     try:
@@ -61,8 +63,10 @@ def validate_dappnode_execution_endpoints(
     return value
 
 
-# pylint: disable-next=unused-argument
-def validate_min_deposit_amount_gwei(ctx, param, value):  # type: ignore
+def validate_min_deposit_amount_gwei(
+    ctx: click.Context, param: click.Parameter, value: int
+) -> Gwei | None:
+    value = Gwei(value)
     if value < DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI:
         raise click.BadParameter(
             f'min-deposit-amount-gwei must be greater than or equal to '
@@ -72,8 +76,7 @@ def validate_min_deposit_amount_gwei(ctx, param, value):  # type: ignore
     return value
 
 
-# pylint: disable-next=unused-argument
-def validate_public_key(ctx, param, value):  # type: ignore
+def validate_public_key(ctx: click.Context, param: click.Parameter, value: str) -> str | None:
     if not value:
         return None
     if not _is_public_key(value):
@@ -82,8 +85,9 @@ def validate_public_key(ctx, param, value):  # type: ignore
     return value
 
 
-# pylint: disable-next=unused-argument
-def validate_public_keys(ctx, param, value):  # type: ignore
+def validate_public_keys(
+    ctx: click.Context, param: click.Parameter, value: str
+) -> list[HexStr] | None:
     if not value:
         return None
     for key in value.split(','):
@@ -93,8 +97,7 @@ def validate_public_keys(ctx, param, value):  # type: ignore
     return [HexStr(address) for address in value.split(',')]
 
 
-# pylint: disable-next=unused-argument
-def validate_public_keys_file(ctx, param, value):  # type: ignore
+def validate_public_keys_file(ctx: click.Context, param: click.Parameter, value: str) -> str | None:
     if not value:
         return None
     with open(value, 'r', encoding='utf-8') as f:
