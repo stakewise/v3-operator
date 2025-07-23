@@ -21,6 +21,13 @@ logger = logging.getLogger(__name__)
     envvar='REMOTE_SIGNER_URL',
     help='The base URL of the remote signer, e.g. http://signer:9000',
 )
+@click.option(
+    '--public-keys-file',
+    type=click.Path(exists=True, file_okay=True, dir_okay=False),
+    envvar='PUBLIC_KEYS_FILE',
+    help='Absolute path to the available validator public keys file. '
+    'Default is the file generated with "create-keys" command.',
+)
 @add_common_options(start_common_options)
 @click.command(help='Start operator service with remote signer integration')
 # pylint: disable-next=too-many-arguments,too-many-locals
@@ -41,6 +48,7 @@ def start_remote_signer(
     log_format: str,
     network: str | None,
     remote_signer_url: str | None,
+    public_keys_file: str | None,
     hot_wallet_file: str | None,
     hot_wallet_password_file: str | None,
     max_fee_per_gas_gwei: int | None,
@@ -72,6 +80,7 @@ def start_remote_signer(
         network=operator_config.network,
         validator_type=validator_type,
         remote_signer_url=remote_signer_url,
+        public_keys_file=public_keys_file,
         hot_wallet_file=hot_wallet_file,
         hot_wallet_password_file=hot_wallet_password_file,
         max_fee_per_gas_gwei=max_fee_per_gas_gwei,
@@ -80,7 +89,7 @@ def start_remote_signer(
         log_format=log_format,
         pool_size=pool_size,
         min_validators_registration=min_validators_registration,
-        min_deposit_amount=Gwei(min_deposit_amount_gwei),
+        min_deposit_amount_gwei=Gwei(min_deposit_amount_gwei),
     )
 
     try:

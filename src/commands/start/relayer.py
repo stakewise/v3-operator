@@ -106,7 +106,7 @@ def start_relayer(
         relayer_type=relayer_type,
         relayer_endpoint=relayer_endpoint,
         validators_registration_mode=validators_registration_mode,
-        min_deposit_amount=Gwei(min_deposit_amount_gwei),
+        min_deposit_amount_gwei=Gwei(min_deposit_amount_gwei),
     )
 
     try:

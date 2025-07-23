@@ -7,13 +7,16 @@ from eth_typing import ChecksumAddress
 
 from src.common.logging import LOG_LEVELS
 from src.common.typings import ValidatorType
-from src.common.validators import validate_eth_addresses, validate_min_deposit_amount
+from src.common.validators import (
+    validate_eth_addresses,
+    validate_min_deposit_amount_gwei,
+)
 from src.config.networks import AVAILABLE_NETWORKS, GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
     DEFAULT_METRICS_PREFIX,
-    DEFAULT_MIN_DEPOSIT_AMOUNT,
+    DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
     DEFAULT_MIN_VALIDATORS_REGISTRATION,
     LOG_FORMATS,
     LOG_PLAIN,
@@ -183,8 +186,8 @@ start_common_options = [
         type=int,
         envvar='MIN_DEPOSIT_AMOUNT_GWEI',
         help='Minimum amount in gwei to deposit into validator.',
-        default=DEFAULT_MIN_DEPOSIT_AMOUNT,
-        callback=validate_min_deposit_amount,
+        default=DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
+        callback=validate_min_deposit_amount_gwei,
     ),
     click.option(
         '--no-confirm',
