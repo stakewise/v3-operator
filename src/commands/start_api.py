@@ -18,7 +18,7 @@ from src.config.settings import (
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
     DEFAULT_METRICS_PREFIX,
-    DEFAULT_MIN_DEPOSIT_AMOUNT,
+    DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
     LOG_FORMATS,
     LOG_PLAIN,
     settings,
@@ -119,7 +119,7 @@ AUTO = 'AUTO'
     type=int,
     envvar='MIN_DEPOSIT_AMOUNT_GWEI',
     help='Minimum amount in gwei to deposit into validator.',
-    default=DEFAULT_MIN_DEPOSIT_AMOUNT,
+    default=DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
 )
 @click.option(
     '-v',
@@ -275,7 +275,7 @@ def start_api(
         relayer_type=relayer_type,
         relayer_endpoint=relayer_endpoint,
         validators_registration_mode=validators_registration_mode,
-        min_deposit_amount=Gwei(min_deposit_amount_gwei),
+        min_deposit_amount_gwei=Gwei(min_deposit_amount_gwei),
     )
 
     try:
