@@ -48,7 +48,7 @@ class TestValidatorsExit:
         keystore_files = LocalKeystore.list_keystore_files()
         pubkeys = []
         for keystore_file in keystore_files:
-            pubkey, _ = LocalKeystore._process_keystore_file(keystore_file, keystores_dir)
+            pubkey, _ = LocalKeystore._process_keystore_file(keystore_file)
             pubkeys.append(pubkey)
 
         args = [

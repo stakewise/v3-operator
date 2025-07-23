@@ -6,13 +6,15 @@ import click
 import psutil
 
 from src.config.networks import AVAILABLE_NETWORKS, NETWORKS
-from src.config.settings import DEFAULT_NETWORK, LOG_DATE_FORMAT
+from src.config.settings import DEFAULT_NETWORK, LOG_DATE_FORMAT, settings
 from src.nodes.exceptions import NodeFailedToStartError
+from src.nodes.lighthouse import generate_validator_definitions_file
 from src.nodes.process import (
     LighthouseProcessBuilder,
     ProcessRunner,
     RethProcessBuilder,
 )
+from src.validators.keystores.local import LocalKeystore
 
 logger = logging.getLogger(__name__)
 
@@ -50,13 +52,25 @@ def node_start(data_dir: Path, network: str, no_confirm: bool) -> None:
         datefmt=LOG_DATE_FORMAT,
         level='INFO',
     )
-    # Create the data directory if it does not exist
-    # Also the data directory could be created by the `init` command
-    data_dir.mkdir(parents=True, exist_ok=True)
+
+    # Minimal settings for the nodes
+    settings.set(
+        vaults=[],
+        network=network,
+        data_dir=data_dir / network,
+    )
 
     click.echo('Checking hardware requirements...')
     _check_hardware_requirements(data_dir=data_dir, network=network, no_confirm=no_confirm)
 
+    validator_definitions_path = settings.nodes_dir / 'lighthouse' / 'validator_definitions.yaml'
+
+    click.echo('Generating validator definitions file...')
+    generate_validator_definitions_file(
+        keystores_dir=settings.keystores_dir,
+        keystore_files=LocalKeystore.list_keystore_files(),
+        output_path=validator_definitions_path,
+    )
     asyncio.run(main(data_dir=data_dir, network=network))
 
 

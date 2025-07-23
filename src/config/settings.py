@@ -275,6 +275,11 @@ class Settings(metaclass=Singleton):
     def network_config(self) -> NetworkConfig:
         return NETWORKS[self.network]
 
+    @property
+    def nodes_dir(self) -> Path:
+        """Returns the nodes directory within the data directory."""
+        return self.data_dir / 'nodes'
+
 
 settings = Settings()
 

@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class KeystoreFile:
     name: str
+    path: Path
     password: str
     password_file: Path
 
@@ -53,7 +54,7 @@ class LocalKeystore(BaseKeystore):
             results = [
                 pool.apply_async(
                     LocalKeystore._process_keystore_file,
-                    (keystore_file, settings.keystores_dir),
+                    (keystore_file,),
                     error_callback=_stop_pool,
                 )
                 for keystore_file in keystore_files
@@ -115,10 +116,7 @@ class LocalKeystore(BaseKeystore):
     def get_public_keys_from_keystore_files() -> list[HexStr]:
         """Returns a list of public keys from the keystore files."""
         keystore_files = LocalKeystore.list_keystore_files()
-        keys = [
-            LocalKeystore._read_keystore_file(keystore_file, settings.keystores_dir)
-            for keystore_file in keystore_files
-        ]
+        keys = [LocalKeystore.read_keystore_file(keystore_file) for keystore_file in keystore_files]
         keys.sort(key=lambda x: x[0])
         return [x[1] for x in keys]
 
@@ -138,39 +136,42 @@ class LocalKeystore(BaseKeystore):
                 password_file = keystores_password_file
 
             password = LocalKeystore._load_keystores_password(password_file)
-            res.append(KeystoreFile(name=f, password=password, password_file=password_file))
+            res.append(
+                KeystoreFile(
+                    name=f, path=keystores_dir / f, password=password, password_file=password_file
+                )
+            )
 
         return res
 
     @staticmethod
-    def _read_keystore_file(keystore_file: KeystoreFile, keystore_path: Path) -> tuple[int, HexStr]:
+    def read_keystore_file(keystore_file: KeystoreFile) -> tuple[int, HexStr]:
         """Light keystore reading. Return tuple of keystore index and public key."""
-        file_name = keystore_file.name
-        file_path = keystore_path / file_name
+        file_path = keystore_file.path
         try:
             keystore = ScryptKeystore.from_file(file_path)
             index = keystore.path.split('/')[-3]
             return int(index), add_0x_prefix(HexStr(keystore.pubkey))
         except BaseException as e:
-            raise KeystoreException(f'Invalid keystore format in file "{file_name}"') from e
+            raise KeystoreException(
+                f'Invalid keystore format in file "{keystore_file.name}"'
+            ) from e
 
     @staticmethod
-    def _process_keystore_file(
-        keystore_file: KeystoreFile, keystore_path: Path
-    ) -> tuple[HexStr, BLSPrivkey]:
-        file_name = keystore_file.name
+    def _process_keystore_file(keystore_file: KeystoreFile) -> tuple[HexStr, BLSPrivkey]:
         keystores_password = keystore_file.password
-        file_path = keystore_path / file_name
 
         try:
-            keystore = ScryptKeystore.from_file(file_path)
+            keystore = ScryptKeystore.from_file(keystore_file.path)
         except BaseException as e:
-            raise KeystoreException(f'Invalid keystore format in file "{file_name}"') from e
+            raise KeystoreException(
+                f'Invalid keystore format in file "{keystore_file.name}"'
+            ) from e
 
         try:
             private_key = BLSPrivkey(keystore.decrypt(keystores_password))
         except BaseException as e:
-            raise KeystoreException(f'Invalid password for keystore "{file_name}"') from e
+            raise KeystoreException(f'Invalid password for keystore "{keystore_file.name}"') from e
         public_key = Web3.to_hex(bls.SkToPk(private_key))
         return public_key, private_key
 
