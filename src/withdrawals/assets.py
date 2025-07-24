@@ -8,6 +8,15 @@ from src.common.harvest import get_harvest_params
 from src.common.typings import ExitQueueMissingAssetsParams
 from src.validators.typings import ConsensusValidator
 
+CAN_BE_EXITED_STATUSES = [
+    ValidatorStatus.ACTIVE_ONGOING,
+    ValidatorStatus.ACTIVE_EXITING,
+    ValidatorStatus.ACTIVE_SLASHED,
+    ValidatorStatus.EXITED_UNSLASHED,
+    ValidatorStatus.EXITED_SLASHED,
+    ValidatorStatus.WITHDRAWAL_POSSIBLE,
+]
+
 
 EXITING_STATUSES = [
     ValidatorStatus.ACTIVE_EXITING,

@@ -6,7 +6,11 @@ from src.common.tests.utils import ether_to_gwei
 from src.config.networks import HOODI
 from src.config.settings import settings
 from src.validators.tests.factories import create_consensus_validator
-from src.withdrawals.tasks import _get_partial_withdrawals_data, _get_withdrawals_data
+from src.withdrawals.tasks import (
+    _get_partial_withdrawals_data,
+    _get_withdrawals_data,
+    _is_partial_withdrawable_validator,
+)
 
 
 def test_get_partial_withdrawals_data():
@@ -57,7 +61,7 @@ def test_get_partial_withdrawals_data():
     result = _get_partial_withdrawals_data(validators, withdrawals_amount)
     assert result == expected
 
-    # use_single validator withdrawals
+    # use single validator withdrawals
     validators = {
         '0x1': ether_to_gwei(40),
         '0x2': ether_to_gwei(50),
@@ -69,7 +73,7 @@ def test_get_partial_withdrawals_data():
     result = _get_partial_withdrawals_data(validators, queued_assets)
     assert result == expected
 
-    # no_validators_have_sufficient_balance(
+    # no validators have sufficient balance
     validators = {'0x1': ether_to_gwei(30)}
     queued_assets = ether_to_gwei(40)
     expected = {}
@@ -81,7 +85,7 @@ def test_get_partial_withdrawals_data():
 async def test_get_withdrawals_data(data_dir):
     settings.set(vaults=[], data_dir=data_dir, network=HOODI)
 
-    # returns_correct_partial_withdrawals_when_capacity_is_sufficient
+    # correct partial withdrawals when capacity is sufficient
     chain_head = create_chain_head(epoch=500)
     queued_assets = ether_to_gwei(20)
 
@@ -103,7 +107,7 @@ async def test_get_withdrawals_data(data_dir):
     expected = {'0x1': ether_to_gwei(2), '0x2': ether_to_gwei(18)}
     assert result == expected
 
-    # full_withdrawals_when_partial_withdrawals_capacity_is_insufficient
+    # full withdrawals when partial withdrawals capacity is insufficient
     chain_head = create_chain_head(epoch=500)
     queued_assets = ether_to_gwei(100)
     consensus_validators = [
@@ -125,7 +129,7 @@ async def test_get_withdrawals_data(data_dir):
 
     assert result == expected
 
-    # empty_when_partial_withdrawals_capacity_is_insufficient_and_full_withdrawals_disabled
+    # empty when partial withdrawals capacity is insufficient and full withdrawals disabled
     settings.disable_full_withdrawals = True
 
     chain_head = create_chain_head(epoch=500)
@@ -148,7 +152,7 @@ async def test_get_withdrawals_data(data_dir):
     assert result == {}
     settings.disable_full_withdrawals = False
 
-    # prioritizes_full_withdrawals_when_partial_withdrawals_capacity_is_insufficient
+    # prioritizes full withdrawals when partial withdrawals capacity is insufficient
     chain_head = create_chain_head(epoch=500)
     queued_assets = ether_to_gwei(90)
     consensus_validators = [
@@ -175,7 +179,7 @@ async def test_get_withdrawals_data(data_dir):
     expected = {'0x1': ether_to_gwei(0), '0x2': ether_to_gwei(0)}
     assert result == expected
 
-    # no_partial_withdrawals_after_full_withdrawals
+    # no partial withdrawals after full withdrawals
     chain_head = create_chain_head(epoch=500)
     queued_assets = ether_to_gwei(30)
     consensus_validators = [
@@ -196,7 +200,7 @@ async def test_get_withdrawals_data(data_dir):
     expected = {'0x1': ether_to_gwei(0)}
     assert result == expected
 
-    # full_withdrawals_when_partial_withdrawals_capacity
+    # full withdrawals when partial withdrawals capacity
     chain_head = create_chain_head(epoch=500)
     queued_assets = ether_to_gwei(50)
     consensus_validators = [
@@ -217,7 +221,7 @@ async def test_get_withdrawals_data(data_dir):
     expected = {'0x1': ether_to_gwei(0), '0x2': ether_to_gwei(10)}
     assert result == expected
 
-    # skip_partial_withdrawals_from_non_compound_validators
+    # skip partial withdrawals from non compound validators
     chain_head = create_chain_head(epoch=500)
     queued_assets = ether_to_gwei(10)
     consensus_validators = [
@@ -239,7 +243,7 @@ async def test_get_withdrawals_data(data_dir):
     expected = {'0x1': 0}
     assert result == expected
 
-    # excludes_oracle_exit_indexes_from_full_withdrawals
+    # excludes oracle exit indexes from full withdrawals
     chain_head = create_chain_head(epoch=500)
     queued_assets = ether_to_gwei(20)
     consensus_validators = [
@@ -262,10 +266,43 @@ async def test_get_withdrawals_data(data_dir):
     expected = {'0x2': ether_to_gwei(0)}
     assert result == expected
 
-    # handles_case_with_no_active_validators
+    # handles case with no active validators
     chain_head = create_chain_head(epoch=500)
     queued_assets = ether_to_gwei(20)
     consensus_validators = []
 
     result = await _get_withdrawals_data(chain_head, queued_assets, consensus_validators, 10, set())
     assert result == {}
+
+
+def test_is_partial_withdrawable_validator():
+    epoch = 500
+
+    validator = create_consensus_validator(
+        balance=ether_to_gwei(32),
+        status=ValidatorStatus.ACTIVE_ONGOING,
+        activation_epoch=10,
+        is_compounding=False,
+    )
+    result = _is_partial_withdrawable_validator(validator, epoch)
+    assert result is False
+
+    # validator status is not active
+    validator = create_consensus_validator(
+        balance=ether_to_gwei(32), status=ValidatorStatus.ACTIVE_EXITING, activation_epoch=10
+    )
+    result = _is_partial_withdrawable_validator(validator, epoch)
+    assert result is False
+
+    # validator not active long enough
+    validator = create_consensus_validator(
+        balance=ether_to_gwei(32), status=ValidatorStatus.ACTIVE_ONGOING, activation_epoch=400
+    )
+    result = _is_partial_withdrawable_validator(validator, epoch)
+    assert result is False
+
+    validator = create_consensus_validator(
+        balance=ether_to_gwei(32), status=ValidatorStatus.ACTIVE_ONGOING, activation_epoch=10
+    )
+    result = _is_partial_withdrawable_validator(validator, epoch)
+    assert result is True

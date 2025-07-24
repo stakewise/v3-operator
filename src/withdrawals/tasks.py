@@ -1,8 +1,7 @@
 import logging
 
 from eth_typing import ChecksumAddress, HexStr
-from sw_utils import ChainHead, InterruptHandler, ProtocolConfig
-from sw_utils.consensus import ACTIVE_STATUSES
+from sw_utils import ChainHead, InterruptHandler, ProtocolConfig, ValidatorStatus
 from web3 import Web3
 from web3.types import BlockNumber, Gwei
 
@@ -177,7 +176,7 @@ async def _get_withdrawals_data(
     partial_withdrawable_validators = [
         val
         for val in consensus_validators
-        if _is_partial_withdrawable_validators(val, chain_head.epoch)
+        if _is_partial_withdrawable_validator(val, chain_head.epoch)
     ]
     available_partial_withdrawals_capacity = sum(
         val.balance - MIN_ACTIVATION_BALANCE_GWEI for val in partial_withdrawable_validators
@@ -306,10 +305,10 @@ async def _submit_withdraw_validators(
     return Web3.to_hex(tx)
 
 
-def _is_partial_withdrawable_validators(validator: ConsensusValidator, epoch: int) -> bool:
+def _is_partial_withdrawable_validator(validator: ConsensusValidator, epoch: int) -> bool:
     if not validator.is_compounding:
         return False
-    if validator.status not in ACTIVE_STATUSES:
+    if validator.status != ValidatorStatus.ACTIVE_ONGOING:
         return False
     # filter validator that was active long enough
     if epoch < validator.activation_epoch + settings.network_config.SHARD_COMMITTEE_PERIOD:
@@ -323,14 +322,14 @@ def _filter_exitable_validators(
     oracle_exit_indexes: set[int],
 ) -> list[ConsensusValidator]:
     """
-    Retrieve validators that are either in the process of exiting or eligible for exit.
+    Retrieve validators that are eligible for exit.
     Order by balance to exit as minimal assets as possible.
     """
     can_be_exited_validators = []
     for validator in consensus_validators:
         if validator.activation_epoch > min_activation_epoch:
             continue
-        if validator.status not in ACTIVE_STATUSES:
+        if validator.status != ValidatorStatus.ACTIVE_ONGOING:
             continue
         if validator.index in oracle_exit_indexes:
             continue
