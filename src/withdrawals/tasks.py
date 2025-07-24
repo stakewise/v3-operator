@@ -104,7 +104,7 @@ class WithdrawalsTask(BaseTask):
         app_state.partial_withdrawal_cache[vault_address] = chain_head.block_number
 
         logger.info(
-            'Successfully withrawned %s %s for validators with public keys %s, tx hash: %s',
+            'Successfully withdrawn %s %s for validators with public keys %s, tx hash: %s',
             round_down(Web3.from_wei(Web3.to_wei(queued_assets, 'gwei'), 'ether'), 2),
             settings.network_config.VAULT_BALANCE_SYMBOL,
             ', '.join([str(index) for index in withdrawals_data]),
@@ -142,15 +142,13 @@ class WithdrawalsTask(BaseTask):
         Return the last event block number.
         """
         vault_contract = VaultContract(vault_address)
-        withdrawals_events = await vault_contract.get_validator_withdrawal_submitted_events(
-            from_block
-        )
+        events = await vault_contract.get_validator_withdrawal_submitted_events(from_block)
         consensus_validators = await fetch_consensus_validators(
-            [event.public_key for event in withdrawals_events]
+            [event.public_key for event in events]
         )
         public_key_to_index = {val.public_key: val.index for val in consensus_validators}
 
-        for event in withdrawals_events:
+        for event in events:
             slot = await calc_slot_by_block_number(event.block_number)
             pending_partial_withdrawals = await consensus_client.get_pending_partial_withdrawals(
                 slot
@@ -171,7 +169,7 @@ async def _get_withdrawals_data(
     consensus_validators: list[ConsensusValidator],
     validator_min_active_epochs: int,
     oracle_exit_indexes: set[int],
-) -> dict[HexStr, int]:
+) -> dict[HexStr, Gwei]:
     # filter active validators
     partial_withdrawable_validators = [
         val
@@ -199,7 +197,7 @@ async def _get_withdrawals_data(
         min_activation_epoch=min_activation_epoch,
         oracle_exit_indexes=oracle_exit_indexes,
     )
-    withdrawals_data: dict[HexStr, int] = {}
+    withdrawals_data: dict[HexStr, Gwei] = {}
 
     for validator in can_be_exited_validators:
         if sum(withdrawals_data.values()) >= queued_assets:
@@ -221,47 +219,51 @@ async def _get_withdrawals_data(
             val.balance - MIN_ACTIVATION_BALANCE_GWEI for val in partial_withdrawable_validators
         )
 
-        withdrawals_data[validator.public_key] = 0  # full withdrawal
+        withdrawals_data[validator.public_key] = Gwei(0)  # full withdrawal
 
     return withdrawals_data
 
 
 def _get_partial_withdrawals_data(
-    validator_balances: dict[HexStr, Gwei], queued_assets: int
-) -> dict[HexStr, int]:
+    validator_balances: dict[HexStr, Gwei], queued_assets: Gwei
+) -> dict[HexStr, Gwei]:
     """
     Calculate partial withdrawals for validators.
     First, try to withdraw from a single validator in one request.
     If that fails, split the amount across validators,
     starting with those holding the largest balances.
     """
-    withdrawals_data = {}
+    withdrawals_data: dict[HexStr, Gwei] = {}
 
-    # can be executed in single request
-    for public_key, balance in sorted(
-        validator_balances.items(), key=lambda item: item[1], reverse=False
-    ):
-        if balance - MIN_ACTIVATION_BALANCE_GWEI >= queued_assets:
-            withdrawals_data[public_key] = queued_assets
-            return withdrawals_data
-
-    # need to split withdrawal amount between validators
+    # Try single validator first
     for public_key, balance in sorted(
         validator_balances.items(), key=lambda item: item[1], reverse=True
     ):
-        validators_amount = balance - MIN_ACTIVATION_BALANCE_GWEI
-        if validators_amount > 0:
-            withdrawals_data[public_key] = min(validators_amount, queued_assets)
-            queued_assets -= min(validators_amount, queued_assets)
+        available = balance - MIN_ACTIVATION_BALANCE_GWEI
+        if available >= queued_assets:
+            return {public_key: queued_assets}
+
+    # Split across multiple validators
+    for public_key, balance in sorted(
+        validator_balances.items(), key=lambda item: item[1], reverse=True
+    ):
+        available = balance - MIN_ACTIVATION_BALANCE_GWEI
+        if available <= 0:
+            continue
+
+        amount = Gwei(min(available, queued_assets))
+        withdrawals_data[public_key] = amount
+        queued_assets = Gwei(queued_assets - amount)
+
         if queued_assets <= 0:
             break
 
     return withdrawals_data
 
 
-def _encode_withdrawals_data(withdrawable_data: dict[HexStr, int]) -> bytes:
+def _encode_withdrawals_data(withdrawable_data: dict[HexStr, Gwei]) -> bytes:
     """
-    Encodes validators data for withdrawValidators contract call
+    Encodes validator data for withdrawValidators contract call
     """
     data = b''
     for public_key, amount in withdrawable_data.items():
@@ -285,10 +287,8 @@ async def _submit_withdraw_validators(
             b'',
         ).transact({'value': Web3.to_wei(current_fee, 'gwei')})
     except Exception as e:
-        logger.info('Failed to withdrawal validators: %s', format_error(e))
+        logger.info('Failed to withdraw from validators: %s', format_error(e))
         return None
-
-    vault_contract = VaultContract(vault_address)
 
     vault_contract.encode_abi(
         fn_name='withdrawValidators',
@@ -322,7 +322,7 @@ def _filter_exitable_validators(
     oracle_exit_indexes: set[int],
 ) -> list[ConsensusValidator]:
     """
-    Retrieve validators that are eligible for exit.
+    Returns validators that are eligible for exit.
     Order by balance to exit as minimal assets as possible.
     """
     can_be_exited_validators = []

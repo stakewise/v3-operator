@@ -62,7 +62,7 @@ async def get_queued_assets(
 
     # Missing assets express how much assets are needed to cover the exit requests
     # until the exit queue cumulative ticket is reached
-    missing_assets = await validators_checker_contract.get_exit_queue_missing_assets(
+    queued_assets = await validators_checker_contract.get_exit_queue_missing_assets(
         exit_queue_missing_assets_params=ExitQueueMissingAssetsParams(
             vault=vault_address,
             withdrawing_assets=withdrawing_assets,
@@ -71,7 +71,7 @@ async def get_queued_assets(
         harvest_params=harvest_params,
         block_number=chain_head.block_number,
     )
-    return Gwei(int(Web3.from_wei(missing_assets, 'gwei')))
+    return Gwei(int(Web3.from_wei(queued_assets, 'gwei')))
 
 
 async def _get_pending_partial_withdrawals_amount(
@@ -81,16 +81,19 @@ async def _get_pending_partial_withdrawals_amount(
     """
     Calculate the sum of pending partial withdrawals at the current moment
     """
-    pending_partial_withdrawals_sum = 0
-    pending_withdrawals_data = await consensus_client.get_pending_partial_withdrawals(str(slot))
-    for pending_withdrawal_item in pending_withdrawals_data:
-        index = pending_withdrawal_item['validator_index']
+    if not validator_indexes:
+        return Wei(0)
+
+    total_pending_withdrawals = 0
+    pending_withdrawals = await consensus_client.get_pending_partial_withdrawals(str(slot))
+    for pending_withdrawal in pending_withdrawals:
+        index = pending_withdrawal['validator_index']
         if index not in validator_indexes:
             continue
 
-        pending_partial_withdrawals_sum += int(pending_withdrawal_item['amount'])
+        total_pending_withdrawals += int(pending_withdrawal['amount'])
 
-    return Web3.to_wei(pending_partial_withdrawals_sum, 'gwei')
+    return Web3.to_wei(total_pending_withdrawals, 'gwei')
 
 
 async def _get_validators_exits_amount(
@@ -98,7 +101,7 @@ async def _get_validators_exits_amount(
     oracle_exiting_validators: list[ConsensusValidator],
 ) -> Wei:
     """
-    Calculate the sum of exiting validators balances. Consists of two parts:
+    Calculate the sum of exiting validators balances. Calculated from two components:
     1. Active exits from oracles.
     2. Manually exited validators.
     """
