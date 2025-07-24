@@ -142,8 +142,7 @@ def load_operator_config(
         if vault_dir.exists() and not (root_dir / 'config.json').exists():
             if not no_confirm:
                 click.confirm(
-                    f'Vault directory "{vault_dir}" already exists. '
-                    'Would you like to migrate to a multivault setup?',
+                    'The data directory structure has been updated. Would you like to migrate to the new schema?',
                     default=True,
                 )
             migrate_to_multivault(

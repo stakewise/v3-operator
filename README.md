@@ -347,7 +347,7 @@ Check [Hashi Vault guide](https://docs.stakewise.io/for-operators/operator-servi
 
 ##### Remote signer
 
-You may not want the operator service to have direct access to the validator keys. Validator keystores do not need to be present directly in the operator. The operator can query a remote signer to get signatures for validator exit messages.
+You may not want the operator service to have direct access to the validator keys. Validator keystores do not need to be present directly in the operator. The operator can query a remote signer to get signatures for validator deposit and exit messages.
 
 ```./operator start-remote-signer ...```
 
