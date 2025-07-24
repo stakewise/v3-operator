@@ -2,6 +2,7 @@ import logging
 
 from eth_typing import ChecksumAddress, HexStr
 from sw_utils import ChainHead, InterruptHandler, ProtocolConfig
+from sw_utils.consensus import ACTIVE_STATUSES
 from web3 import Web3
 from web3.types import BlockNumber, Gwei
 
@@ -23,12 +24,12 @@ from src.validators.consensus import fetch_consensus_validators
 from src.validators.database import VaultValidatorCrud
 from src.validators.oracles import poll_active_exits
 from src.validators.typings import ConsensusValidator
-from src.withdrawals.assets import CAN_BE_EXITED_STATUSES, get_queued_assets
+from src.withdrawals.assets import get_queued_assets
 
 logger = logging.getLogger(__name__)
 
 
-class PartialWithdrawalsTask(BaseTask):
+class WithdrawalsTask(BaseTask):
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         """
         Every N hours check the exit queue and submit partial withdrawals if needed.
@@ -64,25 +65,15 @@ class PartialWithdrawalsTask(BaseTask):
             consensus_validators, protocol_config
         )
 
-        queued_assets = await get_queued_assets(  # todo: queued or missing - unify
+        queued_assets = await get_queued_assets(
             vault_address=vault_address,
             consensus_validators=consensus_validators,
             oracle_exiting_validators=oracle_exiting_validators,
             chain_head=chain_head,
         )
         if queued_assets < MIN_WITHDRAWAL_AMOUNT_GWEI:
+            app_state.partial_withdrawal_cache[vault_address] = chain_head.block_number
             return
-
-        # filter active validators
-        active_validators = [
-            val
-            for val in consensus_validators
-            if _is_withdrawable_validators(val, chain_head.epoch)
-        ]
-
-        available_partial_withdrawals_capacity = sum(
-            val.balance - MIN_ACTIVATION_BALANCE_GWEI for val in active_validators
-        )
 
         current_fee = await get_execution_request_fee(
             settings.network_config.WITHDRAWAL_CONTRACT_ADDRESS,
@@ -95,25 +86,13 @@ class PartialWithdrawalsTask(BaseTask):
                 current_fee,
             )
             return
-        withdrawals_data = _get_partial_withdrawals_data(  # todo: full withdrawals first?
-            validator_balances={val.public_key: val.balance for val in active_validators},
+        withdrawals_data = await _get_withdrawals_data(
+            chain_head=chain_head,
             queued_assets=queued_assets,
+            consensus_validators=consensus_validators,
+            validator_min_active_epochs=protocol_config.validator_min_active_epochs,
+            oracle_exit_indexes={val.index for val in oracle_exiting_validators},
         )
-
-        if available_partial_withdrawals_capacity < queued_assets:
-            logger.info('Available partial withdrawals capacity is less than queued assets')
-            if not settings.disable_full_withdrawals:
-                logger.info('Full withdrawals')
-                full_withdrawals = await _get_full_withdrawals_data(
-                    chain_head=chain_head,
-                    missing_assets=Gwei(queued_assets - sum(withdrawals_data.values())),
-                    consensus_validators=consensus_validators,
-                    protocol_config=protocol_config,
-                    oracle_exit_indexes={val.index for val in oracle_exiting_validators},
-                )
-                withdrawals_data = full_withdrawals | withdrawals_data
-
-        app_state.partial_withdrawal_cache[vault_address] = chain_head.block_number
 
         tx_hash = await _submit_withdraw_validators(
             vault_address=vault_address,
@@ -122,6 +101,8 @@ class PartialWithdrawalsTask(BaseTask):
         )
         if not tx_hash:
             return
+
+        app_state.partial_withdrawal_cache[vault_address] = chain_head.block_number
 
         logger.info(
             'Successfully withrawned %s %s for validators with public keys %s, tx hash: %s',
@@ -185,29 +166,63 @@ class PartialWithdrawalsTask(BaseTask):
         return None
 
 
-async def _get_full_withdrawals_data(
+async def _get_withdrawals_data(
     chain_head: ChainHead,
-    missing_assets: Gwei,
+    queued_assets: Gwei,
     consensus_validators: list[ConsensusValidator],
-    protocol_config: ProtocolConfig,
+    validator_min_active_epochs: int,
     oracle_exit_indexes: set[int],
 ) -> dict[HexStr, int]:
-    """"""
-    max_activation_epoch = max(0, chain_head.epoch - protocol_config.validator_min_active_epochs)
-    withdrawals_data: dict[HexStr, int] = {}
+    # filter active validators
+    partial_withdrawable_validators = [
+        val
+        for val in consensus_validators
+        if _is_partial_withdrawable_validators(val, chain_head.epoch)
+    ]
+    available_partial_withdrawals_capacity = sum(
+        val.balance - MIN_ACTIVATION_BALANCE_GWEI for val in partial_withdrawable_validators
+    )
+    if available_partial_withdrawals_capacity >= queued_assets:
+        return _get_partial_withdrawals_data(
+            validator_balances={
+                val.public_key: val.balance for val in partial_withdrawable_validators
+            },
+            queued_assets=queued_assets,
+        )
+    if settings.disable_full_withdrawals:
+        logger.info('Available partial withdrawals capacity is less than queued assets')
+        return {}
 
-    if not consensus_validators or not missing_assets:
-        return withdrawals_data
+    min_activation_epoch = max(0, chain_head.epoch - validator_min_active_epochs)
+
     can_be_exited_validators = _filter_exitable_validators(
         consensus_validators=consensus_validators,
-        max_activation_epoch=max_activation_epoch,
+        min_activation_epoch=min_activation_epoch,
         oracle_exit_indexes=oracle_exit_indexes,
     )
+    withdrawals_data: dict[HexStr, int] = {}
 
     for validator in can_be_exited_validators:
-        if sum(withdrawals_data.values()) >= missing_assets:
-            break
-        withdrawals_data[validator.public_key] = validator.balance
+        if sum(withdrawals_data.values()) >= queued_assets:
+            return withdrawals_data
+        if sum(withdrawals_data.values()) + available_partial_withdrawals_capacity >= queued_assets:
+            partial_data = _get_partial_withdrawals_data(
+                validator_balances={
+                    val.public_key: val.balance for val in partial_withdrawable_validators
+                },
+                queued_assets=queued_assets,
+            )
+            return withdrawals_data | partial_data
+
+        partial_withdrawable_validators = [
+            val for val in partial_withdrawable_validators if val.public_key != validator.public_key
+        ]
+        queued_assets = Gwei(queued_assets - validator.balance)
+        available_partial_withdrawals_capacity = sum(
+            val.balance - MIN_ACTIVATION_BALANCE_GWEI for val in partial_withdrawable_validators
+        )
+
+        withdrawals_data[validator.public_key] = 0  # full withdrawal
 
     return withdrawals_data
 
@@ -215,7 +230,12 @@ async def _get_full_withdrawals_data(
 def _get_partial_withdrawals_data(
     validator_balances: dict[HexStr, Gwei], queued_assets: int
 ) -> dict[HexStr, int]:
-    """"""
+    """
+    Calculate partial withdrawals for validators.
+    First, try to withdraw from a single validator in one request.
+    If that fails, split the amount across validators,
+    starting with those holding the largest balances.
+    """
     withdrawals_data = {}
 
     # can be executed in single request
@@ -286,9 +306,10 @@ async def _submit_withdraw_validators(
     return Web3.to_hex(tx)
 
 
-def _is_withdrawable_validators(validator: ConsensusValidator, epoch: int) -> bool:
-    # todo: rename
-    if validator.status not in CAN_BE_EXITED_STATUSES:
+def _is_partial_withdrawable_validators(validator: ConsensusValidator, epoch: int) -> bool:
+    if not validator.is_compounding:
+        return False
+    if validator.status not in ACTIVE_STATUSES:
         return False
     # filter validator that was active long enough
     if epoch < validator.activation_epoch + settings.network_config.SHARD_COMMITTEE_PERIOD:
@@ -298,16 +319,18 @@ def _is_withdrawable_validators(validator: ConsensusValidator, epoch: int) -> bo
 
 def _filter_exitable_validators(
     consensus_validators: list[ConsensusValidator],
-    max_activation_epoch: int,
+    min_activation_epoch: int,
     oracle_exit_indexes: set[int],
 ) -> list[ConsensusValidator]:
-    # Retrieve validators that are either in the process of exiting or eligible for exit.
-    # Order by balance to exit as minimal assets as possible.
+    """
+    Retrieve validators that are either in the process of exiting or eligible for exit.
+    Order by balance to exit as minimal assets as possible.
+    """
     can_be_exited_validators = []
     for validator in consensus_validators:
-        if validator.activation_epoch > max_activation_epoch:  # todo
+        if validator.activation_epoch > min_activation_epoch:
             continue
-        if validator.status not in CAN_BE_EXITED_STATUSES:
+        if validator.status not in ACTIVE_STATUSES:
             continue
         if validator.index in oracle_exit_indexes:
             continue
@@ -320,17 +343,10 @@ def _filter_exitable_validators(
 async def _fetch_oracle_exiting_validators(
     consensus_validators: list[ConsensusValidator], protocol_config: ProtocolConfig
 ) -> list[ConsensusValidator]:
-    """"""
+    """Fetch exiting validators indexes from oracles and filter them from consensus validators."""
     vault_indexes = {val.index for val in consensus_validators}
     oracles_exits_indexes = await poll_active_exits(protocol_config=protocol_config)
     vault_oracles_exiting_indexes = [
         index for index in oracles_exits_indexes if index in vault_indexes
     ]
-    vault_oracles_exiting_validators = []
-    for val in consensus_validators:
-        if val.index in vault_oracles_exiting_indexes:
-            vault_oracles_exiting_validators.append(val)
-        else:
-            raise ValueError('Invalid validator index in vault oracles exiting indexes')
-
-    return vault_oracles_exiting_validators
+    return [val for val in consensus_validators if val.index in vault_oracles_exiting_indexes]
