@@ -1,17 +1,12 @@
 import logging
-from typing import cast
 
 from sw_utils import InterruptHandler
 from web3 import Web3
-from web3.types import BlockNumber, ChecksumAddress, HexBytes, HexStr, Wei
+from web3.types import BlockNumber, ChecksumAddress, HexStr, Wei
 
 from src.common.app_state import AppState
 from src.common.clients import execution_client
-from src.common.contracts import (
-    RewardSplitterContract,
-    RewardSplitterEncoder,
-    multicall_contract,
-)
+from src.common.contracts import RewardSplitterContract, RewardSplitterEncoder
 from src.common.execution import build_gas_manager
 from src.common.harvest import get_harvest_params
 from src.common.tasks import BaseTask
@@ -19,7 +14,6 @@ from src.common.typings import HarvestParams
 from src.common.wallet import hot_wallet
 from src.config.networks import ZERO_CHECKSUM_ADDRESS
 from src.config.settings import (
-    MULTICALL_BATCH_SIZE,
     REWARD_SPLITTER_INTERVAL,
     REWARD_SPLITTER_MIN_ASSETS,
     settings,
@@ -97,21 +91,16 @@ class SplitRewardTask(BaseTask):
             logger.warning('No calls to process')
             return
 
-        calls_batches = []
-        calls_batch: list[tuple[ChecksumAddress, HexStr]] = []
+        logger.info('Processing reward splitter calls')
         for address, address_calls in calls.items():
-            if len(calls_batch) + len(address_calls) <= MULTICALL_BATCH_SIZE:
-                calls_batch.extend([(address, call) for call in address_calls])
-            else:
-                calls_batches.append(calls_batch)
-                calls_batch = [(address, call) for call in address_calls]
-        calls_batches.append(calls_batch)
+            contract = RewardSplitterContract(
+                address=address,
+                execution_client=execution_client,
+            )
+            contract_func = contract.functions.multicall(address_calls)
 
-        for calls_batch in calls_batches:
-            logger.info('Processing reward splitter multicall batch')
-            tx = await _multicall(calls_batch)
-
-            tx = cast(HexBytes, tx)
+            # Send transaction
+            tx = await contract_func.transact()
             tx_hash = Web3.to_hex(tx)
             logger.info('Waiting for transaction %s confirmation', tx_hash)
 
@@ -210,34 +199,6 @@ async def _get_reward_splitter_calls(
 
 async def _get_reward_splitter_assets(reward_splitter: RewardSplitter) -> Wei:
     return Wei(sum(sh.earned_vault_assets for sh in reward_splitter.shareholders))
-
-
-async def _multicall(calls: list[tuple[ChecksumAddress, HexStr]]) -> HexBytes | None:
-    """
-    Helper function to execute multicall:
-    - Calls the original contract if all calls are to the same address.
-    - Calls multicall contract otherwise.
-    - Sends the transaction otherwise.
-    """
-    if not calls:
-        return None
-
-    distinct_addresses = list(set(address for address, _ in calls))
-    if len(distinct_addresses) == 1:
-        # Call the original contract when possible
-        # as it makes it easier to find the transaction in the block explorer on the contract page
-        contract = RewardSplitterContract(
-            address=distinct_addresses[0],
-            execution_client=execution_client,
-        )
-        contract_func = contract.functions.multicall([call for _, call in calls])
-    else:
-        # Call multicall contract
-        contract_func = multicall_contract.functions.aggregate(calls)
-
-    # Send transaction
-    tx = await contract_func.transact()
-    return tx
 
 
 def _get_reward_splitter_encoder() -> RewardSplitterEncoder:

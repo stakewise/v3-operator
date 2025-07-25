@@ -328,8 +328,6 @@ HASHI_VAULT_TIMEOUT = 10
 
 ATTEMPTS_WITH_DEFAULT_GAS: int = decouple_config('ATTEMPTS_WITH_DEFAULT_GAS', default=3, cast=int)
 
-MULTICALL_BATCH_SIZE: int = decouple_config('MULTICALL_BATCH_SIZE', default='20', cast=int)
-
 # Minimum amount of rewards to process reward splitter
 REWARD_SPLITTER_MIN_ASSETS: int = decouple_config(
     'REWARD_SPLITTER_MIN_ASSETS', default=Web3.to_wei('0.001', 'ether'), cast=int
