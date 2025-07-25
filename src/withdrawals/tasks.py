@@ -49,7 +49,7 @@ class WithdrawalsTask(BaseTask):
         protocol_config: ProtocolConfig,
     ) -> None:
         app_state = AppState()
-        if not await self._check_withdrawals_block(
+        if not await self._is_withdrawal_interval_passed(
             app_state, vault_address, chain_head.block_number
         ):
             return
@@ -80,9 +80,15 @@ class WithdrawalsTask(BaseTask):
         )
         if current_fee > MAX_WITHDRAWAL_REQUEST_FEE:
             logger.info(
-                'Partial withdrawals are skipped due to high withdrawal fees, '
+                'Partial withdrawals are skipped due to high withdrawal fee, '
                 'the current fee is %s.',
                 current_fee,
+            )
+            return
+        if await _is_pending_partial_withdrawals_queue_full():
+            logger.info(
+                'Partial withdrawals are currently skipped because '
+                'the pending partial withdrawals queue has exceeded its limit.'
             )
             return
         withdrawals_data = await _get_withdrawals_data(
@@ -111,7 +117,7 @@ class WithdrawalsTask(BaseTask):
             tx_hash,
         )
 
-    async def _check_withdrawals_block(
+    async def _is_withdrawal_interval_passed(
         self, app_state: AppState, vault_address: ChecksumAddress, block_number: BlockNumber
     ) -> bool:
         last_withdrawals_block = app_state.partial_withdrawal_cache.get(vault_address)
@@ -188,7 +194,12 @@ async def _get_withdrawals_data(
         )
     if settings.disable_full_withdrawals:
         logger.info('Available partial withdrawals capacity is less than queued assets')
-        return {}
+        return _get_partial_withdrawals_data(
+            validator_balances={
+                val.public_key: val.balance for val in partial_withdrawable_validators
+            },
+            queued_assets=queued_assets,
+        )
 
     min_activation_epoch = max(0, chain_head.epoch - validator_min_active_epochs)
 
@@ -199,10 +210,11 @@ async def _get_withdrawals_data(
     )
     withdrawals_data: dict[HexStr, Gwei] = {}
 
+    total_exited_assets = 0
     for validator in can_be_exited_validators:
-        if sum(withdrawals_data.values()) >= queued_assets:
+        if total_exited_assets >= queued_assets:
             return withdrawals_data
-        if sum(withdrawals_data.values()) + available_partial_withdrawals_capacity >= queued_assets:
+        if total_exited_assets + available_partial_withdrawals_capacity >= queued_assets:
             partial_data = _get_partial_withdrawals_data(
                 validator_balances={
                     val.public_key: val.balance for val in partial_withdrawable_validators
@@ -214,6 +226,7 @@ async def _get_withdrawals_data(
         partial_withdrawable_validators = [
             val for val in partial_withdrawable_validators if val.public_key != validator.public_key
         ]
+        total_exited_assets += validator.balance
         queued_assets = Gwei(queued_assets - validator.balance)
         available_partial_withdrawals_capacity = sum(
             val.balance - MIN_ACTIVATION_BALANCE_GWEI for val in partial_withdrawable_validators
@@ -349,3 +362,12 @@ async def _fetch_oracle_exiting_validators(
         index for index in oracles_exits_indexes if index in vault_indexes
     ]
     return [val for val in consensus_validators if val.index in vault_oracles_exiting_indexes]
+
+
+async def _is_pending_partial_withdrawals_queue_full() -> bool:
+    """"""
+    pending_partial_withdrawals = await consensus_client.get_pending_partial_withdrawals()
+    queue_length = len(pending_partial_withdrawals)
+    if queue_length == settings.network_config.PENDING_PARTIAL_WITHDRAWALS_LIMIT:
+        return True
+    return True

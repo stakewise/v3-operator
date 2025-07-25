@@ -27,6 +27,7 @@ class NetworkConfig(BaseNetworkConfig):
     DEFAULT_DVT_RELAYER_ENDPOINT: str
     MAX_FEE_PER_GAS_GWEI: Gwei
     SHARD_COMMITTEE_PERIOD: int
+    PENDING_PARTIAL_WITHDRAWALS_LIMIT: int
 
 
 NETWORKS: dict[str, NetworkConfig] = {
@@ -53,6 +54,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         DEFAULT_DVT_RELAYER_ENDPOINT='https://mainnet-dvt-relayer.stakewise.io',
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
+        PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
     ),
     HOODI: NetworkConfig(
         **asdict(BASE_NETWORKS[HOODI]),
@@ -77,6 +79,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         DEFAULT_DVT_RELAYER_ENDPOINT='https://hoodi-dvt-relayer.stakewise.io',
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
+        PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
     ),
     GNOSIS: NetworkConfig(
         **asdict(BASE_NETWORKS[GNOSIS]),
@@ -101,6 +104,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         DEFAULT_DVT_RELAYER_ENDPOINT='gnosis-dvt-relayer.stakewise.io',
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
+        PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
     ),
     CHIADO: NetworkConfig(
         **asdict(BASE_NETWORKS[CHIADO]),
@@ -125,5 +129,6 @@ NETWORKS: dict[str, NetworkConfig] = {
         DEFAULT_DVT_RELAYER_ENDPOINT='chiado-dvt-relayer.stakewise.io',
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
+        PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
     ),
 }

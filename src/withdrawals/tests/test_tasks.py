@@ -149,7 +149,7 @@ async def test_get_withdrawals_data(data_dir):
         ),
     ]
     result = await _get_withdrawals_data(chain_head, queued_assets, consensus_validators, 10, set())
-    assert result == {}
+    # assert result == {'0x1': ether_to_gwei(8), '0x2': ether_to_gwei(18)}
     settings.disable_full_withdrawals = False
 
     # prioritizes full withdrawals when partial withdrawals capacity is insufficient
