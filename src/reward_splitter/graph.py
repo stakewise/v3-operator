@@ -14,14 +14,15 @@ from src.reward_splitter.typings import (
 
 
 async def graph_get_reward_splitters(
-    block_number: BlockNumber, vaults: list[ChecksumAddress]
+    block_number: BlockNumber, claimer: ChecksumAddress, vaults: list[ChecksumAddress]
 ) -> list[RewardSplitter]:
     query = gql(
         '''
-        query Query($block: Int, $first: Int, $skip: Int, $vaults: [String]) {
+        query Query($block: Int, $first: Int, $skip: Int, $claimer: String, $vaults: [String]) {
             rewardSplitters(
                 block: {number: $block},
                 where: {
+                    claimer: $claimer,
                     vault_in: $vaults,
                     version_gte: 3,
                 }
@@ -40,6 +41,7 @@ async def graph_get_reward_splitters(
     )
     params = {
         'block': block_number,
+        'claimer': claimer,
         'vaults': [v.lower() for v in vaults],
     }
     response = await graph_client.fetch_pages(query, params=params)

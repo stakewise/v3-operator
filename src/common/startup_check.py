@@ -17,7 +17,6 @@ from web3.exceptions import BadFunctionCallOutput
 from src.common.clients import OPERATOR_USER_AGENT, db_client
 from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import (
-    RewardSplitterContract,
     VaultContract,
     keeper_contract,
     validators_registry_contract,
@@ -29,7 +28,6 @@ from src.common.utils import format_error, round_down, warning_verbose
 from src.common.wallet import hot_wallet
 from src.config.networks import NETWORKS
 from src.config.settings import settings
-from src.reward_splitter.graph import graph_get_reward_splitters
 from src.validators.execution import get_withdrawable_assets
 from src.validators.keystores.local import LocalKeystore
 from src.validators.relayer import DvtRelayerClient
@@ -88,10 +86,6 @@ async def startup_checks() -> None:
 
     logger.info('Checking hot wallet balance %s...', hot_wallet.address)
     await check_hot_wallet_balance()
-
-    if settings.split_rewards:
-        logger.info('Checking reward splitter claimer account...')
-        await _check_reward_splitter_wallet()
 
     logger.info('Checking connection to ipfs nodes...')
     healthy_ipfs_endpoints = await _check_ipfs_endpoints()
@@ -402,20 +396,6 @@ async def _check_validators_type() -> None:
             raise RuntimeError(
                 f'Please upgrade your Vault to the latest version '
                 f'to use {ValidatorType.V2.value} validators.'
-            )
-
-
-async def _check_reward_splitter_wallet() -> None:
-    chain_state = await get_chain_finalized_head()
-    reward_splitters = await graph_get_reward_splitters(
-        vaults=settings.vaults, block_number=chain_state.block_number
-    )
-    for reward_splitter in reward_splitters:
-        rewards_splitter_contract = RewardSplitterContract(reward_splitter.address)
-        if rewards_splitter_contract != hot_wallet.account.address:
-            raise RuntimeError(
-                f'Reward splitter claimer for vault {reward_splitter.vault} '
-                f'must equal to hot wallet address'
             )
 
 

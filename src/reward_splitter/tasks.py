@@ -16,6 +16,7 @@ from src.common.execution import build_gas_manager
 from src.common.harvest import get_harvest_params
 from src.common.tasks import BaseTask
 from src.common.typings import HarvestParams
+from src.common.wallet import hot_wallet
 from src.config.networks import ZERO_CHECKSUM_ADDRESS
 from src.config.settings import (
     MULTICALL_BATCH_SIZE,
@@ -58,13 +59,15 @@ class SplitRewardTask(BaseTask):
 
         logger.info('Fetching reward splitters')
         reward_splitters = await graph_get_reward_splitters(
-            block_number=block['number'], vaults=settings.vaults
+            block_number=block['number'], claimer=hot_wallet.account.address, vaults=settings.vaults
         )
 
         if not reward_splitters:
-            logger.info('No reward splitters found for given vaults')
+            logger.info(
+                'No reward splitters found for provided vaults with the claimer %s',
+                hot_wallet.address,
+            )
             return
-
         splitter_to_exit_requests = await graph_get_claimable_exit_requests(
             block_number=block['number'], receivers=[rs.address for rs in reward_splitters]
         )
@@ -161,7 +164,9 @@ async def _get_reward_splitter_calls(
     reward_splitter_assets = await _get_reward_splitter_assets(reward_splitter)
 
     if reward_splitter_assets < REWARD_SPLITTER_MIN_ASSETS:
-        logger.info('Reward splitter %s has not enough assets to withdraw', reward_splitter.address)
+        logger.info(
+            'Reward splitter %s does not have enough assets to withdraw', reward_splitter.address
+        )
     else:
         # Append update state call
         if harvest_params:
@@ -171,7 +176,7 @@ async def _get_reward_splitter_calls(
 
         # Append enter exit queue on behalf calls
         for shareholder in reward_splitter.shareholders:
-            logger.info('Processing shareholder %s', shareholder.address)
+            logger.debug('Processing shareholder %s', shareholder.address)
 
             reward_splitter_calls.append(
                 reward_splitter_encoder.enter_exit_queue_on_behalf(
@@ -187,8 +192,8 @@ async def _get_reward_splitter_calls(
     for exit_request in exit_requests:
         logger.info('Processing exit request with position ticket %s', exit_request.position_ticket)
         if exit_request.exit_queue_index is None:
-            logger.info(
-                'Exit request with position ticket %s has no exit queue index',
+            logger.error(
+                'Exit request with position ticket %s does not have an exit queue index',
                 exit_request.position_ticket,
             )
             continue

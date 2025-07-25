@@ -247,9 +247,6 @@ class RewardSplitterContract(ContractWrapper):
     def encoder(self) -> 'RewardSplitterEncoder':
         return RewardSplitterEncoder(self)
 
-    async def claimer(self) -> ChecksumAddress:
-        return await self.contract.functions.claimer().call()
-
 
 class RewardSplitterEncoder:
     """
