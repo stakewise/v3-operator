@@ -176,87 +176,50 @@ async def _get_withdrawals_data(
     validator_min_active_epochs: int,
     oracle_exit_indexes: set[int],
 ) -> dict[HexStr, Gwei]:
-    # filter active validators
-    partial_withdrawable_validators = [
-        val
-        for val in consensus_validators
-        if _is_partial_withdrawable_validator(val, chain_head.epoch)
+    # Find all partial-withdrawable validators
+    partials = [
+        v for v in consensus_validators if _is_partial_withdrawable_validator(v, chain_head.epoch)
     ]
-    available_partial_withdrawals_capacity = sum(
-        val.balance - MIN_ACTIVATION_BALANCE_GWEI for val in partial_withdrawable_validators
-    )
-    if available_partial_withdrawals_capacity >= queued_assets:
+    partial_capacity = sum(v.balance - MIN_ACTIVATION_BALANCE_GWEI for v in partials)
+
+    # If enough partials, use only them
+    if partial_capacity >= queued_assets or settings.disable_full_withdrawals:
         return _get_partial_withdrawals_data(
-            validator_balances={
-                val.public_key: val.balance for val in partial_withdrawable_validators
-            },
-            queued_assets=queued_assets,
-        )
-    if settings.disable_full_withdrawals:
-        logger.info('Available partial withdrawals capacity is less than queued assets')
-        return _get_partial_withdrawals_data(
-            validator_balances={
-                val.public_key: val.balance for val in partial_withdrawable_validators
-            },
-            queued_assets=queued_assets,
+            {v.public_key: v.balance for v in partials}, queued_assets
         )
 
-    min_activation_epoch = max(0, chain_head.epoch - validator_min_active_epochs)
-
-    can_be_exited_validators = _filter_exitable_validators(
-        consensus_validators=consensus_validators,
-        min_activation_epoch=min_activation_epoch,
-        oracle_exit_indexes=oracle_exit_indexes,
+    # Otherwise, add full withdrawals as needed
+    min_epoch = max(0, chain_head.epoch - validator_min_active_epochs)
+    exitable_validators = _filter_exitable_validators(
+        consensus_validators, min_epoch, oracle_exit_indexes
     )
-    withdrawals_data: dict[HexStr, Gwei] = {}
+    withdrawals: dict[HexStr, Gwei] = {}
+    exited_assets = 0
 
-    total_exited_assets = 0
-    for validator in can_be_exited_validators:
-        if total_exited_assets >= queued_assets:
-            return withdrawals_data
-        if total_exited_assets + available_partial_withdrawals_capacity >= queued_assets:
-            partial_data = _get_partial_withdrawals_data(
-                validator_balances={
-                    val.public_key: val.balance for val in partial_withdrawable_validators
-                },
-                queued_assets=queued_assets,
-            )
-            return withdrawals_data | partial_data
-
-        partial_withdrawable_validators = [
-            val for val in partial_withdrawable_validators if val.public_key != validator.public_key
-        ]
-        total_exited_assets += validator.balance
+    for validator in exitable_validators:
+        withdrawals[validator.public_key] = Gwei(0)  # full withdrawal
+        exited_assets += validator.balance
         queued_assets = Gwei(queued_assets - validator.balance)
-        available_partial_withdrawals_capacity = sum(
-            val.balance - MIN_ACTIVATION_BALANCE_GWEI for val in partial_withdrawable_validators
-        )
+        # Remove exited validator from partials
+        partials = [p for p in partials if p.public_key != validator.public_key]
+        partial_capacity = sum(p.balance - MIN_ACTIVATION_BALANCE_GWEI for p in partials)
+        if exited_assets + partial_capacity >= queued_assets:
+            partials_data = _get_partial_withdrawals_data(
+                {p.public_key: p.balance for p in partials}, queued_assets
+            )
+            withdrawals.update(partials_data)
+            break
 
-        withdrawals_data[validator.public_key] = Gwei(0)  # full withdrawal
-
-    return withdrawals_data
+    return withdrawals
 
 
 def _get_partial_withdrawals_data(
     validator_balances: dict[HexStr, Gwei], queued_assets: Gwei
 ) -> dict[HexStr, Gwei]:
-    """
-    Calculate partial withdrawals for validators.
-    First, try to withdraw from a single validator in one request.
-    If that fails, split the amount across validators,
-    starting with those holding the largest balances.
-    """
     withdrawals_data: dict[HexStr, Gwei] = {}
 
-    # Try single validator first
-    for public_key, balance in sorted(
-        validator_balances.items(), key=lambda item: item[1], reverse=True
-    ):
-        available = balance - MIN_ACTIVATION_BALANCE_GWEI
-        if available >= queued_assets:
-            return {public_key: queued_assets}
-
-    # Split across multiple validators
+    if queued_assets <= 0:
+        return withdrawals_data
     for public_key, balance in sorted(
         validator_balances.items(), key=lambda item: item[1], reverse=True
     ):
