@@ -29,9 +29,9 @@ class BaseProcess:
         self.command: list[str | Path] = []
         self.proc: subprocess.Popen | None = None
 
-        # Flag to indicate if the process was stopped
+        # Flag to indicate if the process stop was initiated
         # This is used to determine if the process was stopped by the user or exited unexpectedly
-        self._stopped = False
+        self._is_stopping = False
 
     def start(self) -> None:
         if self.proc:
@@ -57,12 +57,13 @@ class BaseProcess:
             return
 
         logger.info('Stopping %s...', self.name)
+        self._is_stopping = True
         await kill_proc(self.proc)
-        self._stopped = True
+        logger.info('%s stopped', self.name)
 
     @property
-    def is_stopped(self) -> bool:
-        return self._stopped
+    def is_stopping(self) -> bool:
+        return self._is_stopping
 
 
 class RethProcess(BaseProcess):
@@ -240,10 +241,12 @@ class ProcessRunner:
         last_restart = time.time()
 
         while True:
+            # Read stdout and stderr to prevent blocking
+            self._read_stdout()
             self._log_stderr()
 
             # Check if the process was stopped by another task
-            if self.process.is_stopped:
+            if self.process.is_stopping:
                 break
 
             # If the process is not alive, restart it if the minimum restart interval has passed
@@ -265,6 +268,11 @@ class ProcessRunner:
     async def stop(self) -> None:
         if self.process:
             await self.process.stop()
+
+    def _read_stdout(self) -> None:
+        # Drain the stdout stream to prevent blocking
+        if self.process and self.process.proc and self.process.proc.stdout:
+            self.process.proc.stdout.read()
 
     def _log_stderr(self) -> None:
         if self.process and self.process.proc and self.process.proc.stderr:
