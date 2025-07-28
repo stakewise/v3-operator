@@ -18,6 +18,7 @@ from staking_deposit.key_handling.key_derivation.tree import (
 )
 from staking_deposit.key_handling.keystore import Keystore, ScryptKeystore
 from staking_deposit.settings import DEPOSIT_CLI_VERSION
+from sw_utils import chunkify
 from sw_utils.signing import (
     DepositData,
     DepositMessage,
@@ -31,7 +32,6 @@ from web3 import Web3
 from web3._utils import request
 
 from src.common.typings import ValidatorType
-from src.common.utils import chunkify
 from src.config.networks import NETWORKS
 
 # Set path as EIP-2334 format

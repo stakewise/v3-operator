@@ -5,7 +5,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from decimal import ROUND_FLOOR, Decimal, localcontext
 from pathlib import Path
-from typing import Any, Callable, Iterable, Iterator, TypeVar, overload
+from typing import Any, Callable, Iterable, TypeVar
 
 import click
 import tenacity
@@ -97,19 +97,6 @@ def process_oracles_approvals(
     for _, signature in sorted(votes, key=lambda x: Web3.to_int(hexstr=x[0]))[:votes_threshold]:
         signatures += signature
     return OraclesApproval(ipfs_hash=winner[0], signatures=signatures, deadline=winner[1])
-
-
-@overload
-def chunkify(items: list[T], size: int) -> Iterator[list[T]]: ...
-
-
-@overload
-def chunkify(items: range, size: int) -> Iterator[range]: ...
-
-
-def chunkify(items, size):  # type: ignore[no-untyped-def]
-    for i in range(0, len(items), size):
-        yield items[i : i + size]
 
 
 def greenify(value: Any) -> str:

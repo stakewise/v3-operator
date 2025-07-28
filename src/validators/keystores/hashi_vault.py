@@ -8,9 +8,9 @@ from typing import Iterable
 from aiohttp import ClientSession, ClientTimeout
 from eth_typing import HexStr
 from eth_utils import add_0x_prefix
+from sw_utils import chunkify
 from web3 import Web3
 
-from src.common.utils import chunkify
 from src.config.settings import HASHI_VAULT_TIMEOUT, settings
 from src.validators.keystores.local import Keys, LocalKeystore
 from src.validators.typings import BLSPrivkey
