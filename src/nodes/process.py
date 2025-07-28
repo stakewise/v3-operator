@@ -17,10 +17,12 @@ class BaseProcess:
 
     def __init__(
         self,
+        network: str,
         stdin: IO_Any = subprocess.PIPE,
         stdout: IO_Any = subprocess.PIPE,
         stderr: IO_Any = subprocess.PIPE,
     ):
+        self.network = network
         self.stdin = stdin
         self.stdout = stdout
         self.stderr = stderr
@@ -66,7 +68,7 @@ class RethProcess(BaseProcess):
         :param network: The network name
         :param reth_dir: The directory where Reth data will be stored
         """
-        super().__init__()
+        super().__init__(network=network)
         self.reth_dir = reth_dir
 
         binary_path = reth_dir / 'reth'
@@ -100,17 +102,33 @@ class RethProcess(BaseProcess):
             reth_dir / 'logs',
             '--nat',
             'upnp',
+            *self.pruning_options,
         ]
 
         if era_url := NETWORKS[network].NODE_CONFIG.ERA_URL:
             self.command.extend(['--era.enable', '--era.url', era_url])
+
+    @property
+    def pruning_options(self) -> list[str]:
+        """
+        Returns the pruning options for Reth.
+        """
+
+        network_config = NETWORKS[self.network]
+        keeper_contract_address = network_config.KEEPER_CONTRACT_ADDRESS
+        config_update_event_block = network_config.CONFIG_UPDATE_EVENT_BLOCK
+
+        return [
+            '--prune.receiptslogfilter',
+            f'{keeper_contract_address.lower()}:before:{config_update_event_block - 1}',
+        ]
 
 
 class LighthouseProcess(BaseProcess):
     name = 'Lighthouse'
 
     def __init__(self, network: str, lighthouse_dir: Path, jwt_secret_path: Path):
-        super().__init__()
+        super().__init__(network=network)
 
         binary_path = lighthouse_dir / 'lighthouse'
 
