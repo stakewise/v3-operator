@@ -10,6 +10,7 @@ from sw_utils import (
     get_consensus_client,
     get_execution_client,
 )
+from sw_utils.graph.client import GraphClient as SWGraphClient
 from web3 import AsyncWeb3
 from web3.middleware.signing import async_construct_sign_and_send_raw_middleware
 
@@ -84,6 +85,20 @@ class ConsensusClient:
         return getattr(self.client, item)
 
 
+class GraphClient:
+    @cached_property
+    def client(self) -> SWGraphClient:
+        return SWGraphClient(
+            endpoint=settings.graph_endpoint,
+            request_timeout=settings.graph_request_timeout,
+            retry_timeout=settings.graph_retry_timeout,
+            page_size=settings.graph_page_size,
+        )
+
+    def __getattr__(self, item):  # type: ignore
+        return getattr(self.client, item)
+
+
 class IpfsLazyFetchClient:
     @cached_property
     def client(self) -> IpfsFetchClient:
@@ -104,6 +119,7 @@ db_client = Database()
 execution_client = cast(AsyncWeb3, ExecutionClient())
 execution_non_retry_client = cast(AsyncWeb3, ExecutionClient(use_retries=False))
 consensus_client = cast(ExtendedAsyncBeacon, ConsensusClient())
+graph_client = cast(SWGraphClient, GraphClient())
 ipfs_fetch_client = IpfsLazyFetchClient()
 
 

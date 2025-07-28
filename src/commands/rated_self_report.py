@@ -4,11 +4,12 @@ from pathlib import Path
 import click
 import requests
 from eth_typing import ChecksumAddress
+from gql import gql
 
-from src.common.graph import GraphClient
+from src.common.clients import graph_client
 from src.common.validators import validate_eth_addresses
 from src.config.config import OperatorConfig, OperatorConfigException
-from src.config.networks import AVAILABLE_NETWORKS, RATED_NETWORKS
+from src.config.networks import AVAILABLE_NETWORKS, NETWORKS, RATED_NETWORKS
 from src.config.settings import DEFAULT_NETWORK, settings
 
 
@@ -73,6 +74,7 @@ def rated_self_report(
         network=network,
         execution_endpoints='',
         consensus_endpoints='',
+        graph_endpoint=NETWORKS[network].STAKEWISE_API_URL,
     )
     click.secho('Starting rated self report...')
     for vault in vaults:
@@ -85,8 +87,7 @@ async def _report_validators(
     token: str,
     network: str,
 ) -> None:
-    graph_client = GraphClient()
-    validators = await graph_client.get_vault_validators(vault)
+    validators = await graph_get_vault_validators(vault)
     if not validators:
         click.secho('No validators found or failed to fetch validators.', bold=True, fg='red')
         return
@@ -121,3 +122,22 @@ async def _report_validators(
                 bold=True,
                 fg='red',
             )
+
+
+async def graph_get_vault_validators(vault: str) -> list[str]:
+    query = gql(
+        """
+        query Validators($vaultAddress: String!, $first: Int, $skip: Int) {
+          vaultValidators(
+            vaultAddress: $vaultAddress
+            statusIn: ["active_ongoing"]
+            first: $first
+            skip: $skip
+          ) {
+            publicKey
+          }
+        }
+        """
+    )
+    resource = await graph_client.fetch_pages(query, params={'vaultAddress': vault})
+    return [validator['publicKey'] for validator in resource]

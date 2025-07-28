@@ -22,11 +22,12 @@
    2. [Validators voluntary exit](#validators-voluntary-exit)
    3. [Validators consolidation](#validators-consolidation)
    4. [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
-   5. [Recover validator keystores](#recover-validator-keystores)
-   6. [Max gas fee](#max-gas-fee)
-   7. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
-   8. [Self report to Rated Network](#self-report-to-rated-network)
-   9. [Export validators file](#export-validators-file)
+   5. [Automated withdrawals (Reward splitter)](#automated-withdrawals-reward-splitter)
+   6. [Recover validator keystores](#recover-validator-keystores)
+   7. [Max gas fee](#max-gas-fee)
+   8. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
+   9. [Self report to Rated Network](#self-report-to-rated-network)
+   10. [Export validators file](#export-validators-file)
 6. [Contacts](#contacts)
 
 ## What is V3 Operator?
@@ -412,6 +413,7 @@ Operator Service has many different commands that are not mandatory but might co
 - [Validators voluntary exit](#validators-voluntary-exit)
 - [Validators consolidation](#validators-consolidation)
 - [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
+- [Automated withdrawals (Reward splitter)](#automated-withdrawals-reward-splitter)
 - [Add validator keys to Vault](#add-validator-keys-to-vault)
 - [Recover validator keystores](#recover-validator-keystores)
 - [Self report to Rated Network](#self-report-to-rated-network)
@@ -499,6 +501,21 @@ If the requested amount can be processed via partial withdrawals, it submits the
 You can disable partial withdrawals using the `--disable-withdrawals` parameter. In this case, withdrawals will be processed by oracles that exit the entire validator, which may negatively impact the vault’s APR, as the exited amount will exceed the requested withdrawal amount.
 
 The partial withdrawals interval can be adjusted via the `PARTIAL_WITHDRAWALS_INTERVAL` env variable, with every 24 hours being the default.
+
+### Automated withdrawals (Reward splitter)
+
+It is possible to periodically withdraw rewards for the vault’s fee shareholders. To enable this, set the wallet address connected to the operator as the `Fee Claimer` in the `Roles` tab under the vault’s Settings. Additionally, you must pass the --split-rewards flag when starting the Operator Service.
+
+Periodic withdrawal task relies on Reward Splitter contract. The task combines the following contract calls into a multicall:
+
+- Harvest vault rewards from Keeper
+- Withdraw Splitter rewards on behalf of each shareholder. Rewards withdrawn will go to exit queue.
+- Claim exited assets on behalf of each shareholder. Assets claimed will go directly to shareholder address.
+
+Notes:
+
+- To avoid unnecessary gas fees from the operator's wallet, withdrawals are processed only if their total amount exceeds a minimum threshold. This can be adjusted via the `REWARD_SPLITTER_MIN_ASSETS` environment variable. The value is specified in Wei.
+- The automated withdrawals interval can be adjusted via the `REWARD_SPLITTER_INTERVAL` env variable, with every 24 hours being the default.
 
 ### Recover validator keystores
 
