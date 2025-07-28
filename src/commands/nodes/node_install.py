@@ -16,7 +16,7 @@ from src.nodes.typings import Release
 DEFAULT_REQUESTS_TIMEOUT = 60
 
 LATEST_RETH_VERSION = 'v1.5.1'
-LATEST_LIGHTHOUSE_VERSION = 'v7.0.1'
+LATEST_LIGHTHOUSE_VERSION = 'v7.1.0'
 
 
 @click.option(
