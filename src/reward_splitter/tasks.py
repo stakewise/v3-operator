@@ -37,8 +37,7 @@ class SplitRewardTask(BaseTask):
         This function performs the following steps:
         - Retrieves reward splitters associated with the vaults from Subgraph.
         - Retrieves claimable exit requests for the reward splitters.
-        - Generates multicall contract calls for each reward splitter.
-        - Processes the multicall batches and waits for transaction confirmations.
+        - Calls reward splitter contracts and waits for transactions confirmations.
         """
         block = await execution_client.eth.get_block('finalized')
 
@@ -66,9 +65,7 @@ class SplitRewardTask(BaseTask):
             block_number=block['number'], receivers=[rs.address for rs in reward_splitters]
         )
 
-        # Multicall contract calls per address
         calls: dict[ChecksumAddress, list[HexStr]] = {}
-
         for reward_splitter in reward_splitters:
             logger.info(
                 'Processing reward splitter %s for vault %s',
@@ -114,7 +111,7 @@ class SplitRewardTask(BaseTask):
             logger.info('Transaction %s confirmed', tx_hash)
 
         app_state.reward_splitter_block = block['number']
-        logger.info('All multicall batches processed')
+        logger.info('All reward splitter calls processed')
 
 
 async def _check_reward_splitter_block(app_state: AppState, block_number: BlockNumber) -> bool:
