@@ -119,6 +119,12 @@ start_common_options = [
         help='Whether to submit vault harvest transactions. Default is false.',
     ),
     click.option(
+        '--split-rewards',
+        is_flag=True,
+        envvar='SPLIT_REWARDS',
+        help='Claim fee rewards periodically on behalf of the shareholders. Default is false.',
+    ),
+    click.option(
         '--execution-endpoints',
         type=str,
         envvar='EXECUTION_ENDPOINTS',
@@ -138,6 +144,12 @@ start_common_options = [
         envvar='CONSENSUS_ENDPOINTS',
         prompt='Enter comma separated list of API endpoints for consensus nodes',
         help='Comma separated list of API endpoints for consensus nodes.',
+    ),
+    click.option(
+        '--graph-endpoint',
+        type=str,
+        envvar='GRAPH_ENDPOINT',
+        help='API endpoint for graph node.',
     ),
     click.option(
         '--vaults',

@@ -39,8 +39,13 @@ class Settings(metaclass=Singleton):
     execution_retry_timeout: int
     events_blocks_range_interval: int
     execution_jwt_secret: str | None
+    graph_endpoint: str
+    graph_request_timeout: int
+    graph_retry_timeout: int
+    graph_page_size: int
 
     harvest_vault: bool
+    split_rewards: bool
     verbose: bool
     enable_metrics: bool
     metrics_host: str
@@ -68,6 +73,7 @@ class Settings(metaclass=Singleton):
     log_level: str
     log_format: str
     web3_log_level: str
+    gql_log_level: str
 
     ipfs_fetch_endpoints: list[str]
     ipfs_timeout: int
@@ -107,7 +113,9 @@ class Settings(metaclass=Singleton):
         consensus_endpoints: str = '',
         execution_endpoints: str = '',
         execution_jwt_secret: str | None = None,
+        graph_endpoint: str = '',
         harvest_vault: bool = False,
+        split_rewards: bool = False,
         verbose: bool = False,
         enable_metrics: bool = False,
         metrics_port: int = DEFAULT_METRICS_PORT,
@@ -146,7 +154,9 @@ class Settings(metaclass=Singleton):
         self.consensus_endpoints = [node.strip() for node in consensus_endpoints.split(',')]
         self.execution_endpoints = [node.strip() for node in execution_endpoints.split(',')]
         self.execution_jwt_secret = execution_jwt_secret
+        self.graph_endpoint = graph_endpoint or self.network_config.STAKEWISE_GRAPH_ENDPOINT
         self.harvest_vault = harvest_vault
+        self.split_rewards = split_rewards
         self.verbose = verbose
         self.enable_metrics = enable_metrics
         self.metrics_host = metrics_host
@@ -213,6 +223,7 @@ class Settings(metaclass=Singleton):
         self.log_level = log_level or 'INFO'
         self.log_format = log_format or LOG_PLAIN
         self.web3_log_level = decouple_config('WEB3_LOG_LEVEL', default='INFO')
+        self.gql_log_level = decouple_config('GQL_LOG_LEVEL', default='WARNING')
 
         self.sentry_dsn = decouple_config('SENTRY_DSN', default='')
         self.sentry_environment = decouple_config('SENTRY_ENVIRONMENT', default='')
@@ -256,6 +267,9 @@ class Settings(metaclass=Singleton):
         self.consensus_retry_timeout = decouple_config(
             'CONSENSUS_RETRY_TIMEOUT', default=120, cast=int
         )
+        self.graph_request_timeout = decouple_config('GRAPH_REQUEST_TIMEOUT', default=10, cast=int)
+        self.graph_retry_timeout = decouple_config('GRAPH_RETRY_TIMEOUT', default=60, cast=int)
+        self.graph_page_size = decouple_config('GRAPH_PAGE_SIZE', default=100, cast=int)
         self.relayer_type = relayer_type
         self.relayer_endpoint = relayer_endpoint or ''
         self.relayer_timeout = decouple_config('RELAYER_TIMEOUT', default=10, cast=int)
@@ -315,9 +329,13 @@ HASHI_VAULT_TIMEOUT = 10
 
 ATTEMPTS_WITH_DEFAULT_GAS: int = decouple_config('ATTEMPTS_WITH_DEFAULT_GAS', default=3, cast=int)
 
-# Graphql timeout
-GRAPH_API_TIMEOUT = 10
-
+# Minimum amount of rewards to process reward splitter
+REWARD_SPLITTER_MIN_ASSETS: int = decouple_config(
+    'REWARD_SPLITTER_MIN_ASSETS', default=Web3.to_wei('0.001', 'ether'), cast=int
+)
+REWARD_SPLITTER_INTERVAL: int = decouple_config(
+    'REWARD_SPLITTER_INTERVAL', default=86400, cast=int  # every 24 hr
+)
 # logging
 LOG_PLAIN = 'plain'
 LOG_JSON = 'json'
