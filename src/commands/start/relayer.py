@@ -3,7 +3,7 @@ import logging
 import sys
 
 import click
-from eth_typing import ChecksumAddress
+from eth_utils import to_checksum_address
 from web3.types import Gwei
 
 from src.commands.start.base import load_operator_config, start_base
@@ -43,7 +43,7 @@ AUTO = 'AUTO'
 @click.command(help='Start operator service in API mode')
 # pylint: disable-next=too-many-arguments,too-many-locals
 def start_relayer(
-    vaults: list[ChecksumAddress],
+    vaults: str,
     consensus_endpoints: str,
     execution_endpoints: str,
     execution_jwt_secret: str | None,
@@ -69,8 +69,10 @@ def start_relayer(
     relayer_endpoint: str,
     no_confirm: bool,
 ) -> None:
+    vault_addresses = [to_checksum_address(address) for address in vaults.split(',')]
+
     operator_config = load_operator_config(
-        vaults=vaults,
+        vaults=vault_addresses,
         data_dir=data_dir,
         network=network,
         no_confirm=no_confirm,
@@ -86,7 +88,7 @@ def start_relayer(
     validators_registration_mode = ValidatorsRegistrationMode.API
 
     settings.set(
-        vaults=vaults,
+        vaults=vault_addresses,
         data_dir=operator_config.data_dir,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,

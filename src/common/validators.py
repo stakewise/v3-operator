@@ -31,7 +31,7 @@ def validate_eth_address(
 
 def validate_eth_addresses(
     ctx: click.Context, param: click.Parameter, value: str | None
-) -> list[ChecksumAddress] | None:
+) -> str | None:
     if not value:
         return None
     try:
@@ -41,7 +41,7 @@ def validate_eth_addresses(
     except ValueError:
         pass
 
-    return [to_checksum_address(address) for address in value.split(',')]
+    return value
 
 
 def validate_db_uri(ctx: click.Context, param: click.Parameter, value: str) -> str:
