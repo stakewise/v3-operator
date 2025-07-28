@@ -41,7 +41,7 @@ async def graph_get_reward_splitters(
     )
     params = {
         'block': block_number,
-        'claimer': claimer,
+        'claimer': claimer.lower(),
         'vaults': [v.lower() for v in vaults],
     }
     response = await graph_client.fetch_pages(query, params=params)
