@@ -17,8 +17,10 @@ from src.commands.init import init
 from src.commands.rated_self_report import rated_self_report
 from src.commands.recover import recover
 from src.commands.remote_signer_setup import remote_signer_setup
-from src.commands.start import start
-from src.commands.start_api import start_api
+from src.commands.start.hashi_vault import start_hashi_vault
+from src.commands.start.local import start_local
+from src.commands.start.relayer import start_relayer
+from src.commands.start.remote_signer import start_remote_signer
 from src.commands.validators_exit import validators_exit
 from src.common.utils import get_build_version
 from src.remote_db.commands import remote_db_group
@@ -42,8 +44,11 @@ cli.add_command(export_public_keys)
 cli.add_command(remote_signer_setup)
 cli.add_command(create_wallet)
 cli.add_command(validators_exit)
-cli.add_command(start)
-cli.add_command(start_api)
+cli.add_command(start_local)
+cli.add_command(start_local, name='start')  # alias for start_local
+cli.add_command(start_hashi_vault)
+cli.add_command(start_remote_signer)
+cli.add_command(start_relayer)
 cli.add_command(recover)
 cli.add_command(import_genesis_keys)
 cli.add_command(remote_db_group)

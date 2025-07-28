@@ -10,12 +10,13 @@ import aiohttp
 import click
 from aiohttp import ClientTimeout
 from eth_typing import ChecksumAddress
+from sw_utils import chunkify
 
 from src.common.clients import setup_clients
 from src.common.contracts import VaultContract
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.startup_check import wait_for_execution_node
-from src.common.utils import chunkify, log_verbose
+from src.common.utils import log_verbose
 from src.common.validators import (
     validate_dappnode_execution_endpoints,
     validate_eth_address,
