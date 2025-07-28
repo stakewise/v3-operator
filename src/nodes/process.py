@@ -115,12 +115,11 @@ class RethProcess(BaseProcess):
         """
 
         network_config = NETWORKS[self.network]
-        keeper_contract_address = network_config.KEEPER_CONTRACT_ADDRESS
-        config_update_event_block = network_config.CONFIG_UPDATE_EVENT_BLOCK
+        validators_registry_genesis_block = network_config.VALIDATORS_REGISTRY_GENESIS_BLOCK
 
         return [
-            '--prune.receiptslogfilter',
-            f'{keeper_contract_address.lower()}:before:{config_update_event_block - 1}',
+            '--prune.receipts.before',
+            f'{validators_registry_genesis_block}',
         ]
 
 
