@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 
 from src.config.networks import NETWORKS
-from src.nodes.exceptions import NodeException
+from src.nodes.exceptions import NodeException, NodeFailedToStartError
 from src.nodes.typings import IO_Any
 from src.nodes.utils.proc import kill_proc
 
@@ -28,6 +28,10 @@ class BaseProcess:
         self.stderr = stderr
         self.command: list[str | Path] = []
         self.proc: subprocess.Popen | None = None
+
+        # Flag to indicate if the process was stopped
+        # This is used to determine if the process was stopped by the user or exited unexpectedly
+        self._stopped = False
 
     def start(self) -> None:
         if self.proc:
@@ -54,10 +58,11 @@ class BaseProcess:
 
         logger.info('Stopping %s...', self.name)
         await kill_proc(self.proc)
+        self._stopped = True
 
     @property
     def is_stopped(self) -> bool:
-        return self.proc is not None and self.proc.poll() is not None
+        return self._stopped
 
 
 class RethProcess(BaseProcess):
@@ -203,10 +208,14 @@ class ProcessRunner:
     Helper class for running a node process and keeping it alive.
     """
 
-    def __init__(self, process_builder: ProcessBuilder, min_restart_interval: int):
+    def __init__(
+        self, process_builder: ProcessBuilder, min_restart_interval: int, start_interval: int = 1
+    ):
         self.process_builder = process_builder
         self.min_restart_interval = min_restart_interval
+        self.start_interval = start_interval
         self.process: BaseProcess | None = None
+        self.stderr_max_length = 10_000
 
     @property
     def is_alive(self) -> bool:
@@ -218,10 +227,22 @@ class ProcessRunner:
         """
         self.process = self.process_builder.get_process()
         self.process.start()
+
+        # Give the process some time to start
+        await asyncio.sleep(self.start_interval)
+
+        # Handle the case when the process could not start
+        # Probably the command is incorrect
+        if not self.process.is_alive:
+            self._log_stderr()
+            raise NodeFailedToStartError(self.process.name)
+
         last_restart = time.time()
 
         while True:
-            # Check if the process is stopped by another task
+            self._log_stderr()
+
+            # Check if the process was stopped by another task
             if self.process.is_stopped:
                 break
 
@@ -244,3 +265,9 @@ class ProcessRunner:
     async def stop(self) -> None:
         if self.process:
             await self.process.stop()
+
+    def _log_stderr(self) -> None:
+        if self.process and self.process.proc and self.process.proc.stderr:
+            stderr = self.process.proc.stderr.read().decode('utf-8', errors='replace')
+            if stderr:
+                logger.error('%s:\n%s', self.process.name, stderr[: self.stderr_max_length])

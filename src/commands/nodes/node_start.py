@@ -7,6 +7,7 @@ import psutil
 
 from src.config.networks import AVAILABLE_NETWORKS, NETWORKS
 from src.config.settings import DEFAULT_NETWORK, LOG_DATE_FORMAT
+from src.nodes.exceptions import NodeFailedToStartError
 from src.nodes.process import (
     LighthouseProcessBuilder,
     ProcessRunner,
@@ -77,6 +78,9 @@ async def main(data_dir: Path, network: str) -> None:
             reth_runner.run(),
             lighthouse_runner.run(),
         )
+    except NodeFailedToStartError as e:
+        click.echo(str(e))
+        raise click.Abort() from e
     except (KeyboardInterrupt, asyncio.CancelledError):
         # Handle Ctrl+C
         # Shut down the processes gracefully
