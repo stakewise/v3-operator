@@ -5,6 +5,7 @@ from pathlib import Path
 
 from src.common.credentials import CredentialManager
 from src.config.networks import AVAILABLE_NETWORKS
+from src.config.settings import PUBLIC_KEYS_FILENAME
 
 
 class OperatorConfigException(ValueError):
@@ -37,6 +38,18 @@ class OperatorConfig:
     @property
     def tmp_data_dir(self) -> Path:
         return self.data_dir / '.tmp'
+
+    @property
+    def public_keys_file(self) -> Path:
+        return self.data_dir / PUBLIC_KEYS_FILENAME
+
+    @property
+    def keystores_dir(self) -> Path:
+        return self.data_dir / 'keystores'
+
+    @property
+    def keystores_password_file(self) -> Path:
+        return self.keystores_dir / 'password.txt'
 
     def create_tmp_dir(self) -> None:
         self.tmp_data_dir.mkdir(parents=True, exist_ok=True)
