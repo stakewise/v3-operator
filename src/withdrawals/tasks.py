@@ -154,7 +154,7 @@ class WithdrawalsTask(BaseTask):
         )
         public_key_to_index = {val.public_key: val.index for val in consensus_validators}
 
-        for event in events:
+        for event in events[::-1]:  # reverse order to get the latest event
             slot = await calc_slot_by_block_number(event.block_number)
             pending_partial_withdrawals = await consensus_client.get_pending_partial_withdrawals(
                 slot
@@ -203,7 +203,7 @@ async def _get_withdrawals_data(
         # Remove exited validator from partials
         partials = [p for p in partials if p.public_key != validator.public_key]
         partial_capacity = sum(p.balance - MIN_ACTIVATION_BALANCE_GWEI for p in partials)
-        if exited_assets + partial_capacity >= queued_assets:
+        if partial_capacity >= queued_assets:
             partials_data = _get_partial_withdrawals_data(
                 {p.public_key: p.balance for p in partials}, queued_assets
             )
@@ -328,9 +328,6 @@ async def _fetch_oracle_exiting_validators(
 
 
 async def _is_pending_partial_withdrawals_queue_full() -> bool:
-    """"""
     pending_partial_withdrawals = await consensus_client.get_pending_partial_withdrawals()
     queue_length = len(pending_partial_withdrawals)
-    if queue_length == settings.network_config.PENDING_PARTIAL_WITHDRAWALS_LIMIT:
-        return True
-    return True
+    return queue_length >= settings.network_config.PENDING_PARTIAL_WITHDRAWALS_LIMIT
