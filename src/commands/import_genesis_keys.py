@@ -65,9 +65,7 @@ def import_genesis_keys(
     if settings.network_config.GENESIS_VAULT_CONTRACT_ADDRESS != vault:
         raise click.ClickException('The command is only for the genesis vault.')
 
-    keystores_dir = operator_config.data_dir / 'keystores'
-    password_file = keystores_dir / 'password.txt'
-    password = get_or_create_password_file(password_file)
+    password = get_or_create_password_file(operator_config.keystores_password_file)
 
     click.secho('Decrypting keystores...', bold=True)
 
@@ -75,7 +73,7 @@ def import_genesis_keys(
         keys_dir=exported_keys_dir, decrypt_key=rsa_key
     )
 
-    click.secho(f'Saving keystores to {greenify(keystores_dir)}...', bold=True)
+    click.secho(f'Saving keystores to {greenify(operator_config.keystores_dir)}...', bold=True)
 
     index = 0
     for private_key in transferred_keypairs.values():
@@ -84,12 +82,14 @@ def import_genesis_keys(
             network=network,
             path=f'imported_{index}',
         )
-        credential.save_signing_keystore(password=password, folder=str(keystores_dir))
+        credential.save_signing_keystore(
+            password=password, folder=str(operator_config.keystores_dir)
+        )
         index += 1
 
     click.echo(
         f'Done. Imported {greenify(len(transferred_keypairs))} keys for {greenify(vault)} vault.\n'
-        f'Keystores saved to {greenify(keystores_dir)} file\n'
+        f'Keystores saved to {greenify(operator_config.keystores_dir)} file\n'
     )
 
 
