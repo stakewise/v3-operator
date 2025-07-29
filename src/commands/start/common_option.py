@@ -45,17 +45,17 @@ start_common_options = [
         f'{NETWORKS[GNOSIS].MAX_FEE_PER_GAS_GWEI} Gwei for Gnosis.',
     ),
     click.option(
-        '--hot-wallet-password-file',
+        '--wallet-password-file',
         type=click.Path(exists=True, file_okay=True, dir_okay=False),
-        envvar='HOT_WALLET_PASSWORD_FILE',
-        help='Absolute path to the hot wallet password file. '
+        envvar='WALLET_PASSWORD_FILE',
+        help='Absolute path to the wallet password file. '
         'Default is the file generated with "create-wallet" command.',
     ),
     click.option(
-        '--hot-wallet-file',
+        '--wallet-file',
         type=click.Path(exists=True, file_okay=True, dir_okay=False),
-        envvar='HOT_WALLET_FILE',
-        help='Absolute path to the hot wallet. '
+        envvar='WALLET_FILE',
+        help='Absolute path to the wallet. '
         'Default is the file generated with "create-wallet" command.',
     ),
     click.option(

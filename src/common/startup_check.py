@@ -21,11 +21,11 @@ from src.common.contracts import (
     keeper_contract,
     validators_registry_contract,
 )
-from src.common.execution import check_hot_wallet_balance, get_protocol_config
+from src.common.execution import check_wallet_balance, get_protocol_config
 from src.common.harvest import get_harvest_params
 from src.common.typings import ValidatorType
 from src.common.utils import format_error, round_down, warning_verbose
-from src.common.wallet import hot_wallet
+from src.common.wallet import wallet
 from src.config.networks import NETWORKS
 from src.config.settings import settings
 from src.validators.execution import get_withdrawable_assets
@@ -84,8 +84,8 @@ async def startup_checks() -> None:
             settings.network_config.VAULT_BALANCE_SYMBOL,
         )
 
-    logger.info('Checking hot wallet balance %s...', hot_wallet.address)
-    await check_hot_wallet_balance()
+    logger.info('Checking wallet balance %s...', wallet.address)
+    await check_wallet_balance()
 
     logger.info('Checking connection to ipfs nodes...')
     healthy_ipfs_endpoints = await _check_ipfs_endpoints()
@@ -379,8 +379,8 @@ async def _check_validators_manager(vault_address: ChecksumAddress) -> None:
         return
     vault_contract = VaultContract(vault_address)
     validators_manager = await vault_contract.validators_manager()
-    if validators_manager != hot_wallet.account.address:
-        raise RuntimeError('validators manager address must equal to hot wallet address')
+    if validators_manager != wallet.account.address:
+        raise RuntimeError('validators manager address must equal to wallet address')
 
 
 async def _check_validators_type() -> None:

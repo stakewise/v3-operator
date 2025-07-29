@@ -8,7 +8,7 @@ from eth_account.account import LocalAccount
 from src.config.settings import settings
 
 
-class HotWallet:
+class Wallet:
     def can_load(self) -> bool:
         try:
             self.account
@@ -18,8 +18,8 @@ class HotWallet:
 
     @cached_property
     def account(self) -> LocalAccount:
-        keystore_file = settings.hot_wallet_file
-        keystore_password_file = settings.hot_wallet_password_file
+        keystore_file = settings.wallet_file
+        keystore_password_file = settings.wallet_password_file
         if not os.path.isfile(keystore_file):
             raise ValueError(
                 f"Can't open wallet key file. "
@@ -40,4 +40,4 @@ class HotWallet:
         return getattr(self.account, item)
 
 
-hot_wallet = HotWallet()
+wallet = Wallet()
