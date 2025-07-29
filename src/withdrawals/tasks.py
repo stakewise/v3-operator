@@ -29,9 +29,9 @@ from src.withdrawals.typings import WithdrawalEvent
 logger = logging.getLogger(__name__)
 
 
-class WithdrawalsQueueFullError(ValueError):
+class LastWithdrawalNotProcessedError(ValueError):
     """
-    Raised when the pending partial withdrawals queue is full.
+    Raised when the pending partial withdrawals is not finalized or withdrawals queue is full.
     This means that the vault cannot process any more partial withdrawals
     until some of the existing requests are processed.
     """
@@ -138,7 +138,7 @@ class WithdrawalsTask(BaseTask):
                     vault_address, from_block, chain_head.slot
                 )
                 app_state.partial_withdrawal_cache[vault_address] = last_withdrawals_block
-            except WithdrawalsQueueFullError:
+            except LastWithdrawalNotProcessedError:
                 return False
         if (
             last_withdrawals_block
@@ -164,7 +164,7 @@ class WithdrawalsTask(BaseTask):
         public_key_to_index = {val.public_key: val.index for val in consensus_validators}
 
         for event in events[::-1]:  # reverse order to get the latest event
-            if check_event_withdrawals(
+            if await is_event_withdrawal_processed(
                 event=event,
                 current_slot=current_slot,
                 public_key_to_index=public_key_to_index,
@@ -174,7 +174,7 @@ class WithdrawalsTask(BaseTask):
         return None
 
 
-async def check_event_withdrawals(
+async def is_event_withdrawal_processed(
     event: WithdrawalEvent, current_slot: int, public_key_to_index: dict[HexStr, int]
 ) -> bool:
     event_slot = await calc_slot_by_block_number(event.block_number)
@@ -203,8 +203,8 @@ async def check_event_withdrawals(
 
         previous_partial_withdrawals = pending_partial_withdrawals
 
-    # event withdrawal is still processing via execution client layer
-    raise WithdrawalsQueueFullError
+    # event block is not finalized or withdrawal is still processing via execution client layer
+    raise LastWithdrawalNotProcessedError
 
 
 async def _get_withdrawals_data(
