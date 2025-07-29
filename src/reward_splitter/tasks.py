@@ -11,7 +11,7 @@ from src.common.execution import build_gas_manager
 from src.common.harvest import get_harvest_params
 from src.common.tasks import BaseTask
 from src.common.typings import HarvestParams
-from src.common.wallet import hot_wallet
+from src.common.wallet import wallet
 from src.config.networks import ZERO_CHECKSUM_ADDRESS
 from src.config.settings import (
     REWARD_SPLITTER_INTERVAL,
@@ -52,13 +52,13 @@ class SplitRewardTask(BaseTask):
 
         logger.info('Fetching reward splitters')
         reward_splitters = await graph_get_reward_splitters(
-            block_number=block['number'], claimer=hot_wallet.account.address, vaults=settings.vaults
+            block_number=block['number'], claimer=wallet.account.address, vaults=settings.vaults
         )
 
         if not reward_splitters:
             logger.info(
                 'No reward splitters found for provided vaults with the claimer %s',
-                hot_wallet.address,
+                wallet.address,
             )
             return
         splitter_to_exit_requests = await graph_get_claimable_exit_requests(

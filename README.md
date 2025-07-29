@@ -14,7 +14,7 @@
 4. [Usage](#usage)
    1. [Step 1. Create mnemonic](#step-1-create-mnemonic)
    2. [Step 2. Create validator keys](#step-2-create-validator-keys)
-   3. [Step 3. Create hot wallet](#step-3-create-hot-wallet)
+   3. [Step 3. Create wallet](#step-3-create-wallet)
    4. [Step 4. Setup validators manager role](#step-4-setup-validators-manager-role)
    5. [Step 5. Start Operator Service](#step-5-start-operator-service)
 5. [Extra commands](#extra-commands)
@@ -211,11 +211,11 @@ the [Kubernetes setup](https://docs.stakewise.io/for-operators/kubernetes-stakin
 ## Usage
 
 To run the Operator Service, you must first create keystores and a file containing the list of available validator public keys for your Vault. You must also
-set up a hot wallet for Operator Service to handle validator registrations.
+set up a wallet for Operator Service to handle validator registrations.
 
 The Operator Service includes built-in functionality to generate all of the above.
 Alternatively, you may use your preferred methods to generate keystores (e.g., [Wagyu Keygen](https://github.com/stake-house/wagyu-key-gen))
-and create the hot wallet (e.g., [MetaMask](https://metamask.io/) or [MyEtherWallet](https://help.myetherwallet.com/en/articles/6512619-using-mew-offline-current-mew-version-6)).
+and create the wallet (e.g., [MetaMask](https://metamask.io/) or [MyEtherWallet](https://help.myetherwallet.com/en/articles/6512619-using-mew-offline-current-mew-version-6)).
 If you choose to use your own methods, you will need to generate the public key file using the `export-public-keys` command.
 
 The below steps walk you through this set-up using Operator Service:
@@ -275,9 +275,9 @@ run Operator Service with them.
 **Remember to upload the newly generated validator keys to the validator(s). For that, please follow a guide for your
 consensus client. The password for your keystores is located in the `password.txt` file in the keystores folder.**
 
-### Step 3. Create hot wallet
+### Step 3. Create wallet
 
-Run the `create-wallet` command to create your hot wallet using your mnemonic (note, this mnemonic can be the same as
+Run the `create-wallet` command to create your wallet using your mnemonic (note, this mnemonic can be the same as
 the one used to generate the validator keys, or a new mnemonic if you desire).
 
 ```bash
@@ -485,7 +485,7 @@ the previous update and the Vault fees are distributed in newly minted ERC-20 to
 
 By default, each _Vault state_ gets updated whenever a user interacts with the Vault (deposit, withdraw, etc.), with a
 12 hours cooldown. Vault state can also be updated by the Vault Operator(s) by passing the `--harvest-vault` flag to the
-Operator Service `start` command. Harvest occurs every 12 hours and the gas fees are paid by the hot wallet linked to
+Operator Service `start` command. Harvest occurs every 12 hours and the gas fees are paid by the wallet linked to
 the Operator Service.
 
 Harvesting the Vault rewards simplifies the contract calls to the Vault contract and reduces the gas fees for stakers,
