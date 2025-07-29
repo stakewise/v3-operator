@@ -146,7 +146,7 @@ def build_gas_manager() -> GasManager:
     )
 
 
-async def get_execution_request_fee(address: ChecksumAddress, block_number: BlockNumber) -> Gwei:
+async def get_execution_request_fee(address: ChecksumAddress) -> Gwei:
     """
     Retrieves the current fee for an execution layer request.
     """
@@ -155,5 +155,5 @@ async def get_execution_request_fee(address: ChecksumAddress, block_number: Bloc
         'data': b'',
     }
 
-    fee = await execution_client.eth.call(tx_data, block_identifier=block_number)
+    fee = await execution_client.eth.call(tx_data, block_identifier='latest')
     return Gwei(Web3.to_int(fee))

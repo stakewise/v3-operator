@@ -32,6 +32,7 @@ class NetworkConfig(BaseNetworkConfig):
     MAX_FEE_PER_GAS_GWEI: Gwei
     SHARD_COMMITTEE_PERIOD: int
     PENDING_PARTIAL_WITHDRAWALS_LIMIT: int
+    MAX_WITHDRAWAL_REQUESTS_PER_BLOCK: int
 
 
 NETWORKS: dict[str, NetworkConfig] = {
@@ -62,6 +63,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
         PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
+        MAX_WITHDRAWAL_REQUESTS_PER_BLOCK=16,
     ),
     HOODI: NetworkConfig(
         **asdict(BASE_NETWORKS[HOODI]),
@@ -88,6 +90,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
         PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
+        MAX_WITHDRAWAL_REQUESTS_PER_BLOCK=16,
     ),
     GNOSIS: NetworkConfig(
         **asdict(BASE_NETWORKS[GNOSIS]),
@@ -116,6 +119,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
         PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
+        MAX_WITHDRAWAL_REQUESTS_PER_BLOCK=16,
     ),
     CHIADO: NetworkConfig(
         **asdict(BASE_NETWORKS[CHIADO]),
@@ -144,5 +148,6 @@ NETWORKS: dict[str, NetworkConfig] = {
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
         PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
+        MAX_WITHDRAWAL_REQUESTS_PER_BLOCK=16,
     ),
 }
