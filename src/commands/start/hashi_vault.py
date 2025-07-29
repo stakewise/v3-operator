@@ -3,7 +3,7 @@ import logging
 import sys
 
 import click
-from eth_typing import ChecksumAddress
+from eth_utils import to_checksum_address
 from web3.types import Gwei
 
 from src.commands.start.base import load_operator_config, start_base
@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 @click.command(help='Start operator service with Hashi Vault integration')
 # pylint: disable-next=too-many-arguments,too-many-locals
 def start_hashi_vault(
-    vaults: list[ChecksumAddress],
+    vaults: str,
     consensus_endpoints: str,
     execution_endpoints: str,
     execution_jwt_secret: str | None,
@@ -86,15 +86,16 @@ def start_hashi_vault(
     min_deposit_amount_gwei: int,
     no_confirm: bool,
 ) -> None:
+    vault_addresses = [to_checksum_address(address) for address in vaults.split(',')]
     operator_config = load_operator_config(
-        vaults=vaults,
+        vaults=vault_addresses,
         data_dir=data_dir,
         network=network,
         no_confirm=no_confirm,
     )
 
     settings.set(
-        vaults=vaults,
+        vaults=vault_addresses,
         data_dir=operator_config.data_dir,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
