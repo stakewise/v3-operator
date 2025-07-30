@@ -7,19 +7,19 @@ from src.config.networks import HOODI
 from src.config.settings import settings
 from src.validators.tests.factories import create_consensus_validator
 from src.withdrawals.tasks import (
-    _get_partial_withdrawals_data,
-    _get_withdrawals_data,
+    _get_partial_withdrawals,
+    _get_withdrawals,
     _is_partial_withdrawable_validator,
 )
 
 
-def test_get_partial_withdrawals_data():
+def test_get_partial_withdrawals():
     validators = {
         '0x1': ether_to_gwei(40),
     }
     withdrawals_amount = ether_to_gwei(0)
     expected = {}
-    result = _get_partial_withdrawals_data(validators, withdrawals_amount)
+    result = _get_partial_withdrawals(validators, withdrawals_amount)
     assert result == expected
 
     validators = {
@@ -27,7 +27,7 @@ def test_get_partial_withdrawals_data():
     }
     withdrawals_amount = ether_to_gwei(8)
     expected = {'0x1': ether_to_gwei(8)}
-    result = _get_partial_withdrawals_data(validators, withdrawals_amount)
+    result = _get_partial_withdrawals(validators, withdrawals_amount)
     assert result == expected
 
     validators = {
@@ -38,7 +38,7 @@ def test_get_partial_withdrawals_data():
     }
     withdrawals_amount = ether_to_gwei(18)
     expected = {'0x3': ether_to_gwei(18)}
-    result = _get_partial_withdrawals_data(validators, withdrawals_amount)
+    result = _get_partial_withdrawals(validators, withdrawals_amount)
     assert result == expected
 
     validators = {
@@ -49,7 +49,7 @@ def test_get_partial_withdrawals_data():
 
     withdrawals_amount = ether_to_gwei(20)
     expected = {'0x3': ether_to_gwei(18), '0x2': ether_to_gwei(2)}
-    result = _get_partial_withdrawals_data(validators, withdrawals_amount)
+    result = _get_partial_withdrawals(validators, withdrawals_amount)
     assert result == expected
 
     validators = {
@@ -60,13 +60,13 @@ def test_get_partial_withdrawals_data():
 
     withdrawals_amount = ether_to_gwei(27)
     expected = {'0x3': ether_to_gwei(18), '0x2': ether_to_gwei(8), '0x1': ether_to_gwei(1)}
-    result = _get_partial_withdrawals_data(validators, withdrawals_amount)
+    result = _get_partial_withdrawals(validators, withdrawals_amount)
     assert result == expected
 
     validators = {}
     withdrawals_amount = 10
     expected = {}
-    result = _get_partial_withdrawals_data(validators, withdrawals_amount)
+    result = _get_partial_withdrawals(validators, withdrawals_amount)
     assert result == expected
 
     # use single validator withdrawals
@@ -78,19 +78,19 @@ def test_get_partial_withdrawals_data():
     expected = {
         '0x2': ether_to_gwei(18),
     }
-    result = _get_partial_withdrawals_data(validators, queued_assets)
+    result = _get_partial_withdrawals(validators, queued_assets)
     assert result == expected
 
     # no validators have sufficient balance
     validators = {'0x1': ether_to_gwei(30)}
     queued_assets = ether_to_gwei(40)
     expected = {}
-    result = _get_partial_withdrawals_data(validators, queued_assets)
+    result = _get_partial_withdrawals(validators, queued_assets)
     assert result == expected
 
 
 @pytest.mark.asyncio
-async def test_get_withdrawals_data(data_dir):
+async def test_get_withdrawals(data_dir):
     settings.set(vaults=[], data_dir=data_dir, network=HOODI)
 
     # correct partial withdrawals when capacity is sufficient
@@ -111,7 +111,7 @@ async def test_get_withdrawals_data(data_dir):
             activation_epoch=200,
         ),
     ]
-    result = await _get_withdrawals_data(chain_head, queued_assets, consensus_validators, 10, set())
+    result = await _get_withdrawals(chain_head, queued_assets, consensus_validators, 10, set())
     expected = {'0x1': ether_to_gwei(2), '0x2': ether_to_gwei(18)}
     assert result == expected
 
@@ -132,7 +132,7 @@ async def test_get_withdrawals_data(data_dir):
             activation_epoch=85,
         ),
     ]
-    result = await _get_withdrawals_data(chain_head, queued_assets, consensus_validators, 10, set())
+    result = await _get_withdrawals(chain_head, queued_assets, consensus_validators, 10, set())
     expected = {'0x1': ether_to_gwei(0), '0x2': ether_to_gwei(0)}
 
     assert result == expected
@@ -156,7 +156,7 @@ async def test_get_withdrawals_data(data_dir):
             activation_epoch=85,
         ),
     ]
-    result = await _get_withdrawals_data(chain_head, queued_assets, consensus_validators, 10, set())
+    result = await _get_withdrawals(chain_head, queued_assets, consensus_validators, 10, set())
     assert result == {'0x1': ether_to_gwei(8), '0x2': ether_to_gwei(18)}
     settings.disable_full_withdrawals = False
 
@@ -177,7 +177,7 @@ async def test_get_withdrawals_data(data_dir):
             activation_epoch=85,
         ),
     ]
-    result = await _get_withdrawals_data(chain_head, queued_assets, consensus_validators, 10, set())
+    result = await _get_withdrawals(chain_head, queued_assets, consensus_validators, 10, set())
     expected = {'0x1': ether_to_gwei(0)}
     assert result == expected
 
@@ -198,7 +198,7 @@ async def test_get_withdrawals_data(data_dir):
             activation_epoch=85,
         ),
     ]
-    result = await _get_withdrawals_data(chain_head, queued_assets, consensus_validators, 10, set())
+    result = await _get_withdrawals(chain_head, queued_assets, consensus_validators, 10, set())
     expected = {'0x1': ether_to_gwei(0), '0x2': ether_to_gwei(10)}
     assert result == expected
 
@@ -225,7 +225,7 @@ async def test_get_withdrawals_data(data_dir):
             activation_epoch=80,
         ),
     ]
-    result = await _get_withdrawals_data(chain_head, queued_assets, consensus_validators, 10, set())
+    result = await _get_withdrawals(chain_head, queued_assets, consensus_validators, 10, set())
     expected = {'0x1': ether_to_gwei(0), '0x2': ether_to_gwei(18), '0x3': ether_to_gwei(28)}
     assert result == expected
 
@@ -246,7 +246,7 @@ async def test_get_withdrawals_data(data_dir):
             activation_epoch=85,
         ),
     ]
-    result = await _get_withdrawals_data(chain_head, queued_assets, consensus_validators, 10, set())
+    result = await _get_withdrawals(chain_head, queued_assets, consensus_validators, 10, set())
     expected = {'0x1': ether_to_gwei(0)}
     assert result == expected
 
@@ -267,7 +267,7 @@ async def test_get_withdrawals_data(data_dir):
             activation_epoch=85,
         ),
     ]
-    result = await _get_withdrawals_data(chain_head, queued_assets, consensus_validators, 10, set())
+    result = await _get_withdrawals(chain_head, queued_assets, consensus_validators, 10, set())
     expected = {'0x1': ether_to_gwei(0), '0x2': ether_to_gwei(0)}
     assert result == expected
 
@@ -289,7 +289,7 @@ async def test_get_withdrawals_data(data_dir):
             activation_epoch=85,
         ),
     ]
-    result = await _get_withdrawals_data(chain_head, queued_assets, consensus_validators, 10, set())
+    result = await _get_withdrawals(chain_head, queued_assets, consensus_validators, 10, set())
     expected = {'0x1': 0}
     assert result == expected
 
@@ -312,7 +312,7 @@ async def test_get_withdrawals_data(data_dir):
             index=2,
         ),
     ]
-    result = await _get_withdrawals_data(chain_head, queued_assets, consensus_validators, 10, {1})
+    result = await _get_withdrawals(chain_head, queued_assets, consensus_validators, 10, {1})
     expected = {'0x2': ether_to_gwei(0)}
     assert result == expected
 
@@ -335,7 +335,7 @@ async def test_get_withdrawals_data(data_dir):
             index=2,
         ),
     ]
-    result = await _get_withdrawals_data(chain_head, queued_assets, consensus_validators, 10, set())
+    result = await _get_withdrawals(chain_head, queued_assets, consensus_validators, 10, set())
     expected = {'0x2': ether_to_gwei(0)}
     assert result == expected
 
@@ -351,7 +351,7 @@ async def test_get_withdrawals_data(data_dir):
             activation_epoch=200,
         ),
     ]
-    result = await _get_withdrawals_data(chain_head, queued_assets, consensus_validators, 10, set())
+    result = await _get_withdrawals(chain_head, queued_assets, consensus_validators, 10, set())
     expected = {}
     assert result == expected
     # handles case with no active validators
@@ -359,7 +359,7 @@ async def test_get_withdrawals_data(data_dir):
     queued_assets = ether_to_gwei(20)
     consensus_validators = []
 
-    result = await _get_withdrawals_data(chain_head, queued_assets, consensus_validators, 10, set())
+    result = await _get_withdrawals(chain_head, queued_assets, consensus_validators, 10, set())
     assert result == {}
 
 

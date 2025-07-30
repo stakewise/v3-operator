@@ -79,7 +79,7 @@ async def _get_pending_partial_withdrawals_amount(
     slot: int,
 ) -> Wei:
     """
-    Calculate the sum of pending partial withdrawals at the current moment
+    Calculate the sum of pending partial withdrawals at the specified slot
     """
     if not validator_indexes:
         return Wei(0)

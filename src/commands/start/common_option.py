@@ -128,7 +128,7 @@ start_common_options = [
         '--disable-withdrawals',
         is_flag=True,
         envvar='DISABLE_WITHDRAWALS',
-        help='Whether to disable submitting partial vault withdrawals. Default is false.',
+        help='Whether to disable submitting partial vault withdrawals.',
     ),
     click.option(
         '--execution-endpoints',

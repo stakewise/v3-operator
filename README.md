@@ -498,7 +498,7 @@ Another operator task is to trigger partial ETH/GNO withdrawals from validators.
 Every 24 hours the operator checks the current exit queue.
 If the requested amount can be processed via partial withdrawals, it submits them through the execution layer.
 
-You can disable partial withdrawals using the `--disable-withdrawals` parameter. In this case, withdrawals will be processed by oracles that exit the entire validator, which may negatively impact the vault’s APR, as the exited amount will exceed the requested withdrawal amount.
+You can disable partial withdrawals using the `--disable-withdrawals` parameter. In this case, withdrawals will be processed by oracles that exit the entire validator, which may negatively impact the vault’s APR.
 
 The partial withdrawals interval can be adjusted via the `PARTIAL_WITHDRAWALS_INTERVAL` env variable, with every 24 hours being the default.
 

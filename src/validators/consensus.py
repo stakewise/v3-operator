@@ -118,16 +118,7 @@ async def fetch_non_exiting_validators(
             status = ValidatorStatus(beacon_validator['status'])
             if status in EXITING_STATUSES:
                 continue
-            validators.append(
-                ConsensusValidator(
-                    index=int(beacon_validator['index']),
-                    public_key=add_0x_prefix(beacon_validator['validator']['pubkey']),
-                    balance=Gwei(int(beacon_validator['balance'])),
-                    withdrawal_credentials=beacon_validator['validator']['withdrawal_credentials'],
-                    status=ValidatorStatus(beacon_validator['status']),
-                    activation_epoch=int(beacon_validator['validator']['activation_epoch']),
-                )
-            )
+            validators.append(ConsensusValidator.from_consensus_data(beacon_validator))
 
     return validators
 
@@ -139,15 +130,6 @@ async def fetch_consensus_validators(
     for chunk_keys in chunkify(public_keys, settings.validators_fetch_chunk_size):
         beacon_validators = await consensus_client.get_validators_by_ids(chunk_keys)
         for beacon_validator in beacon_validators['data']:
-            validators.append(
-                ConsensusValidator(
-                    index=int(beacon_validator['index']),
-                    public_key=add_0x_prefix(beacon_validator['validator']['pubkey']),
-                    balance=Gwei(int(beacon_validator['balance'])),
-                    withdrawal_credentials=beacon_validator['validator']['withdrawal_credentials'],
-                    status=ValidatorStatus(beacon_validator['status']),
-                    activation_epoch=int(beacon_validator['validator']['activation_epoch']),
-                )
-            )
+            validators.append(ConsensusValidator.from_consensus_data(beacon_validator))
 
     return validators

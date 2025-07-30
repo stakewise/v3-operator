@@ -3,6 +3,7 @@ from enum import Enum
 from typing import NewType
 
 from eth_typing import BlockNumber, BLSSignature, ChecksumAddress, HexStr
+from eth_utils import add_0x_prefix
 from sw_utils import ValidatorStatus
 from web3.types import Gwei, Wei
 
@@ -51,6 +52,17 @@ class ConsensusValidator:
     @property
     def is_compounding(self) -> bool:
         return self.withdrawal_credentials.startswith('0x02')
+
+    @staticmethod
+    def from_consensus_data(beacon_validator: dict) -> 'ConsensusValidator':
+        return ConsensusValidator(
+            index=int(beacon_validator['index']),
+            public_key=add_0x_prefix(beacon_validator['validator']['pubkey']),
+            balance=Gwei(int(beacon_validator['balance'])),
+            withdrawal_credentials=beacon_validator['validator']['withdrawal_credentials'],
+            status=ValidatorStatus(beacon_validator['status']),
+            activation_epoch=int(beacon_validator['validator']['activation_epoch']),
+        )
 
 
 @dataclass

@@ -415,7 +415,7 @@ async def poll_active_exits(
     exit_indexes = []
     counter = Counter(itertools.chain(*[exits[1] for exits in active_exits]))
     for index, count in counter.items():
-        if count > protocol_config.exit_signature_recover_threshold:
+        if count >= protocol_config.exit_signature_recover_threshold:
             exit_indexes.append(index)
     return exit_indexes
 
