@@ -2,7 +2,7 @@ import logging
 from typing import Sequence, cast
 
 from eth_typing import HexStr
-from sw_utils import InterruptHandler, IpfsFetchClient, convert_to_mgno
+from sw_utils import IpfsFetchClient, convert_to_mgno
 from sw_utils.networks import GNO_NETWORKS
 from sw_utils.pectra import get_pectra_vault_version
 from sw_utils.typings import Bytes32
@@ -13,7 +13,6 @@ from src.common.contracts import VaultContract, validators_registry_contract
 from src.common.execution import build_gas_manager, get_protocol_config
 from src.common.harvest import get_harvest_params
 from src.common.metrics import metrics
-from src.common.tasks import BaseTask
 from src.common.typings import HarvestParams, ValidatorType
 from src.config.settings import (
     MAX_EFFECTIVE_BALANCE,
@@ -46,7 +45,7 @@ from src.validators.validators_manager import get_validators_manager_signature
 logger = logging.getLogger(__name__)
 
 
-class ValidatorsTask(BaseTask):
+class ValidatorRegistrationSubtask:
     def __init__(
         self,
         keystore: BaseKeystore | None,
@@ -57,7 +56,7 @@ class ValidatorsTask(BaseTask):
         self.available_public_keys = available_public_keys
         self.relayer_adapter = relayer_adapter
 
-    async def process_block(self, interrupt_handler: InterruptHandler) -> None:
+    async def process_block(self) -> None:
         if self.keystore and self.available_public_keys:
             await update_unused_validator_keys_metric(
                 keystore=self.keystore, available_public_keys=self.available_public_keys

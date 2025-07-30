@@ -1,16 +1,14 @@
 import logging
 
 from eth_typing import ChecksumAddress, HexStr
-from sw_utils import ChainHead, InterruptHandler, ProtocolConfig, ValidatorStatus
+from sw_utils import ChainHead, ProtocolConfig, ValidatorStatus
 from web3 import Web3
 from web3.types import BlockNumber, Gwei
 
 from src.common.app_state import AppState
 from src.common.clients import consensus_client
-from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import VaultContract
 from src.common.execution import get_execution_request_fee, get_protocol_config
-from src.common.tasks import BaseTask
 from src.common.utils import calc_slot_by_block_number, round_down
 from src.config.settings import (
     MAX_WITHDRAWAL_REQUEST_FEE,
@@ -38,12 +36,11 @@ class LastWithdrawalNotProcessedError(ValueError):
     """
 
 
-class WithdrawalsTask(BaseTask):
-    async def process_block(self, interrupt_handler: InterruptHandler) -> None:
+class ValidatorWithdrawalSubtask:
+    async def process_block(self, chain_head: ChainHead) -> None:
         """
         Every N hours check the exit queue and submit partial withdrawals if needed.
         """
-        chain_head = await get_chain_finalized_head()
         protocol_config = await get_protocol_config()
         for vault_address in settings.vaults:
             await self.process_vault(
