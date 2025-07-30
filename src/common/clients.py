@@ -15,7 +15,7 @@ from web3 import AsyncWeb3
 from web3.middleware.signing import async_construct_sign_and_send_raw_middleware
 
 import src
-from src.common.wallet import hot_wallet
+from src.common.wallet import wallet
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -55,11 +55,11 @@ class ExecutionClient:
         )
         # Account is required when emitting transactions.
         # For read-only queries account may be omitted.
-        if hot_wallet.can_load():
+        if wallet.can_load():
             w3.middleware_onion.add(
-                await async_construct_sign_and_send_raw_middleware(hot_wallet.account)
+                await async_construct_sign_and_send_raw_middleware(wallet.account)
             )
-            w3.eth.default_account = hot_wallet.address
+            w3.eth.default_account = wallet.address
 
         self.client = w3
         self.is_set_up = True

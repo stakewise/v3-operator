@@ -3,7 +3,7 @@ import logging
 import sys
 
 import click
-from eth_typing import ChecksumAddress
+from eth_utils import to_checksum_address
 from web3.types import Gwei
 
 from src.commands.start.base import load_operator_config, start_base
@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 @click.command(help='Start operator service with remote signer integration')
 # pylint: disable-next=too-many-arguments,too-many-locals
 def start_remote_signer(
-    vaults: list[ChecksumAddress],
+    vaults: str,
     consensus_endpoints: str,
     execution_endpoints: str,
     execution_jwt_secret: str | None,
@@ -52,8 +52,8 @@ def start_remote_signer(
     network: str | None,
     remote_signer_url: str | None,
     public_keys_file: str | None,
-    hot_wallet_file: str | None,
-    hot_wallet_password_file: str | None,
+    wallet_file: str | None,
+    wallet_password_file: str | None,
     max_fee_per_gas_gwei: int | None,
     database_dir: str | None,
     pool_size: int | None,
@@ -61,15 +61,17 @@ def start_remote_signer(
     min_deposit_amount_gwei: int,
     no_confirm: bool,
 ) -> None:
+    vault_addresses = [to_checksum_address(address) for address in vaults.split(',')]
+
     operator_config = load_operator_config(
-        vaults=vaults,
+        vaults=vault_addresses,
         data_dir=data_dir,
         network=network,
         no_confirm=no_confirm,
     )
 
     settings.set(
-        vaults=vaults,
+        vaults=vault_addresses,
         data_dir=operator_config.data_dir,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
@@ -87,8 +89,8 @@ def start_remote_signer(
         validator_type=validator_type,
         remote_signer_url=remote_signer_url,
         public_keys_file=public_keys_file,
-        hot_wallet_file=hot_wallet_file,
-        hot_wallet_password_file=hot_wallet_password_file,
+        wallet_file=wallet_file,
+        wallet_password_file=wallet_password_file,
         max_fee_per_gas_gwei=max_fee_per_gas_gwei,
         database_dir=database_dir,
         log_level=log_level,

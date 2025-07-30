@@ -66,8 +66,8 @@ class Settings(metaclass=Singleton):
     hashi_vault_engine_name: str
     hashi_vault_token: str | None
     hashi_vault_parallelism: int
-    hot_wallet_file: Path
-    hot_wallet_password_file: Path
+    wallet_file: Path
+    wallet_password_file: Path
     max_fee_per_gas_gwei: Gwei
     database: Path
 
@@ -139,8 +139,8 @@ class Settings(metaclass=Singleton):
         hashi_vault_engine_name: str = DEFAULT_HASHI_VAULT_ENGINE_NAME,
         hashi_vault_token: str | None = None,
         hashi_vault_parallelism: int = DEFAULT_HASHI_VAULT_PARALLELISM,
-        hot_wallet_file: str | None = None,
-        hot_wallet_password_file: str | None = None,
+        wallet_file: str | None = None,
+        wallet_password_file: str | None = None,
         database_dir: str | None = None,
         log_level: str | None = None,
         log_format: str | None = None,
@@ -213,13 +213,11 @@ class Settings(metaclass=Singleton):
         self.hashi_vault_token = hashi_vault_token
         self.hashi_vault_parallelism = hashi_vault_parallelism
 
-        # hot wallet
-        self.hot_wallet_file = (
-            Path(hot_wallet_file) if hot_wallet_file else data_dir / 'wallet' / 'wallet.json'
-        )
-        self.hot_wallet_password_file = (
-            Path(hot_wallet_password_file)
-            if hot_wallet_password_file
+        # wallet
+        self.wallet_file = Path(wallet_file) if wallet_file else data_dir / 'wallet' / 'wallet.json'
+        self.wallet_password_file = (
+            Path(wallet_password_file)
+            if wallet_password_file
             else data_dir / 'wallet' / 'password.txt'
         )
 

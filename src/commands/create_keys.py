@@ -77,10 +77,6 @@ def create_keys(
         data_dir=operator_config.data_dir,
     )
 
-    public_keys_file = operator_config.data_dir / PUBLIC_KEYS_FILENAME
-    keystores_dir = operator_config.data_dir / 'keystores'
-    password_file = keystores_dir / 'password.txt'
-
     credentials = CredentialManager.generate_credentials(
         network=operator_config.network,
         mnemonic=mnemonic,
@@ -97,7 +93,7 @@ def create_keys(
         _export_keystores(
             credentials=credentials,
             keystores_dir=tmp_keystores_dir,
-            password_file=password_file,
+            password_file=operator_config.keystores_password_file,
             per_keystore_password=per_keystore_password,
             pool_size=pool_size,
         )
@@ -107,18 +103,19 @@ def create_keys(
         operator_config.increment_mnemonic_index(count)
 
         # move files from tmp dir
-        keystores_dir.mkdir(exist_ok=True)
-        tmp_public_keys_file.replace(public_keys_file)
+        operator_config.keystores_dir.mkdir(exist_ok=True)
+        tmp_public_keys_file.replace(operator_config.public_keys_file)
         for src_file in tmp_keystores_dir.glob('*'):
-            src_file.rename(keystores_dir.joinpath(src_file.name))
+            src_file.rename(operator_config.keystores_dir.joinpath(src_file.name))
 
     finally:
         operator_config.remove_tmp_dir()
 
     click.echo(
         f'Done. Generated {greenify(count)} keys for StakeWise operator.\n'
-        f'Keystores saved to {greenify(keystores_dir)} file\n'
-        f'Validator public keys saved to {greenify(path.abspath(public_keys_file))} file'
+        f'Keystores saved to {greenify(operator_config.keystores_dir)} file\n'
+        'Validator public keys saved to '
+        f'{greenify(path.abspath(operator_config.public_keys_file))} file'
     )
 
 

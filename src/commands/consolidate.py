@@ -25,7 +25,7 @@ from src.common.validators import (
     validate_public_keys,
     validate_public_keys_file,
 )
-from src.common.wallet import hot_wallet
+from src.common.wallet import wallet
 from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import (
@@ -98,17 +98,17 @@ logger = logging.getLogger(__name__)
     help='Comma separated list of API endpoints for execution nodes.',
 )
 @click.option(
-    '--hot-wallet-password-file',
+    '--wallet-password-file',
     type=click.Path(exists=True, file_okay=True, dir_okay=False),
-    envvar='HOT_WALLET_PASSWORD_FILE',
-    help='Absolute path to the hot wallet password file. '
+    envvar='WALLET_PASSWORD_FILE',
+    help='Absolute path to the wallet password file. '
     'Default is the file generated with "create-wallet" command.',
 )
 @click.option(
-    '--hot-wallet-file',
+    '--wallet-file',
     type=click.Path(exists=True, file_okay=True, dir_okay=False),
-    envvar='HOT_WALLET_FILE',
-    help='Absolute path to the hot wallet. '
+    envvar='WALLET_FILE',
+    help='Absolute path to the wallet. '
     'Default is the file generated with "create-wallet" command.',
 )
 @click.option(
@@ -145,8 +145,8 @@ def consolidate(
     execution_endpoints: str,
     consensus_endpoints: str,
     data_dir: str,
-    hot_wallet_file: str | None,
-    hot_wallet_password_file: str | None,
+    wallet_file: str | None,
+    wallet_password_file: str | None,
     verbose: bool,
     no_confirm: bool,
     log_level: str,
@@ -176,8 +176,8 @@ def consolidate(
         data_dir=operator_config.data_dir,
         execution_endpoints=execution_endpoints,
         consensus_endpoints=consensus_endpoints,
-        hot_wallet_file=hot_wallet_file,
-        hot_wallet_password_file=hot_wallet_password_file,
+        wallet_file=wallet_file,
+        wallet_password_file=wallet_password_file,
         verbose=verbose,
         log_level=log_level,
     )
@@ -324,8 +324,8 @@ def _encode_validators(target_source_public_keys: list[tuple[HexStr, HexStr]]) -
 async def _check_validators_manager(vault_address: ChecksumAddress) -> None:
     vault_contract = VaultContract(vault_address)
     validators_manager = await vault_contract.validators_manager()
-    if validators_manager != hot_wallet.account.address:
-        raise RuntimeError('validators manager address must equal to hot wallet address')
+    if validators_manager != wallet.account.address:
+        raise RuntimeError('validators manager address must equal to wallet address')
 
 
 def _is_switch_to_compounding(source_public_keys: list[HexStr], target_public_key: HexStr) -> bool:

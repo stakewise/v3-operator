@@ -3,7 +3,7 @@ import logging
 import sys
 
 import click
-from eth_typing import ChecksumAddress
+from eth_utils import to_checksum_address
 from web3.types import Gwei
 
 from src.commands.start.base import load_operator_config, start_base
@@ -43,7 +43,7 @@ AUTO = 'AUTO'
 @click.command(help='Start operator service in API mode')
 # pylint: disable-next=too-many-arguments,too-many-locals
 def start_relayer(
-    vaults: list[ChecksumAddress],
+    vaults: str,
     consensus_endpoints: str,
     execution_endpoints: str,
     execution_jwt_secret: str | None,
@@ -62,16 +62,18 @@ def start_relayer(
     log_level: str,
     log_format: str,
     network: str | None,
-    hot_wallet_file: str | None,
-    hot_wallet_password_file: str | None,
+    wallet_file: str | None,
+    wallet_password_file: str | None,
     max_fee_per_gas_gwei: int | None,
     database_dir: str | None,
     relayer_type: str,
     relayer_endpoint: str,
     no_confirm: bool,
 ) -> None:
+    vault_addresses = [to_checksum_address(address) for address in vaults.split(',')]
+
     operator_config = load_operator_config(
-        vaults=vaults,
+        vaults=vault_addresses,
         data_dir=data_dir,
         network=network,
         no_confirm=no_confirm,
@@ -87,7 +89,7 @@ def start_relayer(
     validators_registration_mode = ValidatorsRegistrationMode.API
 
     settings.set(
-        vaults=vaults,
+        vaults=vault_addresses,
         data_dir=operator_config.data_dir,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
@@ -103,8 +105,8 @@ def start_relayer(
         metrics_prefix=metrics_prefix,
         validator_type=validator_type,
         network=network,
-        hot_wallet_file=hot_wallet_file,
-        hot_wallet_password_file=hot_wallet_password_file,
+        wallet_file=wallet_file,
+        wallet_password_file=wallet_password_file,
         max_fee_per_gas_gwei=max_fee_per_gas_gwei,
         database_dir=database_dir,
         log_level=log_level,

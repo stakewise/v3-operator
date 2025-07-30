@@ -125,7 +125,6 @@ def recover(
                 per_keystore_password=per_keystore_password,
                 no_confirm=no_confirm,
                 operator_config=operator_config,
-                network=network,
             )
         )
     except Exception as e:
@@ -139,7 +138,6 @@ async def main(
     per_keystore_password: bool,
     no_confirm: bool,
     operator_config: OperatorConfig,
-    network: str,
 ) -> None:
     setup_logging()
     await setup_clients()
@@ -166,8 +164,7 @@ async def main(
             abort=True,
         )
 
-    keystores_dir = operator_config.data_dir / network / 'keystores'
-    password_file = keystores_dir / 'password.txt'
+    keystores_dir = operator_config.keystores_dir
     if keystores_dir.exists():
         if no_confirm:
             click.secho(f'Removing existing {keystores_dir} keystores directory...')
@@ -185,7 +182,7 @@ async def main(
     mnemonic_next_index = await _generate_keystores(
         mnemonic=mnemonic,
         keystores_dir=keystores_dir,
-        password_file=password_file,
+        password_file=operator_config.keystores_password_file,
         validator_statuses=validators,
         per_keystore_password=per_keystore_password,
     )

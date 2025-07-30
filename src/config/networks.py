@@ -23,7 +23,7 @@ class NetworkConfig(BaseNetworkConfig):
     VALIDATORS_CHECKER_CONTRACT_ADDRESS: ChecksumAddress
     CONSOLIDATION_CONTRACT_ADDRESS: ChecksumAddress
     WITHDRAWAL_CONTRACT_ADDRESS: ChecksumAddress
-    HOT_WALLET_MIN_BALANCE: Wei
+    WALLET_MIN_BALANCE: Wei
     STAKEWISE_API_URL: str
     STAKEWISE_GRAPH_ENDPOINT: str
     RATED_API_URL: str
@@ -52,7 +52,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         WITHDRAWAL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x00000961Ef480Eb55e80D19ad83579A64c007002'
         ),
-        HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
+        WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
         STAKEWISE_API_URL='https://mainnet-api.stakewise.io/graphql',
         STAKEWISE_GRAPH_ENDPOINT=(
             'https://graphs.stakewise.io/mainnet/subgraphs/name/stakewise/prod'
@@ -81,7 +81,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         WITHDRAWAL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x00000961Ef480Eb55e80D19ad83579A64c007002'
         ),
-        HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
+        WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
         STAKEWISE_API_URL='https://hoodi-api.stakewise.io/graphql',
         STAKEWISE_GRAPH_ENDPOINT='https://graphs.stakewise.io/hoodi/subgraphs/name/stakewise/prod',
         RATED_API_URL='https://api.rated.network',
@@ -108,7 +108,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         WITHDRAWAL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x00000961Ef480Eb55e80D19ad83579A64c007002'
         ),
-        HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
+        WALLET_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
         STAKEWISE_API_URL='https://gnosis-api.stakewise.io/graphql',
         STAKEWISE_GRAPH_ENDPOINT=(
             'https://graphs.stakewise.io/gnosis/subgraphs/name/stakewise/prod'
@@ -137,7 +137,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         WITHDRAWAL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x00000961Ef480Eb55e80D19ad83579A64c007002'
         ),
-        HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
+        WALLET_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
         STAKEWISE_API_URL='https://chiado-api.stakewise.io/graphql',
         STAKEWISE_GRAPH_ENDPOINT=(
             'https://graphs.stakewise.io/chiado/subgraphs/name/stakewise/prod'
