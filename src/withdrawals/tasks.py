@@ -186,7 +186,6 @@ async def is_event_withdrawal_processed(
     """
     event_slot = await calc_slot_by_block_number(event.block_number)
 
-    previous_partial_withdrawals = []
     for withdrawal_slot in range(event_slot, current_slot + 1):
         pending_partial_withdrawals = await consensus_client.get_pending_partial_withdrawals(
             withdrawal_slot
@@ -199,16 +198,19 @@ async def is_event_withdrawal_processed(
             ):
                 return True
 
-        # Check that withdrawal queue is not full, otherwise check next slot
-        # Stop if withdrawals per slot less than limit,
-        added_requests = 0
-        for request in pending_partial_withdrawals:
-            if request not in previous_partial_withdrawals:
-                added_requests += 1
-        if added_requests < settings.network_config.MAX_WITHDRAWAL_REQUESTS_PER_BLOCK:
-            return False
-
-        previous_partial_withdrawals = pending_partial_withdrawals
+        # Withdrawal queue can be full, check that request was added on this slot
+        # Otherwise check next slot
+        consensus_block = await consensus_client.get_block(str(withdrawal_slot))
+        execution_withdrawals = consensus_block['data']['message']['body']['execution_requests'][
+            'withdrawals'
+        ]
+        for request in execution_withdrawals:
+            # request was added but reverted by consensus layer
+            if (
+                request['validator_pubkey'] == event.public_key
+                and Web3.to_wei(request['amount'], 'gwei') == event.amount
+            ):
+                return False
 
     # event block is not finalized or withdrawal is still processing via execution client layer
     raise LastWithdrawalNotProcessedError
