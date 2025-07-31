@@ -196,7 +196,7 @@ async def register_new_validators(
     available_public_keys: list[HexStr] | None,
     relayer_adapter: RelayerAdapter | None = None,
 ) -> HexStr | None:
-    validators_amounts = _get_deposits_amounts(vault_assets, settings.validator_type)
+    validators_amounts = _get_deposits_amounts(vault_assets, settings.get_validator_type())
     validators_count = len(validators_amounts)
     if not validators_amounts:
         # not enough balance to register validators

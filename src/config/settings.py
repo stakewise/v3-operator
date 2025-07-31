@@ -51,7 +51,7 @@ class Settings(metaclass=Singleton):
     metrics_host: str
     metrics_port: int
     metrics_prefix: str
-    validator_type: ValidatorType
+    validator_type: ValidatorType | None
     public_keys_file: Path
     keystores_dir: Path
     keystores_password_dir: Path
@@ -123,7 +123,7 @@ class Settings(metaclass=Singleton):
         metrics_prefix: str = DEFAULT_METRICS_PREFIX,
         max_fee_per_gas_gwei: int | None = None,
         public_keys_file: str | None = None,
-        validator_type: ValidatorType = ValidatorType.V2,
+        validator_type: ValidatorType | None = None,
         keystores_dir: str | None = None,
         keystores_password_file: str | None = None,
         remote_signer_url: str | None = None,
@@ -275,6 +275,11 @@ class Settings(metaclass=Singleton):
         self.validators_registration_mode = validators_registration_mode
 
         self.skip_startup_checks = decouple_config('SKIP_STARTUP_CHECKS', default=False, cast=bool)
+
+    def get_validator_type(self) -> ValidatorType:
+        if self.validator_type is None:
+            raise RuntimeError('Validator type is not set')
+        return self.validator_type
 
     @property
     def keystore_cls_str(self) -> str:

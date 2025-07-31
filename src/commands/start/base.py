@@ -5,16 +5,19 @@ from pathlib import Path
 import click
 from eth_typing import ChecksumAddress, HexStr
 from sw_utils import InterruptHandler
+from sw_utils.pectra import get_pectra_vault_version
 
 import src
 from src.common.checks import wait_execution_catch_up_consensus
 from src.common.clients import setup_clients
 from src.common.consensus import get_chain_finalized_head
+from src.common.contracts import VaultContract
 from src.common.execution import WalletTask, update_oracles_cache
 from src.common.logging import setup_logging
 from src.common.metrics import MetricsTask, metrics, metrics_server
 from src.common.migrate import migrate_to_multivault
 from src.common.startup_check import startup_checks
+from src.common.typings import ValidatorType
 from src.common.utils import get_build_version
 from src.config.config import OperatorConfig, OperatorConfigException
 from src.config.settings import settings
@@ -38,6 +41,7 @@ async def start_base() -> None:
     setup_logging()
     setup_sentry()
     await setup_clients()
+    await setup_validators_type()
 
     log_start()
 
@@ -156,3 +160,20 @@ def load_operator_config(
         operator_config = OperatorConfig(Path(data_dir))
         operator_config.load()
         return operator_config
+
+
+async def setup_validators_type() -> None:
+    """The validator type selection is determined by the vault version."""
+    if settings.validator_type:
+        # explicit set by cmd parameter
+        return
+
+    for vault_address in settings.vaults:
+        vault_contract = VaultContract(vault_address)
+        if await vault_contract.version() >= get_pectra_vault_version(
+            settings.network, vault_address
+        ):
+            settings.validator_type = ValidatorType.V2
+            return
+
+    settings.validator_type = ValidatorType.V1
