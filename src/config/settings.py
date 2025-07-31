@@ -1,3 +1,4 @@
+from enum import Enum
 from pathlib import Path
 
 from decouple import Csv
@@ -7,7 +8,6 @@ from web3.types import ChecksumAddress, Gwei, Wei
 
 from src.common.typings import Singleton, ValidatorType
 from src.config.networks import MAINNET, NETWORKS, NetworkConfig
-from src.validators.typings import RelayerTypes, ValidatorsRegistrationMode
 
 DATA_DIR = Path.home() / '.stakewise'
 PUBLIC_KEYS_FILENAME = 'public_keys.txt'
@@ -23,6 +23,21 @@ DEFAULT_HASHI_VAULT_ENGINE_NAME = 'secret'
 
 DEFAULT_MIN_DEPOSIT_AMOUNT = Web3.to_wei(1, 'ether')
 DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI = Gwei(int(Web3.from_wei(DEFAULT_MIN_DEPOSIT_AMOUNT, 'gwei')))
+
+
+class ValidatorsRegistrationMode(Enum):
+    """
+    AUTO mode: validators are registered automatically when vault assets are enough.
+    API mode: validators registration is triggered by API request.
+    """
+
+    AUTO = 'AUTO'
+    API = 'API'
+
+
+class RelayerTypes:
+    DVT = 'DVT'
+    DEFAULT = 'DEFAULT'
 
 
 # pylint: disable-next=too-many-public-methods,too-many-instance-attributes

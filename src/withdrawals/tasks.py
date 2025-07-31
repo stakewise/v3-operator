@@ -117,7 +117,7 @@ class ValidatorWithdrawalSubtask:
             'Successfully withdrawn %s %s for validators with public keys %s, tx hash: %s',
             round_down(Web3.from_wei(Web3.to_wei(queued_assets, 'gwei'), 'ether'), 2),
             settings.network_config.VAULT_BALANCE_SYMBOL,
-            ', '.join([str(index) for index in withdrawals]),
+            ', '.join(withdrawals.keys()),
             tx_hash,
         )
 
@@ -225,7 +225,7 @@ async def _get_withdrawals(
     partial_validators = [
         v for v in consensus_validators if _is_partial_withdrawable_validator(v, chain_head.epoch)
     ]
-    partial_capacity = sum(v.balance - MIN_ACTIVATION_BALANCE_GWEI for v in partial_validators)
+    partial_capacity = sum(v.withdrawal_capacity for v in partial_validators)
 
     # If enough partials, use only them
     if partial_capacity >= queued_assets or settings.disable_full_withdrawals:
@@ -245,11 +245,15 @@ async def _get_withdrawals(
         withdrawals[validator.public_key] = Gwei(0)  # full withdrawal
         queued_assets = Gwei(queued_assets - validator.balance)
         # Remove exited validator from partials
-        partial_validators = [p for p in partial_validators if p.public_key != validator.public_key]
-        partial_capacity = sum(p.balance - MIN_ACTIVATION_BALANCE_GWEI for p in partial_validators)
+        partial_capacity = Gwei(partial_capacity - validator.withdrawal_capacity)
         if partial_capacity >= queued_assets:
             partials = _get_partial_withdrawals(
-                {p.public_key: p.balance for p in partial_validators}, queued_assets
+                {
+                    p.public_key: p.balance
+                    for p in partial_validators
+                    if p.public_key not in withdrawals
+                },
+                queued_assets,
             )
             withdrawals.update(partials)
             break

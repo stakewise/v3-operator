@@ -11,8 +11,7 @@ from src.commands.start.common_option import add_common_options, start_common_op
 from src.common.typings import ValidatorType
 from src.common.utils import log_verbose
 from src.config.networks import NETWORKS
-from src.config.settings import settings
-from src.validators.typings import RelayerTypes, ValidatorsRegistrationMode
+from src.config.settings import RelayerTypes, ValidatorsRegistrationMode, settings
 
 logger = logging.getLogger(__name__)
 

@@ -1,11 +1,12 @@
 from dataclasses import dataclass
-from enum import Enum
 from typing import NewType
 
 from eth_typing import BlockNumber, BLSSignature, ChecksumAddress, HexStr
 from eth_utils import add_0x_prefix
 from sw_utils import ValidatorStatus
 from web3.types import Gwei, Wei
+
+from src.config.settings import MIN_ACTIVATION_BALANCE_GWEI
 
 BLSPrivkey = NewType('BLSPrivkey', bytes)
 
@@ -53,6 +54,10 @@ class ConsensusValidator:
     def is_compounding(self) -> bool:
         return self.withdrawal_credentials.startswith('0x02')
 
+    @property
+    def withdrawal_capacity(self) -> Gwei:
+        return Gwei(self.balance - MIN_ACTIVATION_BALANCE_GWEI)
+
     @staticmethod
     def from_consensus_data(beacon_validator: dict) -> 'ConsensusValidator':
         return ConsensusValidator(
@@ -90,21 +95,6 @@ class ApprovalRequest:
     validators_manager_signature: HexStr
     deadline: int
     amounts: list[int] | None = None
-
-
-class ValidatorsRegistrationMode(Enum):
-    """
-    AUTO mode: validators are registered automatically when vault assets are enough.
-    API mode: validators registration is triggered by API request.
-    """
-
-    AUTO = 'AUTO'
-    API = 'API'
-
-
-class RelayerTypes:
-    DVT = 'DVT'
-    DEFAULT = 'DEFAULT'
 
 
 @dataclass

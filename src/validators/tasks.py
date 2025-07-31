@@ -20,6 +20,7 @@ from src.config.settings import (
     MIN_ACTIVATION_BALANCE,
     MIN_ACTIVATION_BALANCE_GWEI,
     PUBLIC_KEYS_FILENAME,
+    ValidatorsRegistrationMode,
     settings,
 )
 from src.validators.consensus import fetch_compounding_validators_balances
@@ -34,11 +35,7 @@ from src.validators.metrics import update_unused_validator_keys_metric
 from src.validators.oracles import poll_validation_approval
 from src.validators.register_validators import fund_validators, register_validators
 from src.validators.relayer import RelayerAdapter
-from src.validators.typings import (
-    NetworkValidator,
-    Validator,
-    ValidatorsRegistrationMode,
-)
+from src.validators.typings import NetworkValidator, Validator
 from src.validators.utils import get_funded_validators, get_registered_validators
 from src.validators.validators_manager import get_validators_manager_signature
 

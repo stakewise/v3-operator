@@ -18,7 +18,7 @@ from src.common.startup_check import startup_checks
 from src.common.tasks import BaseTask
 from src.common.utils import get_build_version
 from src.config.config import OperatorConfig, OperatorConfigException
-from src.config.settings import settings
+from src.config.settings import ValidatorsRegistrationMode, settings
 from src.exits.tasks import ExitSignatureTask
 from src.harvest.tasks import HarvestTask
 from src.reward_splitter.tasks import SplitRewardTask
@@ -28,7 +28,6 @@ from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
 from src.validators.relayer import RelayerAdapter, create_relayer_adapter
 from src.validators.tasks import ValidatorRegistrationSubtask, load_genesis_validators
-from src.validators.typings import ValidatorsRegistrationMode
 from src.validators.utils import load_public_keys
 from src.withdrawals.tasks import ValidatorWithdrawalSubtask
 
