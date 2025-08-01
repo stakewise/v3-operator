@@ -580,13 +580,13 @@ python src/main.py export-public-keys --data-dir <path-to-data-dir>
 
 ### Start Command
 
-We've streamlined the launch process by separating setup flows for Hashi Vault, Web3Signer and relayers -- each now has its own dedicated command.
+We've streamlined the launch process by separating setup flows for Hashi Vault, Web3Signer and relayers — each now has its own dedicated command.
 
 📖 Docs: [Start Operator Service](#step-5-start-operator-service)
 
 ### No More Deposit Data File
 
-V4 Operator no longer requires pre-uploaded deposit data for validator registration—it generates deposit data automatically during registration.
+V4 Operator no longer requires pre-uploaded deposit data for validator registration — it generates deposit data automatically during registration.
 
 ⚠ Important: To support this new flow, you must assign your operator wallet as the Validators Manager in the vault settings.
 🔗 [How to Set Up Validators Manager](#step-4-setup-validators-manager-role)
@@ -603,7 +603,7 @@ Key Changes:
 
 ### Pectra Upgrade Support
 
-Ensure your vault is updated to version 5 for full Pectra compatibility.
+Ensure your vault is updated to version 5 for Ethereum network or version 3 for Gnosis network for full Pectra compatibility.
 
 After the upgrade, validator balances are no longer limited to 32 ETH. By default, we register 0x02 validators. To register 0x01 validators, add the flag `--validators-type=0x01`.
 
@@ -614,7 +614,7 @@ To migrate 0x01 validators to 0x02, use the consolidate command (see [reference]
 Also, partial withdrawals for compound validators are now supported. Partial withdrawals are significantly faster and more efficient than full validator exits. Even full validator exits now can be processed via execution request call.
 To disable this, use the flag `--disable-withdrawals` — in this case, funds will be withdrawn via full exits using oracles.
 
-### Automated withdrawals
+### Automated rewards withdrawals
 
 It is possible to periodically withdraw rewards for the vault’s fee shareholders.
 Check for more details in [Reward splitter section](#automated-withdrawals-reward-splitter)
