@@ -124,6 +124,12 @@ start_common_options = [
         help='Claim fee rewards periodically on behalf of the shareholders. Default is false.',
     ),
     click.option(
+        '--disable-withdrawals',
+        is_flag=True,
+        envvar='DISABLE_WITHDRAWALS',
+        help='Whether to disable submitting partial vault withdrawals.',
+    ),
+    click.option(
         '--execution-endpoints',
         type=str,
         envvar='EXECUTION_ENDPOINTS',

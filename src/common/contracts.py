@@ -15,9 +15,14 @@ from web3.contract.async_contract import (
 from web3.types import BlockNumber, ChecksumAddress, EventData, Wei
 
 from src.common.clients import execution_client as default_execution_client
-from src.common.typings import HarvestParams, RewardVoteInfo
+from src.common.typings import (
+    ExitQueueMissingAssetsParams,
+    HarvestParams,
+    RewardVoteInfo,
+)
 from src.config.settings import settings
 from src.validators.typings import V2ValidatorEventData
+from src.withdrawals.typings import WithdrawalEvent
 
 SOLIDITY_UINT256_MAX = 2**256 - 1
 
@@ -172,6 +177,27 @@ class VaultContract(ContractWrapper, VaultStateMixin):
     async def validators_manager(self) -> ChecksumAddress:
         return await self.contract.functions.validatorsManager().call()
 
+    async def get_validator_withdrawal_submitted_events(
+        self,
+        from_block: BlockNumber,
+    ) -> list[WithdrawalEvent]:
+        from_block = max(from_block, settings.network_config.KEEPER_GENESIS_BLOCK)
+        if settings.network_config.PECTRA_BLOCK:
+            from_block = max(from_block, settings.network_config.PECTRA_BLOCK)
+        events = await self._get_events(
+            self.events.ValidatorWithdrawalSubmitted,  # type: ignore
+            from_block=from_block,
+            to_block=await self.execution_client.eth.get_block_number(),
+        )
+        return [
+            WithdrawalEvent(
+                public_key=Web3.to_hex(event['args']['publicKey']),
+                amount=event['args']['amount'],
+                block_number=BlockNumber(event['blockNumber']),
+            )
+            for event in events
+        ]
+
 
 class GnoVaultContract(ContractWrapper, VaultStateMixin):
     abi_path = 'abi/IGnoVault.json'
@@ -297,6 +323,88 @@ class MulticallContract(ContractWrapper):
         return await self.contract.functions.aggregate(data).call(block_identifier=block_number)
 
 
+class ValidatorsCheckerContract(ContractWrapper):
+    abi_path = 'abi/IValidatorsChecker.json'
+    settings_key = 'VALIDATORS_CHECKER_CONTRACT_ADDRESS'
+
+    async def multicall(
+        self,
+        calls: list[HexStr],
+        block_number: BlockNumber | None = None,
+    ) -> list[bytes]:
+        return await self.contract.functions.multicall(calls).call(block_identifier=block_number)
+
+    async def get_exit_queue_cumulative_tickets(
+        self,
+        vault_address: ChecksumAddress,
+        harvest_params: HarvestParams | None,
+        block_number: BlockNumber,
+    ) -> int:
+        calls = []
+        if harvest_params is not None:
+            calls.append(
+                self._get_update_vault_state_call(
+                    vault=vault_address,
+                    harvest_params=harvest_params,
+                )
+            )
+
+        calls.append(self.encode_abi('getExitQueueCumulativeTickets', args=[vault_address]))
+        response = await self.multicall(calls=calls, block_number=block_number)
+        return Web3.to_int(response[-1])
+
+    async def get_exit_queue_missing_assets(
+        self,
+        exit_queue_missing_assets_params: ExitQueueMissingAssetsParams,
+        harvest_params: HarvestParams | None,
+        block_number: BlockNumber,
+    ) -> Wei:
+        calls: list[HexStr] = []
+        vault = exit_queue_missing_assets_params.vault
+
+        if harvest_params is not None:
+            calls.append(
+                self._get_update_vault_state_call(
+                    vault=vault,
+                    harvest_params=harvest_params,
+                )
+            )
+
+        calls.append(self._get_exit_queue_missing_assets_call(exit_queue_missing_assets_params))
+        multicall_response = await self.contract.functions.multicall(calls).call(
+            block_identifier=block_number
+        )
+
+        return Wei(Web3.to_int(multicall_response[-1]))
+
+    def _get_update_vault_state_call(
+        self, vault: ChecksumAddress, harvest_params: HarvestParams
+    ) -> HexStr:
+        return self.encode_abi(
+            'updateVaultState',
+            [
+                vault,
+                (
+                    harvest_params.rewards_root,
+                    harvest_params.reward,
+                    harvest_params.unlocked_mev_reward,
+                    harvest_params.proof,
+                ),
+            ],
+        )
+
+    def _get_exit_queue_missing_assets_call(self, params: ExitQueueMissingAssetsParams) -> HexStr:
+        return self.encode_abi(
+            'getExitQueueMissingAssets',
+            [
+                params.vault,
+                params.withdrawing_assets,
+                params.exit_queue_cumulative_ticket,
+            ],
+        )
+
+
 validators_registry_contract = ValidatorsRegistryContract()
 keeper_contract = KeeperContract()
 multicall_contract = MulticallContract()
+validators_checker_contract = ValidatorsCheckerContract()

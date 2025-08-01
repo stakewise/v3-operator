@@ -15,6 +15,7 @@ from web3 import Web3
 from web3.exceptions import Web3Exception
 from web3.types import Timestamp
 
+from src.common.clients import execution_client
 from src.common.consensus import get_chain_finalized_head
 from src.common.exceptions import (
     InvalidOraclesRequestError,
@@ -140,3 +141,14 @@ def round_down(d: int | Decimal, precision: int) -> Decimal:
 
 def find_first(iterable: Iterable[T], predicate: Callable[[T], bool]) -> T | None:
     return next((item for item in iterable if predicate(item)), None)
+
+
+async def calc_slot_by_block_number(block_number: BlockNumber) -> int:
+    execution_block = await execution_client.eth.get_block(block_number)
+    return calc_slot_by_block_timestamp(execution_block['timestamp'])
+
+
+def calc_slot_by_block_timestamp(ts: Timestamp) -> int:
+    return int(
+        (ts - settings.network_config.GENESIS_TIMESTAMP) / settings.network_config.SECONDS_PER_SLOT
+    )
