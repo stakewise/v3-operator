@@ -15,9 +15,10 @@ from src.common.logging import setup_logging
 from src.common.metrics import MetricsTask, metrics, metrics_server
 from src.common.migrate import migrate_to_multivault
 from src.common.startup_check import startup_checks
+from src.common.tasks import BaseTask
 from src.common.utils import get_build_version
 from src.config.config import OperatorConfig, OperatorConfigException
-from src.config.settings import settings
+from src.config.settings import ValidatorsRegistrationMode, settings
 from src.exits.tasks import ExitSignatureTask
 from src.harvest.tasks import HarvestTask
 from src.reward_splitter.tasks import SplitRewardTask
@@ -26,9 +27,9 @@ from src.validators.execution import scan_validators_events
 from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
 from src.validators.relayer import RelayerAdapter, create_relayer_adapter
-from src.validators.tasks import ValidatorsTask, load_genesis_validators
-from src.validators.typings import ValidatorsRegistrationMode
+from src.validators.tasks import ValidatorRegistrationSubtask, load_genesis_validators
 from src.validators.utils import load_public_keys
+from src.withdrawals.tasks import ValidatorWithdrawalSubtask
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +85,7 @@ async def start_base() -> None:
     metrics.service_started.labels(network=settings.network).set(1)
     with InterruptHandler() as interrupt_handler:
         tasks = [
-            ValidatorsTask(
+            ValidatorTask(
                 keystore=keystore,
                 available_public_keys=available_public_keys,
                 relayer_adapter=relayer_adapter,
@@ -101,6 +102,35 @@ async def start_base() -> None:
             tasks.append(SplitRewardTask().run(interrupt_handler))
 
         await asyncio.gather(*tasks)
+
+
+class ValidatorTask(BaseTask):
+    def __init__(
+        self,
+        keystore: BaseKeystore | None,
+        available_public_keys: list[HexStr] | None,
+        relayer_adapter: RelayerAdapter | None,
+    ):
+        self.validator_registration_subtask = ValidatorRegistrationSubtask(
+            keystore=keystore,
+            available_public_keys=available_public_keys,
+            relayer_adapter=relayer_adapter,
+        )
+
+        self.validator_withdrawal_subtask = ValidatorWithdrawalSubtask()
+
+    async def process_block(self, interrupt_handler: InterruptHandler) -> None:
+        chain_head = await get_chain_finalized_head()
+        await wait_execution_catch_up_consensus(
+            chain_head=chain_head, interrupt_handler=interrupt_handler
+        )
+        await scan_validators_events(block_number=chain_head.block_number, is_startup=False)
+        subtasks = [
+            self.validator_registration_subtask.process_block(),
+        ]
+        if not settings.disable_withdrawals:
+            subtasks.append(self.validator_withdrawal_subtask.process_block(chain_head))
+        await asyncio.gather(*subtasks)
 
 
 def log_start() -> None:
