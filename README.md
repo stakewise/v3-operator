@@ -492,6 +492,17 @@ the Operator Service.
 Harvesting the Vault rewards simplifies the contract calls to the Vault contract and reduces the gas fees for stakers,
 for example, the Vault does not need to sync rewards before calling deposit when a user stakes.
 
+### Withdraw Vault queued assets
+
+Another operator task is to trigger partial ETH/GNO withdrawals from validators.
+
+Every 24 hours the operator checks the current exit queue.
+If the requested amount can be processed via partial withdrawals, it submits them through the execution layer.
+
+You can disable partial withdrawals using the `--disable-withdrawals` parameter. In this case, withdrawals will be processed by oracles that exit the entire validator, which may negatively impact the vault’s APR.
+
+The partial withdrawals interval can be adjusted via the `PARTIAL_WITHDRAWALS_INTERVAL` env variable, with every 24 hours being the default.
+
 ### Automated withdrawals (Reward splitter)
 
 It is possible to periodically withdraw rewards for the vault’s fee shareholders. To enable this, set the wallet address connected to the operator as the `Fee Claimer` in the `Roles` tab under the vault’s Settings. Additionally, you must pass the --split-rewards flag when starting the Operator Service.

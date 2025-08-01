@@ -1,3 +1,4 @@
+from enum import Enum
 from pathlib import Path
 
 from decouple import Csv
@@ -7,7 +8,6 @@ from web3.types import ChecksumAddress, Gwei, Wei
 
 from src.common.typings import Singleton, ValidatorType
 from src.config.networks import MAINNET, NETWORKS, NetworkConfig
-from src.validators.typings import RelayerTypes, ValidatorsRegistrationMode
 
 DATA_DIR = Path.home() / '.stakewise'
 PUBLIC_KEYS_FILENAME = 'public_keys.txt'
@@ -23,6 +23,21 @@ DEFAULT_HASHI_VAULT_ENGINE_NAME = 'secret'
 
 DEFAULT_MIN_DEPOSIT_AMOUNT = Web3.to_wei(1, 'ether')
 DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI = Gwei(int(Web3.from_wei(DEFAULT_MIN_DEPOSIT_AMOUNT, 'gwei')))
+
+
+class ValidatorsRegistrationMode(Enum):
+    """
+    AUTO mode: validators are registered automatically when vault assets are enough.
+    API mode: validators registration is triggered by API request.
+    """
+
+    AUTO = 'AUTO'
+    API = 'API'
+
+
+class RelayerTypes:
+    DVT = 'DVT'
+    DEFAULT = 'DEFAULT'
 
 
 # pylint: disable-next=too-many-public-methods,too-many-instance-attributes
@@ -46,12 +61,13 @@ class Settings(metaclass=Singleton):
 
     harvest_vault: bool
     split_rewards: bool
+    disable_withdrawals: bool
     verbose: bool
     enable_metrics: bool
     metrics_host: str
     metrics_port: int
     metrics_prefix: str
-    validator_type: ValidatorType
+    validator_type: ValidatorType | None
     public_keys_file: Path
     keystores_dir: Path
     keystores_password_dir: Path
@@ -100,6 +116,9 @@ class Settings(metaclass=Singleton):
     disable_available_validators_warnings: bool = decouple_config(
         'DISABLE_AVAILABLE_VALIDATORS_WARNINGS', default=False, cast=bool
     )
+    disable_full_withdrawals: bool = decouple_config(
+        'DISABLE_FULL_WITHDRAWALS', default=False, cast=bool
+    )
 
     min_validators_registration: int
     min_deposit_amount_gwei: Gwei
@@ -116,6 +135,7 @@ class Settings(metaclass=Singleton):
         graph_endpoint: str = '',
         harvest_vault: bool = False,
         split_rewards: bool = False,
+        disable_withdrawals: bool = False,
         verbose: bool = False,
         enable_metrics: bool = False,
         metrics_port: int = DEFAULT_METRICS_PORT,
@@ -123,7 +143,7 @@ class Settings(metaclass=Singleton):
         metrics_prefix: str = DEFAULT_METRICS_PREFIX,
         max_fee_per_gas_gwei: int | None = None,
         public_keys_file: str | None = None,
-        validator_type: ValidatorType = ValidatorType.V2,
+        validator_type: ValidatorType | None = None,
         keystores_dir: str | None = None,
         keystores_password_file: str | None = None,
         remote_signer_url: str | None = None,
@@ -157,6 +177,7 @@ class Settings(metaclass=Singleton):
         self.graph_endpoint = graph_endpoint or self.network_config.STAKEWISE_GRAPH_ENDPOINT
         self.harvest_vault = harvest_vault
         self.split_rewards = split_rewards
+        self.disable_withdrawals = disable_withdrawals
         self.verbose = verbose
         self.enable_metrics = enable_metrics
         self.metrics_host = metrics_host
@@ -276,6 +297,11 @@ class Settings(metaclass=Singleton):
 
         self.skip_startup_checks = decouple_config('SKIP_STARTUP_CHECKS', default=False, cast=bool)
 
+    def get_validator_type(self) -> ValidatorType:
+        if self.validator_type is None:
+            raise RuntimeError('Validator type is not set')
+        return self.validator_type
+
     @property
     def keystore_cls_str(self) -> str:
         if self.remote_signer_url:
@@ -302,6 +328,13 @@ ORACLES_VALIDATORS_TIMEOUT: int = decouple_config(
 ORACLES_CONSOLIDATION_TIMEOUT: int = decouple_config(
     'ORACLES_CONSOLIDATION_TIMEOUT', default=10, cast=int
 )
+ORACLES_EXITS_TIMEOUT: int = decouple_config('ORACLES_EXITS_TIMEOUT', default=10, cast=int)
+# partial withdrawals
+PARTIAL_WITHDRAWALS_INTERVAL: int = decouple_config(
+    'PARTIAL_WITHDRAWALS_INTERVAL', default=86400, cast=int  # every 24 hr
+)
+MIN_WITHDRAWAL_AMOUNT_GWEI: Gwei = Gwei(1)
+
 # common
 MIN_ACTIVATION_BALANCE: Wei = Web3.to_wei(32, 'ether')
 MIN_ACTIVATION_BALANCE_GWEI: Gwei = Gwei(int(Web3.from_wei(MIN_ACTIVATION_BALANCE, 'gwei')))
@@ -311,6 +344,9 @@ MAX_EFFECTIVE_BALANCE_GWEI: Gwei = Gwei(int(Web3.from_wei(MAX_EFFECTIVE_BALANCE,
 
 MAX_CONSOLIDATION_REQUEST_FEE: Gwei = decouple_config(
     'MAX_CONSOLIDATION_REQUEST_FEE', default=10, cast=int
+)
+MAX_WITHDRAWAL_REQUEST_FEE: Gwei = decouple_config(
+    'MAX_WITHDRAWAL_REQUEST_FEE', default=10, cast=int
 )
 
 # Backoff retries

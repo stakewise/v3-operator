@@ -23,6 +23,7 @@ class ExitSignatureUpdateCache:
 class AppState(metaclass=Singleton):
     def __init__(self) -> None:
         self.exit_signature_update_cache: dict[ChecksumAddress, ExitSignatureUpdateCache] = {}
+        self.partial_withdrawal_cache: dict[ChecksumAddress, BlockNumber | None] = {}
         self.reward_splitter_block: BlockNumber | None = None
         for vault in settings.vaults:
             self.exit_signature_update_cache[vault] = ExitSignatureUpdateCache()

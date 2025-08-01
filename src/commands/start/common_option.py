@@ -99,7 +99,6 @@ start_common_options = [
         help='Type of registered validators: '
         f'{ValidatorType.V1.value} or {ValidatorType.V2.value}.',
         envvar='VALIDATOR_TYPE',
-        default=ValidatorType.V2,
         type=click.Choice(
             ValidatorType,
             case_sensitive=False,
@@ -123,6 +122,12 @@ start_common_options = [
         is_flag=True,
         envvar='SPLIT_REWARDS',
         help='Claim fee rewards periodically on behalf of the shareholders. Default is false.',
+    ),
+    click.option(
+        '--disable-withdrawals',
+        is_flag=True,
+        envvar='DISABLE_WITHDRAWALS',
+        help='Whether to disable submitting partial vault withdrawals.',
     ),
     click.option(
         '--execution-endpoints',
@@ -153,6 +158,7 @@ start_common_options = [
     ),
     click.option(
         '--vaults',
+        '--vault',
         callback=validate_eth_addresses,
         envvar='VAULTS',
         prompt='Enter comma separated list of your vault addresses',

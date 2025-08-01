@@ -27,11 +27,10 @@ from src.common.typings import ValidatorType
 from src.common.utils import format_error, round_down, warning_verbose
 from src.common.wallet import wallet
 from src.config.networks import NETWORKS
-from src.config.settings import settings
+from src.config.settings import RelayerTypes, ValidatorsRegistrationMode, settings
 from src.validators.execution import get_withdrawable_assets
 from src.validators.keystores.local import LocalKeystore
 from src.validators.relayer import DvtRelayerClient
-from src.validators.typings import RelayerTypes, ValidatorsRegistrationMode
 
 logger = logging.getLogger(__name__)
 

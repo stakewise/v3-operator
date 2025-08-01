@@ -11,8 +11,7 @@ from src.commands.start.common_option import add_common_options, start_common_op
 from src.common.typings import ValidatorType
 from src.common.utils import log_verbose
 from src.config.networks import NETWORKS
-from src.config.settings import settings
-from src.validators.typings import RelayerTypes, ValidatorsRegistrationMode
+from src.config.settings import RelayerTypes, ValidatorsRegistrationMode, settings
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +49,7 @@ def start_relayer(
     graph_endpoint: str,
     harvest_vault: bool,
     split_rewards: bool,
+    disable_withdrawals: bool,
     verbose: bool,
     enable_metrics: bool,
     metrics_host: str,
@@ -96,6 +96,7 @@ def start_relayer(
         graph_endpoint=graph_endpoint,
         harvest_vault=harvest_vault,
         split_rewards=split_rewards,
+        disable_withdrawals=disable_withdrawals,
         verbose=verbose,
         enable_metrics=enable_metrics,
         metrics_host=metrics_host,
