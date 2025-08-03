@@ -14,7 +14,7 @@ from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.contracts import keeper_contract, multicall_contract
 from src.common.metrics import metrics
 from src.common.tasks import BaseTask
-from src.common.wallet import hot_wallet
+from src.common.wallet import wallet
 from src.config.settings import ATTEMPTS_WITH_DEFAULT_GAS, settings
 
 logger = logging.getLogger(__name__)
@@ -81,31 +81,31 @@ async def update_oracles_cache() -> None:
 
 class WalletTask(BaseTask):
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
-        await check_hot_wallet_balance()
+        await check_wallet_balance()
 
 
-async def check_hot_wallet_balance() -> None:
-    hot_wallet_min_balance = settings.network_config.HOT_WALLET_MIN_BALANCE
+async def check_wallet_balance() -> None:
+    wallet_min_balance = settings.network_config.WALLET_MIN_BALANCE
     symbol = settings.network_config.WALLET_BALANCE_SYMBOL
 
-    if hot_wallet_min_balance <= 0:
+    if wallet_min_balance <= 0:
         return
 
-    hot_wallet_balance = await get_hot_wallet_balance()
+    wallet_balance = await get_wallet_balance()
 
-    metrics.wallet_balance.labels(network=settings.network).set(hot_wallet_balance)
+    metrics.wallet_balance.labels(network=settings.network).set(wallet_balance)
 
-    if hot_wallet_balance < hot_wallet_min_balance:
+    if wallet_balance < wallet_min_balance:
         logger.warning(
             'Wallet %s balance is too low. At least %s %s is recommended.',
-            hot_wallet.address,
-            Web3.from_wei(hot_wallet_min_balance, 'ether'),
+            wallet.address,
+            Web3.from_wei(wallet_min_balance, 'ether'),
             symbol,
         )
 
 
-async def get_hot_wallet_balance() -> Wei:
-    return await execution_client.eth.get_balance(hot_wallet.address)
+async def get_wallet_balance() -> Wei:
+    return await execution_client.eth.get_balance(wallet.address)
 
 
 async def transaction_gas_wrapper(
@@ -139,23 +139,21 @@ def build_gas_manager() -> GasManager:
     min_effective_priority_fee_per_gas = settings.network_config.MIN_EFFECTIVE_PRIORITY_FEE_PER_GAS
     return GasManager(
         execution_client=execution_client,
-        max_fee_per_gas=Wei(settings.max_fee_per_gas_gwei),
+        max_fee_per_gas=Web3.to_wei(settings.max_fee_per_gas_gwei, 'gwei'),
         priority_fee_num_blocks=settings.priority_fee_num_blocks,
         priority_fee_percentile=settings.priority_fee_percentile,
         min_effective_priority_fee_per_gas=min_effective_priority_fee_per_gas,
     )
 
 
-async def get_consolidation_request_fee(
-    address: ChecksumAddress, block_number: BlockNumber
-) -> Gwei:
+async def get_execution_request_fee(address: ChecksumAddress) -> Gwei:
     """
-    Retrieves the current fee for a consolidation transaction with an execution layer request.
+    Retrieves the current fee for an execution layer request.
     """
     tx_data: TxParams = {
         'to': address,
         'data': b'',
     }
 
-    fee = await execution_client.eth.call(tx_data, block_identifier=block_number)
+    fee = await execution_client.eth.call(tx_data, block_identifier='latest')
     return Gwei(Web3.to_int(fee))

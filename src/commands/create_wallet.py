@@ -36,7 +36,7 @@ from src.config.networks import AVAILABLE_NETWORKS
         case_sensitive=False,
     ),
 )
-@click.command(help='Creates the encrypted hot wallet from the mnemonic.')
+@click.command(help='Creates the encrypted wallet from the mnemonic.')
 def create_wallet(mnemonic: str, data_dir: str, network: str | None) -> None:
     try:
         operator_config = OperatorConfig(Path(data_dir))

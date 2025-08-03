@@ -5,7 +5,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from decimal import ROUND_FLOOR, Decimal, localcontext
 from pathlib import Path
-from typing import Any, Callable, Iterable, Iterator, TypeVar, overload
+from typing import Any, Callable, Iterable, TypeVar
 
 import click
 import tenacity
@@ -15,6 +15,7 @@ from web3 import Web3
 from web3.exceptions import Web3Exception
 from web3.types import Timestamp
 
+from src.common.clients import execution_client
 from src.common.consensus import get_chain_finalized_head
 from src.common.exceptions import (
     InvalidOraclesRequestError,
@@ -98,19 +99,6 @@ def process_oracles_approvals(
     return OraclesApproval(ipfs_hash=winner[0], signatures=signatures, deadline=winner[1])
 
 
-@overload
-def chunkify(items: list[T], size: int) -> Iterator[list[T]]: ...
-
-
-@overload
-def chunkify(items: range, size: int) -> Iterator[range]: ...
-
-
-def chunkify(items, size):  # type: ignore[no-untyped-def]
-    for i in range(0, len(items), size):
-        yield items[i : i + size]
-
-
 def greenify(value: Any) -> str:
     return click.style(value, bold=True, fg='green')
 
@@ -153,3 +141,14 @@ def round_down(d: int | Decimal, precision: int) -> Decimal:
 
 def find_first(iterable: Iterable[T], predicate: Callable[[T], bool]) -> T | None:
     return next((item for item in iterable if predicate(item)), None)
+
+
+async def calc_slot_by_block_number(block_number: BlockNumber) -> int:
+    execution_block = await execution_client.eth.get_block(block_number)
+    return calc_slot_by_block_timestamp(execution_block['timestamp'])
+
+
+def calc_slot_by_block_timestamp(ts: Timestamp) -> int:
+    return int(
+        (ts - settings.network_config.GENESIS_TIMESTAMP) / settings.network_config.SECONDS_PER_SLOT
+    )

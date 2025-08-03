@@ -88,7 +88,7 @@ class LocalKeystore(BaseKeystore):
             network=settings.network,
             private_key=BLSPrivateKey(Web3.to_int(private_key)),
             vault=vault_address,
-            validator_type=settings.validator_type,
+            validator_type=settings.get_validator_type(),
         )
 
         return credential.get_deposit_datum_dict(amount)

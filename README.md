@@ -14,7 +14,7 @@
 4. [Usage](#usage)
    1. [Step 1. Create mnemonic](#step-1-create-mnemonic)
    2. [Step 2. Create validator keys](#step-2-create-validator-keys)
-   3. [Step 3. Create hot wallet](#step-3-create-hot-wallet)
+   3. [Step 3. Create wallet](#step-3-create-wallet)
    4. [Step 4. Setup validators manager role](#step-4-setup-validators-manager-role)
    5. [Step 5. Start Operator Service](#step-5-start-operator-service)
 5. [Extra commands](#extra-commands)
@@ -22,11 +22,12 @@
    2. [Validators voluntary exit](#validators-voluntary-exit)
    3. [Validators consolidation](#validators-consolidation)
    4. [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
-   5. [Recover validator keystores](#recover-validator-keystores)
-   6. [Max gas fee](#max-gas-fee)
-   7. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
-   8. [Self report to Rated Network](#self-report-to-rated-network)
-   9. [Export validators file](#export-validators-file)
+   5. [Automated withdrawals (Reward splitter)](#automated-withdrawals-reward-splitter)
+   6. [Recover validator keystores](#recover-validator-keystores)
+   7. [Max gas fee](#max-gas-fee)
+   8. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
+   9. [Self report to Rated Network](#self-report-to-rated-network)
+   10. [Export validators file](#export-validators-file)
 6. [Contacts](#contacts)
 
 ## What is V3 Operator?
@@ -155,14 +156,14 @@ Head to [Usage](#usage) to launch your Operator service.
 Pull the latest docker Operator docker image:
 
 ```bash
-docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.9
+docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.10
 ```
 
 You can also build the docker image from source by cloning this repo and executing the following command from within
 the `v3-operator` folder:
 
 ```bash
-docker build --pull -t europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.9 .
+docker build --pull -t europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.10 .
 ```
 
 You will execute Operator Service commands using the format below (note the use of flags are optional):
@@ -171,7 +172,7 @@ You will execute Operator Service commands using the format below (note the use 
 docker run --rm -ti \
 -u $(id -u):$(id -g) \
 -v ~/.stakewise/:/data \
-europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.9 \
+europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.10 \
 src/main.py COMMAND \
 --flagA=123 \
 --flagB=xyz
@@ -210,11 +211,11 @@ the [Kubernetes setup](https://docs.stakewise.io/for-operators/kubernetes-stakin
 ## Usage
 
 To run the Operator Service, you must first create keystores and a file containing the list of available validator public keys for your Vault. You must also
-set up a hot wallet for Operator Service to handle validator registrations.
+set up a wallet for Operator Service to handle validator registrations.
 
 The Operator Service includes built-in functionality to generate all of the above.
 Alternatively, you may use your preferred methods to generate keystores (e.g., [Wagyu Keygen](https://github.com/stake-house/wagyu-key-gen))
-and create the hot wallet (e.g., [MetaMask](https://metamask.io/) or [MyEtherWallet](https://help.myetherwallet.com/en/articles/6512619-using-mew-offline-current-mew-version-6)).
+and create the wallet (e.g., [MetaMask](https://metamask.io/) or [MyEtherWallet](https://help.myetherwallet.com/en/articles/6512619-using-mew-offline-current-mew-version-6)).
 If you choose to use your own methods, you will need to generate the public key file using the `export-public-keys` command.
 
 The below steps walk you through this set-up using Operator Service:
@@ -274,9 +275,9 @@ run Operator Service with them.
 **Remember to upload the newly generated validator keys to the validator(s). For that, please follow a guide for your
 consensus client. The password for your keystores is located in the `password.txt` file in the keystores folder.**
 
-### Step 3. Create hot wallet
+### Step 3. Create wallet
 
-Run the `create-wallet` command to create your hot wallet using your mnemonic (note, this mnemonic can be the same as
+Run the `create-wallet` command to create your wallet using your mnemonic (note, this mnemonic can be the same as
 the one used to generate the validator keys, or a new mnemonic if you desire).
 
 ```bash
@@ -314,20 +315,58 @@ You are all set! Now it's time to run the Operator Service.
 You are ready to run the Operator Service using the `start` command, optionally passing your Vault address and consensus
 and execution endpoints as flags.
 
-If you **did not** use Operator Service to generate hot wallet, you will need to add the following flags:
+There are several ways to run the Operator Service, depending on how you store private keys.
 
-- `--hot-wallet-file` - path to the password-protected _.txt_ file containing your hot wallet private key.
-- `--hot-wallet-password-file` - path to a _.txt_ file containing the password to open the protected hot wallet private
-  key file.
+#### Locally stored keystores
+
+By default, the Operator Service runs with locally stored keystores.
+
+```./operator start-local --vaults=0x3320a...68 --consensus-endpoints=http://localhost:5052 --execution-endpoints=http://localhost:8545```
 
 If you **did not** use Operator Service to generate validator keys, you will need to add the following flag:
 
 - `--keystores-dir` - The directory with validator keys in the EIP-2335 standard. The folder must contain either a
   single `password.txt` password file for all the keystores or separate password files for each keystore with the same
   name as keystore, but ending with `.txt`. For example, `keystore1.json`, `keystore1.txt`, etc.
+- `--keystores-password-file`: Absolute path to the password file for decrypting keystores.
 
-To register a validator using the 0x01 (ETH1_ADDRESS_WITHDRAWAL_PREFIX) credential type,
-include the `--validator-type 0x01` flag in your command.
+#### Hashi vault
+
+Operator supports loading signing keys from remote Hashi Vault instance, avoiding storage of keystores on the filesystem. This approach is best suited for node operators who already have most of Stakewise Operator functionality implemented in their systems, and only need integration for validator registration or pooling support. Regular users should only employ this functionality on their own risk, if they already manage a deployment of hashi vault.
+
+```./operator start-hashi-vault ...```
+
+Hashi vault options:
+
+- `--hashi-vault-url`: The base URL of the vault service, e.g. `http://vault:8200`.
+- `--hashi-vault-token`: Authentication token for accessing Hashi vault.
+- `--hashi-vault-key-path`: Key path(s) in the K/V secret engine where validator signing keys are stored.
+- `--hashi-vault-key-prefix`: Key prefix(es) in the K/V secret engine under which validator signing keys are stored.
+- `--hashi-vault-parallelism`: How much requests to K/V secrets engine to do in parallel.
+
+Check [Hashi Vault guide](https://docs.stakewise.io/for-operators/operator-service/running-with-hashi-vault) for more details.
+
+##### Remote signer
+
+You may not want the operator service to have direct access to the validator keys. Validator keystores do not need to be present directly in the operator. The operator can query a remote signer to get signatures for validator deposit and exit messages.
+
+```./operator start-remote-signer ...```
+
+Remote signer options:
+
+- `--remote-signer-url`: The base URL of the remote signer, e.g. `http://signer:9000`
+
+Check [Remote signer guide](https://docs.stakewise.io/for-operators/operator-service/running-with-remote-signer) for more details.
+
+#### Relayer(API mode)
+
+The Operator API facilitates the initiation of validator registrations via API calls, proving particularly useful in cases where the operator independently oversees the creation and storage of validator keys. Within this framework, keystores are generated and preserved externally from the operator. Similarly, exit signatures are produced outside the operator. In essence, the operator acts as an intermediary for communication with the vault contract.
+
+```./operator start-relayer```
+
+Check [API mode guide](https://docs.stakewise.io/for-operators/operator-service/running-as-api-service) for more details.
+
+### Running Operator options
 
 #### Using binary
 
@@ -347,7 +386,7 @@ below:
 docker run --restart on-failure:10 \
 -u $(id -u):$(id -g) \
 -v ~/.stakewise/:/data \
-europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.9 \
+europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.10 \
 src/main.py start \
 --vaults=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
 --data-dir=/data \
@@ -374,6 +413,7 @@ Operator Service has many different commands that are not mandatory but might co
 - [Validators voluntary exit](#validators-voluntary-exit)
 - [Validators consolidation](#validators-consolidation)
 - [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
+- [Automated withdrawals (Reward splitter)](#automated-withdrawals-reward-splitter)
 - [Add validator keys to Vault](#add-validator-keys-to-vault)
 - [Recover validator keystores](#recover-validator-keystores)
 - [Self report to Rated Network](#self-report-to-rated-network)
@@ -445,11 +485,37 @@ the previous update and the Vault fees are distributed in newly minted ERC-20 to
 
 By default, each _Vault state_ gets updated whenever a user interacts with the Vault (deposit, withdraw, etc.), with a
 12 hours cooldown. Vault state can also be updated by the Vault Operator(s) by passing the `--harvest-vault` flag to the
-Operator Service `start` command. Harvest occurs every 12 hours and the gas fees are paid by the hot wallet linked to
+Operator Service `start` command. Harvest occurs every 12 hours and the gas fees are paid by the wallet linked to
 the Operator Service.
 
 Harvesting the Vault rewards simplifies the contract calls to the Vault contract and reduces the gas fees for stakers,
 for example, the Vault does not need to sync rewards before calling deposit when a user stakes.
+
+### Withdraw Vault queued assets
+
+Another operator task is to trigger partial ETH/GNO withdrawals from validators.
+
+Every 24 hours the operator checks the current exit queue.
+If the requested amount can be processed via partial withdrawals, it submits them through the execution layer.
+
+You can disable partial withdrawals using the `--disable-withdrawals` parameter. In this case, withdrawals will be processed by oracles that exit the entire validator, which may negatively impact the vault’s APR.
+
+The partial withdrawals interval can be adjusted via the `PARTIAL_WITHDRAWALS_INTERVAL` env variable, with every 24 hours being the default.
+
+### Automated withdrawals (Reward splitter)
+
+It is possible to periodically withdraw rewards for the vault’s fee shareholders. To enable this, set the wallet address connected to the operator as the `Fee Claimer` in the `Roles` tab under the vault’s Settings. Additionally, you must pass the --split-rewards flag when starting the Operator Service.
+
+Periodic withdrawal task relies on Reward Splitter contract. The task combines the following contract calls into a multicall:
+
+- Harvest vault rewards from Keeper
+- Withdraw Splitter rewards on behalf of each shareholder. Rewards withdrawn will go to exit queue.
+- Claim exited assets on behalf of each shareholder. Assets claimed will go directly to shareholder address.
+
+Notes:
+
+- To avoid unnecessary gas fees from the operator's wallet, withdrawals are processed only if their total amount exceeds a minimum threshold. This can be adjusted via the `REWARD_SPLITTER_MIN_ASSETS` environment variable. The value is specified in Wei.
+- The automated withdrawals interval can be adjusted via the `REWARD_SPLITTER_INTERVAL` env variable, with every 24 hours being the default.
 
 ### Recover validator keystores
 

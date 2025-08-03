@@ -3,12 +3,12 @@ import sys
 from pathlib import Path
 
 import click
-from eth_typing import BlockNumber, ChecksumAddress, HexStr
+from eth_typing import ChecksumAddress, HexStr
 from eth_utils import add_0x_prefix
 from sw_utils.consensus import EXITED_STATUSES, ValidatorStatus
 
 from src.common.clients import consensus_client, execution_client, setup_clients
-from src.common.contracts import VaultContract, v2_pool_contract
+from src.common.contracts import VaultContract
 from src.common.credentials import CredentialManager
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.password import generate_password, get_or_create_password_file
@@ -16,7 +16,7 @@ from src.common.utils import greenify, log_verbose
 from src.common.validators import validate_eth_address, validate_mnemonic
 from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
-from src.config.settings import DEFAULT_NETWORK, SECONDS_PER_MONTH, settings
+from src.config.settings import DEFAULT_NETWORK, settings
 
 
 @click.command(help='Recover config data directory and keystores.')
@@ -125,7 +125,6 @@ def recover(
                 per_keystore_password=per_keystore_password,
                 no_confirm=no_confirm,
                 operator_config=operator_config,
-                network=network,
             )
         )
     except Exception as e:
@@ -139,7 +138,6 @@ async def main(
     per_keystore_password: bool,
     no_confirm: bool,
     operator_config: OperatorConfig,
-    network: str,
 ) -> None:
     setup_logging()
     await setup_clients()
@@ -166,8 +164,7 @@ async def main(
             abort=True,
         )
 
-    keystores_dir = operator_config.data_dir / network / 'keystores'
-    password_file = keystores_dir / 'password.txt'
+    keystores_dir = operator_config.keystores_dir
     if keystores_dir.exists():
         if no_confirm:
             click.secho(f'Removing existing {keystores_dir} keystores directory...')
@@ -185,7 +182,7 @@ async def main(
     mnemonic_next_index = await _generate_keystores(
         mnemonic=mnemonic,
         keystores_dir=keystores_dir,
-        password_file=password_file,
+        password_file=operator_config.keystores_password_file,
         validator_statuses=validators,
         per_keystore_password=per_keystore_password,
     )
@@ -209,26 +206,6 @@ async def _fetch_registered_validators(
         from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
         to_block=current_block,
     )
-
-    if (
-        settings.network_config.IS_SUPPORT_V2_MIGRATION
-        and vault == settings.network_config.GENESIS_VAULT_CONTRACT_ADDRESS
-    ):
-        # fetch registered validators from v2 pool contract
-        # new validators won't be registered after upgrade to the v3,
-        # no need to check up to the latest block
-        blocks_per_month = int(SECONDS_PER_MONTH // settings.network_config.SECONDS_PER_BLOCK)
-        to_block = BlockNumber(
-            min(
-                settings.network_config.KEEPER_GENESIS_BLOCK + blocks_per_month,
-                current_block,
-            )
-        )
-        public_keys.extend(
-            await v2_pool_contract.get_registered_validators_public_keys(
-                from_block=settings.network_config.V2_POOL_GENESIS_BLOCK, to_block=to_block
-            )
-        )
     click.secho(f'Fetched {len(public_keys)} registered validators', bold=True)
 
     click.secho('Fetching validators statuses...', bold=True)

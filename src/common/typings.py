@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from hexbytes import HexBytes
-from web3.types import Wei
+from web3.types import ChecksumAddress, Wei
 
 
 @dataclass
@@ -31,6 +31,13 @@ class OraclesApproval:
     signatures: bytes
     ipfs_hash: str
     deadline: int
+
+
+@dataclass
+class ExitQueueMissingAssetsParams:
+    vault: ChecksumAddress
+    withdrawing_assets: Wei
+    exit_queue_cumulative_ticket: int
 
 
 class ValidatorType(Enum):
