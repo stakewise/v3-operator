@@ -10,12 +10,11 @@ from sw_utils.common import urljoin
 from web3 import Web3
 from web3.types import Gwei
 
-from src.config.settings import MIN_ACTIVATION_BALANCE_GWEI, settings
+from src.config.settings import MIN_ACTIVATION_BALANCE_GWEI, RelayerTypes, settings
 from src.validators.exceptions import MissingAvailableValidatorsException
 from src.validators.execution import get_validators_start_index
 from src.validators.typings import (
     ExitSignatureShards,
-    RelayerTypes,
     RelayerValidatorsResponse,
     Validator,
 )

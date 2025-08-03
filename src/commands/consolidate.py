@@ -9,12 +9,12 @@ from eth_typing import ChecksumAddress, HexStr
 from web3 import Web3
 from web3.types import BlockNumber
 
-from src.common.clients import execution_client, setup_clients
+from src.common.clients import setup_clients
 from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import VaultContract
 from src.common.execution import (
     build_gas_manager,
-    get_consolidation_request_fee,
+    get_execution_request_fee,
     get_protocol_config,
 )
 from src.common.logging import LOG_LEVELS, setup_logging
@@ -25,7 +25,7 @@ from src.common.validators import (
     validate_public_keys,
     validate_public_keys_file,
 )
-from src.common.wallet import hot_wallet
+from src.common.wallet import wallet
 from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import (
@@ -98,17 +98,17 @@ logger = logging.getLogger(__name__)
     help='Comma separated list of API endpoints for execution nodes.',
 )
 @click.option(
-    '--hot-wallet-password-file',
+    '--wallet-password-file',
     type=click.Path(exists=True, file_okay=True, dir_okay=False),
-    envvar='HOT_WALLET_PASSWORD_FILE',
-    help='Absolute path to the hot wallet password file. '
+    envvar='WALLET_PASSWORD_FILE',
+    help='Absolute path to the wallet password file. '
     'Default is the file generated with "create-wallet" command.',
 )
 @click.option(
-    '--hot-wallet-file',
+    '--wallet-file',
     type=click.Path(exists=True, file_okay=True, dir_okay=False),
-    envvar='HOT_WALLET_FILE',
-    help='Absolute path to the hot wallet. '
+    envvar='WALLET_FILE',
+    help='Absolute path to the wallet. '
     'Default is the file generated with "create-wallet" command.',
 )
 @click.option(
@@ -145,8 +145,8 @@ def consolidate(
     execution_endpoints: str,
     consensus_endpoints: str,
     data_dir: str,
-    hot_wallet_file: str | None,
-    hot_wallet_password_file: str | None,
+    wallet_file: str | None,
+    wallet_password_file: str | None,
     verbose: bool,
     no_confirm: bool,
     log_level: str,
@@ -176,8 +176,8 @@ def consolidate(
         data_dir=operator_config.data_dir,
         execution_endpoints=execution_endpoints,
         consensus_endpoints=consensus_endpoints,
-        hot_wallet_file=hot_wallet_file,
-        hot_wallet_password_file=hot_wallet_password_file,
+        wallet_file=wallet_file,
+        wallet_password_file=wallet_password_file,
         verbose=verbose,
         log_level=log_level,
     )
@@ -225,9 +225,8 @@ async def main(
             abort=True,
         )
 
-    current_fee = await get_consolidation_request_fee(
+    current_fee = await get_execution_request_fee(
         settings.network_config.CONSOLIDATION_CONTRACT_ADDRESS,
-        block_number=await execution_client.eth.get_block_number(),
     )
     if current_fee > MAX_CONSOLIDATION_REQUEST_FEE:
         logger.info(
@@ -325,8 +324,8 @@ def _encode_validators(target_source_public_keys: list[tuple[HexStr, HexStr]]) -
 async def _check_validators_manager(vault_address: ChecksumAddress) -> None:
     vault_contract = VaultContract(vault_address)
     validators_manager = await vault_contract.validators_manager()
-    if validators_manager != hot_wallet.account.address:
-        raise RuntimeError('validators manager address must equal to hot wallet address')
+    if validators_manager != wallet.account.address:
+        raise RuntimeError('validators manager address must equal to wallet address')
 
 
 def _is_switch_to_compounding(source_public_keys: list[HexStr], target_public_key: HexStr) -> bool:

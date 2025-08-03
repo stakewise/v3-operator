@@ -1,37 +1,48 @@
 import asyncio
 import logging
+from pathlib import Path
 
-from eth_typing import HexStr
+import click
+from eth_typing import ChecksumAddress, HexStr
 from sw_utils import InterruptHandler
+from sw_utils.pectra import get_pectra_vault_version
 
 import src
 from src.common.checks import wait_execution_catch_up_consensus
 from src.common.clients import setup_clients
 from src.common.consensus import get_chain_finalized_head
+from src.common.contracts import VaultContract
 from src.common.execution import WalletTask, update_oracles_cache
 from src.common.logging import setup_logging
 from src.common.metrics import MetricsTask, metrics, metrics_server
+from src.common.migrate import migrate_to_multivault
 from src.common.startup_check import startup_checks
+from src.common.tasks import BaseTask
+from src.common.typings import ValidatorType
 from src.common.utils import get_build_version
-from src.config.settings import settings
+from src.config.config import OperatorConfig, OperatorConfigException
+from src.config.settings import ValidatorsRegistrationMode, settings
 from src.exits.tasks import ExitSignatureTask
 from src.harvest.tasks import HarvestTask
+from src.reward_splitter.tasks import SplitRewardTask
 from src.validators.database import NetworkValidatorCrud, VaultCrud, VaultValidatorCrud
 from src.validators.execution import scan_validators_events
 from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
 from src.validators.relayer import RelayerAdapter, create_relayer_adapter
-from src.validators.tasks import ValidatorsTask, load_genesis_validators
-from src.validators.typings import ValidatorsRegistrationMode
+from src.validators.tasks import ValidatorRegistrationSubtask, load_genesis_validators
 from src.validators.utils import load_public_keys
+from src.withdrawals.tasks import ValidatorWithdrawalSubtask
 
 logger = logging.getLogger(__name__)
 
 
 async def start_base() -> None:
+    """Bootstrap operator service and start periodic tasks."""
     setup_logging()
     setup_sentry()
     await setup_clients()
+    await setup_validators_type()
 
     log_start()
 
@@ -78,7 +89,7 @@ async def start_base() -> None:
     metrics.service_started.labels(network=settings.network).set(1)
     with InterruptHandler() as interrupt_handler:
         tasks = [
-            ValidatorsTask(
+            ValidatorTask(
                 keystore=keystore,
                 available_public_keys=available_public_keys,
                 relayer_adapter=relayer_adapter,
@@ -91,8 +102,39 @@ async def start_base() -> None:
         ]
         if settings.harvest_vault:
             tasks.append(HarvestTask().run(interrupt_handler))
+        if settings.split_rewards:
+            tasks.append(SplitRewardTask().run(interrupt_handler))
 
         await asyncio.gather(*tasks)
+
+
+class ValidatorTask(BaseTask):
+    def __init__(
+        self,
+        keystore: BaseKeystore | None,
+        available_public_keys: list[HexStr] | None,
+        relayer_adapter: RelayerAdapter | None,
+    ):
+        self.validator_registration_subtask = ValidatorRegistrationSubtask(
+            keystore=keystore,
+            available_public_keys=available_public_keys,
+            relayer_adapter=relayer_adapter,
+        )
+
+        self.validator_withdrawal_subtask = ValidatorWithdrawalSubtask()
+
+    async def process_block(self, interrupt_handler: InterruptHandler) -> None:
+        chain_head = await get_chain_finalized_head()
+        await wait_execution_catch_up_consensus(
+            chain_head=chain_head, interrupt_handler=interrupt_handler
+        )
+        await scan_validators_events(block_number=chain_head.block_number, is_startup=False)
+        subtasks = [
+            self.validator_registration_subtask.process_block(),
+        ]
+        if not settings.disable_withdrawals:
+            subtasks.append(self.validator_withdrawal_subtask.process_block(chain_head))
+        await asyncio.gather(*subtasks)
 
 
 def log_start() -> None:
@@ -117,3 +159,51 @@ def setup_sentry() -> None:
         )
         sentry_sdk.set_tag('network', settings.network)
         sentry_sdk.set_tag('project_version', src.__version__)
+
+
+def load_operator_config(
+    vaults: list[ChecksumAddress], data_dir: str, network: str | None, no_confirm: bool
+) -> OperatorConfig:
+    try:
+        operator_config = OperatorConfig(Path(data_dir))
+        operator_config.load(network=network)
+        return operator_config
+    except OperatorConfigException as e:
+        if not e.can_be_migrated:
+            raise click.ClickException(str(e))
+
+        # trying to migrate from single vault setup to multivault
+        vault = vaults[0].lower()
+        root_dir = Path(data_dir)
+        vault_dir = root_dir / vault
+        if vault_dir.exists() and not (root_dir / 'config.json').exists():
+            if not no_confirm:
+                click.confirm(
+                    'The data directory structure has been updated. '
+                    'Would you like to migrate to the new schema?',
+                    default=True,
+                )
+            migrate_to_multivault(
+                vault_dir=vault_dir,
+                root_dir=root_dir,
+            )
+        operator_config = OperatorConfig(Path(data_dir))
+        operator_config.load()
+        return operator_config
+
+
+async def setup_validators_type() -> None:
+    """The validator type selection is determined by the vault version."""
+    if settings.validator_type:
+        # explicit set by cmd parameter
+        return
+
+    for vault_address in settings.vaults:
+        vault_contract = VaultContract(vault_address)
+        if await vault_contract.version() >= get_pectra_vault_version(
+            settings.network, vault_address
+        ):
+            settings.validator_type = ValidatorType.V2
+            return
+
+    settings.validator_type = ValidatorType.V1

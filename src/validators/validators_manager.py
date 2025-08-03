@@ -5,7 +5,7 @@ from eth_typing import ChecksumAddress, HexStr
 from web3 import Web3
 
 from src.common.typings import ValidatorType
-from src.common.wallet import hot_wallet
+from src.common.wallet import wallet
 from src.config.settings import settings
 from src.validators.typings import Validator
 
@@ -36,7 +36,7 @@ def get_validators_manager_signature(
     }
 
     encoded_message = encode_typed_data(full_message=full_message)
-    signed_msg = hot_wallet.sign_message(encoded_message)
+    signed_msg = wallet.sign_message(encoded_message)
 
     return HexStr(signed_msg.signature.hex())
 

@@ -1,7 +1,9 @@
 import asyncio
 import dataclasses
+import itertools
 import logging
 import random
+from collections import Counter
 from typing import Sequence
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
@@ -23,6 +25,7 @@ from src.common.utils import (
 )
 from src.config.settings import (
     ORACLES_CONSOLIDATION_TIMEOUT,
+    ORACLES_EXITS_TIMEOUT,
     ORACLES_VALIDATORS_TIMEOUT,
     settings,
 )
@@ -392,3 +395,102 @@ async def _send_consolidation_request(
         raise e
     logger.debug('Received response from oracle %s: %s', endpoint, data)
     return Web3.to_bytes(hexstr=data['signature'])
+
+
+async def poll_active_exits(
+    protocol_config: ProtocolConfig,
+) -> list[int]:
+    """
+    Polls oracles for active validator exit indexes
+    """
+    active_exits = await _fetch_active_exits_requests(protocol_config)
+
+    if len(active_exits) < protocol_config.exit_signature_recover_threshold:
+        logger.error(
+            'Not enough oracle exits responses: %d. Threshold is %d.',
+            len(active_exits),
+            protocol_config.exit_signature_recover_threshold,
+        )
+    # filter only validators with enough amount of exit shares
+    exit_indexes = []
+    counter = Counter(itertools.chain(*[exits[1] for exits in active_exits]))
+    for index, count in counter.items():
+        if count >= protocol_config.exit_signature_recover_threshold:
+            exit_indexes.append(index)
+    return exit_indexes
+
+
+async def _fetch_active_exits_requests(
+    protocol_config: ProtocolConfig,
+) -> list[tuple[ChecksumAddress, list[int]]]:
+    """Requests active exits from all oracles."""
+    endpoints = [(oracle.address, oracle.endpoints) for oracle in protocol_config.oracles]
+    async with ClientSession(timeout=ClientTimeout(ORACLES_EXITS_TIMEOUT)) as session:
+        results = await asyncio.gather(
+            *[
+                _fetch_active_exits_from_replicas(
+                    session=session,
+                    replicas=replicas,
+                )
+                for address, replicas in endpoints
+            ],
+            return_exceptions=True,
+        )
+    exits = []
+    failed_endpoints: list[str] = []
+    for (address, replicas), result in zip(endpoints, results):
+        if isinstance(result, BaseException):
+            warning_verbose(
+                'All endpoints for oracle %s failed to return active validator exits. '
+                'Last error: %s',
+                address,
+                format_error(result),
+            )
+            failed_endpoints.extend(replicas)
+            continue
+
+        exits.append((address, result))
+
+    if failed_endpoints:
+        logger.error(
+            'The oracles with endpoints %s have failed to respond.', ', '.join(failed_endpoints)
+        )
+
+    return exits
+
+
+# pylint: disable=duplicate-code
+async def _fetch_active_exits_from_replicas(
+    session: ClientSession, replicas: list[str]
+) -> list[int]:
+    last_error = None
+
+    # Shuffling may help if the first endpoint is slower than others
+    replicas = random.sample(replicas, len(replicas))
+
+    for endpoint in replicas:
+        try:
+            return await _fetch_active_exits_request(session, endpoint)
+        except (ClientError, asyncio.TimeoutError) as e:
+            warning_verbose('%s for endpoint %s', format_error(e), endpoint)
+            last_error = e
+
+    if last_error:
+        raise last_error
+
+    raise RuntimeError('Failed to get response from replicas')
+
+
+async def _fetch_active_exits_request(session: ClientSession, endpoint: str) -> list[int]:
+    """Requests active exits from single oracle."""
+    endpoint = urljoin(endpoint, 'exits/')
+    try:
+        async with session.get(url=endpoint) as response:
+            if response.status == 400:
+                logger.warning('%s response: %s', endpoint, await response.json())
+            response.raise_for_status()
+            data = await response.json()
+    except (ClientError, asyncio.TimeoutError) as e:
+        raise e
+    logger.debug('Received response from oracle %s: %s', endpoint, data)
+    return [item['index'] for item in data]

@@ -10,11 +10,12 @@ from sw_utils import (
     get_consensus_client,
     get_execution_client,
 )
+from sw_utils.graph.client import GraphClient as SWGraphClient
 from web3 import AsyncWeb3
 from web3.middleware.signing import async_construct_sign_and_send_raw_middleware
 
 import src
-from src.common.wallet import hot_wallet
+from src.common.wallet import wallet
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -54,11 +55,11 @@ class ExecutionClient:
         )
         # Account is required when emitting transactions.
         # For read-only queries account may be omitted.
-        if hot_wallet.can_load():
+        if wallet.can_load():
             w3.middleware_onion.add(
-                await async_construct_sign_and_send_raw_middleware(hot_wallet.account)
+                await async_construct_sign_and_send_raw_middleware(wallet.account)
             )
-            w3.eth.default_account = hot_wallet.address
+            w3.eth.default_account = wallet.address
 
         self.client = w3
         self.is_set_up = True
@@ -78,6 +79,20 @@ class ConsensusClient:
             timeout=settings.consensus_timeout,
             retry_timeout=settings.consensus_retry_timeout,
             user_agent=OPERATOR_USER_AGENT,
+        )
+
+    def __getattr__(self, item):  # type: ignore
+        return getattr(self.client, item)
+
+
+class GraphClient:
+    @cached_property
+    def client(self) -> SWGraphClient:
+        return SWGraphClient(
+            endpoint=settings.graph_endpoint,
+            request_timeout=settings.graph_request_timeout,
+            retry_timeout=settings.graph_retry_timeout,
+            page_size=settings.graph_page_size,
         )
 
     def __getattr__(self, item):  # type: ignore
@@ -104,6 +119,7 @@ db_client = Database()
 execution_client = cast(AsyncWeb3, ExecutionClient())
 execution_non_retry_client = cast(AsyncWeb3, ExecutionClient(use_retries=False))
 consensus_client = cast(ExtendedAsyncBeacon, ConsensusClient())
+graph_client = cast(SWGraphClient, GraphClient())
 ipfs_fetch_client = IpfsLazyFetchClient()
 
 

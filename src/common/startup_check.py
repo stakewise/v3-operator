@@ -7,28 +7,30 @@ from os import path
 import click
 from aiohttp import ClientSession, ClientTimeout
 from eth_typing import ChecksumAddress
+from gql import gql
 from sw_utils import IpfsFetchClient, get_consensus_client, get_execution_client
+from sw_utils.graph.client import GraphClient as SWGraphClient
 from sw_utils.pectra import get_pectra_vault_version
 from web3 import Web3
 from web3.exceptions import BadFunctionCallOutput
 
 from src.common.clients import OPERATOR_USER_AGENT, db_client
+from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import (
     VaultContract,
     keeper_contract,
     validators_registry_contract,
 )
-from src.common.execution import check_hot_wallet_balance, get_protocol_config
+from src.common.execution import check_wallet_balance, get_protocol_config
 from src.common.harvest import get_harvest_params
 from src.common.typings import ValidatorType
 from src.common.utils import format_error, round_down, warning_verbose
-from src.common.wallet import hot_wallet
+from src.common.wallet import wallet
 from src.config.networks import NETWORKS
-from src.config.settings import settings
+from src.config.settings import RelayerTypes, ValidatorsRegistrationMode, settings
 from src.validators.execution import get_withdrawable_assets
 from src.validators.keystores.local import LocalKeystore
 from src.validators.relayer import DvtRelayerClient
-from src.validators.typings import RelayerTypes, ValidatorsRegistrationMode
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +54,10 @@ async def startup_checks() -> None:
 
     logger.info('Checking consensus nodes network...')
     await _check_consensus_nodes_network()
+
+    if settings.split_rewards:
+        logger.info('Checking graph nodes...')
+        await wait_for_graph_node()
 
     logger.info('Checking execution nodes network...')
     await _check_execution_nodes_network()
@@ -77,8 +83,8 @@ async def startup_checks() -> None:
             settings.network_config.VAULT_BALANCE_SYMBOL,
         )
 
-    logger.info('Checking hot wallet balance %s...', hot_wallet.address)
-    await check_hot_wallet_balance()
+    logger.info('Checking wallet balance %s...', wallet.address)
+    await check_wallet_balance()
 
     logger.info('Checking connection to ipfs nodes...')
     healthy_ipfs_endpoints = await _check_ipfs_endpoints()
@@ -120,6 +126,9 @@ def validate_settings() -> None:
 
     if not settings.consensus_endpoints:
         raise ValueError('CONSENSUS_ENDPOINTS is missing')
+
+    if not settings.graph_endpoint and settings.split_rewards:
+        raise ValueError('GRAPH_ENDPOINT is missing')
 
 
 async def wait_for_consensus_node() -> None:
@@ -208,6 +217,43 @@ async def wait_for_execution_node() -> None:
             return
         logger.warning('Failed to connect to execution nodes. Retrying in 10 seconds...')
         await asyncio.sleep(10)
+
+
+async def wait_for_graph_node() -> None:
+    """
+    Waits until graph node is available and synced to the finalized head of the chain.
+    """
+    graph_client = SWGraphClient(
+        endpoint=settings.graph_endpoint,
+        request_timeout=settings.graph_request_timeout,
+        retry_timeout=0,
+        page_size=settings.graph_page_size,
+    )
+    query = gql(
+        '''
+        query Meta {
+          _meta {
+            block {
+              number
+            }
+          }
+        }
+    '''
+    )
+    while True:
+        response = await graph_client.run_query(query)
+        graph_block_number = response['_meta']['block']['number']
+        chain_state = await get_chain_finalized_head()
+        if graph_block_number < chain_state.block_number:
+            logger.warning(
+                'The graph node node located at %s has not completed synchronization yet.',
+                settings.graph_endpoint,
+            )
+            await asyncio.sleep(10)
+            continue
+        return
+
+    return
 
 
 async def collect_healthy_oracles() -> list:
@@ -332,8 +378,8 @@ async def _check_validators_manager(vault_address: ChecksumAddress) -> None:
         return
     vault_contract = VaultContract(vault_address)
     validators_manager = await vault_contract.validators_manager()
-    if validators_manager != hot_wallet.account.address:
-        raise RuntimeError('validators manager address must equal to hot wallet address')
+    if validators_manager != wallet.account.address:
+        raise RuntimeError('validators manager address must equal to wallet address')
 
 
 async def _check_validators_type() -> None:
