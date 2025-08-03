@@ -24,6 +24,9 @@ DEFAULT_HASHI_VAULT_ENGINE_NAME = 'secret'
 DEFAULT_MIN_DEPOSIT_AMOUNT = Web3.to_wei(1, 'ether')
 DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI = Gwei(int(Web3.from_wei(DEFAULT_MIN_DEPOSIT_AMOUNT, 'gwei')))
 
+DEFAULT_CONSENSUS_ENDPOINT = 'http://localhost:5052'
+DEFAULT_EXECUTION_ENDPOINT = 'http://localhost:8545'
+
 
 class ValidatorsRegistrationMode(Enum):
     """
@@ -171,8 +174,16 @@ class Settings(metaclass=Singleton):
         self.data_dir = data_dir
         self.network = network
 
-        self.consensus_endpoints = [node.strip() for node in consensus_endpoints.split(',')]
-        self.execution_endpoints = [node.strip() for node in execution_endpoints.split(',')]
+        if consensus_endpoints:
+            self.consensus_endpoints = [node.strip() for node in consensus_endpoints.split(',')]
+        else:
+            self.consensus_endpoints = [DEFAULT_CONSENSUS_ENDPOINT]
+
+        if execution_endpoints:
+            self.execution_endpoints = [node.strip() for node in execution_endpoints.split(',')]
+        else:
+            self.execution_endpoints = [DEFAULT_EXECUTION_ENDPOINT]
+
         self.execution_jwt_secret = execution_jwt_secret
         self.graph_endpoint = graph_endpoint or self.network_config.STAKEWISE_GRAPH_ENDPOINT
         self.harvest_vault = harvest_vault

@@ -4,6 +4,10 @@ import subprocess
 import time
 from pathlib import Path
 
+from eth_typing import ChecksumAddress
+
+from src.common.contracts import VaultContract
+from src.common.startup_check import wait_for_consensus_node, wait_for_execution_node
 from src.config.networks import NETWORKS
 from src.nodes.exceptions import NodeException, NodeFailedToStartError
 from src.nodes.typings import IO_Any
@@ -164,6 +168,28 @@ class LighthouseProcess(BaseProcess):
         ]
 
 
+class LighthouseVCProcess(BaseProcess):
+    name = 'Lighthouse validator client'
+
+    def __init__(self, network: str, lighthouse_dir: Path, fee_recipient: ChecksumAddress):
+        super().__init__(network=network)
+
+        binary_path = lighthouse_dir / 'lighthouse'
+
+        self.command = [
+            binary_path,
+            'vc',
+            '--network',
+            network,
+            '--datadir',
+            lighthouse_dir,
+            '--logfile-dir',
+            lighthouse_dir / 'logs',
+            '--suggested-fee-recipient',
+            fee_recipient,
+        ]
+
+
 class ProcessBuilder:
     """
     Helper class for constructing Execution and Consensus node instances.
@@ -177,19 +203,19 @@ class ProcessBuilder:
     def nodes_dir(self) -> Path:
         return self.data_dir / self.network / 'nodes'
 
-    def get_process(self) -> BaseProcess:
+    async def get_process(self) -> BaseProcess:
         raise NotImplementedError()
 
 
 class RethProcessBuilder(ProcessBuilder):
-    def get_process(self) -> RethProcess:
+    async def get_process(self) -> RethProcess:
         reth_dir = self.nodes_dir / 'reth'
 
         return RethProcess(network=self.network, reth_dir=reth_dir)
 
 
 class LighthouseProcessBuilder(ProcessBuilder):
-    def get_process(self) -> LighthouseProcess:
+    async def get_process(self) -> LighthouseProcess:
         lighthouse_dir = self.nodes_dir / 'lighthouse'
 
         # Let Reth create the JWT secret file on first run
@@ -202,6 +228,29 @@ class LighthouseProcessBuilder(ProcessBuilder):
     def get_default_jwt_secret_path(self) -> Path:
         """Returns the default JWT secret path created by Reth."""
         return self.nodes_dir / 'reth' / 'jwt.hex'
+
+
+class LighthouseVCProcessBuilder(ProcessBuilder):
+    def __init__(self, network: str, data_dir: Path, vault_address: ChecksumAddress):
+        super().__init__(network, data_dir)
+        self.vault_address = vault_address
+        self.fee_recipient: ChecksumAddress | None = None
+
+    async def get_process(self) -> LighthouseVCProcess:
+        # Wait for nodes to be ready
+        await wait_for_execution_node()
+        await wait_for_consensus_node()
+
+        # Fetch mev escrow address and cache it
+        if not self.fee_recipient:
+            vault_contract = VaultContract(self.vault_address)
+            self.fee_recipient = await vault_contract.mev_escrow()
+
+        lighthouse_dir = self.nodes_dir / 'lighthouse'
+
+        return LighthouseVCProcess(
+            network=self.network, lighthouse_dir=lighthouse_dir, fee_recipient=self.fee_recipient
+        )
 
 
 class ProcessRunner:
@@ -226,7 +275,7 @@ class ProcessRunner:
         """
         Starts the process and keeps it running.
         """
-        self.process = self.process_builder.get_process()
+        self.process = await self.process_builder.get_process()
         self.process.start()
 
         # Give the process some time to start
@@ -253,7 +302,7 @@ class ProcessRunner:
             if not self.process.is_alive:
                 if time.time() - last_restart >= self.min_restart_interval:
                     logger.info('%s is terminated. Restarting...', self.process.name)
-                    self.process = self.process_builder.get_process()
+                    self.process = await self.process_builder.get_process()
                     self.process.start()
                     last_restart = time.time()
                 else:

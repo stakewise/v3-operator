@@ -4,13 +4,16 @@ from pathlib import Path
 
 import click
 import psutil
+from web3 import Web3
 
+from src.common.validators import validate_eth_address
 from src.config.networks import AVAILABLE_NETWORKS, NETWORKS
 from src.config.settings import DEFAULT_NETWORK, LOG_DATE_FORMAT, settings
 from src.nodes.exceptions import NodeFailedToStartError
 from src.nodes.lighthouse import generate_validator_definitions_file
 from src.nodes.process import (
     LighthouseProcessBuilder,
+    LighthouseVCProcessBuilder,
     ProcessRunner,
     RethProcessBuilder,
 )
@@ -45,8 +48,15 @@ logger = logging.getLogger(__name__)
     default=False,
     help='Skips confirmation messages when provided.',
 )
-@click.command(help='Starts execution and consensus nodes.')
-def node_start(data_dir: Path, network: str, no_confirm: bool) -> None:
+@click.option(
+    '--vault',
+    prompt='Enter your vault address',
+    help='Vault addresses',
+    type=str,
+    callback=validate_eth_address,
+)
+@click.command(help='Starts execution and consensus nodes, starts validator client.')
+def node_start(data_dir: Path, network: str, no_confirm: bool, vault: str) -> None:
     logging.basicConfig(
         format='%(asctime)s %(levelname)-8s %(message)s',
         datefmt=LOG_DATE_FORMAT,
@@ -55,7 +65,7 @@ def node_start(data_dir: Path, network: str, no_confirm: bool) -> None:
 
     # Minimal settings for the nodes
     settings.set(
-        vaults=[],
+        vaults=[Web3.to_checksum_address(vault)],
         network=network,
         data_dir=data_dir / network,
     )
@@ -78,19 +88,33 @@ async def main(data_dir: Path, network: str) -> None:
     reth_process_builder = RethProcessBuilder(network=network, data_dir=data_dir)
     lighthouse_process_builder = LighthouseProcessBuilder(network=network, data_dir=data_dir)
 
+    lighthouse_vc_process_builder = LighthouseVCProcessBuilder(
+        network=network,
+        data_dir=data_dir,
+        vault_address=settings.vaults[0],
+    )
+
+    min_restart_interval = 60  # seconds
+
+    # Create process runners
     reth_runner = ProcessRunner(
         process_builder=reth_process_builder,
-        min_restart_interval=60,  # seconds
+        min_restart_interval=min_restart_interval,
     )
     lighthouse_runner = ProcessRunner(
         process_builder=lighthouse_process_builder,
-        min_restart_interval=60,  # seconds
+        min_restart_interval=min_restart_interval,
+    )
+    lighthouse_vc_runner = ProcessRunner(
+        process_builder=lighthouse_vc_process_builder,
+        min_restart_interval=min_restart_interval,
     )
 
     try:
         await asyncio.gather(
             reth_runner.run(),
             lighthouse_runner.run(),
+            lighthouse_vc_runner.run(),
         )
     except NodeFailedToStartError as e:
         click.echo(str(e))
