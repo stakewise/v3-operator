@@ -22,9 +22,9 @@ class BaseProcess:
     def __init__(
         self,
         network: str,
-        stdin: IO_Any = subprocess.PIPE,
-        stdout: IO_Any = subprocess.PIPE,
-        stderr: IO_Any = subprocess.PIPE,
+        stdin: IO_Any = None,
+        stdout: IO_Any = None,
+        stderr: IO_Any = None,
     ):
         self.network = network
         self.stdin = stdin
