@@ -589,6 +589,19 @@ python src/main.py export-public-keys --data-dir <path-to-data-dir>
 
 ## V4 Upgrade Guide
 
+### Pectra Upgrade Support
+
+Ensure your vault is updated to version 5 for Ethereum network or version 3 for Gnosis network for full Pectra compatibility.
+
+After the upgrade, validator balances are no longer limited to 32 ETH. By default, we register 0x02 validators. To register 0x01 validators, add the flag `--validators-type=0x01`.
+
+When replenishing validators, funds first top up existing 0x02 validators up to 2048 ETH. New validators are registered once the vault accumulates another 32 ETH.
+
+To migrate 0x01 validators to 0x02, use the consolidate command (see [reference](#validators-consolidation)).
+
+Also, partial withdrawals for compound validators are now supported. Partial withdrawals are significantly faster and more efficient than full validator exits. Even full validator exits now can be processed via execution request call.
+To disable this, use the flag `--disable-withdrawals` — in this case, funds will be withdrawn via full exits using oracles.
+
 ### Start Command
 
 We've streamlined the launch process by separating setup flows for Hashi Vault, Web3Signer and relayers — each now has its own dedicated command.
@@ -604,26 +617,14 @@ V4 Operator no longer requires pre-uploaded deposit data for validator registrat
 
 ### Multivault Support
 
-Operators can now manage multiple vaults simultaneously, reducing setup complexity for multi-vault users.
+The operator service can now manage multiple vaults simultaneously, reducing setup complexity for multi-vault users.
 
 Key Changes:
 
 - Single Wallet & Keystores – Shared across all vaults (no `--vault` flag needed for create-keys/create-wallets).
 - Migration – Existing setups will auto-migrate to the new structure on first launch.
 - Launch Command – Use `--vaults` with multiple addresses (e.g., `--vaults=0x1...23,0x4...56`).
-
-### Pectra Upgrade Support
-
-Ensure your vault is updated to version 5 for Ethereum network or version 3 for Gnosis network for full Pectra compatibility.
-
-After the upgrade, validator balances are no longer limited to 32 ETH. By default, we register 0x02 validators. To register 0x01 validators, add the flag `--validators-type=0x01`.
-
-When replenishing validators, funds first top up existing 0x02 validators up to 2048 ETH. New validators are registered once the vault accumulates another 32 ETH.
-
-To migrate 0x01 validators to 0x02, use the consolidate command (see [reference](#validators-consolidation)).
-
-Also, partial withdrawals for compound validators are now supported. Partial withdrawals are significantly faster and more efficient than full validator exits. Even full validator exits now can be processed via execution request call.
-To disable this, use the flag `--disable-withdrawals` — in this case, funds will be withdrawn via full exits using oracles.
+- All validator keys linked to the operator will be used for every connected vault.
 
 ### Automated rewards withdrawals
 
@@ -634,7 +635,12 @@ Check for more details in [Reward splitter section](#automated-withdrawals-rewar
 
 #### Mandatory
 
-Set Validator Manager role in vault UI.
+- Upgrade vault to version 5 for Ethereum or version 3 for Gnosis.
+- Set Validator Manager role in vault UI.
+
+#### For Pectra
+
+- Use consolidate command for legacy validators.
 
 #### Per Setup Type
 
@@ -647,11 +653,6 @@ Set Validator Manager role in vault UI.
 
 - Pass comma-separated addresses in --vaults.
 - Recreate operator directory for clean migration.
-
-#### For Pectra
-
-- Upgrade vault to v5.
-- Use consolidate command for legacy validators.
 
 #### Main parameter changes
 
