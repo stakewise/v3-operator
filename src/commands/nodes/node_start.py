@@ -6,6 +6,7 @@ import click
 import psutil
 from web3 import Web3
 
+from src.common.clients import setup_clients
 from src.common.validators import validate_eth_address
 from src.config.networks import AVAILABLE_NETWORKS, NETWORKS
 from src.config.settings import DEFAULT_NETWORK, LOG_DATE_FORMAT, settings
@@ -122,6 +123,8 @@ async def main(
     show_lighthouse_output: bool,
     show_validator_output: bool,
 ) -> None:
+    await setup_clients()
+
     reth_process_builder = RethProcessBuilder(
         network=network, data_dir=data_dir, streams=_build_std_streams(show_reth_output)
     )
