@@ -5,6 +5,8 @@ from pathlib import Path
 
 from eth_typing import ChecksumAddress
 
+from src.common.checks import wait_execution_catch_up_consensus
+from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import VaultContract
 from src.common.startup_check import wait_for_consensus_node, wait_for_execution_node
 from src.config.networks import NETWORKS
@@ -21,10 +23,10 @@ class BaseProcess:
     def __init__(
         self,
         network: str,
-        streams: StdStreams | None = None,
+        streams: StdStreams,
     ):
         self.network = network
-        self.std_streams = streams or StdStreams()
+        self.std_streams = streams
         self.program: str | Path = ''
         self.args: list[str | Path] = []
         self.proc: asyncio.subprocess.Process | None = None  # pylint: disable=no-member
@@ -37,7 +39,7 @@ class BaseProcess:
         if self.proc:
             raise NodeException('Already running')
 
-        command_str = ' '.join(str(arg) for arg in self.args)
+        command_str = f"{self.program} {' '.join(str(arg) for arg in self.args)}"
         logger.info('Launching %s: %s', self.name, command_str)
 
         self.proc = await asyncio.create_subprocess_exec(
@@ -70,12 +72,12 @@ class BaseProcess:
 class RethProcess(BaseProcess):
     name = 'Reth'
 
-    def __init__(self, network: str, reth_dir: Path):
+    def __init__(self, network: str, reth_dir: Path, streams: StdStreams):
         """
         :param network: The network name
         :param reth_dir: The directory where Reth data will be stored
         """
-        super().__init__(network=network)
+        super().__init__(network=network, streams=streams)
         self.reth_dir = reth_dir
         self.program = reth_dir / 'reth'
 
@@ -131,8 +133,10 @@ class RethProcess(BaseProcess):
 class LighthouseProcess(BaseProcess):
     name = 'Lighthouse'
 
-    def __init__(self, network: str, lighthouse_dir: Path, jwt_secret_path: Path):
-        super().__init__(network=network)
+    def __init__(
+        self, network: str, lighthouse_dir: Path, jwt_secret_path: Path, streams: StdStreams
+    ):
+        super().__init__(network=network, streams=streams)
 
         self.program = lighthouse_dir / 'lighthouse'
 
@@ -165,8 +169,14 @@ class LighthouseProcess(BaseProcess):
 class LighthouseVCProcess(BaseProcess):
     name = 'Lighthouse validator client'
 
-    def __init__(self, network: str, lighthouse_dir: Path, fee_recipient: ChecksumAddress):
-        super().__init__(network=network)
+    def __init__(
+        self,
+        network: str,
+        lighthouse_dir: Path,
+        fee_recipient: ChecksumAddress,
+        streams: StdStreams,
+    ):
+        super().__init__(network=network, streams=streams)
 
         binary_path = lighthouse_dir / 'lighthouse'
 
@@ -189,9 +199,10 @@ class ProcessBuilder:
     Helper class for constructing Execution and Consensus node instances.
     """
 
-    def __init__(self, network: str, data_dir: Path):
+    def __init__(self, network: str, data_dir: Path, streams: StdStreams):
         self.network = network
         self.data_dir = data_dir
+        self.streams = streams
 
     @property
     def nodes_dir(self) -> Path:
@@ -205,7 +216,7 @@ class RethProcessBuilder(ProcessBuilder):
     async def get_process(self) -> RethProcess:
         reth_dir = self.nodes_dir / 'reth'
 
-        return RethProcess(network=self.network, reth_dir=reth_dir)
+        return RethProcess(network=self.network, reth_dir=reth_dir, streams=self.streams)
 
 
 class LighthouseProcessBuilder(ProcessBuilder):
@@ -216,7 +227,10 @@ class LighthouseProcessBuilder(ProcessBuilder):
         jwt_secret_path = self.get_default_jwt_secret_path()
 
         return LighthouseProcess(
-            network=self.network, lighthouse_dir=lighthouse_dir, jwt_secret_path=jwt_secret_path
+            network=self.network,
+            lighthouse_dir=lighthouse_dir,
+            jwt_secret_path=jwt_secret_path,
+            streams=self.streams,
         )
 
     def get_default_jwt_secret_path(self) -> Path:
@@ -225,8 +239,10 @@ class LighthouseProcessBuilder(ProcessBuilder):
 
 
 class LighthouseVCProcessBuilder(ProcessBuilder):
-    def __init__(self, network: str, data_dir: Path, vault_address: ChecksumAddress):
-        super().__init__(network, data_dir)
+    def __init__(
+        self, network: str, data_dir: Path, streams: StdStreams, vault_address: ChecksumAddress
+    ):
+        super().__init__(network=network, data_dir=data_dir, streams=streams)
         self.vault_address = vault_address
         self.fee_recipient: ChecksumAddress | None = None
 
@@ -234,6 +250,9 @@ class LighthouseVCProcessBuilder(ProcessBuilder):
         # Wait for nodes to be ready
         await wait_for_execution_node()
         await wait_for_consensus_node()
+
+        chain_state = await get_chain_finalized_head()
+        await wait_execution_catch_up_consensus(chain_state)
 
         # Fetch mev escrow address and cache it
         if not self.fee_recipient:
@@ -243,7 +262,10 @@ class LighthouseVCProcessBuilder(ProcessBuilder):
         lighthouse_dir = self.nodes_dir / 'lighthouse'
 
         return LighthouseVCProcess(
-            network=self.network, lighthouse_dir=lighthouse_dir, fee_recipient=self.fee_recipient
+            network=self.network,
+            lighthouse_dir=lighthouse_dir,
+            fee_recipient=self.fee_recipient,
+            streams=self.streams,
         )
 
 

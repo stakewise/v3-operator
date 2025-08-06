@@ -17,6 +17,7 @@ from src.nodes.process import (
     ProcessRunner,
     RethProcessBuilder,
 )
+from src.nodes.typings import StdStreams
 from src.validators.keystores.local import LocalKeystore
 
 logger = logging.getLogger(__name__)
@@ -55,8 +56,30 @@ logger = logging.getLogger(__name__)
     type=str,
     callback=validate_eth_address,
 )
+@click.option('--show-reth-output', is_flag=True, default=False, help='Whether to show Reth output')
+@click.option(
+    '--show-lighthouse-output',
+    is_flag=True,
+    default=False,
+    help='Whether to show Lighthouse output',
+)
+@click.option(
+    '--show-validator-output',
+    is_flag=True,
+    default=False,
+    help='Whether to show validator client output',
+)
 @click.command(help='Starts execution and consensus nodes, starts validator client.')
-def node_start(data_dir: Path, network: str, no_confirm: bool, vault: str) -> None:
+# pylint: disable=too-many-arguments
+def node_start(
+    data_dir: Path,
+    network: str,
+    no_confirm: bool,
+    vault: str,
+    show_reth_output: bool,
+    show_lighthouse_output: bool,
+    show_validator_output: bool,
+) -> None:
     logging.basicConfig(
         format='%(asctime)s %(levelname)-8s %(message)s',
         datefmt=LOG_DATE_FORMAT,
@@ -81,17 +104,36 @@ def node_start(data_dir: Path, network: str, no_confirm: bool, vault: str) -> No
         keystore_files=LocalKeystore.list_keystore_files(),
         output_path=validator_definitions_path,
     )
-    asyncio.run(main(data_dir=data_dir, network=network))
+    asyncio.run(
+        main(
+            data_dir=data_dir,
+            network=network,
+            show_reth_output=show_reth_output,
+            show_lighthouse_output=show_lighthouse_output,
+            show_validator_output=show_validator_output,
+        )
+    )
 
 
-async def main(data_dir: Path, network: str) -> None:
-    reth_process_builder = RethProcessBuilder(network=network, data_dir=data_dir)
-    lighthouse_process_builder = LighthouseProcessBuilder(network=network, data_dir=data_dir)
+async def main(
+    data_dir: Path,
+    network: str,
+    show_reth_output: bool,
+    show_lighthouse_output: bool,
+    show_validator_output: bool,
+) -> None:
+    reth_process_builder = RethProcessBuilder(
+        network=network, data_dir=data_dir, streams=_build_std_streams(show_reth_output)
+    )
+    lighthouse_process_builder = LighthouseProcessBuilder(
+        network=network, data_dir=data_dir, streams=_build_std_streams(show_lighthouse_output)
+    )
 
     lighthouse_vc_process_builder = LighthouseVCProcessBuilder(
         network=network,
         data_dir=data_dir,
         vault_address=settings.vaults[0],
+        streams=_build_std_streams(show_validator_output),
     )
 
     min_restart_interval = 60  # seconds
@@ -127,6 +169,7 @@ async def main(data_dir: Path, network: str) -> None:
         await asyncio.gather(
             reth_runner.stop(),
             lighthouse_runner.stop(),
+            lighthouse_vc_runner.stop(),
         )
     finally:
         # Handle unexpected error
@@ -137,6 +180,7 @@ async def main(data_dir: Path, network: str) -> None:
             await asyncio.gather(
                 reth_runner.stop(),
                 lighthouse_runner.stop(),
+                lighthouse_vc_runner.stop(),
             )
 
 
@@ -168,3 +212,22 @@ def _check_hardware_requirements(data_dir: Path, network: str, no_confirm: bool)
             default=False,
         ):
             raise click.Abort()
+
+
+def _build_std_streams(show_output: bool) -> StdStreams:
+    """
+    Builds standard streams for the process based on the show_output flag.
+    """
+    if show_output:
+        # The value None will make the subprocess
+        # inherit the stream from parent process
+        return StdStreams(
+            stdin=asyncio.subprocess.PIPE,
+            stdout=None,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+    return StdStreams(
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
