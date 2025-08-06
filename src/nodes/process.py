@@ -112,7 +112,7 @@ class RethProcess(BaseProcess):
             reth_dir / 'logs',
             '--nat',
             'upnp',
-            *self.pruning_options,
+            *self._build_pruning_options(network),
         ]
 
         if era_url := NETWORKS[network].NODE_CONFIG.ERA_URL:
@@ -120,13 +120,12 @@ class RethProcess(BaseProcess):
 
         super().__init__(network=network, program=program, args=args, streams=streams)
 
-    @property
-    def pruning_options(self) -> list[str]:
+    def _build_pruning_options(self, network: str) -> list[str]:
         """
         Returns the pruning options for Reth.
         """
 
-        network_config = NETWORKS[self.network]
+        network_config = NETWORKS[network]
         validators_registry_genesis_block = network_config.VALIDATORS_REGISTRY_GENESIS_BLOCK
 
         return [
