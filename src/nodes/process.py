@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import subprocess
 import time
 from pathlib import Path
 
@@ -10,7 +9,7 @@ from src.common.contracts import VaultContract
 from src.common.startup_check import wait_for_consensus_node, wait_for_execution_node
 from src.config.networks import NETWORKS
 from src.nodes.exceptions import NodeException, NodeFailedToStartError
-from src.nodes.typings import IO_Any
+from src.nodes.typings import StdStreams
 from src.nodes.utils.proc import kill_proc
 
 logger = logging.getLogger(__name__)
@@ -22,38 +21,36 @@ class BaseProcess:
     def __init__(
         self,
         network: str,
-        stdin: IO_Any = None,
-        stdout: IO_Any = None,
-        stderr: IO_Any = None,
+        streams: StdStreams | None = None,
     ):
         self.network = network
-        self.stdin = stdin
-        self.stdout = stdout
-        self.stderr = stderr
-        self.command: list[str | Path] = []
-        self.proc: subprocess.Popen | None = None
+        self.std_streams = streams or StdStreams()
+        self.program: str | Path = ''
+        self.args: list[str | Path] = []
+        self.proc: asyncio.subprocess.Process | None = None  # pylint: disable=no-member
 
         # Flag to indicate if the process stop was initiated
         # This is used to determine if the process was stopped by the user or exited unexpectedly
         self._is_stopping = False
 
-    def start(self) -> None:
+    async def start(self) -> None:
         if self.proc:
             raise NodeException('Already running')
 
-        command_str = ' '.join(str(arg) for arg in self.command)
+        command_str = ' '.join(str(arg) for arg in self.args)
         logger.info('Launching %s: %s', self.name, command_str)
 
-        self.proc = subprocess.Popen(  # pylint: disable=consider-using-with
-            self.command,
-            stdin=self.stdin,  # nosec
-            stdout=self.stdout,
-            stderr=self.stderr,
+        self.proc = await asyncio.create_subprocess_exec(
+            self.program,
+            *self.args,
+            stdin=self.std_streams.stdin,  # nosec
+            stdout=self.std_streams.stdout,
+            stderr=self.std_streams.stderr,
         )
 
     @property
     def is_alive(self) -> bool:
-        return self.proc is not None and self.proc.poll() is None
+        return self.proc is not None and self.proc.returncode is None
 
     async def stop(self) -> None:
         if not self.proc:
@@ -80,12 +77,10 @@ class RethProcess(BaseProcess):
         """
         super().__init__(network=network)
         self.reth_dir = reth_dir
-
-        binary_path = reth_dir / 'reth'
+        self.program = reth_dir / 'reth'
 
         # Port numbers are set according to Reth's defaults
-        self.command = [
-            binary_path,
+        self.args = [
             'node',
             '--full',
             '--chain',
@@ -116,7 +111,7 @@ class RethProcess(BaseProcess):
         ]
 
         if era_url := NETWORKS[network].NODE_CONFIG.ERA_URL:
-            self.command.extend(['--era.enable', '--era.url', era_url])
+            self.args.extend(['--era.enable', '--era.url', era_url])
 
     @property
     def pruning_options(self) -> list[str]:
@@ -139,11 +134,10 @@ class LighthouseProcess(BaseProcess):
     def __init__(self, network: str, lighthouse_dir: Path, jwt_secret_path: Path):
         super().__init__(network=network)
 
-        binary_path = lighthouse_dir / 'lighthouse'
+        self.program = lighthouse_dir / 'lighthouse'
 
         # Port numbers are set according to Lighthouse's defaults
-        self.command = [
-            binary_path,
+        self.args = [
             'bn',
             '--network',
             network,
@@ -176,7 +170,7 @@ class LighthouseVCProcess(BaseProcess):
 
         binary_path = lighthouse_dir / 'lighthouse'
 
-        self.command = [
+        self.args = [
             binary_path,
             'vc',
             '--network',
@@ -276,7 +270,7 @@ class ProcessRunner:
         Starts the process and keeps it running.
         """
         self.process = await self.process_builder.get_process()
-        self.process.start()
+        await self.process.start()
 
         # Give the process some time to start
         await asyncio.sleep(self.start_interval)
@@ -284,15 +278,15 @@ class ProcessRunner:
         # Handle the case when the process could not start
         # Probably the command is incorrect
         if not self.process.is_alive:
-            self._log_stderr()
+            await self._log_stderr()
             raise NodeFailedToStartError(self.process.name)
 
         last_restart = time.time()
 
         while True:
             # Read stdout and stderr to prevent blocking
-            self._read_stdout()
-            self._log_stderr()
+            await self._read_stdout()
+            await self._log_stderr()
 
             # Check if the process was stopped by another task
             if self.process.is_stopping:
@@ -303,7 +297,7 @@ class ProcessRunner:
                 if time.time() - last_restart >= self.min_restart_interval:
                     logger.info('%s is terminated. Restarting...', self.process.name)
                     self.process = await self.process_builder.get_process()
-                    self.process.start()
+                    await self.process.start()
                     last_restart = time.time()
                 else:
                     logger.info(
@@ -318,13 +312,12 @@ class ProcessRunner:
         if self.process:
             await self.process.stop()
 
-    def _read_stdout(self) -> None:
-        # Drain the stdout stream to prevent blocking
+    async def _read_stdout(self) -> None:
         if self.process and self.process.proc and self.process.proc.stdout:
-            self.process.proc.stdout.read()
+            await self.process.proc.stdout.read()
 
-    def _log_stderr(self) -> None:
+    async def _log_stderr(self) -> None:
         if self.process and self.process.proc and self.process.proc.stderr:
-            stderr = self.process.proc.stderr.read().decode('utf-8', errors='replace')
+            stderr = (await self.process.proc.stderr.read()).decode('utf-8', errors='replace')
             if stderr:
                 logger.error('%s:\n%s', self.process.name, stderr[: self.stderr_max_length])
