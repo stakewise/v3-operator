@@ -98,7 +98,7 @@ def node_start(
     _check_hardware_requirements(data_dir=data_dir, network=network, no_confirm=no_confirm)
 
     validator_definitions_path = (
-        settings.nodes_dir / 'lighthouse' / 'validators' / 'validator_definitions.yaml'
+        settings.nodes_dir / 'lighthouse' / 'validators' / 'validator_definitions.yml'
     )
 
     click.echo('Generating validator definitions file...')
