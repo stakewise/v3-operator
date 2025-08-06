@@ -23,12 +23,14 @@ class BaseProcess:
     def __init__(
         self,
         network: str,
+        program: str | Path,
+        args: list[str | Path],
         streams: StdStreams,
     ):
         self.network = network
         self.std_streams = streams
-        self.program: str | Path = ''
-        self.args: list[str | Path] = []
+        self.program = program
+        self.args = args
         self.proc: asyncio.subprocess.Process | None = None  # pylint: disable=no-member
 
         # Flag to indicate if the process stop was initiated
@@ -38,6 +40,9 @@ class BaseProcess:
     async def start(self) -> None:
         if self.proc:
             raise NodeException('Already running')
+
+        if not self.program:
+            raise NodeException('Program path is not set')
 
         command_str = f"{self.program} {' '.join(str(arg) for arg in self.args)}"
         logger.info('Launching %s: %s', self.name, command_str)
@@ -77,12 +82,10 @@ class RethProcess(BaseProcess):
         :param network: The network name
         :param reth_dir: The directory where Reth data will be stored
         """
-        super().__init__(network=network, streams=streams)
-        self.reth_dir = reth_dir
-        self.program = reth_dir / 'reth'
+        program = reth_dir / 'reth'
 
         # Port numbers are set according to Reth's defaults
-        self.args = [
+        args: list[str | Path] = [
             'node',
             '--full',
             '--chain',
@@ -113,7 +116,9 @@ class RethProcess(BaseProcess):
         ]
 
         if era_url := NETWORKS[network].NODE_CONFIG.ERA_URL:
-            self.args.extend(['--era.enable', '--era.url', era_url])
+            args.extend(['--era.enable', '--era.url', era_url])
+
+        super().__init__(network=network, program=program, args=args, streams=streams)
 
     @property
     def pruning_options(self) -> list[str]:
@@ -136,12 +141,10 @@ class LighthouseProcess(BaseProcess):
     def __init__(
         self, network: str, lighthouse_dir: Path, jwt_secret_path: Path, streams: StdStreams
     ):
-        super().__init__(network=network, streams=streams)
-
-        self.program = lighthouse_dir / 'lighthouse'
+        program = lighthouse_dir / 'lighthouse'
 
         # Port numbers are set according to Lighthouse's defaults
-        self.args = [
+        args: list[str | Path] = [
             'bn',
             '--network',
             network,
@@ -165,6 +168,8 @@ class LighthouseProcess(BaseProcess):
             lighthouse_dir / 'logs',
         ]
 
+        super().__init__(network=network, program=program, args=args, streams=streams)
+
 
 class LighthouseVCProcess(BaseProcess):
     name = 'Lighthouse validator client'
@@ -176,12 +181,9 @@ class LighthouseVCProcess(BaseProcess):
         fee_recipient: ChecksumAddress,
         streams: StdStreams,
     ):
-        super().__init__(network=network, streams=streams)
+        program = lighthouse_dir / 'lighthouse'
 
-        binary_path = lighthouse_dir / 'lighthouse'
-
-        self.args = [
-            binary_path,
+        args: list[str | Path] = [
             'vc',
             '--network',
             network,
@@ -192,6 +194,7 @@ class LighthouseVCProcess(BaseProcess):
             '--suggested-fee-recipient',
             fee_recipient,
         ]
+        super().__init__(network=network, program=program, args=args, streams=streams)
 
 
 class ProcessBuilder:
