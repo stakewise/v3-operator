@@ -56,7 +56,7 @@ def update_validator_definitions_file(
     # Check if the current items differ from the previous ones
     current_public_keys = {item['voting_public_key'] for item in current_items}
     if current_public_keys == previous_public_keys:
-        logger.info('No changes in validator definitions file, skipping update.')
+        logger.info('No changes in keystores, skipping update of validator definitions file')
         return False
 
     # Write the YAML file
