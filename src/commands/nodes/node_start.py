@@ -11,7 +11,7 @@ from src.common.validators import validate_eth_address
 from src.config.networks import AVAILABLE_NETWORKS, NETWORKS
 from src.config.settings import DEFAULT_NETWORK, LOG_DATE_FORMAT, settings
 from src.nodes.exceptions import NodeFailedToStartError
-from src.nodes.lighthouse import generate_validator_definitions_file
+from src.nodes.lighthouse import update_validator_definitions_file
 from src.nodes.process import (
     LighthouseProcessBuilder,
     LighthouseVCProcessBuilder,
@@ -101,12 +101,26 @@ def node_start(
         settings.nodes_dir / 'lighthouse' / 'validators' / 'validator_definitions.yml'
     )
 
-    click.echo('Generating validator definitions file...')
-    generate_validator_definitions_file(
+    # Usually the validator definitions file is created during `import` command
+    # `lighthouse account validator import ...`
+    # The problem is the case of per-keystore password files.
+    # Natively, Lighthouse does not support per-keystore password files.
+    # So we need to update the validator definitions file manually.
+
+    click.echo('Updating validator definitions file...')
+    is_validator_definitions_updated = update_validator_definitions_file(
         keystores_dir=settings.keystores_dir,
         keystore_files=LocalKeystore.list_keystore_files(),
         output_path=validator_definitions_path,
     )
+    # Note on slashing protection.
+    # Normally, slashing protection database is updated during `import` command
+    # `lighthouse account validator import ...`
+    # But since we update the validator definitions file manually, we need to ensure
+    # that slashing protection database is updated as well.
+    # The option `init_slashing_protection` helps to achieve that.
+    # Otherwise, validator client will refuse to start.
+
     asyncio.run(
         main(
             data_dir=data_dir,
@@ -114,16 +128,19 @@ def node_start(
             show_reth_output=show_reth_output,
             show_lighthouse_output=show_lighthouse_output,
             show_validator_output=show_validator_output,
+            init_slashing_protection=is_validator_definitions_updated,
         )
     )
 
 
+# pylint: disable=too-many-arguments
 async def main(
     data_dir: Path,
     network: str,
     show_reth_output: bool,
     show_lighthouse_output: bool,
     show_validator_output: bool,
+    init_slashing_protection: bool,
 ) -> None:
     await setup_clients()
 
@@ -139,6 +156,7 @@ async def main(
         data_dir=data_dir,
         vault_address=settings.vaults[0],
         streams=_build_std_streams(show_validator_output),
+        init_slashing_protection=init_slashing_protection,
     )
 
     min_restart_interval = 60  # seconds

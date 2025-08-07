@@ -173,12 +173,14 @@ class LighthouseProcess(BaseProcess):
 class LighthouseVCProcess(BaseProcess):
     name = 'Lighthouse validator client'
 
+    # pylint: disable=too-many-arguments
     def __init__(
         self,
         network: str,
         lighthouse_dir: Path,
         fee_recipient: ChecksumAddress,
         streams: StdStreams,
+        init_slashing_protection: bool,
     ):
         program = lighthouse_dir / 'lighthouse'
 
@@ -193,6 +195,8 @@ class LighthouseVCProcess(BaseProcess):
             '--suggested-fee-recipient',
             fee_recipient,
         ]
+        if init_slashing_protection:
+            args.append('--init-slashing-protection')
         super().__init__(network=network, program=program, args=args, streams=streams)
 
 
@@ -242,11 +246,17 @@ class LighthouseProcessBuilder(ProcessBuilder):
 
 class LighthouseVCProcessBuilder(ProcessBuilder):
     def __init__(
-        self, network: str, data_dir: Path, streams: StdStreams, vault_address: ChecksumAddress
+        self,
+        network: str,
+        data_dir: Path,
+        streams: StdStreams,
+        vault_address: ChecksumAddress,
+        init_slashing_protection: bool,
     ):
         super().__init__(network=network, data_dir=data_dir, streams=streams)
         self.vault_address = vault_address
         self.fee_recipient: ChecksumAddress | None = None
+        self.init_slashing_protection = init_slashing_protection
 
     async def get_process(self) -> LighthouseVCProcess:
         # Wait for nodes to be ready
@@ -268,6 +278,7 @@ class LighthouseVCProcessBuilder(ProcessBuilder):
             lighthouse_dir=lighthouse_dir,
             fee_recipient=self.fee_recipient,
             streams=self.streams,
+            init_slashing_protection=self.init_slashing_protection,
         )
 
 
