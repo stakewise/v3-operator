@@ -87,6 +87,9 @@ def node_start(
         level='INFO',
     )
 
+    click.echo('Checking hardware requirements...')
+    _check_hardware_requirements(data_dir=data_dir, network=network, no_confirm=no_confirm)
+
     # Minimal settings for the nodes
     settings.set(
         vaults=[Web3.to_checksum_address(vault)],
@@ -94,39 +97,11 @@ def node_start(
         data_dir=data_dir / network,
     )
 
-    click.echo('Checking hardware requirements...')
-    _check_hardware_requirements(data_dir=data_dir, network=network, no_confirm=no_confirm)
-
-    validator_definitions_path = (
-        settings.nodes_dir / 'lighthouse' / 'validators' / 'validator_definitions.yml'
-    )
-
-    # Usually the validator definitions file is created during `import` command
-    # `lighthouse account validator import ...`
-    # The problem is the case of per-keystore password files.
-    # Natively, Lighthouse does not support per-keystore password files.
-    # So we need to update the validator definitions file manually.
-
-    click.echo('Updating validator definitions file...')
-    is_validator_definitions_updated = update_validator_definitions_file(
-        keystores_dir=settings.keystores_dir,
-        keystore_files=LocalKeystore.list_keystore_files(),
-        output_path=validator_definitions_path,
-    )
-    # Note on slashing protection.
-    # Normally, slashing protection database is updated during `import` command
-    # `lighthouse account validator import ...`
-    # But since we update the validator definitions file manually, we need to ensure
-    # that slashing protection database is updated as well.
-    # The option `init_slashing_protection` helps to achieve that.
-    # Otherwise, validator client will refuse to start.
-
     asyncio.run(
         main(
             show_reth_output=show_reth_output,
             show_lighthouse_output=show_lighthouse_output,
             show_validator_output=show_validator_output,
-            init_slashing_protection=is_validator_definitions_updated,
         )
     )
 
@@ -135,35 +110,13 @@ async def main(
     show_reth_output: bool,
     show_lighthouse_output: bool,
     show_validator_output: bool,
-    init_slashing_protection: bool,
 ) -> None:
     await setup_clients()
 
-    reth_process_builder = RethProcessBuilder(streams=_build_std_streams(show_reth_output))
-    lighthouse_process_builder = LighthouseProcessBuilder(
-        streams=_build_std_streams(show_lighthouse_output)
-    )
-
-    lighthouse_vc_process_builder = LighthouseVCProcessBuilder(
-        streams=_build_std_streams(show_validator_output),
-        init_slashing_protection=init_slashing_protection,
-    )
-
-    min_restart_interval = 60  # seconds
-
     # Create process runners
-    reth_runner = ProcessRunner(
-        process_builder=reth_process_builder,
-        min_restart_interval=min_restart_interval,
-    )
-    lighthouse_runner = ProcessRunner(
-        process_builder=lighthouse_process_builder,
-        min_restart_interval=min_restart_interval,
-    )
-    lighthouse_vc_runner = ProcessRunner(
-        process_builder=lighthouse_vc_process_builder,
-        min_restart_interval=min_restart_interval,
-    )
+    reth_runner = _get_reth_runner(show_reth_output)
+    lighthouse_runner = _get_lighthouse_runner(show_lighthouse_output)
+    lighthouse_vc_runner = _get_lighthouse_vc_runner(show_validator_output)
 
     try:
         await asyncio.gather(
@@ -225,6 +178,64 @@ def _check_hardware_requirements(data_dir: Path, network: str, no_confirm: bool)
             default=False,
         ):
             raise click.Abort()
+
+
+def _get_reth_runner(show_output: bool) -> ProcessRunner:
+    reth_process_builder = RethProcessBuilder(streams=_build_std_streams(show_output))
+
+    min_restart_interval = 60  # seconds
+    return ProcessRunner(
+        process_builder=reth_process_builder,
+        min_restart_interval=min_restart_interval,
+    )
+
+
+def _get_lighthouse_runner(show_output: bool) -> ProcessRunner:
+    lighthouse_process_builder = LighthouseProcessBuilder(streams=_build_std_streams(show_output))
+
+    min_restart_interval = 60  # seconds
+    return ProcessRunner(
+        process_builder=lighthouse_process_builder,
+        min_restart_interval=min_restart_interval,
+    )
+
+
+def _get_lighthouse_vc_runner(show_output: bool) -> ProcessRunner:
+    validator_definitions_path = (
+        settings.nodes_dir / 'lighthouse' / 'validators' / 'validator_definitions.yml'
+    )
+
+    # Usually the validator definitions file is created during `import` command
+    # `lighthouse account validator import ...`
+    # The problem is the case of per-keystore password files.
+    # Natively, Lighthouse import does not support per-keystore password files.
+    # So we need to update the validator definitions file manually.
+
+    logger.info('Updating validator definitions file %s...', validator_definitions_path)
+    is_validator_definitions_updated = update_validator_definitions_file(
+        keystores_dir=settings.keystores_dir,
+        keystore_files=LocalKeystore.list_keystore_files(),
+        output_path=validator_definitions_path,
+    )
+    # Note on slashing protection.
+    # Normally, slashing protection database is updated during `import` command
+    # `lighthouse account validator import ...`
+    # But since we update the validator definitions file manually, we need to ensure
+    # that slashing protection database is updated as well.
+    # The option `init_slashing_protection` helps to achieve that.
+    # Otherwise, validator client will refuse to start.
+    init_slashing_protection = is_validator_definitions_updated
+
+    lighthouse_vc_process_builder = LighthouseVCProcessBuilder(
+        streams=_build_std_streams(show_output),
+        init_slashing_protection=init_slashing_protection,
+    )
+    min_restart_interval = 60  # seconds
+
+    return ProcessRunner(
+        process_builder=lighthouse_vc_process_builder,
+        min_restart_interval=min_restart_interval,
+    )
 
 
 def _build_std_streams(show_output: bool) -> StdStreams:
