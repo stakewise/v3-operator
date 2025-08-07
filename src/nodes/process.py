@@ -3,13 +3,14 @@ import logging
 import time
 from pathlib import Path
 
-from eth_typing import ChecksumAddress
+from eth_typing import BlockNumber, ChecksumAddress
 
 from src.common.checks import wait_execution_catch_up_consensus
 from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import VaultContract
 from src.common.startup_check import wait_for_consensus_node, wait_for_execution_node
 from src.config.networks import NETWORKS
+from src.config.settings import settings
 from src.nodes.exceptions import NodeException, NodeFailedToStartError
 from src.nodes.typings import StdStreams
 from src.nodes.utils.proc import kill_proc
@@ -22,12 +23,10 @@ class BaseProcess:
 
     def __init__(
         self,
-        network: str,
         program: str | Path,
         args: list[str | Path],
         streams: StdStreams,
     ):
-        self.network = network
         self.std_streams = streams
         self.program = program
         self.args = args
@@ -77,11 +76,15 @@ class BaseProcess:
 class RethProcess(BaseProcess):
     name = 'Reth'
 
-    def __init__(self, network: str, reth_dir: Path, streams: StdStreams):
-        """
-        :param network: The network name
-        :param reth_dir: The directory where Reth data will be stored
-        """
+    # pylint: disable=too-many-arguments
+    def __init__(
+        self,
+        network: str,
+        reth_dir: Path,
+        streams: StdStreams,
+        prune_receipts_before: BlockNumber,
+        era_url: str,
+    ):
         program = reth_dir / 'reth'
 
         # Port numbers are set according to Reth's defaults
@@ -112,26 +115,14 @@ class RethProcess(BaseProcess):
             reth_dir / 'logs',
             '--nat',
             'upnp',
-            *self._build_pruning_options(network),
+            '--prune.receipts.before',
+            str(prune_receipts_before),
         ]
 
-        if era_url := NETWORKS[network].NODE_CONFIG.ERA_URL:
+        if era_url:
             args.extend(['--era.enable', '--era.url', era_url])
 
-        super().__init__(network=network, program=program, args=args, streams=streams)
-
-    def _build_pruning_options(self, network: str) -> list[str]:
-        """
-        Returns the pruning options for Reth.
-        """
-
-        network_config = NETWORKS[network]
-        validators_registry_genesis_block = network_config.VALIDATORS_REGISTRY_GENESIS_BLOCK
-
-        return [
-            '--prune.receipts.before',
-            f'{validators_registry_genesis_block}',
-        ]
+        super().__init__(program=program, args=args, streams=streams)
 
 
 class LighthouseProcess(BaseProcess):
@@ -167,7 +158,7 @@ class LighthouseProcess(BaseProcess):
             lighthouse_dir / 'logs',
         ]
 
-        super().__init__(network=network, program=program, args=args, streams=streams)
+        super().__init__(program=program, args=args, streams=streams)
 
 
 class LighthouseVCProcess(BaseProcess):
@@ -197,7 +188,7 @@ class LighthouseVCProcess(BaseProcess):
         ]
         if init_slashing_protection:
             args.append('--init-slashing-protection')
-        super().__init__(network=network, program=program, args=args, streams=streams)
+        super().__init__(program=program, args=args, streams=streams)
 
 
 class ProcessBuilder:
@@ -205,14 +196,8 @@ class ProcessBuilder:
     Helper class for constructing Execution and Consensus node instances.
     """
 
-    def __init__(self, network: str, data_dir: Path, streams: StdStreams):
-        self.network = network
-        self.data_dir = data_dir
+    def __init__(self, streams: StdStreams):
         self.streams = streams
-
-    @property
-    def nodes_dir(self) -> Path:
-        return self.data_dir / self.network / 'nodes'
 
     async def get_process(self) -> BaseProcess:
         raise NotImplementedError()
@@ -220,20 +205,28 @@ class ProcessBuilder:
 
 class RethProcessBuilder(ProcessBuilder):
     async def get_process(self) -> RethProcess:
-        reth_dir = self.nodes_dir / 'reth'
+        reth_dir = settings.nodes_dir / 'reth'
+        prune_receipts_before = settings.network_config.VALIDATORS_REGISTRY_GENESIS_BLOCK
+        era_url = NETWORKS[settings.network].NODE_CONFIG.ERA_URL
 
-        return RethProcess(network=self.network, reth_dir=reth_dir, streams=self.streams)
+        return RethProcess(
+            network=settings.network,
+            reth_dir=reth_dir,
+            streams=self.streams,
+            prune_receipts_before=prune_receipts_before,
+            era_url=era_url,
+        )
 
 
 class LighthouseProcessBuilder(ProcessBuilder):
     async def get_process(self) -> LighthouseProcess:
-        lighthouse_dir = self.nodes_dir / 'lighthouse'
+        lighthouse_dir = settings.nodes_dir / 'lighthouse'
 
         # Let Reth create the JWT secret file on first run
         jwt_secret_path = self.get_default_jwt_secret_path()
 
         return LighthouseProcess(
-            network=self.network,
+            network=settings.network,
             lighthouse_dir=lighthouse_dir,
             jwt_secret_path=jwt_secret_path,
             streams=self.streams,
@@ -241,20 +234,16 @@ class LighthouseProcessBuilder(ProcessBuilder):
 
     def get_default_jwt_secret_path(self) -> Path:
         """Returns the default JWT secret path created by Reth."""
-        return self.nodes_dir / 'reth' / 'jwt.hex'
+        return settings.nodes_dir / 'reth' / 'jwt.hex'
 
 
 class LighthouseVCProcessBuilder(ProcessBuilder):
     def __init__(
         self,
-        network: str,
-        data_dir: Path,
         streams: StdStreams,
-        vault_address: ChecksumAddress,
         init_slashing_protection: bool,
     ):
-        super().__init__(network=network, data_dir=data_dir, streams=streams)
-        self.vault_address = vault_address
+        super().__init__(streams=streams)
         self.fee_recipient: ChecksumAddress | None = None
         self.init_slashing_protection = init_slashing_protection
 
@@ -268,13 +257,14 @@ class LighthouseVCProcessBuilder(ProcessBuilder):
 
         # Fetch mev escrow address and cache it
         if not self.fee_recipient:
-            vault_contract = VaultContract(self.vault_address)
+            vault_address = settings.vaults[0]
+            vault_contract = VaultContract(vault_address)
             self.fee_recipient = await vault_contract.mev_escrow()
 
-        lighthouse_dir = self.nodes_dir / 'lighthouse'
+        lighthouse_dir = settings.nodes_dir / 'lighthouse'
 
         return LighthouseVCProcess(
-            network=self.network,
+            network=settings.network,
             lighthouse_dir=lighthouse_dir,
             fee_recipient=self.fee_recipient,
             streams=self.streams,

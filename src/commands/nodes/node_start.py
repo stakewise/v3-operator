@@ -123,8 +123,6 @@ def node_start(
 
     asyncio.run(
         main(
-            data_dir=data_dir,
-            network=network,
             show_reth_output=show_reth_output,
             show_lighthouse_output=show_lighthouse_output,
             show_validator_output=show_validator_output,
@@ -133,10 +131,7 @@ def node_start(
     )
 
 
-# pylint: disable=too-many-arguments
 async def main(
-    data_dir: Path,
-    network: str,
     show_reth_output: bool,
     show_lighthouse_output: bool,
     show_validator_output: bool,
@@ -144,17 +139,12 @@ async def main(
 ) -> None:
     await setup_clients()
 
-    reth_process_builder = RethProcessBuilder(
-        network=network, data_dir=data_dir, streams=_build_std_streams(show_reth_output)
-    )
+    reth_process_builder = RethProcessBuilder(streams=_build_std_streams(show_reth_output))
     lighthouse_process_builder = LighthouseProcessBuilder(
-        network=network, data_dir=data_dir, streams=_build_std_streams(show_lighthouse_output)
+        streams=_build_std_streams(show_lighthouse_output)
     )
 
     lighthouse_vc_process_builder = LighthouseVCProcessBuilder(
-        network=network,
-        data_dir=data_dir,
-        vault_address=settings.vaults[0],
         streams=_build_std_streams(show_validator_output),
         init_slashing_protection=init_slashing_protection,
     )
