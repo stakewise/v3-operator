@@ -7,7 +7,6 @@ from src.validators.keystores.local import KeystoreFile, LocalKeystore
 
 
 def update_validator_definitions_file(
-    keystores_dir: Path,
     keystore_files: list[KeystoreFile],
     output_path: Path,
 ) -> bool:
@@ -16,7 +15,6 @@ def update_validator_definitions_file(
     if there are changes in the keystore files.
 
     Args:
-        keystores_dir (Path): Directory containing keystore files.
         keystore_files (list[KeystoreFile]): List of keystore file objects.
         output_path (Path): Path to the validator definitions YAML file.
 
@@ -43,7 +41,7 @@ def update_validator_definitions_file(
                 'enabled': True,
                 'voting_public_key': public_key,
                 'type': 'local_keystore',
-                'voting_keystore_path': str(keystores_dir / keystore_file.name),
+                'voting_keystore_path': str(keystore_file.path),
                 'voting_keystore_password_path': str(keystore_file.password_file),
             }
         )

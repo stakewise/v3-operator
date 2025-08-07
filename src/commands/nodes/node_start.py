@@ -213,7 +213,6 @@ def _get_lighthouse_vc_runner(show_output: bool) -> ProcessRunner:
 
     logger.info('Updating validator definitions file %s...', validator_definitions_path)
     is_validator_definitions_updated = update_validator_definitions_file(
-        keystores_dir=settings.keystores_dir,
         keystore_files=LocalKeystore.list_keystore_files(),
         output_path=validator_definitions_path,
     )
