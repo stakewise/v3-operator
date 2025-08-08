@@ -204,6 +204,9 @@ def _get_lighthouse_vc_runner(show_output: bool) -> ProcessRunner:
     validator_definitions_path = (
         settings.nodes_dir / 'lighthouse' / 'validators' / 'validator_definitions.yml'
     )
+    # Create the parent directory if it does not exist
+    if not validator_definitions_path.parent.exists():
+        validator_definitions_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Usually the validator definitions file is created during `import` command
     # `lighthouse account validator import ...`
