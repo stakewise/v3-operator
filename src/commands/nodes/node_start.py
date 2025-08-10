@@ -215,7 +215,7 @@ def _get_lighthouse_vc_runner(show_output: bool) -> ProcessRunner:
     # So we need to update the validator definitions file manually.
 
     logger.info('Updating validator definitions file %s...', validator_definitions_path)
-    is_validator_definitions_updated = update_validator_definitions_file(
+    update_validator_definitions_file(
         keystore_files=LocalKeystore.list_keystore_files(),
         output_path=validator_definitions_path,
     )
@@ -226,7 +226,7 @@ def _get_lighthouse_vc_runner(show_output: bool) -> ProcessRunner:
     # that slashing protection database is updated as well.
     # The option `init_slashing_protection` helps to achieve that.
     # Otherwise, validator client will refuse to start.
-    init_slashing_protection = is_validator_definitions_updated
+    init_slashing_protection = True
 
     lighthouse_vc_process_builder = LighthouseVCProcessBuilder(
         streams=_build_std_streams(show_output),
