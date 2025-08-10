@@ -58,29 +58,34 @@ logger = logging.getLogger(__name__)
     prompt='Enter comma separated list of your vault addresses',
     help='Addresses of the vaults to register validators for.',
 )
-@click.option('--show-reth-output', is_flag=True, default=False, help='Whether to show Reth output')
 @click.option(
-    '--show-lighthouse-output',
+    '--print-execution-logs',
     is_flag=True,
     default=False,
-    help='Whether to show Lighthouse output',
+    help='Whether to print execution node logs',
 )
 @click.option(
-    '--show-validator-output',
+    '--print-consensus-logs',
     is_flag=True,
     default=False,
-    help='Whether to show validator client output',
+    help='Whether to print consensus node logs',
 )
-@click.command(help='Starts execution and consensus nodes, starts validator client.')
+@click.option(
+    '--print-validator-logs',
+    is_flag=True,
+    default=False,
+    help='Whether to print validator node logs',
+)
+@click.command(help='Starts execution, consensus, and validator nodes.')
 # pylint: disable=too-many-arguments
 def node_start(
     data_dir: Path,
     network: str,
     no_confirm: bool,
     vaults: str,
-    show_reth_output: bool,
-    show_lighthouse_output: bool,
-    show_validator_output: bool,
+    print_execution_logs: bool,
+    print_consensus_logs: bool,
+    print_validator_logs: bool,
 ) -> None:
     logging.basicConfig(
         format='%(asctime)s %(levelname)-8s %(message)s',
@@ -100,24 +105,24 @@ def node_start(
 
     asyncio.run(
         main(
-            show_reth_output=show_reth_output,
-            show_lighthouse_output=show_lighthouse_output,
-            show_validator_output=show_validator_output,
+            print_execution_logs=print_execution_logs,
+            print_consensus_logs=print_consensus_logs,
+            print_validator_logs=print_validator_logs,
         )
     )
 
 
 async def main(
-    show_reth_output: bool,
-    show_lighthouse_output: bool,
-    show_validator_output: bool,
+    print_execution_logs: bool,
+    print_consensus_logs: bool,
+    print_validator_logs: bool,
 ) -> None:
     await setup_clients()
 
     # Create process runners
-    reth_runner = _get_reth_runner(show_reth_output)
-    lighthouse_runner = _get_lighthouse_runner(show_lighthouse_output)
-    lighthouse_vc_runner = _get_lighthouse_vc_runner(show_validator_output)
+    reth_runner = _get_reth_runner(print_execution_logs)
+    lighthouse_runner = _get_lighthouse_runner(print_consensus_logs)
+    lighthouse_vc_runner = _get_lighthouse_vc_runner(print_validator_logs)
 
     try:
         await asyncio.gather(
