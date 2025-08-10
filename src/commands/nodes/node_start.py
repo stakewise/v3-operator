@@ -7,7 +7,7 @@ import psutil
 from web3 import Web3
 
 from src.common.clients import setup_clients
-from src.common.validators import validate_eth_address
+from src.common.validators import validate_eth_addresses
 from src.config.networks import AVAILABLE_NETWORKS, NETWORKS
 from src.config.settings import DEFAULT_NETWORK, LOG_DATE_FORMAT, settings
 from src.nodes.exceptions import NodeFailedToStartError
@@ -51,11 +51,12 @@ logger = logging.getLogger(__name__)
     help='Skips confirmation messages when provided.',
 )
 @click.option(
+    '--vaults',
     '--vault',
-    prompt='Enter your vault address',
-    help='Vault addresses',
-    type=str,
-    callback=validate_eth_address,
+    callback=validate_eth_addresses,
+    envvar='VAULTS',
+    prompt='Enter comma separated list of your vault addresses',
+    help='Addresses of the vaults to register validators for.',
 )
 @click.option('--show-reth-output', is_flag=True, default=False, help='Whether to show Reth output')
 @click.option(
@@ -76,7 +77,7 @@ def node_start(
     data_dir: Path,
     network: str,
     no_confirm: bool,
-    vault: str,
+    vaults: str,
     show_reth_output: bool,
     show_lighthouse_output: bool,
     show_validator_output: bool,
@@ -92,7 +93,7 @@ def node_start(
 
     # Minimal settings for the nodes
     settings.set(
-        vaults=[Web3.to_checksum_address(vault)],
+        vaults=[Web3.to_checksum_address(vault) for vault in vaults.split(',')],
         network=network,
         data_dir=data_dir / network,
     )

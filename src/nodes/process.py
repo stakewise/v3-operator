@@ -257,9 +257,7 @@ class LighthouseVCProcessBuilder(ProcessBuilder):
 
         # Fetch mev escrow address and cache it
         if not self.fee_recipient:
-            vault_address = settings.vaults[0]
-            vault_contract = VaultContract(vault_address)
-            self.fee_recipient = await vault_contract.mev_escrow()
+            self.fee_recipient = await self._get_fee_recipient()
 
         lighthouse_dir = settings.nodes_dir / 'lighthouse'
 
@@ -270,6 +268,24 @@ class LighthouseVCProcessBuilder(ProcessBuilder):
             streams=self.streams,
             init_slashing_protection=self.init_slashing_protection,
         )
+
+    async def _get_fee_recipient(self) -> ChecksumAddress:
+        """
+        Fetches the fee recipient address from the vault contract.
+        This is used to set the suggested fee recipient for the validator client.
+        """
+        fee_recipients: set[ChecksumAddress] = set()
+        for vault in settings.vaults:
+            vault_contract = VaultContract(vault)
+            fee_recipients.add(await vault_contract.mev_escrow())
+
+        if len(fee_recipients) > 1:
+            raise NodeException(
+                'Fee recipient is ambiguous. Hint: configure your vaults to use smoothing pool. '
+                'Then fee recipient will be unique.'
+            )
+
+        return fee_recipients.pop()
 
 
 class ProcessRunner:
