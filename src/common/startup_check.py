@@ -167,7 +167,7 @@ async def wait_for_consensus_node() -> None:
                 )
         if done:
             return
-        logger.warning('Failed to connect to consensus nodes. Retrying in 10 seconds...')
+        logger.warning('Consensus nodes are not ready. Retrying in 10 seconds...')
         await asyncio.sleep(10)
 
 
@@ -215,7 +215,7 @@ async def wait_for_execution_node() -> None:
                 )
         if done:
             return
-        logger.warning('Failed to connect to execution nodes. Retrying in 10 seconds...')
+        logger.warning('Execution nodes are not ready. Retrying in 10 seconds...')
         await asyncio.sleep(10)
 
 
