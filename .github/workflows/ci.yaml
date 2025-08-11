@@ -122,3 +122,5 @@ jobs:
       - uses: pypa/gh-action-pip-audit@v1.0.7
         with:
           inputs: audit_requirements.txt
+          ignore-vulns: |
+            GHSA-9548-qrrj-x5pj  # aiohttp 3.12.14 causes issues in sentry-sdk
