@@ -606,6 +606,8 @@ Partial withdrawals run every 24 hours by default, processing available ETH from
 
 If partial withdrawal capacity is insufficient or no validators have balances above 32 ETH or 1 GNO, the operator triggers a full validator exit.
 
+If the operator does not initiate partial or full withdrawals, the oracle will automatically execute them after 24 hr.
+
 ### Start Command
 
 We've streamlined the launch process by separating setup flows for Hashi Vault, Web3Signer and relayers — each now has its own dedicated command.
