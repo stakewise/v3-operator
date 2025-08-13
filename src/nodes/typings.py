@@ -74,3 +74,10 @@ class Release:
 
         # Build the full URL for the Reth binary
         return f'{self.repo_url}/releases/download/{self.app_version}/{archive_name}'
+
+
+@dataclass
+class StdStreams:
+    stdin: IO_Any = None
+    stdout: IO_Any = None
+    stderr: IO_Any = None

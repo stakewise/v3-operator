@@ -26,9 +26,10 @@ async def wait_execution_catch_up_consensus(
 
         logger.warning(
             'The execution client is behind the consensus client: '
-            'execution block %d, consensus finalized block %d',
+            'execution block %d, consensus finalized block %d, distance %d blocks',
             execution_block_number,
             chain_head.block_number,
+            chain_head.block_number - execution_block_number,
         )
         sleep_time = float(settings.network_config.SECONDS_PER_BLOCK)
 

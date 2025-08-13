@@ -1,12 +1,18 @@
 import asyncio
 import logging
-import subprocess
 import time
 from pathlib import Path
 
+from eth_typing import BlockNumber, ChecksumAddress
+
+from src.common.checks import wait_execution_catch_up_consensus
+from src.common.consensus import get_chain_finalized_head
+from src.common.contracts import VaultContract
+from src.common.startup_check import wait_for_consensus_node, wait_for_execution_node
 from src.config.networks import NETWORKS
+from src.config.settings import settings
 from src.nodes.exceptions import NodeException, NodeFailedToStartError
-from src.nodes.typings import IO_Any
+from src.nodes.typings import StdStreams
 from src.nodes.utils.proc import kill_proc
 
 logger = logging.getLogger(__name__)
@@ -17,39 +23,40 @@ class BaseProcess:
 
     def __init__(
         self,
-        network: str,
-        stdin: IO_Any = subprocess.PIPE,
-        stdout: IO_Any = subprocess.PIPE,
-        stderr: IO_Any = subprocess.PIPE,
+        program: str | Path,
+        args: list[str | Path],
+        streams: StdStreams,
     ):
-        self.network = network
-        self.stdin = stdin
-        self.stdout = stdout
-        self.stderr = stderr
-        self.command: list[str | Path] = []
-        self.proc: subprocess.Popen | None = None
+        self.std_streams = streams
+        self.program = program
+        self.args = args
+        self.proc: asyncio.subprocess.Process | None = None  # pylint: disable=no-member
 
         # Flag to indicate if the process stop was initiated
         # This is used to determine if the process was stopped by the user or exited unexpectedly
         self._is_stopping = False
 
-    def start(self) -> None:
+    async def start(self) -> None:
         if self.proc:
             raise NodeException('Already running')
 
-        command_str = ' '.join(str(arg) for arg in self.command)
+        if not self.program:
+            raise NodeException('Program path is not set')
+
+        command_str = f"{self.program} {' '.join(str(arg) for arg in self.args)}"
         logger.info('Launching %s: %s', self.name, command_str)
 
-        self.proc = subprocess.Popen(  # pylint: disable=consider-using-with
-            self.command,
-            stdin=self.stdin,  # nosec
-            stdout=self.stdout,
-            stderr=self.stderr,
+        self.proc = await asyncio.create_subprocess_exec(
+            self.program,
+            *self.args,
+            stdin=self.std_streams.stdin,  # nosec
+            stdout=self.std_streams.stdout,
+            stderr=self.std_streams.stderr,
         )
 
     @property
     def is_alive(self) -> bool:
-        return self.proc is not None and self.proc.poll() is None
+        return self.proc is not None and self.proc.returncode is None
 
     async def stop(self) -> None:
         if not self.proc:
@@ -69,19 +76,19 @@ class BaseProcess:
 class RethProcess(BaseProcess):
     name = 'Reth'
 
-    def __init__(self, network: str, reth_dir: Path):
-        """
-        :param network: The network name
-        :param reth_dir: The directory where Reth data will be stored
-        """
-        super().__init__(network=network)
-        self.reth_dir = reth_dir
-
-        binary_path = reth_dir / 'reth'
+    # pylint: disable=too-many-arguments
+    def __init__(
+        self,
+        network: str,
+        reth_dir: Path,
+        streams: StdStreams,
+        prune_receipts_before: BlockNumber,
+        era_url: str,
+    ):
+        program = reth_dir / 'reth'
 
         # Port numbers are set according to Reth's defaults
-        self.command = [
-            binary_path,
+        args: list[str | Path] = [
             'node',
             '--full',
             '--chain',
@@ -108,38 +115,26 @@ class RethProcess(BaseProcess):
             reth_dir / 'logs',
             '--nat',
             'upnp',
-            *self.pruning_options,
-        ]
-
-        if era_url := NETWORKS[network].NODE_CONFIG.ERA_URL:
-            self.command.extend(['--era.enable', '--era.url', era_url])
-
-    @property
-    def pruning_options(self) -> list[str]:
-        """
-        Returns the pruning options for Reth.
-        """
-
-        network_config = NETWORKS[self.network]
-        validators_registry_genesis_block = network_config.VALIDATORS_REGISTRY_GENESIS_BLOCK
-
-        return [
             '--prune.receipts.before',
-            f'{validators_registry_genesis_block}',
+            str(prune_receipts_before),
         ]
+
+        if era_url:
+            args.extend(['--era.enable', '--era.url', era_url])
+
+        super().__init__(program=program, args=args, streams=streams)
 
 
 class LighthouseProcess(BaseProcess):
     name = 'Lighthouse'
 
-    def __init__(self, network: str, lighthouse_dir: Path, jwt_secret_path: Path):
-        super().__init__(network=network)
-
-        binary_path = lighthouse_dir / 'lighthouse'
+    def __init__(
+        self, network: str, lighthouse_dir: Path, jwt_secret_path: Path, streams: StdStreams
+    ):
+        program = lighthouse_dir / 'lighthouse'
 
         # Port numbers are set according to Lighthouse's defaults
-        self.command = [
-            binary_path,
+        args: list[str | Path] = [
             'bn',
             '--network',
             network,
@@ -163,45 +158,134 @@ class LighthouseProcess(BaseProcess):
             lighthouse_dir / 'logs',
         ]
 
+        super().__init__(program=program, args=args, streams=streams)
+
+
+class LighthouseVCProcess(BaseProcess):
+    name = 'Lighthouse validator client'
+
+    # pylint: disable=too-many-arguments
+    def __init__(
+        self,
+        network: str,
+        lighthouse_dir: Path,
+        fee_recipient: ChecksumAddress,
+        streams: StdStreams,
+        init_slashing_protection: bool,
+    ):
+        program = lighthouse_dir / 'lighthouse'
+
+        args: list[str | Path] = [
+            'vc',
+            '--network',
+            network,
+            '--datadir',
+            lighthouse_dir,
+            '--logfile-dir',
+            lighthouse_dir / 'logs',
+            '--suggested-fee-recipient',
+            fee_recipient,
+        ]
+        if init_slashing_protection:
+            args.append('--init-slashing-protection')
+        super().__init__(program=program, args=args, streams=streams)
+
 
 class ProcessBuilder:
     """
     Helper class for constructing Execution and Consensus node instances.
     """
 
-    def __init__(self, network: str, data_dir: Path):
-        self.network = network
-        self.data_dir = data_dir
+    def __init__(self, streams: StdStreams):
+        self.streams = streams
 
-    @property
-    def nodes_dir(self) -> Path:
-        return self.data_dir / self.network / 'nodes'
-
-    def get_process(self) -> BaseProcess:
+    async def get_process(self) -> BaseProcess:
         raise NotImplementedError()
 
 
 class RethProcessBuilder(ProcessBuilder):
-    def get_process(self) -> RethProcess:
-        reth_dir = self.nodes_dir / 'reth'
+    async def get_process(self) -> RethProcess:
+        reth_dir = settings.nodes_dir / 'reth'
+        prune_receipts_before = settings.network_config.VALIDATORS_REGISTRY_GENESIS_BLOCK
+        era_url = NETWORKS[settings.network].NODE_CONFIG.ERA_URL
 
-        return RethProcess(network=self.network, reth_dir=reth_dir)
+        return RethProcess(
+            network=settings.network,
+            reth_dir=reth_dir,
+            streams=self.streams,
+            prune_receipts_before=prune_receipts_before,
+            era_url=era_url,
+        )
 
 
 class LighthouseProcessBuilder(ProcessBuilder):
-    def get_process(self) -> LighthouseProcess:
-        lighthouse_dir = self.nodes_dir / 'lighthouse'
+    async def get_process(self) -> LighthouseProcess:
+        lighthouse_dir = settings.nodes_dir / 'lighthouse'
 
         # Let Reth create the JWT secret file on first run
         jwt_secret_path = self.get_default_jwt_secret_path()
 
         return LighthouseProcess(
-            network=self.network, lighthouse_dir=lighthouse_dir, jwt_secret_path=jwt_secret_path
+            network=settings.network,
+            lighthouse_dir=lighthouse_dir,
+            jwt_secret_path=jwt_secret_path,
+            streams=self.streams,
         )
 
     def get_default_jwt_secret_path(self) -> Path:
         """Returns the default JWT secret path created by Reth."""
-        return self.nodes_dir / 'reth' / 'jwt.hex'
+        return settings.nodes_dir / 'reth' / 'jwt.hex'
+
+
+class LighthouseVCProcessBuilder(ProcessBuilder):
+    def __init__(
+        self,
+        streams: StdStreams,
+        init_slashing_protection: bool,
+    ):
+        super().__init__(streams=streams)
+        self.fee_recipient: ChecksumAddress | None = None
+        self.init_slashing_protection = init_slashing_protection
+
+    async def get_process(self) -> LighthouseVCProcess:
+        # Wait for nodes to be ready
+        await wait_for_execution_node()
+        await wait_for_consensus_node()
+
+        chain_state = await get_chain_finalized_head()
+        await wait_execution_catch_up_consensus(chain_state)
+
+        # Fetch mev escrow address and cache it
+        if not self.fee_recipient:
+            self.fee_recipient = await self._get_fee_recipient()
+
+        lighthouse_dir = settings.nodes_dir / 'lighthouse'
+
+        return LighthouseVCProcess(
+            network=settings.network,
+            lighthouse_dir=lighthouse_dir,
+            fee_recipient=self.fee_recipient,
+            streams=self.streams,
+            init_slashing_protection=self.init_slashing_protection,
+        )
+
+    async def _get_fee_recipient(self) -> ChecksumAddress:
+        """
+        Fetches the fee recipient address from the vault contract.
+        This is used to set the suggested fee recipient for the validator client.
+        """
+        fee_recipients: set[ChecksumAddress] = set()
+        for vault in settings.vaults:
+            vault_contract = VaultContract(vault)
+            fee_recipients.add(await vault_contract.mev_escrow())
+
+        if len(fee_recipients) > 1:
+            raise NodeException(
+                'All vaults must either be connected to the MEV smoothing pool '
+                'or only a single vault must be provided.'
+            )
+
+        return fee_recipients.pop()
 
 
 class ProcessRunner:
@@ -210,10 +294,13 @@ class ProcessRunner:
     """
 
     def __init__(
-        self, process_builder: ProcessBuilder, min_restart_interval: int, start_interval: int = 1
+        self,
+        process_builder: ProcessBuilder,
+        min_restart_interval: int | None = None,
+        start_interval: int = 1,
     ):
         self.process_builder = process_builder
-        self.min_restart_interval = min_restart_interval
+        self.min_restart_interval = min_restart_interval or 60
         self.start_interval = start_interval
         self.process: BaseProcess | None = None
         self.stderr_max_length = 10_000
@@ -226,8 +313,8 @@ class ProcessRunner:
         """
         Starts the process and keeps it running.
         """
-        self.process = self.process_builder.get_process()
-        self.process.start()
+        self.process = await self.process_builder.get_process()
+        await self.process.start()
 
         # Give the process some time to start
         await asyncio.sleep(self.start_interval)
@@ -235,15 +322,15 @@ class ProcessRunner:
         # Handle the case when the process could not start
         # Probably the command is incorrect
         if not self.process.is_alive:
-            self._log_stderr()
+            await self._log_stderr()
             raise NodeFailedToStartError(self.process.name)
 
         last_restart = time.time()
 
         while True:
             # Read stdout and stderr to prevent blocking
-            self._read_stdout()
-            self._log_stderr()
+            await self._read_stdout()
+            await self._log_stderr()
 
             # Check if the process was stopped by another task
             if self.process.is_stopping:
@@ -253,8 +340,8 @@ class ProcessRunner:
             if not self.process.is_alive:
                 if time.time() - last_restart >= self.min_restart_interval:
                     logger.info('%s is terminated. Restarting...', self.process.name)
-                    self.process = self.process_builder.get_process()
-                    self.process.start()
+                    self.process = await self.process_builder.get_process()
+                    await self.process.start()
                     last_restart = time.time()
                 else:
                     logger.info(
@@ -269,13 +356,12 @@ class ProcessRunner:
         if self.process:
             await self.process.stop()
 
-    def _read_stdout(self) -> None:
-        # Drain the stdout stream to prevent blocking
+    async def _read_stdout(self) -> None:
         if self.process and self.process.proc and self.process.proc.stdout:
-            self.process.proc.stdout.read()
+            await self.process.proc.stdout.read()
 
-    def _log_stderr(self) -> None:
+    async def _log_stderr(self) -> None:
         if self.process and self.process.proc and self.process.proc.stderr:
-            stderr = self.process.proc.stderr.read().decode('utf-8', errors='replace')
+            stderr = (await self.process.proc.stderr.read()).decode('utf-8', errors='replace')
             if stderr:
                 logger.error('%s:\n%s', self.process.name, stderr[: self.stderr_max_length])

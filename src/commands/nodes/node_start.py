@@ -4,15 +4,22 @@ from pathlib import Path
 
 import click
 import psutil
+from web3 import Web3
 
+from src.common.clients import setup_clients
+from src.common.validators import validate_eth_addresses
 from src.config.networks import AVAILABLE_NETWORKS, NETWORKS
-from src.config.settings import DEFAULT_NETWORK, LOG_DATE_FORMAT
+from src.config.settings import DEFAULT_NETWORK, LOG_DATE_FORMAT, settings
 from src.nodes.exceptions import NodeFailedToStartError
+from src.nodes.lighthouse import update_validator_definitions_file
 from src.nodes.process import (
     LighthouseProcessBuilder,
+    LighthouseVCProcessBuilder,
     ProcessRunner,
     RethProcessBuilder,
 )
+from src.nodes.typings import StdStreams
+from src.validators.keystores.local import LocalKeystore
 
 logger = logging.getLogger(__name__)
 
@@ -43,40 +50,85 @@ logger = logging.getLogger(__name__)
     default=False,
     help='Skips confirmation messages when provided.',
 )
-@click.command(help='Starts execution and consensus nodes.')
-def node_start(data_dir: Path, network: str, no_confirm: bool) -> None:
+@click.option(
+    '--vaults',
+    '--vault',
+    callback=validate_eth_addresses,
+    envvar='VAULTS',
+    prompt='Enter comma separated list of your vault addresses',
+    help='Addresses of the vaults to register validators for.',
+)
+@click.option(
+    '--print-execution-logs',
+    is_flag=True,
+    default=False,
+    help='Whether to print execution node logs',
+)
+@click.option(
+    '--print-consensus-logs',
+    is_flag=True,
+    default=False,
+    help='Whether to print consensus node logs',
+)
+@click.option(
+    '--print-validator-logs',
+    is_flag=True,
+    default=False,
+    help='Whether to print validator node logs',
+)
+@click.command(help='Starts execution, consensus, and validator nodes.')
+# pylint: disable=too-many-arguments
+def node_start(
+    data_dir: Path,
+    network: str,
+    no_confirm: bool,
+    vaults: str,
+    print_execution_logs: bool,
+    print_consensus_logs: bool,
+    print_validator_logs: bool,
+) -> None:
     logging.basicConfig(
         format='%(asctime)s %(levelname)-8s %(message)s',
         datefmt=LOG_DATE_FORMAT,
         level='INFO',
     )
-    # Create the data directory if it does not exist
-    # Also the data directory could be created by the `init` command
-    data_dir.mkdir(parents=True, exist_ok=True)
 
     click.echo('Checking hardware requirements...')
     _check_hardware_requirements(data_dir=data_dir, network=network, no_confirm=no_confirm)
 
-    asyncio.run(main(data_dir=data_dir, network=network))
-
-
-async def main(data_dir: Path, network: str) -> None:
-    reth_process_builder = RethProcessBuilder(network=network, data_dir=data_dir)
-    lighthouse_process_builder = LighthouseProcessBuilder(network=network, data_dir=data_dir)
-
-    reth_runner = ProcessRunner(
-        process_builder=reth_process_builder,
-        min_restart_interval=60,  # seconds
+    # Minimal settings for the nodes
+    settings.set(
+        vaults=[Web3.to_checksum_address(vault) for vault in vaults.split(',')],
+        network=network,
+        data_dir=data_dir / network,
     )
-    lighthouse_runner = ProcessRunner(
-        process_builder=lighthouse_process_builder,
-        min_restart_interval=60,  # seconds
+
+    asyncio.run(
+        main(
+            print_execution_logs=print_execution_logs,
+            print_consensus_logs=print_consensus_logs,
+            print_validator_logs=print_validator_logs,
+        )
     )
+
+
+async def main(
+    print_execution_logs: bool,
+    print_consensus_logs: bool,
+    print_validator_logs: bool,
+) -> None:
+    await setup_clients()
+
+    # Create process runners
+    reth_runner = _get_reth_runner(print_execution_logs)
+    lighthouse_runner = _get_lighthouse_runner(print_consensus_logs)
+    lighthouse_vc_runner = _get_lighthouse_vc_runner(print_validator_logs)
 
     try:
         await asyncio.gather(
             reth_runner.run(),
             lighthouse_runner.run(),
+            lighthouse_vc_runner.run(),
         )
     except NodeFailedToStartError as e:
         click.echo(str(e))
@@ -89,6 +141,7 @@ async def main(data_dir: Path, network: str) -> None:
         await asyncio.gather(
             reth_runner.stop(),
             lighthouse_runner.stop(),
+            lighthouse_vc_runner.stop(),
         )
     finally:
         # Handle unexpected error
@@ -99,6 +152,7 @@ async def main(data_dir: Path, network: str) -> None:
             await asyncio.gather(
                 reth_runner.stop(),
                 lighthouse_runner.stop(),
+                lighthouse_vc_runner.stop(),
             )
 
 
@@ -130,3 +184,76 @@ def _check_hardware_requirements(data_dir: Path, network: str, no_confirm: bool)
             default=False,
         ):
             raise click.Abort()
+
+
+def _get_reth_runner(show_output: bool) -> ProcessRunner:
+    reth_process_builder = RethProcessBuilder(streams=_build_std_streams(show_output))
+
+    return ProcessRunner(
+        process_builder=reth_process_builder,
+    )
+
+
+def _get_lighthouse_runner(show_output: bool) -> ProcessRunner:
+    lighthouse_process_builder = LighthouseProcessBuilder(streams=_build_std_streams(show_output))
+
+    return ProcessRunner(
+        process_builder=lighthouse_process_builder,
+    )
+
+
+def _get_lighthouse_vc_runner(show_output: bool) -> ProcessRunner:
+    validator_definitions_path = (
+        settings.nodes_dir / 'lighthouse' / 'validators' / 'validator_definitions.yml'
+    )
+    # Create the parent directory if it does not exist
+    if not validator_definitions_path.parent.exists():
+        validator_definitions_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Usually the validator definitions file is created during `import` command
+    # `lighthouse account validator import ...`
+    # The problem is the case of per-keystore password files.
+    # Natively, Lighthouse import does not support per-keystore password files.
+    # So we need to update the validator definitions file manually.
+
+    logger.info('Updating validator definitions file %s...', validator_definitions_path)
+    update_validator_definitions_file(
+        keystore_files=LocalKeystore.list_keystore_files(),
+        output_path=validator_definitions_path,
+    )
+    # Note on slashing protection.
+    # Normally, slashing protection database is updated during `import` command
+    # `lighthouse account validator import ...`
+    # But since we update the validator definitions file manually, we need to ensure
+    # that slashing protection database is updated as well.
+    # The option `init_slashing_protection` helps to achieve that.
+    # Otherwise, validator client will refuse to start.
+    init_slashing_protection = True
+
+    lighthouse_vc_process_builder = LighthouseVCProcessBuilder(
+        streams=_build_std_streams(show_output),
+        init_slashing_protection=init_slashing_protection,
+    )
+
+    return ProcessRunner(
+        process_builder=lighthouse_vc_process_builder,
+    )
+
+
+def _build_std_streams(show_output: bool) -> StdStreams:
+    """
+    Builds standard streams for the process based on the show_output flag.
+    """
+    if show_output:
+        # The value None will make the subprocess
+        # inherit the stream from parent process
+        return StdStreams(
+            stdin=asyncio.subprocess.PIPE,
+            stdout=None,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+    return StdStreams(
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
