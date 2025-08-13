@@ -593,14 +593,18 @@ python src/main.py export-public-keys --data-dir <path-to-data-dir>
 
 Ensure your vault is updated to version 5 for Ethereum network or version 3 for Gnosis network for full Pectra compatibility.
 
-After the upgrade, validator balances are no longer limited to 32 ETH. By default, we register 0x02 validators. To register 0x01 validators, add the flag `--validators-type=0x01`.
+After the upgrade, validator balances are no longer limited to 32 ETH or 1 GNO. By default, the 0x02 validators are registered. To register 0x01 validators, add the flag `--validators-type=0x01`.
 
-When replenishing validators, funds first top up existing 0x02 validators up to 2048 ETH. New validators are registered once the vault accumulates another 32 ETH.
+When replenishing validators, funds first top up existing 0x02 validators up to 2048 ETH or 64 GNO. New validators are registered once the vault accumulates another 32 ETH or 1 GNO.
 
 To migrate 0x01 validators to 0x02, use the consolidate command (see [reference](#validators-consolidation)).
 
 Also, partial withdrawals for compound validators are now supported. Partial withdrawals are significantly faster and more efficient than full validator exits. Even full validator exits now can be processed via execution request call.
 To disable this, use the flag `--disable-withdrawals` — in this case, funds will be withdrawn via full exits using oracles.
+
+Partial withdrawals run every 24 hours by default, processing available ETH from validators with balances exceeding 32 ETH or 1 GNO. The operator prioritizes validators with higher balances first.
+
+If partial withdrawal capacity is insufficient or no validators have balances above 32 ETH or 1 GNO, the operator triggers a full validator exit.
 
 ### Start Command
 

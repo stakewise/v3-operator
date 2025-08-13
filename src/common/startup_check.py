@@ -387,10 +387,7 @@ async def _check_vault_version() -> None:
         if await vault_contract.version() < get_pectra_vault_version(
             settings.network, vault_address
         ):
-            raise RuntimeError(
-                'Please upgrade your Vault to the latest version '
-                'to use the new operator version.'
-            )
+            raise RuntimeError('Please upgrade your Vault to the latest version.')
 
 
 async def _check_events_logs() -> None:
