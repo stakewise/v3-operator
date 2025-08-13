@@ -281,8 +281,8 @@ class LighthouseVCProcessBuilder(ProcessBuilder):
 
         if len(fee_recipients) > 1:
             raise NodeException(
-                'Fee recipient is ambiguous. Hint: configure your vaults to use smoothing pool. '
-                'Then fee recipient will be unique.'
+                'All vaults must either be connected to the MEV smoothing pool '
+                'or only a single vault must be provided.'
             )
 
         return fee_recipients.pop()
@@ -294,10 +294,13 @@ class ProcessRunner:
     """
 
     def __init__(
-        self, process_builder: ProcessBuilder, min_restart_interval: int, start_interval: int = 1
+        self,
+        process_builder: ProcessBuilder,
+        min_restart_interval: int | None = None,
+        start_interval: int = 1,
     ):
         self.process_builder = process_builder
-        self.min_restart_interval = min_restart_interval
+        self.min_restart_interval = min_restart_interval or 60
         self.start_interval = start_interval
         self.process: BaseProcess | None = None
         self.stderr_max_length = 10_000

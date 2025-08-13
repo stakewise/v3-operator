@@ -189,20 +189,16 @@ def _check_hardware_requirements(data_dir: Path, network: str, no_confirm: bool)
 def _get_reth_runner(show_output: bool) -> ProcessRunner:
     reth_process_builder = RethProcessBuilder(streams=_build_std_streams(show_output))
 
-    min_restart_interval = 60  # seconds
     return ProcessRunner(
         process_builder=reth_process_builder,
-        min_restart_interval=min_restart_interval,
     )
 
 
 def _get_lighthouse_runner(show_output: bool) -> ProcessRunner:
     lighthouse_process_builder = LighthouseProcessBuilder(streams=_build_std_streams(show_output))
 
-    min_restart_interval = 60  # seconds
     return ProcessRunner(
         process_builder=lighthouse_process_builder,
-        min_restart_interval=min_restart_interval,
     )
 
 
@@ -238,11 +234,9 @@ def _get_lighthouse_vc_runner(show_output: bool) -> ProcessRunner:
         streams=_build_std_streams(show_output),
         init_slashing_protection=init_slashing_protection,
     )
-    min_restart_interval = 60  # seconds
 
     return ProcessRunner(
         process_builder=lighthouse_vc_process_builder,
-        min_restart_interval=min_restart_interval,
     )
 
 
