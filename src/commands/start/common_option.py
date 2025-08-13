@@ -99,6 +99,7 @@ start_common_options = [
         help='Type of registered validators: '
         f'{ValidatorType.V1.value} or {ValidatorType.V2.value}.',
         envvar='VALIDATOR_TYPE',
+        default=ValidatorType.V2,
         type=click.Choice(
             ValidatorType,
             case_sensitive=False,

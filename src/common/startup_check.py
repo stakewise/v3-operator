@@ -23,7 +23,6 @@ from src.common.contracts import (
 )
 from src.common.execution import check_wallet_balance, get_protocol_config
 from src.common.harvest import get_harvest_params
-from src.common.typings import ValidatorType
 from src.common.utils import format_error, round_down, warning_verbose
 from src.common.wallet import wallet
 from src.config.networks import NETWORKS
@@ -95,6 +94,8 @@ async def startup_checks() -> None:
     healthy_oracles = await collect_healthy_oracles()
     logger.info('Connected to oracles at %s', ', '.join(healthy_oracles))
 
+    await _check_vault_version()
+
     if settings.enable_metrics:
         logger.info('Checking metrics server...')
         check_metrics_port()
@@ -109,8 +110,6 @@ async def startup_checks() -> None:
 
     for vault_address in settings.vaults:
         await _check_validators_manager(vault_address)
-
-    await _check_validators_type()
 
     if (
         settings.validators_registration_mode == ValidatorsRegistrationMode.API
@@ -382,20 +381,13 @@ async def _check_validators_manager(vault_address: ChecksumAddress) -> None:
         raise RuntimeError('validators manager address must equal to wallet address')
 
 
-async def _check_validators_type() -> None:
-    if not settings.validator_type:
-        return
+async def _check_vault_version() -> None:
     for vault_address in settings.vaults:
         vault_contract = VaultContract(vault_address)
-        if (
-            await vault_contract.version()
-            < get_pectra_vault_version(settings.network, vault_address)
-            and settings.validator_type == ValidatorType.V2
+        if await vault_contract.version() < get_pectra_vault_version(
+            settings.network, vault_address
         ):
-            raise RuntimeError(
-                f'Please upgrade your Vault to the latest version '
-                f'to use {ValidatorType.V2.value} validators.'
-            )
+            raise RuntimeError('Please upgrade your Vault to the latest version.')
 
 
 async def _check_events_logs() -> None:
