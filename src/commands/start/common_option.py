@@ -159,6 +159,7 @@ start_common_options = [
     ),
     click.option(
         '--vaults',
+        '--vault',
         callback=validate_eth_addresses,
         envvar='VAULTS',
         prompt='Enter comma separated list of your vault addresses',
