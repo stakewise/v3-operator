@@ -29,14 +29,6 @@ class KeyPairsCrud:
             row = cur.fetchone()
             return row[0]
 
-    def get_public_keys(self) -> list[HexStr]:
-        """Returns the public keys of keypairs in the database."""
-        with self.db_connection.cursor() as cur:
-            cur.execute(
-                f'SELECT public_key FROM {self.table}',
-            )
-            return [HexStr(row) for row in cur.fetchall()]
-
     def get_first_keypair(self) -> RemoteDatabaseKeyPair | None:
         """Returns the first keypair in the database."""
         with self.db_connection.cursor() as cur:

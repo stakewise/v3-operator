@@ -27,7 +27,6 @@
    7. [Max gas fee](#max-gas-fee)
    8. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
    9. [Self report to Rated Network](#self-report-to-rated-network)
-   10. [Export validators file](#export-validators-file)
 6. [Contacts](#contacts)
 
 ## What is V3 Operator?
@@ -43,8 +42,7 @@ a registration transaction to the Vault.
 The validator registration process consists of the following steps:
 
 1. Check whether Vault has accumulated enough assets to register a validator (e.g., 32 ETH for Ethereum)
-2. Get the next free validator public key from the `public_keys.txt` file attached to the Operator. The validators are
-   registered in the same order as specified in the `public_keys.txt` file.
+2. Get the next free validator key from the used keystore.
 3. Obtain BLS signature for exit message using local keystores or remote signer.
 4. Share the exit signature of the validator with StakeWise Oracles:
    1. Using [Shamir's secret sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing), split
@@ -210,13 +208,12 @@ the [Kubernetes setup](https://docs.stakewise.io/for-operators/kubernetes-stakin
 
 ## Usage
 
-To run the Operator Service, you must first create keystores and a file containing the list of available validator public keys for your Vault. You must also
+To run the Operator Service, you must first create keystores for your Vault. You must also
 set up a wallet for Operator Service to handle validator registrations.
 
 The Operator Service includes built-in functionality to generate all of the above.
 Alternatively, you may use your preferred methods to generate keystores (e.g., [Wagyu Keygen](https://github.com/stake-house/wagyu-key-gen))
 and create the wallet (e.g., [MetaMask](https://metamask.io/) or [MyEtherWallet](https://help.myetherwallet.com/en/articles/6512619-using-mew-offline-current-mew-version-6)).
-If you choose to use your own methods, you will need to generate the public key file using the `export-public-keys` command.
 
 The below steps walk you through this set-up using Operator Service:
 
@@ -263,7 +260,6 @@ Exporting validator keystores    [####################################]  10/10
 
 Done. Generated 10 keys for StakeWise Operator.
 Keystores saved to /home/user/.stakewise/keystores file
-Validator public keys saved to /home/user/.stakewise/validators.txt file
 ```
 
 You may not want the Operator service to have direct access to the validator keys. Validator keystores do not need to be
@@ -569,21 +565,6 @@ Here's an example of how to use the command:
 
 ```bash
 python src/main.py rated-self-report --vaults <your-vault-addresses> --network <network-name> --pool-tag <pool-tag> --token <your-oauth-token> --data-dir <path-to-data-dir>
-```
-
-### Export validators file
-
-This command fetches available public keys from local keystores and exports them to a validators.txt file.
-
-To use the `export-public-keys` command, you can provide the following parameters:
-
-- `--data-dir`: Path where the vault data will be placed. Default is ~/.stakewise.
-- `--keystores-dir` - The directory with validator keys in the EIP-2335 standard.
-
-Here's an example of how to use the command:
-
-```bash
-python src/main.py export-public-keys --data-dir <path-to-data-dir>
 ```
 
 ## Contacts

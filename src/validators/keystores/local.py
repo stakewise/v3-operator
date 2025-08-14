@@ -8,7 +8,6 @@ from typing import NewType
 
 import milagro_bls_binding as bls
 from eth_typing import BLSPrivateKey, BLSSignature, ChecksumAddress, HexStr
-from eth_utils import add_0x_prefix
 from staking_deposit.key_handling.keystore import ScryptKeystore
 from sw_utils.signing import get_exit_message_signing_root
 from sw_utils.typings import ConsensusFork
@@ -44,7 +43,7 @@ class LocalKeystore(BaseKeystore):
         """Extracts private keys from the keys."""
         keystore_files = LocalKeystore.list_keystore_files()
         logger.info('Loading keys from %s...', settings.keystores_dir)
-        keys = {}
+        keystores_data = []
         with Pool(processes=settings.pool_size) as pool:
             # pylint: disable-next=unused-argument
             def _stop_pool(*args, **kwargs):  # type: ignore
@@ -61,11 +60,14 @@ class LocalKeystore(BaseKeystore):
             for result in results:
                 result.wait()
                 try:
-                    pub_key, priv_key = result.get()
-                    keys[pub_key] = priv_key
+                    keystores_data.append(result.get())
                 except KeystoreException as e:
                     logger.error(e)
                     raise RuntimeError('Failed to load keys') from e
+
+        keys: dict[HexStr, BLSPrivkey] = {}
+        for pub_key, priv_key, _ in sorted(keystores_data, key=lambda x: x[2]):
+            keys[pub_key] = priv_key
 
         logger.info('Loaded %d keys', len(keys))
         return LocalKeystore(Keys(keys))
@@ -112,17 +114,6 @@ class LocalKeystore(BaseKeystore):
         return list(self.keys.keys())
 
     @staticmethod
-    def get_public_keys_from_keystore_files() -> list[HexStr]:
-        """Returns a list of public keys from the keystore files."""
-        keystore_files = LocalKeystore.list_keystore_files()
-        keys = [
-            LocalKeystore._read_keystore_file(keystore_file, settings.keystores_dir)
-            for keystore_file in keystore_files
-        ]
-        keys.sort(key=lambda x: x[0])
-        return [x[1] for x in keys]
-
-    @staticmethod
     def list_keystore_files() -> list[KeystoreFile]:
         keystores_dir = settings.keystores_dir
         keystores_password_dir = settings.keystores_password_dir
@@ -143,21 +134,9 @@ class LocalKeystore(BaseKeystore):
         return res
 
     @staticmethod
-    def _read_keystore_file(keystore_file: KeystoreFile, keystore_path: Path) -> tuple[int, HexStr]:
-        """Light keystore reading. Return tuple of keystore index and public key."""
-        file_name = keystore_file.name
-        file_path = keystore_path / file_name
-        try:
-            keystore = ScryptKeystore.from_file(file_path)
-            index = keystore.path.split('/')[-3]
-            return int(index), add_0x_prefix(HexStr(keystore.pubkey))
-        except BaseException as e:
-            raise KeystoreException(f'Invalid keystore format in file "{file_name}"') from e
-
-    @staticmethod
     def _process_keystore_file(
         keystore_file: KeystoreFile, keystore_path: Path
-    ) -> tuple[HexStr, BLSPrivkey]:
+    ) -> tuple[HexStr, BLSPrivkey, int]:
         file_name = keystore_file.name
         keystores_password = keystore_file.password
         file_path = keystore_path / file_name
@@ -172,7 +151,7 @@ class LocalKeystore(BaseKeystore):
         except BaseException as e:
             raise KeystoreException(f'Invalid password for keystore "{file_name}"') from e
         public_key = Web3.to_hex(bls.SkToPk(private_key))
-        return public_key, private_key
+        return public_key, private_key, int(keystore.path.split('/')[3])
 
     @staticmethod
     def _load_keystores_password(password_path: Path) -> str:

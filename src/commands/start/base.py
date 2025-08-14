@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 
 import click
-from eth_typing import ChecksumAddress, HexStr
+from eth_typing import ChecksumAddress
 from sw_utils import InterruptHandler
 
 import src
@@ -28,7 +28,6 @@ from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
 from src.validators.relayer import RelayerAdapter, create_relayer_adapter
 from src.validators.tasks import ValidatorRegistrationSubtask, load_genesis_validators
-from src.validators.utils import load_public_keys
 from src.withdrawals.tasks import ValidatorWithdrawalSubtask
 
 logger = logging.getLogger(__name__)
@@ -56,14 +55,10 @@ async def start_base() -> None:
     await load_genesis_validators()
 
     keystore: BaseKeystore | None = None
-    available_public_keys: list[HexStr] | None = None
     relayer_adapter: RelayerAdapter | None = None
 
-    # load keystore and available public keys
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
         keystore = await load_keystore()
-
-        available_public_keys = load_public_keys(settings.public_keys_file)
     else:
         relayer_adapter = create_relayer_adapter()
 
@@ -87,7 +82,6 @@ async def start_base() -> None:
         tasks = [
             ValidatorTask(
                 keystore=keystore,
-                available_public_keys=available_public_keys,
                 relayer_adapter=relayer_adapter,
             ).run(interrupt_handler),
             ExitSignatureTask(
@@ -108,12 +102,10 @@ class ValidatorTask(BaseTask):
     def __init__(
         self,
         keystore: BaseKeystore | None,
-        available_public_keys: list[HexStr] | None,
         relayer_adapter: RelayerAdapter | None,
     ):
         self.validator_registration_subtask = ValidatorRegistrationSubtask(
             keystore=keystore,
-            available_public_keys=available_public_keys,
             relayer_adapter=relayer_adapter,
         )
 

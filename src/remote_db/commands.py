@@ -252,21 +252,3 @@ def setup_validator(
         output_dir=Path(output_dir),
     )
     click.echo('Successfully created validator configuration files.')
-
-
-@remote_db_group.command(help='Create operator remote signer configuration.')
-@click.option(
-    '--output-dir',
-    envvar='REMOTE_DB_OUTPUT_DIR',
-    help='The folder where configuration file will be saved.',
-    required=False,
-    type=click.Path(exists=False, file_okay=False, dir_okay=True),
-)
-@click.pass_context
-def setup_operator(ctx: Context, output_dir: str | None) -> None:
-    dest_dir = Path(output_dir) if output_dir is not None else settings.data_dir
-    tasks.setup_operator(
-        db_url=ctx.obj['db_url'],
-        output_dir=dest_dir,
-    )
-    click.echo('Successfully created operator configuration file.')

@@ -11,7 +11,6 @@ import src
 from src.commands.consolidate import consolidate
 from src.commands.create_keys import create_keys
 from src.commands.create_wallet import create_wallet
-from src.commands.export_public_keys import export_public_keys
 from src.commands.import_genesis_keys import import_genesis_keys
 from src.commands.init import init
 from src.commands.rated_self_report import rated_self_report
@@ -40,7 +39,6 @@ def cli() -> None:
 cli.add_command(init)
 cli.add_command(create_keys)
 cli.add_command(consolidate)
-cli.add_command(export_public_keys)
 cli.add_command(remote_signer_setup)
 cli.add_command(create_wallet)
 cli.add_command(validators_exit)
