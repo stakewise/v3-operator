@@ -11,6 +11,7 @@ from src.common.clients import consensus_client, execution_client
 from src.common.contracts import VaultContract
 from src.config.settings import settings
 from src.validators.database import VaultValidatorCrud
+from src.validators.execution import get_latest_vault_v2_validator_public_keys
 from src.validators.typings import ConsensusValidator, VaultValidator
 
 EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
@@ -28,9 +29,12 @@ async def fetch_compounding_validators_balances(
     block_number = await execution_client.eth.get_block_number()
 
     vault_validators = VaultValidatorCrud().get_vault_validators(vault_address)
-    if not vault_validators:
+    vault_public_keys = {key.public_key for key in vault_validators}
+    non_finalized_public_keys = await get_latest_vault_v2_validator_public_keys(vault_address)
+    vault_public_keys.update(non_finalized_public_keys)
+    if not vault_public_keys:
         return {}
-    vault_public_keys = [key.public_key for key in vault_validators]
+
     active_validator_balances, non_activated_public_keys = (
         await _fetch_compounding_balances_and_non_activated_keys(vault_public_keys)
     )
@@ -46,7 +50,7 @@ async def fetch_compounding_validators_balances(
 
 
 async def _fetch_compounding_balances_and_non_activated_keys(
-    public_keys: list[HexStr],
+    public_keys: set[HexStr],
 ) -> tuple[dict[HexStr, Gwei], list[HexStr]]:
     """
     Returns a tuple of active compounding validators with their balances
@@ -54,7 +58,7 @@ async def _fetch_compounding_balances_and_non_activated_keys(
     """
     validators = {}
     consensus_public_keys = []
-    for chunk_keys in chunkify(public_keys, settings.validators_fetch_chunk_size):
+    for chunk_keys in chunkify(list(public_keys), settings.validators_fetch_chunk_size):
         beacon_validators = await consensus_client.get_validators_by_ids(chunk_keys)
         for beacon_validator in beacon_validators['data']:
             public_key = add_0x_prefix(beacon_validator['validator']['pubkey'])

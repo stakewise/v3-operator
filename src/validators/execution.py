@@ -166,6 +166,20 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
     return new_public_keys
 
 
+async def get_latest_vault_v2_validator_public_keys(vault_address: ChecksumAddress) -> Set[HexStr]:
+    """Fetches the latest vault v2 validator public keys registered after finalized block"""
+    block_number = VaultCrud().get_vault_v2_validators_checkpoint(vault_address)
+    if block_number:
+        from_block = BlockNumber(block_number + 1)
+    else:
+        from_block = settings.network_config.KEEPER_GENESIS_BLOCK
+    vault_contract = VaultContract(vault_address)
+    events = await vault_contract.events.V2ValidatorRegistered.get_logs(  # type: ignore
+        fromBlock=from_block
+    )
+    return {Web3.to_hex(event['args']['publicKey']) for event in events}
+
+
 def process_network_validator_event(
     event: EventData, fork_version: bytes
 ) -> NetworkValidator | None:

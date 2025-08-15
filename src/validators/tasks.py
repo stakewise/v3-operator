@@ -6,7 +6,7 @@ from sw_utils import IpfsFetchClient, convert_to_mgno
 from sw_utils.networks import GNO_NETWORKS
 from sw_utils.typings import Bytes32
 from web3 import Web3
-from web3.types import BlockNumber, ChecksumAddress, Gwei
+from web3.types import BlockNumber, ChecksumAddress, Gwei, Wei
 
 from src.common.contracts import validators_registry_contract
 from src.common.execution import build_gas_manager, get_protocol_config
@@ -88,13 +88,14 @@ async def process_validators(
     validators_balances = await fetch_compounding_validators_balances(vault_address)
     if validators_balances:
         try:
-            vault_assets = await fund_compounding_validators(
+            remaining_amount = await fund_compounding_validators(
                 vault_address=vault_address,
                 validators_balances=validators_balances,
                 keystore=keystore,
                 amount=Gwei(int(Web3.from_wei(vault_assets, 'gwei'))),
                 harvest_params=harvest_params,
             )
+            vault_assets = Web3.to_wei(remaining_amount, 'gwei')
         except EmptyRelayerResponseException:
             return
         if not vault_assets:
@@ -168,7 +169,7 @@ async def fund_compounding_validators(
 # pylint: disable-next=too-many-locals,too-many-return-statements,too-many-branches,disable-next=too-many-arguments
 async def register_new_validators(
     vault_address: ChecksumAddress,
-    vault_assets: int,
+    vault_assets: Wei,
     harvest_params: HarvestParams | None,
     keystore: BaseKeystore | None,
     relayer_adapter: RelayerAdapter | None = None,
@@ -271,7 +272,7 @@ async def register_new_validators(
 
 async def get_vault_assets(
     vault_address: ChecksumAddress, harvest_params: HarvestParams | None
-) -> int:
+) -> Wei:
     vault_balance = await get_withdrawable_assets(
         vault_address=vault_address, harvest_params=harvest_params
     )
