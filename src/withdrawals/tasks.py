@@ -102,7 +102,6 @@ class ValidatorWithdrawalSubtask:
             validator_min_active_epochs=protocol_config.validator_min_active_epochs,
             oracle_exit_indexes={val.index for val in oracle_exiting_validators},
         )
-
         tx_hash = await submit_withdraw_validators(
             vault_address=vault_address,
             withdrawals=withdrawals,
@@ -157,6 +156,8 @@ class ValidatorWithdrawalSubtask:
         """
         vault_contract = VaultContract(vault_address)
         events = await vault_contract.get_validator_withdrawal_submitted_events(from_block)
+        if not events:
+            return None
         consensus_validators = await fetch_consensus_validators(
             [event.public_key for event in events]
         )
@@ -236,9 +237,14 @@ async def _get_withdrawals(
         )
 
     # Otherwise, add full withdrawals as needed
+    max_activation_epoch = min(
+        chain_head.epoch - validator_min_active_epochs,  # sw protocol limitation
+        chain_head.epoch
+        - settings.network_config.SHARD_COMMITTEE_PERIOD,  # consensus layer limitation
+    )
     exitable_validators = _filter_exitable_validators(
         consensus_validators=consensus_validators,
-        max_activation_epoch=max(0, chain_head.epoch - validator_min_active_epochs),
+        max_activation_epoch=max(max_activation_epoch, 0),
         oracle_exit_indexes=oracle_exit_indexes,
     )
 
