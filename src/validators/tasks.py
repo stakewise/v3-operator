@@ -86,22 +86,23 @@ async def process_validators(
         return None
 
     validators_balances = await fetch_compounding_validators_balances(vault_address)
-    try:
-        vault_assets = await fund_compounding_validators(
-            vault_address=vault_address,
-            validators_balances=validators_balances,
-            keystore=keystore,
-            amount=Gwei(int(Web3.from_wei(vault_assets, 'gwei'))),
-            harvest_params=harvest_params,
+    if validators_balances:
+        try:
+            vault_assets = await fund_compounding_validators(
+                vault_address=vault_address,
+                validators_balances=validators_balances,
+                keystore=keystore,
+                amount=Gwei(int(Web3.from_wei(vault_assets, 'gwei'))),
+                harvest_params=harvest_params,
+            )
+        except EmptyRelayerResponseException:
+            return
+        if not vault_assets:
+            return
+        logger.info(
+            'Not enough capacity to fund compounding validators, '
+            'trying to register new validators...'
         )
-    except EmptyRelayerResponseException:
-        return
-    if not vault_assets:
-        return
-    logger.info(
-        'Not enough capacity to fund compounding validators, '
-        'trying to register new validators...'
-    )
 
     await register_new_validators(
         vault_address=vault_address,

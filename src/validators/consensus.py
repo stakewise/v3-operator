@@ -28,6 +28,8 @@ async def fetch_compounding_validators_balances(
     block_number = await execution_client.eth.get_block_number()
 
     vault_validators = VaultValidatorCrud().get_vault_validators(vault_address)
+    if not vault_validators:
+        return {}
     vault_public_keys = [key.public_key for key in vault_validators]
     active_validator_balances, non_activated_public_keys = (
         await _fetch_compounding_balances_and_non_activated_keys(vault_public_keys)
