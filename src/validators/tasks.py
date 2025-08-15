@@ -88,14 +88,13 @@ async def process_validators(
     validators_balances = await fetch_compounding_validators_balances(vault_address)
     if validators_balances:
         try:
-            remaining_amount = await fund_compounding_validators(
+            vault_assets = await fund_compounding_validators(
                 vault_address=vault_address,
                 validators_balances=validators_balances,
                 keystore=keystore,
-                amount=Gwei(int(Web3.from_wei(vault_assets, 'gwei'))),
+                amount=vault_assets,
                 harvest_params=harvest_params,
             )
-            vault_assets = Web3.to_wei(remaining_amount, 'gwei')
         except EmptyRelayerResponseException:
             return
         if not vault_assets:
@@ -119,15 +118,17 @@ async def fund_compounding_validators(
     vault_address: ChecksumAddress,
     keystore: BaseKeystore | None,
     validators_balances: dict[HexStr, Gwei],
-    amount: Gwei,
+    amount: Wei,
     harvest_params: HarvestParams | None,
     relayer_adapter: RelayerAdapter | None = None,
-) -> Gwei:
+) -> Wei:
     """
     Funds vault compounding validators with the specified amount.
     Returns the remaining amount after funding.
     """
-    funding_amounts = _get_funding_amounts(validators_balances, amount)
+    funding_amounts = _get_funding_amounts(
+        validators_balances, Gwei(int(Web3.from_wei(amount, 'gwei')))
+    )
     if not funding_amounts:
         raise ValueError('Can not fund validators')
 
@@ -162,8 +163,7 @@ async def fund_compounding_validators(
         pub_keys = ', '.join(funding_amounts.keys())
         logger.info('Successfully funded validator(s) with public key(s) %s', pub_keys)
 
-    left_amount = max(amount - sum(funding_amounts.values()), 0)
-    return Gwei(left_amount)
+    return Wei(max(amount - Web3.to_wei(sum(funding_amounts.values()), 'gwei'), 0))
 
 
 # pylint: disable-next=too-many-locals,too-many-return-statements,too-many-branches,disable-next=too-many-arguments
