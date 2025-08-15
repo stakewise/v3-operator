@@ -1,5 +1,4 @@
 from multiprocessing import Pool
-from os import path
 from pathlib import Path
 
 import click
@@ -10,9 +9,7 @@ from src.common.utils import greenify
 from src.common.validators import validate_mnemonic
 from src.config.config import OperatorConfig, OperatorConfigException
 from src.config.networks import AVAILABLE_NETWORKS
-from src.config.settings import PUBLIC_KEYS_FILENAME, settings
-from src.validators.keystores.local import LocalKeystore
-from src.validators.utils import save_public_keys
+from src.config.settings import settings
 
 
 @click.option(
@@ -87,7 +84,6 @@ def create_keys(
 
     # first generate files in tmp directory
     operator_config.create_tmp_dir()
-    tmp_public_keys_file = operator_config.tmp_data_dir / PUBLIC_KEYS_FILENAME
     tmp_keystores_dir = operator_config.tmp_data_dir / 'keystores'
     try:
         _export_keystores(
@@ -97,14 +93,10 @@ def create_keys(
             per_keystore_password=per_keystore_password,
             pool_size=pool_size,
         )
-        public_keys = LocalKeystore.get_public_keys_from_keystore_files()
-        public_keys.extend([c.public_key for c in credentials])
-        save_public_keys(public_keys=public_keys, filename=tmp_public_keys_file)
         operator_config.increment_mnemonic_index(count)
 
         # move files from tmp dir
         operator_config.keystores_dir.mkdir(exist_ok=True)
-        tmp_public_keys_file.replace(operator_config.public_keys_file)
         for src_file in tmp_keystores_dir.glob('*'):
             src_file.rename(operator_config.keystores_dir.joinpath(src_file.name))
 
@@ -114,8 +106,6 @@ def create_keys(
     click.echo(
         f'Done. Generated {greenify(count)} keys for StakeWise operator.\n'
         f'Keystores saved to {greenify(operator_config.keystores_dir)} file\n'
-        'Validator public keys saved to '
-        f'{greenify(path.abspath(operator_config.public_keys_file))} file'
     )
 
 

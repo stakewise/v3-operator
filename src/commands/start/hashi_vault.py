@@ -43,13 +43,6 @@ logger = logging.getLogger(__name__)
     help='How much requests to K/V secrets engine to do in parallel.',
     default=DEFAULT_HASHI_VAULT_PARALLELISM,
 )
-@click.option(
-    '--public-keys-file',
-    type=click.Path(exists=True, file_okay=True, dir_okay=False),
-    envvar='PUBLIC_KEYS_FILE',
-    help='Absolute path to the available validator public keys file. '
-    'Default is the file generated with "create-keys" command.',
-)
 @add_common_options(start_common_options)
 @click.command(help='Start operator service with Hashi Vault integration')
 # pylint: disable-next=too-many-arguments,too-many-locals
@@ -77,7 +70,6 @@ def start_hashi_vault(
     hashi_vault_token: str | None,
     hashi_vault_url: str | None,
     hashi_vault_parallelism: int,
-    public_keys_file: str | None,
     wallet_file: str | None,
     wallet_password_file: str | None,
     max_fee_per_gas_gwei: int | None,
@@ -117,7 +109,6 @@ def start_hashi_vault(
         hashi_vault_key_prefixes=hashi_vault_key_prefix,
         hashi_vault_parallelism=hashi_vault_parallelism,
         hashi_vault_url=hashi_vault_url,
-        public_keys_file=public_keys_file,
         wallet_file=wallet_file,
         wallet_password_file=wallet_password_file,
         max_fee_per_gas_gwei=max_fee_per_gas_gwei,

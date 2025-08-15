@@ -10,7 +10,6 @@ from src.common.typings import Singleton, ValidatorType
 from src.config.networks import MAINNET, NETWORKS, NetworkConfig
 
 DATA_DIR = Path.home() / '.stakewise'
-PUBLIC_KEYS_FILENAME = 'public_keys.txt'
 
 DEFAULT_METRICS_HOST = '127.0.0.1'
 DEFAULT_METRICS_PORT = 9100
@@ -68,7 +67,6 @@ class Settings(metaclass=Singleton):
     metrics_port: int
     metrics_prefix: str
     validator_type: ValidatorType
-    public_keys_file: Path
     keystores_dir: Path
     keystores_password_dir: Path
     keystores_password_file: Path
@@ -142,7 +140,6 @@ class Settings(metaclass=Singleton):
         metrics_host: str = DEFAULT_METRICS_HOST,
         metrics_prefix: str = DEFAULT_METRICS_PREFIX,
         max_fee_per_gas_gwei: int | None = None,
-        public_keys_file: str | None = None,
         validator_type: ValidatorType = ValidatorType.V2,
         keystores_dir: str | None = None,
         keystores_password_file: str | None = None,
@@ -191,10 +188,6 @@ class Settings(metaclass=Singleton):
         self.max_fee_per_gas_gwei = Gwei(max_fee_per_gas_gwei)
         self.min_validators_registration = min_validators_registration
         self.min_deposit_amount_gwei = min_deposit_amount_gwei
-
-        self.public_keys_file = (
-            Path(public_keys_file) if public_keys_file else data_dir / PUBLIC_KEYS_FILENAME
-        )
 
         # keystores
         self.keystores_dir = Path(keystores_dir) if keystores_dir else data_dir / 'keystores'

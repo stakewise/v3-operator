@@ -139,11 +139,10 @@ async def get_registered_validators(
     keystore: BaseKeystore,
     amounts: list[Gwei],
     vault_address: ChecksumAddress,
-    available_public_keys: list[HexStr],
 ) -> Sequence[Validator]:
     """Returns list of available validators for registration."""
     available_public_keys = await filter_nonregistered_public_keys(
-        available_public_keys=available_public_keys,
+        available_public_keys=keystore.public_keys,
         count=len(amounts),
     )
     validators = []
@@ -205,18 +204,11 @@ async def filter_nonregistered_public_keys(
 
 
 def load_public_keys(public_keys_file: Path) -> list[HexStr]:
-    """Loads available public keys from file."""
+    """Loads public keys from file."""
     with open(public_keys_file, 'r', encoding='utf-8') as f:
         public_keys = [HexStr(line.rstrip()) for line in f]
 
     return public_keys
-
-
-def save_public_keys(filename: Path, public_keys: list[HexStr]) -> None:
-    filename.parent.mkdir(parents=True, exist_ok=True)
-    with open(filename, 'w', encoding='utf-8') as f:
-        for public_key in public_keys:
-            f.write(f'{public_key}\n')
 
 
 def get_withdrawal_credentials(vault_address: HexAddress) -> Bytes32:

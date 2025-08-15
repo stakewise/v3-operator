@@ -18,7 +18,6 @@ from src.config.settings import (
     MAX_EFFECTIVE_BALANCE_GWEI,
     MIN_ACTIVATION_BALANCE,
     MIN_ACTIVATION_BALANCE_GWEI,
-    PUBLIC_KEYS_FILENAME,
     ValidatorsRegistrationMode,
     settings,
 )
@@ -45,23 +44,20 @@ class ValidatorRegistrationSubtask:
     def __init__(
         self,
         keystore: BaseKeystore | None,
-        available_public_keys: list[HexStr] | None,
         relayer_adapter: RelayerAdapter | None,
     ):
         self.keystore = keystore
-        self.available_public_keys = available_public_keys
         self.relayer_adapter = relayer_adapter
 
     async def process_block(self) -> None:
-        if self.keystore and self.available_public_keys:
+        if self.keystore:
             await update_unused_validator_keys_metric(
-                keystore=self.keystore, available_public_keys=self.available_public_keys
+                keystore=self.keystore,
             )
         # check and register new validators
         for vault_address in settings.vaults:
             await process_validators(
                 vault_address=vault_address,
-                available_public_keys=self.available_public_keys,
                 keystore=self.keystore,
                 relayer_adapter=self.relayer_adapter,
             )
@@ -71,7 +67,6 @@ class ValidatorRegistrationSubtask:
 async def process_validators(
     vault_address: ChecksumAddress,
     keystore: BaseKeystore | None,
-    available_public_keys: list[HexStr] | None,
     relayer_adapter: RelayerAdapter | None = None,
 ) -> None:
     """
@@ -113,7 +108,6 @@ async def process_validators(
         vault_assets=vault_assets,
         harvest_params=harvest_params,
         keystore=keystore,
-        available_public_keys=available_public_keys,
         relayer_adapter=relayer_adapter,
     )
 
@@ -176,7 +170,6 @@ async def register_new_validators(
     vault_assets: int,
     harvest_params: HarvestParams | None,
     keystore: BaseKeystore | None,
-    available_public_keys: list[HexStr] | None,
     relayer_adapter: RelayerAdapter | None = None,
 ) -> HexStr | None:
     validators_amounts = _get_deposits_amounts(vault_assets, settings.validator_type)
@@ -203,7 +196,6 @@ async def register_new_validators(
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
         validators = await get_registered_validators(
             keystore=cast(BaseKeystore, keystore),
-            available_public_keys=cast(list[HexStr], available_public_keys),
             amounts=validators_amounts[:validators_batch_size],
             vault_address=vault_address,
         )
@@ -216,10 +208,9 @@ async def register_new_validators(
             if not settings.disable_available_validators_warnings:
                 logger.warning(
                     'There are no available public keys '
-                    'in the current %s file '
+                    'in current keystores files'
                     'to proceed with registration. '
-                    'To register additional validators, you must generate new keys.',
-                    PUBLIC_KEYS_FILENAME,
+                    'To register additional validators, you must generate new keystores.',
                 )
             return None
     else:
@@ -231,10 +222,8 @@ async def register_new_validators(
             if not settings.disable_available_validators_warnings:
                 logger.warning(
                     'There are no available public keys '
-                    'in the current %s file '
+                    'in current keystores files '
                     'to proceed with registration. '
-                    'To register additional validators, you must generate new keys.',
-                    PUBLIC_KEYS_FILENAME,
                 )
             return None
 
