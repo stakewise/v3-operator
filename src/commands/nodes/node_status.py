@@ -80,7 +80,7 @@ async def get_consensus_node_status() -> dict | None:
         return None
 
     return {
-        'syncing': syncing['data']['is_syncing'],
+        'is_syncing': syncing['data']['is_syncing'],
         'sync_distance': sync_distance,
         'finalized_epoch': finalized_epoch,
     }
@@ -106,7 +106,7 @@ def log_consensus_node_status(consensus_node_status: dict, output_format: str) -
     else:
         click.echo(
             f'Consensus Node Status:\n'
-            f'  Syncing: {consensus_node_status["syncing"]}\n'
+            f'  Is Syncing: {consensus_node_status["is_syncing"]}\n'
             f'  Sync Distance: {consensus_node_status["sync_distance"]}\n'
             f'  Finalized Epoch: {consensus_node_status["finalized_epoch"]}'
         )
@@ -118,6 +118,6 @@ def log_execution_node_status(execution_node_status: dict, output_format: str) -
     else:
         click.echo(
             f'Execution Node Status:\n'
-            f'  Syncing: {execution_node_status["syncing"]}\n'
+            f'  Is Syncing: {execution_node_status["is_syncing"]}\n'
             f'  Block Number: {execution_node_status["block_number"]}'
         )
