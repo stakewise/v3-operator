@@ -201,6 +201,13 @@ async def main(
     target_public_key: HexStr,
     no_confirm: bool,
 ) -> None:
+    # pylint: disable=line-too-long
+    """
+    Consolidate validators from source public keys to target public key.
+    First validate the consolidation request is correct and consensus can handle it.
+    Check validation details: https://github.com/ethereum/consensus-specs/blob/dev/specs/electra/beacon-chain.md#new-process_consolidation_request
+    Then send the request to the contract.
+    """
     setup_logging()
     await setup_clients()
     await _check_validators_manager(vault_address)
@@ -297,7 +304,7 @@ async def _validate_public_keys(
                 )
 
     #  Verify the source validators has no pending withdrawals in the queue
-    await _check_pending_balance_to_withdraw(slot=chain_head.slot, validator_indexes=source_indexes)
+    await _check_pending_balance_to_withdraw(validator_indexes=source_indexes)
 
     # validate that target_public_key is a compounding validator.
     # Not required for a single validator consolidation
@@ -355,9 +362,9 @@ async def _check_consolidations_queue() -> None:
         )
 
 
-async def _check_pending_balance_to_withdraw(slot: int, validator_indexes: set[int]) -> None:
+async def _check_pending_balance_to_withdraw(validator_indexes: set[int]) -> None:
     """Verify the source validators has no pending withdrawals in the queue"""
-    pending_partial_withdrawals = await consensus_client.get_pending_partial_withdrawals(slot)
+    pending_partial_withdrawals = await consensus_client.get_pending_partial_withdrawals()
     for withdrawal in pending_partial_withdrawals:
         if int(withdrawal['validator_index']) in validator_indexes and withdrawal['amount']:
             raise click.ClickException(
