@@ -108,11 +108,19 @@ async def _get_validators_exits_amount(
     # 1. Validator exits
     # validator status can be not changed yet, so use active exits from oracles
     oracle_exiting_balance = sum(val.balance for val in oracle_exiting_validators)
+
+    # fetch pending consolidations to exclude source validators from exiting balance
+    consolidations = await consensus_client.get_pending_consolidations()
+    source_consolidations_indexes = {
+        int(consolidation['source_index']) for consolidation in consolidations
+    }
     # 2. Validator manually exits
     manually_exiting_balance = sum(
         val.balance
         for val in consensus_validators
-        if val.status in EXITING_STATUSES and val.index not in oracle_exiting_validators
+        if val.status in EXITING_STATUSES
+        and val.index not in oracle_exiting_validators
+        and val.index not in source_consolidations_indexes
     )
 
     return Web3.to_wei(oracle_exiting_balance + manually_exiting_balance, 'gwei')
