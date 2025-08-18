@@ -111,9 +111,9 @@ async def _get_validators_exits_amount(
 
     # fetch pending consolidations to exclude source validators from exiting balance
     consolidations = await consensus_client.get_pending_consolidations()
-    source_consolidations_indexes = [
+    source_consolidations_indexes = {
         int(consolidation['source_index']) for consolidation in consolidations
-    ]
+    }
     # 2. Validator manually exits
     manually_exiting_balance = sum(
         val.balance
