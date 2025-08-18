@@ -9,7 +9,7 @@ from eth_typing import ChecksumAddress, HexStr
 from sw_utils import ChainHead
 from web3 import Web3
 
-from src.common.clients import setup_clients
+from src.common.clients import consensus_client, setup_clients
 from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import VaultContract
 from src.common.execution import (
@@ -204,6 +204,8 @@ async def main(
     setup_logging()
     await setup_clients()
     await _check_validators_manager(vault_address)
+    await _check_consolidations_queue()
+
     chain_head = await get_chain_finalized_head()
 
     target_source_public_keys = await _validate_public_keys(
@@ -281,16 +283,21 @@ async def _validate_public_keys(
     for key in non_active_public_keys:
         raise click.ClickException(f'Trying to consolidate non-active validator {key}.')
 
+    source_indexes = set()
     # Verify the source has been active long enough
     max_activation_epoch = chain_head.epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
     for validator in active_validators:
         if validator.public_key in source_public_keys:
+            source_indexes.add(validator.index)
             if validator.activation_epoch > max_activation_epoch:
                 raise click.ClickException(
                     f'Validator {validator.public_key} is not active enough for consolidation. '
                     f'It must be active for at least '
                     f'{settings.network_config.SHARD_COMMITTEE_PERIOD} epochs before consolidation.'
                 )
+
+    #  Verify the source validators has no pending withdrawals in the queue
+    await _check_pending_balance_to_withdraw(slot=chain_head.slot, validator_indexes=source_indexes)
 
     # validate that target_public_key is a compounding validator.
     # Not required for a single validator consolidation
@@ -336,7 +343,27 @@ async def _check_validators_manager(vault_address: ChecksumAddress) -> None:
     vault_contract = VaultContract(vault_address)
     validators_manager = await vault_contract.validators_manager()
     if validators_manager != wallet.account.address:
-        raise RuntimeError('validators manager address must equal to wallet address')
+        raise click.ClickException('validators manager address must equal to wallet address')
+
+
+async def _check_consolidations_queue() -> None:
+    pending_consolidations = await consensus_client.get_pending_consolidations()
+    queue_length = len(pending_consolidations)
+    if queue_length >= settings.network_config.PENDING_CONSOLIDATIONS_LIMIT:
+        raise click.ClickException(
+            'Pending consolidations queue has exceeded its limit. Please try again later.'
+        )
+
+
+async def _check_pending_balance_to_withdraw(slot: int, validator_indexes: set[int]) -> None:
+    """Verify the source validators has no pending withdrawals in the queue"""
+    pending_partial_withdrawals = await consensus_client.get_pending_partial_withdrawals(slot)
+    for withdrawal in pending_partial_withdrawals:
+        if int(withdrawal['validator_index']) in validator_indexes and withdrawal['amount']:
+            raise click.ClickException(
+                f'Validator {withdrawal['validator_index']} '
+                f'has pending partial withdrawals in the queue. '
+            )
 
 
 def _is_switch_to_compounding(source_public_keys: list[HexStr], target_public_key: HexStr) -> bool:
