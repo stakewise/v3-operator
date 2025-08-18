@@ -6,8 +6,8 @@ from typing import cast
 
 import click
 from eth_typing import ChecksumAddress, HexStr
+from sw_utils import ChainHead
 from web3 import Web3
-from web3.types import BlockNumber
 
 from src.common.clients import setup_clients
 from src.common.consensus import get_chain_finalized_head
@@ -210,7 +210,7 @@ async def main(
         vault_address=vault_address,
         source_public_keys=source_public_keys,
         target_public_key=target_public_key,
-        block_number=chain_head.block_number,
+        chain_head=chain_head,
     )
 
     click.secho(
@@ -270,7 +270,7 @@ async def _validate_public_keys(
     vault_address: ChecksumAddress,
     source_public_keys: list[HexStr],
     target_public_key: HexStr,
-    block_number: BlockNumber,
+    chain_head: ChainHead,
 ) -> list[tuple[HexStr, HexStr]]:
     """Validate that provided public keys can be consolidated."""
     logger.info('Checking selected validators for consolidation...')
@@ -280,6 +280,17 @@ async def _validate_public_keys(
     non_active_public_keys = set(all_public_keys) - active_public_keys
     for key in non_active_public_keys:
         raise click.ClickException(f'Trying to consolidate non-active validator {key}.')
+
+    # Verify the source has been active long enough
+    max_activation_epoch = chain_head.epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
+    for validator in active_validators:
+        if validator.public_key in source_public_keys:
+            if validator.activation_epoch > max_activation_epoch:
+                raise click.ClickException(
+                    f'Validator {validator.public_key} is not active enough for consolidation. '
+                    f'It must be active for at least '
+                    f'{settings.network_config.SHARD_COMMITTEE_PERIOD} epochs before consolidation.'
+                )
 
     # validate that target_public_key is a compounding validator.
     # Not required for a single validator consolidation
@@ -297,7 +308,7 @@ async def _validate_public_keys(
     logger.info('Fetching vault validators...')
     vault_validators = await VaultContract(vault_address).get_registered_validators_public_keys(
         from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
-        to_block=block_number,
+        to_block=chain_head.block_number,
     )
     for public_keys in source_public_keys + [target_public_key]:
         if public_keys not in vault_validators:
