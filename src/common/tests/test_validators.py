@@ -10,6 +10,7 @@ from src.common.validators import (
     validate_eth_address,
     validate_eth_addresses,
     validate_min_deposit_amount_gwei,
+    validate_public_key,
     validate_public_keys,
     validate_public_keys_file,
 )
@@ -72,6 +73,25 @@ def test_validate_min_deposit_amount_gwei():
         match=f"min-deposit-amount-gwei must be greater than or equal to {DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI} Gwei",
     ):
         validate_min_deposit_amount_gwei(None, None, DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI - 1)
+
+
+def test_validate_public_key():
+    public_key = faker.validator_public_key()
+
+    # returns_none_for_empty_public_key
+    result = validate_public_key(None, None, None)
+    assert result is None
+
+    # raises_error_for_invalid_public_key_format
+    with pytest.raises(BadParameter, match='Invalid validator public key'):
+        validate_public_key(None, None, 'invalid_key')
+
+    with pytest.raises(BadParameter, match='Invalid validator public key'):
+        validate_public_key(None, None, public_key[:-2])
+
+    # returns_value_for_valid_public_key
+    result = validate_public_key(None, None, public_key)
+    assert result == public_key
 
 
 def test_validate_public_keys():
