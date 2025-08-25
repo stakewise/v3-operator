@@ -1,3 +1,5 @@
+from unittest import mock
+
 import pytest
 from sw_utils import ValidatorStatus
 
@@ -7,9 +9,11 @@ from src.config.networks import HOODI
 from src.config.settings import settings
 from src.validators.tests.factories import create_consensus_validator
 from src.withdrawals.tasks import (
+    _filter_exitable_validators,
     _get_partial_withdrawals,
     _get_withdrawals,
     _is_partial_withdrawable_validator,
+    _is_pending_partial_withdrawals_queue_full,
 )
 
 
@@ -394,3 +398,111 @@ def test_is_partial_withdrawable_validator():
     )
     result = _is_partial_withdrawable_validator(validator, epoch)
     assert result is True
+
+
+async def test_is_pending_partial_withdrawals_queue_full():
+    limit = 100
+    with mock.patch.object(
+        settings.network_config, 'PENDING_PARTIAL_WITHDRAWALS_LIMIT', new=limit
+    ), mock.patch(
+        'sw_utils.consensus.ExtendedAsyncBeacon.get_pending_partial_withdrawals',
+        return_value=[{'validator_index': i, 'amount': 1} for i in range(limit - 1)],
+    ):
+        await _is_pending_partial_withdrawals_queue_full() is False
+
+    with mock.patch.object(
+        settings.network_config, 'PENDING_PARTIAL_WITHDRAWALS_LIMIT', new=limit
+    ), mock.patch(
+        'sw_utils.consensus.ExtendedAsyncBeacon.get_pending_partial_withdrawals',
+        return_value=[{'validator_index': i, 'amount': 1} for i in range(limit)],
+    ):
+        await _is_pending_partial_withdrawals_queue_full() is True
+
+    with mock.patch.object(
+        settings.network_config, 'PENDING_PARTIAL_WITHDRAWALS_LIMIT', new=limit
+    ), mock.patch(
+        'sw_utils.consensus.ExtendedAsyncBeacon.get_pending_partial_withdrawals',
+        return_value=[{'validator_index': i, 'amount': 1} for i in range(limit + 1)],
+    ):
+        await _is_pending_partial_withdrawals_queue_full() is True
+
+
+def test_filter_exitable_validators():
+    # validators_with_activation_epoch_above_limit_are_excluded
+    validators = [
+        create_consensus_validator(
+            index=1, activation_epoch=10, status=ValidatorStatus.ACTIVE_ONGOING, balance=32
+        ),
+        create_consensus_validator(
+            index=2, activation_epoch=15, status=ValidatorStatus.ACTIVE_ONGOING, balance=32
+        ),
+    ]
+    result = _filter_exitable_validators(
+        validators, max_activation_epoch=12, oracle_exit_indexes=set()
+    )
+    assert len(result) == 1
+    assert result[0].index == 1
+
+    # validators_with_non_active_status_are_excluded
+    validators = [
+        create_consensus_validator(
+            index=1, activation_epoch=10, status=ValidatorStatus.ACTIVE_ONGOING, balance=32
+        ),
+        create_consensus_validator(
+            index=2, activation_epoch=10, status=ValidatorStatus.ACTIVE_EXITING, balance=32
+        ),
+    ]
+    result = _filter_exitable_validators(
+        validators, max_activation_epoch=12, oracle_exit_indexes=set()
+    )
+    assert len(result) == 1
+    assert result[0].index == 1
+
+    # validators_in_oracle_exit_indexes_are_excluded
+    validators = [
+        create_consensus_validator(
+            index=1, activation_epoch=10, status=ValidatorStatus.ACTIVE_ONGOING, balance=32
+        ),
+        create_consensus_validator(
+            index=2, activation_epoch=10, status=ValidatorStatus.ACTIVE_ONGOING, balance=32
+        ),
+    ]
+    result = _filter_exitable_validators(
+        validators, max_activation_epoch=12, oracle_exit_indexes={2}
+    )
+    assert len(result) == 1
+    assert result[0].index == 1
+
+    # validators_are_sorted_by_balance_and_index
+    validators = [
+        create_consensus_validator(
+            index=2, activation_epoch=10, status=ValidatorStatus.ACTIVE_ONGOING, balance=30
+        ),
+        create_consensus_validator(
+            index=1, activation_epoch=10, status=ValidatorStatus.ACTIVE_ONGOING, balance=32
+        ),
+        create_consensus_validator(
+            index=3, activation_epoch=10, status=ValidatorStatus.ACTIVE_ONGOING, balance=30
+        ),
+    ]
+    result = _filter_exitable_validators(
+        validators, max_activation_epoch=12, oracle_exit_indexes=set()
+    )
+    assert len(result) == 3
+    assert result[0].index == 2
+    assert result[1].index == 3
+    assert result[2].index == 1
+
+    # no_validators_returned_when_all_are_excluded
+    validators = [
+        create_consensus_validator(
+            index=1, activation_epoch=15, status=ValidatorStatus.ACTIVE_ONGOING, balance=32
+        ),
+        create_consensus_validator(
+            index=2, activation_epoch=10, status=ValidatorStatus.ACTIVE_EXITING, balance=32
+        ),
+    ]
+    result = _filter_exitable_validators(
+        validators, max_activation_epoch=12, oracle_exit_indexes={1}
+    )
+    assert len(result) == 0
