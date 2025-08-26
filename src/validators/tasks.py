@@ -34,7 +34,10 @@ from src.validators.oracles import poll_validation_approval
 from src.validators.register_validators import fund_validators, register_validators
 from src.validators.relayer import RelayerAdapter
 from src.validators.typings import NetworkValidator, Validator
-from src.validators.utils import get_funded_validators, get_registered_validators
+from src.validators.utils import (
+    get_validators_for_funding,
+    get_validators_for_registration,
+)
 from src.validators.validators_manager import get_validators_manager_signature
 
 logger = logging.getLogger(__name__)
@@ -135,7 +138,7 @@ async def fund_compounding_validators(
     logger.info('Started funding of %d validator(s)', len(funding_amounts))
     validators_manager_signature = HexStr('0x')
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
-        validators = await get_funded_validators(
+        validators = await get_validators_for_funding(
             funding_amounts=funding_amounts,
             keystore=cast(BaseKeystore, keystore),
             vault_address=vault_address,
@@ -196,7 +199,7 @@ async def register_new_validators(
     validators: Sequence[Validator]
 
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
-        validators = await get_registered_validators(
+        validators = await get_validators_for_registration(
             keystore=cast(BaseKeystore, keystore),
             amounts=validators_amounts[:validators_batch_size],
             vault_address=vault_address,

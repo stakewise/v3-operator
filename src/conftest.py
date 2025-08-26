@@ -20,9 +20,15 @@ from src.common.credentials import CredentialManager
 from src.config.config import OperatorConfig
 from src.config.networks import HOODI
 from src.config.settings import settings
-from src.test_fixtures.hashi_vault import hashi_vault_url, mocked_hashi_vault  # noqa
-from src.test_fixtures.remote_signer import mocked_remote_signer, remote_signer_url
 from src.validators.keystores.remote import RemoteSignerKeystore
+from src.validators.keystores.tests.test_fixtures.hashi_vault import (
+    hashi_vault_url,
+    mocked_hashi_vault,
+)
+from src.validators.keystores.tests.test_fixtures.remote_signer import (
+    mocked_remote_signer,
+    remote_signer_url,
+)
 from src.validators.signing.tests.oracle_functions import OracleCommittee
 from src.validators.typings import BLSPrivkey
 
