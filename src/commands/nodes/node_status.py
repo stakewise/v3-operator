@@ -4,10 +4,12 @@ import logging
 from pathlib import Path
 
 import click
+from sw_utils.consensus import ACTIVE_STATUSES, ValidatorStatus
 
 from src.common.clients import consensus_client, execution_client, setup_clients
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_NETWORK, settings
+from src.validators.keystores.local import LocalKeystore
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +46,6 @@ OUTPUT_FORMATS = ['text', 'json']
     show_default=True,
 )
 @click.command(help='Displays the status of the nodes.')
-# pylint: disable=too-many-arguments
 def node_status(data_dir: Path, network: str, output_format: str) -> None:
     # Minimal settings for the nodes
     settings.set(
@@ -63,6 +64,10 @@ async def main(output_format: str) -> None:
     )
     log_consensus_node_status(consensus_node_status, output_format)
     log_execution_node_status(execution_node_status, output_format)
+
+    if consensus_node_status['is_syncing'] is False:
+        validator_activity_stats = await get_validator_activity_stats()
+        log_validator_activity_stats(validator_activity_stats, output_format)
 
 
 async def get_consensus_node_status() -> dict:
@@ -124,4 +129,43 @@ def log_execution_node_status(execution_node_status: dict, output_format: str) -
             f'Execution node status:\n'
             f'  Is syncing: {execution_node_status['is_syncing']}\n'
             f'  Block number: {execution_node_status['block_number']}'
+        )
+
+
+async def get_validator_activity_stats() -> dict:
+    """
+    Returns the activity statistics of validators.
+    Format: `{'active': int, 'total': int}`
+    """
+    keystore_files = LocalKeystore.list_keystore_files()
+    stats: dict[str, int] = {'active': 0, 'total': 0}
+    public_keys: list[str] = []
+
+    # Read public keys from keystore files
+    for keystore_file in keystore_files:
+        _, public_key = LocalKeystore.read_keystore_file(keystore_file)
+        public_keys.append(public_key)
+
+    stats['total'] = len(public_keys)
+
+    # Get validator statuses
+    validators = await consensus_client.get_validators_by_ids(public_key)
+
+    # Calc number of active validators
+    for validator in validators:
+        status = ValidatorStatus(validator['status'])
+        if status in ACTIVE_STATUSES:
+            stats['active'] += 1
+
+    return stats
+
+
+def log_validator_activity_stats(validator_activity_stats: dict, output_format: str) -> None:
+    if output_format == 'json':
+        click.echo(json.dumps({'validator_activity': validator_activity_stats}))
+    else:
+        click.echo(
+            f'Validator activity:\n'
+            f'  Active validators: {validator_activity_stats['active']}\n'
+            f'  Total validators: {validator_activity_stats['total']}'
         )
