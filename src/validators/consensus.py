@@ -19,6 +19,18 @@ EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
 logger = logging.getLogger(__name__)
 
 
+async def fetch_consensus_validators(
+    public_keys: list[HexStr],
+) -> list[ConsensusValidator]:
+    validators = []
+    for chunk_keys in chunkify(public_keys, settings.validators_fetch_chunk_size):
+        beacon_validators = await consensus_client.get_validators_by_ids(chunk_keys)
+        for beacon_validator in beacon_validators['data']:
+            validators.append(ConsensusValidator.from_consensus_data(beacon_validator))
+
+    return validators
+
+
 async def fetch_compounding_validators_balances(
     vault_address: ChecksumAddress,
 ) -> dict[HexStr, Gwei]:
@@ -112,30 +124,3 @@ async def _get_non_activated_balances(
         public_key: Gwei(int(Web3.from_wei(amount_wei, 'gwei')))
         for public_key, amount_wei in non_activated_balances.items()
     }
-
-
-async def fetch_non_exiting_validators(
-    public_keys: list[HexStr],
-) -> list[ConsensusValidator]:
-    validators = []
-    for chunk_keys in chunkify(public_keys, settings.validators_fetch_chunk_size):
-        beacon_validators = await consensus_client.get_validators_by_ids(chunk_keys)
-        for beacon_validator in beacon_validators['data']:
-            status = ValidatorStatus(beacon_validator['status'])
-            if status in EXITING_STATUSES:
-                continue
-            validators.append(ConsensusValidator.from_consensus_data(beacon_validator))
-
-    return validators
-
-
-async def fetch_consensus_validators(
-    public_keys: list[HexStr],
-) -> list[ConsensusValidator]:
-    validators = []
-    for chunk_keys in chunkify(public_keys, settings.validators_fetch_chunk_size):
-        beacon_validators = await consensus_client.get_validators_by_ids(chunk_keys)
-        for beacon_validator in beacon_validators['data']:
-            validators.append(ConsensusValidator.from_consensus_data(beacon_validator))
-
-    return validators

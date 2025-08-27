@@ -7,8 +7,6 @@ from pathlib import Path
 import click
 from aiohttp import ClientResponseError
 from eth_typing import HexStr
-from sw_utils import ValidatorStatus
-from sw_utils.consensus import EXITED_STATUSES
 from web3 import Web3
 
 from src.common.clients import consensus_client
@@ -21,6 +19,7 @@ from src.config.settings import (
     DEFAULT_HASHI_VAULT_PARALLELISM,
     settings,
 )
+from src.validators.consensus import EXITING_STATUSES
 from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
 
@@ -29,9 +28,6 @@ from src.validators.keystores.load import load_keystore
 class ValidatorExit:
     public_key: HexStr
     index: int
-
-
-EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
 
 
 @click.option(
