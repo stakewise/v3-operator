@@ -149,7 +149,7 @@ async def get_validator_activity_stats() -> dict:
     stats['total'] = len(public_keys)
 
     # Get validator statuses
-    validators = await consensus_client.get_validators_by_ids(public_key)
+    validators = (await consensus_client.get_validators_by_ids(public_keys))['data']
 
     # Calc number of active validators
     for validator in validators:
