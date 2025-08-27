@@ -16,15 +16,12 @@ class OperatorConfigException(ValueError):
 
 
 class OperatorConfig:
-    network: str = ''
     mnemonic_next_index: int = 0
     first_public_key: str | None = None
 
-    def __init__(
-        self,
-        data_dir: Path,
-    ):
+    def __init__(self, data_dir: Path, network: str = ''):
         self.root_dir = Path(data_dir)
+        self.network = network
 
     @property
     def data_dir(self) -> Path:
@@ -82,8 +79,7 @@ class OperatorConfig:
             )
         self._validate(mnemonic)
 
-    def save(self, network: str, mnemonic: str, mnemonic_next_index: int = 0) -> None:
-        self.network = network
+    def save(self, mnemonic: str, mnemonic_next_index: int = 0) -> None:
         self.mnemonic_next_index = mnemonic_next_index
         self.first_public_key = CredentialManager.generate_credential_first_public_key(
             self.network, mnemonic
@@ -109,10 +105,6 @@ class OperatorConfig:
         }
         with self.config_path.open('w') as f:
             json.dump(config, f)
-
-    def is_network_config_exists(self, network: str) -> bool:
-        config_path = self.root_dir / network / 'config.json'
-        return config_path.is_file()
 
     def _validate(self, mnemonic: str | None = None) -> None:
         """Validates the loaded configuration data."""
