@@ -4,11 +4,10 @@ import logging
 from pathlib import Path
 
 import click
-from web3 import Web3
 
-from src.common.clients import setup_clients, consensus_client, execution_client
-from src.config.networks import AVAILABLE_NETWORKS, NETWORKS
-from src.config.settings import DEFAULT_NETWORK, LOG_DATE_FORMAT, settings
+from src.common.clients import consensus_client, execution_client, setup_clients
+from src.config.networks import AVAILABLE_NETWORKS
+from src.config.settings import DEFAULT_NETWORK, settings
 
 logger = logging.getLogger(__name__)
 
@@ -62,14 +61,11 @@ async def main(output_format: str) -> None:
     consensus_node_status, execution_node_status = await asyncio.gather(
         get_consensus_node_status(), get_execution_node_status()
     )
-    if consensus_node_status:
-        log_consensus_node_status(consensus_node_status, output_format)
-
-    if execution_node_status:
-        log_execution_node_status(execution_node_status, output_format)
+    log_consensus_node_status(consensus_node_status, output_format)
+    log_execution_node_status(execution_node_status, output_format)
 
 
-async def get_consensus_node_status() -> dict | None:
+async def get_consensus_node_status() -> dict:
     try:
         syncing = await consensus_client.get_syncing()
         sync_distance = syncing['data']['sync_distance']
@@ -77,7 +73,7 @@ async def get_consensus_node_status() -> dict | None:
         data = await consensus_client.get_finality_checkpoint()
         finalized_epoch = data['data']['finalized']['epoch']
     except Exception:
-        return None
+        return {}
 
     return {
         'is_syncing': syncing['data']['is_syncing'],
@@ -86,7 +82,7 @@ async def get_consensus_node_status() -> dict | None:
     }
 
 
-async def get_execution_node_status() -> dict | None:
+async def get_execution_node_status() -> dict:
     try:
         sync_status = await execution_client.eth.syncing
         if isinstance(sync_status, bool):
@@ -95,7 +91,7 @@ async def get_execution_node_status() -> dict | None:
             is_syncing = False
         block_number = await execution_client.eth.block_number
     except Exception:
-        return None
+        return {}
 
     return {'is_syncing': is_syncing, 'block_number': block_number}
 
@@ -104,11 +100,15 @@ def log_consensus_node_status(consensus_node_status: dict, output_format: str) -
     if output_format == 'json':
         click.echo(json.dumps({'consensus_node': consensus_node_status}))
     else:
+        if not consensus_node_status:
+            click.echo('Consensus node status: unavailable.')
+            return
+
         click.echo(
-            f'Consensus Node Status:\n'
-            f'  Is Syncing: {consensus_node_status["is_syncing"]}\n'
-            f'  Sync Distance: {consensus_node_status["sync_distance"]}\n'
-            f'  Finalized Epoch: {consensus_node_status["finalized_epoch"]}'
+            f'Consensus node status:\n'
+            f'  Is syncing: {consensus_node_status['is_syncing']}\n'
+            f'  Sync distance: {consensus_node_status['sync_distance']}\n'
+            f'  Finalized epoch: {consensus_node_status['finalized_epoch']}'
         )
 
 
@@ -116,8 +116,12 @@ def log_execution_node_status(execution_node_status: dict, output_format: str) -
     if output_format == 'json':
         click.echo(json.dumps({'execution_node': execution_node_status}))
     else:
+        if not execution_node_status:
+            click.echo('Execution node status: unavailable.')
+            return
+
         click.echo(
-            f'Execution Node Status:\n'
-            f'  Is Syncing: {execution_node_status["is_syncing"]}\n'
-            f'  Block Number: {execution_node_status["block_number"]}'
+            f'Execution node status:\n'
+            f'  Is syncing: {execution_node_status['is_syncing']}\n'
+            f'  Block number: {execution_node_status['block_number']}'
         )
