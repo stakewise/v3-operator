@@ -33,7 +33,7 @@ from src.config.settings import (
     MAX_EFFECTIVE_BALANCE_GWEI,
     settings,
 )
-from src.validators.consensus import fetch_non_exiting_validators
+from src.validators.consensus import EXITING_STATUSES, fetch_consensus_validators
 from src.validators.oracles import poll_consolidation_signature
 from src.validators.register_validators import submit_consolidate_validators
 from src.validators.typings import ConsensusValidator
@@ -285,8 +285,10 @@ async def _check_public_keys(
     """Validate that provided public keys can be consolidated."""
     logger.info('Checking selected validators for consolidation...')
     all_public_keys = source_public_keys + [target_public_key]
-    active_validators = await fetch_non_exiting_validators(source_public_keys + [target_public_key])
-    active_public_keys = {key.public_key for key in active_validators}
+    active_validators = await fetch_consensus_validators(source_public_keys + [target_public_key])
+    active_public_keys = {
+        val.public_key for val in active_validators if val.status not in EXITING_STATUSES
+    }
     non_active_public_keys = set(all_public_keys) - active_public_keys
     for key in non_active_public_keys:
         raise click.ClickException(f'Trying to consolidate non-active validator {key}.')
