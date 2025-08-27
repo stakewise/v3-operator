@@ -6,7 +6,7 @@ import pytest
 from click.testing import CliRunner
 from sw_utils.typings import ConsensusFork
 
-from src.commands.validators_exit import validators_exit
+from src.commands.exit_validators import exit_validators
 from src.validators.keystores.local import LocalKeystore
 from src.validators.keystores.remote import RemoteSignerKeystore
 
@@ -75,7 +75,7 @@ class TestValidatorsExit:
                 },
             ),
         ):
-            result = runner.invoke(validators_exit, args, input='y')
+            result = runner.invoke(exit_validators, args, input='y')
         assert result.exit_code == 0
         assert 'Validators 0, 1, 2 (3 of 3) exits successfully initiated\n' in result.output
 
@@ -119,7 +119,7 @@ class TestValidatorsExit:
                 },
             ),
         ):
-            result = runner.invoke(validators_exit, args, input='y')
+            result = runner.invoke(exit_validators, args, input='y')
         assert result.exit_code == 0
 
         for expected_line in ('Validators 0, 1, 2 (3 of 3) exits successfully initiated',):
