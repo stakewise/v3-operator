@@ -37,7 +37,6 @@ from src.validators.consensus import fetch_non_exiting_validators
 from src.validators.oracles import poll_consolidation_signature
 from src.validators.register_validators import submit_consolidate_validators
 from src.validators.typings import ConsensusValidator
-from src.validators.utils import load_public_keys
 
 logger = logging.getLogger(__name__)
 
@@ -165,7 +164,7 @@ def consolidate(
         )
 
     if source_public_keys_file:
-        source_public_keys = load_public_keys(source_public_keys_file)
+        source_public_keys = _load_public_keys(source_public_keys_file)
     source_public_keys = cast(list[HexStr], source_public_keys)
     operator_config = OperatorConfig(Path(data_dir))
     operator_config.load(network=network)
@@ -210,17 +209,19 @@ async def main(
     """
     setup_logging()
     await setup_clients()
-    await _check_validators_manager(vault_address)
-    await _check_consolidations_queue()
-
     chain_head = await get_chain_finalized_head()
 
-    target_source_public_keys = await _validate_public_keys(
+    await _check_validators_manager(vault_address)
+    await _check_consolidations_queue()
+    await _check_public_keys(
         vault_address=vault_address,
         source_public_keys=source_public_keys,
         target_public_key=target_public_key,
         chain_head=chain_head,
     )
+    target_source_public_keys = [
+        (target_public_key, source_key) for source_key in source_public_keys
+    ]
 
     click.secho(
         f'Consolidating {len(target_source_public_keys)} validators: ',
@@ -275,12 +276,12 @@ async def main(
         )
 
 
-async def _validate_public_keys(
+async def _check_public_keys(
     vault_address: ChecksumAddress,
     source_public_keys: list[HexStr],
     target_public_key: HexStr,
     chain_head: ChainHead,
-) -> list[tuple[HexStr, HexStr]]:
+) -> None:
     """Validate that provided public keys can be consolidated."""
     logger.info('Checking selected validators for consolidation...')
     all_public_keys = source_public_keys + [target_public_key]
@@ -335,16 +336,6 @@ async def _validate_public_keys(
             f' total balance exceed {MAX_EFFECTIVE_BALANCE_GWEI} Gwei'
         )
 
-    return [(target_public_key, source_key) for source_key in source_public_keys]
-
-
-def _encode_validators(target_source_public_keys: list[tuple[HexStr, HexStr]]) -> bytes:
-    validators_data = b''
-    for target_key, source_key in target_source_public_keys:
-        validators_data += Web3.to_bytes(hexstr=source_key)
-        validators_data += Web3.to_bytes(hexstr=target_key)
-    return validators_data
-
 
 async def _check_validators_manager(vault_address: ChecksumAddress) -> None:
     vault_contract = VaultContract(vault_address)
@@ -373,5 +364,21 @@ async def _check_pending_balance_to_withdraw(validator_indexes: set[int]) -> Non
             )
 
 
+def _encode_validators(target_source_public_keys: list[tuple[HexStr, HexStr]]) -> bytes:
+    validators_data = b''
+    for target_key, source_key in target_source_public_keys:
+        validators_data += Web3.to_bytes(hexstr=source_key)
+        validators_data += Web3.to_bytes(hexstr=target_key)
+    return validators_data
+
+
 def _is_switch_to_compounding(source_public_keys: list[HexStr], target_public_key: HexStr) -> bool:
     return len(source_public_keys) == 1 and source_public_keys[0] == target_public_key
+
+
+def _load_public_keys(public_keys_file: Path) -> list[HexStr]:
+    """Loads public keys from file."""
+    with open(public_keys_file, 'r', encoding='utf-8') as f:
+        public_keys = [HexStr(line.rstrip()) for line in f]
+
+    return public_keys

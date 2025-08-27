@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 from typing import Sequence
 
 from eth_typing import ChecksumAddress, HexAddress, HexStr
@@ -18,13 +17,13 @@ from src.validators.typings import Validator
 logger = logging.getLogger(__name__)
 
 
-async def get_registered_validators(
+async def get_validators_for_registration(
     keystore: BaseKeystore,
     amounts: list[Gwei],
     vault_address: ChecksumAddress,
 ) -> Sequence[Validator]:
     """Returns list of available validators for registration."""
-    available_public_keys = await filter_nonregistered_public_keys(
+    available_public_keys = await _filter_nonregistered_public_keys(
         available_public_keys=keystore.public_keys,
         count=len(amounts),
     )
@@ -45,7 +44,7 @@ async def get_registered_validators(
     return validators
 
 
-async def get_funded_validators(
+async def get_validators_for_funding(
     keystore: BaseKeystore,
     funding_amounts: dict[HexStr, Gwei],
     vault_address: ChecksumAddress,
@@ -68,7 +67,14 @@ async def get_funded_validators(
     return validators
 
 
-async def filter_nonregistered_public_keys(
+def get_withdrawal_credentials(vault_address: HexAddress) -> Bytes32:
+    """Returns withdrawal credentials based on the vault address and validator type."""
+    if settings.validator_type == ValidatorType.V1:
+        return get_v1_withdrawal_credentials(vault_address)
+    return get_v2_withdrawal_credentials(vault_address)
+
+
+async def _filter_nonregistered_public_keys(
     available_public_keys: list[HexStr],
     count: int,
 ) -> list[HexStr]:
@@ -84,18 +90,3 @@ async def filter_nonregistered_public_keys(
             break
 
     return public_keys
-
-
-def load_public_keys(public_keys_file: Path) -> list[HexStr]:
-    """Loads public keys from file."""
-    with open(public_keys_file, 'r', encoding='utf-8') as f:
-        public_keys = [HexStr(line.rstrip()) for line in f]
-
-    return public_keys
-
-
-def get_withdrawal_credentials(vault_address: HexAddress) -> Bytes32:
-    """Returns withdrawal credentials based on the vault address and validator type."""
-    if settings.validator_type == ValidatorType.V1:
-        return get_v1_withdrawal_credentials(vault_address)
-    return get_v2_withdrawal_credentials(vault_address)
