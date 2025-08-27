@@ -48,7 +48,7 @@ class ValidatorExit:
 )
 @click.option(
     '--count',
-    help='The number of validators to exit.',
+    help='The number of validators to exit. Default is all the active validators.',
     type=click.IntRange(min=1),
 )
 @click.option(
@@ -117,13 +117,13 @@ class ValidatorExit:
 )
 @click.option(
     '--pool-size',
-    help='Number of processes in a pool.',
+    help='Number of processes in a pool. The default is 1.',
     envvar='POOL_SIZE',
     type=int,
 )
 @click.command(help='Performs a voluntary exit for active vault validators.')
 # pylint: disable-next=too-many-arguments,too-many-locals
-def validators_exit(
+def exit_validators(
     network: str,
     count: int | None,
     consensus_endpoints: str,

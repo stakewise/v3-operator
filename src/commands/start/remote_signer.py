@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
     help='The base URL of the remote signer, e.g. http://signer:9000',
 )
 @add_common_options(start_common_options)
-@click.command(help='Start operator service with remote signer integration')
+@click.command(help='Start operator service with the remote signer integration.')
 # pylint: disable-next=too-many-arguments,too-many-locals
 def start_remote_signer(
     vaults: str,

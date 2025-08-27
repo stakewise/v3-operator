@@ -30,7 +30,7 @@ from src.config.networks import AVAILABLE_NETWORKS
 )
 @click.option(
     '--network',
-    help='The network of your vault.',
+    help='The network of your vault. Default is the network specified at "init" command.',
     type=click.Choice(
         AVAILABLE_NETWORKS,
         case_sensitive=False,

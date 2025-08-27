@@ -96,8 +96,9 @@ start_common_options = [
     ),
     click.option(
         '--validator-type',
-        help='Type of registered validators: '
-        f'{ValidatorType.V1.value} or {ValidatorType.V2.value}.',
+        help='Type of the validators to register:'
+        f' {ValidatorType.V1.value} or {ValidatorType.V2.value}.'
+        f' Default is {ValidatorType.V2.value}.',
         envvar='VALIDATOR_TYPE',
         default=ValidatorType.V2,
         type=click.Choice(
@@ -116,19 +117,20 @@ start_common_options = [
         '--harvest-vault',
         is_flag=True,
         envvar='HARVEST_VAULT',
-        help='Whether to submit vault harvest transactions. Default is false.',
+        help='Submit the vault state sync transaction periodically. Default is false.',
     ),
     click.option(
-        '--split-rewards',
+        '--claim–fee-splitter',
         is_flag=True,
-        envvar='SPLIT_REWARDS',
-        help='Claim fee rewards periodically on behalf of the shareholders. Default is false.',
+        envvar='CLAIM_FEE_SPLITTER',
+        help='Claim fee splitter rewards periodically on behalf of the shareholders.'
+        ' Default is false.',
     ),
     click.option(
         '--disable-withdrawals',
         is_flag=True,
         envvar='DISABLE_WITHDRAWALS',
-        help='Whether to disable submitting partial vault withdrawals.',
+        help='Disable submitting validator withdrawals through the vault contract.',
     ),
     click.option(
         '--execution-endpoints',
@@ -142,7 +144,7 @@ start_common_options = [
         type=str,
         envvar='EXECUTION_JWT_SECRET',
         help='JWT secret key used for signing and verifying JSON Web Tokens'
-        'when connecting to execution nodes.',
+        ' when connecting to execution nodes.',
     ),
     click.option(
         '--consensus-endpoints',
@@ -202,7 +204,7 @@ start_common_options = [
         '--min-deposit-amount-gwei',
         type=int,
         envvar='MIN_DEPOSIT_AMOUNT_GWEI',
-        help='Minimum amount in gwei to deposit into validator.',
+        help='Minimum amount in gwei to deposit into validator. The default is 1000000000 (1 ETH).',
         default=DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
         callback=validate_min_deposit_amount_gwei,
     ),
