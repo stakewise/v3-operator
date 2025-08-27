@@ -79,7 +79,7 @@ class TestValidatorsExit:
         assert result.exit_code == 0
         assert 'Validators 0, 1, 2 (3 of 3) exits successfully initiated\n' in result.output
 
-    @pytest.mark.usefixtures('_remote_signer_setup')
+    @pytest.mark.usefixtures('_setup_remote_signer')
     async def test_remote_signer(
         self,
         consensus_endpoints: str,
