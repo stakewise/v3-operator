@@ -65,7 +65,7 @@ async def main(output_format: str) -> None:
     log_consensus_node_status(consensus_node_status, output_format)
     log_execution_node_status(execution_node_status, output_format)
 
-    if consensus_node_status['is_syncing'] is False:
+    if consensus_node_status:
         validator_activity_stats = await get_validator_activity_stats()
         log_validator_activity_stats(validator_activity_stats, output_format)
 
