@@ -12,7 +12,6 @@ from src.commands.consolidate import consolidate
 from src.commands.create_keys import create_keys
 from src.commands.create_wallet import create_wallet
 from src.commands.exit_validators import exit_validators
-from src.commands.import_genesis_keys import import_genesis_keys
 from src.commands.init import init
 from src.commands.recover import recover
 from src.commands.setup_remote_signer import setup_remote_signer
@@ -48,7 +47,6 @@ cli.add_command(start_hashi_vault)
 cli.add_command(start_remote_signer)
 cli.add_command(start_relayer)
 cli.add_command(recover)
-cli.add_command(import_genesis_keys)
 cli.add_command(remote_db_group)
 cli.add_command(submit_rated_network)
 
