@@ -3,6 +3,7 @@ from typing import Callable
 
 import click
 from click.decorators import FC
+from web3 import Web3
 
 from src.common.logging import LOG_LEVELS
 from src.common.typings import ValidatorType
@@ -120,7 +121,7 @@ start_common_options = [
         help='Submit the vault state sync transaction periodically. Default is false.',
     ),
     click.option(
-        '--claim–fee-splitter',
+        '--claim-fee-splitter',
         is_flag=True,
         envvar='CLAIM_FEE_SPLITTER',
         help='Claim fee splitter rewards periodically on behalf of the shareholders.'
@@ -204,7 +205,9 @@ start_common_options = [
         '--min-deposit-amount-gwei',
         type=int,
         envvar='MIN_DEPOSIT_AMOUNT_GWEI',
-        help='Minimum amount in gwei to deposit into validator. The default is 1000000000 (1 ETH).',
+        help=f'Minimum amount in gwei to deposit into validator.'
+        f' The default is {DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI} '
+        f'({Web3.from_wei(Web3.to_wei(DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI, 'gwei'), 'ether')} ETH).',
         default=DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
         callback=validate_min_deposit_amount_gwei,
     ),

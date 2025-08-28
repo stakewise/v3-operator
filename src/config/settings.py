@@ -59,7 +59,7 @@ class Settings(metaclass=Singleton):
     graph_page_size: int
 
     harvest_vault: bool
-    split_rewards: bool
+    claim_fee_splitter: bool
     disable_withdrawals: bool
     verbose: bool
     enable_metrics: bool
@@ -132,7 +132,7 @@ class Settings(metaclass=Singleton):
         execution_jwt_secret: str | None = None,
         graph_endpoint: str = '',
         harvest_vault: bool = False,
-        split_rewards: bool = False,
+        claim_fee_splitter: bool = False,
         disable_withdrawals: bool = False,
         verbose: bool = False,
         enable_metrics: bool = False,
@@ -173,7 +173,7 @@ class Settings(metaclass=Singleton):
         self.execution_jwt_secret = execution_jwt_secret
         self.graph_endpoint = graph_endpoint or self.network_config.STAKEWISE_GRAPH_ENDPOINT
         self.harvest_vault = harvest_vault
-        self.split_rewards = split_rewards
+        self.claim_fee_splitter = claim_fee_splitter
         self.disable_withdrawals = disable_withdrawals
         self.verbose = verbose
         self.enable_metrics = enable_metrics
