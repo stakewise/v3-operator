@@ -8,7 +8,8 @@ from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.types import BlockNumber, ChecksumAddress, Gwei, Wei
 
-from src.common.contracts import validators_registry_contract
+from src.common.clients import execution_client
+from src.common.contracts import VaultContract, validators_registry_contract
 from src.common.execution import build_gas_manager, get_protocol_config
 from src.common.harvest import get_harvest_params
 from src.common.metrics import metrics
@@ -90,6 +91,8 @@ async def process_validators(
 
     validators_balances = await fetch_compounding_validators_balances(vault_address)
     if validators_balances:
+        if not await _is_funding_interval_passed(vault_address):
+            return
         try:
             vault_assets = await fund_compounding_validators(
                 vault_address=vault_address,
@@ -338,3 +341,15 @@ def _get_funding_amounts(
         if funding_amount < settings.min_deposit_amount_gwei:
             break
     return result
+
+
+async def _is_funding_interval_passed(vault_address: ChecksumAddress) -> bool:
+    """
+    Check if the required interval has passed since the last funding event.
+    Mitigate gas griefing attack
+    """
+    blocks_delay = settings.min_deposit_delay // settings.network_config.SECONDS_PER_BLOCK
+    to_block = await execution_client.eth.get_block_number()
+    from_block = BlockNumber(to_block - blocks_delay)
+    funding_events = await VaultContract(vault_address).get_funding_events(from_block, to_block)
+    return len(funding_events) == 0

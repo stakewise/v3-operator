@@ -59,6 +59,7 @@ def start_local(
     database_dir: str | None,
     concurrency: int | None,
     min_deposit_amount_gwei: int,
+    min_deposit_delay: int,
     no_confirm: bool,
 ) -> None:
     vault_addresses = [to_checksum_address(address) for address in vaults.split(',')]
@@ -96,6 +97,7 @@ def start_local(
         log_format=log_format,
         concurrency=concurrency,
         min_deposit_amount_gwei=Gwei(min_deposit_amount_gwei),
+        min_deposit_delay=min_deposit_delay,
     )
 
     try:

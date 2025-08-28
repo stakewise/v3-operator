@@ -17,6 +17,7 @@ from src.config.settings import (
     DEFAULT_METRICS_PREFIX,
     DEFAULT_MIN_DEPOSIT_AMOUNT,
     DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
+    DEFAULT_MIN_DEPOSIT_DELAY,
     LOG_FORMATS,
     LOG_PLAIN,
 )
@@ -202,6 +203,14 @@ start_common_options = [
         f'({DEFAULT_MIN_DEPOSIT_AMOUNT} ETH).',
         default=DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
         callback=validate_min_deposit_amount_gwei,
+    ),
+    click.option(
+        '--min-deposit-delay',
+        type=int,
+        envvar='MIN_DEPOSIT_DELAY',
+        help=f'Minimum delay for validator funding in seconds.'
+        f' The default is {DEFAULT_MIN_DEPOSIT_DELAY}',
+        default=DEFAULT_MIN_DEPOSIT_DELAY,
     ),
     click.option(
         '--no-confirm',
