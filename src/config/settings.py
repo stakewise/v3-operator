@@ -21,7 +21,7 @@ DEFAULT_HASHI_VAULT_ENGINE_NAME = 'secret'
 DEFAULT_MIN_DEPOSIT_AMOUNT = Web3.to_wei(1, 'ether')
 DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI = Gwei(int(Web3.from_wei(DEFAULT_MIN_DEPOSIT_AMOUNT, 'gwei')))
 
-DEFAULT_MIN_DEPOSIT_DELAY = 60  # 1 minute
+DEFAULT_MIN_DEPOSIT_DELAY = 3600  # 1 hour
 
 
 class ValidatorsRegistrationMode(Enum):
