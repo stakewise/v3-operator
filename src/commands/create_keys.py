@@ -23,7 +23,8 @@ from src.config.settings import settings
     '--per-keystore-password',
     is_flag=True,
     default=False,
-    help='Creates separate password file for each keystore.',
+    help='Creates separate password file for each keystore.'
+    ' Creates a single password file by default.',
 )
 @click.option(
     '--mnemonic',
@@ -41,13 +42,13 @@ from src.config.settings import settings
 )
 @click.option(
     '--concurrency',
-    help='Number of processes in a pool.',
+    help='Number of processes in a pool. The default is 1.',
     envvar='CONCURRENCY',
     type=int,
 )
 @click.option(
     '--network',
-    help='The network of your vault.',
+    help='The network of your vault. Default is the network specified at "init" command.',
     type=click.Choice(
         AVAILABLE_NETWORKS,
         case_sensitive=False,

@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
     help='The base URL of the remote signer, e.g. http://signer:9000',
 )
 @add_common_options(start_common_options)
-@click.command(help='Start operator service with remote signer integration')
+@click.command(help='Start operator service with the remote signer integration.')
 # pylint: disable-next=too-many-arguments,too-many-locals
 def start_remote_signer(
     vaults: str,
@@ -31,7 +31,7 @@ def start_remote_signer(
     execution_jwt_secret: str | None,
     graph_endpoint: str,
     harvest_vault: bool,
-    split_rewards: bool,
+    claim_fee_splitter: bool,
     disable_withdrawals: bool,
     verbose: bool,
     enable_metrics: bool,
@@ -70,7 +70,7 @@ def start_remote_signer(
         execution_jwt_secret=execution_jwt_secret,
         graph_endpoint=graph_endpoint,
         harvest_vault=harvest_vault,
-        split_rewards=split_rewards,
+        claim_fee_splitter=claim_fee_splitter,
         disable_withdrawals=disable_withdrawals,
         verbose=verbose,
         enable_metrics=enable_metrics,

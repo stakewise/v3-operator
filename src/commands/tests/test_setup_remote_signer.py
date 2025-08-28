@@ -6,7 +6,7 @@ from click.testing import CliRunner
 from eth_typing import HexAddress
 
 from src.commands.create_keys import create_keys
-from src.commands.remote_signer_setup import remote_signer_setup
+from src.commands.setup_remote_signer import setup_remote_signer
 from src.config.settings import settings
 
 
@@ -34,7 +34,7 @@ class TestOperatorRemoteSignerSetup:
             str(data_dir),
         ]
 
-        result = runner.invoke(remote_signer_setup, args, input='y')
+        result = runner.invoke(setup_remote_signer, args, input='y')
         assert result.exit_code == 0
         for expected_output_message in [
             f'Successfully imported {key_count} keys into remote signer.',
@@ -87,7 +87,7 @@ class TestOperatorRemoteSignerSetup:
                 str(data_dir),
             ]
 
-            result = runner.invoke(remote_signer_setup, args, input='y')
+            result = runner.invoke(setup_remote_signer, args, input='y')
             assert result.exit_code == 0
             assert (
                 f'Done. Successfully configured operator to use remote signer for {key_count} public key(s)'
