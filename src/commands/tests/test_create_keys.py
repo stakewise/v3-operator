@@ -26,7 +26,7 @@ class TestCreateKeys:
             str(count),
             '--data-dir',
             str(data_dir),
-            '--pool-size',
+            '--concurrency',
             '1',
         ]
         result = runner.invoke(create_keys, args)
@@ -61,7 +61,7 @@ class TestCreateKeys:
             str(count),
             '--data-dir',
             str(data_dir),
-            '--pool-size',
+            '--concurrency',
             '1',
             '--per-keystore-password',
         ]

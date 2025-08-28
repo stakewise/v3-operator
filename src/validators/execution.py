@@ -62,7 +62,7 @@ def process_network_validator_events_multiprocessing(
     and returns the list of valid validators.
     Use multiprocessing to speed up operator startup.
     """
-    with Pool(processes=settings.pool_size) as pool:
+    with Pool(processes=settings.concurrency) as pool:
         results = [
             pool.apply_async(
                 process_network_validator_event,

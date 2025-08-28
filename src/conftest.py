@@ -100,7 +100,7 @@ def _create_keys(
             str(count),
             '--data-dir',
             str(data_dir),
-            '--pool-size',
+            '--concurrency',
             '1',
         ],
     )
