@@ -426,7 +426,7 @@ The validator exits are handled by oracles, but in case you want to force trigge
 validators, you can run the following command:
 
 ```bash
-./operator validators-exit
+./operator exit-validators
 ```
 
 Follow the steps, confirming your consensus node endpoint, Vault address, and the validator indexes to exit.
@@ -501,7 +501,7 @@ The partial withdrawals interval can be adjusted via the `PARTIAL_WITHDRAWALS_IN
 
 ### Automated withdrawals (Reward splitter)
 
-It is possible to periodically withdraw rewards for the vault’s fee shareholders. To enable this, set the wallet address connected to the operator as the `Fee Claimer` in the `Roles` tab under the vault’s Settings. Additionally, you must pass the --split-rewards flag when starting the Operator Service.
+It is possible to periodically withdraw rewards for the vault’s fee shareholders. To enable this, set the wallet address connected to the operator as the `Fee Claimer` in the `Roles` tab under the vault’s Settings. Additionally, you must pass the `--claim-fee-splitter` flag when starting the Operator Service.
 
 Periodic withdrawal task relies on Reward Splitter contract. The task combines the following contract calls into a multicall:
 
@@ -554,7 +554,7 @@ much CPU load and impact node performance during the creation and loading of key
 
 This command allows you to self-report your validator keys to the Rated Network, ensuring that your validator set is tracked and updated on the Rated Explorer.
 
-To use the `rated-self-report` command, you will need to provide the following parameters:
+To use the `submit-rated-network` command, you will need to provide the following parameters:
 
 - `--data-dir`: Path where the vault data will be placed. Default is ~/.stakewise.
 - `--vaults`:  The comma separated list of your vault addresses.
@@ -565,7 +565,7 @@ To use the `rated-self-report` command, you will need to provide the following p
 Here's an example of how to use the command:
 
 ```bash
-python src/main.py rated-self-report --vaults <your-vault-addresses> --network <network-name> --pool-tag <pool-tag> --token <your-oauth-token> --data-dir <path-to-data-dir>
+python src/main.py submit-rated-network --vaults <your-vault-addresses> --network <network-name> --pool-tag <pool-tag> --token <your-oauth-token> --data-dir <path-to-data-dir>
 ```
 
 ## V4 Upgrade Guide
