@@ -79,17 +79,15 @@ def test_get_funding_amounts(data_dir):
     public_key_1 = faker.eth_address()
     public_key_2 = faker.eth_address()
 
-    data = _get_funding_amounts({public_key_1: ether_to_gwei(32)}, funding_amount=ether_to_gwei(1))
+    data = _get_funding_amounts({public_key_1: ether_to_gwei(32)}, vault_assets=ether_to_gwei(1))
     assert data == {public_key_1: ether_to_gwei(1)}
 
-    data = _get_funding_amounts(
-        {public_key_1: ether_to_gwei(32)}, funding_amount=ether_to_gwei(100)
-    )
+    data = _get_funding_amounts({public_key_1: ether_to_gwei(32)}, vault_assets=ether_to_gwei(100))
     assert data == {public_key_1: ether_to_gwei(100)}
 
     data = _get_funding_amounts(
         {public_key_1: ether_to_gwei(32), public_key_2: ether_to_gwei(33)},
-        funding_amount=ether_to_gwei(2100),
+        vault_assets=ether_to_gwei(2100),
     )
     assert data == {
         public_key_2: ether_to_gwei(2015),
@@ -98,7 +96,7 @@ def test_get_funding_amounts(data_dir):
 
     data = _get_funding_amounts(
         {public_key_1: ether_to_gwei(2038), public_key_2: ether_to_gwei(32)},
-        funding_amount=ether_to_gwei(10.5),
+        vault_assets=ether_to_gwei(10.5),
     )
     assert data == {
         public_key_1: ether_to_gwei(10),
@@ -106,7 +104,7 @@ def test_get_funding_amounts(data_dir):
 
     data = _get_funding_amounts(
         {public_key_1: ether_to_gwei(32), public_key_2: ether_to_gwei(33)},
-        funding_amount=ether_to_gwei(2100.5),
+        vault_assets=ether_to_gwei(2100.5),
     )
     assert data == {
         public_key_2: ether_to_gwei(2015),
