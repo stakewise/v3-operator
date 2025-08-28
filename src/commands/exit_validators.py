@@ -116,9 +116,9 @@ class ValidatorExit:
     help='The log level.',
 )
 @click.option(
-    '--pool-size',
+    '--concurrency',
     help='Number of processes in a pool. The default is 1.',
-    envvar='POOL_SIZE',
+    envvar='CONCURRENCY',
     type=int,
 )
 @click.command(help='Performs a voluntary exit for active vault validators.')
@@ -137,7 +137,7 @@ def exit_validators(
     data_dir: str,
     verbose: bool,
     log_level: str,
-    pool_size: int | None,
+    concurrency: int | None,
 ) -> None:
     # pylint: disable=duplicate-code
     operator_config = OperatorConfig(Path(data_dir))
@@ -162,7 +162,7 @@ def exit_validators(
         hashi_vault_parallelism=hashi_vault_parallelism,
         verbose=verbose,
         log_level=log_level,
-        pool_size=pool_size,
+        concurrency=concurrency,
     )
     try:
         # Try-catch to enable async calls in test - an event loop

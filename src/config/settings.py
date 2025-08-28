@@ -97,7 +97,7 @@ class Settings(metaclass=Singleton):
     validators_fetch_chunk_size: int
     sentry_dsn: str
     sentry_environment: str
-    pool_size: int | None
+    concurrency: int | None
 
     relayer_type: str
     relayer_endpoint: str
@@ -156,7 +156,7 @@ class Settings(metaclass=Singleton):
         database_dir: str | None = None,
         log_level: str | None = None,
         log_format: str | None = None,
-        pool_size: int | None = None,
+        concurrency: int | None = None,
         relayer_type: str = RelayerTypes.DEFAULT,
         relayer_endpoint: str | None = None,
         validators_registration_mode: ValidatorsRegistrationMode = ValidatorsRegistrationMode.AUTO,
@@ -262,7 +262,7 @@ class Settings(metaclass=Singleton):
         self.validators_fetch_chunk_size = decouple_config(
             'VALIDATORS_FETCH_CHUNK_SIZE', default=100, cast=int
         )
-        self.pool_size = pool_size
+        self.concurrency = concurrency
         self.execution_timeout = decouple_config('EXECUTION_TIMEOUT', default=30, cast=int)
         self.execution_transaction_timeout = decouple_config(
             'EXECUTION_TRANSACTION_TIMEOUT', default=300, cast=int

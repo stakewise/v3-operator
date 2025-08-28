@@ -44,7 +44,7 @@ class LocalKeystore(BaseKeystore):
         keystore_files = LocalKeystore.list_keystore_files()
         logger.info('Loading keys from %s...', settings.keystores_dir)
         keystores_data = []
-        with Pool(processes=settings.pool_size) as pool:
+        with Pool(processes=settings.concurrency) as pool:
             # pylint: disable-next=unused-argument
             def _stop_pool(*args, **kwargs):  # type: ignore
                 pool.close()

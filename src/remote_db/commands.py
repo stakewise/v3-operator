@@ -122,9 +122,9 @@ def cleanup(ctx: Context) -> None:
     help='Comma separated list of API endpoints for execution nodes.',
 )
 @click.option(
-    '--pool-size',
+    '--concurrency',
     help='Number of processes in a pool.',
-    envvar='POOL_SIZE',
+    envvar='CONCURRENCY',
     type=int,
 )
 @click.option(
@@ -141,7 +141,7 @@ def upload_keypairs(
     encrypt_key: str,
     execution_endpoints: str,
     execution_jwt_secret: str | None,
-    pool_size: int | None,
+    concurrency: int | None,
 ) -> None:
     settings.set(
         vaults=[],
@@ -151,7 +151,7 @@ def upload_keypairs(
         verbose=settings.verbose,
         execution_endpoints=execution_endpoints,
         execution_jwt_secret=execution_jwt_secret,
-        pool_size=pool_size,
+        concurrency=concurrency,
     )
     try:
         asyncio.run(_setup_clients_and_upload_keypairs(ctx.obj['db_url'], encrypt_key))

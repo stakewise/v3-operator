@@ -41,9 +41,9 @@ from src.config.settings import settings
     type=click.IntRange(min=1),
 )
 @click.option(
-    '--pool-size',
+    '--concurrency',
     help='Number of processes in a pool. The default is 1.',
-    envvar='POOL_SIZE',
+    envvar='CONCURRENCY',
     type=int,
 )
 @click.option(
@@ -61,7 +61,7 @@ def create_keys(
     count: int,
     data_dir: str,
     per_keystore_password: bool,
-    pool_size: int | None,
+    concurrency: int | None,
     network: str | None,
 ) -> None:
     try:
@@ -80,7 +80,7 @@ def create_keys(
         mnemonic=mnemonic,
         count=count,
         start_index=operator_config.mnemonic_next_index,
-        pool_size=pool_size,
+        concurrency=concurrency,
     )
 
     # first generate files in tmp directory
@@ -92,7 +92,7 @@ def create_keys(
             keystores_dir=tmp_keystores_dir,
             password_file=operator_config.keystores_password_file,
             per_keystore_password=per_keystore_password,
-            pool_size=pool_size,
+            concurrency=concurrency,
         )
         operator_config.increment_mnemonic_index(count)
 
@@ -115,7 +115,7 @@ def _export_keystores(
     keystores_dir: Path,
     password_file: Path,
     per_keystore_password: bool,
-    pool_size: int | None = None,
+    concurrency: int | None = None,
 ) -> None:
     keystores_dir.mkdir(exist_ok=True)
 
@@ -128,7 +128,7 @@ def _export_keystores(
             show_percent=False,
             show_pos=True,
         ) as progress_bar,
-        Pool(processes=pool_size) as pool,
+        Pool(processes=concurrency) as pool,
     ):
         results = [
             pool.apply_async(

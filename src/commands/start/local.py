@@ -57,7 +57,7 @@ def start_local(
     wallet_password_file: str | None,
     max_fee_per_gas_gwei: int | None,
     database_dir: str | None,
-    pool_size: int | None,
+    concurrency: int | None,
     min_validators_registration: int,
     min_deposit_amount_gwei: int,
     no_confirm: bool,
@@ -95,7 +95,7 @@ def start_local(
         database_dir=database_dir,
         log_level=log_level,
         log_format=log_format,
-        pool_size=pool_size,
+        concurrency=concurrency,
         min_validators_registration=min_validators_registration,
         min_deposit_amount_gwei=Gwei(min_deposit_amount_gwei),
     )
