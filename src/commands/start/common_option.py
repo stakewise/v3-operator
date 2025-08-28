@@ -186,9 +186,9 @@ start_common_options = [
         help='The log level.',
     ),
     click.option(
-        '--pool-size',
+        '--concurrency',
         help='Number of processes in a pool.',
-        envvar='POOL_SIZE',
+        envvar='CONCURRENCY',
         type=int,
     ),
     click.option(
