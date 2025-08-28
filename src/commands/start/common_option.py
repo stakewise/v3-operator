@@ -17,7 +17,6 @@ from src.config.settings import (
     DEFAULT_METRICS_PREFIX,
     DEFAULT_MIN_DEPOSIT_AMOUNT,
     DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
-    DEFAULT_MIN_VALIDATORS_REGISTRATION,
     LOG_FORMATS,
     LOG_PLAIN,
 )
@@ -193,13 +192,6 @@ start_common_options = [
         help='Number of processes in a pool.',
         envvar='CONCURRENCY',
         type=int,
-    ),
-    click.option(
-        '--min-validators-registration',
-        type=int,
-        envvar='MIN_VALIDATORS_REGISTRATION',
-        help='Minimum number of validators required to start registration.',
-        default=DEFAULT_MIN_VALIDATORS_REGISTRATION,
     ),
     click.option(
         '--min-deposit-amount-gwei',

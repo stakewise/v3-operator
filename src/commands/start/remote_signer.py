@@ -49,7 +49,6 @@ def start_remote_signer(
     max_fee_per_gas_gwei: int | None,
     database_dir: str | None,
     concurrency: int | None,
-    min_validators_registration: int,
     min_deposit_amount_gwei: int,
     no_confirm: bool,
 ) -> None:
@@ -87,7 +86,6 @@ def start_remote_signer(
         log_level=log_level,
         log_format=log_format,
         concurrency=concurrency,
-        min_validators_registration=min_validators_registration,
         min_deposit_amount_gwei=Gwei(min_deposit_amount_gwei),
     )
 
