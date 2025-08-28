@@ -15,8 +15,6 @@ DEFAULT_METRICS_HOST = '127.0.0.1'
 DEFAULT_METRICS_PORT = 9100
 DEFAULT_METRICS_PREFIX = 'sw_operator'
 
-DEFAULT_MIN_VALIDATORS_REGISTRATION = 1
-
 DEFAULT_HASHI_VAULT_PARALLELISM = 8
 DEFAULT_HASHI_VAULT_ENGINE_NAME = 'secret'
 
@@ -118,7 +116,6 @@ class Settings(metaclass=Singleton):
         'DISABLE_FULL_WITHDRAWALS', default=False, cast=bool
     )
 
-    min_validators_registration: int
     min_deposit_amount_gwei: Gwei
 
     # pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements
@@ -160,7 +157,6 @@ class Settings(metaclass=Singleton):
         relayer_type: str = RelayerTypes.DEFAULT,
         relayer_endpoint: str | None = None,
         validators_registration_mode: ValidatorsRegistrationMode = ValidatorsRegistrationMode.AUTO,
-        min_validators_registration: int = DEFAULT_MIN_VALIDATORS_REGISTRATION,
         min_deposit_amount_gwei: Gwei = DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
     ) -> None:
         self.vaults = vaults
@@ -186,7 +182,6 @@ class Settings(metaclass=Singleton):
             max_fee_per_gas_gwei = self.network_config.MAX_FEE_PER_GAS_GWEI
 
         self.max_fee_per_gas_gwei = Gwei(max_fee_per_gas_gwei)
-        self.min_validators_registration = min_validators_registration
         self.min_deposit_amount_gwei = min_deposit_amount_gwei
 
         # keystores
