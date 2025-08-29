@@ -21,6 +21,8 @@ DEFAULT_HASHI_VAULT_ENGINE_NAME = 'secret'
 DEFAULT_MIN_DEPOSIT_AMOUNT = Web3.to_wei(1, 'ether')
 DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI = Gwei(int(Web3.from_wei(DEFAULT_MIN_DEPOSIT_AMOUNT, 'gwei')))
 
+DEFAULT_MIN_DEPOSIT_DELAY = 3600  # 1 hour
+
 
 class ValidatorsRegistrationMode(Enum):
     """
@@ -117,6 +119,7 @@ class Settings(metaclass=Singleton):
     )
 
     min_deposit_amount_gwei: Gwei
+    min_deposit_delay: int
 
     # pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements
     def set(
@@ -158,6 +161,7 @@ class Settings(metaclass=Singleton):
         relayer_endpoint: str | None = None,
         validators_registration_mode: ValidatorsRegistrationMode = ValidatorsRegistrationMode.AUTO,
         min_deposit_amount_gwei: Gwei = DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
+        min_deposit_delay: int = DEFAULT_MIN_DEPOSIT_DELAY,
     ) -> None:
         self.vaults = vaults
         data_dir.mkdir(parents=True, exist_ok=True)
@@ -183,6 +187,7 @@ class Settings(metaclass=Singleton):
 
         self.max_fee_per_gas_gwei = Gwei(max_fee_per_gas_gwei)
         self.min_deposit_amount_gwei = min_deposit_amount_gwei
+        self.min_deposit_delay = min_deposit_delay
 
         # keystores
         self.keystores_dir = Path(keystores_dir) if keystores_dir else data_dir / 'keystores'

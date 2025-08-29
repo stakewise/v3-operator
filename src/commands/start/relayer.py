@@ -57,6 +57,7 @@ def start_relayer(
     metrics_prefix: str,
     validator_type: ValidatorType,
     min_deposit_amount_gwei: int,
+    min_deposit_delay: int,
     data_dir: str,
     log_level: str,
     log_format: str,
@@ -114,6 +115,7 @@ def start_relayer(
         relayer_endpoint=relayer_endpoint,
         validators_registration_mode=validators_registration_mode,
         min_deposit_amount_gwei=Gwei(min_deposit_amount_gwei),
+        min_deposit_delay=min_deposit_delay,
     )
 
     try:

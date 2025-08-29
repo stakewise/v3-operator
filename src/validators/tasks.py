@@ -8,7 +8,8 @@ from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.types import BlockNumber, ChecksumAddress, Gwei, Wei
 
-from src.common.contracts import validators_registry_contract
+from src.common.clients import execution_client
+from src.common.contracts import VaultContract, validators_registry_contract
 from src.common.execution import build_gas_manager, get_protocol_config
 from src.common.harvest import get_harvest_params
 from src.common.metrics import metrics
@@ -88,18 +89,32 @@ async def process_validators(
     if not await gas_manager.check_gas_price():
         return None
 
-    validators_balances = await fetch_compounding_validators_balances(vault_address)
-    if validators_balances:
+    compounding_validators_balances = await fetch_compounding_validators_balances(vault_address)
+    funding_amounts = _get_funding_amounts(
+        compounding_validators_balances=compounding_validators_balances,
+        vault_assets=Gwei(int(Web3.from_wei(vault_assets, 'gwei'))),
+    )
+
+    if funding_amounts:
+        if not await _is_funding_interval_passed(vault_address):
+            return
+
         try:
-            vault_assets = await fund_compounding_validators(
+            tx_hash = await fund_compounding_validators(
                 vault_address=vault_address,
-                validators_balances=validators_balances,
+                funding_amounts=funding_amounts,
                 keystore=keystore,
-                amount=vault_assets,
                 harvest_params=harvest_params,
+            )
+            if not tx_hash:
+                return
+
+            vault_assets = Wei(
+                max(vault_assets - Web3.to_wei(sum(funding_amounts.values()), 'gwei'), 0)
             )
         except EmptyRelayerResponseException:
             return
+
         if not vault_assets:
             return
         logger.info(
@@ -116,25 +131,16 @@ async def process_validators(
     )
 
 
-# pylint: disable-next=too-many-arguments
 async def fund_compounding_validators(
     vault_address: ChecksumAddress,
     keystore: BaseKeystore | None,
-    validators_balances: dict[HexStr, Gwei],
-    amount: Wei,
+    funding_amounts: dict[HexStr, Gwei],
     harvest_params: HarvestParams | None,
     relayer_adapter: RelayerAdapter | None = None,
-) -> Wei:
+) -> HexStr | None:
     """
     Funds vault compounding validators with the specified amount.
-    Returns the remaining amount after funding.
     """
-    funding_amounts = _get_funding_amounts(
-        validators_balances, Gwei(int(Web3.from_wei(amount, 'gwei')))
-    )
-    if not funding_amounts:
-        raise ValueError('Can not fund validators')
-
     logger.info('Started funding of %d validator(s)', len(funding_amounts))
     validators_manager_signature = HexStr('0x')
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
@@ -165,8 +171,7 @@ async def fund_compounding_validators(
     if tx_hash:
         pub_keys = ', '.join(funding_amounts.keys())
         logger.info('Successfully funded validator(s) with public key(s) %s', pub_keys)
-
-    return Wei(max(amount - Web3.to_wei(sum(funding_amounts.values()), 'gwei'), 0))
+    return tx_hash
 
 
 # pylint: disable-next=too-many-locals,too-many-return-statements,too-many-branches,disable-next=too-many-arguments
@@ -324,17 +329,29 @@ def _get_deposits_amounts(vault_assets: int, validator_type: ValidatorType) -> l
 
 
 def _get_funding_amounts(
-    vault_validators: dict[HexStr, Gwei], funding_amount: Gwei
+    compounding_validators_balances: dict[HexStr, Gwei], vault_assets: Gwei
 ) -> dict[HexStr, Gwei]:
     result = {}
     for public_key, balance in sorted(
-        vault_validators.items(), key=lambda item: item[1], reverse=True
+        compounding_validators_balances.items(), key=lambda item: item[1], reverse=True
     ):
         remaining_capacity = MAX_EFFECTIVE_BALANCE_GWEI - balance
         if remaining_capacity >= settings.min_deposit_amount_gwei:
-            val_amount = min(remaining_capacity, funding_amount)
+            val_amount = min(remaining_capacity, vault_assets)
             result[public_key] = Gwei(val_amount)
-            funding_amount = Gwei(funding_amount - val_amount)
-        if funding_amount < settings.min_deposit_amount_gwei:
+            vault_assets = Gwei(vault_assets - val_amount)
+        if vault_assets < settings.min_deposit_amount_gwei:
             break
     return result
+
+
+async def _is_funding_interval_passed(vault_address: ChecksumAddress) -> bool:
+    """
+    Check if the required interval has passed since the last funding event.
+    Mitigate gas griefing attack
+    """
+    blocks_delay = settings.min_deposit_delay // settings.network_config.SECONDS_PER_BLOCK
+    to_block = await execution_client.eth.get_block_number()
+    from_block = BlockNumber(to_block - blocks_delay)
+    funding_events = await VaultContract(vault_address).get_funding_events(from_block, to_block)
+    return len(funding_events) == 0
