@@ -151,21 +151,21 @@ def consolidate(
     log_level: str,
     source_public_keys: list[HexStr] | None,
     source_public_keys_file: Path | None,
-    target_public_key: HexStr,
+    target_public_key: HexStr | None = None,
 ) -> None:
     if all([source_public_keys, source_public_keys_file]):
         raise click.ClickException(
             'Provide only one parameter: either --from-public-keys-file or --from-public-keys.'
         )
-    if not any([source_public_keys, source_public_keys_file]):
+    if not any([source_public_keys, source_public_keys_file]) and target_public_key:
         raise click.ClickException(
-            'One of these parameters must be provided:'
+            'One of these parameters must be provided with target-public-key:'
             ' --from-public-keys-file or --from-public-keys.'
         )
 
     if source_public_keys_file:
         source_public_keys = _load_public_keys(source_public_keys_file)
-    source_public_keys = cast(list[HexStr], source_public_keys)
+
     operator_config = OperatorConfig(Path(data_dir))
     operator_config.load(network=network)
 
@@ -196,8 +196,8 @@ def consolidate(
 
 async def main(
     vault_address: ChecksumAddress,
-    source_public_keys: list[HexStr],
-    target_public_key: HexStr,
+    source_public_keys: list[HexStr] | None,
+    target_public_key: HexStr | None,
     no_confirm: bool,
 ) -> None:
     # pylint: disable=line-too-long
@@ -213,15 +213,28 @@ async def main(
 
     await _check_validators_manager(vault_address)
     await _check_consolidations_queue()
-    await _check_public_keys(
-        vault_address=vault_address,
-        source_public_keys=source_public_keys,
-        target_public_key=target_public_key,
-        chain_head=chain_head,
-    )
-    target_source_public_keys = [
-        (target_public_key, source_key) for source_key in source_public_keys
-    ]
+
+    if source_public_keys is not None and target_public_key is not None:
+        # keys provided by the user
+        await _check_public_keys(
+            vault_address=vault_address,
+            source_public_keys=source_public_keys,
+            target_public_key=target_public_key,
+            chain_head=chain_head,
+        )
+        target_source_public_keys = [
+            (target_public_key, source_key) for source_key in source_public_keys
+        ]
+
+    else:
+        target_source_public_keys = await _find_target_source_public_keys(
+            vault_address=vault_address,
+            chain_head=chain_head,
+        )
+        if not target_source_public_keys:
+            raise click.ClickException(
+                f'Validators in vault {vault_address} can\'t be consolidated'
+            )
 
     click.secho(
         f'Consolidating {len(target_source_public_keys)} validators: ',
@@ -384,3 +397,67 @@ def _load_public_keys(public_keys_file: Path) -> list[HexStr]:
         public_keys = [HexStr(line.rstrip()) for line in f]
 
     return public_keys
+
+
+async def _find_target_source_public_keys(
+    vault_address: ChecksumAddress, chain_head: ChainHead
+) -> list[tuple[HexStr, HexStr]]:
+    """
+    If there are no 0x02 validators,
+    take the oldest 0x01 validator and convert it to 0x02 with confirmation prompt.
+    If there is 0x02 validator,
+    take the oldest 0x01 validators to top up its balance to 2048 ETH / 64 GNO.
+    """
+    max_activation_epoch = chain_head.epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
+
+    pending_partial_withdrawals = await consensus_client.get_pending_partial_withdrawals()
+    pending_partial_withdrawals_indexes = {
+        int(withdrawal['validator_index'])
+        for withdrawal in pending_partial_withdrawals
+        if withdrawal['amount']
+    }
+
+    vault_contract = VaultContract(vault_address)
+    public_keys = await vault_contract.get_registered_validators_public_keys(
+        from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
+        to_block=chain_head.block_number,
+    )
+    consensus_validators = await fetch_consensus_validators(public_keys)
+    active_validators = {val for val in consensus_validators if val.status not in EXITING_STATUSES}
+    if len(active_validators) < 2:
+        raise click.ClickException(
+            f'Not enough active validators for vault {vault_address} to consolidate'
+        )
+
+    compounding_validators = [val for val in active_validators if val.is_compounding]
+    if not compounding_validators:
+        # no 0x02 validators, switch the oldest 0x01 to 0x02
+        # should be active long enough
+        can_be_compounded_validators = [
+            val
+            for val in active_validators
+            if val.activation_epoch < max_activation_epoch
+            and val.index not in pending_partial_withdrawals_indexes
+        ]
+        oldest_validator = min(can_be_compounded_validators, key=lambda val: val.activation_epoch)
+        return [(oldest_validator.public_key, oldest_validator.public_key)]
+
+    # there is at least one 0x02 validator, top up from oldest 0x01 validators
+    target_validator = min(compounding_validators, key=lambda val: val.balance)
+    source_validators: list[ConsensusValidator] = []
+    for val in sorted(
+        (val for val in active_validators if not val.is_compounding),
+        key=lambda val: val.activation_epoch,
+    ):
+        if val.activation_epoch > max_activation_epoch:
+            continue
+        if val.index in pending_partial_withdrawals_indexes:
+            continue
+        if (
+            target_validator.balance + sum(v.balance for v in source_validators)
+            > MAX_EFFECTIVE_BALANCE_GWEI
+        ):
+            break
+        source_validators.append(val)
+
+    return [(target_validator.public_key, val.public_key) for val in source_validators]
