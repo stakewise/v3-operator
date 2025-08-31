@@ -18,6 +18,7 @@ from src.nodes.process import (
     ProcessRunner,
     RethProcessBuilder,
 )
+from src.nodes.status import update_sync_status_periodically
 from src.nodes.typings import StdStreams
 from src.validators.keystores.local import LocalKeystore
 
@@ -129,6 +130,7 @@ async def main(
             reth_runner.run(),
             lighthouse_runner.run(),
             lighthouse_vc_runner.run(),
+            update_sync_status_periodically(),
         )
     except NodeFailedToStartError as e:
         click.echo(str(e))
