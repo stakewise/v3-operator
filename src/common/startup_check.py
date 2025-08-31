@@ -139,6 +139,7 @@ async def wait_for_consensus_node() -> None:
     while True:
         for consensus_endpoint in settings.consensus_endpoints:
             try:
+                # Create non-retry client to fail fast
                 consensus_client = get_consensus_client(
                     [consensus_endpoint],
                     user_agent=OPERATOR_USER_AGENT,
@@ -179,6 +180,7 @@ async def wait_for_execution_node() -> None:
     while True:
         for execution_endpoint in settings.execution_endpoints:
             try:
+                # Create non-retry client to fail fast
                 execution_client = get_execution_client(
                     [execution_endpoint],
                     jwt_secret=settings.execution_jwt_secret,

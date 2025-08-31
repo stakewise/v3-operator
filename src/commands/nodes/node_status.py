@@ -9,6 +9,7 @@ from sw_utils.consensus import ACTIVE_STATUSES, ValidatorStatus
 from src.common.clients import consensus_client, execution_client, setup_clients
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_NETWORK, settings
+from src.nodes.status import calc_sync_eta
 from src.validators.keystores.local import LocalKeystore
 
 logger = logging.getLogger(__name__)
@@ -45,8 +46,8 @@ OUTPUT_FORMATS = ['text', 'json']
     type=click.Choice(OUTPUT_FORMATS, case_sensitive=False),
     show_default=True,
 )
-@click.command(help='Displays the status of the nodes.')
-def node_status(data_dir: Path, network: str, output_format: str) -> None:
+@click.command(help='Displays the status of the nodes.', name='node-status')
+def node_status_command(data_dir: Path, network: str, output_format: str) -> None:
     # Minimal settings for the nodes
     settings.set(
         vaults=[],
@@ -59,11 +60,20 @@ def node_status(data_dir: Path, network: str, output_format: str) -> None:
 async def main(output_format: str) -> None:
     await setup_clients()
 
-    consensus_node_status, execution_node_status = await asyncio.gather(
-        get_consensus_node_status(), get_execution_node_status()
+    # Get node statuses concurrently
+    consensus_node_status, execution_node_status, sync_eta = await asyncio.gather(
+        get_consensus_node_status(), get_execution_node_status(), calc_sync_eta()
     )
-    log_consensus_node_status(consensus_node_status, output_format)
-    log_execution_node_status(execution_node_status, output_format)
+    execution_eta = sync_eta.get('execution_eta')
+    consensus_eta = sync_eta.get('consensus_eta')
+
+    # Log statuses
+    log_consensus_node_status(
+        node_status=consensus_node_status, output_format=output_format, eta=execution_eta
+    )
+    log_execution_node_status(
+        node_status=execution_node_status, output_format=output_format, eta=consensus_eta
+    )
 
     if consensus_node_status['is_syncing'] is False:
         validator_activity_stats = await get_validator_activity_stats()
@@ -101,35 +111,47 @@ async def get_execution_node_status() -> dict:
     return {'is_syncing': is_syncing, 'block_number': block_number}
 
 
-def log_consensus_node_status(consensus_node_status: dict, output_format: str) -> None:
+def log_consensus_node_status(node_status: dict, output_format: str, eta: int | None) -> None:
     if output_format == 'json':
-        click.echo(json.dumps({'consensus_node': consensus_node_status}))
+        click.echo(json.dumps({'consensus_node': node_status, 'eta': eta}))
     else:
-        if not consensus_node_status:
+        if not node_status:
             click.echo('Consensus node status: unavailable.')
             return
 
-        click.echo(
+        status_message = (
             f'Consensus node status:\n'
-            f'  Is syncing: {consensus_node_status['is_syncing']}\n'
-            f'  Sync distance: {consensus_node_status['sync_distance']}\n'
-            f'  Finalized epoch: {consensus_node_status['finalized_epoch']}'
+            f'  Is syncing: {node_status['is_syncing']}\n'
+            f'  Sync distance: {node_status['sync_distance']}\n'
+            f'  Finalized epoch: {node_status['finalized_epoch']}'
         )
+        if node_status['is_syncing'] and eta is not None:
+            status_message += f'\n  Estimated time to sync: {eta} seconds'
+        elif node_status['is_syncing'] and eta is None:
+            status_message += '\n  Estimated time to sync: unavailable'
+
+        click.echo(status_message)
 
 
-def log_execution_node_status(execution_node_status: dict, output_format: str) -> None:
+def log_execution_node_status(node_status: dict, output_format: str, eta: int | None) -> None:
     if output_format == 'json':
-        click.echo(json.dumps({'execution_node': execution_node_status}))
+        click.echo(json.dumps({'execution_node': node_status, 'eta': eta}))
     else:
-        if not execution_node_status:
+        if not node_status:
             click.echo('Execution node status: unavailable.')
             return
 
-        click.echo(
+        status_message = (
             f'Execution node status:\n'
-            f'  Is syncing: {execution_node_status['is_syncing']}\n'
-            f'  Block number: {execution_node_status['block_number']}'
+            f'  Is syncing: {node_status['is_syncing']}\n'
+            f'  Block number: {node_status['block_number']}'
         )
+        if node_status['is_syncing'] and eta is not None:
+            status_message += f'\n  Estimated time to sync: {eta} seconds'
+        elif node_status['is_syncing'] and eta is None:
+            status_message += '\n  Estimated time to sync: unavailable'
+
+        click.echo(status_message)
 
 
 async def get_validator_activity_stats() -> dict:
