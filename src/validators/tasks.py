@@ -53,7 +53,7 @@ class ValidatorRegistrationSubtask:
         self.keystore = keystore
         self.relayer_adapter = relayer_adapter
 
-    async def process_block(self) -> None:
+    async def process(self) -> None:
         if self.keystore:
             await update_unused_validator_keys_metric(
                 keystore=self.keystore,
