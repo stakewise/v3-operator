@@ -258,7 +258,7 @@ def _get_remote_db_keypairs(
         keystores[public_key] = private_key
 
     key_records: list[RemoteDatabaseKeyPair] = []
-    for public_key, private_key in keystores.items():  # pylint: disable=no-member
+    for public_key, private_key in keystores.items():
         encrypted_priv_key, nonce = _encrypt_private_key(private_key, encryption_key)
         key_records.append(
             RemoteDatabaseKeyPair(

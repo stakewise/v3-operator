@@ -67,7 +67,6 @@ class ValidatorRegistrationSubtask:
             )
 
 
-# pylint: disable-next=too-many-locals,too-many-return-statements,too-many-branches
 async def process_validators(
     vault_address: ChecksumAddress,
     keystore: BaseKeystore | None,
@@ -174,7 +173,7 @@ async def fund_compounding_validators(
     return tx_hash
 
 
-# pylint: disable-next=too-many-locals,too-many-return-statements,too-many-branches,disable-next=too-many-arguments
+# pylint: disable-next=too-many-locals
 async def register_new_validators(
     vault_address: ChecksumAddress,
     vault_assets: Wei,

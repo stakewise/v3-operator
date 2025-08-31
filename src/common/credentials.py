@@ -126,7 +126,6 @@ class Credential:
 
 class CredentialManager:
     @staticmethod
-    # pylint: disable-next=too-many-arguments
     def generate_credentials(
         network: str,
         mnemonic: str,
