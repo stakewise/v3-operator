@@ -378,7 +378,10 @@ async def _check_validators_manager(vault_address: ChecksumAddress) -> None:
     vault_contract = VaultContract(vault_address)
     validators_manager = await vault_contract.validators_manager()
     if validators_manager != wallet.account.address:
-        raise RuntimeError('validators manager address must equal to wallet address')
+        raise RuntimeError(
+            f'The Validators Manager role must be assigned to the address {wallet.account.address}.'
+            f' Please update it in the vault settings.'
+        )
 
 
 async def _check_vault_version() -> None:

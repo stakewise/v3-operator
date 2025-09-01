@@ -356,7 +356,10 @@ async def _check_validators_manager(vault_address: ChecksumAddress) -> None:
     vault_contract = VaultContract(vault_address)
     validators_manager = await vault_contract.validators_manager()
     if validators_manager != wallet.account.address:
-        raise click.ClickException('validators manager address must equal to wallet address')
+        raise click.ClickException(
+            f'The Validators Manager role must be assigned to the address {wallet.account.address}.'
+            f' Please update it in the vault settings.'
+        )
 
 
 async def _check_consolidations_queue() -> None:

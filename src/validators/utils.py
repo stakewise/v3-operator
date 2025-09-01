@@ -52,7 +52,7 @@ async def get_validators_for_funding(
     validators = []
     for public_key, amount in funding_amounts.items():
         if public_key not in keystore:
-            raise RuntimeError(f'Public key {public_key} not found in keystore')
+            raise RuntimeError(f'Public key {public_key} not found in keystores')
         deposit_data = await keystore.get_deposit_data(
             public_key=public_key, amount=amount, vault_address=vault_address
         )
