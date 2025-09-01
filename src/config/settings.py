@@ -260,7 +260,7 @@ class Settings(metaclass=Singleton):
         )
 
         self.validators_fetch_chunk_size = decouple_config(
-            'VALIDATORS_FETCH_CHUNK_SIZE', default=100, cast=int
+            'VALIDATORS_FETCH_CHUNK_SIZE', default=50000, cast=int
         )
         self.concurrency = concurrency
         self.execution_timeout = decouple_config('EXECUTION_TIMEOUT', default=30, cast=int)
