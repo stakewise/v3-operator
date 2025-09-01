@@ -6,6 +6,7 @@ from sw_utils.consensus import EXITED_STATUSES
 from web3.types import Gwei
 
 from src.common.clients import consensus_client
+from src.common.consensus import get_chain_justified_head
 from src.config.settings import settings
 from src.validators.database import VaultValidatorCrud
 from src.validators.execution import get_latest_vault_v2_validator_public_keys
@@ -30,7 +31,11 @@ async def fetch_compounding_validators_balances(
     vault_public_keys.update(non_finalized_public_keys)
     if not vault_public_keys:
         return {}
-    consensus_validators = await fetch_consensus_validators(list(vault_public_keys))
+
+    chain_head = await get_chain_justified_head()
+    consensus_validators = await fetch_consensus_validators(
+        list(vault_public_keys), slot=str(chain_head.slot)
+    )
 
     active_validator_balances = {
         v.public_key: v.balance
@@ -38,7 +43,7 @@ async def fetch_compounding_validators_balances(
         if v.is_compounding and v.status not in EXITING_STATUSES
     }
 
-    all_pending_deposits = await consensus_client.get_pending_deposits()
+    all_pending_deposits = await consensus_client.get_pending_deposits(chain_head.slot)
     pending_deposits = {
         deposit['pubkey']: Gwei(int(deposit['amount']))
         for deposit in all_pending_deposits
@@ -55,11 +60,13 @@ async def fetch_compounding_validators_balances(
 
 
 async def fetch_consensus_validators(
-    public_keys: list[HexStr],
+    public_keys: list[HexStr], slot: str = 'head'
 ) -> list[ConsensusValidator]:
     validators = []
     for chunk_keys in chunkify(public_keys, settings.validators_fetch_chunk_size):
-        beacon_validators = await consensus_client.get_validators_by_ids(chunk_keys)
+        beacon_validators = await consensus_client.get_validators_by_ids(
+            validator_ids=chunk_keys, state_id=slot
+        )
         for beacon_validator in beacon_validators['data']:
             validators.append(ConsensusValidator.from_consensus_data(beacon_validator))
 
