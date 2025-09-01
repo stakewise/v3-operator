@@ -57,7 +57,7 @@ from src.remote_db.database import check_db_connection
     is_flag=True,
 )
 @click.pass_context
-# pylint: disable-next=too-many-arguments,too-many-locals
+# pylint: disable-next=too-many-arguments
 def remote_db_group(
     ctx: Context,
     data_dir: str,
@@ -135,7 +135,6 @@ def cleanup(ctx: Context) -> None:
     'when connecting to execution nodes.',
 )
 @click.pass_context
-# pylint: disable-next=too-many-arguments
 def upload_keypairs(
     ctx: Context,
     encrypt_key: str,

@@ -71,7 +71,6 @@ async def send_signature_rotation_requests(
     return process_oracles_approvals(approvals, protocol_config.validators_threshold)
 
 
-# pylint: disable=duplicate-code
 @retry_aiohttp_errors(delay=DEFAULT_RETRY_TIME)
 async def send_signature_rotation_request_to_replicas(
     session: aiohttp.ClientSession, replicas: list[str], payload: dict

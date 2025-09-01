@@ -48,7 +48,6 @@ def cleanup(db_url: str) -> None:
         keypairs_crud.remove_keypairs()
 
 
-# pylint: disable=too-many-locals
 async def upload_keypairs(db_url: str, b64_encrypt_key: str) -> None:
     """Uploads key-pairs to remote DB. Updates configs in the remote DB."""
     encryption_key = _check_encryption_key(db_url, b64_encrypt_key)

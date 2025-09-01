@@ -200,7 +200,7 @@ async def send_approval_requests(
     return process_oracles_approvals(approvals, protocol_config.validators_threshold)
 
 
-# pylint: disable-next=too-many-arguments,too-many-locals
+# pylint: disable-next=too-many-arguments
 async def create_approval_request(
     vault_address: ChecksumAddress,
     protocol_config: ProtocolConfig,

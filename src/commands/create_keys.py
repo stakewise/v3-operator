@@ -55,7 +55,7 @@ from src.config.settings import settings
     ),
 )
 @click.command(help='Creates the validator keys from the mnemonic.')
-# pylint: disable-next=too-many-arguments,too-many-locals
+# pylint: disable-next=too-many-arguments
 def create_keys(
     mnemonic: str,
     count: int,

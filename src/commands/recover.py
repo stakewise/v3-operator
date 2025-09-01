@@ -133,7 +133,6 @@ def recover(
         sys.exit(1)
 
 
-# pylint: disable-next=too-many-arguments
 async def main(
     mnemonic: str,
     per_keystore_password: bool,
@@ -195,7 +194,6 @@ async def main(
     )
 
 
-# pylint: disable-next=too-many-locals
 async def _fetch_registered_validators(
     vault: ChecksumAddress,
 ) -> dict[HexStr, ValidatorStatus | None]:
@@ -225,7 +223,6 @@ async def _fetch_registered_validators(
     return validator_statuses
 
 
-# pylint: disable-next=too-many-arguments,too-many-locals
 async def _generate_keystores(
     mnemonic: str,
     keystores_dir: Path,

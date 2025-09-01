@@ -37,7 +37,7 @@ class LastWithdrawalNotProcessedError(ValueError):
 
 
 class ValidatorWithdrawalSubtask:
-    async def process_block(self, chain_head: ChainHead) -> None:
+    async def process(self, chain_head: ChainHead) -> None:
         """
         Every N hours check the exit queue and submit partial withdrawals if needed.
         """
