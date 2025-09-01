@@ -6,7 +6,6 @@ from sw_utils.consensus import EXITED_STATUSES
 from web3.types import Gwei
 
 from src.common.clients import consensus_client
-from src.common.consensus import get_chain_justified_head
 from src.config.settings import settings
 from src.validators.database import VaultValidatorCrud
 from src.validators.execution import get_latest_vault_v2_validator_public_keys
@@ -22,7 +21,8 @@ async def fetch_compounding_validators_balances(
 ) -> dict[HexStr, Gwei]:
     """
     Retrieves the actual balances of compounding validators in the vault.
-    Also includes non-activated validator balances.
+    Also includes balances from pending deposits
+    that have not yet been processed by the consensus node.
     """
     vault_public_keys = {
         key.public_key for key in VaultValidatorCrud().get_vault_validators(vault_address)
@@ -32,10 +32,9 @@ async def fetch_compounding_validators_balances(
     if not vault_public_keys:
         return {}
 
-    chain_head = await get_chain_justified_head()
-    consensus_validators = await fetch_consensus_validators(
-        list(vault_public_keys), slot=str(chain_head.slot)
-    )
+    consensus_block = await consensus_client.get_block('head')
+    slot = consensus_block['data']['message']['slot']
+    consensus_validators = await fetch_consensus_validators(list(vault_public_keys), slot=slot)
 
     validators_balances = {
         v.public_key: v.balance
@@ -43,7 +42,7 @@ async def fetch_compounding_validators_balances(
         if v.is_compounding and v.status not in EXITING_STATUSES
     }
 
-    all_pending_deposits = await consensus_client.get_pending_deposits(chain_head.slot)
+    all_pending_deposits = await consensus_client.get_pending_deposits(slot)
     for deposit in all_pending_deposits:
         public_key, amount = deposit['pubkey'], int(deposit['amount'])
         if public_key not in vault_public_keys:
