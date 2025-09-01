@@ -1,22 +1,57 @@
 import logging
 
 from eth_typing import ChecksumAddress, HexStr
-from eth_utils import add_0x_prefix
 from sw_utils import ValidatorStatus, chunkify
 from sw_utils.consensus import EXITED_STATUSES
-from web3 import Web3
-from web3.types import BlockNumber, Gwei, Wei
+from web3.types import Gwei
 
-from src.common.clients import consensus_client, execution_client
-from src.common.contracts import VaultContract
+from src.common.clients import consensus_client
 from src.config.settings import settings
 from src.validators.database import VaultValidatorCrud
 from src.validators.execution import get_latest_vault_v2_validator_public_keys
-from src.validators.typings import ConsensusValidator, VaultValidator
+from src.validators.typings import ConsensusValidator
 
 EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
 
 logger = logging.getLogger(__name__)
+
+
+async def fetch_compounding_validators_balances(
+    vault_address: ChecksumAddress,
+) -> dict[HexStr, Gwei]:
+    """
+    Retrieves the actual balances of compounding validators in the vault.
+    Also includes non-activated validator balances.
+    """
+    vault_public_keys = {
+        key.public_key for key in VaultValidatorCrud().get_vault_validators(vault_address)
+    }
+    non_finalized_public_keys = await get_latest_vault_v2_validator_public_keys(vault_address)
+    vault_public_keys.update(non_finalized_public_keys)
+    if not vault_public_keys:
+        return {}
+    consensus_validators = await fetch_consensus_validators(list(vault_public_keys))
+
+    active_validator_balances = {
+        v.public_key: v.balance
+        for v in consensus_validators
+        if v.is_compounding and v.status not in EXITING_STATUSES
+    }
+
+    all_pending_deposits = await consensus_client.get_pending_deposits()
+    pending_deposits = {
+        deposit['pubkey']: Gwei(int(deposit['amount']))
+        for deposit in all_pending_deposits
+        if deposit['pubkey'] in vault_public_keys
+        and deposit['withdrawal_credentials'].startswith('0x02')
+    }
+
+    # sum active balances and pending deposits
+    result: dict[HexStr, Gwei] = {}
+    for d in [active_validator_balances, pending_deposits]:
+        for k in d.keys():
+            result[k] = Gwei(result.get(k, 0) + d[k])
+    return result
 
 
 async def fetch_consensus_validators(
@@ -29,98 +64,3 @@ async def fetch_consensus_validators(
             validators.append(ConsensusValidator.from_consensus_data(beacon_validator))
 
     return validators
-
-
-async def fetch_compounding_validators_balances(
-    vault_address: ChecksumAddress,
-) -> dict[HexStr, Gwei]:
-    """
-    Retrieves the actual balances of compounding validators in the vault.
-    """
-    vault_contract = VaultContract(vault_address)
-    block_number = await execution_client.eth.get_block_number()
-
-    vault_validators = VaultValidatorCrud().get_vault_validators(vault_address)
-    vault_public_keys = {key.public_key for key in vault_validators}
-    non_finalized_public_keys = await get_latest_vault_v2_validator_public_keys(vault_address)
-    vault_public_keys.update(non_finalized_public_keys)
-    if not vault_public_keys:
-        return {}
-
-    active_validator_balances, non_activated_public_keys = (
-        await _fetch_compounding_balances_and_non_activated_keys(vault_public_keys)
-    )
-
-    non_activated_balances = await _get_non_activated_balances(
-        vault_validators=vault_validators,
-        non_activated_public_keys=non_activated_public_keys,
-        vault_contract=vault_contract,
-        block_number=block_number,
-    )
-
-    return active_validator_balances | non_activated_balances
-
-
-async def _fetch_compounding_balances_and_non_activated_keys(
-    public_keys: set[HexStr],
-) -> tuple[dict[HexStr, Gwei], list[HexStr]]:
-    """
-    Returns a tuple of active compounding validators with their balances
-    and a list of public keys not yet registered in the consensus client
-    """
-    validators = {}
-    consensus_public_keys = []
-    for chunk_keys in chunkify(list(public_keys), settings.validators_fetch_chunk_size):
-        beacon_validators = await consensus_client.get_validators_by_ids(chunk_keys)
-        for beacon_validator in beacon_validators['data']:
-            public_key = add_0x_prefix(beacon_validator['validator']['pubkey'])
-            consensus_public_keys.append(public_key)
-            withdrawal_credentials = beacon_validator['validator']['withdrawal_credentials']
-            if not withdrawal_credentials.startswith('0x02'):
-                continue
-
-            status = ValidatorStatus(beacon_validator['status'])
-            if status in EXITING_STATUSES:
-                continue
-
-            validators[public_key] = Gwei(int(beacon_validator['balance']))
-
-    return validators, list(set(public_keys) - set(consensus_public_keys))
-
-
-async def _get_non_activated_balances(
-    vault_validators: list[VaultValidator],
-    non_activated_public_keys: list[HexStr],
-    vault_contract: VaultContract,
-    block_number: BlockNumber,
-) -> dict[HexStr, Gwei]:
-    """Fetches the start balances for validators not yet registered in the consensus client."""
-    if not non_activated_public_keys:
-        return {}
-
-    min_funding_block = min(
-        v.block_number for v in vault_validators if v.public_key in non_activated_public_keys
-    )
-    compounding_event_data = await vault_contract.get_compounding_validators_events(
-        from_block=min_funding_block,
-        to_block=block_number,
-    )
-    non_activated_balances = {
-        v.public_key: v.amount
-        for v in compounding_event_data
-        if v.public_key in non_activated_public_keys
-    }
-    funding_event_data = await vault_contract.get_funding_events(
-        from_block=min_funding_block,
-        to_block=block_number,
-    )
-
-    for funding in funding_event_data:
-        if funding.public_key in non_activated_balances:
-            non_activated_balances[funding.public_key] = Wei(
-                non_activated_balances[funding.public_key] + funding.amount
-            )
-    return {
-        public_key: Gwei(int(Web3.from_wei(amount_wei, 'gwei')))
-        for public_key, amount_wei in non_activated_balances.items()
-    }
