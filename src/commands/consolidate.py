@@ -410,6 +410,9 @@ async def _find_target_source_public_keys(
     """
     max_activation_epoch = chain_head.epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
 
+    current_consolidations = await consensus_client.get_pending_consolidations(chain_head.slot)
+    consolidating_indexes = {int(cons['source_index']) for cons in current_consolidations}
+    consolidating_indexes.update({int(cons['target_index']) for cons in current_consolidations})
     pending_partial_withdrawals = await consensus_client.get_pending_partial_withdrawals()
     pending_partial_withdrawals_indexes = {
         int(withdrawal['validator_index'])
@@ -422,42 +425,43 @@ async def _find_target_source_public_keys(
         from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
         to_block=chain_head.block_number,
     )
-    consensus_validators = await fetch_consensus_validators(public_keys)
-    active_validators = {val for val in consensus_validators if val.status not in EXITING_STATUSES}
-    if len(active_validators) < 2:
+    active_validators = [
+        val
+        for val in await fetch_consensus_validators(public_keys)
+        if val.status not in EXITING_STATUSES and val.index not in consolidating_indexes
+    ]
+
+    source_validators = [
+        val
+        for val in active_validators
+        if not val.is_compounding
+        and val.activation_epoch < max_activation_epoch
+        and val.index not in pending_partial_withdrawals_indexes
+    ]
+    if not source_validators:
         raise click.ClickException(
             f'Not enough active validators for vault {vault_address} to consolidate'
         )
 
+    source_validators = sorted(source_validators, key=lambda val: val.activation_epoch)
+
     compounding_validators = [val for val in active_validators if val.is_compounding]
-    if not compounding_validators:
-        # no 0x02 validators, switch the oldest 0x01 to 0x02
-        # should be active long enough
-        can_be_compounded_validators = [
-            val
-            for val in active_validators
-            if val.activation_epoch < max_activation_epoch
-            and val.index not in pending_partial_withdrawals_indexes
-        ]
-        oldest_validator = min(can_be_compounded_validators, key=lambda val: val.activation_epoch)
-        return [(oldest_validator.public_key, oldest_validator.public_key)]
+    if compounding_validators:
+        # there is at least one 0x02 validator, top up from oldest 0x01 validators
+        target_validator = min(compounding_validators, key=lambda val: val.balance)
+        selected_source_validators: list[ConsensusValidator] = []
+        for val in source_validators:
+            if (
+                target_validator.balance + sum(v.balance for v in selected_source_validators)
+                > MAX_EFFECTIVE_BALANCE_GWEI
+            ):
+                break
+            selected_source_validators.append(val)
+            if selected_source_validators:
+                return [
+                    (target_validator.public_key, val.public_key)
+                    for val in selected_source_validators
+                ]
 
-    # there is at least one 0x02 validator, top up from oldest 0x01 validators
-    target_validator = min(compounding_validators, key=lambda val: val.balance)
-    source_validators: list[ConsensusValidator] = []
-    for val in sorted(
-        (val for val in active_validators if not val.is_compounding),
-        key=lambda val: val.activation_epoch,
-    ):
-        if val.activation_epoch > max_activation_epoch:
-            continue
-        if val.index in pending_partial_withdrawals_indexes:
-            continue
-        if (
-            target_validator.balance + sum(v.balance for v in source_validators)
-            > MAX_EFFECTIVE_BALANCE_GWEI
-        ):
-            break
-        source_validators.append(val)
-
-    return [(target_validator.public_key, val.public_key) for val in source_validators]
+    # there are no 0x02 validators, switch the oldest 0x01 to 0x02
+    return [(source_validators[0].public_key, source_validators[0].public_key)]
