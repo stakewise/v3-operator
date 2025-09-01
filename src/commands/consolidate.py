@@ -137,7 +137,7 @@ logger = logging.getLogger(__name__)
     help='Performs a vault validators consolidation from 0x01 validators to 0x02 validator. '
     'Switches a validator from 0x01 to 0x02 if the source and target keys are identical.'
 )
-# pylint: disable-next=too-many-arguments,too-many-locals
+# pylint: disable-next=too-many-arguments
 def consolidate(
     network: str,
     vault: ChecksumAddress,

@@ -6,7 +6,7 @@ from sw_utils import IpfsFetchClient, convert_to_mgno
 from sw_utils.networks import GNO_NETWORKS
 from sw_utils.typings import Bytes32
 from web3 import Web3
-from web3.types import BlockNumber, ChecksumAddress, Gwei, Wei
+from web3.types import BlockNumber, ChecksumAddress, Gwei
 
 from src.common.clients import execution_client
 from src.common.contracts import VaultContract, validators_registry_contract
@@ -15,9 +15,7 @@ from src.common.harvest import get_harvest_params
 from src.common.metrics import metrics
 from src.common.typings import HarvestParams, ValidatorType
 from src.config.settings import (
-    MAX_EFFECTIVE_BALANCE,
     MAX_EFFECTIVE_BALANCE_GWEI,
-    MIN_ACTIVATION_BALANCE,
     MIN_ACTIVATION_BALANCE_GWEI,
     ValidatorsRegistrationMode,
     settings,
@@ -53,7 +51,7 @@ class ValidatorRegistrationSubtask:
         self.keystore = keystore
         self.relayer_adapter = relayer_adapter
 
-    async def process_block(self) -> None:
+    async def process(self) -> None:
         if self.keystore:
             await update_unused_validator_keys_metric(
                 keystore=self.keystore,
@@ -67,7 +65,6 @@ class ValidatorRegistrationSubtask:
             )
 
 
-# pylint: disable-next=too-many-locals,too-many-return-statements,too-many-branches
 async def process_validators(
     vault_address: ChecksumAddress,
     keystore: BaseKeystore | None,
@@ -82,7 +79,7 @@ async def process_validators(
         vault_address=vault_address, harvest_params=harvest_params
     )
 
-    if vault_assets < Web3.to_wei(settings.min_deposit_amount_gwei, 'gwei'):
+    if vault_assets < settings.min_deposit_amount_gwei:
         return None
 
     gas_manager = build_gas_manager()
@@ -92,7 +89,7 @@ async def process_validators(
     compounding_validators_balances = await fetch_compounding_validators_balances(vault_address)
     funding_amounts = _get_funding_amounts(
         compounding_validators_balances=compounding_validators_balances,
-        vault_assets=Gwei(int(Web3.from_wei(vault_assets, 'gwei'))),
+        vault_assets=vault_assets,
     )
 
     if funding_amounts:
@@ -109,9 +106,7 @@ async def process_validators(
             if not tx_hash:
                 return
 
-            vault_assets = Wei(
-                max(vault_assets - Web3.to_wei(sum(funding_amounts.values()), 'gwei'), 0)
-            )
+            vault_assets = Gwei(max(vault_assets - sum(funding_amounts.values()), 0))
         except EmptyRelayerResponseException:
             return
 
@@ -174,10 +169,10 @@ async def fund_compounding_validators(
     return tx_hash
 
 
-# pylint: disable-next=too-many-locals,too-many-return-statements,too-many-branches,disable-next=too-many-arguments
+# pylint: disable-next=too-many-locals
 async def register_new_validators(
     vault_address: ChecksumAddress,
-    vault_assets: Wei,
+    vault_assets: Gwei,
     harvest_params: HarvestParams | None,
     keystore: BaseKeystore | None,
     relayer_adapter: RelayerAdapter | None = None,
@@ -271,17 +266,17 @@ async def register_new_validators(
 
 async def get_vault_assets(
     vault_address: ChecksumAddress, harvest_params: HarvestParams | None
-) -> Wei:
-    vault_balance = await get_withdrawable_assets(
+) -> Gwei:
+    vault_assets = await get_withdrawable_assets(
         vault_address=vault_address, harvest_params=harvest_params
     )
     if settings.network in GNO_NETWORKS:
         # apply GNO -> mGNO exchange rate
-        vault_balance = convert_to_mgno(vault_balance)
+        vault_assets = convert_to_mgno(vault_assets)
 
-    metrics.stakeable_assets.labels(network=settings.network).set(int(vault_balance))
+    metrics.stakeable_assets.labels(network=settings.network).set(int(vault_assets))
 
-    return vault_balance
+    return Gwei(int(Web3.from_wei(vault_assets, 'gwei')))
 
 
 async def load_genesis_validators() -> None:
@@ -313,18 +308,18 @@ async def load_genesis_validators() -> None:
     logger.info('Loaded %d genesis validators', len(genesis_validators))
 
 
-def _get_deposits_amounts(vault_assets: int, validator_type: ValidatorType) -> list[Gwei]:
+def _get_deposits_amounts(vault_assets: Gwei, validator_type: ValidatorType) -> list[Gwei]:
     """Returns a list of amounts in Gwei for each validator to be registered."""
-    if vault_assets < MIN_ACTIVATION_BALANCE:
+    if vault_assets < MIN_ACTIVATION_BALANCE_GWEI:
         return []
     if validator_type == ValidatorType.V1:
-        return [MIN_ACTIVATION_BALANCE_GWEI] * (vault_assets // MIN_ACTIVATION_BALANCE)
+        return [MIN_ACTIVATION_BALANCE_GWEI] * (vault_assets // MIN_ACTIVATION_BALANCE_GWEI)
     amounts = []
-    while vault_assets >= MAX_EFFECTIVE_BALANCE:
+    while vault_assets >= MAX_EFFECTIVE_BALANCE_GWEI:
         amounts.append(MAX_EFFECTIVE_BALANCE_GWEI)
-        vault_assets -= MAX_EFFECTIVE_BALANCE
-    if vault_assets >= MIN_ACTIVATION_BALANCE:
-        amounts.append(Gwei(int(Web3.from_wei(vault_assets, 'gwei'))))
+        vault_assets = Gwei(vault_assets - MAX_EFFECTIVE_BALANCE_GWEI)
+    if vault_assets >= MIN_ACTIVATION_BALANCE_GWEI:
+        amounts.append(vault_assets)
     return amounts
 
 
