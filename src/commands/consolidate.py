@@ -442,9 +442,7 @@ async def _find_target_source_public_keys(
         and val.index not in pending_partial_withdrawals_indexes
     ]
     if not source_validators:
-        raise click.ClickException(
-            f'Not enough active validators for vault {vault_address} to consolidate'
-        )
+        return []
 
     source_validators = sorted(source_validators, key=lambda val: val.activation_epoch)
 
