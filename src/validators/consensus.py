@@ -45,16 +45,15 @@ async def fetch_compounding_validators_balances(
 
     all_pending_deposits = await consensus_client.get_pending_deposits(chain_head.slot)
     for deposit in all_pending_deposits:
-        if not deposit['pubkey'] in vault_public_keys:
+        public_key, amount = deposit['pubkey'], int(deposit['amount'])
+        if public_key not in vault_public_keys:
             continue
         if not deposit['withdrawal_credentials'].startswith('0x02'):
             continue
-        if validators_balances.get(deposit['pubkey']):
-            validators_balances[deposit['pubkey']] = Gwei(
-                validators_balances[deposit['pubkey']] + int(deposit['amount'])
-            )
+        if validators_balances.get(public_key):
+            validators_balances[public_key] = Gwei(validators_balances[public_key] + amount)
         else:
-            validators_balances[deposit['pubkey']] = Gwei(int(deposit['amount']))
+            validators_balances[public_key] = Gwei(amount)
 
     return validators_balances
 
