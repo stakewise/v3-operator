@@ -110,13 +110,6 @@ async def process_validators(
         except EmptyRelayerResponseException:
             return
 
-        if not vault_assets:
-            return
-        logger.info(
-            'Not enough capacity to fund compounding validators, '
-            'trying to register new validators...'
-        )
-
     await register_new_validators(
         vault_address=vault_address,
         vault_assets=vault_assets,
