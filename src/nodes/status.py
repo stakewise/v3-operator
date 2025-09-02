@@ -6,6 +6,7 @@ from csv import DictReader, DictWriter
 from eth_typing import BlockNumber
 from sw_utils import ExtendedAsyncBeacon, get_consensus_client, get_execution_client
 from web3 import AsyncWeb3
+from web3.types import Timestamp
 
 from src.common.utils import calc_slot_by_block_number, calc_slot_by_block_timestamp
 from src.config.settings import settings
@@ -61,7 +62,6 @@ async def calc_sync_eta() -> dict[str, int | None]:
     # Calculate ETAs
     execution_eta = await calc_execution_eta(
         execution_client=execution_client,
-        consensus_client=consensus_client,
         sync_status_history=sync_status_history,
     )
     consensus_eta = await calc_consensus_eta(
@@ -99,7 +99,6 @@ async def calc_consensus_eta(
 
 async def calc_execution_eta(
     execution_client: AsyncWeb3,
-    consensus_client: ExtendedAsyncBeacon,
     sync_status_history: list[dict],
 ) -> int | None:
     if len(sync_status_history) < 2:
@@ -127,23 +126,21 @@ async def calc_execution_eta(
     if execution_speed <= 0:
         return None
 
-    # Get latest block and finalized epoch
+    # Get the latest block
     try:
         latest_block = await execution_client.eth.get_block('latest')
-        finalized_epoch = int(
-            (await consensus_client.get_finality_checkpoint())['data']['finalized']['epoch']
-        )
     except Exception:
         return None
 
     # Calculate ETA
     latest_block_slot = calc_slot_by_block_timestamp(latest_block['timestamp'])
-    finalized_slot = finalized_epoch * settings.network_config.SLOTS_PER_EPOCH
+    head_slot = calc_slot_by_block_timestamp(Timestamp(int(time.time())))
 
-    if latest_block_slot >= finalized_slot:
+    allowed_delay = 5
+    if latest_block_slot >= head_slot - allowed_delay:
         return 0
 
-    execution_eta = int((finalized_slot - latest_block_slot) / execution_speed)
+    execution_eta = int((head_slot - latest_block_slot) / execution_speed)
     return execution_eta
 
 
@@ -182,6 +179,7 @@ def _load_sync_status_history() -> list[dict]:
     if sync_status_path.exists():
         with sync_status_path.open('r') as f:
             reader = DictReader(f, fieldnames=SYNC_STATUS_FIELDNAMES)
+            next(reader)  # skip header
             return list(reader)
 
     return []
