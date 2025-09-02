@@ -574,7 +574,7 @@ python src/main.py submit-rated-network --vaults <your-vault-addresses> --networ
 
 Ensure your vault is updated to version 5 for Ethereum network or version 3 for Gnosis network for full Pectra compatibility.
 
-After the upgrade, validator balances are no longer limited to 32 ETH or 1 GNO. By default, the 0x02 validators are registered. To register 0x01 validators, add the flag `--validators-type=0x01`.
+After the upgrade, validator balances are no longer limited to 32 ETH or 1 GNO. By default, the 0x02 validators are registered. To register 0x01 validators, add the flag `--validators-type=0x01`. Note that funding will be disabled when using this validator type.
 
 When replenishing validators, funds first top up existing 0x02 validators up to 2048 ETH or 64 GNO. New validators are registered once the vault accumulates another 32 ETH or 1 GNO.
 
