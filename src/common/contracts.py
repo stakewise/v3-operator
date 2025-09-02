@@ -128,9 +128,10 @@ class VaultContract(ContractWrapper, VaultStateMixin):
             to_block=to_block,
         )
         result = [Web3.to_hex(event['args']['publicKey']) for event in events]
+        v2_validators_from_block = max(from_block, settings.network_config.PECTRA_BLOCK)
         events = await self._get_events(
             event=self.events.V2ValidatorRegistered,  # type: ignore
-            from_block=from_block,
+            from_block=v2_validators_from_block,
             to_block=to_block,
         )
         result.extend([Web3.to_hex(event['args']['publicKey']) for event in events])
