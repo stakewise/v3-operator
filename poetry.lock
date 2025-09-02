@@ -2084,6 +2084,20 @@ files = [
 ]
 
 [[package]]
+name = "pbr"
+version = "7.0.1"
+description = "Python Build Reasonableness"
+optional = false
+python-versions = ">=2.6"
+files = [
+    {file = "pbr-7.0.1-py2.py3-none-any.whl", hash = "sha256:32df5156fbeccb6f8a858d1ebc4e465dcf47d6cc7a4895d5df9aa951c712fc35"},
+    {file = "pbr-7.0.1.tar.gz", hash = "sha256:3ecbcb11d2b8551588ec816b3756b1eb4394186c3b689b17e04850dfc20f7e57"},
+]
+
+[package.dependencies]
+setuptools = "*"
+
+[[package]]
 name = "pefile"
 version = "2023.2.7"
 description = "Python PE parsing module"
@@ -3678,4 +3692,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12,<3.13"
-content-hash = "9743e99c234f5ef596e6e7e2d55eee330a29fddf904418203ee2823850845b30"
+content-hash = "d401165b85177544e477f15a04876ecc794f813cbc4a8756f4da5bf1540889e6"
