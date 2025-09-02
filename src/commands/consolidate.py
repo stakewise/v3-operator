@@ -11,7 +11,7 @@ from web3 import Web3
 from web3.types import Gwei
 
 from src.common.clients import consensus_client, setup_clients
-from src.common.consensus import get_chain_finalized_head
+from src.common.consensus import get_chain_justified_head
 from src.common.contracts import VaultContract
 from src.common.execution import (
     build_gas_manager,
@@ -210,7 +210,7 @@ async def main(
     """
     setup_logging()
     await setup_clients()
-    chain_head = await get_chain_finalized_head()
+    chain_head = await get_chain_justified_head()
 
     await _check_validators_manager(vault_address)
     await _check_consolidations_queue()
@@ -423,13 +423,6 @@ async def _find_target_source_public_keys(
         consolidating_indexes.add(int(cons['source_index']))
         consolidating_indexes.add(int(cons['target_index']))
 
-    pending_partial_withdrawals = await consensus_client.get_pending_partial_withdrawals()
-    pending_partial_withdrawals_indexes = {
-        int(withdrawal['validator_index'])
-        for withdrawal in pending_partial_withdrawals
-        if withdrawal['amount']
-    }
-
     vault_contract = VaultContract(vault_address)
     public_keys = await vault_contract.get_registered_validators_public_keys(
         from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
@@ -440,20 +433,15 @@ async def _find_target_source_public_keys(
         for val in await fetch_consensus_validators(public_keys)
         if val.status not in EXITING_STATUSES and val.index not in consolidating_indexes
     ]
-    source_validators = []
-    for val in active_validators:
-        if val.is_compounding:
-            continue
-        if val.activation_epoch >= max_activation_epoch:
-            continue
-        if val.index in pending_partial_withdrawals_indexes:
-            continue
-        source_validators.append(val)
 
+    source_validators = await get_source_validators(
+        active_validators=active_validators,
+        max_activation_epoch=max_activation_epoch,
+    )
     if not source_validators:
         return []
 
-    source_validators = sorted(source_validators, key=lambda val: val.activation_epoch)
+    source_validators.sort(key=lambda val: val.activation_epoch)
 
     compounding_validators = [val for val in active_validators if val.is_compounding]
     if compounding_validators:
@@ -475,3 +463,26 @@ async def _find_target_source_public_keys(
 
     # there are no 0x02 validators, switch the oldest 0x01 to 0x02
     return [(source_validators[0].public_key, source_validators[0].public_key)]
+
+
+async def get_source_validators(
+    active_validators: list[ConsensusValidator], max_activation_epoch: int
+) -> list[ConsensusValidator]:
+    pending_partial_withdrawals = await consensus_client.get_pending_partial_withdrawals()
+    pending_partial_withdrawals_indexes = {
+        int(withdrawal['validator_index'])
+        for withdrawal in pending_partial_withdrawals
+        if withdrawal['amount']
+    }
+
+    source_validators = []
+    for val in active_validators:
+        if val.is_compounding:
+            continue
+        if val.activation_epoch >= max_activation_epoch:
+            continue
+        if val.index in pending_partial_withdrawals_indexes:
+            continue
+        source_validators.append(val)
+
+    return source_validators
