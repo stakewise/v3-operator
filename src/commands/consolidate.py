@@ -195,6 +195,7 @@ def consolidate(
         sys.exit(1)
 
 
+# pylint: disable-next=too-many-locals
 async def main(
     vault_address: ChecksumAddress,
     source_public_keys: list[HexStr] | None,
@@ -217,31 +218,28 @@ async def main(
 
     if source_public_keys is not None and target_public_key is not None:
         # keys provided by the user
-        await _check_public_keys(
+        target_source = await _check_public_keys(
             vault_address=vault_address,
             source_public_keys=source_public_keys,
             target_public_key=target_public_key,
             chain_head=chain_head,
         )
-        target_source_public_keys = [
-            (target_public_key, source_key) for source_key in source_public_keys
-        ]
 
     else:
-        target_source_public_keys = await _find_target_source_public_keys(
+        target_source = await _find_target_source_public_keys(
             vault_address=vault_address,
             chain_head=chain_head,
         )
-        if not target_source_public_keys:
+        if not target_source:
             raise click.ClickException(
                 f'Validators in vault {vault_address} can\'t be consolidated'
             )
 
-    click.secho(
-        f'Consolidating {len(target_source_public_keys)} validator(s): ',
-    )
-    for target_key, source_key in target_source_public_keys:
-        click.secho(f'    {source_key} -> {target_key}')
+    for target_validator, source_validator in target_source:
+        click.secho(
+            f'Consolidating from validator with index {source_validator.index} '
+            f'to validator with index {target_validator.index}'
+        )
     if not no_confirm:
         click.confirm(
             'Proceed consolidation?',
@@ -263,13 +261,18 @@ async def main(
         return
     # Current fee calculated for the number of validators consolidated + gap
     # in case there are some other consolidations in the network.
-    current_fee = Gwei(default_fee * len(target_source_public_keys) + default_fee)
+    current_fee = Gwei(default_fee * len(target_source) + default_fee)
+
     gas_manager = build_gas_manager()
     if not await gas_manager.check_gas_price():
         return
 
     protocol_config = await get_protocol_config()
 
+    target_source_public_keys = [
+        (target_validator.public_key, source_validator.public_key)
+        for target_validator, source_validator in target_source
+    ]
     oracle_signatures = await poll_consolidation_signature(
         target_source_public_keys=target_source_public_keys,
         vault=vault_address,
@@ -297,8 +300,11 @@ async def _check_public_keys(
     source_public_keys: list[HexStr],
     target_public_key: HexStr,
     chain_head: ChainHead,
-) -> None:
-    """Validate that provided public keys can be consolidated."""
+) -> list[tuple[ConsensusValidator, ConsensusValidator]]:
+    """
+    Validate that provided public keys can be consolidated
+    and returns the target and source validators info.
+    """
     logger.info('Checking selected validators for consolidation...')
     all_public_keys = source_public_keys + [target_public_key]
     active_validators = await fetch_consensus_validators(source_public_keys + [target_public_key])
@@ -309,12 +315,12 @@ async def _check_public_keys(
     for key in non_active_public_keys:
         raise click.ClickException(f'Trying to consolidate non-active validator {key}.')
 
-    source_indexes = set()
+    source_validators = set()
     # Verify the source has been active long enough
     max_activation_epoch = chain_head.epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
     for validator in active_validators:
         if validator.public_key in source_public_keys:
-            source_indexes.add(validator.index)
+            source_validators.add(validator)
             if validator.activation_epoch > max_activation_epoch:
                 raise click.ClickException(
                     f'Validator {validator.public_key} is not active enough for consolidation. '
@@ -323,16 +329,18 @@ async def _check_public_keys(
                 )
 
     #  Verify the source validators has no pending withdrawals in the queue
-    await _check_pending_balance_to_withdraw(validator_indexes=source_indexes)
+    await _check_pending_balance_to_withdraw(
+        validator_indexes={val.index for val in source_validators}
+    )
 
     # validate that target_public_key is a compounding validator.
     # Not required for a single validator consolidation
+    target_validator = find_first(
+        active_validators, lambda val: val.public_key == target_public_key
+    )
+    # `target_validator` is not None, because of validation above
+    target_validator = cast(ConsensusValidator, target_validator)
     if not _is_switch_to_compounding(source_public_keys, target_public_key):
-        target_validator = find_first(
-            active_validators, lambda val: val.public_key == target_public_key
-        )
-        # `target_validator` is not None, because of validation above
-        target_validator = cast(ConsensusValidator, target_validator)
         if not target_validator.is_compounding:
             raise click.ClickException(
                 f'The target validator {target_public_key} is not a compounding validator.'
@@ -353,6 +361,7 @@ async def _check_public_keys(
             'Cannot consolidate validators,'
             f' total balance exceed {MAX_EFFECTIVE_BALANCE_GWEI} Gwei'
         )
+    return [(target_validator, source_validator) for source_validator in source_validators]
 
 
 async def _check_validators_manager(vault_address: ChecksumAddress) -> None:
@@ -405,10 +414,9 @@ def _load_public_keys(public_keys_file: Path) -> list[HexStr]:
     return public_keys
 
 
-# pylint: disable-next=too-many-locals
 async def _find_target_source_public_keys(
     vault_address: ChecksumAddress, chain_head: ChainHead
-) -> list[tuple[HexStr, HexStr]]:
+) -> list[tuple[ConsensusValidator, ConsensusValidator]]:
     """
     If there are no 0x02 validators,
     take the oldest 0x01 validator and convert it to 0x02 with confirmation prompt.
@@ -457,12 +465,10 @@ async def _find_target_source_public_keys(
             selected_source_validators.append(val)
 
         if selected_source_validators:
-            return [
-                (target_validator.public_key, val.public_key) for val in selected_source_validators
-            ]
+            return [(target_validator, val) for val in selected_source_validators]
 
     # there are no 0x02 validators, switch the oldest 0x01 to 0x02
-    return [(source_validators[0].public_key, source_validators[0].public_key)]
+    return [(source_validators[0], source_validators[0])]
 
 
 async def get_source_validators(
