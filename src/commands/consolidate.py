@@ -8,6 +8,7 @@ import click
 from eth_typing import ChecksumAddress, HexStr
 from sw_utils import ChainHead
 from web3 import Web3
+from web3.types import Gwei
 
 from src.common.clients import consensus_client, setup_clients
 from src.common.consensus import get_chain_finalized_head
@@ -237,7 +238,7 @@ async def main(
             )
 
     click.secho(
-        f'Consolidating {len(target_source_public_keys)} validators: ',
+        f'Consolidating {len(target_source_public_keys)} validator(s): ',
     )
     for target_key, source_key in target_source_public_keys:
         click.secho(f'    {source_key} -> {target_key}')
@@ -248,19 +249,21 @@ async def main(
             abort=True,
         )
 
-    current_fee = await get_execution_request_fee(
+    default_fee = await get_execution_request_fee(
         settings.network_config.CONSOLIDATION_CONTRACT_ADDRESS,
     )
-    if current_fee > MAX_CONSOLIDATION_REQUEST_FEE:
+    if default_fee > MAX_CONSOLIDATION_REQUEST_FEE:
         logger.info(
-            'The current consolidation fee (%s Gwei) exceeds the maximum allowed (%s Gwei). '
+            'The current consolidation fee per one consolidation (%s Gwei) exceeds the maximum allowed (%s Gwei). '
             'You can override the limit using '
             'the MAX_CONSOLIDATION_REQUEST_FEE environment variable.',
-            current_fee,
+            default_fee,
             MAX_CONSOLIDATION_REQUEST_FEE,
         )
         return
-
+    # Current fee calculated for the number of validators consolidated + gap
+    # in case there are some other consolidations in the network.
+    current_fee = Gwei(default_fee * len(target_source_public_keys) + default_fee)
     gas_manager = build_gas_manager()
     if not await gas_manager.check_gas_price():
         return
@@ -448,7 +451,7 @@ async def _find_target_source_public_keys(
 
     compounding_validators = [val for val in active_validators if val.is_compounding]
     if compounding_validators:
-        # there is at least one 0x02 validator, top up from oldest 0x01 validators
+        # there is at least one 0x02 validator, top up from the one with smallest balance
         target_validator = min(compounding_validators, key=lambda val: val.balance)
         selected_source_validators: list[ConsensusValidator] = []
         for val in source_validators:
@@ -458,11 +461,11 @@ async def _find_target_source_public_keys(
             ):
                 break
             selected_source_validators.append(val)
-            if selected_source_validators:
-                return [
-                    (target_validator.public_key, val.public_key)
-                    for val in selected_source_validators
-                ]
+
+        if selected_source_validators:
+            return [
+                (target_validator.public_key, val.public_key) for val in selected_source_validators
+            ]
 
     # there are no 0x02 validators, switch the oldest 0x01 to 0x02
     return [(source_validators[0].public_key, source_validators[0].public_key)]
