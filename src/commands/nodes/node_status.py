@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import time
 from pathlib import Path
 
 import click
@@ -75,7 +76,7 @@ async def main(output_format: str) -> None:
         node_status=execution_node_status, output_format=output_format, eta=consensus_eta
     )
 
-    if consensus_node_status['is_syncing'] is False:
+    if consensus_node_status.get('is_syncing') is False:
         validator_activity_stats = await get_validator_activity_stats()
         log_validator_activity_stats(validator_activity_stats, output_format)
 
@@ -84,31 +85,33 @@ async def get_consensus_node_status() -> dict:
     try:
         syncing = await consensus_client.get_syncing()
         sync_distance = syncing['data']['sync_distance']
-
-        data = await consensus_client.get_finality_checkpoint()
-        finalized_epoch = data['data']['finalized']['epoch']
     except Exception:
         return {}
 
     return {
         'is_syncing': syncing['data']['is_syncing'],
         'sync_distance': sync_distance,
-        'finalized_epoch': finalized_epoch,
     }
 
 
 async def get_execution_node_status() -> dict:
     try:
         sync_status = await execution_client.eth.syncing
-        if isinstance(sync_status, bool):
-            is_syncing = sync_status
-        else:
-            is_syncing = False
-        block_number = await execution_client.eth.block_number
+        block = await execution_client.eth.get_block('latest')
     except Exception:
         return {}
 
-    return {'is_syncing': is_syncing, 'block_number': block_number}
+    # Sync status can be a boolean or an object
+    if isinstance(sync_status, bool):
+        is_syncing = sync_status
+
+    sync_distance = (
+        int(time.time()) - block['timestamp']
+    ) // settings.network_config.SECONDS_PER_BLOCK
+    allowed_delay = 5
+    is_syncing = sync_distance > allowed_delay
+
+    return {'is_syncing': is_syncing, 'block_number': block['number']}
 
 
 def log_consensus_node_status(node_status: dict, output_format: str, eta: int | None) -> None:
@@ -123,7 +126,6 @@ def log_consensus_node_status(node_status: dict, output_format: str, eta: int | 
             f'Consensus node status:\n'
             f'  Is syncing: {node_status['is_syncing']}\n'
             f'  Sync distance: {node_status['sync_distance']}\n'
-            f'  Finalized epoch: {node_status['finalized_epoch']}'
         )
         if node_status['is_syncing'] and eta is not None:
             status_message += f'\n  Estimated time to sync: {_format_eta(eta)}'
