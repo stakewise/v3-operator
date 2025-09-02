@@ -126,7 +126,7 @@ def log_consensus_node_status(node_status: dict, output_format: str, eta: int | 
             f'  Finalized epoch: {node_status['finalized_epoch']}'
         )
         if node_status['is_syncing'] and eta is not None:
-            status_message += f'\n  Estimated time to sync: {eta} seconds'
+            status_message += f'\n  Estimated time to sync: {_format_eta(eta)}'
         elif node_status['is_syncing'] and eta is None:
             status_message += '\n  Estimated time to sync: unavailable'
 
@@ -147,11 +147,32 @@ def log_execution_node_status(node_status: dict, output_format: str, eta: int | 
             f'  Block number: {node_status['block_number']}'
         )
         if node_status['is_syncing'] and eta is not None:
-            status_message += f'\n  Estimated time to sync: {eta} seconds'
+            status_message += f'\n  Estimated time to sync: {_format_eta(eta)}'
         elif node_status['is_syncing'] and eta is None:
             status_message += '\n  Estimated time to sync: unavailable'
 
         click.echo(status_message)
+
+
+def _format_eta(eta: int) -> str:
+    if eta == 0:
+        return '0'
+
+    minutes, seconds = divmod(eta, 60)
+    hours, minutes = divmod(minutes, 60)
+    days, hours = divmod(hours, 24)
+
+    parts = []
+    if days > 0:
+        parts.append(f'{days}d')
+    if hours > 0:
+        parts.append(f'{hours}h')
+    if minutes > 0:
+        parts.append(f'{minutes}m')
+    if seconds > 0:
+        parts.append(f'{seconds}s')
+
+    return ' '.join(parts)
 
 
 async def get_validator_activity_stats() -> dict:
