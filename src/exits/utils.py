@@ -29,7 +29,7 @@ async def send_signature_rotation_requests(
     """Requests exit signature rotation from all oracles."""
     payload = dataclasses.asdict(request)
     endpoints = [(oracle.address, oracle.endpoints) for oracle in protocol_config.oracles]
-    random.shuffle(endpoints)
+    random.shuffle(endpoints)  # nosec
 
     approvals: dict[ChecksumAddress, OracleApproval] = {}
     failed_endpoints: list[str] = []
@@ -78,8 +78,7 @@ async def send_signature_rotation_request_to_replicas(
     last_error = None
 
     # Shuffling may help if the first endpoint is slower than others
-    replicas = random.sample(replicas, len(replicas))
-
+    replicas = random.sample(replicas, len(replicas))  # nosec
     for endpoint in replicas:
         try:
             return await send_signature_rotation_request(session, endpoint, payload)
