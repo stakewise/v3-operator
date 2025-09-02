@@ -86,6 +86,16 @@ async def process_validators(
     if not await gas_manager.check_gas_price():
         return None
 
+    if settings.validator_type == ValidatorType.V1:
+        await register_new_validators(
+            vault_address=vault_address,
+            vault_assets=vault_assets,
+            harvest_params=harvest_params,
+            keystore=keystore,
+            relayer_adapter=relayer_adapter,
+        )
+        return
+
     compounding_validators_balances = await fetch_compounding_validators_balances(vault_address)
     funding_amounts = _get_funding_amounts(
         compounding_validators_balances=compounding_validators_balances,
