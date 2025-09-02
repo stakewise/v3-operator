@@ -65,8 +65,8 @@ async def main(output_format: str) -> None:
     consensus_node_status, execution_node_status, sync_eta = await asyncio.gather(
         get_consensus_node_status(), get_execution_node_status(), calc_sync_eta()
     )
-    execution_eta = sync_eta.get('execution_eta')
-    consensus_eta = sync_eta.get('consensus_eta')
+    execution_eta = sync_eta.get('execution')
+    consensus_eta = sync_eta.get('consensus')
 
     # Log statuses
     log_consensus_node_status(
