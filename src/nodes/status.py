@@ -4,12 +4,14 @@ import time
 from csv import DictReader, DictWriter
 
 from eth_typing import BlockNumber
-from sw_utils import ExtendedAsyncBeacon, get_consensus_client, get_execution_client
+from sw_utils import ExtendedAsyncBeacon
+from sw_utils.consensus import ACTIVE_STATUSES, ValidatorStatus
 from web3 import AsyncWeb3
 from web3.types import Timestamp
 
 from src.common.utils import calc_slot_by_block_number, calc_slot_by_block_timestamp
 from src.config.settings import settings
+from src.validators.keystores.local import LocalKeystore
 
 logger = logging.getLogger(__name__)
 
@@ -19,20 +21,73 @@ SYNC_STATUS_FIELDNAMES = ['timestamp', 'block_number', 'slot']
 SYNC_STATUS_INTERVAL = 60
 
 
-async def update_sync_status_periodically() -> None:
+async def get_consensus_node_status(consensus_client: ExtendedAsyncBeacon) -> dict:
+    try:
+        syncing = await consensus_client.get_syncing()
+        sync_distance = syncing['data']['sync_distance']
+    except Exception:
+        return {}
+
+    return {
+        'is_syncing': syncing['data']['is_syncing'],
+        'sync_distance': sync_distance,
+    }
+
+
+async def get_execution_node_status(execution_client: AsyncWeb3) -> dict:
+    try:
+        sync_status = await execution_client.eth.syncing
+        block = await execution_client.eth.get_block('latest')
+    except Exception:
+        return {}
+
+    # Sync status can be a boolean or an object
+    if isinstance(sync_status, bool):
+        is_syncing = sync_status
+
+    sync_distance = (
+        int(time.time()) - block['timestamp']
+    ) // settings.network_config.SECONDS_PER_BLOCK
+    allowed_delay = 5
+    is_syncing = sync_distance > allowed_delay
+
+    return {'is_syncing': is_syncing, 'block_number': block['number']}
+
+
+async def get_validator_activity_stats(consensus_client: ExtendedAsyncBeacon) -> dict:
+    """
+    Returns the activity statistics of validators.
+    Format: `{'active': int, 'total': int}`
+    """
+    keystore_files = LocalKeystore.list_keystore_files()
+    stats: dict[str, int] = {'active': 0, 'total': 0}
+    public_keys: list[str] = []
+
+    # Read public keys from keystore files
+    for keystore_file in keystore_files:
+        _, public_key = LocalKeystore.read_keystore_file(keystore_file)
+        public_keys.append(public_key)
+
+    stats['total'] = len(public_keys)
+
+    # Get validator statuses
+    validators = (await consensus_client.get_validators_by_ids(public_keys))['data']
+
+    # Calc number of active validators
+    for validator in validators:
+        status = ValidatorStatus(validator['status'])
+        if status in ACTIVE_STATUSES:
+            stats['active'] += 1
+
+    return stats
+
+
+async def update_sync_status_periodically(
+    execution_client: AsyncWeb3, consensus_client: ExtendedAsyncBeacon
+) -> None:
     """
     Periodically updates the synchronization status of the node.
     """
-    # Create non-retry clients to fail fast
-    execution_client = get_execution_client(
-        endpoints=settings.execution_endpoints,
-        timeout=10,
-    )
-    consensus_client = get_consensus_client(
-        endpoints=settings.consensus_endpoints,
-        timeout=10,
-    )
-
     # Give the nodes some time to start
     startup_interval = 10
     await asyncio.sleep(startup_interval)
@@ -45,19 +100,11 @@ async def update_sync_status_periodically() -> None:
         await asyncio.sleep(SYNC_STATUS_INTERVAL)
 
 
-async def calc_sync_eta() -> dict[str, int | None]:
+async def calc_sync_eta(
+    execution_client: AsyncWeb3, consensus_client: ExtendedAsyncBeacon
+) -> dict[str, int | None]:
     # Read the sync status history from the file
     sync_status_history = _load_sync_status_history()
-
-    # Create non-retry clients to fail fast
-    execution_client = get_execution_client(
-        endpoints=settings.execution_endpoints,
-        timeout=10,
-    )
-    consensus_client = get_consensus_client(
-        endpoints=settings.consensus_endpoints,
-        timeout=10,
-    )
 
     # Calculate ETAs
     execution_eta = await calc_execution_eta(

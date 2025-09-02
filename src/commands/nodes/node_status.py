@@ -1,17 +1,19 @@
 import asyncio
 import json
 import logging
-import time
 from pathlib import Path
 
 import click
-from sw_utils.consensus import ACTIVE_STATUSES, ValidatorStatus
+from sw_utils import get_consensus_client, get_execution_client
 
-from src.common.clients import consensus_client, execution_client, setup_clients
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_NETWORK, settings
-from src.nodes.status import calc_sync_eta
-from src.validators.keystores.local import LocalKeystore
+from src.nodes.status import (
+    calc_sync_eta,
+    get_consensus_node_status,
+    get_execution_node_status,
+    get_validator_activity_stats,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -59,62 +61,39 @@ def node_status_command(data_dir: Path, network: str, output_format: str) -> Non
 
 
 async def main(output_format: str) -> None:
-    await setup_clients()
+    # Create non-retry clients to fail fast
+    execution_client = get_execution_client(
+        endpoints=settings.execution_endpoints,
+        timeout=10,
+    )
+    consensus_client = get_consensus_client(
+        endpoints=settings.consensus_endpoints,
+        timeout=10,
+    )
 
     # Get node statuses concurrently
     consensus_node_status, execution_node_status, sync_eta = await asyncio.gather(
-        get_consensus_node_status(), get_execution_node_status(), calc_sync_eta()
+        get_consensus_node_status(consensus_client),
+        get_execution_node_status(execution_client),
+        calc_sync_eta(execution_client, consensus_client),
     )
     execution_eta = sync_eta.get('execution')
     consensus_eta = sync_eta.get('consensus')
 
     # Log statuses
-    log_consensus_node_status(
+    _log_consensus_node_status(
         node_status=consensus_node_status, output_format=output_format, eta=consensus_eta
     )
-    log_execution_node_status(
+    _log_execution_node_status(
         node_status=execution_node_status, output_format=output_format, eta=execution_eta
     )
 
     if consensus_node_status.get('is_syncing') is False:
-        validator_activity_stats = await get_validator_activity_stats()
-        log_validator_activity_stats(validator_activity_stats, output_format)
+        validator_activity_stats = await get_validator_activity_stats(consensus_client)
+        _log_validator_activity_stats(validator_activity_stats, output_format)
 
 
-async def get_consensus_node_status() -> dict:
-    try:
-        syncing = await consensus_client.get_syncing()
-        sync_distance = syncing['data']['sync_distance']
-    except Exception:
-        return {}
-
-    return {
-        'is_syncing': syncing['data']['is_syncing'],
-        'sync_distance': sync_distance,
-    }
-
-
-async def get_execution_node_status() -> dict:
-    try:
-        sync_status = await execution_client.eth.syncing
-        block = await execution_client.eth.get_block('latest')
-    except Exception:
-        return {}
-
-    # Sync status can be a boolean or an object
-    if isinstance(sync_status, bool):
-        is_syncing = sync_status
-
-    sync_distance = (
-        int(time.time()) - block['timestamp']
-    ) // settings.network_config.SECONDS_PER_BLOCK
-    allowed_delay = 5
-    is_syncing = sync_distance > allowed_delay
-
-    return {'is_syncing': is_syncing, 'block_number': block['number']}
-
-
-def log_consensus_node_status(node_status: dict, output_format: str, eta: int | None) -> None:
+def _log_consensus_node_status(node_status: dict, output_format: str, eta: int | None) -> None:
     if output_format == 'json':
         click.echo(json.dumps({'consensus_node': node_status, 'eta': eta}))
     else:
@@ -135,7 +114,7 @@ def log_consensus_node_status(node_status: dict, output_format: str, eta: int | 
         click.echo('\n'.join(status_message))
 
 
-def log_execution_node_status(node_status: dict, output_format: str, eta: int | None) -> None:
+def _log_execution_node_status(node_status: dict, output_format: str, eta: int | None) -> None:
     if output_format == 'json':
         click.echo(json.dumps({'execution_node': node_status, 'eta': eta}))
     else:
@@ -177,35 +156,7 @@ def _format_eta(eta: int) -> str:
     return ' '.join(parts)
 
 
-async def get_validator_activity_stats() -> dict:
-    """
-    Returns the activity statistics of validators.
-    Format: `{'active': int, 'total': int}`
-    """
-    keystore_files = LocalKeystore.list_keystore_files()
-    stats: dict[str, int] = {'active': 0, 'total': 0}
-    public_keys: list[str] = []
-
-    # Read public keys from keystore files
-    for keystore_file in keystore_files:
-        _, public_key = LocalKeystore.read_keystore_file(keystore_file)
-        public_keys.append(public_key)
-
-    stats['total'] = len(public_keys)
-
-    # Get validator statuses
-    validators = (await consensus_client.get_validators_by_ids(public_keys))['data']
-
-    # Calc number of active validators
-    for validator in validators:
-        status = ValidatorStatus(validator['status'])
-        if status in ACTIVE_STATUSES:
-            stats['active'] += 1
-
-    return stats
-
-
-def log_validator_activity_stats(validator_activity_stats: dict, output_format: str) -> None:
+def _log_validator_activity_stats(validator_activity_stats: dict, output_format: str) -> None:
     if output_format == 'json':
         click.echo(json.dumps({'validator_activity': validator_activity_stats}))
     else:

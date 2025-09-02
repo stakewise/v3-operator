@@ -4,9 +4,9 @@ from pathlib import Path
 
 import click
 import psutil
+from sw_utils import get_consensus_client, get_execution_client
 from web3 import Web3
 
-from src.common.clients import setup_clients
 from src.common.validators import validate_eth_addresses
 from src.config.networks import AVAILABLE_NETWORKS, NETWORKS
 from src.config.settings import DEFAULT_NETWORK, LOG_DATE_FORMAT, settings
@@ -118,7 +118,15 @@ async def main(
     print_consensus_logs: bool,
     print_validator_logs: bool,
 ) -> None:
-    await setup_clients()
+    # Create non-retry clients to fail fast
+    execution_client = get_execution_client(
+        endpoints=settings.execution_endpoints,
+        timeout=10,
+    )
+    consensus_client = get_consensus_client(
+        endpoints=settings.consensus_endpoints,
+        timeout=10,
+    )
 
     # Create process runners
     reth_runner = _get_reth_runner(print_execution_logs)
@@ -130,7 +138,9 @@ async def main(
             reth_runner.run(),
             lighthouse_runner.run(),
             lighthouse_vc_runner.run(),
-            update_sync_status_periodically(),
+            update_sync_status_periodically(
+                execution_client=execution_client, consensus_client=consensus_client
+            ),
         )
     except NodeFailedToStartError as e:
         click.echo(str(e))
