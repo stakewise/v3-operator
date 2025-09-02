@@ -141,7 +141,7 @@ async def _fetch_outdated_indexes(
     oracles: list[Oracle], update_block: BlockNumber | None, vault: ChecksumAddress
 ) -> list[int]:
     endpoints = list(chain.from_iterable([oracle.endpoints for oracle in oracles]))
-    shuffle(endpoints)
+    shuffle(endpoints)  # nosec
 
     for oracle_endpoint in endpoints:
         try:
