@@ -405,6 +405,7 @@ def _load_public_keys(public_keys_file: Path) -> list[HexStr]:
     return public_keys
 
 
+# pylint: disable-next=too-many-locals
 async def _find_target_source_public_keys(
     vault_address: ChecksumAddress, chain_head: ChainHead
 ) -> list[tuple[HexStr, HexStr]]:
@@ -416,9 +417,12 @@ async def _find_target_source_public_keys(
     """
     max_activation_epoch = chain_head.epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
 
-    current_consolidations = await consensus_client.get_pending_consolidations(chain_head.slot)
-    consolidating_indexes = {int(cons['source_index']) for cons in current_consolidations}
-    consolidating_indexes.update({int(cons['target_index']) for cons in current_consolidations})
+    current_consolidations = await consensus_client.get_pending_consolidations()
+    consolidating_indexes = set()
+    for cons in current_consolidations:
+        consolidating_indexes.add(int(cons['source_index']))
+        consolidating_indexes.add(int(cons['target_index']))
+
     pending_partial_withdrawals = await consensus_client.get_pending_partial_withdrawals()
     pending_partial_withdrawals_indexes = {
         int(withdrawal['validator_index'])
@@ -436,14 +440,16 @@ async def _find_target_source_public_keys(
         for val in await fetch_consensus_validators(public_keys)
         if val.status not in EXITING_STATUSES and val.index not in consolidating_indexes
     ]
+    source_validators = []
+    for val in active_validators:
+        if val.is_compounding:
+            continue
+        if val.activation_epoch >= max_activation_epoch:
+            continue
+        if val.index in pending_partial_withdrawals_indexes:
+            continue
+        source_validators.append(val)
 
-    source_validators = [
-        val
-        for val in active_validators
-        if not val.is_compounding
-        and val.activation_epoch < max_activation_epoch
-        and val.index not in pending_partial_withdrawals_indexes
-    ]
     if not source_validators:
         return []
 
