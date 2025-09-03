@@ -452,23 +452,22 @@ async def _find_target_source_public_keys(
     source_validators.sort(key=lambda val: val.activation_epoch)
 
     compounding_validators = [val for val in active_validators if val.is_compounding]
-    if compounding_validators:
-        # there is at least one 0x02 validator, top up from the one with smallest balance
-        target_validator = min(compounding_validators, key=lambda val: val.balance)
-        selected_source_validators: list[ConsensusValidator] = []
-        for val in source_validators:
-            if (
-                target_validator.balance + sum(v.balance for v in selected_source_validators)
-                > MAX_EFFECTIVE_BALANCE_GWEI
-            ):
-                break
-            selected_source_validators.append(val)
+    if not compounding_validators:
+        # there are no 0x02 validators, switch the oldest 0x01 to 0x02
+        return [(source_validators[0], source_validators[0])]
 
-        if selected_source_validators:
-            return [(target_validator, val) for val in selected_source_validators]
+    # there is at least one 0x02 validator, top up from the one with smallest balance
+    target_validator = min(compounding_validators, key=lambda val: val.balance)
 
-    # there are no 0x02 validators, switch the oldest 0x01 to 0x02
-    return [(source_validators[0], source_validators[0])]
+    selected_source_validators: list[ConsensusValidator] = []
+    source_balance = 0
+    for val in source_validators:
+        if target_validator.balance + source_balance + val.balance > MAX_EFFECTIVE_BALANCE_GWEI:
+            break
+        selected_source_validators.append(val)
+        source_balance += val.balance
+
+    return [(target_validator, val) for val in selected_source_validators]
 
 
 async def get_source_validators(
