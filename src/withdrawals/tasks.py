@@ -203,7 +203,7 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
         tx_hash = await submit_withdraw_validators(
             vault_address=vault_address,
             withdrawals=withdrawals,
-            current_fee=current_fee,
+            tx_fee=current_fee,
         )
         if not tx_hash:
             return

@@ -247,21 +247,21 @@ async def main(
             abort=True,
         )
 
-    default_fee = await get_execution_request_fee(
+    consolidation_request_fee = await get_execution_request_fee(
         settings.network_config.CONSOLIDATION_CONTRACT_ADDRESS,
     )
-    if default_fee > MAX_CONSOLIDATION_REQUEST_FEE:
+    if consolidation_request_fee > MAX_CONSOLIDATION_REQUEST_FEE:
         logger.info(
             'The current consolidation fee per one consolidation (%s Gwei) exceeds the maximum allowed (%s Gwei). '
             'You can override the limit using '
             'the MAX_CONSOLIDATION_REQUEST_FEE environment variable.',
-            default_fee,
+            consolidation_request_fee,
             MAX_CONSOLIDATION_REQUEST_FEE,
         )
         return
     # Current fee calculated for the number of validators consolidated + gap
     # in case there are some other consolidations in the network.
-    current_fee = Gwei(default_fee * len(target_source) + default_fee)
+    tx_fee = Gwei(consolidation_request_fee * len(target_source) + consolidation_request_fee)
 
     gas_manager = build_gas_manager()
     if not await gas_manager.check_gas_price():
@@ -284,7 +284,7 @@ async def main(
         vault_address=vault_address,
         validators=encoded_validators,
         oracle_signatures=oracle_signatures,
-        current_fee=current_fee,
+        tx_fee=tx_fee,
     )
 
     if tx_hash:
