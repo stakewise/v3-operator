@@ -429,9 +429,12 @@ validators, you can run the following command:
 ./operator exit-validators
 ```
 
-Follow the steps, confirming your consensus node endpoint, Vault address, and the validator indexes to exit.
+Follow the steps, confirming your consensus and execution node endpoints, Vault address, and the validator indexes to exit.
+
+- Optionally specify `--indexes` parameter to trigger exits only for selected validators.
 
 ```text
+Enter the comma separated list of API endpoints for execution nodes: : https://example.com
 Enter the comma separated list of API endpoints for consensus nodes: https://example.com
 Enter your vault address: 0x3320ad928c20187602a2b2c04eeaa813fa899468
 Are you sure you want to exit 3 validators with indexes: 513571, 513572, 513861? [y/N]: y
@@ -443,11 +446,11 @@ Validators 513571, 513572, 513861 exits successfully initiated
 Converts 0x01 validators to compound validators (0x02) using the consolidate command.
 The wallet executing this command must be set as the Validators Manager in the vault settings.
 
-- Specify `--source-public-keys` and `--target-public-key` parameters to consolidate selected validators.
+- Optionally specify `--source-public-keys` and `--target-public-key` parameters to consolidate selected validators.
 
 ```bash
 ./operator consolidate --vault=0x000...  --source-public-keys=0x001,0x002 --target-public-key=0x003
-Enter comma separated list of API endpoints for execution nodes: : https://example.com
+Enter the comma separated list of API endpoints for execution nodes: : https://example.com
 Enter the comma separated list of API endpoints for consensus nodes: https://example.com
 Enter your vault address: 0x3320ad928c20187602a2b2c04eeaa813fa899468
 Consolidating 2 validators:
@@ -528,8 +531,8 @@ keys.**
 ```text
 Enter the mnemonic for generating the validator keys: [Your Mnemonic Here]
 Enter your vault address: 0x3320ad928c20187602a2b2c04eeaa813fa899468
-Enter comma separated list of API endpoints for execution nodes: https://example.com
-Enter comma separated list of API endpoints for consensus nodes: https://example.com
+Enter the comma separated list of API endpoints for execution nodes: https://example.com
+Enter the comma separated list of API endpoints for consensus nodes: https://example.com
 Enter the network name: goerli
 Found 24 validators, recovering...
 Generating keystores [####################################] 100%

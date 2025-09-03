@@ -24,15 +24,15 @@ def _patch_get_consensus_fork() -> Generator:
 
 
 @pytest.fixture
-def _patch_submit_voluntary_exit() -> Generator:
+def _patch_submit_withdraw_validators() -> Generator:
     with mock.patch(
-        'sw_utils.consensus.ExtendedAsyncBeacon.submit_voluntary_exit',
+        'src.commands.exit_validators.submit_withdraw_validators',
         return_value=None,
     ):
         yield
 
 
-@pytest.mark.usefixtures('_patch_get_consensus_fork', '_patch_submit_voluntary_exit')
+@pytest.mark.usefixtures('_patch_get_consensus_fork', '_patch_submit_withdraw_validators')
 @pytest.mark.usefixtures('_init_config', '_create_keys')
 class TestValidatorsExit:
     @pytest.mark.usefixtures('fake_settings')
