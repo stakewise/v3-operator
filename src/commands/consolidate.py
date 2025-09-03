@@ -431,6 +431,7 @@ async def _find_target_source_public_keys(
         consolidating_indexes.add(int(cons['source_index']))
         consolidating_indexes.add(int(cons['target_index']))
 
+    logger.info('Fetching vault validators...')
     vault_contract = VaultContract(vault_address)
     public_keys = await vault_contract.get_registered_validators_public_keys(
         from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
