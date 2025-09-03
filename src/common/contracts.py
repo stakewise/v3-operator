@@ -122,15 +122,17 @@ class VaultContract(ContractWrapper, VaultStateMixin):
         self, from_block: BlockNumber, to_block: BlockNumber
     ) -> list[HexStr]:
         """Fetches the validator registered events."""
+        v1_validators_from_block = max(from_block, settings.network_config.KEEPER_GENESIS_BLOCK)
         events = await self._get_events(
             event=self.events.ValidatorRegistered,  # type: ignore
-            from_block=from_block,
+            from_block=v1_validators_from_block,
             to_block=to_block,
         )
         result = [Web3.to_hex(event['args']['publicKey']) for event in events]
+        v2_validators_from_block = max(from_block, settings.network_config.PECTRA_BLOCK)
         events = await self._get_events(
             event=self.events.V2ValidatorRegistered,  # type: ignore
-            from_block=from_block,
+            from_block=v2_validators_from_block,
             to_block=to_block,
         )
         result.extend([Web3.to_hex(event['args']['publicKey']) for event in events])

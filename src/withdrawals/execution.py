@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 async def submit_withdraw_validators(
     vault_address: ChecksumAddress,
     withdrawals: dict[HexStr, Gwei],
-    current_fee: Gwei,
+    tx_fee: Gwei,
 ) -> HexStr | None:
     """Sends withdrawValidators transaction to vault contract"""
     logger.info('Submitting withdrawValidators transaction')
@@ -24,7 +24,7 @@ async def submit_withdraw_validators(
         tx = await vault_contract.functions.withdrawValidators(
             _encode_withdrawals(withdrawals),
             b'',
-        ).transact({'value': Web3.to_wei(current_fee, 'gwei')})
+        ).transact({'value': Web3.to_wei(tx_fee, 'gwei')})
     except Exception as e:
         logger.info('Failed to withdraw from validators: %s', format_error(e))
         return None
