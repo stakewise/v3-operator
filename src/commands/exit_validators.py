@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import click
@@ -90,6 +91,12 @@ logger = logging.getLogger(__name__)
     envvar='LOG_LEVEL',
     help='The log level.',
 )
+@click.option(
+    '--no-confirm',
+    is_flag=True,
+    default=False,
+    help='Skips confirmation messages when provided.',
+)
 @click.command(help='Performs a voluntary exit for active vault validators.')
 # pylint: disable-next=too-many-arguments
 def exit_validators(
@@ -101,8 +108,13 @@ def exit_validators(
     execution_endpoints: str,
     data_dir: str,
     verbose: bool,
+    no_confirm: bool,
     log_level: str,
 ) -> None:
+    """
+    Trigger vault validator exits via vault contract.
+    To initiate a full validator exit, send a withdrawal request with a zero amount.
+    """
     if all([indexes, count]):
         raise click.ClickException('Please provide either --indexes or --count, not both.')
     operator_config = OperatorConfig(Path(data_dir))
@@ -118,19 +130,43 @@ def exit_validators(
         log_level=log_level,
     )
     try:
-        asyncio.run(
-            main(
-                vault_address=vault,
-                indexes=indexes,
-                count=count,
-            )
-        )
+        # Try-catch to enable async calls in test - an event loop
+        #  will already be running in that case
+        try:
+            asyncio.get_running_loop()
+            # we need to create a separate thread so we can block before returning
+            with ThreadPoolExecutor(1) as pool:
+                pool.submit(
+                    lambda: asyncio.run(
+                        main(
+                            vault_address=vault,
+                            indexes=indexes,
+                            count=count,
+                            no_confirm=no_confirm,
+                        )
+                    )
+                ).result()
+        except RuntimeError as e:
+            if 'no running event loop' == e.args[0]:
+                # no event loop running
+                asyncio.run(
+                    main(
+                        vault_address=vault,
+                        indexes=indexes,
+                        count=count,
+                        no_confirm=no_confirm,
+                    )
+                )
+            else:
+                raise e
     except Exception as e:
         log_verbose(e)
         sys.exit(1)
 
 
-async def main(vault_address: ChecksumAddress, count: int | None, indexes: list[int]) -> None:
+async def main(
+    vault_address: ChecksumAddress, count: int | None, indexes: list[int], no_confirm: bool
+) -> None:
     setup_logging()
     await setup_clients()
 
@@ -171,12 +207,12 @@ async def main(vault_address: ChecksumAddress, count: int | None, indexes: list[
 
     if count:
         active_validators = active_validators[:count]
-
-    click.confirm(
-        f'Are you sure you want to exit {len(active_validators)} validators '
-        f'with indexes: {', '.join(str(x.index) for x in active_validators)}?',
-        abort=True,
-    )
+    if not no_confirm:
+        click.confirm(
+            f'Are you sure you want to exit {len(active_validators)} validators '
+            f'with indexes: {', '.join(str(x.index) for x in active_validators)}?',
+            abort=True,
+        )
     tx_hash = await submit_withdraw_validators(
         vault_address=vault_address,
         withdrawals={val.public_key: Gwei(0) for val in active_validators},
@@ -184,8 +220,9 @@ async def main(vault_address: ChecksumAddress, count: int | None, indexes: list[
     )
     if tx_hash:
         click.secho(
-            f'Validators {', '.join(str(val.index) for val in active_validators)} '
-            f'exits successfully initiated',
+            'Exits for validators with '
+            f'index(es) {', '.join(str(val.index) for val in active_validators)} '
+            'are successfully initiated',
             bold=True,
             fg='green',
         )
