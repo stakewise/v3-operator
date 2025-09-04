@@ -156,42 +156,42 @@ async def main(vault_address: ChecksumAddress, count: int | None, indexes: list[
         to_block=chain_head.block_number,
     )
     if indexes:
-        exiting_validators = await _check_exiting_validators(
+        active_validators = await _check_exiting_validators(
             indexes=indexes,
             vault_public_keys=public_keys,
             max_activation_epoch=max_activation_epoch,
         )
     else:
-        exiting_validators = await _get_exiting_validators(
+        active_validators = await _get_active_validators(
             vault_public_keys=public_keys, max_activation_epoch=max_activation_epoch
         )
 
-    if not exiting_validators:
+    if not active_validators:
         raise click.ClickException('No active validators found')
 
     if count:
-        exiting_validators = exiting_validators[:count]
+        active_validators = active_validators[:count]
 
     click.confirm(
-        f'Are you sure you want to exit {len(exiting_validators)} validators '
-        f'with indexes: {', '.join(str(x.index) for x in exiting_validators)}?',
+        f'Are you sure you want to exit {len(active_validators)} validators '
+        f'with indexes: {', '.join(str(x.index) for x in active_validators)}?',
         abort=True,
     )
     tx_hash = await submit_withdraw_validators(
         vault_address=vault_address,
-        withdrawals={val.public_key: Gwei(0) for val in exiting_validators},
+        withdrawals={val.public_key: Gwei(0) for val in active_validators},
         tx_fee=withdrawal_request_fee,
     )
     if tx_hash:
         click.secho(
-            f'Validators {', '.join(str(val.index) for val in exiting_validators)} '
+            f'Validators {', '.join(str(val.index) for val in active_validators)} '
             f'exits successfully initiated',
             bold=True,
             fg='green',
         )
 
 
-async def _get_exiting_validators(
+async def _get_active_validators(
     max_activation_epoch: int, vault_public_keys: list[HexStr]
 ) -> list[ConsensusValidator]:
     """Fetch consensus validators that are eligible for exit."""
