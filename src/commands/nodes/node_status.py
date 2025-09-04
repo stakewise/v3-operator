@@ -96,6 +96,7 @@ def _log_consensus_node_status(node_status: dict, output_format: str) -> None:
         status_message = [
             'Consensus node status:',
             f'  Is syncing: {node_status['is_syncing']}',
+            f'  Head slot: {node_status['head_slot']}',
             f'  Sync distance: {node_status['sync_distance']}',
         ]
         eta = node_status.get('eta')
@@ -119,7 +120,8 @@ def _log_execution_node_status(node_status: dict, output_format: str) -> None:
         status_message = [
             'Execution node status:',
             f'  Is syncing: {node_status['is_syncing']}',
-            f'  Block number: {node_status['block_number']}',
+            f'  Block number: {node_status['latest_block_number']}',
+            f'  Sync distance: {node_status['sync_distance']}',
         ]
         eta = node_status.get('eta')
 

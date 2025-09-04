@@ -29,7 +29,8 @@ async def get_consensus_node_status(consensus_client: ExtendedAsyncBeacon) -> di
 
     return {
         'is_syncing': syncing['is_syncing'],
-        'sync_distance': syncing['sync_distance'],
+        'head_slot': int(syncing['head_slot']),
+        'sync_distance': int(syncing['sync_distance']),
         'eta': eta,
     }
 
@@ -57,7 +58,8 @@ async def get_execution_node_status(execution_client: AsyncWeb3) -> dict:
 
     return {
         'is_syncing': is_syncing,
-        'block_number': latest_block['number'],
+        'latest_block_number': latest_block['number'],
+        'sync_distance': sync_distance,
         'eta': eta,
     }
 
