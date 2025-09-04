@@ -9,7 +9,6 @@ from sw_utils import get_consensus_client, get_execution_client
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_NETWORK, settings
 from src.nodes.status import (
-    calc_sync_eta,
     get_consensus_node_status,
     get_execution_node_status,
     get_validator_activity_stats,
@@ -72,30 +71,23 @@ async def main(output_format: str) -> None:
     )
 
     # Get node statuses concurrently
-    consensus_node_status, execution_node_status, sync_eta = await asyncio.gather(
+    consensus_node_status, execution_node_status = await asyncio.gather(
         get_consensus_node_status(consensus_client),
         get_execution_node_status(execution_client),
-        calc_sync_eta(execution_client, consensus_client),
     )
-    execution_eta = sync_eta.get('execution')
-    consensus_eta = sync_eta.get('consensus')
 
     # Log statuses
-    _log_consensus_node_status(
-        node_status=consensus_node_status, output_format=output_format, eta=consensus_eta
-    )
-    _log_execution_node_status(
-        node_status=execution_node_status, output_format=output_format, eta=execution_eta
-    )
+    _log_consensus_node_status(node_status=consensus_node_status, output_format=output_format)
+    _log_execution_node_status(node_status=execution_node_status, output_format=output_format)
 
     if consensus_node_status.get('is_syncing') is False:
         validator_activity_stats = await get_validator_activity_stats(consensus_client)
         _log_validator_activity_stats(validator_activity_stats, output_format)
 
 
-def _log_consensus_node_status(node_status: dict, output_format: str, eta: int | None) -> None:
+def _log_consensus_node_status(node_status: dict, output_format: str) -> None:
     if output_format == 'json':
-        click.echo(json.dumps({'consensus_node': node_status, 'eta': eta}))
+        click.echo(json.dumps({'consensus_node': node_status}))
     else:
         if not node_status:
             click.echo('Consensus node status: unavailable.')
@@ -106,6 +98,8 @@ def _log_consensus_node_status(node_status: dict, output_format: str, eta: int |
             f'  Is syncing: {node_status['is_syncing']}',
             f'  Sync distance: {node_status['sync_distance']}',
         ]
+        eta = node_status.get('eta')
+
         if node_status['is_syncing'] and eta is not None:
             status_message.append(f'  Estimated time to sync: {_format_eta(eta)}')
         elif node_status['is_syncing'] and eta is None:
@@ -114,9 +108,9 @@ def _log_consensus_node_status(node_status: dict, output_format: str, eta: int |
         click.echo('\n'.join(status_message))
 
 
-def _log_execution_node_status(node_status: dict, output_format: str, eta: int | None) -> None:
+def _log_execution_node_status(node_status: dict, output_format: str) -> None:
     if output_format == 'json':
-        click.echo(json.dumps({'execution_node': node_status, 'eta': eta}))
+        click.echo(json.dumps({'execution_node': node_status}))
     else:
         if not node_status:
             click.echo('Execution node status: unavailable.')
@@ -127,6 +121,8 @@ def _log_execution_node_status(node_status: dict, output_format: str, eta: int |
             f'  Is syncing: {node_status['is_syncing']}',
             f'  Block number: {node_status['block_number']}',
         ]
+        eta = node_status.get('eta')
+
         if node_status['is_syncing'] and eta is not None:
             status_message.append(f'  Estimated time to sync: {_format_eta(eta)}')
         elif node_status['is_syncing'] and eta is None:

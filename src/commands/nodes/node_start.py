@@ -18,7 +18,7 @@ from src.nodes.process import (
     ProcessRunner,
     RethProcessBuilder,
 )
-from src.nodes.status import update_sync_status_periodically
+from src.nodes.status import SyncStatusHistory
 from src.nodes.typings import StdStreams
 from src.validators.keystores.local import LocalKeystore
 
@@ -132,13 +132,14 @@ async def main(
     reth_runner = _get_reth_runner(print_execution_logs)
     lighthouse_runner = _get_lighthouse_runner(print_consensus_logs)
     lighthouse_vc_runner = _get_lighthouse_vc_runner(print_validator_logs)
+    sync_status_history = SyncStatusHistory()
 
     try:
         await asyncio.gather(
             reth_runner.run(),
             lighthouse_runner.run(),
             lighthouse_vc_runner.run(),
-            update_sync_status_periodically(
+            sync_status_history.update_periodically(
                 execution_client=execution_client, consensus_client=consensus_client
             ),
         )
