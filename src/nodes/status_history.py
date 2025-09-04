@@ -7,6 +7,7 @@ from sw_utils import ExtendedAsyncBeacon
 from web3 import AsyncWeb3
 
 from src.config.settings import settings
+from src.nodes.typings import StatusHistoryRecord
 
 logger = logging.getLogger(__name__)
 
@@ -57,27 +58,37 @@ class SyncStatusHistory:
         sync_status_history = SyncStatusHistory().load_history()
 
         sync_status_history.append(
-            {'timestamp': cur_ts, 'block_number': cur_block_number, 'slot': cur_slot}
+            StatusHistoryRecord(timestamp=cur_ts, block_number=cur_block_number, slot=cur_slot)
         )
         sync_status_history = sync_status_history[-SYNC_STATUS_HISTORY_LEN:]
 
         self._dump_history(sync_status_history)
 
-    def load_history(self) -> list[dict]:
+    def load_history(self) -> list[StatusHistoryRecord]:
         sync_status_path = settings.data_dir / 'sync_status.csv'
 
-        if sync_status_path.exists():
-            with sync_status_path.open('r') as f:
-                reader = DictReader(f, fieldnames=SYNC_STATUS_FIELDNAMES)
-                next(reader)  # skip header
-                return list(reader)
+        if not sync_status_path.exists():
+            return []
 
-        return []
+        records: list[StatusHistoryRecord] = []
 
-    def _dump_history(self, sync_status_history: list[dict]) -> None:
+        with sync_status_path.open('r') as f:
+            reader = DictReader(f, fieldnames=SYNC_STATUS_FIELDNAMES)
+            next(reader)  # skip header
+            for row in reader:
+                records.append(
+                    StatusHistoryRecord(
+                        timestamp=int(row['timestamp']),
+                        block_number=int(row['block_number']),
+                        slot=int(row['slot']),
+                    )
+                )
+        return records
+
+    def _dump_history(self, sync_status_history: list[StatusHistoryRecord]) -> None:
         sync_status_path = settings.data_dir / 'sync_status.csv'
 
         with sync_status_path.open('w') as f:
             writer = DictWriter(f, fieldnames=SYNC_STATUS_FIELDNAMES)
             writer.writeheader()
-            writer.writerows(sync_status_history)
+            writer.writerows([record.__dict__ for record in sync_status_history])

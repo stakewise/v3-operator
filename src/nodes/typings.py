@@ -81,3 +81,10 @@ class StdStreams:
     stdin: IO_Any = None
     stdout: IO_Any = None
     stderr: IO_Any = None
+
+
+@dataclass
+class StatusHistoryRecord:
+    timestamp: int
+    block_number: int
+    slot: int

@@ -10,6 +10,7 @@ from web3.types import BlockData, Timestamp
 from src.common.utils import calc_slot_by_block_number, calc_slot_by_block_timestamp
 from src.config.settings import settings
 from src.nodes.status_history import SyncStatusHistory
+from src.nodes.typings import StatusHistoryRecord
 from src.validators.keystores.local import LocalKeystore
 
 logger = logging.getLogger(__name__)
@@ -90,7 +91,7 @@ async def get_validator_activity_stats(consensus_client: ExtendedAsyncBeacon) ->
 
 
 async def _calc_consensus_eta(
-    consensus_syncing: dict, sync_status_history: list[dict]
+    consensus_syncing: dict, sync_status_history: list[StatusHistoryRecord]
 ) -> int | None:
     if len(sync_status_history) < 2:
         return None
@@ -101,10 +102,15 @@ async def _calc_consensus_eta(
     if sync_distance <= allowed_delay:
         return 0
 
-    first_timestamp = int(sync_status_history[0]['timestamp'])
-    last_timestamp = int(sync_status_history[-1]['timestamp'])
-    first_slot = int(sync_status_history[0]['slot'])
-    last_slot = int(sync_status_history[-1]['slot'])
+    first_record = sync_status_history[-2]
+    last_record = sync_status_history[-1]
+
+    first_timestamp = first_record.timestamp
+    last_timestamp = last_record.timestamp
+
+    first_slot = first_record.slot
+    last_slot = last_record.slot
+
     consensus_speed = (last_slot - first_slot) / (last_timestamp - first_timestamp)
 
     consensus_eta = int(sync_distance / consensus_speed) if consensus_speed > 0 else None
@@ -112,7 +118,9 @@ async def _calc_consensus_eta(
 
 
 async def _calc_execution_eta(
-    execution_client: AsyncWeb3, sync_status_history: list[dict], latest_block: BlockData
+    execution_client: AsyncWeb3,
+    sync_status_history: list[StatusHistoryRecord],
+    latest_block: BlockData,
 ) -> int | None:
     if len(sync_status_history) < 2:
         return None
@@ -133,12 +141,30 @@ async def _calc_execution_eta(
 
 
 async def _calc_execution_speed_slots(
-    sync_status_history: list[dict], execution_client: AsyncWeb3
+    sync_status_history: list[StatusHistoryRecord], execution_client: AsyncWeb3
 ) -> float | None:
+    last_record = sync_status_history[-1]
+    first_record: StatusHistoryRecord | None = None
+
+    # Too old records are not useful for speed calculation
+    max_time_diff = 3600  # 1 hour
+
+    for record in reversed(sync_status_history):
+        # Find the last record with a different block number
+        # and within the max_time_diff
+        if (
+            record.block_number != last_record.block_number
+            and last_record.timestamp - record.timestamp < max_time_diff
+        ):
+            first_record = record
+            break
+
+    if first_record is None:
+        return None
 
     # Get first and last blocks from the history
-    first_block_number = BlockNumber(int(sync_status_history[0]['block_number']))
-    last_block_number = BlockNumber(int(sync_status_history[-1]['block_number']))
+    first_block_number = BlockNumber(int(first_record.block_number))
+    last_block_number = BlockNumber(int(last_record.block_number))
 
     # Calculate execution speed in slots per second (not blocks per second)
     try:
@@ -151,7 +177,7 @@ async def _calc_execution_speed_slots(
     except Exception:
         return None
 
-    first_timestamp = int(sync_status_history[0]['timestamp'])
-    last_timestamp = int(sync_status_history[-1]['timestamp'])
+    first_timestamp = int(first_record.timestamp)
+    last_timestamp = int(last_record.timestamp)
     execution_speed = (last_block_slot - first_block_slot) / (last_timestamp - first_timestamp)
     return execution_speed
