@@ -16,7 +16,7 @@ from src.common.contracts import (
     validators_registry_contract,
 )
 from src.common.typings import HarvestParams
-from src.config.settings import MIN_ACTIVATION_BALANCE, settings
+from src.config.settings import settings
 from src.harvest.execution import get_update_state_calls
 from src.validators.database import NetworkValidatorCrud, VaultCrud, VaultValidatorCrud
 from src.validators.typings import NetworkValidator, VaultValidator
@@ -62,7 +62,7 @@ def process_network_validator_events_multiprocessing(
     and returns the list of valid validators.
     Use multiprocessing to speed up operator startup.
     """
-    with Pool(processes=settings.pool_size) as pool:
+    with Pool(processes=settings.concurrency) as pool:
         results = [
             pool.apply_async(
                 process_network_validator_event,
@@ -166,6 +166,20 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
     return new_public_keys
 
 
+async def get_latest_vault_v2_validator_public_keys(vault_address: ChecksumAddress) -> Set[HexStr]:
+    """Fetches the latest vault v2 validator public keys registered after finalized block"""
+    block_number = VaultCrud().get_vault_v2_validators_checkpoint(vault_address)
+    if block_number:
+        from_block = BlockNumber(block_number + 1)
+    else:
+        from_block = settings.network_config.KEEPER_GENESIS_BLOCK
+    vault_contract = VaultContract(vault_address)
+    events = await vault_contract.events.V2ValidatorRegistered.get_logs(  # type: ignore
+        fromBlock=from_block
+    )
+    return {Web3.to_hex(event['args']['publicKey']) for event in events}
+
+
 def process_network_validator_event(
     event: EventData, fork_version: bytes
 ) -> NetworkValidator | None:
@@ -191,10 +205,8 @@ async def get_withdrawable_assets(
 ) -> Wei:
     """Fetches vault's available assets for staking."""
     vault_contract = VaultContract(vault_address)
-    before_update_assets = await vault_contract.functions.withdrawableAssets().call()
-
     if harvest_params is None:
-        return before_update_assets
+        return await vault_contract.functions.withdrawableAssets().call()
 
     calls = await get_update_state_calls(
         vault_address=vault_contract.contract_address, harvest_params=harvest_params
@@ -203,14 +215,7 @@ async def get_withdrawable_assets(
     calls.append((vault_contract.contract_address, withdrawable_assets_call))
 
     _, multicall = await multicall_contract.aggregate(calls)
-    after_update_assets = Web3.to_int(multicall[-1])
-
-    before_update_validators = before_update_assets // MIN_ACTIVATION_BALANCE
-    after_update_validators = after_update_assets // MIN_ACTIVATION_BALANCE
-    if before_update_validators != after_update_validators:
-        return Wei(after_update_assets)
-
-    return Wei(before_update_assets)
+    return Wei(Web3.to_int(multicall[-1]))
 
 
 async def scan_validators_events(block_number: BlockNumber, is_startup: bool) -> None:

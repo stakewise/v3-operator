@@ -89,14 +89,14 @@ logger = logging.getLogger(__name__)
     '--execution-endpoints',
     type=str,
     envvar='EXECUTION_ENDPOINTS',
-    help="""Comma separated list of API endpoints for execution nodes.
-Used to retrieve vault validator fee recipient (only needed if flag --dappnode is set).""",
+    help='Comma separated list of API endpoints for execution nodes.'
+    ' Used to retrieve vault validator fee recipient (only needed if --dappnode flag is set).',
     callback=validate_dappnode_execution_endpoints,
     default='',
 )
 @click.option(
     '--network',
-    help='The network of your vault.',
+    help='The network of your vault. Default is the network specified at "init" command.',
     type=click.Choice(
         AVAILABLE_NETWORKS,
         case_sensitive=False,
@@ -104,7 +104,7 @@ Used to retrieve vault validator fee recipient (only needed if flag --dappnode i
 )
 @click.command(help='Uploads private keys to a remote signer.')
 # pylint: disable-next=too-many-arguments
-def remote_signer_setup(
+def setup_remote_signer(
     vault: ChecksumAddress | None,
     remote_signer_url: str,
     data_dir: str,

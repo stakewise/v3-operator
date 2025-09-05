@@ -7,8 +7,6 @@ from pathlib import Path
 import click
 from aiohttp import ClientResponseError
 from eth_typing import HexStr
-from sw_utils import ValidatorStatus
-from sw_utils.consensus import EXITED_STATUSES
 from web3 import Web3
 
 from src.common.clients import consensus_client
@@ -21,6 +19,7 @@ from src.config.settings import (
     DEFAULT_HASHI_VAULT_PARALLELISM,
     settings,
 )
+from src.validators.consensus import EXITING_STATUSES
 from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
 
@@ -29,9 +28,6 @@ from src.validators.keystores.load import load_keystore
 class ValidatorExit:
     public_key: HexStr
     index: int
-
-
-EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
 
 
 @click.option(
@@ -52,7 +48,7 @@ EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
 )
 @click.option(
     '--count',
-    help='The number of validators to exit.',
+    help='The number of validators to exit. Default is all the active validators.',
     type=click.IntRange(min=1),
 )
 @click.option(
@@ -120,14 +116,14 @@ EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
     help='The log level.',
 )
 @click.option(
-    '--pool-size',
-    help='Number of processes in a pool.',
-    envvar='POOL_SIZE',
+    '--concurrency',
+    help='Number of processes in a pool. The default is 1.',
+    envvar='CONCURRENCY',
     type=int,
 )
 @click.command(help='Performs a voluntary exit for active vault validators.')
 # pylint: disable-next=too-many-arguments,too-many-locals
-def validators_exit(
+def exit_validators(
     network: str,
     count: int | None,
     consensus_endpoints: str,
@@ -141,7 +137,7 @@ def validators_exit(
     data_dir: str,
     verbose: bool,
     log_level: str,
-    pool_size: int | None,
+    concurrency: int | None,
 ) -> None:
     # pylint: disable=duplicate-code
     operator_config = OperatorConfig(Path(data_dir))
@@ -166,7 +162,7 @@ def validators_exit(
         hashi_vault_parallelism=hashi_vault_parallelism,
         verbose=verbose,
         log_level=log_level,
-        pool_size=pool_size,
+        concurrency=concurrency,
     )
     try:
         # Try-catch to enable async calls in test - an event loop

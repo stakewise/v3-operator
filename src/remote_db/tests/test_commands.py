@@ -1,5 +1,4 @@
 import base64
-from collections import defaultdict
 from pathlib import Path
 from secrets import randbits
 from typing import Generator
@@ -248,45 +247,6 @@ class TestRemoteDbSetupValidator:
             assert output.strip() in result.output.strip()
 
 
-@pytest.mark.usefixtures(
-    '_patch_check_db_connection',
-    '_patch_get_db_connection',
-)
-@pytest.mark.usefixtures('_init_config', '_create_keys')
-class TestRemoteDbSetupOperator:
-    def test_setup_operator(
-        self,
-        data_dir: Path,
-        vault_address: HexAddress,
-        runner: CliRunner,
-    ):
-        db_url = 'postgresql://user:password@localhost:5432/dbname'
-        encryption_key = '43ueY4nqsiajWHTnkdqrc3OWj2W+t0bbdBISJFjZ3Ck='
-
-        args = [
-            '--db-url',
-            db_url,
-            '--data-dir',
-            str(data_dir),
-            'setup-operator',
-            '--output-dir',
-            './operator',
-        ]
-        keypairs = _get_remote_db_keypairs(base64.b64decode(encryption_key), total_validators=3)
-        remote_config: dict[str, list[str]] = defaultdict(list)
-        for keypair in keypairs:
-            remote_config['public_key'].append(keypair.public_key)
-
-        with (
-            runner.isolated_filesystem(),
-            mock.patch.object(KeyPairsCrud, 'get_first_keypair', return_value=keypairs[0]),
-            mock.patch.object(KeyPairsCrud, 'get_keypairs', return_value=keypairs),
-        ):
-            result = runner.invoke(remote_db_group, args)
-            output = 'Successfully created operator configuration file.\n'
-            assert output.strip() in result.output.strip()
-
-
 def _get_remote_db_keypairs(
     encryption_key: bytes, total_validators: int
 ) -> list[RemoteDatabaseKeyPair]:
@@ -298,7 +258,7 @@ def _get_remote_db_keypairs(
         keystores[public_key] = private_key
 
     key_records: list[RemoteDatabaseKeyPair] = []
-    for public_key, private_key in keystores.items():  # pylint: disable=no-member
+    for public_key, private_key in keystores.items():
         encrypted_priv_key, nonce = _encrypt_private_key(private_key, encryption_key)
         key_records.append(
             RemoteDatabaseKeyPair(

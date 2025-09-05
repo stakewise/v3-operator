@@ -40,7 +40,7 @@ from src.config.settings import DEFAULT_NETWORK, settings
 @click.option(
     '--pool-tag',
     default='',
-    help='The pool name listed on the Explorer.',
+    help='The pool name listed in the Explorer.',
     prompt='Enter the pool tag (if any)',
     type=str,
 )
@@ -50,8 +50,8 @@ from src.config.settings import DEFAULT_NETWORK, settings
     help='OAuth token for authorization.',
     type=str,
 )
-@click.command(help='Self-report your validators to the Rated Network.')
-def rated_self_report(
+@click.command(help='Submit your validators to the Rated Network.')
+def submit_rated_network(
     vaults: list[ChecksumAddress],
     network: str,
     pool_tag: str,

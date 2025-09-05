@@ -15,8 +15,9 @@ from src.config.settings import (
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
     DEFAULT_METRICS_PREFIX,
+    DEFAULT_MIN_DEPOSIT_AMOUNT,
     DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
-    DEFAULT_MIN_VALIDATORS_REGISTRATION,
+    DEFAULT_MIN_DEPOSIT_DELAY,
     LOG_FORMATS,
     LOG_PLAIN,
 )
@@ -96,9 +97,11 @@ start_common_options = [
     ),
     click.option(
         '--validator-type',
-        help='Type of registered validators: '
-        f'{ValidatorType.V1.value} or {ValidatorType.V2.value}.',
+        help='Type of the validators to register:'
+        f' {ValidatorType.V1.value} or {ValidatorType.V2.value}.'
+        f' Default is {ValidatorType.V2.value}.',
         envvar='VALIDATOR_TYPE',
+        default=ValidatorType.V2,
         type=click.Choice(
             ValidatorType,
             case_sensitive=False,
@@ -115,19 +118,20 @@ start_common_options = [
         '--harvest-vault',
         is_flag=True,
         envvar='HARVEST_VAULT',
-        help='Whether to submit vault harvest transactions. Default is false.',
+        help='Submit the vault state sync transaction periodically. Default is false.',
     ),
     click.option(
-        '--split-rewards',
+        '--claim-fee-splitter',
         is_flag=True,
-        envvar='SPLIT_REWARDS',
-        help='Claim fee rewards periodically on behalf of the shareholders. Default is false.',
+        envvar='CLAIM_FEE_SPLITTER',
+        help='Claim fee splitter rewards periodically on behalf of the shareholders.'
+        ' Default is false.',
     ),
     click.option(
         '--disable-withdrawals',
         is_flag=True,
         envvar='DISABLE_WITHDRAWALS',
-        help='Whether to disable submitting partial vault withdrawals.',
+        help='Disable submitting validator withdrawals through the vault contract.',
     ),
     click.option(
         '--execution-endpoints',
@@ -141,7 +145,7 @@ start_common_options = [
         type=str,
         envvar='EXECUTION_JWT_SECRET',
         help='JWT secret key used for signing and verifying JSON Web Tokens'
-        'when connecting to execution nodes.',
+        ' when connecting to execution nodes.',
     ),
     click.option(
         '--consensus-endpoints',
@@ -185,25 +189,28 @@ start_common_options = [
         help='The log level.',
     ),
     click.option(
-        '--pool-size',
+        '--concurrency',
         help='Number of processes in a pool.',
-        envvar='POOL_SIZE',
+        envvar='CONCURRENCY',
         type=int,
-    ),
-    click.option(
-        '--min-validators-registration',
-        type=int,
-        envvar='MIN_VALIDATORS_REGISTRATION',
-        help='Minimum number of validators required to start registration.',
-        default=DEFAULT_MIN_VALIDATORS_REGISTRATION,
     ),
     click.option(
         '--min-deposit-amount-gwei',
         type=int,
         envvar='MIN_DEPOSIT_AMOUNT_GWEI',
-        help='Minimum amount in gwei to deposit into validator.',
+        help=f'Minimum amount in gwei to deposit into validator.'
+        f' The default is {DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI} '
+        f'({DEFAULT_MIN_DEPOSIT_AMOUNT} ETH).',
         default=DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
         callback=validate_min_deposit_amount_gwei,
+    ),
+    click.option(
+        '--min-deposit-delay',
+        type=int,
+        envvar='MIN_DEPOSIT_DELAY',
+        help=f'Minimum delay for validator funding in seconds.'
+        f' The default is {DEFAULT_MIN_DEPOSIT_DELAY}',
+        default=DEFAULT_MIN_DEPOSIT_DELAY,
     ),
     click.option(
         '--no-confirm',

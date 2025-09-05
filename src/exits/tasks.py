@@ -141,7 +141,7 @@ async def _fetch_outdated_indexes(
     oracles: list[Oracle], update_block: BlockNumber | None, vault: ChecksumAddress
 ) -> list[int]:
     endpoints = list(chain.from_iterable([oracle.endpoints for oracle in oracles]))
-    shuffle(endpoints)
+    shuffle(endpoints)  # nosec
 
     for oracle_endpoint in endpoints:
         try:
@@ -166,7 +166,6 @@ async def _update_exit_signatures(
 ) -> None:
     """Fetches update signature requests from oracles."""
     logger.info('Starting exit signature rotation for %d validators', len(outdated_indexes))
-    # pylint: disable=duplicate-code
     validators = await get_validator_public_keys(outdated_indexes)
     approvals_min_interval = 1
     deadline: int | None = None

@@ -3,22 +3,19 @@ import logging
 from pathlib import Path
 
 import click
-from eth_typing import ChecksumAddress, HexStr
+from eth_typing import ChecksumAddress
 from sw_utils import InterruptHandler
-from sw_utils.pectra import get_pectra_vault_version
 
 import src
 from src.common.checks import wait_execution_catch_up_consensus
 from src.common.clients import setup_clients
 from src.common.consensus import get_chain_finalized_head
-from src.common.contracts import VaultContract
 from src.common.execution import WalletTask, update_oracles_cache
 from src.common.logging import setup_logging
 from src.common.metrics import MetricsTask, metrics, metrics_server
 from src.common.migrate import migrate_to_multivault
 from src.common.startup_check import startup_checks
 from src.common.tasks import BaseTask
-from src.common.typings import ValidatorType
 from src.common.utils import get_build_version
 from src.config.config import OperatorConfig, OperatorConfigException
 from src.config.settings import ValidatorsRegistrationMode, settings
@@ -31,7 +28,6 @@ from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
 from src.validators.relayer import RelayerAdapter, create_relayer_adapter
 from src.validators.tasks import ValidatorRegistrationSubtask, load_genesis_validators
-from src.validators.utils import load_public_keys
 from src.withdrawals.tasks import ValidatorWithdrawalSubtask
 
 logger = logging.getLogger(__name__)
@@ -42,7 +38,6 @@ async def start_base() -> None:
     setup_logging()
     setup_sentry()
     await setup_clients()
-    await setup_validators_type()
 
     log_start()
 
@@ -60,14 +55,10 @@ async def start_base() -> None:
     await load_genesis_validators()
 
     keystore: BaseKeystore | None = None
-    available_public_keys: list[HexStr] | None = None
     relayer_adapter: RelayerAdapter | None = None
 
-    # load keystore and available public keys
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
         keystore = await load_keystore()
-
-        available_public_keys = load_public_keys(settings.public_keys_file)
     else:
         relayer_adapter = create_relayer_adapter()
 
@@ -91,7 +82,6 @@ async def start_base() -> None:
         tasks = [
             ValidatorTask(
                 keystore=keystore,
-                available_public_keys=available_public_keys,
                 relayer_adapter=relayer_adapter,
             ).run(interrupt_handler),
             ExitSignatureTask(
@@ -102,7 +92,7 @@ async def start_base() -> None:
         ]
         if settings.harvest_vault:
             tasks.append(HarvestTask().run(interrupt_handler))
-        if settings.split_rewards:
+        if settings.claim_fee_splitter:
             tasks.append(SplitRewardTask().run(interrupt_handler))
 
         await asyncio.gather(*tasks)
@@ -112,12 +102,10 @@ class ValidatorTask(BaseTask):
     def __init__(
         self,
         keystore: BaseKeystore | None,
-        available_public_keys: list[HexStr] | None,
         relayer_adapter: RelayerAdapter | None,
     ):
         self.validator_registration_subtask = ValidatorRegistrationSubtask(
             keystore=keystore,
-            available_public_keys=available_public_keys,
             relayer_adapter=relayer_adapter,
         )
 
@@ -130,10 +118,10 @@ class ValidatorTask(BaseTask):
         )
         await scan_validators_events(block_number=chain_head.block_number, is_startup=False)
         subtasks = [
-            self.validator_registration_subtask.process_block(),
+            self.validator_registration_subtask.process(),
         ]
         if not settings.disable_withdrawals:
-            subtasks.append(self.validator_withdrawal_subtask.process_block(chain_head))
+            subtasks.append(self.validator_withdrawal_subtask.process(chain_head))
         await asyncio.gather(*subtasks)
 
 
@@ -190,20 +178,3 @@ def load_operator_config(
         operator_config = OperatorConfig(Path(data_dir))
         operator_config.load()
         return operator_config
-
-
-async def setup_validators_type() -> None:
-    """The validator type selection is determined by the vault version."""
-    if settings.validator_type:
-        # explicit set by cmd parameter
-        return
-
-    for vault_address in settings.vaults:
-        vault_contract = VaultContract(vault_address)
-        if await vault_contract.version() >= get_pectra_vault_version(
-            settings.network, vault_address
-        ):
-            settings.validator_type = ValidatorType.V2
-            return
-
-    settings.validator_type = ValidatorType.V1

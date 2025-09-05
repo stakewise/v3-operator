@@ -27,8 +27,8 @@
    7. [Max gas fee](#max-gas-fee)
    8. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
    9. [Self report to Rated Network](#self-report-to-rated-network)
-   10. [Export validators file](#export-validators-file)
-6. [Contacts](#contacts)
+6. [V4 Upgrade guide](#v4-upgrade-guide)
+7. [Contacts](#contacts)
 
 ## What is V3 Operator?
 
@@ -43,8 +43,7 @@ a registration transaction to the Vault.
 The validator registration process consists of the following steps:
 
 1. Check whether Vault has accumulated enough assets to register a validator (e.g., 32 ETH for Ethereum)
-2. Get the next free validator public key from the `public_keys.txt` file attached to the Operator. The validators are
-   registered in the same order as specified in the `public_keys.txt` file.
+2. Get the next free validator key from the used keystore.
 3. Obtain BLS signature for exit message using local keystores or remote signer.
 4. Share the exit signature of the validator with StakeWise Oracles:
    1. Using [Shamir's secret sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing), split
@@ -156,14 +155,14 @@ Head to [Usage](#usage) to launch your Operator service.
 Pull the latest docker Operator docker image:
 
 ```bash
-docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.10
+docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v4.0.0
 ```
 
 You can also build the docker image from source by cloning this repo and executing the following command from within
 the `v3-operator` folder:
 
 ```bash
-docker build --pull -t europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.10 .
+docker build --pull -t europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v4.0.0 .
 ```
 
 You will execute Operator Service commands using the format below (note the use of flags are optional):
@@ -172,7 +171,7 @@ You will execute Operator Service commands using the format below (note the use 
 docker run --rm -ti \
 -u $(id -u):$(id -g) \
 -v ~/.stakewise/:/data \
-europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.10 \
+europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v4.0.0 \
 src/main.py COMMAND \
 --flagA=123 \
 --flagB=xyz
@@ -210,13 +209,12 @@ the [Kubernetes setup](https://docs.stakewise.io/for-operators/kubernetes-stakin
 
 ## Usage
 
-To run the Operator Service, you must first create keystores and a file containing the list of available validator public keys for your Vault. You must also
+To run the Operator Service, you must first create keystores for your Vault. You must also
 set up a wallet for Operator Service to handle validator registrations.
 
 The Operator Service includes built-in functionality to generate all of the above.
 Alternatively, you may use your preferred methods to generate keystores (e.g., [Wagyu Keygen](https://github.com/stake-house/wagyu-key-gen))
 and create the wallet (e.g., [MetaMask](https://metamask.io/) or [MyEtherWallet](https://help.myetherwallet.com/en/articles/6512619-using-mew-offline-current-mew-version-6)).
-If you choose to use your own methods, you will need to generate the public key file using the `export-public-keys` command.
 
 The below steps walk you through this set-up using Operator Service:
 
@@ -263,7 +261,6 @@ Exporting validator keystores    [####################################]  10/10
 
 Done. Generated 10 keys for StakeWise Operator.
 Keystores saved to /home/user/.stakewise/keystores file
-Validator public keys saved to /home/user/.stakewise/validators.txt file
 ```
 
 You may not want the Operator service to have direct access to the validator keys. Validator keystores do not need to be
@@ -386,7 +383,7 @@ below:
 docker run --restart on-failure:10 \
 -u $(id -u):$(id -g) \
 -v ~/.stakewise/:/data \
-europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.10 \
+europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v4.0.0 \
 src/main.py start \
 --vaults=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
 --data-dir=/data \
@@ -429,7 +426,7 @@ The validator exits are handled by oracles, but in case you want to force trigge
 validators, you can run the following command:
 
 ```bash
-./operator validators-exit
+./operator exit-validators
 ```
 
 Follow the steps, confirming your consensus node endpoint, Vault address, and the validator indexes to exit.
@@ -504,7 +501,7 @@ The partial withdrawals interval can be adjusted via the `PARTIAL_WITHDRAWALS_IN
 
 ### Automated withdrawals (Reward splitter)
 
-It is possible to periodically withdraw rewards for the vault’s fee shareholders. To enable this, set the wallet address connected to the operator as the `Fee Claimer` in the `Roles` tab under the vault’s Settings. Additionally, you must pass the --split-rewards flag when starting the Operator Service.
+It is possible to periodically withdraw rewards for the vault’s fee shareholders. To enable this, set the wallet address connected to the operator as the `Fee Claimer` in the `Roles` tab under the vault’s Settings. Additionally, you must pass the `--claim-fee-splitter` flag when starting the Operator Service.
 
 Periodic withdrawal task relies on Reward Splitter contract. The task combines the following contract calls into a multicall:
 
@@ -557,7 +554,7 @@ much CPU load and impact node performance during the creation and loading of key
 
 This command allows you to self-report your validator keys to the Rated Network, ensuring that your validator set is tracked and updated on the Rated Explorer.
 
-To use the `rated-self-report` command, you will need to provide the following parameters:
+To use the `submit-rated-network` command, you will need to provide the following parameters:
 
 - `--data-dir`: Path where the vault data will be placed. Default is ~/.stakewise.
 - `--vaults`:  The comma separated list of your vault addresses.
@@ -568,23 +565,88 @@ To use the `rated-self-report` command, you will need to provide the following p
 Here's an example of how to use the command:
 
 ```bash
-python src/main.py rated-self-report --vaults <your-vault-addresses> --network <network-name> --pool-tag <pool-tag> --token <your-oauth-token> --data-dir <path-to-data-dir>
+python src/main.py submit-rated-network --vaults <your-vault-addresses> --network <network-name> --pool-tag <pool-tag> --token <your-oauth-token> --data-dir <path-to-data-dir>
 ```
 
-### Export validators file
+## V4 Upgrade Guide
 
-This command fetches available public keys from local keystores and exports them to a validators.txt file.
+### Pectra Upgrade Support
 
-To use the `export-public-keys` command, you can provide the following parameters:
+Ensure your vault is updated to version 5 for Ethereum network or version 3 for Gnosis network for full Pectra compatibility.
 
-- `--data-dir`: Path where the vault data will be placed. Default is ~/.stakewise.
-- `--keystores-dir` - The directory with validator keys in the EIP-2335 standard.
+After the upgrade, validator balances are no longer limited to 32 ETH or 1 GNO. By default, the 0x02 validators are registered. To register 0x01 validators, add the flag `--validators-type=v1`. Note that funding will be disabled when using this validator type.
 
-Here's an example of how to use the command:
+When replenishing validators, funds first top up existing 0x02 validators up to 2048 ETH or 64 GNO. New validators are registered once the vault accumulates another 32 ETH or 1 GNO.
 
-```bash
-python src/main.py export-public-keys --data-dir <path-to-data-dir>
-```
+To migrate 0x01 validators to 0x02, use the consolidate command (see [reference](#validators-consolidation)).
+
+Also, partial withdrawals for compound validators are now supported. Partial withdrawals are significantly faster and more efficient than full validator exits. Even full validator exits now can be processed via execution request call.
+To disable this, use the flag `--disable-withdrawals` — in this case, funds will be withdrawn via full exits using oracles.
+
+Partial withdrawals run every 24 hours by default, processing available ETH from validators with balances exceeding 32 ETH or 1 GNO. The operator prioritizes validators with higher balances first.
+
+If partial withdrawal capacity is insufficient or no validators have balances above 32 ETH or 1 GNO, the operator triggers a full validator exit.
+
+If the operator does not initiate partial or full withdrawals, the oracle will automatically execute full withdrawal after 24 hours.
+
+### Start Command
+
+We've streamlined the launch process by separating setup flows for Hashi Vault, Web3Signer and relayers — each now has its own dedicated command.
+
+📖 Docs: [Start Operator Service](#step-5-start-operator-service)
+
+### No More Deposit Data File
+
+V4 Operator no longer requires pre-uploaded deposit data for validator registration — it generates deposit data automatically during registration.
+
+⚠ Important: To support this new flow, you must assign your operator wallet as the Validators Manager in the vault settings.
+🔗 [How to Set Up Validators Manager](#step-4-setup-validators-manager-role)
+
+### Multivault Support
+
+The operator service can now manage multiple vaults simultaneously, reducing setup complexity for multi-vault users.
+
+Key Changes:
+
+- Single Wallet & Keystores – Shared across all vaults (no `--vault` flag needed for create-keys/create-wallets).
+- Migration – Existing setups will auto-migrate to the new structure on first launch.
+- Launch Command – Use `--vaults` with multiple addresses (e.g., `--vaults=0x1...23,0x4...56`).
+- All validator keys linked to the operator will be used for every connected vault.
+
+### Automated rewards withdrawals
+
+It is possible to periodically withdraw rewards for the vault’s fee shareholders.
+Check for more details in [Reward splitter section](#automated-withdrawals-reward-splitter)
+
+### TL;DR – Quick Setup Checklist
+
+#### Mandatory
+
+- Upgrade vault to version 5 for Ethereum or version 3 for Gnosis.
+- Set Validator Manager role in vault UI.
+
+#### For Pectra
+
+- Use consolidate command for legacy validators.
+
+#### Per Setup Type
+
+- Default Mode → No changes needed.
+- Remote Signer → Use `start-remote-signer` command.
+- Hashi Vault → Use `start-hashi-vault` command.
+- Relayer → Use `start-relayer` command.
+
+#### For Multivault
+
+- Pass comma-separated addresses in --vaults.
+- Recreate operator directory for clean migration.
+
+#### Main parameter changes
+
+- `--vault` → Now `--vaults` , `--vault` is deprecated.
+- Removed `--deposit-data-file` parameter
+- `HOT_WALLET_FILE` → renamed to `WALLET_FILE`
+- `HOT_WALLET_PASSWORD_FILE` → renamed to `WALLET_PASSWORD_FILE`
 
 ## Contacts
 

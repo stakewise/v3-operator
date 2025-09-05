@@ -15,14 +15,20 @@ from sw_utils.typings import Oracle, ProtocolConfig
 
 from src.commands.create_keys import create_keys
 from src.commands.create_wallet import create_wallet
-from src.commands.remote_signer_setup import remote_signer_setup
+from src.commands.setup_remote_signer import setup_remote_signer
 from src.common.credentials import CredentialManager
 from src.config.config import OperatorConfig
 from src.config.networks import HOODI
 from src.config.settings import settings
-from src.test_fixtures.hashi_vault import hashi_vault_url, mocked_hashi_vault  # noqa
-from src.test_fixtures.remote_signer import mocked_remote_signer, remote_signer_url
 from src.validators.keystores.remote import RemoteSignerKeystore
+from src.validators.keystores.tests.test_fixtures.hashi_vault import (
+    hashi_vault_url,
+    mocked_hashi_vault,
+)
+from src.validators.keystores.tests.test_fixtures.remote_signer import (
+    mocked_remote_signer,
+    remote_signer_url,
+)
 from src.validators.signing.tests.oracle_functions import OracleCommittee
 from src.validators.typings import BLSPrivkey
 
@@ -94,7 +100,7 @@ def _create_keys(
             str(count),
             '--data-dir',
             str(data_dir),
-            '--pool-size',
+            '--concurrency',
             '1',
         ],
     )
@@ -116,7 +122,7 @@ def _create_wallet(data_dir: Path, test_mnemonic: str, runner: CliRunner) -> Non
 
 
 @pytest.fixture
-def _remote_signer_setup(
+def _setup_remote_signer(
     data_dir: Path,
     keystores_dir: Path,
     remote_signer_url: str,
@@ -127,7 +133,7 @@ def _remote_signer_setup(
     _create_keys,
 ) -> None:
     result = runner.invoke(
-        remote_signer_setup,
+        setup_remote_signer,
         [
             '--remote-signer-url',
             remote_signer_url,
@@ -140,7 +146,7 @@ def _remote_signer_setup(
 
 
 @pytest.fixture
-async def remote_signer_keystore(_remote_signer_setup) -> RemoteSignerKeystore:
+async def remote_signer_keystore(_setup_remote_signer) -> RemoteSignerKeystore:
     return await RemoteSignerKeystore.load()
 
 

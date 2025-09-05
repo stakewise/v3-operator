@@ -144,7 +144,7 @@ async def submit_consolidate_validators(
     vault_address: ChecksumAddress,
     validators: bytes,
     oracle_signatures: bytes,
-    current_fee: Gwei,
+    tx_fee: Gwei,
 ) -> HexStr | None:
     """Sends consolidate validators transaction to vault contract"""
     logger.info('Submitting consolidate validators transaction')
@@ -154,7 +154,7 @@ async def submit_consolidate_validators(
             validators,
             b'',
             oracle_signatures,
-        ).transact({'value': Web3.to_wei(current_fee, 'gwei')})
+        ).transact({'value': Web3.to_wei(tx_fee, 'gwei')})
     except Exception as e:
         logger.info('Failed to submit consolidate validators transaction: %s', format_error(e))
         return None

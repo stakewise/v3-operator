@@ -11,7 +11,7 @@ from eth_typing import ChecksumAddress, HexStr
 from web3 import Web3
 
 from src.common.utils import greenify
-from src.config.settings import PUBLIC_KEYS_FILENAME, settings
+from src.config.settings import settings
 from src.remote_db.database import KeyPairsCrud, get_db_connection
 from src.remote_db.typings import RemoteDatabaseKeyPair
 from src.validators.keystores.local import LocalKeystore
@@ -48,7 +48,6 @@ def cleanup(db_url: str) -> None:
         keypairs_crud.remove_keypairs()
 
 
-# pylint: disable=too-many-locals
 async def upload_keypairs(db_url: str, b64_encrypt_key: str) -> None:
     """Uploads key-pairs to remote DB. Updates configs in the remote DB."""
     encryption_key = _check_encryption_key(db_url, b64_encrypt_key)
@@ -174,25 +173,6 @@ def setup_validator(
         f'Proposer config for Teku\\Prysm saved to '
         f'{greenify(proposer_config_filepath)} file.\n',
     )
-
-
-def setup_operator(db_url: str, output_dir: Path) -> None:
-    """Create operator remote signer configuration."""
-    keypairs_crud = KeyPairsCrud(db_url=db_url)
-
-    public_keys = keypairs_crud.get_public_keys()
-    if public_keys is None:
-        raise click.ClickException('No keystores found in the remote db.')
-
-    if not output_dir.exists():
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-    output_file = output_dir / PUBLIC_KEYS_FILENAME
-    with open(output_file, 'w', encoding='utf-8') as f:
-        for public_key in public_keys:
-            f.write(f'{public_key}\n')
-
-    click.secho(f'Public keys saved to {greenify(output_file)} file.')
 
 
 def _check_encryption_key(db_url: str, b64_encrypt_key: str) -> bytes:
