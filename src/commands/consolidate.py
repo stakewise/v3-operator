@@ -94,7 +94,7 @@ logger = logging.getLogger(__name__)
     '--execution-endpoints',
     type=str,
     envvar='EXECUTION_ENDPOINTS',
-    prompt='Enter comma separated list of API endpoints for execution nodes',
+    prompt='Enter the comma separated list of API endpoints for execution nodes',
     help='Comma separated list of API endpoints for execution nodes.',
 )
 @click.option(

@@ -1,33 +1,29 @@
 import asyncio
+import logging
 import sys
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
 from pathlib import Path
 
 import click
-from aiohttp import ClientResponseError
-from eth_typing import HexStr
-from web3 import Web3
+from eth_typing import ChecksumAddress, HexStr
+from web3.types import Gwei
 
-from src.common.clients import consensus_client
+from src.common.clients import setup_clients
+from src.common.consensus import get_chain_justified_head
+from src.common.contracts import VaultContract
+from src.common.execution import get_execution_request_fee
 from src.common.logging import LOG_LEVELS, setup_logging
-from src.common.utils import format_error, log_verbose
-from src.config.config import OperatorConfig, OperatorConfigException
+from src.common.startup_check import check_validators_manager, check_vault_version
+from src.common.utils import log_verbose
+from src.common.validators import validate_eth_address, validate_indexes
+from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
-from src.config.settings import (
-    DEFAULT_HASHI_VAULT_ENGINE_NAME,
-    DEFAULT_HASHI_VAULT_PARALLELISM,
-    settings,
-)
-from src.validators.consensus import EXITING_STATUSES
-from src.validators.keystores.base import BaseKeystore
-from src.validators.keystores.load import load_keystore
+from src.config.settings import MAX_WITHDRAWAL_REQUEST_FEE, settings
+from src.validators.consensus import EXITING_STATUSES, fetch_consensus_validators
+from src.validators.typings import ConsensusValidator
+from src.withdrawals.execution import submit_withdraw_validators
 
-
-@dataclass
-class ValidatorExit:
-    public_key: HexStr
-    index: int
+logger = logging.getLogger(__name__)
 
 
 @click.option(
@@ -47,6 +43,19 @@ class ValidatorExit:
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
 )
 @click.option(
+    '--vault',
+    prompt='Enter your vault address',
+    help='Vault address',
+    type=str,
+    callback=validate_eth_address,
+)
+@click.option(
+    '--indexes',
+    type=str,
+    help='Comma separated list of indexes of validators to exit.',
+    callback=validate_indexes,
+)
+@click.option(
     '--count',
     help='The number of validators to exit. Default is all the active validators.',
     type=click.IntRange(min=1),
@@ -59,44 +68,11 @@ class ValidatorExit:
     type=str,
 )
 @click.option(
-    '--remote-signer-url',
+    '--execution-endpoints',
     type=str,
-    envvar='REMOTE_SIGNER_URL',
-    help='The base URL of the remote signer, e.g. http://signer:9000',
-)
-@click.option(
-    '--hashi-vault-url',
-    envvar='HASHI_VAULT_URL',
-    help='The base URL of the vault service, e.g. http://vault:8200.',
-)
-@click.option(
-    '--hashi-vault-engine-name',
-    envvar='HASHI_VAULT_ENGINE_NAME',
-    help='The name of the secret engine, e.g. keystores',
-    default=DEFAULT_HASHI_VAULT_ENGINE_NAME,
-)
-@click.option(
-    '--hashi-vault-token',
-    envvar='HASHI_VAULT_TOKEN',
-    help='Authentication token for accessing Hashi vault.',
-)
-@click.option(
-    '--hashi-vault-key-path',
-    multiple=True,
-    envvar='HASHI_VAULT_KEY_PATH',
-    help='Key path in the K/V secret engine where validator signing keys are stored.',
-)
-@click.option(
-    '--hashi-vault-key-prefix',
-    envvar='HASHI_VAULT_KEY_PREFIX',
-    multiple=True,
-    help='Key prefix(es) in the K/V secret engine under which validator signing keys are stored.',
-)
-@click.option(
-    '--hashi-vault-parallelism',
-    envvar='HASHI_VAULT_PARALLELISM',
-    help='How much requests to K/V secrets engine to do in parallel.',
-    default=DEFAULT_HASHI_VAULT_PARALLELISM,
+    envvar='EXECUTION_ENDPOINTS',
+    prompt='Enter the comma separated list of API endpoints for execution nodes',
+    help='Comma separated list of API endpoints for execution nodes.',
 )
 @click.option(
     '-v',
@@ -116,53 +92,42 @@ class ValidatorExit:
     help='The log level.',
 )
 @click.option(
-    '--concurrency',
-    help='Number of processes in a pool. The default is 1.',
-    envvar='CONCURRENCY',
-    type=int,
+    '--no-confirm',
+    is_flag=True,
+    default=False,
+    help='Skips confirmation messages when provided.',
 )
 @click.command(help='Performs a voluntary exit for active vault validators.')
-# pylint: disable-next=too-many-arguments,too-many-locals
+# pylint: disable-next=too-many-arguments
 def exit_validators(
     network: str,
+    vault: ChecksumAddress,
+    indexes: list[int],
     count: int | None,
     consensus_endpoints: str,
-    remote_signer_url: str,
-    hashi_vault_key_path: list[str] | None,
-    hashi_vault_key_prefix: list[str] | None,
-    hashi_vault_token: str | None,
-    hashi_vault_url: str | None,
-    hashi_vault_engine_name: str,
-    hashi_vault_parallelism: int,
+    execution_endpoints: str,
     data_dir: str,
     verbose: bool,
+    no_confirm: bool,
     log_level: str,
-    concurrency: int | None,
 ) -> None:
-    # pylint: disable=duplicate-code
+    """
+    Trigger vault validator exits via vault contract.
+    To initiate a full validator exit, send a withdrawal request with a zero amount.
+    """
+    if all([indexes, count]):
+        raise click.ClickException('Please provide either --indexes or --count, not both.')
     operator_config = OperatorConfig(Path(data_dir))
-    if network is None:
-        try:
-            operator_config.load(network=network)
-        except OperatorConfigException as e:
-            raise click.ClickException(str(e))
-        network = operator_config.network
+    operator_config.load(network=network)
 
     settings.set(
-        vaults=[],
+        vaults=[vault],
         network=network,
         data_dir=operator_config.data_dir,
         consensus_endpoints=consensus_endpoints,
-        remote_signer_url=remote_signer_url,
-        hashi_vault_token=hashi_vault_token,
-        hashi_vault_key_paths=hashi_vault_key_path,
-        hashi_vault_key_prefixes=hashi_vault_key_prefix,
-        hashi_vault_url=hashi_vault_url,
-        hashi_vault_engine_name=hashi_vault_engine_name,
-        hashi_vault_parallelism=hashi_vault_parallelism,
+        execution_endpoints=execution_endpoints,
         verbose=verbose,
         log_level=log_level,
-        concurrency=concurrency,
     )
     try:
         # Try-catch to enable async calls in test - an event loop
@@ -171,11 +136,27 @@ def exit_validators(
             asyncio.get_running_loop()
             # we need to create a separate thread so we can block before returning
             with ThreadPoolExecutor(1) as pool:
-                pool.submit(lambda: asyncio.run(main(count))).result()
+                pool.submit(
+                    lambda: asyncio.run(
+                        main(
+                            vault_address=vault,
+                            indexes=indexes,
+                            count=count,
+                            no_confirm=no_confirm,
+                        )
+                    )
+                ).result()
         except RuntimeError as e:
             if 'no running event loop' == e.args[0]:
                 # no event loop running
-                asyncio.run(main(count))
+                asyncio.run(
+                    main(
+                        vault_address=vault,
+                        indexes=indexes,
+                        count=count,
+                        no_confirm=no_confirm,
+                    )
+                )
             else:
                 raise e
     except Exception as e:
@@ -183,80 +164,106 @@ def exit_validators(
         sys.exit(1)
 
 
-async def main(count: int | None) -> None:
+async def main(
+    vault_address: ChecksumAddress, count: int | None, indexes: list[int], no_confirm: bool
+) -> None:
     setup_logging()
-    keystore = await load_keystore()
+    await setup_clients()
 
-    validators_exits = await _get_validators_exits(keystore=keystore)
-    if not validators_exits:
-        raise click.ClickException('There are no active validators.')
+    await check_vault_version()
+    await check_validators_manager(vault_address)
 
-    validators_exits.sort(key=lambda x: x.index)
+    withdrawal_request_fee = await get_execution_request_fee(
+        settings.network_config.WITHDRAWAL_CONTRACT_ADDRESS,
+    )
+    if withdrawal_request_fee > MAX_WITHDRAWAL_REQUEST_FEE:
+        raise click.ClickException(
+            'Validator exits are skipped due to high withdrawal fee. '
+            f'The current fee is {withdrawal_request_fee}.'
+        )
+
+    chain_head = await get_chain_justified_head()
+    max_activation_epoch = chain_head.epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
+
+    logger.info('Fetching vault validators...')
+    vault_contract = VaultContract(vault_address)
+    public_keys = await vault_contract.get_registered_validators_public_keys(
+        from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
+        to_block=chain_head.block_number,
+    )
+    if indexes:
+        active_validators = await _check_exiting_validators(
+            indexes=indexes,
+            vault_public_keys=public_keys,
+            max_activation_epoch=max_activation_epoch,
+        )
+    else:
+        active_validators = await _get_active_validators(
+            vault_public_keys=public_keys, max_activation_epoch=max_activation_epoch
+        )
+
+    if not active_validators:
+        raise click.ClickException('No active validators found')
 
     if count:
-        validators_exits = validators_exits[:count]
-
-    click.confirm(
-        f'Are you sure you want to exit {len(validators_exits)} validators '
-        f'with indexes: {', '.join(str(x.index) for x in validators_exits)}?',
-        abort=True,
-    )
-    exited_indexes = []
-    for validator_exit in validators_exits:
-        # todo: validatate that pk in keystores
-
-        exit_signature = await keystore.get_exit_signature(
-            validator_index=validator_exit.index,
-            public_key=validator_exit.public_key,
+        active_validators = active_validators[:count]
+    if not no_confirm:
+        click.confirm(
+            f'Are you sure you want to exit {len(active_validators)} validators '
+            f'with indexes: {', '.join(str(x.index) for x in active_validators)}?',
+            abort=True,
         )
-        try:
-            await consensus_client.submit_voluntary_exit(
-                validator_index=validator_exit.index,
-                signature=Web3.to_hex(exit_signature),
-                epoch=settings.network_config.SHAPELLA_FORK.epoch,
-            )
-        except ClientResponseError as e:
-            # Validator status is updated in CL after some delay.
-            # Status may be active in CL although validator has started exit process.
-            # CL will return status 400 for exit request in this case.
-            click.secho(
-                f'{format_error(e)} for validator_index {validator_exit.index}',
-                fg='yellow',
-            )
-            continue
-
-        exited_indexes.append(validator_exit.index)
-
-    if exited_indexes:
+    tx_hash = await submit_withdraw_validators(
+        vault_address=vault_address,
+        withdrawals={val.public_key: Gwei(0) for val in active_validators},
+        tx_fee=withdrawal_request_fee,
+    )
+    if tx_hash:
         click.secho(
-            f'Validators {', '.join(str(index) for index in exited_indexes)} '
-            f'({len(exited_indexes)} of {len(validators_exits)}) '
-            f'exits successfully initiated',
+            'Exits for validators with '
+            f'index(es) {', '.join(str(val.index) for val in active_validators)} '
+            'are successfully initiated',
             bold=True,
             fg='green',
         )
 
 
-async def _get_validators_exits(
-    keystore: BaseKeystore,
-) -> list[ValidatorExit]:
-    """Fetches validators consensus info."""
-    public_keys = keystore.public_keys
-    results = []
-    exited_statuses = [x.value for x in EXITING_STATUSES]
+async def _get_active_validators(
+    max_activation_epoch: int, vault_public_keys: list[HexStr]
+) -> list[ConsensusValidator]:
+    """Fetch consensus validators that are eligible for exit."""
+    consensus_validators = await fetch_consensus_validators(vault_public_keys)
+    can_be_exited_validators = []
+    for validator in consensus_validators:
+        if validator.activation_epoch > max_activation_epoch:
+            continue
+        if validator.status in EXITING_STATUSES:
+            continue
+        can_be_exited_validators.append(validator)
+    can_be_exited_validators.sort(key=lambda val: val.activation_epoch)
+    return can_be_exited_validators
 
-    for i in range(0, len(public_keys), settings.validators_fetch_chunk_size):
-        validators = await consensus_client.get_validators_by_ids(
-            public_keys[i : i + settings.validators_fetch_chunk_size]
-        )
-        for beacon_validator in validators['data']:
-            if beacon_validator.get('status') in exited_statuses:
-                continue
 
-            results.append(
-                ValidatorExit(
-                    public_key=beacon_validator['validator']['pubkey'],
-                    index=int(beacon_validator['index']),
-                )
+async def _check_exiting_validators(
+    indexes: list[int], vault_public_keys: list[HexStr], max_activation_epoch: int
+) -> list[ConsensusValidator]:
+    """Validate that validators with provided indexes are eligible for exit."""
+    consensus_validators = await fetch_consensus_validators([str(i) for i in indexes])
+    if not consensus_validators:
+        raise click.ClickException('No validators found with the provided indexes.')
+    public_keys = set(vault_public_keys)
+    for validator in consensus_validators:
+        if validator.public_key not in public_keys:
+            raise click.ClickException(
+                f'Validator with index {validator.index} is not registered in the vault.'
             )
-    return results
+        if validator.activation_epoch > max_activation_epoch:
+            raise click.ClickException(
+                f'Validator with index {validator.index} is too new to exit.'
+            )
+        if validator.status in EXITING_STATUSES:
+            raise click.ClickException(
+                f'Validator with index {validator.index} is already exiting or exited.'
+            )
+    consensus_validators.sort(key=lambda val: val.activation_epoch)
+    return consensus_validators

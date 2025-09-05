@@ -137,7 +137,7 @@ start_common_options = [
         '--execution-endpoints',
         type=str,
         envvar='EXECUTION_ENDPOINTS',
-        prompt='Enter comma separated list of API endpoints for execution nodes',
+        prompt='Enter the comma separated list of API endpoints for execution nodes',
         help='Comma separated list of API endpoints for execution nodes.',
     ),
     click.option(
@@ -151,7 +151,7 @@ start_common_options = [
         '--consensus-endpoints',
         type=str,
         envvar='CONSENSUS_ENDPOINTS',
-        prompt='Enter comma separated list of API endpoints for consensus nodes',
+        prompt='Enter the comma separated list of API endpoints for consensus nodes',
         help='Comma separated list of API endpoints for consensus nodes.',
     ),
     click.option(
@@ -165,7 +165,7 @@ start_common_options = [
         '--vault',
         callback=validate_eth_addresses,
         envvar='VAULTS',
-        prompt='Enter comma separated list of your vault addresses',
+        prompt='Enter the comma separated list of your vault addresses',
         help='Addresses of the vaults to register validators for.',
     ),
     click.option(

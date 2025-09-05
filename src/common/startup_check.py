@@ -94,7 +94,7 @@ async def startup_checks() -> None:
     healthy_oracles = await collect_healthy_oracles()
     logger.info('Connected to oracles at %s', ', '.join(healthy_oracles))
 
-    await _check_vault_version()
+    await check_vault_version()
 
     if settings.enable_metrics:
         logger.info('Checking metrics server...')
@@ -109,7 +109,7 @@ async def startup_checks() -> None:
         logger.info('Found keystores dir')
 
     for vault_address in settings.vaults:
-        await _check_validators_manager(vault_address)
+        await check_validators_manager(vault_address)
 
     if (
         settings.validators_registration_mode == ValidatorsRegistrationMode.API
@@ -372,7 +372,7 @@ async def _check_ipfs_endpoints() -> list[str]:
     return healthy_ipfs_endpoints
 
 
-async def _check_validators_manager(vault_address: ChecksumAddress) -> None:
+async def check_validators_manager(vault_address: ChecksumAddress) -> None:
     if settings.validators_registration_mode != ValidatorsRegistrationMode.AUTO:
         return
     vault_contract = VaultContract(vault_address)
@@ -384,7 +384,7 @@ async def _check_validators_manager(vault_address: ChecksumAddress) -> None:
         )
 
 
-async def _check_vault_version() -> None:
+async def check_vault_version() -> None:
     for vault_address in settings.vaults:
         vault_contract = VaultContract(vault_address)
         if await vault_contract.version() < get_pectra_vault_version(

@@ -58,10 +58,10 @@ async def fetch_compounding_validators_balances(
 
 
 async def fetch_consensus_validators(
-    public_keys: list[HexStr], slot: str = 'head'
+    validator_ids: list[HexStr] | list[str], slot: str = 'head'
 ) -> list[ConsensusValidator]:
     validators = []
-    for chunk_keys in chunkify(public_keys, settings.validators_fetch_chunk_size):
+    for chunk_keys in chunkify(validator_ids, settings.validators_fetch_chunk_size):
         beacon_validators = await consensus_client.get_validators_by_ids(
             validator_ids=chunk_keys, state_id=slot
         )

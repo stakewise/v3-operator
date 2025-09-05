@@ -4,123 +4,217 @@ from unittest import mock
 
 import pytest
 from click.testing import CliRunner
-from sw_utils.typings import ConsensusFork
+from sw_utils import ValidatorStatus
 
 from src.commands.exit_validators import exit_validators
-from src.validators.keystores.local import LocalKeystore
-from src.validators.keystores.remote import RemoteSignerKeystore
+from src.common.tests.factories import create_chain_head
+from src.validators.tests.factories import create_consensus_validator
+
+DEFAULT_ACTIVATION_EPOCH = 10000
+WITHDRAWAL_REQUEST_FEE = 2
 
 
 @pytest.fixture
-def _patch_get_consensus_fork() -> Generator:
+def _patch_check_vault_version() -> Generator:
     with mock.patch(
-        'sw_utils.consensus.ExtendedAsyncBeacon.get_consensus_fork',
-        return_value=ConsensusFork(
-            version=bytes.fromhex('00000000'),
-            epoch=1,
-        ),
-    ):
-        yield
-
-
-@pytest.fixture
-def _patch_submit_voluntary_exit() -> Generator:
-    with mock.patch(
-        'sw_utils.consensus.ExtendedAsyncBeacon.submit_voluntary_exit',
+        'src.commands.exit_validators.check_vault_version',
         return_value=None,
     ):
         yield
 
 
-@pytest.mark.usefixtures('_patch_get_consensus_fork', '_patch_submit_voluntary_exit')
-@pytest.mark.usefixtures('_init_config', '_create_keys')
+@pytest.fixture
+def _patch_check_validators_manager() -> Generator:
+    with mock.patch(
+        'src.commands.exit_validators.check_validators_manager',
+        return_value=None,
+    ):
+        yield
+
+
+@pytest.fixture
+def _patch_get_execution_request_fee() -> Generator:
+    with mock.patch(
+        'src.commands.exit_validators.get_execution_request_fee',
+        return_value=WITHDRAWAL_REQUEST_FEE,
+    ):
+        yield
+
+
+@pytest.fixture
+def _patch_submit_withdraw_validators() -> Generator:
+    with mock.patch(
+        'src.commands.exit_validators.submit_withdraw_validators',
+        return_value=None,
+    ):
+        yield
+
+
+@pytest.fixture
+def _patch_get_chain_justified_head() -> Generator:
+    with mock.patch(
+        'src.commands.exit_validators.get_chain_justified_head',
+        return_value=create_chain_head(epoch=DEFAULT_ACTIVATION_EPOCH),
+    ):
+        yield
+
+
+@pytest.mark.usefixtures(
+    '_patch_check_vault_version',
+    '_patch_check_validators_manager',
+    '_patch_get_execution_request_fee',
+    '_patch_get_chain_justified_head',
+)
+@pytest.mark.usefixtures('_init_config')
 class TestValidatorsExit:
     @pytest.mark.usefixtures('fake_settings')
-    def test_local_keystores(
+    async def test_auto_exit(
         self,
+        vault_address: str,
         consensus_endpoints: str,
+        execution_endpoints: str,
         data_dir: Path,
-        config_dir: Path,
-        keystores_dir: Path,
         runner: CliRunner,
     ):
-        # Get pubkey(s) to exit
-        keystore_files = LocalKeystore.list_keystore_files()
-        pubkeys = []
-        for keystore_file in keystore_files:
-            pubkey, _, _ = LocalKeystore._process_keystore_file(keystore_file, keystores_dir)
-            pubkeys.append(pubkey)
-
         args = [
-            '--data-dir',
-            str(data_dir),
+            '--vault',
+            vault_address,
             '--consensus-endpoints',
             consensus_endpoints,
+            '--execution-endpoints',
+            execution_endpoints,
+            '--verbose',
+            '--data-dir',
+            str(data_dir),
+            '--network',
+            'hoodi',
+            '--no-confirm',
         ]
+        consensus_validators = [
+            create_consensus_validator(index=1, activation_epoch=DEFAULT_ACTIVATION_EPOCH - 500)
+        ]
+        public_keys = [val.public_key for val in consensus_validators]
+        with (
+            mock.patch(
+                'src.commands.exit_validators.VaultContract.get_registered_validators_public_keys',
+                return_value=public_keys,
+            ),
+            mock.patch(
+                'src.commands.exit_validators.fetch_consensus_validators',
+                return_value=consensus_validators,
+            ),
+            mock.patch(
+                'src.commands.exit_validators.submit_withdraw_validators',
+                return_value='0x12345',  # tx hash
+            ) as submit_withdraw_validators,
+        ):
+            result = runner.invoke(exit_validators, args)
+            submit_withdraw_validators.assert_called_once_with(
+                vault_address=vault_address,
+                withdrawals={key: 0 for key in public_keys},
+                tx_fee=WITHDRAWAL_REQUEST_FEE,
+            )
+        assert result.exit_code == 0
+        assert 'Exits for validators with index(es) 1 are successfully initiated\n' in result.output
+
+    @pytest.mark.usefixtures('fake_settings')
+    async def test_with_indexes(
+        self,
+        vault_address: str,
+        consensus_endpoints: str,
+        execution_endpoints: str,
+        data_dir: Path,
+        runner: CliRunner,
+    ):
+        args = [
+            '--vault',
+            vault_address,
+            '--consensus-endpoints',
+            consensus_endpoints,
+            '--execution-endpoints',
+            execution_endpoints,
+            '--verbose',
+            '--data-dir',
+            str(data_dir),
+            '--network',
+            'hoodi',
+            '--no-confirm',
+            '--indexes',
+            '1',
+        ]
+        consensus_validators = [
+            create_consensus_validator(index=1, activation_epoch=DEFAULT_ACTIVATION_EPOCH - 500)
+        ]
+        public_keys = [val.public_key for val in consensus_validators]
 
         with (
             mock.patch(
-                'sw_utils.consensus.ExtendedAsyncBeacon.get_validators_by_ids',
-                return_value={
-                    'data': [
-                        {
-                            'status': 'active',
-                            'index': idx,
-                            'validator': {
-                                'pubkey': pubkey,
-                            },
-                        }
-                        for idx, pubkey in enumerate(pubkeys)
-                    ]
-                },
+                'src.commands.exit_validators.VaultContract.get_registered_validators_public_keys',
+                return_value=public_keys,
             ),
+            mock.patch(
+                'src.commands.exit_validators.fetch_consensus_validators',
+                return_value=consensus_validators,
+            ),
+            mock.patch(
+                'src.commands.exit_validators.submit_withdraw_validators',
+                return_value='0x12345',  # tx hash
+            ) as submit_withdraw_validators,
         ):
-            result = runner.invoke(exit_validators, args, input='y')
+            result = runner.invoke(exit_validators, args)
+            submit_withdraw_validators.assert_called_once_with(
+                vault_address=vault_address,
+                withdrawals={key: 0 for key in public_keys},
+                tx_fee=WITHDRAWAL_REQUEST_FEE,
+            )
         assert result.exit_code == 0
-        assert 'Validators 0, 1, 2 (3 of 3) exits successfully initiated\n' in result.output
+        assert 'Exits for validators with index(es) 1 are successfully initiated\n' in result.output
 
-    @pytest.mark.usefixtures('_setup_remote_signer')
-    async def test_remote_signer(
+    @pytest.mark.usefixtures('fake_settings')
+    async def test_non_active_indexes(
         self,
+        vault_address: str,
         consensus_endpoints: str,
+        execution_endpoints: str,
         data_dir: Path,
-        config_dir: Path,
-        keystores_dir: Path,
         runner: CliRunner,
-        remote_signer_url: str,
     ):
-        # Get pubkey(s) to exit
-        keystore = await RemoteSignerKeystore.load()
-        pubkeys = keystore.public_keys
-
         args = [
-            '--data-dir',
-            str(data_dir),
+            '--vault',
+            vault_address,
             '--consensus-endpoints',
             consensus_endpoints,
-            '--remote-signer-url',
-            remote_signer_url,
+            '--execution-endpoints',
+            execution_endpoints,
+            '--data-dir',
+            str(data_dir),
+            '--network',
+            'hoodi',
+            '--no-confirm',
+            '--indexes',
+            '1',
         ]
-
+        consensus_validators = [
+            create_consensus_validator(
+                index=1,
+                activation_epoch=DEFAULT_ACTIVATION_EPOCH - 500,
+                status=ValidatorStatus.ACTIVE_EXITING,
+            )
+        ]
         with (
             mock.patch(
-                'sw_utils.consensus.ExtendedAsyncBeacon.get_validators_by_ids',
-                return_value={
-                    'data': [
-                        {
-                            'status': 'active',
-                            'index': idx,
-                            'validator': {
-                                'pubkey': pubkey,
-                            },
-                        }
-                        for idx, pubkey in enumerate(pubkeys)
-                    ]
-                },
+                'src.commands.exit_validators.VaultContract.get_registered_validators_public_keys',
+                return_value=[validator.public_key for validator in consensus_validators],
             ),
+            mock.patch(
+                'src.commands.exit_validators.fetch_consensus_validators',
+                return_value=consensus_validators,
+            ),
+            mock.patch(
+                'src.commands.exit_validators.submit_withdraw_validators',
+                return_value=None,
+            ) as submit_withdraw_validators,
         ):
-            result = runner.invoke(exit_validators, args, input='y')
-        assert result.exit_code == 0
-
-        for expected_line in ('Validators 0, 1, 2 (3 of 3) exits successfully initiated',):
-            assert expected_line in result.output
+            result = runner.invoke(exit_validators, args)
+            submit_withdraw_validators.assert_not_called()
+        assert result.exit_code == 1
