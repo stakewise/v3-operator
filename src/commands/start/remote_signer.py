@@ -21,15 +21,8 @@ logger = logging.getLogger(__name__)
     envvar='REMOTE_SIGNER_URL',
     help='The base URL of the remote signer, e.g. http://signer:9000',
 )
-@click.option(
-    '--public-keys-file',
-    type=click.Path(exists=True, file_okay=True, dir_okay=False),
-    envvar='PUBLIC_KEYS_FILE',
-    help='Absolute path to the available validator public keys file. '
-    'Default is the file generated with "create-keys" command.',
-)
 @add_common_options(start_common_options)
-@click.command(help='Start operator service with remote signer integration')
+@click.command(help='Start operator service with the remote signer integration.')
 # pylint: disable-next=too-many-arguments,too-many-locals
 def start_remote_signer(
     vaults: str,
@@ -38,7 +31,7 @@ def start_remote_signer(
     execution_jwt_secret: str | None,
     graph_endpoint: str,
     harvest_vault: bool,
-    split_rewards: bool,
+    claim_fee_splitter: bool,
     disable_withdrawals: bool,
     verbose: bool,
     enable_metrics: bool,
@@ -51,14 +44,13 @@ def start_remote_signer(
     log_format: str,
     network: str | None,
     remote_signer_url: str | None,
-    public_keys_file: str | None,
     wallet_file: str | None,
     wallet_password_file: str | None,
     max_fee_per_gas_gwei: int | None,
     database_dir: str | None,
-    pool_size: int | None,
-    min_validators_registration: int,
+    concurrency: int | None,
     min_deposit_amount_gwei: int,
+    min_deposit_delay: int,
     no_confirm: bool,
 ) -> None:
     vault_addresses = [to_checksum_address(address) for address in vaults.split(',')]
@@ -78,7 +70,7 @@ def start_remote_signer(
         execution_jwt_secret=execution_jwt_secret,
         graph_endpoint=graph_endpoint,
         harvest_vault=harvest_vault,
-        split_rewards=split_rewards,
+        claim_fee_splitter=claim_fee_splitter,
         disable_withdrawals=disable_withdrawals,
         verbose=verbose,
         enable_metrics=enable_metrics,
@@ -88,16 +80,15 @@ def start_remote_signer(
         network=operator_config.network,
         validator_type=validator_type,
         remote_signer_url=remote_signer_url,
-        public_keys_file=public_keys_file,
         wallet_file=wallet_file,
         wallet_password_file=wallet_password_file,
         max_fee_per_gas_gwei=max_fee_per_gas_gwei,
         database_dir=database_dir,
         log_level=log_level,
         log_format=log_format,
-        pool_size=pool_size,
-        min_validators_registration=min_validators_registration,
+        concurrency=concurrency,
         min_deposit_amount_gwei=Gwei(min_deposit_amount_gwei),
+        min_deposit_delay=min_deposit_delay,
     )
 
     try:

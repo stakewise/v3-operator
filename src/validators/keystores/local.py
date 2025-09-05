@@ -45,8 +45,8 @@ class LocalKeystore(BaseKeystore):
         """Extracts private keys from the keys."""
         keystore_files = LocalKeystore.list_keystore_files()
         logger.info('Loading keys from %s...', settings.keystores_dir)
-        keys = {}
-        with Pool(processes=settings.pool_size) as pool:
+        keystores_data = []
+        with Pool(processes=settings.concurrency) as pool:
             # pylint: disable-next=unused-argument
             def _stop_pool(*args, **kwargs):  # type: ignore
                 pool.close()
@@ -62,11 +62,14 @@ class LocalKeystore(BaseKeystore):
             for result in results:
                 result.wait()
                 try:
-                    pub_key, priv_key = result.get()
-                    keys[pub_key] = priv_key
+                    keystores_data.append(result.get())
                 except KeystoreException as e:
                     logger.error(e)
                     raise RuntimeError('Failed to load keys') from e
+
+        keys: dict[HexStr, BLSPrivkey] = {}
+        for pub_key, priv_key, _ in sorted(keystores_data, key=lambda x: x[2]):
+            keys[pub_key] = priv_key
 
         logger.info('Loaded %d keys', len(keys))
         return LocalKeystore(Keys(keys))
@@ -88,7 +91,7 @@ class LocalKeystore(BaseKeystore):
             network=settings.network,
             private_key=BLSPrivateKey(Web3.to_int(private_key)),
             vault=vault_address,
-            validator_type=settings.get_validator_type(),
+            validator_type=settings.validator_type,
         )
 
         return credential.get_deposit_datum_dict(amount)
@@ -111,14 +114,6 @@ class LocalKeystore(BaseKeystore):
     @property
     def public_keys(self) -> list[HexStr]:
         return list(self.keys.keys())
-
-    @staticmethod
-    def get_public_keys_from_keystore_files() -> list[HexStr]:
-        """Returns a list of public keys from the keystore files."""
-        keystore_files = LocalKeystore.list_keystore_files()
-        keys = [LocalKeystore.read_keystore_file(keystore_file) for keystore_file in keystore_files]
-        keys.sort(key=lambda x: x[0])
-        return [x[1] for x in keys]
 
     @staticmethod
     def list_keystore_files() -> list[KeystoreFile]:
@@ -158,7 +153,7 @@ class LocalKeystore(BaseKeystore):
             ) from e
 
     @staticmethod
-    def _process_keystore_file(keystore_file: KeystoreFile) -> tuple[HexStr, BLSPrivkey]:
+    def _process_keystore_file(keystore_file: KeystoreFile) -> tuple[HexStr, BLSPrivkey, int]:
         keystores_password = keystore_file.password
 
         try:
@@ -173,7 +168,7 @@ class LocalKeystore(BaseKeystore):
         except BaseException as e:
             raise KeystoreException(f'Invalid password for keystore "{keystore_file.name}"') from e
         public_key = Web3.to_hex(bls.SkToPk(private_key))
-        return public_key, private_key
+        return public_key, private_key, int(keystore.path.split('/')[3])
 
     @staticmethod
     def _load_keystores_password(password_path: Path) -> str:

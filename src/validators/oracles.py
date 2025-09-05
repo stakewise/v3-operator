@@ -200,7 +200,7 @@ async def send_approval_requests(
     return process_oracles_approvals(approvals, protocol_config.validators_threshold)
 
 
-# pylint: disable-next=too-many-arguments,too-many-locals
+# pylint: disable-next=too-many-arguments
 async def create_approval_request(
     vault_address: ChecksumAddress,
     protocol_config: ProtocolConfig,
@@ -264,7 +264,7 @@ async def _send_approval_request_to_replicas(
     last_error = None
 
     # Shuffling may help if the first endpoint is slower than others
-    replicas = random.sample(replicas, len(replicas))
+    replicas = random.sample(replicas, len(replicas))  # nosec
 
     for endpoint in replicas:
         try:
@@ -364,7 +364,7 @@ async def _send_consolidation_request_to_replicas(
     last_error = None
 
     # Shuffling may help if the first endpoint is slower than others
-    replicas = random.sample(replicas, len(replicas))
+    replicas = random.sample(replicas, len(replicas))  # nosec
 
     for endpoint in replicas:
         try:
@@ -466,7 +466,7 @@ async def _fetch_active_exits_from_replicas(
     last_error = None
 
     # Shuffling may help if the first endpoint is slower than others
-    replicas = random.sample(replicas, len(replicas))
+    replicas = random.sample(replicas, len(replicas))  # nosec
 
     for endpoint in replicas:
         try:

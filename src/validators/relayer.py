@@ -18,7 +18,6 @@ from src.validators.typings import (
     RelayerValidatorsResponse,
     Validator,
 )
-from src.validators.utils import filter_nonregistered_public_keys
 
 logger = logging.getLogger(__name__)
 
@@ -103,10 +102,8 @@ class RelayerAdapter:
     def __init__(
         self,
         relayer: DefaultRelayerClient | DvtRelayerClient,
-        available_public_keys: list[HexStr] | None = None,
     ):
         self.relayer = relayer
-        self.available_public_keys = available_public_keys
 
     async def get_validators(
         self, validators_batch_size: int, validators_total: int
@@ -160,15 +157,8 @@ class RelayerAdapter:
     async def _get_validators_from_dvt_relayer(
         self, validators_batch_size: int
     ) -> RelayerValidatorsResponse:
-        # build request
-        if not self.available_public_keys:
-            raise MissingAvailableValidatorsException()
 
-        public_keys = await filter_nonregistered_public_keys(
-            available_public_keys=self.available_public_keys,
-            count=validators_batch_size,
-        )
-
+        public_keys = [][:validators_batch_size]  # type: ignore
         if not public_keys:
             raise MissingAvailableValidatorsException()
 

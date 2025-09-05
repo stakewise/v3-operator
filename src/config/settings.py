@@ -10,13 +10,10 @@ from src.common.typings import Singleton, ValidatorType
 from src.config.networks import MAINNET, NETWORKS, NetworkConfig
 
 DATA_DIR = Path.home() / '.stakewise'
-PUBLIC_KEYS_FILENAME = 'public_keys.txt'
 
 DEFAULT_METRICS_HOST = '127.0.0.1'
 DEFAULT_METRICS_PORT = 9100
 DEFAULT_METRICS_PREFIX = 'sw_operator'
-
-DEFAULT_MIN_VALIDATORS_REGISTRATION = 1
 
 DEFAULT_HASHI_VAULT_PARALLELISM = 8
 DEFAULT_HASHI_VAULT_ENGINE_NAME = 'secret'
@@ -26,6 +23,8 @@ DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI = Gwei(int(Web3.from_wei(DEFAULT_MIN_DEPOSIT_AMO
 
 DEFAULT_CONSENSUS_ENDPOINT = 'http://localhost:5052'
 DEFAULT_EXECUTION_ENDPOINT = 'http://localhost:8545'
+
+DEFAULT_MIN_DEPOSIT_DELAY = 3600  # 1 hour
 
 
 class ValidatorsRegistrationMode(Enum):
@@ -63,15 +62,14 @@ class Settings(metaclass=Singleton):
     graph_page_size: int
 
     harvest_vault: bool
-    split_rewards: bool
+    claim_fee_splitter: bool
     disable_withdrawals: bool
     verbose: bool
     enable_metrics: bool
     metrics_host: str
     metrics_port: int
     metrics_prefix: str
-    validator_type: ValidatorType | None
-    public_keys_file: Path
+    validator_type: ValidatorType
     keystores_dir: Path
     keystores_password_dir: Path
     keystores_password_file: Path
@@ -102,7 +100,7 @@ class Settings(metaclass=Singleton):
     validators_fetch_chunk_size: int
     sentry_dsn: str
     sentry_environment: str
-    pool_size: int | None
+    concurrency: int | None
 
     relayer_type: str
     relayer_endpoint: str
@@ -123,8 +121,8 @@ class Settings(metaclass=Singleton):
         'DISABLE_FULL_WITHDRAWALS', default=False, cast=bool
     )
 
-    min_validators_registration: int
     min_deposit_amount_gwei: Gwei
+    min_deposit_delay: int
 
     # pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements
     def set(
@@ -137,7 +135,7 @@ class Settings(metaclass=Singleton):
         execution_jwt_secret: str | None = None,
         graph_endpoint: str = '',
         harvest_vault: bool = False,
-        split_rewards: bool = False,
+        claim_fee_splitter: bool = False,
         disable_withdrawals: bool = False,
         verbose: bool = False,
         enable_metrics: bool = False,
@@ -145,8 +143,7 @@ class Settings(metaclass=Singleton):
         metrics_host: str = DEFAULT_METRICS_HOST,
         metrics_prefix: str = DEFAULT_METRICS_PREFIX,
         max_fee_per_gas_gwei: int | None = None,
-        public_keys_file: str | None = None,
-        validator_type: ValidatorType | None = None,
+        validator_type: ValidatorType = ValidatorType.V2,
         keystores_dir: str | None = None,
         keystores_password_file: str | None = None,
         remote_signer_url: str | None = None,
@@ -162,12 +159,12 @@ class Settings(metaclass=Singleton):
         database_dir: str | None = None,
         log_level: str | None = None,
         log_format: str | None = None,
-        pool_size: int | None = None,
+        concurrency: int | None = None,
         relayer_type: str = RelayerTypes.DEFAULT,
         relayer_endpoint: str | None = None,
         validators_registration_mode: ValidatorsRegistrationMode = ValidatorsRegistrationMode.AUTO,
-        min_validators_registration: int = DEFAULT_MIN_VALIDATORS_REGISTRATION,
         min_deposit_amount_gwei: Gwei = DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
+        min_deposit_delay: int = DEFAULT_MIN_DEPOSIT_DELAY,
     ) -> None:
         self.vaults = vaults
         data_dir.mkdir(parents=True, exist_ok=True)
@@ -187,7 +184,7 @@ class Settings(metaclass=Singleton):
         self.execution_jwt_secret = execution_jwt_secret
         self.graph_endpoint = graph_endpoint or self.network_config.STAKEWISE_GRAPH_ENDPOINT
         self.harvest_vault = harvest_vault
-        self.split_rewards = split_rewards
+        self.claim_fee_splitter = claim_fee_splitter
         self.disable_withdrawals = disable_withdrawals
         self.verbose = verbose
         self.enable_metrics = enable_metrics
@@ -200,12 +197,8 @@ class Settings(metaclass=Singleton):
             max_fee_per_gas_gwei = self.network_config.MAX_FEE_PER_GAS_GWEI
 
         self.max_fee_per_gas_gwei = Gwei(max_fee_per_gas_gwei)
-        self.min_validators_registration = min_validators_registration
         self.min_deposit_amount_gwei = min_deposit_amount_gwei
-
-        self.public_keys_file = (
-            Path(public_keys_file) if public_keys_file else data_dir / PUBLIC_KEYS_FILENAME
-        )
+        self.min_deposit_delay = min_deposit_delay
 
         # keystores
         self.keystores_dir = Path(keystores_dir) if keystores_dir else data_dir / 'keystores'
@@ -278,9 +271,9 @@ class Settings(metaclass=Singleton):
         )
 
         self.validators_fetch_chunk_size = decouple_config(
-            'VALIDATORS_FETCH_CHUNK_SIZE', default=100, cast=int
+            'VALIDATORS_FETCH_CHUNK_SIZE', default=50000, cast=int
         )
-        self.pool_size = pool_size
+        self.concurrency = concurrency
         self.execution_timeout = decouple_config('EXECUTION_TIMEOUT', default=30, cast=int)
         self.execution_transaction_timeout = decouple_config(
             'EXECUTION_TRANSACTION_TIMEOUT', default=300, cast=int
@@ -307,11 +300,6 @@ class Settings(metaclass=Singleton):
         self.validators_registration_mode = validators_registration_mode
 
         self.skip_startup_checks = decouple_config('SKIP_STARTUP_CHECKS', default=False, cast=bool)
-
-    def get_validator_type(self) -> ValidatorType:
-        if self.validator_type is None:
-            raise RuntimeError('Validator type is not set')
-        return self.validator_type
 
     @property
     def keystore_cls_str(self) -> str:

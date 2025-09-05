@@ -34,6 +34,7 @@ class NetworkConfig(BaseNetworkConfig):
     MAX_FEE_PER_GAS_GWEI: Gwei
     SHARD_COMMITTEE_PERIOD: int
     PENDING_PARTIAL_WITHDRAWALS_LIMIT: int
+    PENDING_CONSOLIDATIONS_LIMIT: int
     MAX_WITHDRAWAL_REQUESTS_PER_BLOCK: int
     NODE_CONFIG: NodeConfig
 
@@ -74,6 +75,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
         PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
+        PENDING_CONSOLIDATIONS_LIMIT=262144,
         MAX_WITHDRAWAL_REQUESTS_PER_BLOCK=16,
         NODE_CONFIG=NodeConfig(
             CONSENSUS_CHECKPOINT_SYNC_URL='https://beaconstate.ethstaker.cc/',
@@ -90,7 +92,7 @@ NETWORKS: dict[str, NetworkConfig] = {
             '0x93a3f880E07B27dacA6Ef2d3C23E77DBd6294487'
         ),
         VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xf3921225B35FFd294C655c4B84fc4dfcDA1d5ABF'
+            '0x08A48Ee1940152595670D84477664DeDbFe61597'
         ),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
@@ -107,6 +109,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
         PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
+        PENDING_CONSOLIDATIONS_LIMIT=262144,
         MAX_WITHDRAWAL_REQUESTS_PER_BLOCK=16,
         NODE_CONFIG=NodeConfig(
             CONSENSUS_CHECKPOINT_SYNC_URL='https://hoodi.beaconstate.ethstaker.cc/',
@@ -142,6 +145,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
         PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
+        PENDING_CONSOLIDATIONS_LIMIT=262144,
         MAX_WITHDRAWAL_REQUESTS_PER_BLOCK=16,
         NODE_CONFIG=NodeConfig(
             CONSENSUS_CHECKPOINT_SYNC_URL='https://beacon.gnosischain.com/',
@@ -158,7 +162,7 @@ NETWORKS: dict[str, NetworkConfig] = {
             '0xFAce8504462AEb9BB6ae7Ecb206BD7B1EdF7956D'
         ),
         VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xE84db38440D105e300ff1E30Ea790Ac324d68829'
+            '0x46429718dbe176129C53d32faB2949fD6C402E4F'
         ),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
@@ -177,6 +181,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
         PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
+        PENDING_CONSOLIDATIONS_LIMIT=262144,
         MAX_WITHDRAWAL_REQUESTS_PER_BLOCK=16,
         NODE_CONFIG=NodeConfig(
             CONSENSUS_CHECKPOINT_SYNC_URL='https://beacon.chiadochain.net/',

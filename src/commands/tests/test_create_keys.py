@@ -6,7 +6,6 @@ import pytest
 from click.testing import CliRunner
 
 from src.commands.create_keys import create_keys
-from src.config.settings import PUBLIC_KEYS_FILENAME
 
 
 @pytest.mark.usefixtures('_init_config')
@@ -27,7 +26,7 @@ class TestCreateKeys:
             str(count),
             '--data-dir',
             str(data_dir),
-            '--pool-size',
+            '--concurrency',
             '1',
         ]
         result = runner.invoke(create_keys, args)
@@ -38,12 +37,8 @@ class TestCreateKeys:
             'Exporting validator keystores\t\t\n'
             f'Done. Generated 5 keys for StakeWise operator.\n'
             f'Keystores saved to {config_dir}/keystores file\n'
-            f'Validator public keys saved to {config_dir}/{PUBLIC_KEYS_FILENAME} file'
         )
         assert output.strip() == result.output.strip()
-        with open(f'{config_dir}/{PUBLIC_KEYS_FILENAME}', encoding='utf-8') as f:
-            public_keys = [line.rstrip() for line in f]
-            assert count == len(public_keys)
         with open(f'{config_dir}/keystores/password.txt', encoding='utf-8') as f:
             assert len(f.readline()) == 20
 
@@ -66,7 +61,7 @@ class TestCreateKeys:
             str(count),
             '--data-dir',
             str(data_dir),
-            '--pool-size',
+            '--concurrency',
             '1',
             '--per-keystore-password',
         ]
@@ -78,12 +73,8 @@ class TestCreateKeys:
             'Exporting validator keystores\t\t\n'
             f'Done. Generated 5 keys for StakeWise operator.\n'
             f'Keystores saved to {config_dir}/keystores file\n'
-            f'Validator public keys saved to {config_dir}/{PUBLIC_KEYS_FILENAME} file'
         )
         assert output.strip() == result.output.strip()
-        with open(f'{config_dir}/{PUBLIC_KEYS_FILENAME}', encoding='utf-8') as f:
-            public_keys = [line.rstrip() for line in f]
-            assert count == len(public_keys)
         password_files = glob.glob(os.path.join(keystores_dir / '*.txt'))
         assert len(password_files) == count
         for password_file in password_files:

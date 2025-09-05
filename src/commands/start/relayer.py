@@ -48,7 +48,7 @@ def start_relayer(
     execution_jwt_secret: str | None,
     graph_endpoint: str,
     harvest_vault: bool,
-    split_rewards: bool,
+    claim_fee_splitter: bool,
     disable_withdrawals: bool,
     verbose: bool,
     enable_metrics: bool,
@@ -57,6 +57,7 @@ def start_relayer(
     metrics_prefix: str,
     validator_type: ValidatorType,
     min_deposit_amount_gwei: int,
+    min_deposit_delay: int,
     data_dir: str,
     log_level: str,
     log_format: str,
@@ -95,7 +96,7 @@ def start_relayer(
         execution_jwt_secret=execution_jwt_secret,
         graph_endpoint=graph_endpoint,
         harvest_vault=harvest_vault,
-        split_rewards=split_rewards,
+        claim_fee_splitter=claim_fee_splitter,
         disable_withdrawals=disable_withdrawals,
         verbose=verbose,
         enable_metrics=enable_metrics,
@@ -114,6 +115,7 @@ def start_relayer(
         relayer_endpoint=relayer_endpoint,
         validators_registration_mode=validators_registration_mode,
         min_deposit_amount_gwei=Gwei(min_deposit_amount_gwei),
+        min_deposit_delay=min_deposit_delay,
     )
 
     try:
