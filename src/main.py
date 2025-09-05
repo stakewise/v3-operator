@@ -16,7 +16,6 @@ from src.commands.init import init
 from src.commands.nodes.node_install import node_install
 from src.commands.nodes.node_start import node_start
 from src.commands.nodes.node_status import node_status
-from src.commands.rated_self_report import rated_self_report
 from src.commands.recover import recover
 from src.commands.setup_remote_signer import setup_remote_signer
 from src.commands.start.hashi_vault import start_hashi_vault

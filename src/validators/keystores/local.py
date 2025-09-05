@@ -8,6 +8,7 @@ from typing import NewType
 
 import milagro_bls_binding as bls
 from eth_typing import BLSPrivateKey, BLSSignature, ChecksumAddress, HexStr
+from eth_utils import add_0x_prefix
 from staking_deposit.key_handling.keystore import ScryptKeystore
 from sw_utils.signing import get_exit_message_signing_root
 from sw_utils.typings import ConsensusFork
@@ -137,6 +138,19 @@ class LocalKeystore(BaseKeystore):
             )
 
         return res
+
+    @staticmethod
+    def read_keystore_file(keystore_file: KeystoreFile) -> tuple[int, HexStr]:
+        """Light keystore reading. Return tuple of keystore index and public key."""
+        file_path = keystore_file.path
+        try:
+            keystore = ScryptKeystore.from_file(file_path)
+            index = keystore.path.split('/')[-3]
+            return int(index), add_0x_prefix(HexStr(keystore.pubkey))
+        except BaseException as e:
+            raise KeystoreException(
+                f'Invalid keystore format in file "{keystore_file.name}"'
+            ) from e
 
     @staticmethod
     def _process_keystore_file(keystore_file: KeystoreFile) -> tuple[HexStr, BLSPrivkey, int]:
