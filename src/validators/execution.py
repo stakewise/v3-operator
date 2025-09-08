@@ -8,6 +8,7 @@ from sw_utils import EventProcessor, EventScanner, is_valid_deposit_data_signatu
 from web3 import Web3
 from web3.types import EventData, Wei
 
+from src.common.app_state import AppState
 from src.common.clients import execution_non_retry_client
 from src.common.contracts import (
     ValidatorsRegistryContract,
@@ -33,6 +34,9 @@ class NetworkValidatorsProcessor(EventProcessor):
         ).contract
 
     async def get_from_block(self) -> BlockNumber:
+        app_state = AppState()
+        if app_state.network_validators_block is not None:
+            return BlockNumber(app_state.network_validators_block + 1)
         last_validator = NetworkValidatorCrud().get_last_network_validator()
         if not last_validator:
             return settings.network_config.VALIDATORS_REGISTRY_GENESIS_BLOCK
@@ -43,6 +47,7 @@ class NetworkValidatorsProcessor(EventProcessor):
     async def process_events(self, events: list[EventData], to_block: BlockNumber) -> None:
         validators = process_network_validator_events(events)
         NetworkValidatorCrud().save_network_validators(validators)
+        AppState().network_validators_block = to_block
 
 
 class NetworkValidatorsStartupProcessor(NetworkValidatorsProcessor):
@@ -52,6 +57,7 @@ class NetworkValidatorsStartupProcessor(NetworkValidatorsProcessor):
     async def process_events(self, events: list[EventData], to_block: BlockNumber) -> None:
         validators = process_network_validator_events_multiprocessing(events)
         NetworkValidatorCrud().save_network_validators(validators)
+        AppState().network_validators_block = to_block
 
 
 def process_network_validator_events_multiprocessing(
