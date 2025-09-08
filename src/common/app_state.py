@@ -25,6 +25,7 @@ class AppState(metaclass=Singleton):
         self.exit_signature_update_cache: dict[ChecksumAddress, ExitSignatureUpdateCache] = {}
         self.partial_withdrawal_cache: dict[ChecksumAddress, BlockNumber | None] = {}
         self.reward_splitter_block: BlockNumber | None = None
+        self.network_validators_block: BlockNumber | None = None
         for vault in settings.vaults:
             self.exit_signature_update_cache[vault] = ExitSignatureUpdateCache()
         self.oracles_cache: OraclesCache | None = None
