@@ -45,7 +45,7 @@ NETWORKS: dict[str, NetworkConfig] = {
             '0x75AB6DdCe07556639333d3Df1eaa684F5735223e'
         ),
         VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xaC9125646185Cb58e86E77d5f402eFa3fAfAFc84'
+            '0x5D075B63291b8A28f911b7535C7AE848283A72aB'
         ),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
@@ -103,7 +103,7 @@ NETWORKS: dict[str, NetworkConfig] = {
             '0x58e16621B5c0786D6667D2d54E28A20940269E16'
         ),
         VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x3E2CC1584a2fB4FB2D4f4aF68AE47B57BE76dC65'
+            '0x5D075B63291b8A28f911b7535C7AE848283A72aB'
         ),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
