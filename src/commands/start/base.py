@@ -26,7 +26,7 @@ from src.validators.database import NetworkValidatorCrud, VaultCrud, VaultValida
 from src.validators.execution import scan_validators_events
 from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
-from src.validators.relayer import RelayerAdapter, create_relayer_adapter
+from src.validators.relayer import RelayerClient
 from src.validators.tasks import ValidatorRegistrationSubtask, load_genesis_validators
 from src.withdrawals.tasks import ValidatorWithdrawalSubtask
 
@@ -55,12 +55,12 @@ async def start_base() -> None:
     await load_genesis_validators()
 
     keystore: BaseKeystore | None = None
-    relayer_adapter: RelayerAdapter | None = None
+    relayer: RelayerClient | None = None
 
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
         keystore = await load_keystore()
     else:
-        relayer_adapter = create_relayer_adapter()
+        relayer = RelayerClient()
 
     # start operator tasks
     chain_state = await get_chain_finalized_head()
@@ -82,7 +82,7 @@ async def start_base() -> None:
         tasks = [
             ValidatorTask(
                 keystore=keystore,
-                relayer_adapter=relayer_adapter,
+                relayer=relayer,
             ).run(interrupt_handler),
             ExitSignatureTask(
                 keystore=keystore,
@@ -102,11 +102,11 @@ class ValidatorTask(BaseTask):
     def __init__(
         self,
         keystore: BaseKeystore | None,
-        relayer_adapter: RelayerAdapter | None,
+        relayer: RelayerClient | None,
     ):
         self.validator_registration_subtask = ValidatorRegistrationSubtask(
             keystore=keystore,
-            relayer_adapter=relayer_adapter,
+            relayer=relayer,
         )
 
         self.validator_withdrawal_subtask = ValidatorWithdrawalSubtask()

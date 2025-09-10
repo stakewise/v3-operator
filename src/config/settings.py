@@ -34,11 +34,6 @@ class ValidatorsRegistrationMode(Enum):
     API = 'API'
 
 
-class RelayerTypes:
-    DVT = 'DVT'
-    DEFAULT = 'DEFAULT'
-
-
 # pylint: disable-next=too-many-public-methods,too-many-instance-attributes
 class Settings(metaclass=Singleton):
     vaults: list[ChecksumAddress]
@@ -99,7 +94,6 @@ class Settings(metaclass=Singleton):
     sentry_environment: str
     concurrency: int | None
 
-    relayer_type: str
     relayer_endpoint: str
     relayer_timeout: int
     validators_registration_mode: ValidatorsRegistrationMode
@@ -157,7 +151,6 @@ class Settings(metaclass=Singleton):
         log_level: str | None = None,
         log_format: str | None = None,
         concurrency: int | None = None,
-        relayer_type: str = RelayerTypes.DEFAULT,
         relayer_endpoint: str | None = None,
         validators_registration_mode: ValidatorsRegistrationMode = ValidatorsRegistrationMode.AUTO,
         min_deposit_amount_gwei: Gwei = DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
@@ -282,7 +275,6 @@ class Settings(metaclass=Singleton):
         self.graph_request_timeout = decouple_config('GRAPH_REQUEST_TIMEOUT', default=10, cast=int)
         self.graph_retry_timeout = decouple_config('GRAPH_RETRY_TIMEOUT', default=60, cast=int)
         self.graph_page_size = decouple_config('GRAPH_PAGE_SIZE', default=100, cast=int)
-        self.relayer_type = relayer_type
         self.relayer_endpoint = relayer_endpoint or ''
         self.relayer_timeout = decouple_config('RELAYER_TIMEOUT', default=10, cast=int)
 

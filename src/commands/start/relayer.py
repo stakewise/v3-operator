@@ -10,33 +10,17 @@ from src.commands.start.base import load_operator_config, start_base
 from src.commands.start.common_option import add_common_options, start_common_options
 from src.common.typings import ValidatorType
 from src.common.utils import log_verbose
-from src.config.networks import NETWORKS
-from src.config.settings import RelayerTypes, ValidatorsRegistrationMode, settings
+from src.config.settings import ValidatorsRegistrationMode, settings
 
 logger = logging.getLogger(__name__)
 
 
-# Special value used to dynamically determine option value
-AUTO = 'AUTO'
-
-
-@click.option(
-    '--relayer-type',
-    type=click.Choice(
-        [RelayerTypes.DEFAULT, RelayerTypes.DVT],
-        case_sensitive=False,
-    ),
-    default=RelayerTypes.DEFAULT,
-    help='Relayer type.',
-    envvar='RELAYER_TYPE',
-)
 @click.option(
     '--relayer-endpoint',
     type=str,
     help='Relayer endpoint.',
     prompt='Enter the relayer endpoint',
     envvar='RELAYER_ENDPOINT',
-    default=AUTO,
 )
 @add_common_options(start_common_options)
 @click.command(help='Start operator service in API mode')
@@ -66,7 +50,6 @@ def start_relayer(
     wallet_password_file: str | None,
     max_fee_per_gas_gwei: int | None,
     database_dir: str | None,
-    relayer_type: str,
     relayer_endpoint: str,
     no_confirm: bool,
 ) -> None:
@@ -79,13 +62,6 @@ def start_relayer(
         no_confirm=no_confirm,
     )
     network = operator_config.network
-    if relayer_endpoint == AUTO and relayer_type == RelayerTypes.DVT:
-        network_config = NETWORKS[network]
-        relayer_endpoint = network_config.DEFAULT_DVT_RELAYER_ENDPOINT
-
-    if relayer_endpoint == AUTO and relayer_type == RelayerTypes.DEFAULT:
-        raise click.ClickException('Relayer endpoint must be specified for default relayer type')
-
     validators_registration_mode = ValidatorsRegistrationMode.API
 
     settings.set(
@@ -111,7 +87,6 @@ def start_relayer(
         database_dir=database_dir,
         log_level=log_level,
         log_format=log_format,
-        relayer_type=relayer_type,
         relayer_endpoint=relayer_endpoint,
         validators_registration_mode=validators_registration_mode,
         min_deposit_amount_gwei=Gwei(min_deposit_amount_gwei),
