@@ -7,11 +7,11 @@ import psutil
 from sw_utils import get_consensus_client, get_execution_client
 from web3 import Web3
 
+from src.common.clients import setup_clients
 from src.common.validators import validate_eth_addresses
 from src.config.networks import AVAILABLE_NETWORKS, NETWORKS
 from src.config.settings import DEFAULT_NETWORK, LOG_DATE_FORMAT, settings
 from src.nodes.exceptions import NodeFailedToStartError
-from src.nodes.lighthouse import update_validator_definitions_file
 from src.nodes.process import (
     LighthouseProcessBuilder,
     LighthouseVCProcessBuilder,
@@ -20,7 +20,6 @@ from src.nodes.process import (
 )
 from src.nodes.status import SyncStatusHistory
 from src.nodes.typings import StdStreams
-from src.validators.keystores.local import LocalKeystore
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +117,9 @@ async def main(
     print_consensus_logs: bool,
     print_validator_logs: bool,
 ) -> None:
+    # Setup default clients
+    await setup_clients()
+
     # Create non-retry clients to fail fast
     execution_client = get_execution_client(
         endpoints=settings.execution_endpoints,
@@ -216,36 +218,8 @@ def _get_lighthouse_runner(show_output: bool) -> ProcessRunner:
 
 
 def _get_lighthouse_vc_runner(show_output: bool) -> ProcessRunner:
-    validator_definitions_path = (
-        settings.nodes_dir / 'lighthouse' / 'validators' / 'validator_definitions.yml'
-    )
-    # Create the parent directory if it does not exist
-    if not validator_definitions_path.parent.exists():
-        validator_definitions_path.parent.mkdir(parents=True, exist_ok=True)
-
-    # Usually the validator definitions file is created during `import` command
-    # `lighthouse account validator import ...`
-    # The problem is the case of per-keystore password files.
-    # Natively, Lighthouse import does not support per-keystore password files.
-    # So we need to update the validator definitions file manually.
-
-    logger.info('Updating validator definitions file %s...', validator_definitions_path)
-    update_validator_definitions_file(
-        keystore_files=LocalKeystore.list_keystore_files(),
-        output_path=validator_definitions_path,
-    )
-    # Note on slashing protection.
-    # Normally, slashing protection database is updated during `import` command
-    # `lighthouse account validator import ...`
-    # But since we update the validator definitions file manually, we need to ensure
-    # that slashing protection database is updated as well.
-    # The option `init_slashing_protection` helps to achieve that.
-    # Otherwise, validator client will refuse to start.
-    init_slashing_protection = True
-
     lighthouse_vc_process_builder = LighthouseVCProcessBuilder(
         streams=_build_std_streams(show_output),
-        init_slashing_protection=init_slashing_protection,
     )
 
     return ProcessRunner(
