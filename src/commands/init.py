@@ -50,7 +50,7 @@ def init(
         data_dir=Path(data_dir),
     )
     if config.is_network_config_exists(network):
-        raise click.ClickException(f'Config directory {config.data_dir / network} already exists.')
+        raise click.ClickException(f'Config directory {config.data_dir} already exists.')
 
     if not language:
         language = click.prompt(

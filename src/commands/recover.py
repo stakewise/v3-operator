@@ -106,9 +106,7 @@ def recover(
         Path(data_dir),
     )
     if operator_config.is_network_config_exists(network):
-        raise click.ClickException(
-            f'Config directory {operator_config.data_dir / network} already exists.'
-        )
+        raise click.ClickException(f'Config directory {operator_config.data_dir} already exists.')
 
     settings.set(
         execution_endpoints=execution_endpoints,
