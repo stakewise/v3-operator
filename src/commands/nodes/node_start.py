@@ -7,6 +7,7 @@ import psutil
 from sw_utils import get_consensus_client, get_execution_client
 from web3 import Web3
 
+from src.common.clients import setup_clients
 from src.common.validators import validate_eth_addresses
 from src.config.networks import AVAILABLE_NETWORKS, NETWORKS
 from src.config.settings import DEFAULT_NETWORK, LOG_DATE_FORMAT, settings
@@ -118,6 +119,9 @@ async def main(
     print_consensus_logs: bool,
     print_validator_logs: bool,
 ) -> None:
+    # Setup default clients
+    await setup_clients()
+
     # Create non-retry clients to fail fast
     execution_client = get_execution_client(
         endpoints=settings.execution_endpoints,
