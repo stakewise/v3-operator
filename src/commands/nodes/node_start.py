@@ -4,9 +4,9 @@ from pathlib import Path
 
 import click
 import psutil
+from sw_utils import get_consensus_client, get_execution_client
 from web3 import Web3
 
-from src.common.clients import setup_clients
 from src.common.validators import validate_eth_addresses
 from src.config.networks import AVAILABLE_NETWORKS, NETWORKS
 from src.config.settings import DEFAULT_NETWORK, LOG_DATE_FORMAT, settings
@@ -18,6 +18,7 @@ from src.nodes.process import (
     ProcessRunner,
     RethProcessBuilder,
 )
+from src.nodes.status import SyncStatusHistory
 from src.nodes.typings import StdStreams
 from src.validators.keystores.local import LocalKeystore
 
@@ -117,18 +118,30 @@ async def main(
     print_consensus_logs: bool,
     print_validator_logs: bool,
 ) -> None:
-    await setup_clients()
+    # Create non-retry clients to fail fast
+    execution_client = get_execution_client(
+        endpoints=settings.execution_endpoints,
+        timeout=10,
+    )
+    consensus_client = get_consensus_client(
+        endpoints=settings.consensus_endpoints,
+        timeout=10,
+    )
 
     # Create process runners
     reth_runner = _get_reth_runner(print_execution_logs)
     lighthouse_runner = _get_lighthouse_runner(print_consensus_logs)
     lighthouse_vc_runner = _get_lighthouse_vc_runner(print_validator_logs)
+    sync_status_history = SyncStatusHistory()
 
     try:
         await asyncio.gather(
             reth_runner.run(),
             lighthouse_runner.run(),
             lighthouse_vc_runner.run(),
+            sync_status_history.update_periodically(
+                execution_client=execution_client, consensus_client=consensus_client
+            ),
         )
     except NodeFailedToStartError as e:
         click.echo(str(e))
