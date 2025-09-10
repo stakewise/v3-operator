@@ -248,6 +248,10 @@ class LighthouseVCProcessBuilder(ProcessBuilder):
         self.init_slashing_protection = init_slashing_protection
 
     async def get_process(self) -> LighthouseVCProcess:
+        # Wait a bit to ensure that the execution and consensus nodes are started
+        startup_interval = 10
+        await asyncio.sleep(startup_interval)
+
         # Wait for nodes to be ready
         await wait_for_execution_node()
         await wait_for_consensus_node()
