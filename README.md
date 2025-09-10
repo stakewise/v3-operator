@@ -67,6 +67,10 @@ By default, every vault pulls these updates on the user interaction with the vau
 also can be done by the vault Operator by passing the `--harvest-vault` flag to the `start` command. Harvesting vault
 rewards simplifies calls to the vault contracts, e.g., you don't need to sync rewards before calling deposit.
 
+### Running execution and consensus nodes (optional)
+
+To operate the StakeWise Operator, you have to run your own execution and consensus nodes. Additionally, a validator client must be set up and running. The Operator CLI provides commands to automate the setup and installation of these nodes, eliminating the need for manual configuration. Validator keys are automatically imported from keystores, ensuring your validator client detects and manages them seamlessly.
+
 ## Prerequisites
 
 ### Execution node
@@ -78,6 +82,8 @@ Any execution client that supports [ETH Execution API specification](https://eth
 - [Erigon](https://launchpad.ethereum.org/en/erigon) (Ethereum, Gnosis)
 - [Geth](https://launchpad.ethereum.org/en/geth) (Ethereum)
 
+Built-in node management commands will simplify the process of installation and running execution and consensus nodes. Refer to the "nodes" section below for details.
+
 ### Consensus node
 
 Any consensus client that supports [ETH Beacon Node API specification](https://ethereum.github.io/beacon-APIs/#/) can be used:
@@ -87,6 +93,8 @@ Any consensus client that supports [ETH Beacon Node API specification](https://e
 - [Prysm](https://launchpad.ethereum.org/en/prysm) (Ethereum)
 - [Teku](https://launchpad.ethereum.org/en/teku) (Ethereum, Gnosis)
 - [Lodestar](https://launchpad.ethereum.org/en/lodestar) (Ethereum, Gnosis)
+
+Built-in node management commands make it easy to install and run both execution and consensus nodes. Refer to the "nodes" section below for details.
 
 ### Vault
 
@@ -402,6 +410,26 @@ PYTHONPATH=. poetry run python src/main.py start \
 
 **Congratulations, you should now have Operator Service up and running and ready to trigger validator registrations
 within your Vault!**
+
+## Running execution and consensus nodes
+
+To install execution and consensus nodes run:
+
+```bash
+./operator node-install
+```
+
+To start execution, consensus and validator nodes run:
+
+```bash
+./operator node-start
+```
+
+To check execution and consensus nodes status run:
+
+```bash
+./operator node-status
+```
 
 ## Extra commands
 
