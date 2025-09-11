@@ -100,10 +100,10 @@ NETWORKS: dict[str, NetworkConfig] = {
             '0x58e16621B5c0786D6667D2d54E28A20940269E16'
         ),
         VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x5D075B63291b8A28f911b7535C7AE848283A72aB'
+            '0xD6B48a2e2f97Bb96d9FdA2b063480fA1d4bF200A'
         ),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
+            '0x99F07eA1Cf491319FF6a2eDbBfEC84F3A5eAbfB5'
         ),
         WITHDRAWAL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x00000961Ef480Eb55e80D19ad83579A64c007002'
@@ -129,7 +129,7 @@ NETWORKS: dict[str, NetworkConfig] = {
             '0xFAce8504462AEb9BB6ae7Ecb206BD7B1EdF7956D'
         ),
         VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x5D075B63291b8A28f911b7535C7AE848283A72aB'
+            '0x765860f5B231aB597e308adAf667851107924Ad6'
         ),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
