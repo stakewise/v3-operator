@@ -79,7 +79,6 @@ async def start_base() -> None:
 
     # start operator tasks
     chain_state = await get_chain_finalized_head()
-    await wait_execution_catch_up_consensus(chain_state)
 
     VaultCrud().save_vaults(settings.vaults)
     logger.info('Syncing validator events...')

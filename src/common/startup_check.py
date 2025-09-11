@@ -14,6 +14,7 @@ from sw_utils.pectra import get_pectra_vault_version
 from web3 import Web3
 from web3.exceptions import BadFunctionCallOutput
 
+from src.common.checks import wait_execution_catch_up_consensus
 from src.common.clients import OPERATOR_USER_AGENT, db_client
 from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import (
@@ -62,12 +63,16 @@ async def startup_checks() -> None:
     logger.info('Checking consensus nodes network...')
     await _check_consensus_nodes_network()
 
+    logger.info('Checking execution nodes network...')
+    await _check_execution_nodes_network()
+
+    logger.info('Checking that consensus and execution nodes are in sync...')
+    chain_state = await get_chain_finalized_head()
+    await wait_execution_catch_up_consensus(chain_state)
+
     if settings.claim_fee_splitter:
         logger.info('Checking graph nodes...')
         await wait_for_graph_node()
-
-    logger.info('Checking execution nodes network...')
-    await _check_execution_nodes_network()
 
     logger.info('Checking oracles config...')
     await _check_events_logs()
