@@ -4,8 +4,8 @@ import socket
 import time
 from os import path
 
-import click
 from aiohttp import ClientSession, ClientTimeout
+from click import ClickException
 from eth_typing import ChecksumAddress
 from gql import gql
 from sw_utils import IpfsFetchClient, get_consensus_client, get_execution_client
@@ -26,7 +26,13 @@ from src.common.harvest import get_harvest_params
 from src.common.utils import format_error, round_down, warning_verbose
 from src.common.wallet import wallet
 from src.config.networks import NETWORKS
-from src.config.settings import RelayerTypes, ValidatorsRegistrationMode, settings
+from src.config.settings import (
+    DEFAULT_CONSENSUS_ENDPOINT,
+    DEFAULT_EXECUTION_ENDPOINT,
+    RelayerTypes,
+    ValidatorsRegistrationMode,
+    settings,
+)
 from src.validators.execution import get_withdrawable_assets
 from src.validators.keystores.local import LocalKeystore
 from src.validators.relayer import DvtRelayerClient
@@ -37,13 +43,15 @@ IPFS_HASH_EXAMPLE = 'QmawUdo17Fvo7xa6ARCUSMV1eoVwPtVuzx8L8Crj2xozWm'
 
 
 async def startup_checks() -> None:
-    validate_settings()
-
     logger.info('Checking connection to database...')
     db_client.create_db_dir()
     with db_client.get_db_connection() as conn:
         conn.cursor()
     logger.info('Connected to database %s.', settings.database)
+
+    if settings.run_nodes:
+        # Wait a bit for nodes to start
+        await asyncio.sleep(10)
 
     logger.info('Checking connection to consensus nodes...')
     await wait_for_consensus_node()
@@ -121,13 +129,25 @@ async def startup_checks() -> None:
 
 def validate_settings() -> None:
     if not settings.execution_endpoints:
-        raise ValueError('EXECUTION_ENDPOINTS is missing')
+        raise ClickException('EXECUTION_ENDPOINTS is missing')
 
     if not settings.consensus_endpoints:
-        raise ValueError('CONSENSUS_ENDPOINTS is missing')
+        raise ClickException('CONSENSUS_ENDPOINTS is missing')
 
     if not settings.graph_endpoint and settings.claim_fee_splitter:
-        raise ValueError('GRAPH_ENDPOINT is missing')
+        raise ClickException('GRAPH_ENDPOINT is missing')
+
+    if settings.run_nodes and settings.execution_endpoints != [DEFAULT_EXECUTION_ENDPOINT]:
+        raise ClickException(
+            f'With --run-nodes enabled, --execution-endpoints should be '
+            f'set to the default value: {DEFAULT_EXECUTION_ENDPOINT}'
+        )
+
+    if settings.run_nodes and settings.consensus_endpoints != [DEFAULT_CONSENSUS_ENDPOINT]:
+        raise ClickException(
+            f'With --run-nodes enabled, --consensus-endpoints should be '
+            f'set to the default value: {DEFAULT_CONSENSUS_ENDPOINT}'
+        )
 
 
 async def wait_for_consensus_node() -> None:
@@ -432,4 +452,4 @@ async def _check_vault_address(vault_address: ChecksumAddress) -> None:
     try:
         await VaultContract(address=vault_address).version()
     except BadFunctionCallOutput as e:
-        raise click.ClickException('Invalid vault contract address') from e
+        raise ClickException('Invalid vault contract address') from e

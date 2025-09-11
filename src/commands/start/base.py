@@ -7,6 +7,7 @@ from eth_typing import ChecksumAddress
 from sw_utils import InterruptHandler
 
 import src
+from src.commands.nodes.node_start import main as run_nodes
 from src.common.checks import wait_execution_catch_up_consensus
 from src.common.clients import setup_clients
 from src.common.consensus import get_chain_finalized_head
@@ -40,6 +41,20 @@ async def start_base() -> None:
     await setup_clients()
 
     log_start()
+
+    background_tasks = set()
+
+    if settings.run_nodes:
+        run_nodes_task = asyncio.create_task(
+            run_nodes(
+                print_execution_logs=False,
+                print_consensus_logs=False,
+                print_validator_logs=False,
+            )
+        )
+
+        # Keep track of background tasks to prevent them from being garbage collected
+        background_tasks.add(run_nodes_task)
 
     if not settings.skip_startup_checks:
         await startup_checks()

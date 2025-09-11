@@ -94,7 +94,7 @@ def node_start(
     )
 
     click.echo('Checking hardware requirements...')
-    _check_hardware_requirements(data_dir=data_dir, network=network, no_confirm=no_confirm)
+    check_hardware_requirements(data_dir=data_dir, network=network, no_confirm=no_confirm)
 
     # Minimal settings for the nodes
     settings.set(
@@ -171,7 +171,7 @@ async def main(
             )
 
 
-def _check_hardware_requirements(data_dir: Path, network: str, no_confirm: bool) -> None:
+def check_hardware_requirements(data_dir: Path, network: str, no_confirm: bool) -> None:
     # Check memory requirements
     mem = psutil.virtual_memory()
     mem_total_gb = mem.total / (1024**3)
