@@ -8,14 +8,20 @@ from aiohttp import ClientSession, ClientTimeout
 from click import ClickException
 from eth_typing import ChecksumAddress
 from gql import gql
-from sw_utils import IpfsFetchClient, get_consensus_client, get_execution_client
+from sw_utils import (
+    ChainHead,
+    InterruptHandler,
+    IpfsFetchClient,
+    get_consensus_client,
+    get_execution_client,
+)
 from sw_utils.graph.client import GraphClient as SWGraphClient
 from sw_utils.pectra import get_pectra_vault_version
 from web3 import Web3
 from web3.exceptions import BadFunctionCallOutput
 
-from src.common.checks import wait_execution_catch_up_consensus
 from src.common.clients import OPERATOR_USER_AGENT, db_client
+from src.common.clients import execution_client as default_execution_client
 from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import (
     VaultContract,
@@ -245,6 +251,38 @@ async def wait_for_execution_node() -> None:
         await asyncio.sleep(10)
 
 
+async def wait_execution_catch_up_consensus(
+    chain_head: ChainHead, interrupt_handler: InterruptHandler | None = None
+) -> None:
+    """
+    Consider execution and consensus nodes are working independently of each other.
+    Check execution node is synced to the consensus finalized block.
+    """
+    execution_client = default_execution_client
+
+    while True:
+        if interrupt_handler and interrupt_handler.exit:
+            return
+
+        execution_block_number = await execution_client.eth.get_block_number()
+        if execution_block_number >= chain_head.block_number:
+            return
+
+        logger.warning(
+            'The execution client is behind the consensus client: '
+            'execution block %d, consensus finalized block %d, distance %d blocks',
+            execution_block_number,
+            chain_head.block_number,
+            chain_head.block_number - execution_block_number,
+        )
+        sleep_time = float(settings.network_config.SECONDS_PER_BLOCK)
+
+        if interrupt_handler:
+            await interrupt_handler.sleep(sleep_time)
+        else:
+            await asyncio.sleep(sleep_time)
+
+
 async def wait_for_graph_node() -> None:
     """
     Waits until graph node is available and synced to the finalized head of the chain.
@@ -336,7 +374,7 @@ async def _check_consensus_nodes_network() -> None:
     """
     Checks that consensus node network is the same as settings.network
     """
-    chain_id_to_network = get_chain_id_to_network_dict()
+    chain_id_to_network = _get_chain_id_to_network_dict()
     for consensus_endpoint in settings.consensus_endpoints:
         consensus_client = get_consensus_client(
             [consensus_endpoint], user_agent=OPERATOR_USER_AGENT
@@ -355,7 +393,7 @@ async def _check_execution_nodes_network() -> None:
     """
     Checks that execution node network is the same as settings.network
     """
-    chain_id_to_network = get_chain_id_to_network_dict()
+    chain_id_to_network = _get_chain_id_to_network_dict()
     for execution_endpoint in settings.execution_endpoints:
         execution_client = get_execution_client(
             [execution_endpoint],
@@ -371,7 +409,7 @@ async def _check_execution_nodes_network() -> None:
             )
 
 
-def get_chain_id_to_network_dict() -> dict[int, str]:
+def _get_chain_id_to_network_dict() -> dict[int, str]:
     chain_id_to_network: dict[int, str] = {}
     for network, network_config in NETWORKS.items():
         chain_id_to_network[network_config.CHAIN_ID] = network
