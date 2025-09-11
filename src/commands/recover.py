@@ -103,12 +103,11 @@ def recover(
 ) -> None:
     # pylint: disable=duplicate-code
     operator_config = OperatorConfig(
-        Path(data_dir),
+        data_dir=Path(data_dir),
+        network=network,
     )
-    if operator_config.is_network_config_exists(network):
-        raise click.ClickException(
-            f'Config directory {operator_config.data_dir / network} already exists.'
-        )
+    if operator_config.config_path.is_file():
+        raise click.ClickException(f'Config directory {operator_config.data_dir} already exists.')
 
     settings.set(
         execution_endpoints=execution_endpoints,
@@ -174,7 +173,7 @@ async def main(
                 default=True,
                 abort=True,
             )
-        for file in keystores_dir.glob('*'):
+        for file in keystores_dir.iterdir():
             file.unlink()
     else:
         keystores_dir.mkdir(parents=True)
@@ -187,7 +186,7 @@ async def main(
         per_keystore_password=per_keystore_password,
     )
 
-    operator_config.save(settings.network, mnemonic, mnemonic_next_index)
+    operator_config.save(mnemonic, mnemonic_next_index)
     click.secho(
         f'Successfully recovered {greenify(mnemonic_next_index)} '
         f'keystores for vaults {greenify(', '.join(settings.vaults))}',

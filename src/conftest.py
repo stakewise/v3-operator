@@ -73,8 +73,8 @@ def test_mnemonic() -> str:
 
 @pytest.fixture
 def _init_config(data_dir: Path, test_mnemonic: str) -> None:
-    config = OperatorConfig(data_dir=data_dir)
-    config.save(HOODI, test_mnemonic)
+    config = OperatorConfig(data_dir=data_dir, network=HOODI)
+    config.save(test_mnemonic)
 
 
 @pytest.fixture

@@ -48,9 +48,10 @@ def init(
 ) -> None:
     config = OperatorConfig(
         data_dir=Path(data_dir),
+        network=network,
     )
-    if config.is_network_config_exists(network):
-        raise click.ClickException(f'Config directory {config.data_dir / network} already exists.')
+    if config.config_path.is_file():
+        raise click.ClickException(f'Config directory {config.data_dir} already exists.')
 
     if not language:
         language = click.prompt(
@@ -60,7 +61,7 @@ def init(
         )
     mnemonic = create_new_mnemonic(language, skip_test=no_verify)
 
-    config.save(network, mnemonic)
+    config.save(mnemonic)
     if not no_verify:
         click.secho(
             'Successfully initialized configuration for StakeWise operator', bold=True, fg='green'
