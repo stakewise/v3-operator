@@ -46,14 +46,33 @@ class RelayerClient:
         )
 
     async def fund_validators(
-        self,
-        # pylint: disable-next=unused-argument
-        funding_amounts: dict[HexStr, Gwei],
+        self, vault_address: ChecksumAddress, funding_amounts: dict[HexStr, Gwei]
     ) -> RelayerValidatorsResponse:
-        # todo
+        relayer_response = await self._fund_validators(
+            vault_address=vault_address,
+            public_keys=list(funding_amounts.keys()),
+            amount=list(funding_amounts.values()),
+        )
+        validators: list[Validator] = []
+        for v in relayer_response.get('validators') or []:
+            public_key = add_0x_prefix(v['public_key'])
+            deposit_signature = add_0x_prefix(v['deposit_signature'])
+            # deposit_data_root=Web3.to_hex(deposit_data['deposit_data_root']),
+
+            validator = Validator(
+                public_key=public_key,
+                amount=v['amount'],
+                signature=deposit_signature,
+            )
+
+            validators.append(validator)
+
+        validators_manager_signature = add_0x_prefix(
+            relayer_response.get('validators_manager_signature') or HexStr('0x')
+        )
         return RelayerValidatorsResponse(
-            validators=[],
-            validators_manager_signature=HexStr('0x'),
+            validators=validators,
+            validators_manager_signature=validators_manager_signature,
         )
 
     async def _register_validators(
@@ -82,6 +101,26 @@ class RelayerClient:
             timeout=ClientTimeout(settings.relayer_timeout)
         ) as session:
             resp = await session.post(url, json=jsn)
+            if 400 <= resp.status < 500:
+                logger.debug('Relayer response: %s', await resp.read())
+            resp.raise_for_status()
+            return await resp.json()
+
+    async def _fund_validators(
+        self, vault_address: ChecksumAddress, public_keys: list[HexStr], amount: list[Gwei]
+    ) -> dict:
+        url = urljoin(settings.relayer_endpoint, 'fund')
+        async with aiohttp.ClientSession(
+            timeout=ClientTimeout(settings.relayer_timeout)
+        ) as session:
+            resp = await session.post(
+                url,
+                json={
+                    'vault': vault_address,
+                    'public_keys': public_keys,
+                    'amounts': amount,
+                },
+            )
             if 400 <= resp.status < 500:
                 logger.debug('Relayer response: %s', await resp.read())
             resp.raise_for_status()

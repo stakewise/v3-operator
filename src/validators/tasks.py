@@ -112,6 +112,7 @@ async def process_validators(
                 funding_amounts=funding_amounts,
                 keystore=keystore,
                 harvest_params=harvest_params,
+                relayer=relayer,
             )
             if not tx_hash:
                 return
@@ -151,6 +152,7 @@ async def fund_compounding_validators(
         # fetch validators and signature from relayer
         validators_response = await cast(RelayerClient, relayer).fund_validators(
             funding_amounts=funding_amounts,
+            vault_address=vault_address,
         )
 
         validators = validators_response.validators
