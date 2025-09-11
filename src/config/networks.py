@@ -133,7 +133,7 @@ NETWORKS: dict[str, NetworkConfig] = {
             '0xFAce8504462AEb9BB6ae7Ecb206BD7B1EdF7956D'
         ),
         VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x5D075B63291b8A28f911b7535C7AE848283A72aB'
+            '0x765860f5B231aB597e308adAf667851107924Ad6'
         ),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
