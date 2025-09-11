@@ -101,6 +101,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install build dependencies for Linux
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y build-essential curl libpq-dev postgresql-client
+        if: matrix.os == 'ubuntu-24.04-arm'
+
       - name: Install build dependencies for MacOS
         run: |
           brew install libpq
