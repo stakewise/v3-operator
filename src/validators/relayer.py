@@ -2,7 +2,7 @@ import logging
 
 import aiohttp
 from aiohttp import ClientTimeout
-from eth_typing import BLSSignature, HexStr
+from eth_typing import BLSSignature, ChecksumAddress, HexStr
 from eth_utils import add_0x_prefix
 from sw_utils.common import urljoin
 from web3 import Web3
@@ -16,13 +16,12 @@ logger = logging.getLogger(__name__)
 
 
 class RelayerClient:
-
-    async def get_validators(
-        self, validators_batch_size: int, validators_total: int
+    async def register_validators(
+        self, vault_address: ChecksumAddress, amounts: list[Gwei]
     ) -> RelayerValidatorsResponse:
         validators_start_index = await get_validators_start_index()
-        relayer_response = await self._get_validators(
-            validators_start_index, validators_batch_size, validators_total
+        relayer_response = await self._register_validators(
+            vault_address, validators_start_index, amounts
         )
         validators: list[Validator] = []
         for v in relayer_response.get('validators') or []:
@@ -32,7 +31,7 @@ class RelayerClient:
 
             validator = Validator(
                 public_key=public_key,
-                amount=v['amount_gwei'],
+                amount=v['amount'],
                 signature=deposit_signature,
                 exit_signature=BLSSignature(Web3.to_bytes(hexstr=exit_signature)),
             )
@@ -47,28 +46,21 @@ class RelayerClient:
         )
 
     async def fund_validators(
-        self, funding_amounts: dict[HexStr, Gwei]
+        self,
+        # pylint: disable-next=unused-argument
+        funding_amounts: dict[HexStr, Gwei],
     ) -> RelayerValidatorsResponse:
-        relayer_response = await self._fund_validators(funding_amounts)
-        validators: list[Validator] = []
-        for v in relayer_response.get('validators') or []:
-            validator = Validator(
-                public_key=add_0x_prefix(v['public_key']),
-                amount=v['amount_gwei'],
-                signature=add_0x_prefix(v['deposit_signature']),
-            )
-            validators.append(validator)
-
-        validators_manager_signature = add_0x_prefix(
-            relayer_response.get('validators_manager_signature') or HexStr('0x')
-        )
+        # todo
         return RelayerValidatorsResponse(
-            validators=validators,
-            validators_manager_signature=validators_manager_signature,
+            validators=[],
+            validators_manager_signature=HexStr('0x'),
         )
 
-    async def _get_validators(
-        self, validators_start_index: int, validators_batch_size: int, validators_total: int
+    async def _register_validators(
+        self,
+        vault_address: ChecksumAddress,
+        validators_start_index: int,
+        amounts: list[Gwei],
     ) -> dict:
         """
         :param validators_start_index: - validator index for the first validator in a batch.
@@ -81,9 +73,10 @@ class RelayerClient:
         """
         url = urljoin(settings.relayer_endpoint, 'validators')
         jsn = {
+            'vault': vault_address,
             'validators_start_index': validators_start_index,
-            'validators_batch_size': validators_batch_size,
-            'validators_total': validators_total,
+            'amounts': amounts,
+            'validator_type': settings.validator_type.value,
         }
         async with aiohttp.ClientSession(
             timeout=ClientTimeout(settings.relayer_timeout)
@@ -94,12 +87,12 @@ class RelayerClient:
             resp.raise_for_status()
             return await resp.json()
 
-    async def _fund_validators(self, funding_amounts: dict[HexStr, Gwei]) -> dict:
-        url = urljoin(settings.relayer_endpoint, 'fund')
+    async def get_info(self) -> dict:
+        url = urljoin(settings.relayer_endpoint, 'info')
         async with aiohttp.ClientSession(
             timeout=ClientTimeout(settings.relayer_timeout)
         ) as session:
-            resp = await session.post(url, json=funding_amounts)
+            resp = await session.get(url)
             if 400 <= resp.status < 500:
                 logger.debug('Relayer response: %s', await resp.read())
             resp.raise_for_status()

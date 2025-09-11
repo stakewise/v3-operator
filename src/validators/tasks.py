@@ -214,8 +214,9 @@ async def register_new_validators(
             return None
     else:
         try:
-            validators_response = await cast(RelayerClient, relayer).get_validators(
-                validators_batch_size, validators_total=validators_count
+            validators_response = await cast(RelayerClient, relayer).register_validators(
+                vault_address=vault_address,
+                amounts=validators_amounts[:validators_batch_size],
             )
         except MissingAvailableValidatorsException:
             if not settings.disable_available_validators_warnings:

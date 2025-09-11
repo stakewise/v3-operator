@@ -413,7 +413,7 @@ async def _check_events_logs() -> None:
 
 
 async def _check_relayer_endpoint() -> None:
-    info = await RelayerClient().get_info()  # todo
+    info = await RelayerClient().get_info()
 
     relayer_network = info['network']
     if relayer_network != settings.network:
