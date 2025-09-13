@@ -244,7 +244,9 @@ async def register_new_validators(
     if not await gas_manager.check_gas_price(high_priority=True):
         return None
 
-    logger.info('Started registration of %d validator(s)', len(validators))
+    logger.info(
+        'Started registration of %d %s validator(s)', len(validators), settings.validator_type
+    )
 
     oracles_request, oracles_approval = await poll_validation_approval(
         vault_address=vault_address,

@@ -1,4 +1,4 @@
-from sw_utils import ChainHead, ValidatorStatus
+from sw_utils import GNO_NETWORKS, ChainHead, ValidatorStatus, convert_to_mgno
 from web3 import Web3
 from web3.types import ChecksumAddress, Gwei, Wei
 
@@ -6,6 +6,7 @@ from src.common.clients import consensus_client
 from src.common.contracts import validators_checker_contract
 from src.common.harvest import get_harvest_params
 from src.common.typings import ExitQueueMissingAssetsParams
+from src.config.settings import settings
 from src.validators.typings import ConsensusValidator
 
 CAN_BE_EXITED_STATUSES = [
@@ -76,6 +77,11 @@ async def get_queued_assets(
         harvest_params=harvest_params,
         block_number=chain_head.block_number,
     )
+
+    if settings.network in GNO_NETWORKS:
+        # apply GNO -> mGNO exchange rate
+        queued_assets = convert_to_mgno(queued_assets)
+
     return Gwei(int(Web3.from_wei(queued_assets, 'gwei')))
 
 
