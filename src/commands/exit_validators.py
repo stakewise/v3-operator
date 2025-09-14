@@ -217,6 +217,7 @@ async def main(
         vault_address=vault_address,
         withdrawals={val.public_key: Gwei(0) for val in active_validators},
         tx_fee=withdrawal_request_fee,
+        validators_manager_signature=HexStr('0x'),
     )
     if tx_hash:
         click.secho(
