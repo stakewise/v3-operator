@@ -315,12 +315,12 @@ async def _check_public_keys(
     for key in non_active_public_keys:
         raise click.ClickException(f'Trying to consolidate non-active validator {key}.')
 
-    source_validators = set()
+    source_validators = []
     # Verify the source has been active long enough
     max_activation_epoch = chain_head.epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
     for validator in active_validators:
         if validator.public_key in source_public_keys:
-            source_validators.add(validator)
+            source_validators.append(validator)
             if validator.activation_epoch > max_activation_epoch:
                 raise click.ClickException(
                     f'Validator {validator.public_key} is not active enough for consolidation. '
