@@ -26,10 +26,10 @@ from src.common.harvest import get_harvest_params
 from src.common.utils import format_error, round_down, warning_verbose
 from src.common.wallet import wallet
 from src.config.networks import NETWORKS
-from src.config.settings import RelayerTypes, ValidatorsRegistrationMode, settings
+from src.config.settings import ValidatorsRegistrationMode, settings
 from src.validators.execution import get_withdrawable_assets
 from src.validators.keystores.local import LocalKeystore
-from src.validators.relayer import DvtRelayerClient
+from src.validators.relayer import RelayerClient
 
 logger = logging.getLogger(__name__)
 
@@ -111,12 +111,9 @@ async def startup_checks() -> None:
     for vault_address in settings.vaults:
         await check_validators_manager(vault_address)
 
-    if (
-        settings.validators_registration_mode == ValidatorsRegistrationMode.API
-        and settings.relayer_type == RelayerTypes.DVT
-    ):
-        logger.info('Checking DVT Relayer endpoint %s...', settings.relayer_endpoint)
-        await _check_dvt_relayer_endpoint()
+    if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
+        logger.info('Checking Relayer endpoint %s...', settings.relayer_endpoint)
+        await _check_relayer_endpoint()
 
 
 def validate_settings() -> None:
@@ -415,8 +412,8 @@ async def _check_events_logs() -> None:
         )
 
 
-async def _check_dvt_relayer_endpoint() -> None:
-    info = await DvtRelayerClient().get_info()
+async def _check_relayer_endpoint() -> None:
+    info = await RelayerClient().get_info()
 
     relayer_network = info['network']
     if relayer_network != settings.network:

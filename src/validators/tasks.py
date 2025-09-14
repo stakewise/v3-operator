@@ -31,7 +31,7 @@ from src.validators.keystores.base import BaseKeystore
 from src.validators.metrics import update_unused_validator_keys_metric
 from src.validators.oracles import poll_validation_approval
 from src.validators.register_validators import fund_validators, register_validators
-from src.validators.relayer import RelayerAdapter
+from src.validators.relayer import RelayerClient
 from src.validators.typings import NetworkValidator, Validator
 from src.validators.utils import (
     get_validators_for_funding,
@@ -46,10 +46,10 @@ class ValidatorRegistrationSubtask:
     def __init__(
         self,
         keystore: BaseKeystore | None,
-        relayer_adapter: RelayerAdapter | None,
+        relayer: RelayerClient | None,
     ):
         self.keystore = keystore
-        self.relayer_adapter = relayer_adapter
+        self.relayer = relayer
 
     async def process(self) -> None:
         if self.keystore:
@@ -61,14 +61,14 @@ class ValidatorRegistrationSubtask:
             await process_validators(
                 vault_address=vault_address,
                 keystore=self.keystore,
-                relayer_adapter=self.relayer_adapter,
+                relayer=self.relayer,
             )
 
 
 async def process_validators(
     vault_address: ChecksumAddress,
     keystore: BaseKeystore | None,
-    relayer_adapter: RelayerAdapter | None = None,
+    relayer: RelayerClient | None = None,
 ) -> None:
     """
     Calculates vault assets, requests oracles approval, submits registration tx
@@ -92,7 +92,7 @@ async def process_validators(
             vault_assets=vault_assets,
             harvest_params=harvest_params,
             keystore=keystore,
-            relayer_adapter=relayer_adapter,
+            relayer=relayer,
         )
         return
 
@@ -125,7 +125,7 @@ async def process_validators(
         vault_assets=vault_assets,
         harvest_params=harvest_params,
         keystore=keystore,
-        relayer_adapter=relayer_adapter,
+        relayer=relayer,
     )
 
 
@@ -134,7 +134,7 @@ async def fund_compounding_validators(
     keystore: BaseKeystore | None,
     funding_amounts: dict[HexStr, Gwei],
     harvest_params: HarvestParams | None,
-    relayer_adapter: RelayerAdapter | None = None,
+    relayer: RelayerClient | None = None,
 ) -> HexStr | None:
     """
     Funds vault compounding validators with the specified amount.
@@ -149,7 +149,7 @@ async def fund_compounding_validators(
         )
     else:
         # fetch validators and signature from relayer
-        validators_response = await cast(RelayerAdapter, relayer_adapter).fund_validators(
+        validators_response = await cast(RelayerClient, relayer).fund_validators(
             funding_amounts=funding_amounts,
         )
 
@@ -178,7 +178,7 @@ async def register_new_validators(
     vault_assets: Gwei,
     harvest_params: HarvestParams | None,
     keystore: BaseKeystore | None,
-    relayer_adapter: RelayerAdapter | None = None,
+    relayer: RelayerClient | None = None,
 ) -> HexStr | None:
     validators_amounts = _get_deposits_amounts(vault_assets, settings.validator_type)
     validators_count = len(validators_amounts)
@@ -214,8 +214,9 @@ async def register_new_validators(
             return None
     else:
         try:
-            validators_response = await cast(RelayerAdapter, relayer_adapter).get_validators(
-                validators_batch_size, validators_total=validators_count
+            validators_response = await cast(RelayerClient, relayer).register_validators(
+                vault_address=vault_address,
+                amounts=validators_amounts[:validators_batch_size],
             )
         except MissingAvailableValidatorsException:
             if not settings.disable_available_validators_warnings:
