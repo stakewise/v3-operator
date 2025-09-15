@@ -213,7 +213,7 @@ async def _get_withdrawals(
                 queued_assets,
             )
             withdrawals.update(partials)
-            queued_assets = Gwei(queued_assets - sum(partials.values()))
+            queued_assets = Gwei(max(0, queued_assets - sum(partials.values())))
 
     return withdrawals
 
