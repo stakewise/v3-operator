@@ -5,7 +5,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from decimal import ROUND_FLOOR, Decimal, localcontext
 from pathlib import Path
-from typing import Any, Callable, Iterable, TypeVar
+from typing import Any
 
 import click
 import tenacity
@@ -25,8 +25,6 @@ from src.common.typings import OracleApproval, OraclesApproval
 from src.config.settings import LOG_DATE_FORMAT, settings
 
 logger = logging.getLogger(__name__)
-
-T = TypeVar('T')
 
 
 def get_build_version() -> str | None:
@@ -137,10 +135,6 @@ def round_down(d: int | Decimal, precision: int) -> Decimal:
     with localcontext() as ctx:
         ctx.rounding = ROUND_FLOOR
         return round(d, precision)
-
-
-def find_first(iterable: Iterable[T], predicate: Callable[[T], bool]) -> T | None:
-    return next((item for item in iterable if predicate(item)), None)
 
 
 async def calc_slot_by_block_number(block_number: BlockNumber) -> int:

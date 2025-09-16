@@ -2,7 +2,6 @@ import asyncio
 import logging
 import sys
 from pathlib import Path
-from typing import cast
 
 import click
 from eth_typing import ChecksumAddress, HexStr
@@ -19,7 +18,7 @@ from src.common.execution import (
     get_protocol_config,
 )
 from src.common.logging import LOG_LEVELS, setup_logging
-from src.common.utils import find_first, log_verbose
+from src.common.utils import log_verbose
 from src.common.validators import (
     validate_eth_address,
     validate_public_key,
@@ -320,46 +319,67 @@ async def _check_public_keys(
     and returns the target and source validators info.
     """
     logger.info('Checking selected validators for consolidation...')
-    all_public_keys = source_public_keys + [target_public_key]
-    active_validators = await fetch_consensus_validators(source_public_keys + [target_public_key])
-    active_public_keys = {
-        val.public_key for val in active_validators if val.status not in EXITING_STATUSES
-    }
-    non_active_public_keys = set(all_public_keys) - active_public_keys
-    for key in non_active_public_keys:
-        raise click.ClickException(f'Trying to consolidate non-active validator {key}.')
+
+    # Validate that source public keys are unique
+    if len(source_public_keys) != len(set(source_public_keys)):
+        raise click.ClickException('Source public keys must be unique.')
+
+    # Fetch source and target validators
+    validators = await fetch_consensus_validators(source_public_keys + [target_public_key])
+    pubkey_to_validator = {val.public_key: val for val in validators}
 
     source_validators = []
-    # Verify the source has been active long enough
     max_activation_epoch = chain_head.epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
-    for validator in active_validators:
-        if validator.public_key in source_public_keys:
-            source_validators.append(validator)
-            if validator.activation_epoch > max_activation_epoch:
-                raise click.ClickException(
-                    f'Validator {validator.public_key} is not active enough for consolidation. '
-                    f'It must be active for at least '
-                    f'{settings.network_config.SHARD_COMMITTEE_PERIOD} epochs before consolidation.'
-                )
 
-    #  Verify the source validators has no pending withdrawals in the queue
-    await _check_pending_balance_to_withdraw(
-        validator_indexes={val.index for val in source_validators}
-    )
+    # Validate source public keys
+    for source_public_key in source_public_keys:
+        source_validator = pubkey_to_validator.get(source_public_key)
 
-    # validate that target_public_key is a compounding validator.
-    # Not required for a single validator consolidation
-    target_validator = find_first(
-        active_validators, lambda val: val.public_key == target_public_key
-    )
-    # `target_validator` is not None, because of validation above
-    target_validator = cast(ConsensusValidator, target_validator)
+        if not source_validator:
+            raise click.ClickException(
+                f'Validator {source_public_key} not found in the consensus layer.'
+            )
+
+        # Validate the source validator status
+        if source_validator.status in EXITING_STATUSES:
+            raise click.ClickException(
+                f'Validator {source_public_key} is in exiting status {source_validator.status}.'
+            )
+
+        # Validate the source has been active long enough
+        if source_validator.activation_epoch > max_activation_epoch:
+            raise click.ClickException(
+                f'Validator {source_validator.public_key} is not active enough for consolidation. '
+                f'It must be active for at least '
+                f'{settings.network_config.SHARD_COMMITTEE_PERIOD} epochs before consolidation.'
+            )
+        source_validators.append(source_validator)
+
+    # Validate target public key
+    target_validator = pubkey_to_validator.get(target_public_key)
+    if not target_validator:
+        raise click.ClickException(
+            f'Target validator {target_public_key} not found in the consensus layer.'
+        )
+    if target_validator.status in EXITING_STATUSES:
+        raise click.ClickException(
+            f'Target validator {target_public_key} is in exiting status {target_validator.status}.'
+        )
+
+    # Validate that target validator is a compounding validator.
+    # Not required for a switch from 0x01 to 0x02.
     if not _is_switch_to_compounding(source_public_keys, target_public_key):
         if not target_validator.is_compounding:
             raise click.ClickException(
                 f'The target validator {target_public_key} is not a compounding validator.'
             )
 
+    # Validate the source validators has no pending withdrawals in the queue
+    await _check_pending_balance_to_withdraw(
+        validator_indexes={val.index for val in source_validators}
+    )
+
+    # Validate the source and target validators are in the vault
     logger.info('Fetching vault validators...')
     vault_validators = await VaultContract(vault_address).get_registered_validators_public_keys(
         from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
@@ -370,11 +390,14 @@ async def _check_public_keys(
             raise click.ClickException(
                 f'Validator {public_keys} is not registered in the vault {vault_address}.'
             )
-    if sum(val.balance for val in active_validators) > MAX_EFFECTIVE_BALANCE_GWEI:
+
+    # Validate the total balance won't exceed the max effective balance
+    if sum(val.balance for val in validators) > MAX_EFFECTIVE_BALANCE_GWEI:
         raise click.ClickException(
             'Cannot consolidate validators,'
             f' total balance exceed {MAX_EFFECTIVE_BALANCE_GWEI} Gwei'
         )
+
     return [(target_validator, source_validator) for source_validator in source_validators]
 
 
