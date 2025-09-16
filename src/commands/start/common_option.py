@@ -3,6 +3,7 @@ from typing import Callable
 
 import click
 from click.decorators import FC
+from web3 import Web3
 
 from src.common.logging import LOG_LEVELS
 from src.common.typings import ValidatorType
@@ -200,7 +201,7 @@ start_common_options = [
         envvar='MIN_DEPOSIT_AMOUNT_GWEI',
         help=f'Minimum amount in gwei to deposit into validator.'
         f' The default is {DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI} '
-        f'({DEFAULT_MIN_DEPOSIT_AMOUNT} ETH).',
+        f'({Web3.from_wei(DEFAULT_MIN_DEPOSIT_AMOUNT, 'ether')} ETH).',
         default=DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
         callback=validate_min_deposit_amount_gwei,
     ),

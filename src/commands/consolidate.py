@@ -235,10 +235,15 @@ async def main(
             )
 
     for target_validator, source_validator in target_source:
-        click.secho(
-            f'Consolidating from validator with index {source_validator.index} '
-            f'to validator with index {target_validator.index}'
-        )
+        if source_validator.index == target_validator.index:
+            click.secho(
+                f'Switching validator with index {source_validator.index} to compounding',
+            )
+        else:
+            click.secho(
+                f'Consolidating from validator with index {source_validator.index} '
+                f'to validator with index {target_validator.index}'
+            )
     if not no_confirm:
         click.confirm(
             'Proceed consolidation?',

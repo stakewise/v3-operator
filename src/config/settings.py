@@ -18,7 +18,7 @@ DEFAULT_METRICS_PREFIX = 'sw_operator'
 DEFAULT_HASHI_VAULT_PARALLELISM = 8
 DEFAULT_HASHI_VAULT_ENGINE_NAME = 'secret'
 
-DEFAULT_MIN_DEPOSIT_AMOUNT = Web3.to_wei(1, 'ether')
+DEFAULT_MIN_DEPOSIT_AMOUNT = Web3.to_wei(10, 'ether')
 DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI = Gwei(int(Web3.from_wei(DEFAULT_MIN_DEPOSIT_AMOUNT, 'gwei')))
 
 DEFAULT_MIN_DEPOSIT_DELAY = 3600  # 1 hour
@@ -311,7 +311,7 @@ ORACLES_CONSOLIDATION_TIMEOUT: int = decouple_config(
 ORACLES_EXITS_TIMEOUT: int = decouple_config('ORACLES_EXITS_TIMEOUT', default=10, cast=int)
 # partial withdrawals
 PARTIAL_WITHDRAWALS_INTERVAL: int = decouple_config(
-    'PARTIAL_WITHDRAWALS_INTERVAL', default=86400, cast=int  # every 24 hr
+    'PARTIAL_WITHDRAWALS_INTERVAL', default=43200, cast=int  # every 12 hr
 )
 MIN_WITHDRAWAL_AMOUNT_GWEI: Gwei = Gwei(1)
 
