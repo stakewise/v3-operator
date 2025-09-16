@@ -6,8 +6,10 @@ import click
 from eth_utils import to_checksum_address
 from web3.types import Gwei
 
+from src.commands.nodes.node_start import check_hardware_requirements
 from src.commands.start.base import load_operator_config, start_base
 from src.commands.start.common_option import add_common_options, start_common_options
+from src.common.startup_check import validate_settings
 from src.common.typings import ValidatorType
 from src.common.utils import log_verbose
 from src.config.settings import settings
@@ -28,6 +30,14 @@ logger = logging.getLogger(__name__)
     envvar='KEYSTORES_DIR',
     help='Absolute path to the directory with all the encrypted keystores. '
     'Default is the directory generated with "create-keys" command.',
+)
+@click.option(
+    '--run-nodes',
+    is_flag=True,
+    default=False,
+    envvar='RUN_NODES',
+    help='If set, the operator will also start and manage local consensus, execution '
+    'and validator nodes.',
 )
 @add_common_options(start_common_options)
 @click.command(help='Start operator service')
@@ -61,6 +71,7 @@ def start_local(
     min_deposit_amount_gwei: int,
     min_deposit_delay: int,
     no_confirm: bool,
+    run_nodes: bool,
 ) -> None:
     vault_addresses = [to_checksum_address(address) for address in vaults.split(',')]
     operator_config = load_operator_config(
@@ -98,7 +109,15 @@ def start_local(
         concurrency=concurrency,
         min_deposit_amount_gwei=Gwei(min_deposit_amount_gwei),
         min_deposit_delay=min_deposit_delay,
+        run_nodes=run_nodes,
     )
+    validate_settings()
+
+    if settings.run_nodes:
+        click.echo('Checking hardware requirements...')
+        check_hardware_requirements(
+            data_dir=settings.data_dir, network=settings.network, no_confirm=no_confirm
+        )
 
     try:
         asyncio.run(start_base())
