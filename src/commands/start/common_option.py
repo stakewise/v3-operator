@@ -147,6 +147,7 @@ start_common_options = [
         default=DEFAULT_EXECUTION_ENDPOINT,
         prompt='Enter the comma separated list of API endpoints for execution nodes',
         help='Comma separated list of API endpoints for execution nodes.',
+        show_default=True,
     ),
     click.option(
         '--execution-jwt-secret',
@@ -162,6 +163,7 @@ start_common_options = [
         default=DEFAULT_CONSENSUS_ENDPOINT,
         prompt='Enter the comma separated list of API endpoints for consensus nodes',
         help='Comma separated list of API endpoints for consensus nodes.',
+        show_default=True,
     ),
     click.option(
         '--graph-endpoint',

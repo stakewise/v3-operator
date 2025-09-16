@@ -3,17 +3,27 @@ import logging
 import socket
 import time
 from os import path
+from pathlib import Path
 
 import click
+import psutil
 from aiohttp import ClientSession, ClientTimeout
+from click import ClickException
 from gql import gql
-from sw_utils import IpfsFetchClient, get_consensus_client, get_execution_client
+from sw_utils import (
+    ChainHead,
+    InterruptHandler,
+    IpfsFetchClient,
+    get_consensus_client,
+    get_execution_client,
+)
 from sw_utils.graph.client import GraphClient as SWGraphClient
 from sw_utils.pectra import get_pectra_vault_version
 from web3 import Web3
 from web3.exceptions import BadFunctionCallOutput
 
 from src.common.clients import OPERATOR_USER_AGENT, db_client
+from src.common.clients import execution_client as default_execution_client
 from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import (
     VaultContract,
@@ -26,7 +36,12 @@ from src.common.typings import ValidatorsRegistrationMode
 from src.common.utils import format_error, round_down, warning_verbose
 from src.common.wallet import wallet
 from src.config.networks import NETWORKS
-from src.config.settings import WITHDRAWALS_INTERVAL, settings
+from src.config.settings import (
+    DEFAULT_CONSENSUS_ENDPOINT,
+    DEFAULT_EXECUTION_ENDPOINT,
+    WITHDRAWALS_INTERVAL,
+    settings,
+)
 from src.validators.execution import get_withdrawable_assets
 from src.validators.keystores.local import LocalKeystore
 from src.validators.relayer import RelayerClient
@@ -36,14 +51,17 @@ logger = logging.getLogger(__name__)
 IPFS_HASH_EXAMPLE = 'QmawUdo17Fvo7xa6ARCUSMV1eoVwPtVuzx8L8Crj2xozWm'
 
 
+# pylint: disable-next=too-many-statements
 async def startup_checks() -> None:
-    validate_settings()
-
     logger.info('Checking connection to database...')
     db_client.create_db_dir()
     with db_client.get_db_connection() as conn:
         conn.cursor()
     logger.info('Connected to database %s.', settings.database)
+
+    if settings.run_nodes:
+        # Wait a bit for nodes to start
+        await asyncio.sleep(10)
 
     logger.info('Checking connection to consensus nodes...')
     await wait_for_consensus_node()
@@ -54,12 +72,16 @@ async def startup_checks() -> None:
     logger.info('Checking consensus nodes network...')
     await _check_consensus_nodes_network()
 
+    logger.info('Checking execution nodes network...')
+    await _check_execution_nodes_network()
+
+    logger.info('Checking that consensus and execution nodes are in sync...')
+    chain_state = await get_chain_finalized_head()
+    await wait_execution_catch_up_consensus(chain_state)
+
     if settings.claim_fee_splitter:
         logger.info('Checking graph nodes...')
         await wait_for_graph_node()
-
-    logger.info('Checking execution nodes network...')
-    await _check_execution_nodes_network()
 
     logger.info('Checking oracles config...')
     await _check_events_logs()
@@ -122,13 +144,25 @@ async def startup_checks() -> None:
 
 def validate_settings() -> None:
     if not settings.execution_endpoints:
-        raise ValueError('EXECUTION_ENDPOINTS is missing')
+        raise ClickException('EXECUTION_ENDPOINTS is missing')
 
     if not settings.consensus_endpoints:
-        raise ValueError('CONSENSUS_ENDPOINTS is missing')
+        raise ClickException('CONSENSUS_ENDPOINTS is missing')
 
     if not settings.graph_endpoint and settings.claim_fee_splitter:
-        raise ValueError('GRAPH_ENDPOINT is missing')
+        raise ClickException('GRAPH_ENDPOINT is missing')
+
+    if settings.run_nodes and settings.execution_endpoints != [DEFAULT_EXECUTION_ENDPOINT]:
+        raise ClickException(
+            f'With --run-nodes enabled, --execution-endpoints should be '
+            f'set to the default value: {DEFAULT_EXECUTION_ENDPOINT}'
+        )
+
+    if settings.run_nodes and settings.consensus_endpoints != [DEFAULT_CONSENSUS_ENDPOINT]:
+        raise ClickException(
+            f'With --run-nodes enabled, --consensus-endpoints should be '
+            f'set to the default value: {DEFAULT_CONSENSUS_ENDPOINT}'
+        )
 
 
 async def wait_for_consensus_node() -> None:
@@ -217,6 +251,38 @@ async def wait_for_execution_node() -> None:
             return
         logger.warning('Failed to connect to execution nodes. Retrying in 10 seconds...')
         await asyncio.sleep(10)
+
+
+async def wait_execution_catch_up_consensus(
+    chain_head: ChainHead, interrupt_handler: InterruptHandler | None = None
+) -> None:
+    """
+    Consider execution and consensus nodes are working independently of each other.
+    Check execution node is synced to the consensus finalized block.
+    """
+    execution_client = default_execution_client
+
+    while True:
+        if interrupt_handler and interrupt_handler.exit:
+            return
+
+        execution_block_number = await execution_client.eth.get_block_number()
+        if execution_block_number >= chain_head.block_number:
+            return
+
+        logger.warning(
+            'The execution client is behind the consensus client: '
+            'execution block %d, consensus finalized block %d, distance %d blocks',
+            execution_block_number,
+            chain_head.block_number,
+            chain_head.block_number - execution_block_number,
+        )
+        sleep_time = float(settings.network_config.SECONDS_PER_BLOCK)
+
+        if interrupt_handler:
+            await interrupt_handler.sleep(sleep_time)
+        else:
+            await asyncio.sleep(sleep_time)
 
 
 async def wait_for_graph_node() -> None:
@@ -310,7 +376,7 @@ async def _check_consensus_nodes_network() -> None:
     """
     Checks that consensus node network is the same as settings.network
     """
-    chain_id_to_network = get_chain_id_to_network_dict()
+    chain_id_to_network = _get_chain_id_to_network_dict()
     for consensus_endpoint in settings.consensus_endpoints:
         consensus_client = get_consensus_client(
             [consensus_endpoint], user_agent=OPERATOR_USER_AGENT
@@ -329,7 +395,7 @@ async def _check_execution_nodes_network() -> None:
     """
     Checks that execution node network is the same as settings.network
     """
-    chain_id_to_network = get_chain_id_to_network_dict()
+    chain_id_to_network = _get_chain_id_to_network_dict()
     for execution_endpoint in settings.execution_endpoints:
         execution_client = get_execution_client(
             [execution_endpoint],
@@ -345,7 +411,7 @@ async def _check_execution_nodes_network() -> None:
             )
 
 
-def get_chain_id_to_network_dict() -> dict[int, str]:
+def _get_chain_id_to_network_dict() -> dict[int, str]:
     chain_id_to_network: dict[int, str] = {}
     for network, network_config in NETWORKS.items():
         chain_id_to_network[network_config.CHAIN_ID] = network
@@ -428,4 +494,34 @@ async def _check_vault_address() -> None:
     try:
         await VaultContract(address=settings.vault).version()
     except BadFunctionCallOutput as e:
-        raise click.ClickException(f'Invalid vault contract address {settings.vault}') from e
+        raise ClickException(f'Invalid vault contract address {settings.vault}') from e
+
+
+def check_hardware_requirements(data_dir: Path, network: str, no_confirm: bool) -> None:
+    # Check memory requirements
+    mem = psutil.virtual_memory()
+    mem_total_gb = mem.total / (1024**3)
+    min_memory_gb = NETWORKS[network].NODE_CONFIG.MIN_MEMORY_GB
+
+    if mem_total_gb < min_memory_gb:
+        if not no_confirm and not click.confirm(
+            f'At least {min_memory_gb} GB of RAM is recommended to run the nodes.\n'
+            f'You have {mem_total_gb:.1f} GB of RAM in total.\n'
+            f'Do you want to continue anyway?',
+            default=False,
+        ):
+            raise click.Abort()
+
+    # Check disk space requirements
+    disk_usage = psutil.disk_usage(str(data_dir))
+    disk_total_tb = disk_usage.total / (1024**4)
+    min_disk_tb = NETWORKS[network].NODE_CONFIG.MIN_DISK_SPACE_TB
+
+    if disk_total_tb < min_disk_tb:
+        if not no_confirm and not click.confirm(
+            f'At least {min_disk_tb} TB of disk space is recommended in the data directory.\n'
+            f'You have {disk_total_tb:.1f} TB available at {data_dir}.\n'
+            f'Do you want to continue anyway?',
+            default=False,
+        ):
+            raise click.Abort()

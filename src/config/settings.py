@@ -111,6 +111,8 @@ class Settings(metaclass=Singleton):
     min_deposit_delay: int
     nodes_dir: Path
 
+    run_nodes: bool
+
     # pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements
     def set(
         self,
@@ -155,6 +157,7 @@ class Settings(metaclass=Singleton):
         max_validator_balance_gwei: Gwei | None = None,
         min_deposit_delay: int = DEFAULT_MIN_DEPOSIT_DELAY,
         nodes_dir: Path = Path(''),
+        run_nodes: bool = False,
     ) -> None:
         self.vault = vault
         vault_dir.mkdir(parents=True, exist_ok=True)
@@ -298,6 +301,7 @@ class Settings(metaclass=Singleton):
 
         self.skip_startup_checks = decouple_config('SKIP_STARTUP_CHECKS', default=False, cast=bool)
         self.nodes_dir = nodes_dir
+        self.run_nodes = run_nodes
 
     @property
     def keystore_cls_str(self) -> str:

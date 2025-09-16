@@ -3,14 +3,13 @@ import logging
 from pathlib import Path
 
 import click
-import psutil
 from eth_typing import ChecksumAddress
 from sw_utils import get_consensus_client, get_execution_client
 
 from src.common.clients import setup_clients
+from src.common.startup_check import check_hardware_requirements
 from src.common.validators import validate_eth_address
 from src.config.config import OperatorConfig
-from src.config.networks import NETWORKS
 from src.config.settings import LOG_DATE_FORMAT, settings
 from src.nodes.exceptions import NodeFailedToStartError
 from src.nodes.process import (
@@ -167,36 +166,6 @@ async def main(
                 lighthouse_runner.stop(),
                 lighthouse_vc_runner.stop(),
             )
-
-
-def check_hardware_requirements(data_dir: Path, network: str, no_confirm: bool) -> None:
-    # Check memory requirements
-    mem = psutil.virtual_memory()
-    mem_total_gb = mem.total / (1024**3)
-    min_memory_gb = NETWORKS[network].NODE_CONFIG.MIN_MEMORY_GB
-
-    if mem_total_gb < min_memory_gb:
-        if not no_confirm and not click.confirm(
-            f'At least {min_memory_gb} GB of RAM is recommended to run the nodes.\n'
-            f'You have {mem_total_gb:.1f} GB of RAM in total.\n'
-            f'Do you want to continue anyway?',
-            default=False,
-        ):
-            raise click.Abort()
-
-    # Check disk space requirements
-    disk_usage = psutil.disk_usage(str(data_dir))
-    disk_total_tb = disk_usage.total / (1024**4)
-    min_disk_tb = NETWORKS[network].NODE_CONFIG.MIN_DISK_SPACE_TB
-
-    if disk_total_tb < min_disk_tb:
-        if not no_confirm and not click.confirm(
-            f'At least {min_disk_tb} TB of disk space is recommended in the data directory.\n'
-            f'You have {disk_total_tb:.1f} TB available at {data_dir}.\n'
-            f'Do you want to continue anyway?',
-            default=False,
-        ):
-            raise click.Abort()
 
 
 def check_execution_node_installed() -> None:
