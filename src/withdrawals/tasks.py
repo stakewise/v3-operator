@@ -19,7 +19,6 @@ from src.common.execution import get_execution_request_fee, get_protocol_config
 from src.common.utils import round_down
 from src.config.settings import (
     MAX_WITHDRAWAL_REQUEST_FEE,
-    MIN_ACTIVATION_BALANCE_GWEI,
     MIN_WITHDRAWAL_AMOUNT_GWEI,
     PARTIAL_WITHDRAWALS_INTERVAL,
     ValidatorsRegistrationMode,
@@ -248,7 +247,7 @@ def _get_partial_withdrawals(
     if queued_assets <= 0:
         return withdrawals
     for validator in sorted(partial_validators, key=lambda item: item.balance, reverse=True):
-        available = validator.balance - MIN_ACTIVATION_BALANCE_GWEI
+        available = validator.withdrawal_capacity
         if available <= 0:
             continue
 
