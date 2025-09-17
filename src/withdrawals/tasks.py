@@ -1,4 +1,5 @@
 import logging
+from typing import cast
 
 from eth_typing import ChecksumAddress, HexStr
 from sw_utils import (
@@ -21,11 +22,14 @@ from src.config.settings import (
     MIN_ACTIVATION_BALANCE_GWEI,
     MIN_WITHDRAWAL_AMOUNT_GWEI,
     PARTIAL_WITHDRAWALS_INTERVAL,
+    ValidatorsRegistrationMode,
     settings,
 )
 from src.validators.consensus import fetch_consensus_validators
 from src.validators.database import VaultValidatorCrud
+from src.validators.exceptions import EmptyRelayerResponseException
 from src.validators.oracles import poll_active_exits
+from src.validators.relayer import RelayerClient
 from src.validators.typings import ConsensusValidator
 from src.withdrawals.assets import get_queued_assets
 from src.withdrawals.execution import submit_withdraw_validators
@@ -73,6 +77,13 @@ class WithdrawalIntervalMixin:
 
 
 class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
+
+    def __init__(
+        self,
+        relayer: RelayerClient | None,
+    ):
+        self.relayer = relayer
+
     async def process(self, chain_head: ChainHead) -> None:
         """
         Every N hours check the exit queue and submit partial withdrawals if needed.
@@ -138,10 +149,24 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
             validator_min_active_epochs=protocol_config.validator_min_active_epochs,
             oracle_exit_indexes={val.index for val in oracle_exiting_validators},
         )
+        validators_manager_signature = HexStr('0x')
+        if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
+            # fetch validator manager signature from relayer
+            relayer_response = await cast(RelayerClient, self.relayer).withdraw_validators(
+                vault_address=vault_address,
+                withdrawals=withdrawals,
+            )
+            if not relayer_response.validators_manager_signature:
+                logger.debug('Waiting for relayer validator manager signature')
+                raise EmptyRelayerResponseException()
+
+            validators_manager_signature = relayer_response.validators_manager_signature
+
         tx_hash = await submit_withdraw_validators(
             vault_address=vault_address,
             withdrawals=withdrawals,
             tx_fee=current_fee,
+            validators_manager_signature=validators_manager_signature,
         )
         if not tx_hash:
             return

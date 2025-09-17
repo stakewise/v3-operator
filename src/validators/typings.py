@@ -83,6 +83,11 @@ class RelayerValidatorsResponse:
 
 
 @dataclass
+class RelayerSignatureResponse:
+    validators_manager_signature: HexStr
+
+
+@dataclass
 # pylint: disable-next=too-many-instance-attributes
 class ApprovalRequest:
     validator_index: int

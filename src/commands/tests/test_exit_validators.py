@@ -113,6 +113,7 @@ class TestValidatorsExit:
                 vault_address=vault_address,
                 withdrawals={key: 0 for key in public_keys},
                 tx_fee=WITHDRAWAL_REQUEST_FEE,
+                validators_manager_signature='0x',
             )
         assert result.exit_code == 0
         assert 'Exits for validators with index(es) 1 are successfully initiated\n' in result.output
@@ -166,6 +167,7 @@ class TestValidatorsExit:
                 vault_address=vault_address,
                 withdrawals={key: 0 for key in public_keys},
                 tx_fee=WITHDRAWAL_REQUEST_FEE,
+                validators_manager_signature='0x',
             )
         assert result.exit_code == 0
         assert 'Exits for validators with index(es) 1 are successfully initiated\n' in result.output

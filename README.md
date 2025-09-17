@@ -361,6 +361,10 @@ The Operator API facilitates the initiation of validator registrations via API c
 
 ```./operator start-relayer```
 
+Relayer options:
+
+- `'--relayer-endpoint`: The base URL of the relayer service, e.g. `http://relayer:8003`
+
 Check [API mode guide](https://docs.stakewise.io/for-operators/operator-service/running-as-api-service) for more details.
 
 ### Running Operator options
