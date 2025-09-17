@@ -19,7 +19,6 @@ from src.common.execution import get_execution_request_fee, get_protocol_config
 from src.common.utils import round_down
 from src.config.settings import (
     MAX_WITHDRAWAL_REQUEST_FEE,
-    MIN_ACTIVATION_BALANCE_GWEI,
     MIN_WITHDRAWAL_AMOUNT_GWEI,
     PARTIAL_WITHDRAWALS_INTERVAL,
     ValidatorsRegistrationMode,
@@ -194,17 +193,18 @@ async def _get_withdrawals(
     validator_min_active_epochs: int,
     oracle_exit_indexes: set[int],
 ) -> dict[HexStr, Gwei]:
+    if queued_assets <= 0:
+        return {}
+
     # Find all partial-withdrawable validators
     partial_validators = [
-        v for v in consensus_validators if _is_partial_withdrawable_validator(v, chain_head.epoch)
+        v for v in consensus_validators if v.is_partially_withdrawable(chain_head.epoch)
     ]
     partial_capacity = sum(v.withdrawal_capacity for v in partial_validators)
 
     # If enough partials, use only them
     if partial_capacity >= queued_assets or settings.disable_full_withdrawals:
-        return _get_partial_withdrawals(
-            {v.public_key: v.balance for v in partial_validators}, queued_assets
-        )
+        return _get_partial_withdrawals(partial_validators, queued_assets)
 
     # Otherwise, add full withdrawals as needed
     max_activation_epoch = min(
@@ -230,11 +230,7 @@ async def _get_withdrawals(
         partial_capacity = Gwei(partial_capacity - validator.withdrawal_capacity)
         if partial_capacity >= queued_assets:
             partials = _get_partial_withdrawals(
-                {
-                    p.public_key: p.balance
-                    for p in partial_validators
-                    if p.public_key not in withdrawals
-                },
+                [p for p in partial_validators if p.public_key not in withdrawals],
                 queued_assets,
             )
             withdrawals.update(partials)
@@ -244,38 +240,25 @@ async def _get_withdrawals(
 
 
 def _get_partial_withdrawals(
-    validator_balances: dict[HexStr, Gwei], queued_assets: Gwei
+    partial_validators: list[ConsensusValidator], queued_assets: Gwei
 ) -> dict[HexStr, Gwei]:
     withdrawals: dict[HexStr, Gwei] = {}
 
     if queued_assets <= 0:
         return withdrawals
-    for public_key, balance in sorted(
-        validator_balances.items(), key=lambda item: item[1], reverse=True
-    ):
-        available = balance - MIN_ACTIVATION_BALANCE_GWEI
+    for validator in sorted(partial_validators, key=lambda item: item.balance, reverse=True):
+        available = validator.withdrawal_capacity
         if available <= 0:
             continue
 
         amount = Gwei(min(available, queued_assets))
-        withdrawals[public_key] = amount
+        withdrawals[validator.public_key] = amount
         queued_assets = Gwei(queued_assets - amount)
 
         if queued_assets <= 0:
             break
 
     return withdrawals
-
-
-def _is_partial_withdrawable_validator(validator: ConsensusValidator, epoch: int) -> bool:
-    if not validator.is_compounding:
-        return False
-    if validator.status != ValidatorStatus.ACTIVE_ONGOING:
-        return False
-    # Filter validator that has been active long enough
-    if epoch < validator.activation_epoch + settings.network_config.SHARD_COMMITTEE_PERIOD:
-        return False
-    return True
 
 
 def _filter_exitable_validators(

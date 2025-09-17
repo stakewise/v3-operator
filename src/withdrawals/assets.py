@@ -113,21 +113,22 @@ def _calculate_validators_exits_amount(
     source_consolidations_indexes: set[int],
 ) -> Wei:
     """
-    Calculate the sum of exiting validators balances. Calculated from two components:
-    1. Active exits from oracles.
-    2. Manually exited validators.
+    Calculate the sum of exiting validators balances. Exiting validators are:
+    1) Validators with exiting status
+    2) Validators that are in active exits according to oracles
+    3) Exclude validators that are consolidating
     """
-    # 1. Validator exits
-    # validator status can be not changed yet, so use active exits from oracles
-    oracle_exiting_balance = sum(val.balance for val in oracle_exiting_validators)
+    oracle_exiting_indexes = set()
+    total_exiting_amount = 0
+    for val in oracle_exiting_validators:
+        if val.index in oracle_exiting_indexes:
+            continue
+        oracle_exiting_indexes.add(val.index)
+        total_exiting_amount += val.balance
 
-    # 2. Validator manually exits
-    manually_exiting_balance = sum(
-        val.balance
-        for val in consensus_validators
-        if val.status in EXITING_STATUSES
-        and val.index not in oracle_exiting_validators
-        and val.index not in source_consolidations_indexes
-    )
+    excluded_indexes = source_consolidations_indexes.union(oracle_exiting_indexes)
+    for val in consensus_validators:
+        if val.index not in excluded_indexes and val.status in EXITING_STATUSES:
+            total_exiting_amount += val.balance
 
-    return Web3.to_wei(oracle_exiting_balance + manually_exiting_balance, 'gwei')
+    return Web3.to_wei(total_exiting_amount, 'gwei')

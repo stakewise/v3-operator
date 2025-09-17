@@ -54,7 +54,7 @@ jobs:
         uses: pr-mpt/actions-commit-hash@v2
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.2.4
         with:
           image-ref: "europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:sha-${{ steps.commit-hash.outputs.short }}"
           format: "table"
