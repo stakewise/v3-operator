@@ -279,7 +279,7 @@ async def test_get_withdrawals(data_dir):
     expected = {'0x1': ether_to_gwei(0), '0x2': ether_to_gwei(18), '0x3': ether_to_gwei(28)}
     assert result == expected
 
-    # full withdrawals when partial withdrawals capacity iz zero
+    # full withdrawals when partial withdrawals capacity is zero
     chain_head = create_chain_head(epoch=500)
     queued_assets = ether_to_gwei(10)
     consensus_validators = [
@@ -451,26 +451,26 @@ async def test_is_pending_partial_withdrawals_queue_full():
     with mock.patch.object(
         settings.network_config, 'PENDING_PARTIAL_WITHDRAWALS_LIMIT', new=limit
     ), mock.patch(
-        'sw_utils.consensus.ExtendedAsyncBeacon.get_pending_partial_withdrawals',
+        'src.withdrawals.tasks.consensus_client.get_pending_partial_withdrawals',
         return_value=[{'validator_index': i, 'amount': 1} for i in range(limit - 1)],
     ):
-        await _is_pending_partial_withdrawals_queue_full() is False
+        assert await _is_pending_partial_withdrawals_queue_full() is False
 
     with mock.patch.object(
         settings.network_config, 'PENDING_PARTIAL_WITHDRAWALS_LIMIT', new=limit
     ), mock.patch(
-        'sw_utils.consensus.ExtendedAsyncBeacon.get_pending_partial_withdrawals',
+        'src.withdrawals.tasks.consensus_client.get_pending_partial_withdrawals',
         return_value=[{'validator_index': i, 'amount': 1} for i in range(limit)],
     ):
-        await _is_pending_partial_withdrawals_queue_full() is True
+        assert await _is_pending_partial_withdrawals_queue_full() is True
 
     with mock.patch.object(
         settings.network_config, 'PENDING_PARTIAL_WITHDRAWALS_LIMIT', new=limit
     ), mock.patch(
-        'sw_utils.consensus.ExtendedAsyncBeacon.get_pending_partial_withdrawals',
+        'src.withdrawals.tasks.consensus_client.get_pending_partial_withdrawals',
         return_value=[{'validator_index': i, 'amount': 1} for i in range(limit + 1)],
     ):
-        await _is_pending_partial_withdrawals_queue_full() is True
+        assert await _is_pending_partial_withdrawals_queue_full() is True
 
 
 def test_filter_exitable_validators():
