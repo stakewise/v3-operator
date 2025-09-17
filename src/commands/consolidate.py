@@ -537,16 +537,15 @@ async def get_source_validators(
 async def get_validators_manager_signature(
     vault_address: ChecksumAddress, target_source_public_keys: list[tuple[HexStr, HexStr]]
 ) -> HexStr:
-    validators_manager_signature = HexStr('0x')
-    if settings.relayer_endpoint:
-        relayer = RelayerClient()
-        # fetch validator manager signature from relayer
-        relayer_response = await relayer.consolidate_validators(
-            vault_address=vault_address,
-            target_source_public_keys=target_source_public_keys,
-        )
-        if not relayer_response.validators_manager_signature:
-            raise click.ClickException('Could not get validator manager signature from relayer')
+    if not settings.relayer_endpoint:
+        return HexStr('0x')
+    relayer = RelayerClient()
+    # fetch validator manager signature from relayer
+    relayer_response = await relayer.consolidate_validators(
+        vault_address=vault_address,
+        target_source_public_keys=target_source_public_keys,
+    )
+    if not relayer_response.validators_manager_signature:
+        raise click.ClickException('Could not get validator manager signature from relayer')
 
-        validators_manager_signature = relayer_response.validators_manager_signature
-    return validators_manager_signature
+    return relayer_response.validators_manager_signature

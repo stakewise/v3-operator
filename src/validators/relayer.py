@@ -55,7 +55,7 @@ class RelayerClient:
         relayer_response = await self._fund_validators(
             vault_address=vault_address,
             public_keys=list(funding_amounts.keys()),
-            amount=list(funding_amounts.values()),
+            amounts=list(funding_amounts.values()),
         )
         validators: list[Validator] = []
         for v in relayer_response.get('validators') or []:
@@ -76,13 +76,13 @@ class RelayerClient:
             validators_manager_signature=validators_manager_signature,
         )
 
-    async def withdrawal_validators(
+    async def withdraw_validators(
         self, vault_address: ChecksumAddress, withdrawals: dict[HexStr, Gwei]
     ) -> RelayerSignatureResponse:
-        relayer_response = await self._withdrawal_validators(
+        relayer_response = await self._withdraw_validators(
             vault_address=vault_address,
             public_keys=list(withdrawals.keys()),
-            amount=list(withdrawals.values()),
+            amounts=list(withdrawals.values()),
         )
         validators_manager_signature = add_0x_prefix(
             relayer_response.get('validators_manager_signature') or HexStr('0x')
@@ -127,12 +127,12 @@ class RelayerClient:
         return await self._send_post_request('validators', jsn)
 
     async def _fund_validators(
-        self, vault_address: ChecksumAddress, public_keys: list[HexStr], amount: list[Gwei]
+        self, vault_address: ChecksumAddress, public_keys: list[HexStr], amounts: list[Gwei]
     ) -> dict:
         jsn = {
             'vault': vault_address,
             'public_keys': public_keys,
-            'amounts': amount,
+            'amounts': amounts,
         }
         return await self._send_post_request('fund', jsn)
 
@@ -149,13 +149,13 @@ class RelayerClient:
         }
         return await self._send_post_request('consolidate', jsn)
 
-    async def _withdrawal_validators(
-        self, vault_address: ChecksumAddress, public_keys: list[HexStr], amount: list[Gwei]
+    async def _withdraw_validators(
+        self, vault_address: ChecksumAddress, public_keys: list[HexStr], amounts: list[Gwei]
     ) -> dict:
         jsn = {
             'vault': vault_address,
             'public_keys': public_keys,
-            'amounts': amount,
+            'amounts': amounts,
         }
         return await self._send_post_request('withdraw', jsn)
 

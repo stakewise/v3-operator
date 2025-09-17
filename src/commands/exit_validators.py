@@ -286,16 +286,15 @@ async def _check_exiting_validators(
 async def get_validators_manager_signature(
     vault_address: ChecksumAddress, withdrawals: dict[HexStr, Gwei]
 ) -> HexStr:
-    validators_manager_signature = HexStr('0x')
-    if settings.relayer_endpoint:
-        relayer = RelayerClient()
-        # fetch validator manager signature from relayer
-        relayer_response = await relayer.withdrawal_validators(
-            vault_address=vault_address,
-            withdrawals=withdrawals,
-        )
-        if not relayer_response.validators_manager_signature:
-            raise click.ClickException('Could not get validator manager signature from relayer')
+    if not settings.relayer_endpoint:
+        return HexStr('0x')
+    relayer = RelayerClient()
+    # fetch validator manager signature from relayer
+    relayer_response = await relayer.withdraw_validators(
+        vault_address=vault_address,
+        withdrawals=withdrawals,
+    )
+    if not relayer_response.validators_manager_signature:
+        raise click.ClickException('Could not get validator manager signature from relayer')
 
-        validators_manager_signature = relayer_response.validators_manager_signature
-    return validators_manager_signature
+    return relayer_response.validators_manager_signature

@@ -214,7 +214,7 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
         validators_manager_signature = HexStr('0x')
         if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
             # fetch validator manager signature from relayer
-            relayer_response = await cast(RelayerClient, self.relayer).withdrawal_validators(
+            relayer_response = await cast(RelayerClient, self.relayer).withdraw_validators(
                 vault_address=vault_address,
                 withdrawals=withdrawals,
             )
