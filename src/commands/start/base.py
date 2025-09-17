@@ -108,8 +108,7 @@ class ValidatorTask(BaseTask):
             keystore=keystore,
             relayer=relayer,
         )
-
-        self.validator_withdrawal_subtask = ValidatorWithdrawalSubtask()
+        self.validator_withdrawal_subtask = ValidatorWithdrawalSubtask(relayer)
 
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         chain_head = await get_chain_finalized_head()
