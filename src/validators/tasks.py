@@ -245,7 +245,7 @@ async def register_new_validators(
         return None
 
     logger.info(
-        'Started registration of %d %s validator(s)', len(validators), settings.validator_type
+        'Started registration of %d %s validator(s)', len(validators), settings.validator_type.value
     )
 
     oracles_request, oracles_approval = await poll_validation_approval(

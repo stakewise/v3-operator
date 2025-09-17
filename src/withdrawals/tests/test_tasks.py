@@ -12,72 +12,111 @@ from src.withdrawals.tasks import (
     _filter_exitable_validators,
     _get_partial_withdrawals,
     _get_withdrawals,
-    _is_partial_withdrawable_validator,
     _is_pending_partial_withdrawals_queue_full,
 )
 
 
 def test_get_partial_withdrawals():
-    validators = {
-        '0x1': ether_to_gwei(40),
-    }
+    validators = [
+        create_consensus_validator(
+            public_key='0x1',
+            balance=ether_to_gwei(40),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=200,
+        )
+    ]
     withdrawals_amount = ether_to_gwei(0)
     expected = {}
     result = _get_partial_withdrawals(validators, withdrawals_amount)
     assert result == expected
 
-    validators = {
-        '0x1': ether_to_gwei(40),
-    }
     withdrawals_amount = ether_to_gwei(8)
     expected = {'0x1': ether_to_gwei(8)}
     result = _get_partial_withdrawals(validators, withdrawals_amount)
     assert result == expected
 
-    validators = {
-        '0x1': ether_to_gwei(33),
-        '0x2': ether_to_gwei(45),
-        '0x3': ether_to_gwei(55),
-        '0x4': ether_to_gwei(43),
-    }
+    validators = [
+        create_consensus_validator(
+            public_key='0x1',
+            balance=ether_to_gwei(33),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=200,
+        ),
+        create_consensus_validator(
+            public_key='0x2',
+            balance=ether_to_gwei(45),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=200,
+        ),
+        create_consensus_validator(
+            public_key='0x3',
+            balance=ether_to_gwei(55),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=200,
+        ),
+        create_consensus_validator(
+            public_key='0x4',
+            balance=ether_to_gwei(43),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=200,
+        ),
+    ]
     withdrawals_amount = ether_to_gwei(18)
     expected = {'0x3': ether_to_gwei(18)}
     result = _get_partial_withdrawals(validators, withdrawals_amount)
     assert result == expected
 
-    validators = {
-        '0x1': ether_to_gwei(33),
-        '0x2': ether_to_gwei(40),
-        '0x3': ether_to_gwei(50),
-    }
-
+    validators = [
+        create_consensus_validator(
+            public_key='0x1',
+            balance=ether_to_gwei(33),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=200,
+        ),
+        create_consensus_validator(
+            public_key='0x2',
+            balance=ether_to_gwei(40),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=200,
+        ),
+        create_consensus_validator(
+            public_key='0x3',
+            balance=ether_to_gwei(50),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=200,
+        ),
+    ]
     withdrawals_amount = ether_to_gwei(20)
     expected = {'0x3': ether_to_gwei(18), '0x2': ether_to_gwei(2)}
     result = _get_partial_withdrawals(validators, withdrawals_amount)
     assert result == expected
-
-    validators = {
-        '0x1': ether_to_gwei(33),
-        '0x2': ether_to_gwei(40),
-        '0x3': ether_to_gwei(50),
-    }
 
     withdrawals_amount = ether_to_gwei(27)
     expected = {'0x3': ether_to_gwei(18), '0x2': ether_to_gwei(8), '0x1': ether_to_gwei(1)}
     result = _get_partial_withdrawals(validators, withdrawals_amount)
     assert result == expected
 
-    validators = {}
+    validators = []
     withdrawals_amount = 10
     expected = {}
     result = _get_partial_withdrawals(validators, withdrawals_amount)
     assert result == expected
 
     # use single validator withdrawals
-    validators = {
-        '0x1': ether_to_gwei(40),
-        '0x2': ether_to_gwei(50),
-    }
+    validators = [
+        create_consensus_validator(
+            public_key='0x1',
+            balance=ether_to_gwei(40),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=200,
+        ),
+        create_consensus_validator(
+            public_key='0x2',
+            balance=ether_to_gwei(50),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=200,
+        ),
+    ]
     queued_assets = ether_to_gwei(18)
     expected = {
         '0x2': ether_to_gwei(18),
@@ -86,7 +125,14 @@ def test_get_partial_withdrawals():
     assert result == expected
 
     # no validators have sufficient balance
-    validators = {'0x1': ether_to_gwei(30)}
+    validators = [
+        create_consensus_validator(
+            public_key='0x1',
+            balance=ether_to_gwei(30),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=200,
+        ),
+    ]
     queued_assets = ether_to_gwei(40)
     expected = {}
     result = _get_partial_withdrawals(validators, queued_assets)
@@ -376,27 +422,27 @@ def test_is_partial_withdrawable_validator():
         activation_epoch=10,
         is_compounding=False,
     )
-    result = _is_partial_withdrawable_validator(validator, epoch)
+    result = validator.is_partially_withdrawable(epoch)
     assert result is False
 
     # validator status is not active
     validator = create_consensus_validator(
         balance=ether_to_gwei(32), status=ValidatorStatus.ACTIVE_EXITING, activation_epoch=10
     )
-    result = _is_partial_withdrawable_validator(validator, epoch)
+    result = validator.is_partially_withdrawable(epoch)
     assert result is False
 
     # validator not active long enough
     validator = create_consensus_validator(
         balance=ether_to_gwei(32), status=ValidatorStatus.ACTIVE_ONGOING, activation_epoch=400
     )
-    result = _is_partial_withdrawable_validator(validator, epoch)
+    result = validator.is_partially_withdrawable(epoch)
     assert result is False
 
     validator = create_consensus_validator(
         balance=ether_to_gwei(32), status=ValidatorStatus.ACTIVE_ONGOING, activation_epoch=10
     )
-    result = _is_partial_withdrawable_validator(validator, epoch)
+    result = validator.is_partially_withdrawable(epoch)
     assert result is True
 
 
