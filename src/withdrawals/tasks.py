@@ -231,7 +231,7 @@ async def _get_withdrawals(
         partial_capacity = Gwei(partial_capacity - validator.withdrawal_capacity)
         if partial_capacity >= queued_assets:
             partials = _get_partial_withdrawals(
-                partial_validators,
+                [p for p in partial_validators if p.public_key not in withdrawals],
                 queued_assets,
             )
             withdrawals.update(partials)
