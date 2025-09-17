@@ -80,11 +80,11 @@ async def process_validators(
     )
 
     if vault_assets < settings.min_deposit_amount_gwei:
-        return None
+        return
 
     gas_manager = build_gas_manager()
     if not await gas_manager.check_gas_price():
-        return None
+        return
 
     if settings.validator_type == ValidatorType.V1:
         await register_new_validators(
