@@ -10,6 +10,7 @@ from src.common.typings import ValidatorType
 from src.common.validators import (
     validate_eth_addresses,
     validate_min_deposit_amount_gwei,
+    validate_network,
 )
 from src.config.networks import AVAILABLE_NETWORKS, GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
@@ -68,6 +69,7 @@ start_common_options = [
         ),
         envvar='NETWORK',
         help='The network of the vault. Default is the network specified at "init" command.',
+        callback=validate_network,
     ),
     click.option(
         '--enable-metrics',

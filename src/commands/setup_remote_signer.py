@@ -20,6 +20,7 @@ from src.common.utils import log_verbose
 from src.common.validators import (
     validate_dappnode_execution_endpoints,
     validate_eth_address,
+    validate_network,
 )
 from src.config.config import OperatorConfig, OperatorConfigException
 from src.config.networks import AVAILABLE_NETWORKS
@@ -101,6 +102,7 @@ logger = logging.getLogger(__name__)
         AVAILABLE_NETWORKS,
         case_sensitive=False,
     ),
+    callback=validate_network,
 )
 @click.command(help='Uploads private keys to a remote signer.')
 # pylint: disable-next=too-many-arguments

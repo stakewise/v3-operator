@@ -8,7 +8,11 @@ from eth_typing import ChecksumAddress
 
 from src.common.clients import setup_clients
 from src.common.utils import greenify, log_verbose
-from src.common.validators import validate_db_uri, validate_eth_address
+from src.common.validators import (
+    validate_db_uri,
+    validate_eth_address,
+    validate_network,
+)
 from src.config.config import OperatorConfig, OperatorConfigException
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import settings
@@ -25,6 +29,7 @@ from src.remote_db.database import check_db_connection
     ),
     envvar='NETWORK',
     help='The network of the vault. Default is the network specified at "init" command.',
+    callback=validate_network,
 )
 @click.option(
     '--db-url',
@@ -63,19 +68,16 @@ def remote_db_group(
     data_dir: str,
     keystores_dir: str | None,
     db_url: str,
-    network: str | None,
+    network: str,
     verbose: bool,
 ) -> None:
     ctx.ensure_object(dict)
 
     config = OperatorConfig(Path(data_dir))
-    if network is None:
-        try:
-            config.load(network=network)
-        except OperatorConfigException as e:
-            raise click.ClickException(str(e))
-        network = config.network
-
+    try:
+        config.load(network=network)
+    except OperatorConfigException as e:
+        raise click.ClickException(str(e))
     settings.set(
         vaults=[],
         data_dir=config.data_dir,
