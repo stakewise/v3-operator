@@ -13,7 +13,7 @@ from web3 import Web3
 from web3.types import BlockNumber, Gwei
 
 from src.common.app_state import AppState
-from src.common.clients import consensus_client
+from src.common.clients import consensus_client, execution_client
 from src.common.contracts import VaultContract
 from src.common.execution import get_execution_request_fee, get_protocol_config
 from src.common.metrics import metrics
@@ -96,6 +96,7 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
                 protocol_config=protocol_config,
             )
 
+    # pylint: disable-next=too-many-locals
     async def process_vault(
         self,
         vault_address: ChecksumAddress,
@@ -187,8 +188,8 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
             ', '.join(withdrawals.keys()),
             tx_hash,
         )
-
-        metrics.last_withdrawal_block.labels(network=settings.network).set(chain_head.block_number)
+        tx_data = await execution_client.eth.get_transaction(tx_hash)
+        metrics.last_withdrawal_block.labels(network=settings.network).set(tx_data['blockNumber'])
 
 
 async def _get_withdrawals(
