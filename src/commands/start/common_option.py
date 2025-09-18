@@ -102,11 +102,12 @@ start_common_options = [
         f' {ValidatorType.V1.value} or {ValidatorType.V2.value}.'
         f' Default is {ValidatorType.V2.value}.',
         envvar='VALIDATOR_TYPE',
-        default=ValidatorType.V2,
+        default=ValidatorType.V2.value,
         type=click.Choice(
-            ValidatorType,
+            [x.value for x in ValidatorType],
             case_sensitive=False,
         ),
+        callback=lambda ctx, param, value: ValidatorType(value),
     ),
     click.option(
         '-v',
