@@ -13,11 +13,7 @@ from src.common.tasks import BaseTask
 from src.common.typings import HarvestParams
 from src.common.wallet import wallet
 from src.config.networks import ZERO_CHECKSUM_ADDRESS
-from src.config.settings import (
-    REWARD_SPLITTER_INTERVAL,
-    REWARD_SPLITTER_MIN_ASSETS,
-    settings,
-)
+from src.config.settings import FEE_SPLITTER_INTERVAL, FEE_SPLITTER_MIN_ASSETS, settings
 from src.reward_splitter.graph import (
     graph_get_claimable_exit_requests,
     graph_get_reward_splitters,
@@ -50,14 +46,14 @@ class SplitRewardTask(BaseTask):
         if not await gas_manager.check_gas_price():
             return
 
-        logger.info('Fetching reward splitters')
+        logger.info('Fetching fee splitters')
         reward_splitters = await graph_get_reward_splitters(
             block_number=block['number'], claimer=wallet.account.address, vaults=settings.vaults
         )
 
         if not reward_splitters:
-            logger.info(
-                'No reward splitters found for provided vaults with the claimer %s',
+            logger.warning(
+                'No fee splitters found for provided vaults with the claimer %s',
                 wallet.address,
             )
             return
@@ -68,7 +64,7 @@ class SplitRewardTask(BaseTask):
         calls: dict[ChecksumAddress, list[HexStr]] = {}
         for reward_splitter in reward_splitters:
             logger.info(
-                'Processing reward splitter %s for vault %s',
+                'Processing fee splitter %s for vault %s',
                 reward_splitter.address,
                 reward_splitter.vault,
             )
@@ -82,13 +78,17 @@ class SplitRewardTask(BaseTask):
                 harvest_params=harvest_params,
                 exit_requests=exit_requests,
             )
+            if not reward_splitter_calls:
+                logger.info('No calls to process for fee splitter %s', reward_splitter.address)
+                continue
 
             calls[reward_splitter.address] = reward_splitter_calls
+
         if not calls:
-            logger.warning('No calls to process')
+            app_state.reward_splitter_block = block['number']
             return
 
-        logger.info('Processing reward splitter calls')
+        logger.info('Processing fee splitter calls')
         for address, address_calls in calls.items():
             contract = RewardSplitterContract(
                 address=address,
@@ -106,18 +106,18 @@ class SplitRewardTask(BaseTask):
             )
             if not tx_receipt['status']:
                 raise RuntimeError(
-                    f'Failed to confirm reward splitter tx: {tx_hash}',
+                    f'Failed to confirm fee splitter tx: {tx_hash}',
                 )
             logger.info('Transaction %s confirmed', tx_hash)
 
         app_state.reward_splitter_block = block['number']
-        logger.info('All reward splitter calls processed')
+        logger.info('All fee splitter calls processed')
 
 
 async def _check_reward_splitter_block(app_state: AppState, block_number: BlockNumber) -> bool:
     last_processed_block = app_state.reward_splitter_block
     reward_splitter_blocks_interval = (
-        REWARD_SPLITTER_INTERVAL // settings.network_config.SECONDS_PER_BLOCK
+        FEE_SPLITTER_INTERVAL // settings.network_config.SECONDS_PER_BLOCK
     )
     if (
         last_processed_block
@@ -149,9 +149,9 @@ async def _get_reward_splitter_calls(
 
     reward_splitter_assets = await _get_reward_splitter_assets(reward_splitter)
 
-    if reward_splitter_assets < REWARD_SPLITTER_MIN_ASSETS:
+    if reward_splitter_assets < FEE_SPLITTER_MIN_ASSETS:
         logger.info(
-            'Reward splitter %s does not have enough assets to withdraw', reward_splitter.address
+            'Fee splitter %s does not have enough assets to withdraw', reward_splitter.address
         )
     else:
         # Append update state call
@@ -173,7 +173,7 @@ async def _get_reward_splitter_calls(
 
     # Append claim exited assets on behalf calls
     if not exit_requests:
-        logger.info('No exit requests for reward splitter %s', reward_splitter.address)
+        logger.info('No exit requests for fee splitter %s', reward_splitter.address)
 
     for exit_request in exit_requests:
         logger.info('Processing exit request with position ticket %s', exit_request.position_ticket)

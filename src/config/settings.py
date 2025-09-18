@@ -344,11 +344,11 @@ HASHI_VAULT_TIMEOUT = 10
 ATTEMPTS_WITH_DEFAULT_GAS: int = decouple_config('ATTEMPTS_WITH_DEFAULT_GAS', default=3, cast=int)
 
 # Minimum amount of rewards to process reward splitter
-REWARD_SPLITTER_MIN_ASSETS: int = decouple_config(
-    'REWARD_SPLITTER_MIN_ASSETS', default=Web3.to_wei('0.001', 'ether'), cast=int
+FEE_SPLITTER_MIN_ASSETS: int = decouple_config(
+    'FEE_SPLITTER_MIN_ASSETS', default=Web3.to_wei('0.001', 'ether'), cast=int
 )
-REWARD_SPLITTER_INTERVAL: int = decouple_config(
-    'REWARD_SPLITTER_INTERVAL', default=86400, cast=int  # every 24 hr
+FEE_SPLITTER_INTERVAL: int = decouple_config(
+    'FEE_SPLITTER_INTERVAL', default=86400, cast=int  # every 24 hr
 )
 # logging
 LOG_PLAIN = 'plain'
