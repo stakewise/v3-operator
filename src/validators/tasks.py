@@ -171,6 +171,8 @@ async def fund_compounding_validators(
     if tx_hash:
         pub_keys = ', '.join(funding_amounts.keys())
         logger.info('Successfully funded validator(s) with public key(s) %s', pub_keys)
+        block_number = await execution_client.eth.get_block_number()
+        metrics.last_funding_block.labels(network=settings.network).set(block_number)
     return tx_hash
 
 
@@ -267,6 +269,8 @@ async def register_new_validators(
     if tx_hash:
         pub_keys = ', '.join([val.public_key for val in validators])
         logger.info('Successfully registered validator(s) with public key(s) %s', pub_keys)
+        block_number = await execution_client.eth.get_block_number()
+        metrics.last_registration_block.labels(network=settings.network).set(block_number)
 
     return tx_hash
 

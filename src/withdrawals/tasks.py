@@ -16,6 +16,7 @@ from src.common.app_state import AppState
 from src.common.clients import consensus_client
 from src.common.contracts import VaultContract
 from src.common.execution import get_execution_request_fee, get_protocol_config
+from src.common.metrics import metrics
 from src.common.utils import round_down
 from src.config.settings import (
     MAX_WITHDRAWAL_REQUEST_FEE,
@@ -121,6 +122,8 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
             oracle_exiting_validators=oracle_exiting_validators,
             chain_head=chain_head,
         )
+        metrics.queued_assets.labels(network=settings.network).set(int(queued_assets))
+
         if queued_assets < MIN_WITHDRAWAL_AMOUNT_GWEI:
             app_state.partial_withdrawal_cache[vault_address] = chain_head.block_number
             return
@@ -184,6 +187,8 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
             ', '.join(withdrawals.keys()),
             tx_hash,
         )
+
+        metrics.last_withdrawal_block.labels(network=settings.network).set(chain_head.block_number)
 
 
 async def _get_withdrawals(
