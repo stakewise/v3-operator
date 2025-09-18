@@ -41,8 +41,8 @@ class ExitQueueMissingAssetsParams:
 
 
 class ValidatorType(Enum):
-    V1 = 'V1'
-    V2 = 'V2'
+    V1 = '0x01'
+    V2 = '0x02'
 
 
 class Singleton(type):
