@@ -22,7 +22,7 @@
    2. [Validators voluntary exit](#validators-voluntary-exit)
    3. [Validators consolidation](#validators-consolidation)
    4. [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
-   5. [Automated withdrawals (Reward splitter)](#automated-withdrawals-reward-splitter)
+   5. [Automated withdrawals (Fee splitter)](#automated-withdrawals-fee-splitter)
    6. [Recover validator keystores](#recover-validator-keystores)
    7. [Max gas fee](#max-gas-fee)
    8. [Reduce Operator Service CPU load](#reduce-operator-service-cpu-load)
@@ -414,7 +414,7 @@ Operator Service has many different commands that are not mandatory but might co
 - [Validators voluntary exit](#validators-voluntary-exit)
 - [Validators consolidation](#validators-consolidation)
 - [Update Vault state (Harvest Vault)](#update-vault-state-harvest-vault)
-- [Automated withdrawals (Reward splitter)](#automated-withdrawals-reward-splitter)
+- [Automated withdrawals (Fee splitter)](#automated-withdrawals-fee-splitter)
 - [Add validator keys to Vault](#add-validator-keys-to-vault)
 - [Recover validator keystores](#recover-validator-keystores)
 - [Self report to Rated Network](#self-report-to-rated-network)
@@ -506,7 +506,7 @@ You can disable partial withdrawals using the `--disable-withdrawals` parameter.
 
 The partial withdrawals interval can be adjusted via the `PARTIAL_WITHDRAWALS_INTERVAL` env variable, with every 24 hours being the default.
 
-### Automated withdrawals (Reward splitter)
+### Automated withdrawals (Fee splitter)
 
 It is possible to periodically withdraw rewards for the vault’s fee shareholders. To enable this, set the wallet address connected to the operator as the `Fee Claimer` in the `Roles` tab under the vault’s Settings. Additionally, you must pass the `--claim-fee-splitter` flag when starting the Operator Service.
 
@@ -623,7 +623,7 @@ Key Changes:
 ### Automated rewards withdrawals
 
 It is possible to periodically withdraw rewards for the vault’s fee shareholders.
-Check for more details in [Reward splitter section](#automated-withdrawals-reward-splitter)
+Check for more details in [Fee splitter section](#automated-withdrawals-fee-splitter)
 
 ### TL;DR – Quick Setup Checklist
 

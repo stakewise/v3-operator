@@ -34,19 +34,11 @@ logger = logging.getLogger(__name__)
 
 
 @click.option(
-    '--vault',
-    help='Vault address',
-    type=str,
-    envvar='VAULT',
-    callback=validate_eth_address,
-    default='',
-)
-@click.option(
     '--remote-signer-url',
     type=str,
     envvar='REMOTE_SIGNER_URL',
-    required=True,
-    help='The base URL of the remote signer, e.g. http://signer:9000',
+    prompt='Enter the URL of the remote signer (e.g. https://signer:9000)',
+    help='The base URL of the remote signer, e.g. https://signer:9000',
 )
 @click.option(
     '--data-dir',
@@ -86,6 +78,14 @@ logger = logging.getLogger(__name__)
     is_flag=True,
 )
 @click.option(
+    '--vault',
+    help='Vault address (only needed if --dappnode flag is set).',
+    type=str,
+    envvar='VAULT',
+    callback=validate_eth_address,
+    default='',
+)
+@click.option(
     '--execution-endpoints',
     type=str,
     envvar='EXECUTION_ENDPOINTS',
@@ -105,13 +105,13 @@ logger = logging.getLogger(__name__)
 @click.command(help='Uploads private keys to a remote signer.')
 # pylint: disable-next=too-many-arguments
 def setup_remote_signer(
-    vault: ChecksumAddress | None,
     remote_signer_url: str,
     data_dir: str,
     keystores_dir: str | None,
     verbose: bool,
     log_level: str,
     dappnode: bool,
+    vault: ChecksumAddress | None,
     execution_endpoints: str,
     network: str | None,
 ) -> None:

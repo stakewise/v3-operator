@@ -209,7 +209,6 @@ async def register_new_validators(
             if not settings.disable_available_validators_warnings:
                 logger.warning(
                     'There are no available public keys '
-                    'in current keystores files'
                     'to proceed with registration. '
                     'To register additional validators, you must generate new keystores.',
                 )
