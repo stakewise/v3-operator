@@ -19,7 +19,7 @@ async def submit_withdraw_validators(
     validators_manager_signature: HexStr,
 ) -> HexStr | None:
     """Sends withdrawValidators transaction to vault contract"""
-    logger.info('Submitting withdrawValidators transaction')
+    logger.info('Submitting a withdrawal from validator(s) transaction')
     vault_contract = VaultContract(vault_address)
     try:
         tx = await vault_contract.functions.withdrawValidators(

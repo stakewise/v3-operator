@@ -152,6 +152,14 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
             validator_min_active_epochs=protocol_config.validator_min_active_epochs,
             oracle_exit_indexes={val.index for val in oracle_exiting_validators},
         )
+        if not withdrawals:
+            logger.info(
+                'No eligible validators found for withdrawal of %s Gwei',
+                queued_assets,
+            )
+            app_state.partial_withdrawal_cache[vault_address] = chain_head.block_number
+            return
+
         validators_manager_signature = HexStr('0x')
         if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
             # fetch validator manager signature from relayer
