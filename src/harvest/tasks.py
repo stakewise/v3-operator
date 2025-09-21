@@ -20,11 +20,12 @@ class HarvestTask(BaseTask):
 
         # check current gas prices
         gas_manager = build_gas_manager()
-        if not await gas_manager.check_gas_price():
-            return
         for vault_address in settings.vaults:
             harvest_params = await get_harvest_params(vault_address=vault_address)
             if not harvest_params:
+                continue
+
+            if not await gas_manager.check_gas_price():
                 return
 
             logger.info('Starting vault %s harvest', vault_address)
@@ -34,5 +35,5 @@ class HarvestTask(BaseTask):
             )
 
             if not tx_hash:
-                return
+                continue
             logger.info('Successfully harvested vault %s', vault_address)

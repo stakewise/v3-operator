@@ -43,8 +43,6 @@ class SplitRewardTask(BaseTask):
 
         # check current gas prices
         gas_manager = build_gas_manager()
-        if not await gas_manager.check_gas_price():
-            return
 
         logger.info('Fetching fee splitters')
         reward_splitters = await graph_get_reward_splitters(
@@ -86,6 +84,9 @@ class SplitRewardTask(BaseTask):
 
         if not calls:
             app_state.reward_splitter_block = block['number']
+            return
+
+        if not await gas_manager.check_gas_price():
             return
 
         logger.info('Processing fee splitter calls')
