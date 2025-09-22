@@ -53,7 +53,7 @@ from src.config.settings import DEFAULT_NETWORK, settings
     callback=validate_eth_addresses,
     envvar='VAULTS',
     prompt='Enter the comma separated list of your vault addresses',
-    help='Addresses of the vaults to register validators for.',
+    help='Addresses of the vaults to recover validators for.',
 )
 @click.option(
     '--execution-endpoints',
@@ -81,7 +81,7 @@ from src.config.settings import DEFAULT_NETWORK, settings
 )
 @click.option(
     '--start-index',
-    help='Start index for generating keystores from the mnemonic.',
+    help='Start index for recovering keystores from the mnemonic.',
     type=int,
     default=0,
 )
@@ -162,12 +162,12 @@ async def main(
     total_validators = len(validators)
     if no_confirm:
         click.secho(
-            f'Vault has {total_validators} registered validator(s), '
+            f'Vaults hava {total_validators} registered validator(s), '
             f'recovering active keystores from provided mnemonic...',
         )
     else:
         click.confirm(
-            f'Vault has {total_validators} registered validator(s), '
+            f'Vaults have {total_validators} registered validator(s), '
             f'recover active keystores from provided mnemonic?',
             default=True,
             abort=True,

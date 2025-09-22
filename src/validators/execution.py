@@ -235,7 +235,6 @@ async def scan_validators_events(block_number: BlockNumber, is_startup: bool) ->
     network_validators_scanner = EventScanner(network_validators_processor)
     await network_validators_scanner.process_new_events(block_number)
     for vault in settings.vaults:
-        logger.info('Processing validator events for vault %s', vault)
         vault_validators_processor = VaultValidatorsProcessor(vault_address=vault)
         vault_validators_scanner = EventScanner(vault_validators_processor)
         await vault_validators_scanner.process_new_events(block_number)
