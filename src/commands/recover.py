@@ -4,7 +4,7 @@ from pathlib import Path
 
 import click
 from eth_typing import ChecksumAddress, HexStr
-from eth_utils import add_0x_prefix
+from eth_utils import add_0x_prefix, to_checksum_address
 from sw_utils.consensus import EXITED_STATUSES, ValidatorStatus
 
 from src.common.clients import consensus_client, execution_client, setup_clients
@@ -13,7 +13,7 @@ from src.common.credentials import CredentialManager
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.password import generate_password, get_or_create_password_file
 from src.common.utils import greenify, log_verbose
-from src.common.validators import validate_eth_address, validate_mnemonic
+from src.common.validators import validate_eth_addresses, validate_mnemonic
 from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_NETWORK, settings
@@ -49,11 +49,11 @@ from src.config.settings import DEFAULT_NETWORK, settings
     callback=validate_mnemonic,
 )
 @click.option(
-    '--vault',
-    prompt='Enter your vault address',
-    help='Vault addresses',
-    type=str,
-    callback=validate_eth_address,
+    '--vaults',
+    callback=validate_eth_addresses,
+    envvar='VAULTS',
+    prompt='Enter the comma separated list of your vault addresses',
+    help='Addresses of the vaults to register validators for.',
 )
 @click.option(
     '--execution-endpoints',
@@ -80,6 +80,12 @@ from src.config.settings import DEFAULT_NETWORK, settings
     ),
 )
 @click.option(
+    '--start-index',
+    help='Start index for generating keystores from the mnemonic.',
+    type=int,
+    default=0,
+)
+@click.option(
     '--log-level',
     type=click.Choice(
         LOG_LEVELS,
@@ -92,15 +98,17 @@ from src.config.settings import DEFAULT_NETWORK, settings
 # pylint: disable-next=too-many-arguments
 def recover(
     data_dir: str,
-    vault: ChecksumAddress,
+    vaults: str,
     network: str,
     mnemonic: str,
     consensus_endpoints: str,
     execution_endpoints: str,
     per_keystore_password: bool,
     no_confirm: bool,
+    start_index: int,
     log_level: str,
 ) -> None:
+    vault_addresses = [to_checksum_address(address) for address in vaults.split(',')]
     # pylint: disable=duplicate-code
     operator_config = OperatorConfig(
         data_dir=Path(data_dir),
@@ -112,7 +120,7 @@ def recover(
     settings.set(
         execution_endpoints=execution_endpoints,
         consensus_endpoints=consensus_endpoints,
-        vaults=[vault],
+        vaults=vault_addresses,
         network=network,
         data_dir=operator_config.data_dir,
         log_level=log_level,
@@ -125,6 +133,7 @@ def recover(
                 per_keystore_password=per_keystore_password,
                 no_confirm=no_confirm,
                 operator_config=operator_config,
+                start_index=start_index,
             )
         )
     except Exception as e:
@@ -137,6 +146,7 @@ async def main(
     per_keystore_password: bool,
     no_confirm: bool,
     operator_config: OperatorConfig,
+    start_index: int,
 ) -> None:
     setup_logging()
     await setup_clients()
@@ -184,6 +194,7 @@ async def main(
         password_file=operator_config.keystores_password_file,
         validator_statuses=validators,
         per_keystore_password=per_keystore_password,
+        start_index=start_index,
     )
 
     operator_config.save(mnemonic, mnemonic_next_index)
@@ -222,14 +233,16 @@ async def _fetch_registered_validators(
     return validator_statuses
 
 
+# pylint: disable-next=too-many-arguments
 async def _generate_keystores(
     mnemonic: str,
     keystores_dir: Path,
     password_file: Path,
     validator_statuses: dict[HexStr, ValidatorStatus | None],
     per_keystore_password: bool,
+    start_index: int,
 ) -> int:
-    index = 0
+    index = start_index
     failed_attempts = 0
 
     validators_count = len(validator_statuses)
