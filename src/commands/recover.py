@@ -162,7 +162,7 @@ async def main(
     total_validators = len(validators)
     if no_confirm:
         click.secho(
-            f'Vaults hava {total_validators} registered validator(s), '
+            f'Vaults have {total_validators} registered validator(s), '
             f'recovering active keystores from provided mnemonic...',
         )
     else:
