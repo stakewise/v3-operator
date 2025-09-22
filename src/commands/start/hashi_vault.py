@@ -18,17 +18,20 @@ logger = logging.getLogger(__name__)
 @click.option(
     '--hashi-vault-url',
     envvar='HASHI_VAULT_URL',
-    help='The base URL of the vault service, e.g. http://vault:8200.',
+    help='The base URL of the Hashi vault, e.g. https://vault:8200.',
+    prompt='Enter the base URL of the Hashi vault (e.g. https://vault:8200)',
 )
 @click.option(
     '--hashi-vault-token',
     envvar='HASHI_VAULT_TOKEN',
     help='Authentication token for accessing Hashi vault.',
+    prompt='Enter the authentication token for accessing Hashi vault',
 )
 @click.option(
     '--hashi-vault-key-path',
     envvar='HASHI_VAULT_KEY_PATH',
     multiple=True,
+    required=True,
     help='Key path(s) in the K/V secret engine where validator signing keys are stored.',
 )
 @click.option(

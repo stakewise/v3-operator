@@ -19,7 +19,8 @@ logger = logging.getLogger(__name__)
     '--remote-signer-url',
     type=str,
     envvar='REMOTE_SIGNER_URL',
-    help='The base URL of the remote signer, e.g. http://signer:9000',
+    help='The base URL of the remote signer, e.g. https://signer:9000',
+    prompt='Enter the base URL of the remote signer (e.g. https://signer:9000)',
 )
 @add_common_options(start_common_options)
 @click.command(help='Start operator service with the remote signer integration.')

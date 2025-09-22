@@ -376,8 +376,8 @@ async def check_validators_manager(vault_address: ChecksumAddress) -> None:
     validators_manager = await vault_contract.validators_manager()
     if validators_manager != wallet.account.address:
         raise RuntimeError(
-            f'The Validators Manager role must be assigned to the address {wallet.account.address}.'
-            f' Please update it in the vault settings.'
+            f'The Validators Manager role must be assigned to the address {wallet.account.address}'
+            f' for the vault {vault_address}. Please update it in the vault settings.'
         )
 
 
@@ -387,7 +387,7 @@ async def check_vault_version() -> None:
         if await vault_contract.version() < get_pectra_vault_version(
             settings.network, vault_address
         ):
-            raise RuntimeError('Please upgrade your Vault to the latest version.')
+            raise RuntimeError(f'Please upgrade Vault {vault_address} to the latest version.')
 
 
 async def _check_events_logs() -> None:
@@ -427,4 +427,4 @@ async def _check_vault_address(vault_address: ChecksumAddress) -> None:
     try:
         await VaultContract(address=vault_address).version()
     except BadFunctionCallOutput as e:
-        raise click.ClickException('Invalid vault contract address') from e
+        raise click.ClickException(f'Invalid vault contract address {vault_address}') from e
