@@ -53,19 +53,16 @@ class OperatorConfig:
         if network:
             self.network = network
         else:
-            # trying to guess network from root_dir
-            dirs = [f for f in self.root_dir.iterdir() if f.is_dir()]
-            # if there is only one network directory, use it
-            network_directory_names = [d.name for d in dirs if d.name in AVAILABLE_NETWORKS]
-            if len(dirs) and len(network_directory_names) == 1:
-                self.network = network_directory_names[0]
             # if there is vault directory from single setup, trying to migrate to multivault
-            elif len(dirs) and any(d.name.startswith('0x') for d in dirs):
+            dirs = [f for f in self.root_dir.iterdir() if f.is_dir()]
+            if len(dirs) and any(d.name.startswith('0x') for d in dirs):
                 raise OperatorConfigException(
-                    'Specify the `network` parameter', can_be_migrated=True
+                    'Config for selected network does not exist. Please run "init" command.',
+                    can_be_migrated=True,
                 )
-            else:
-                raise OperatorConfigException('Specify the `network` parameter')
+            raise OperatorConfigException(
+                'Config for selected network does not exist. Please run "init" command.'
+            )
 
         if self.config_path.is_file():
             with self.config_path.open('r') as f:

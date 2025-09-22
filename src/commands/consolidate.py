@@ -21,6 +21,7 @@ from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import log_verbose
 from src.common.validators import (
     validate_eth_address,
+    validate_network,
     validate_public_key,
     validate_public_keys,
     validate_public_keys_file,
@@ -50,6 +51,7 @@ logger = logging.getLogger(__name__)
     ),
     envvar='NETWORK',
     help='The network of the vault. Default is the network specified at "init" command.',
+    callback=validate_network,
 )
 @click.option(
     '--data-dir',

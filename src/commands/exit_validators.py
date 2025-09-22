@@ -15,7 +15,11 @@ from src.common.execution import get_execution_request_fee
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.startup_check import check_validators_manager, check_vault_version
 from src.common.utils import log_verbose
-from src.common.validators import validate_eth_address, validate_indexes
+from src.common.validators import (
+    validate_eth_address,
+    validate_indexes,
+    validate_network,
+)
 from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import MAX_WITHDRAWAL_REQUEST_FEE, settings
@@ -35,6 +39,7 @@ logger = logging.getLogger(__name__)
     ),
     envvar='NETWORK',
     help='The network of the vault. Default is the network specified at "init" command.',
+    callback=validate_network,
 )
 @click.option(
     '--data-dir',

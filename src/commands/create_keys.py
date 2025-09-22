@@ -6,7 +6,7 @@ import click
 from src.common.credentials import Credential, CredentialManager
 from src.common.password import generate_password, get_or_create_password_file
 from src.common.utils import greenify
-from src.common.validators import validate_mnemonic
+from src.common.validators import validate_mnemonic, validate_network
 from src.config.config import OperatorConfig, OperatorConfigException
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import settings
@@ -53,6 +53,7 @@ from src.config.settings import settings
         AVAILABLE_NETWORKS,
         case_sensitive=False,
     ),
+    callback=validate_network,
 )
 @click.command(help='Creates the validator keys from the mnemonic.')
 # pylint: disable-next=too-many-arguments

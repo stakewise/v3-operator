@@ -8,7 +8,7 @@ from eth_typing import ChecksumAddress
 
 from src.common.password import get_or_create_password_file
 from src.common.utils import greenify
-from src.common.validators import validate_mnemonic
+from src.common.validators import validate_mnemonic, validate_network
 from src.config.config import OperatorConfig, OperatorConfigException
 from src.config.networks import AVAILABLE_NETWORKS
 
@@ -35,6 +35,7 @@ from src.config.networks import AVAILABLE_NETWORKS
         AVAILABLE_NETWORKS,
         case_sensitive=False,
     ),
+    callback=validate_network,
 )
 @click.command(help='Creates the encrypted wallet from the mnemonic.')
 def create_wallet(mnemonic: str, data_dir: str, network: str | None) -> None:
