@@ -2,16 +2,22 @@ from multiprocessing import Pool
 from pathlib import Path
 
 import click
+from eth_typing import ChecksumAddress
 
 from src.common.credentials import Credential, CredentialManager
 from src.common.password import generate_password, get_or_create_password_file
 from src.common.utils import greenify
-from src.common.validators import validate_mnemonic, validate_network
-from src.config.config import OperatorConfig, OperatorConfigException
-from src.config.networks import AVAILABLE_NETWORKS
-from src.config.settings import settings
+from src.common.validators import validate_eth_address, validate_mnemonic
+from src.config.config import OperatorConfig
 
 
+@click.option(
+    '--vault',
+    help='The address of the vault.',
+    prompt='Enter the vault address',
+    type=str,
+    callback=validate_eth_address,
+)
 @click.option(
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
@@ -46,35 +52,18 @@ from src.config.settings import settings
     envvar='CONCURRENCY',
     type=int,
 )
-@click.option(
-    '--network',
-    help='The network of your vault. Default is the network specified at "init" command.',
-    type=click.Choice(
-        AVAILABLE_NETWORKS,
-        case_sensitive=False,
-    ),
-    callback=validate_network,
-)
 @click.command(help='Creates the validator keys from the mnemonic.')
 # pylint: disable-next=too-many-arguments
 def create_keys(
+    vault: ChecksumAddress,
     mnemonic: str,
     count: int,
     data_dir: str,
     per_keystore_password: bool,
     concurrency: int | None,
-    network: str | None,
 ) -> None:
-    try:
-        operator_config = OperatorConfig(Path(data_dir))
-        operator_config.load(network, mnemonic)
-    except OperatorConfigException as e:
-        raise click.ClickException(str(e))
-    settings.set(
-        vaults=[],
-        network=operator_config.network,
-        data_dir=operator_config.data_dir,
-    )
+    operator_config = OperatorConfig(vault, Path(data_dir))
+    operator_config.load(mnemonic)
 
     credentials = CredentialManager.generate_credentials(
         network=operator_config.network,
@@ -86,7 +75,7 @@ def create_keys(
 
     # first generate files in tmp directory
     operator_config.create_tmp_dir()
-    tmp_keystores_dir = operator_config.tmp_data_dir / 'keystores'
+    tmp_keystores_dir = operator_config.tmp_vault_dir / 'keystores'
     try:
         _export_keystores(
             credentials=credentials,

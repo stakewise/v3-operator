@@ -19,7 +19,6 @@ class NetworkValidator:
 
 @dataclass
 class VaultValidator:
-    vault_address: HexStr
     public_key: HexStr
     block_number: BlockNumber
 

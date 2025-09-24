@@ -36,8 +36,8 @@ class ValidatorsRegistrationMode(Enum):
 
 # pylint: disable-next=too-many-public-methods,too-many-instance-attributes
 class Settings(metaclass=Singleton):
-    vaults: list[ChecksumAddress]
-    data_dir: Path
+    vault: ChecksumAddress
+    vault_dir: Path
     network: str
     consensus_endpoints: list[str]
     consensus_timeout: int
@@ -118,8 +118,8 @@ class Settings(metaclass=Singleton):
     # pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements
     def set(
         self,
-        vaults: list[ChecksumAddress],
-        data_dir: Path,
+        vault: ChecksumAddress,
+        vault_dir: Path,
         network: str,
         consensus_endpoints: str = '',
         execution_endpoints: str = '',
@@ -156,9 +156,9 @@ class Settings(metaclass=Singleton):
         min_deposit_amount_gwei: Gwei = DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
         min_deposit_delay: int = DEFAULT_MIN_DEPOSIT_DELAY,
     ) -> None:
-        self.vaults = vaults
-        data_dir.mkdir(parents=True, exist_ok=True)
-        self.data_dir = data_dir
+        self.vault = vault
+        vault_dir.mkdir(parents=True, exist_ok=True)
+        self.vault_dir = vault_dir
         self.network = network
 
         self.consensus_endpoints = [node.strip() for node in consensus_endpoints.split(',')]
@@ -183,16 +183,16 @@ class Settings(metaclass=Singleton):
         self.min_deposit_delay = min_deposit_delay
 
         # keystores
-        self.keystores_dir = Path(keystores_dir) if keystores_dir else data_dir / 'keystores'
+        self.keystores_dir = Path(keystores_dir) if keystores_dir else vault_dir / 'keystores'
         self.keystores_password_dir = decouple_config(
             'KEYSTORES_PASSWORD_DIR',
             cast=Path,
-            default=data_dir / 'keystores',
+            default=vault_dir / 'keystores',
         )
         self.keystores_password_file = (
             Path(keystores_password_file)
             if keystores_password_file
-            else data_dir / 'keystores' / 'password.txt'
+            else vault_dir / 'keystores' / 'password.txt'
         )
 
         # remote signer configuration
@@ -215,14 +215,16 @@ class Settings(metaclass=Singleton):
         self.hashi_vault_parallelism = hashi_vault_parallelism
 
         # wallet
-        self.wallet_file = Path(wallet_file) if wallet_file else data_dir / 'wallet' / 'wallet.json'
+        self.wallet_file = (
+            Path(wallet_file) if wallet_file else vault_dir / 'wallet' / 'wallet.json'
+        )
         self.wallet_password_file = (
             Path(wallet_password_file)
             if wallet_password_file
-            else data_dir / 'wallet' / 'password.txt'
+            else vault_dir / 'wallet' / 'password.txt'
         )
 
-        db_dir = Path(database_dir) if database_dir else data_dir
+        db_dir = Path(database_dir) if database_dir else vault_dir
         self.database = db_dir / 'operator.db'
 
         self.log_level = log_level or 'INFO'

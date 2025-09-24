@@ -46,7 +46,7 @@ class SplitRewardTask(BaseTask):
 
         logger.info('Fetching fee splitters')
         reward_splitters = await graph_get_reward_splitters(
-            block_number=block['number'], claimer=wallet.account.address, vaults=settings.vaults
+            block_number=block['number'], claimer=wallet.account.address, vault=settings.vault
         )
 
         if not reward_splitters:
@@ -66,9 +66,7 @@ class SplitRewardTask(BaseTask):
                 reward_splitter.address,
                 reward_splitter.vault,
             )
-            vault = reward_splitter.vault
-
-            harvest_params = await get_harvest_params(vault)
+            harvest_params = await get_harvest_params()
             exit_requests = splitter_to_exit_requests.get(reward_splitter.address, [])  # nosec
 
             reward_splitter_calls = await _get_reward_splitter_calls(

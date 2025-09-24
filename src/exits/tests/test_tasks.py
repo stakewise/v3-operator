@@ -48,7 +48,7 @@ class TestGetOraclesRequest:
 
     async def test_remote_signer(
         self,
-        config_dir: Path,
+        vault_dir: Path,
         vault_address: ChecksumAddress,
         mocked_protocol_config: ProtocolConfig,
         remote_signer_keystore: RemoteSignerKeystore,
@@ -89,13 +89,13 @@ class TestGetOraclesRequest:
 class TestFetchLastExitSignatureUpdateBlock:
     async def test_normal(self):
         get_event_func = 'src.exits.tasks.keeper_contract.get_exit_signatures_updated_event'
-        vault_address = settings.vaults[0]
+        vault_address = settings.vault
         # no events, checkpoint moved from None to 8
         with (
             mock.patch(get_event_func, return_value=None) as get_event_mock,
             patch_latest_block(8),
         ):
-            last_update_block = await _fetch_last_update_block(vault_address)
+            last_update_block = await _fetch_last_update_block()
 
         assert last_update_block is None
         get_event_mock.assert_called_once_with(vault=vault_address, from_block=None, to_block=8)
@@ -105,7 +105,7 @@ class TestFetchLastExitSignatureUpdateBlock:
             mock.patch(get_event_func, return_value=None) as get_event_mock,
             patch_latest_block(9),
         ):
-            last_update_block = await _fetch_last_update_block(vault_address)
+            last_update_block = await _fetch_last_update_block()
 
         assert last_update_block is None
         get_event_mock.assert_called_once_with(vault=vault_address, from_block=9, to_block=9)
@@ -115,7 +115,7 @@ class TestFetchLastExitSignatureUpdateBlock:
             mock.patch(get_event_func, return_value=dict(blockNumber=11)) as get_event_mock,
             patch_latest_block(15),
         ):
-            last_update_block = await _fetch_last_update_block(vault_address)
+            last_update_block = await _fetch_last_update_block()
 
         assert last_update_block == 11
         get_event_mock.assert_called_once_with(vault=vault_address, from_block=10, to_block=15)
@@ -125,7 +125,7 @@ class TestFetchLastExitSignatureUpdateBlock:
             mock.patch(get_event_func, return_value=None) as get_event_mock,
             patch_latest_block(20),
         ):
-            last_update_block = await _fetch_last_update_block(vault_address)
+            last_update_block = await _fetch_last_update_block()
 
         assert last_update_block == 11
         get_event_mock.assert_called_once_with(vault=vault_address, from_block=16, to_block=20)

@@ -20,10 +20,8 @@ from src.common.utils import log_verbose
 from src.common.validators import (
     validate_dappnode_execution_endpoints,
     validate_eth_address,
-    validate_network,
 )
-from src.config.config import OperatorConfig, OperatorConfigException
-from src.config.networks import AVAILABLE_NETWORKS
+from src.config.config import OperatorConfig
 from src.config.settings import (
     REMOTE_SIGNER_TIMEOUT,
     REMOTE_SIGNER_UPLOAD_CHUNK_SIZE,
@@ -84,7 +82,6 @@ logger = logging.getLogger(__name__)
     type=str,
     envvar='VAULT',
     callback=validate_eth_address,
-    default='',
 )
 @click.option(
     '--execution-endpoints',
@@ -95,15 +92,6 @@ logger = logging.getLogger(__name__)
     callback=validate_dappnode_execution_endpoints,
     default='',
 )
-@click.option(
-    '--network',
-    help='The network of your vault. Default is the network specified at "init" command.',
-    type=click.Choice(
-        AVAILABLE_NETWORKS,
-        case_sensitive=False,
-    ),
-    callback=validate_network,
-)
 @click.command(help='Uploads private keys to a remote signer.')
 # pylint: disable-next=too-many-arguments
 def setup_remote_signer(
@@ -113,21 +101,17 @@ def setup_remote_signer(
     verbose: bool,
     log_level: str,
     dappnode: bool,
-    vault: ChecksumAddress | None,
+    vault: ChecksumAddress,
     execution_endpoints: str,
-    network: str | None,
 ) -> None:
     if dappnode and not vault:
         raise click.ClickException('Enter your vault address for dappnode setup.')
 
-    try:
-        config = OperatorConfig(Path(data_dir))
-        config.load(network=network)
-    except OperatorConfigException as e:
-        raise click.ClickException(str(e))
+    config = OperatorConfig(vault, Path(data_dir))
+    config.load()
     settings.set(
-        vaults=[],
-        data_dir=config.data_dir,
+        vault=vault,
+        vault_dir=config.vault_dir,
         network=config.network,
         keystores_dir=keystores_dir,
         remote_signer_url=remote_signer_url,

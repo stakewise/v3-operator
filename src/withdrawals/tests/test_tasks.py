@@ -141,7 +141,7 @@ def test_get_partial_withdrawals():
 
 @pytest.mark.asyncio
 async def test_get_withdrawals(data_dir):
-    settings.set(vaults=[], data_dir=data_dir, network=HOODI)
+    settings.set(vault=None, vault_dir=data_dir, network=HOODI)
 
     # correct partial withdrawals when capacity is sufficient
     chain_head = create_chain_head(epoch=500)

@@ -7,8 +7,8 @@ from eth_typing import ChecksumAddress
 from gql import gql
 
 from src.common.clients import graph_client
-from src.common.validators import validate_eth_addresses
-from src.config.config import OperatorConfig, OperatorConfigException
+from src.common.validators import validate_eth_address
+from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS, NETWORKS, RATED_NETWORKS
 from src.config.settings import DEFAULT_NETWORK, settings
 
@@ -21,11 +21,11 @@ from src.config.settings import DEFAULT_NETWORK, settings
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
 )
 @click.option(
-    '--vaults',
-    prompt='Enter the comma separated list of your vault addresses',
+    '--vault',
+    prompt='Enter your vault address',
     help='The vault addresses.',
     type=str,
-    callback=validate_eth_addresses,
+    callback=validate_eth_address,
 )
 @click.option(
     '--network',
@@ -52,7 +52,7 @@ from src.config.settings import DEFAULT_NETWORK, settings
 )
 @click.command(help='Submit your validators to the Rated Network.')
 def submit_rated_network(
-    vaults: list[ChecksumAddress],
+    vault: ChecksumAddress,
     network: str,
     pool_tag: str,
     token: str,
@@ -62,23 +62,18 @@ def submit_rated_network(
         click.secho(f'{network} network is not yet rated supported')
         return
 
-    try:
-        operator_config = OperatorConfig(Path(data_dir))
-        operator_config.load(network=network)
-    except OperatorConfigException as e:
-        raise click.ClickException(str(e))
-
+    operator_config = OperatorConfig(vault, Path(data_dir))
+    operator_config.load()
     settings.set(
-        vaults=vaults,
-        data_dir=operator_config.data_dir,
+        vault=vault,
+        vault_dir=operator_config.vault_dir,
         network=network,
         execution_endpoints='',
         consensus_endpoints='',
         graph_endpoint=NETWORKS[network].STAKEWISE_API_URL,
     )
     click.secho('Starting rated self report...')
-    for vault in vaults:
-        asyncio.run(_report_validators(vault, pool_tag, token, network))
+    asyncio.run(_report_validators(vault, pool_tag, token, network))
 
 
 async def _report_validators(

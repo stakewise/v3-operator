@@ -1,8 +1,10 @@
 from pathlib import Path
 
 import click
+from eth_typing import ChecksumAddress
 
 from src.common.language import LANGUAGES, create_new_mnemonic
+from src.common.validators import validate_eth_address
 from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_NETWORK
@@ -30,6 +32,13 @@ from src.config.settings import DEFAULT_NETWORK
     ),
 )
 @click.option(
+    '--vault',
+    prompt='Enter your vault address',
+    help='The vault address.',
+    type=str,
+    callback=validate_eth_address,
+)
+@click.option(
     '--network',
     default=DEFAULT_NETWORK,
     help='The network of your vault.',
@@ -43,15 +52,16 @@ from src.config.settings import DEFAULT_NETWORK
 def init(
     language: str,
     no_verify: bool,
+    vault: ChecksumAddress,
     network: str,
     data_dir: str,
 ) -> None:
     config = OperatorConfig(
+        vault=vault,
         data_dir=Path(data_dir),
-        network=network,
     )
     if config.config_path.is_file():
-        raise click.ClickException(f'Config directory {config.data_dir} already exists.')
+        raise click.ClickException(f'Config directory {config.vault_dir} already exists.')
 
     if not language:
         language = click.prompt(
@@ -61,7 +71,7 @@ def init(
         )
     mnemonic = create_new_mnemonic(language, skip_test=no_verify)
 
-    config.save(mnemonic)
+    config.save(network, mnemonic)
     if not no_verify:
         click.secho(
             'Successfully initialized configuration for StakeWise operator', bold=True, fg='green'
