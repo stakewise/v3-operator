@@ -18,7 +18,7 @@ async def graph_get_reward_splitters(
 ) -> list[RewardSplitter]:
     query = gql(
         '''
-        query Query($block: Int, $first: Int, $skip: Int, $claimer: Bytes, $vaults: [String]) {
+        query Query($block: Int, $first: Int, $skip: Int, $claimer: Bytes, $vault: String) {
             rewardSplitters(
                 block: {number: $block},
                 where: {
