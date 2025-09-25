@@ -11,11 +11,14 @@ mnemonic = ' '.join([faker.word().lower() for x in range(24)])
 @patch('src.common.language.get_mnemonic', return_value=mnemonic)
 class TestCreateMnemonic:
     def test_basic(self, mnemonic_mock, data_dir, runner: CliRunner):
+        vault = faker.eth_address()
         args = [
             '--data-dir',
             str(data_dir),
             '--language',
             'english',
+            '--vault',
+            vault,
             '--network',
             'hoodi',
         ]
@@ -26,11 +29,15 @@ class TestCreateMnemonic:
         assert 'Successfully initialized configuration' in result.output.strip()
 
     def test_bad_verify(self, mnemonic_mock, data_dir, runner: CliRunner):
+        vault = faker.eth_address()
+
         args = [
             '--data-dir',
             str(data_dir),
             '--language',
             'english',
+            '--vault',
+            vault,
             '--network',
             'hoodi',
         ]
@@ -41,11 +48,15 @@ class TestCreateMnemonic:
         assert 'Successfully initialized configuration' in result.output.strip()
 
     def test_no_verify(self, mnemonic_mock, data_dir, runner: CliRunner):
+        vault = faker.eth_address()
+
         args = [
             '--data-dir',
             str(data_dir),
             '--language',
             'english',
+            '--vault',
+            vault,
             '--no-verify',
             '--network',
             'hoodi',

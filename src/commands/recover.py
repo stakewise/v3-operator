@@ -51,7 +51,7 @@ from src.config.settings import DEFAULT_NETWORK, settings
 @click.option(
     '--vault',
     prompt='Enter your vault address',
-    help='Vault addresses',
+    help='Vault address',
     type=str,
     callback=validate_eth_address,
 )
@@ -103,18 +103,18 @@ def recover(
 ) -> None:
     # pylint: disable=duplicate-code
     operator_config = OperatorConfig(
-        data_dir=Path(data_dir),
-        network=network,
+        vault,
+        Path(data_dir),
     )
     if operator_config.config_path.is_file():
-        raise click.ClickException(f'Config directory {operator_config.data_dir} already exists.')
+        raise click.ClickException(f'Config directory {operator_config.vault_dir} already exists.')
 
     settings.set(
         execution_endpoints=execution_endpoints,
         consensus_endpoints=consensus_endpoints,
-        vaults=[vault],
+        vault=vault,
         network=network,
-        data_dir=operator_config.data_dir,
+        vault_dir=operator_config.vault_dir,
         log_level=log_level,
     )
 
@@ -141,10 +141,9 @@ async def main(
     setup_logging()
     await setup_clients()
 
-    validators: dict[HexStr, ValidatorStatus | None] = {}
-    for vault in settings.vaults:
-        vault_validators = await _fetch_registered_validators(vault)
-        validators.update(vault_validators)
+    validators: dict[HexStr, ValidatorStatus | None] = await _fetch_registered_validators(
+        settings.vault
+    )
 
     if not validators:
         raise click.ClickException('No registered validators')
@@ -186,10 +185,10 @@ async def main(
         per_keystore_password=per_keystore_password,
     )
 
-    operator_config.save(mnemonic, mnemonic_next_index)
+    operator_config.save(settings.network, mnemonic, mnemonic_next_index)
     click.secho(
         f'Successfully recovered {greenify(mnemonic_next_index)} '
-        f'keystores for vaults {greenify(', '.join(settings.vaults))}',
+        f'keystores for vault {greenify(settings.vault)}',
     )
 
 

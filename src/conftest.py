@@ -47,8 +47,19 @@ def data_dir(temp_dir: Path) -> Path:
 
 
 @pytest.fixture
-def keystores_dir(config_dir: Path, _init_config) -> Path:
-    keystores_dir = config_dir / 'keystores'
+def vault_address() -> HexAddress:
+    return faker.eth_address()
+
+
+@pytest.fixture
+def vault_dir(data_dir: Path, vault_address: HexAddress) -> Path:
+    vault_dir = data_dir / vault_address.lower()
+    return vault_dir
+
+
+@pytest.fixture
+def keystores_dir(vault_dir: Path, _init_config) -> Path:
+    keystores_dir = vault_dir / 'keystores'
     keystores_dir.mkdir(exist_ok=True)
     return keystores_dir
 
@@ -72,9 +83,9 @@ def test_mnemonic() -> str:
 
 
 @pytest.fixture
-def _init_config(data_dir: Path, test_mnemonic: str) -> None:
-    config = OperatorConfig(data_dir=data_dir, network=HOODI)
-    config.save(test_mnemonic)
+def _init_config(vault_address: HexAddress, data_dir: Path, test_mnemonic: str) -> None:
+    config = OperatorConfig(vault=vault_address, data_dir=data_dir)
+    config.save(HOODI, test_mnemonic)
 
 
 @pytest.fixture
@@ -85,6 +96,7 @@ def runner() -> CliRunner:
 @pytest.fixture
 def _create_keys(
     test_mnemonic: str,
+    vault_address: HexAddress,
     data_dir: Path,
     _test_keystore_password_file: Path,
     runner: CliRunner,
@@ -98,6 +110,8 @@ def _create_keys(
             f'"{test_mnemonic}"',
             '--count',
             str(count),
+            '--vault',
+            str(vault_address),
             '--data-dir',
             str(data_dir),
             '--concurrency',
@@ -108,12 +122,16 @@ def _create_keys(
 
 
 @pytest.fixture
-def _create_wallet(data_dir: Path, test_mnemonic: str, runner: CliRunner) -> None:
+def _create_wallet(
+    vault_address: HexAddress, data_dir: Path, test_mnemonic: str, runner: CliRunner
+) -> None:
     result = runner.invoke(
         create_wallet,
         [
             '--mnemonic',
             f'"{test_mnemonic}"',
+            '--vault',
+            str(vault_address),
             '--data-dir',
             str(data_dir),
         ],
@@ -123,6 +141,7 @@ def _create_wallet(data_dir: Path, test_mnemonic: str, runner: CliRunner) -> Non
 
 @pytest.fixture
 def _setup_remote_signer(
+    vault_address: HexAddress,
     data_dir: Path,
     keystores_dir: Path,
     remote_signer_url: str,
@@ -135,6 +154,8 @@ def _setup_remote_signer(
     result = runner.invoke(
         setup_remote_signer,
         [
+            '--vault',
+            str(vault_address),
             '--remote-signer-url',
             remote_signer_url,
             '--data-dir',
@@ -155,10 +176,10 @@ def vault_address() -> HexAddress:
     return faker.eth_address()
 
 
-@pytest.fixture
-def config_dir(data_dir: Path) -> Path:
-    config_dir = data_dir / HOODI
-    return config_dir
+# @pytest.fixture
+# def config_dir(data_dir: Path) -> Path:
+#     config_dir = data_dir / HOODI
+#     return config_dir
 
 
 @pytest.fixture
@@ -174,15 +195,15 @@ def execution_endpoints() -> str:
 @pytest.fixture
 def fake_settings(
     data_dir: Path,
-    config_dir: Path,
+    vault_dir: Path,
     keystores_dir: Path,
     vault_address: HexAddress,
     consensus_endpoints: str,
     execution_endpoints: str,
 ):
     settings.set(
-        vaults=[vault_address],
-        data_dir=config_dir,
+        vault=vault_address,
+        vault_dir=vault_dir,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
         network=HOODI,

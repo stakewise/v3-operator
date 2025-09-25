@@ -15,13 +15,8 @@ from src.common.execution import get_execution_request_fee
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.startup_check import check_validators_manager, check_vault_version
 from src.common.utils import log_verbose
-from src.common.validators import (
-    validate_eth_address,
-    validate_indexes,
-    validate_network,
-)
+from src.common.validators import validate_eth_address, validate_indexes
 from src.config.config import OperatorConfig
-from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import MAX_WITHDRAWAL_REQUEST_FEE, settings
 from src.validators.consensus import EXITING_STATUSES, fetch_consensus_validators
 from src.validators.relayer import RelayerClient
@@ -31,16 +26,6 @@ from src.withdrawals.execution import submit_withdraw_validators
 logger = logging.getLogger(__name__)
 
 
-@click.option(
-    '--network',
-    type=click.Choice(
-        AVAILABLE_NETWORKS,
-        case_sensitive=False,
-    ),
-    envvar='NETWORK',
-    help='The network of the vault. Default is the network specified at "init" command.',
-    callback=validate_network,
-)
 @click.option(
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
@@ -112,7 +97,6 @@ logger = logging.getLogger(__name__)
 @click.command(help='Performs a voluntary exit for active vault validators.')
 # pylint: disable-next=too-many-arguments
 def exit_validators(
-    network: str,
     vault: ChecksumAddress,
     indexes: list[int],
     count: int | None,
@@ -130,13 +114,13 @@ def exit_validators(
     """
     if all([indexes, count]):
         raise click.ClickException('Please provide either --indexes or --count, not both.')
-    operator_config = OperatorConfig(Path(data_dir))
-    operator_config.load(network=network)
+    operator_config = OperatorConfig(vault, Path(data_dir))
+    operator_config.load()
 
     settings.set(
-        vaults=[vault],
-        network=network,
-        data_dir=operator_config.data_dir,
+        vault=vault,
+        vault_dir=operator_config.vault_dir,
+        network=operator_config.network,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
         relayer_endpoint=relayer_endpoint,
@@ -185,7 +169,7 @@ async def main(
     await setup_clients()
 
     await check_vault_version()
-    await check_validators_manager(vault_address)
+    await check_validators_manager()
 
     withdrawal_request_fee = await get_execution_request_fee(
         settings.network_config.WITHDRAWAL_CONTRACT_ADDRESS,
@@ -228,11 +212,8 @@ async def main(
             abort=True,
         )
     withdrawals = {val.public_key: Gwei(0) for val in active_validators}
-    validators_manager_signature = await get_validators_manager_signature(
-        vault_address, withdrawals
-    )
+    validators_manager_signature = await get_validators_manager_signature(withdrawals)
     tx_hash = await submit_withdraw_validators(
-        vault_address=vault_address,
         withdrawals=withdrawals,
         tx_fee=withdrawal_request_fee,
         validators_manager_signature=validators_manager_signature,
@@ -288,15 +269,12 @@ async def _check_exiting_validators(
     return consensus_validators
 
 
-async def get_validators_manager_signature(
-    vault_address: ChecksumAddress, withdrawals: dict[HexStr, Gwei]
-) -> HexStr:
+async def get_validators_manager_signature(withdrawals: dict[HexStr, Gwei]) -> HexStr:
     if not settings.relayer_endpoint:
         return HexStr('0x')
     relayer = RelayerClient()
     # fetch validator manager signature from relayer
     relayer_response = await relayer.withdraw_validators(
-        vault_address=vault_address,
         withdrawals=withdrawals,
     )
     if not relayer_response.validators_manager_signature:

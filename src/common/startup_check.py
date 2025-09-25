@@ -6,7 +6,6 @@ from os import path
 
 import click
 from aiohttp import ClientSession, ClientTimeout
-from eth_typing import ChecksumAddress
 from gql import gql
 from sw_utils import IpfsFetchClient, get_consensus_client, get_execution_client
 from sw_utils.graph.client import GraphClient as SWGraphClient
@@ -64,23 +63,20 @@ async def startup_checks() -> None:
     logger.info('Checking oracles config...')
     await _check_events_logs()
 
-    for vault_address in settings.vaults:
-        logger.info('Checking vault address %s...', vault_address)
-        await _check_vault_address(vault_address)
+    logger.info('Checking vault address %s...', settings.vault)
+    await _check_vault_address()
 
-        harvest_params = await get_harvest_params(vault_address=vault_address)
-        withdrawable_assets = await get_withdrawable_assets(
-            harvest_params=harvest_params, vault_address=vault_address
-        )
+    harvest_params = await get_harvest_params()
+    withdrawable_assets = await get_withdrawable_assets(harvest_params=harvest_params)
 
-        # Note. We round down assets in the log message because of the case when assets
-        # is slightly less than required amount to register validator.
-        # Standard rounding will show that we have enough assets, but in fact we don't.
-        logger.info(
-            'Vault withdrawable assets: %s %s',
-            round_down(Web3.from_wei(withdrawable_assets, 'ether'), 2),
-            settings.network_config.VAULT_BALANCE_SYMBOL,
-        )
+    # Note. We round down assets in the log message because of the case when assets
+    # is slightly less than required amount to register validator.
+    # Standard rounding will show that we have enough assets, but in fact we don't.
+    logger.info(
+        'Vault withdrawable assets: %s %s',
+        round_down(Web3.from_wei(withdrawable_assets, 'ether'), 2),
+        settings.network_config.VAULT_BALANCE_SYMBOL,
+    )
 
     logger.info('Checking wallet balance %s...', wallet.address)
     await check_wallet_balance()
@@ -108,8 +104,7 @@ async def startup_checks() -> None:
         wait_for_keystores_dir()
         logger.info('Found keystores dir')
 
-    for vault_address in settings.vaults:
-        await check_validators_manager(vault_address)
+    await check_validators_manager()
 
     if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
         logger.info('Checking Relayer endpoint %s...', settings.relayer_endpoint)
@@ -317,7 +312,7 @@ async def _check_consensus_nodes_network() -> None:
         if settings.network_config.CHAIN_ID != consensus_chain_id:
             raise ValueError(
                 f'Consensus node network is {consensus_network or 'unknown'}, '
-                f'while {settings.network} is passed in "--network" parameter'
+                f'while {settings.network} is set in the vault config.'
             )
 
 
@@ -337,7 +332,7 @@ async def _check_execution_nodes_network() -> None:
         if settings.network_config.CHAIN_ID != execution_chain_id:
             raise ValueError(
                 f'Execution node network is {execution_network or 'unknown'}, '
-                f'while {settings.network} is passed in "--network" parameter'
+                f'while {settings.network}  is set in the vault config.'
             )
 
 
@@ -369,25 +364,22 @@ async def _check_ipfs_endpoints() -> list[str]:
     return healthy_ipfs_endpoints
 
 
-async def check_validators_manager(vault_address: ChecksumAddress) -> None:
+async def check_validators_manager() -> None:
     if settings.validators_registration_mode != ValidatorsRegistrationMode.AUTO:
         return
-    vault_contract = VaultContract(vault_address)
+    vault_contract = VaultContract(settings.vault)
     validators_manager = await vault_contract.validators_manager()
     if validators_manager != wallet.account.address:
         raise RuntimeError(
             f'The Validators Manager role must be assigned to the address {wallet.account.address}'
-            f' for the vault {vault_address}. Please update it in the vault settings.'
+            f' for the vault {settings.vault}. Please update it in the vault settings.'
         )
 
 
 async def check_vault_version() -> None:
-    for vault_address in settings.vaults:
-        vault_contract = VaultContract(vault_address)
-        if await vault_contract.version() < get_pectra_vault_version(
-            settings.network, vault_address
-        ):
-            raise RuntimeError(f'Please upgrade Vault {vault_address} to the latest version.')
+    vault_contract = VaultContract(settings.vault)
+    if await vault_contract.version() < get_pectra_vault_version(settings.network, settings.vault):
+        raise RuntimeError(f'Please upgrade Vault {settings.vault} to the latest version.')
 
 
 async def _check_events_logs() -> None:
@@ -423,8 +415,8 @@ async def _check_relayer_endpoint() -> None:
         )
 
 
-async def _check_vault_address(vault_address: ChecksumAddress) -> None:
+async def _check_vault_address() -> None:
     try:
-        await VaultContract(address=vault_address).version()
+        await VaultContract(address=settings.vault).version()
     except BadFunctionCallOutput as e:
-        raise click.ClickException(f'Invalid vault contract address {vault_address}') from e
+        raise click.ClickException(f'Invalid vault contract address {settings.vault}') from e

@@ -28,10 +28,10 @@ class SplitRewardTask(BaseTask):
     # pylint: disable-next=too-many-locals
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         """
-        Processes reward splitters for the vaults specified in settings.
+        Processes reward splitters for the vault specified in settings.
 
         This function performs the following steps:
-        - Retrieves reward splitters associated with the vaults from Subgraph.
+        - Retrieves reward splitters associated with the vault from Subgraph.
         - Retrieves claimable exit requests for the reward splitters.
         - Calls reward splitter contracts and waits for transactions confirmations.
         """
@@ -46,12 +46,12 @@ class SplitRewardTask(BaseTask):
 
         logger.info('Fetching fee splitters')
         reward_splitters = await graph_get_reward_splitters(
-            block_number=block['number'], claimer=wallet.account.address, vaults=settings.vaults
+            block_number=block['number'], claimer=wallet.account.address, vault=settings.vault
         )
 
         if not reward_splitters:
             logger.warning(
-                'No fee splitters found for provided vaults with the claimer %s',
+                'No fee splitters found for provided vault with the claimer %s',
                 wallet.address,
             )
             return
@@ -62,13 +62,10 @@ class SplitRewardTask(BaseTask):
         calls: dict[ChecksumAddress, list[HexStr]] = {}
         for reward_splitter in reward_splitters:
             logger.info(
-                'Processing fee splitter %s for vault %s',
+                'Processing fee splitter %s ',
                 reward_splitter.address,
-                reward_splitter.vault,
             )
-            vault = reward_splitter.vault
-
-            harvest_params = await get_harvest_params(vault)
+            harvest_params = await get_harvest_params()
             exit_requests = splitter_to_exit_requests.get(reward_splitter.address, [])  # nosec
 
             reward_splitter_calls = await _get_reward_splitter_calls(

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import NewType
 
 import milagro_bls_binding as bls
-from eth_typing import BLSPrivateKey, BLSSignature, ChecksumAddress, HexStr
+from eth_typing import BLSPrivateKey, BLSSignature, HexStr
 from staking_deposit.key_handling.keystore import ScryptKeystore
 from sw_utils.signing import get_exit_message_signing_root
 from sw_utils.typings import ConsensusFork
@@ -81,14 +81,12 @@ class LocalKeystore(BaseKeystore):
     def __len__(self) -> int:
         return len(self.keys)
 
-    async def get_deposit_data(
-        self, public_key: HexStr, amount: int, vault_address: ChecksumAddress
-    ) -> dict:
+    async def get_deposit_data(self, public_key: HexStr, amount: int) -> dict:
         private_key = self.keys[public_key]
         credential = CredentialManager.load_credential(
             network=settings.network,
             private_key=BLSPrivateKey(Web3.to_int(private_key)),
-            vault=vault_address,
+            vault=settings.vault,
             validator_type=settings.validator_type,
         )
 

@@ -8,9 +8,8 @@ from eth_typing import ChecksumAddress
 
 from src.common.password import get_or_create_password_file
 from src.common.utils import greenify
-from src.common.validators import validate_mnemonic, validate_network
-from src.config.config import OperatorConfig, OperatorConfigException
-from src.config.networks import AVAILABLE_NETWORKS
+from src.common.validators import validate_eth_address, validate_mnemonic
+from src.config.config import OperatorConfig
 
 
 @click.option(
@@ -29,22 +28,18 @@ from src.config.networks import AVAILABLE_NETWORKS
     callback=validate_mnemonic,
 )
 @click.option(
-    '--network',
-    help='The network of your vault. Default is the network specified at "init" command.',
-    type=click.Choice(
-        AVAILABLE_NETWORKS,
-        case_sensitive=False,
-    ),
-    callback=validate_network,
+    '--vault',
+    help='The address of the vault.',
+    prompt='Enter the vault address',
+    type=str,
+    callback=validate_eth_address,
 )
 @click.command(help='Creates the encrypted wallet from the mnemonic.')
-def create_wallet(mnemonic: str, data_dir: str, network: str | None) -> None:
-    try:
-        operator_config = OperatorConfig(Path(data_dir))
-        operator_config.load(network, mnemonic)
-    except OperatorConfigException as e:
-        raise click.ClickException(str(e))
-    wallet_dir = operator_config.data_dir / 'wallet'
+def create_wallet(mnemonic: str, data_dir: str, vault: ChecksumAddress) -> None:
+    operator_config = OperatorConfig(vault, Path(data_dir))
+    operator_config.load(mnemonic)
+
+    wallet_dir = operator_config.vault_dir / 'wallet'
 
     wallet_dir.mkdir(parents=True, exist_ok=True)
     address = _generate_encrypted_wallet(mnemonic, wallet_dir)

@@ -1,6 +1,6 @@
 import logging
 
-from eth_typing import ChecksumAddress, HexStr
+from eth_typing import HexStr
 from web3 import Web3
 from web3.types import Gwei
 
@@ -13,14 +13,13 @@ logger = logging.getLogger(__name__)
 
 
 async def submit_withdraw_validators(
-    vault_address: ChecksumAddress,
     withdrawals: dict[HexStr, Gwei],
     tx_fee: Gwei,
     validators_manager_signature: HexStr,
 ) -> HexStr | None:
     """Sends withdrawValidators transaction to vault contract"""
     logger.info('Submitting a withdrawal from validator(s) transaction')
-    vault_contract = VaultContract(vault_address)
+    vault_contract = VaultContract(settings.vault)
     try:
         tx = await vault_contract.functions.withdrawValidators(
             _encode_withdrawals(withdrawals),

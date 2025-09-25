@@ -15,10 +15,10 @@ from src.config.settings import settings
 logger = logging.getLogger(__name__)
 
 
-async def submit_harvest_transaction(
-    vault_address: ChecksumAddress, harvest_params: HarvestParams
-) -> HexStr | None:
-    calls = await get_update_state_calls(harvest_params=harvest_params, vault_address=vault_address)
+async def submit_harvest_transaction(harvest_params: HarvestParams) -> HexStr | None:
+    calls = await get_update_state_calls(
+        harvest_params=harvest_params, vault_address=settings.vault
+    )
     try:
         tx_function = multicall_contract.functions.aggregate(calls)
         tx = await transaction_gas_wrapper(tx_function=tx_function)
