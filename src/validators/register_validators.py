@@ -1,7 +1,7 @@
 import logging
 from typing import Sequence
 
-from eth_typing import ChecksumAddress, HexStr
+from eth_typing import HexStr
 from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.exceptions import ContractLogicError
@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 
 # pylint: disable=too-many-arguments,too-many-locals
 async def register_validators(
-    vault_address: ChecksumAddress,
     approval: OraclesApproval,
     validators: Sequence[Validator],
     harvest_params: HarvestParams | None,
@@ -32,10 +31,9 @@ async def register_validators(
         Web3.to_bytes(tx_validator)
         for tx_validator in encode_tx_validator_list(
             validators=validators,
-            vault_address=vault_address,
         )
     ]
-    vault_contract = VaultContract(vault_address)
+    vault_contract = VaultContract(settings.vault)
     if harvest_params is not None:
         # add update state calls before validator registration
         calls = [vault_contract.get_update_state_call(harvest_params)]
@@ -95,7 +93,6 @@ async def register_validators(
 
 
 async def fund_validators(
-    vault_address: ChecksumAddress,
     validators: list[Validator],
     validators_manager_signature: HexStr,
     harvest_params: HarvestParams | None,
@@ -104,11 +101,10 @@ async def fund_validators(
         Web3.to_bytes(tx_validator)
         for tx_validator in encode_tx_validator_list(
             validators=validators,
-            vault_address=vault_address,
         )
     ]
     calls = []
-    vault_contract = VaultContract(vault_address)
+    vault_contract = VaultContract(settings.vault)
     if harvest_params is not None:
         # add update state calls before validator funding
         calls.append(vault_contract.get_update_state_call(harvest_params))
@@ -141,7 +137,6 @@ async def fund_validators(
 
 
 async def submit_consolidate_validators(
-    vault_address: ChecksumAddress,
     validators: bytes,
     oracle_signatures: bytes,
     tx_fee: Gwei,
@@ -149,7 +144,7 @@ async def submit_consolidate_validators(
 ) -> HexStr | None:
     """Sends consolidate validators transaction to vault contract"""
     logger.info('Submitting consolidate validators transaction')
-    vault_contract = VaultContract(vault_address)
+    vault_contract = VaultContract(settings.vault)
     try:
         tx = await vault_contract.functions.consolidateValidators(
             validators,

@@ -1,9 +1,6 @@
 import asyncio
 import logging
-from pathlib import Path
 
-import click
-from eth_typing import ChecksumAddress
 from sw_utils import InterruptHandler
 
 import src
@@ -13,16 +10,18 @@ from src.common.consensus import get_chain_finalized_head
 from src.common.execution import WalletTask, update_oracles_cache
 from src.common.logging import setup_logging
 from src.common.metrics import MetricsTask, metrics, metrics_server
-from src.common.migrate import migrate_to_multivault
 from src.common.startup_check import startup_checks
 from src.common.tasks import BaseTask
 from src.common.utils import get_build_version
-from src.config.config import OperatorConfig, OperatorConfigException
 from src.config.settings import ValidatorsRegistrationMode, settings
 from src.exits.tasks import ExitSignatureTask
 from src.harvest.tasks import HarvestTask
 from src.reward_splitter.tasks import SplitRewardTask
-from src.validators.database import NetworkValidatorCrud, VaultCrud, VaultValidatorCrud
+from src.validators.database import (
+    CheckpointCrud,
+    NetworkValidatorCrud,
+    VaultValidatorCrud,
+)
 from src.validators.execution import scan_validators_events
 from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
@@ -49,7 +48,7 @@ async def start_base() -> None:
 
     NetworkValidatorCrud().setup()
     VaultValidatorCrud().setup()
-    VaultCrud().setup()
+    CheckpointCrud().setup()
 
     # load network validators from ipfs dump
     await load_genesis_validators()
@@ -66,7 +65,7 @@ async def start_base() -> None:
     chain_state = await get_chain_finalized_head()
     await wait_execution_catch_up_consensus(chain_state)
 
-    VaultCrud().save_vaults(settings.vaults)
+    CheckpointCrud().save_checkpoints()
     logger.info('Syncing validator events...')
     await scan_validators_events(chain_state.block_number, is_startup=True)
 
@@ -146,34 +145,3 @@ def setup_sentry() -> None:
         )
         sentry_sdk.set_tag('network', settings.network)
         sentry_sdk.set_tag('project_version', src.__version__)
-
-
-def load_operator_config(
-    vaults: list[ChecksumAddress], data_dir: str, network: str | None, no_confirm: bool
-) -> OperatorConfig:
-    try:
-        operator_config = OperatorConfig(Path(data_dir))
-        operator_config.load(network=network)
-        return operator_config
-    except OperatorConfigException as e:
-        if not e.can_be_migrated:
-            raise click.ClickException(str(e))
-
-        # trying to migrate from single vault setup to multivault
-        vault = vaults[0].lower()
-        root_dir = Path(data_dir)
-        vault_dir = root_dir / vault
-        if vault_dir.exists() and not (root_dir / 'config.json').exists():
-            if not no_confirm:
-                click.confirm(
-                    'The data directory structure has been updated. '
-                    'Would you like to migrate to the new schema?',
-                    default=True,
-                )
-            migrate_to_multivault(
-                vault_dir=vault_dir,
-                root_dir=root_dir,
-            )
-        operator_config = OperatorConfig(Path(data_dir))
-        operator_config.load()
-        return operator_config

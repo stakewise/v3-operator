@@ -1,6 +1,5 @@
 # pylint: disable=unused-argument
 import re
-from pathlib import Path
 
 import click
 from eth_typing import ChecksumAddress, HexStr
@@ -8,26 +7,7 @@ from eth_utils import is_address, is_hexstr, to_checksum_address
 from web3.types import Gwei
 
 from src.common.language import validate_mnemonic as verify_mnemonic
-from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI
-
-
-def validate_network(ctx: click.Context, param: click.Parameter, value: str) -> str | None:
-    if value:
-        return value
-    data_dir = ctx.params.get('data_dir') or str(Path.home() / '.stakewise')
-    root_dir = Path(data_dir)
-    try:
-        network = _guess_network(root_dir)
-    except MultipleNetworksFound:
-        network = click.prompt(
-            'Enter the network of your vault',
-            type=click.Choice(
-                AVAILABLE_NETWORKS,
-                case_sensitive=False,
-            ),
-        )
-    return network
 
 
 def validate_mnemonic(ctx: click.Context, param: click.Parameter, value: str) -> str:
@@ -47,21 +27,6 @@ def validate_eth_address(
         pass
 
     raise click.BadParameter('Invalid Ethereum address')
-
-
-def validate_eth_addresses(
-    ctx: click.Context, param: click.Parameter, value: str | None
-) -> str | None:
-    if not value:
-        return None
-    try:
-        for address in value.split(','):
-            if not is_address(address):
-                raise click.BadParameter('Invalid Ethereum address')
-    except ValueError:
-        pass
-
-    return value
 
 
 def validate_db_uri(ctx: click.Context, param: click.Parameter, value: str) -> str:
@@ -144,18 +109,3 @@ def validate_indexes(ctx: click.Context, param: click.Parameter, value: str) -> 
 def _is_public_key(value: str) -> bool:
     public_key_length = 98
     return is_hexstr(value) and len(value) == public_key_length
-
-
-class MultipleNetworksFound(Exception):
-    pass
-
-
-def _guess_network(root_dir: Path) -> str | None:
-    dirs = [f for f in root_dir.iterdir() if f.is_dir()]
-    network_directory_names = [d.name for d in dirs if d.name in AVAILABLE_NETWORKS]
-    if len(dirs) and len(network_directory_names) == 1:
-        return network_directory_names[0]
-
-    if len(dirs) and len(network_directory_names) > 1:
-        raise MultipleNetworksFound
-    return None

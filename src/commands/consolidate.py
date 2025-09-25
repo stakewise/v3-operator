@@ -21,14 +21,12 @@ from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import log_verbose
 from src.common.validators import (
     validate_eth_address,
-    validate_network,
     validate_public_key,
     validate_public_keys,
     validate_public_keys_file,
 )
 from src.common.wallet import wallet
 from src.config.config import OperatorConfig
-from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import (
     MAX_CONSOLIDATION_REQUEST_FEE,
     MAX_EFFECTIVE_BALANCE_GWEI,
@@ -43,16 +41,6 @@ from src.validators.typings import ConsensusValidator
 logger = logging.getLogger(__name__)
 
 
-@click.option(
-    '--network',
-    type=click.Choice(
-        AVAILABLE_NETWORKS,
-        case_sensitive=False,
-    ),
-    envvar='NETWORK',
-    help='The network of the vault. Default is the network specified at "init" command.',
-    callback=validate_network,
-)
 @click.option(
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
@@ -148,7 +136,6 @@ logger = logging.getLogger(__name__)
 )
 # pylint: disable-next=too-many-arguments,too-many-locals
 def consolidate(
-    network: str,
     vault: ChecksumAddress,
     execution_endpoints: str,
     consensus_endpoints: str,
@@ -176,13 +163,13 @@ def consolidate(
     if source_public_keys_file:
         source_public_keys = _load_public_keys(source_public_keys_file)
 
-    operator_config = OperatorConfig(Path(data_dir))
-    operator_config.load(network=network)
+    operator_config = OperatorConfig(vault, Path(data_dir))
+    operator_config.load()
 
     settings.set(
-        vaults=[vault],
+        vault=vault,
         network=operator_config.network,
-        data_dir=operator_config.data_dir,
+        vault_dir=operator_config.vault_dir,
         execution_endpoints=execution_endpoints,
         consensus_endpoints=consensus_endpoints,
         wallet_file=wallet_file,
@@ -300,7 +287,6 @@ async def main(
     )
 
     tx_hash = await submit_consolidate_validators(
-        vault_address=vault_address,
         validators=encoded_validators,
         oracle_signatures=oracle_signatures,
         tx_fee=tx_fee,

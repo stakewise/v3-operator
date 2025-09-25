@@ -86,8 +86,6 @@ class TestValidatorsExit:
             '--verbose',
             '--data-dir',
             str(data_dir),
-            '--network',
-            'hoodi',
             '--no-confirm',
         ]
         consensus_validators = [
@@ -110,7 +108,6 @@ class TestValidatorsExit:
         ):
             result = runner.invoke(exit_validators, args)
             submit_withdraw_validators.assert_called_once_with(
-                vault_address=vault_address,
                 withdrawals={key: 0 for key in public_keys},
                 tx_fee=WITHDRAWAL_REQUEST_FEE,
                 validators_manager_signature='0x',
@@ -137,8 +134,6 @@ class TestValidatorsExit:
             '--verbose',
             '--data-dir',
             str(data_dir),
-            '--network',
-            'hoodi',
             '--no-confirm',
             '--indexes',
             '1',
@@ -164,7 +159,6 @@ class TestValidatorsExit:
         ):
             result = runner.invoke(exit_validators, args)
             submit_withdraw_validators.assert_called_once_with(
-                vault_address=vault_address,
                 withdrawals={key: 0 for key in public_keys},
                 tx_fee=WITHDRAWAL_REQUEST_FEE,
                 validators_manager_signature='0x',
@@ -190,8 +184,6 @@ class TestValidatorsExit:
             execution_endpoints,
             '--data-dir',
             str(data_dir),
-            '--network',
-            'hoodi',
             '--no-confirm',
             '--indexes',
             '1',

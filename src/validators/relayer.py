@@ -20,12 +20,10 @@ logger = logging.getLogger(__name__)
 
 
 class RelayerClient:
-    async def register_validators(
-        self, vault_address: ChecksumAddress, amounts: list[Gwei]
-    ) -> RelayerValidatorsResponse:
+    async def register_validators(self, amounts: list[Gwei]) -> RelayerValidatorsResponse:
         validators_start_index = await get_validators_start_index()
         relayer_response = await self._register_validators(
-            vault_address, validators_start_index, amounts
+            settings.vault, validators_start_index, amounts
         )
         validators: list[Validator] = []
         for v in relayer_response.get('validators') or []:
@@ -50,10 +48,10 @@ class RelayerClient:
         )
 
     async def fund_validators(
-        self, vault_address: ChecksumAddress, funding_amounts: dict[HexStr, Gwei]
+        self, funding_amounts: dict[HexStr, Gwei]
     ) -> RelayerValidatorsResponse:
         relayer_response = await self._fund_validators(
-            vault_address=vault_address,
+            vault_address=settings.vault,
             public_keys=list(funding_amounts.keys()),
             amounts=list(funding_amounts.values()),
         )
@@ -77,10 +75,10 @@ class RelayerClient:
         )
 
     async def withdraw_validators(
-        self, vault_address: ChecksumAddress, withdrawals: dict[HexStr, Gwei]
+        self, withdrawals: dict[HexStr, Gwei]
     ) -> RelayerSignatureResponse:
         relayer_response = await self._withdraw_validators(
-            vault_address=vault_address,
+            vault_address=settings.vault,
             public_keys=list(withdrawals.keys()),
             amounts=list(withdrawals.values()),
         )

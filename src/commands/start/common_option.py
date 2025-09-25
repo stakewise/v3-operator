@@ -7,12 +7,8 @@ from web3 import Web3
 
 from src.common.logging import LOG_LEVELS
 from src.common.typings import ValidatorType
-from src.common.validators import (
-    validate_eth_addresses,
-    validate_min_deposit_amount_gwei,
-    validate_network,
-)
-from src.config.networks import AVAILABLE_NETWORKS, GNOSIS, MAINNET, NETWORKS
+from src.common.validators import validate_eth_address, validate_min_deposit_amount_gwei
+from src.config.networks import GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
@@ -60,16 +56,6 @@ start_common_options = [
         envvar='WALLET_FILE',
         help='Absolute path to the wallet. '
         'Default is the file generated with "create-wallet" command.',
-    ),
-    click.option(
-        '--network',
-        type=click.Choice(
-            AVAILABLE_NETWORKS,
-            case_sensitive=False,
-        ),
-        envvar='NETWORK',
-        help='The network of the vault. Default is the network specified at "init" command.',
-        callback=validate_network,
     ),
     click.option(
         '--enable-metrics',
@@ -165,12 +151,11 @@ start_common_options = [
         help='API endpoint for graph node.',
     ),
     click.option(
-        '--vaults',
         '--vault',
-        callback=validate_eth_addresses,
-        envvar='VAULTS',
-        prompt='Enter the comma separated list of your vault addresses',
-        help='Addresses of the vaults to register validators for.',
+        callback=validate_eth_address,
+        envvar='VAULT',
+        prompt='Enter your vault address',
+        help='Address of the vault to register validators for.',
     ),
     click.option(
         '--log-format',
@@ -215,12 +200,6 @@ start_common_options = [
         help=f'Minimum delay for validator funding in seconds.'
         f' The default is {DEFAULT_MIN_DEPOSIT_DELAY}',
         default=DEFAULT_MIN_DEPOSIT_DELAY,
-    ),
-    click.option(
-        '--no-confirm',
-        is_flag=True,
-        default=False,
-        help='Skips confirmation messages when provided.',
     ),
 ]
 

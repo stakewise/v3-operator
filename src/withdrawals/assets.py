@@ -1,6 +1,6 @@
 from sw_utils import GNO_NETWORKS, ChainHead, ValidatorStatus, convert_to_mgno
 from web3 import Web3
-from web3.types import ChecksumAddress, Gwei, Wei
+from web3.types import Gwei, Wei
 
 from src.common.clients import consensus_client
 from src.common.contracts import validators_checker_contract
@@ -29,17 +29,16 @@ EXITING_STATUSES = [
 
 
 async def get_queued_assets(
-    vault_address: ChecksumAddress,
     consensus_validators: list[ConsensusValidator],
     oracle_exiting_validators: list[ConsensusValidator],
     chain_head: ChainHead,
 ) -> Gwei:
-    harvest_params = await get_harvest_params(vault_address)
+    harvest_params = await get_harvest_params()
 
     # Get exit queue cumulative tickets
     exit_queue_cumulative_ticket = (
         await validators_checker_contract.get_exit_queue_cumulative_tickets(
-            vault_address=vault_address,
+            vault_address=settings.vault,
             harvest_params=harvest_params,
             block_number=chain_head.block_number,
         )
@@ -70,7 +69,7 @@ async def get_queued_assets(
     # until the exit queue cumulative ticket is reached
     queued_assets = await validators_checker_contract.get_exit_queue_missing_assets(
         exit_queue_missing_assets_params=ExitQueueMissingAssetsParams(
-            vault=vault_address,
+            vault=settings.vault,
             withdrawing_assets=withdrawing_assets,
             exit_queue_cumulative_ticket=exit_queue_cumulative_ticket,
         ),

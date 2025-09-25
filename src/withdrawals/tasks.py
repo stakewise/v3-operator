@@ -1,7 +1,7 @@
 import logging
 from typing import cast
 
-from eth_typing import ChecksumAddress, HexStr
+from eth_typing import HexStr
 from sw_utils import (
     GNO_NETWORKS,
     ChainHead,
@@ -39,19 +39,17 @@ logger = logging.getLogger(__name__)
 
 class WithdrawalIntervalMixin:
     async def _is_withdrawal_interval_passed(
-        self, app_state: AppState, vault_address: ChecksumAddress, chain_head: ChainHead
+        self, app_state: AppState, chain_head: ChainHead
     ) -> bool:
-        last_withdrawals_block = app_state.partial_withdrawal_cache.get(vault_address)
+        last_withdrawals_block = app_state.partial_withdrawal_block
 
         partial_withdrawals_blocks_interval = (
             PARTIAL_WITHDRAWALS_INTERVAL // settings.network_config.SECONDS_PER_BLOCK
         )
         from_block = BlockNumber(chain_head.block_number - partial_withdrawals_blocks_interval)
         if not last_withdrawals_block:
-            last_withdrawals_block = await self._fetch_last_withdrawals_block(
-                vault_address, from_block
-            )
-            app_state.partial_withdrawal_cache[vault_address] = last_withdrawals_block
+            last_withdrawals_block = await self._fetch_last_withdrawals_block(from_block)
+            app_state.partial_withdrawal_block = last_withdrawals_block
 
         if (
             last_withdrawals_block
@@ -61,14 +59,12 @@ class WithdrawalIntervalMixin:
             return False
         return True
 
-    async def _fetch_last_withdrawals_block(
-        self, vault_address: ChecksumAddress, from_block: BlockNumber
-    ) -> BlockNumber | None:
+    async def _fetch_last_withdrawals_block(self, from_block: BlockNumber) -> BlockNumber | None:
         """
         Fetches withdrawal events within the specified interval.
         Returns the block number of the last withdrawal event, or None if not found.
         """
-        vault_contract = VaultContract(vault_address)
+        vault_contract = VaultContract(settings.vault)
         events = await vault_contract.get_validator_withdrawal_submitted_events(from_block)
         if events:
             return events[-1].block_number
@@ -89,27 +85,11 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
         Every N hours check the exit queue and submit partial withdrawals if needed.
         """
         protocol_config = await get_protocol_config()
-        for vault_address in settings.vaults:
-            await self.process_vault(
-                vault_address=vault_address,
-                chain_head=chain_head,
-                protocol_config=protocol_config,
-            )
-
-    # pylint: disable-next=too-many-locals
-    async def process_vault(
-        self,
-        vault_address: ChecksumAddress,
-        chain_head: ChainHead,
-        protocol_config: ProtocolConfig,
-    ) -> None:
         app_state = AppState()
-        if not await self._is_withdrawal_interval_passed(app_state, vault_address, chain_head):
+        if not await self._is_withdrawal_interval_passed(app_state, chain_head):
             return
 
-        vault_validators = VaultValidatorCrud().get_vault_validators(
-            vault_address=vault_address,
-        )
+        vault_validators = VaultValidatorCrud().get_vault_validators()
         consensus_validators = await fetch_consensus_validators(
             [val.public_key for val in vault_validators]
         )
@@ -118,7 +98,6 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
         )
 
         queued_assets = await get_queued_assets(
-            vault_address=vault_address,
             consensus_validators=consensus_validators,
             oracle_exiting_validators=oracle_exiting_validators,
             chain_head=chain_head,
@@ -126,7 +105,7 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
         metrics.queued_assets.labels(network=settings.network).set(int(queued_assets))
 
         if queued_assets < MIN_WITHDRAWAL_AMOUNT_GWEI:
-            app_state.partial_withdrawal_cache[vault_address] = chain_head.block_number
+            app_state.partial_withdrawal_block = chain_head.block_number
             return
 
         current_fee = await get_execution_request_fee(
@@ -157,14 +136,13 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
                 'No eligible validators found for withdrawal of %s Gwei',
                 queued_assets,
             )
-            app_state.partial_withdrawal_cache[vault_address] = chain_head.block_number
+            app_state.partial_withdrawal_block = chain_head.block_number
             return
 
         validators_manager_signature = HexStr('0x')
         if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
             # fetch validator manager signature from relayer
             relayer_response = await cast(RelayerClient, self.relayer).withdraw_validators(
-                vault_address=vault_address,
                 withdrawals=withdrawals,
             )
             if not relayer_response.validators_manager_signature:
@@ -174,7 +152,6 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
             validators_manager_signature = relayer_response.validators_manager_signature
 
         tx_hash = await submit_withdraw_validators(
-            vault_address=vault_address,
             withdrawals=withdrawals,
             tx_fee=current_fee,
             validators_manager_signature=validators_manager_signature,
@@ -182,7 +159,7 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
         if not tx_hash:
             return
 
-        app_state.partial_withdrawal_cache[vault_address] = chain_head.block_number
+        app_state.partial_withdrawal_block = chain_head.block_number
 
         withdrawn_assets = Web3.to_wei(queued_assets, 'gwei')
         if settings.network in GNO_NETWORKS:

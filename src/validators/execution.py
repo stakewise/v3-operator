@@ -19,7 +19,11 @@ from src.common.contracts import (
 from src.common.typings import HarvestParams
 from src.config.settings import settings
 from src.harvest.execution import get_update_state_calls
-from src.validators.database import NetworkValidatorCrud, VaultCrud, VaultValidatorCrud
+from src.validators.database import (
+    CheckpointCrud,
+    NetworkValidatorCrud,
+    VaultValidatorCrud,
+)
 from src.validators.typings import NetworkValidator, VaultValidator
 
 logger = logging.getLogger(__name__)
@@ -112,7 +116,7 @@ class VaultValidatorsProcessor(EventProcessor):
         ).contract
 
     async def get_from_block(self) -> BlockNumber:
-        checkpoint = VaultCrud().get_vault_validators_checkpoint(self.vault_address)
+        checkpoint = CheckpointCrud().get_vault_validators_checkpoint()
         if not checkpoint:
             return settings.network_config.KEEPER_GENESIS_BLOCK
 
@@ -122,7 +126,6 @@ class VaultValidatorsProcessor(EventProcessor):
     async def process_events(self, events: list[EventData], to_block: BlockNumber) -> None:
         validators = [
             VaultValidator(
-                vault_address=self.vault_address,
                 public_key=Web3.to_hex(event['args']['publicKey']),
                 block_number=BlockNumber(event['blockNumber']),
             )
@@ -135,7 +138,7 @@ class VaultV2ValidatorsProcessor(VaultValidatorsProcessor):
     contract_event = 'V2ValidatorRegistered'
 
     async def get_from_block(self) -> BlockNumber:
-        checkpoint = VaultCrud().get_vault_v2_validators_checkpoint(self.vault_address)
+        checkpoint = CheckpointCrud().get_vault_v2_validators_checkpoint()
         if not checkpoint:
             return settings.network_config.KEEPER_GENESIS_BLOCK
 
@@ -174,7 +177,7 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
 
 async def get_latest_vault_v2_validator_public_keys(vault_address: ChecksumAddress) -> Set[HexStr]:
     """Fetches the latest vault v2 validator public keys registered after finalized block"""
-    block_number = VaultCrud().get_vault_v2_validators_checkpoint(vault_address)
+    block_number = CheckpointCrud().get_vault_v2_validators_checkpoint()
     if block_number:
         from_block = BlockNumber(block_number + 1)
     else:
@@ -206,11 +209,9 @@ def process_network_validator_event(
     return None
 
 
-async def get_withdrawable_assets(
-    vault_address: ChecksumAddress, harvest_params: HarvestParams | None
-) -> Wei:
+async def get_withdrawable_assets(harvest_params: HarvestParams | None) -> Wei:
     """Fetches vault's available assets for staking."""
-    vault_contract = VaultContract(vault_address)
+    vault_contract = VaultContract(settings.vault)
     if harvest_params is None:
         return await vault_contract.functions.withdrawableAssets().call()
 
@@ -234,14 +235,12 @@ async def scan_validators_events(block_number: BlockNumber, is_startup: bool) ->
 
     network_validators_scanner = EventScanner(network_validators_processor)
     await network_validators_scanner.process_new_events(block_number)
-    for vault in settings.vaults:
-        logger.info('Processing validator events for vault %s', vault)
-        vault_validators_processor = VaultValidatorsProcessor(vault_address=vault)
-        vault_validators_scanner = EventScanner(vault_validators_processor)
-        await vault_validators_scanner.process_new_events(block_number)
+    vault_validators_processor = VaultValidatorsProcessor(settings.vault)
+    vault_validators_scanner = EventScanner(vault_validators_processor)
+    await vault_validators_scanner.process_new_events(block_number)
 
-        vault_v2_validators_processor = VaultV2ValidatorsProcessor(vault_address=vault)
-        vault_v2_validators_scanner = EventScanner(vault_v2_validators_processor)
-        await vault_v2_validators_scanner.process_new_events(block_number)
+    vault_v2_validators_processor = VaultV2ValidatorsProcessor(settings.vault)
+    vault_v2_validators_scanner = EventScanner(vault_v2_validators_processor)
+    await vault_v2_validators_scanner.process_new_events(block_number)
 
-        VaultCrud().update_vault_checkpoints(vault_address=vault, block_number=block_number)
+    CheckpointCrud().update_vault_checkpoints(block_number=block_number)

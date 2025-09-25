@@ -46,7 +46,6 @@ logger = logging.getLogger(__name__)
 
 
 async def poll_validation_approval(
-    vault_address: ChecksumAddress,
     keystore: BaseKeystore | None,
     validators: Sequence[Validator],
     validators_manager_signature: HexStr,
@@ -81,7 +80,6 @@ async def poll_validation_approval(
             deadline = current_timestamp + protocol_config.signature_validity_period
 
             oracles_request = await create_approval_request(
-                vault_address=vault_address,
                 protocol_config=protocol_config,
                 keystore=keystore,
                 validators=validators,
@@ -202,7 +200,6 @@ async def send_approval_requests(
 
 # pylint: disable-next=too-many-arguments
 async def create_approval_request(
-    vault_address: ChecksumAddress,
     protocol_config: ProtocolConfig,
     keystore: BaseKeystore | None,
     validators: Sequence[Validator],
@@ -219,7 +216,7 @@ async def create_approval_request(
     # get exit signature shards
     request = ApprovalRequest(
         validator_index=validators_start_index,
-        vault_address=vault_address,
+        vault_address=settings.vault,
         validators_root=Web3.to_hex(registry_root),
         public_keys=[],
         deposit_signatures=[],

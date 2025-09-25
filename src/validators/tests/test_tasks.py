@@ -74,7 +74,7 @@ def test_get_deposits_amounts():
 
 
 def test_get_funding_amounts(data_dir):
-    settings.set(vaults=[], data_dir=data_dir, network=HOODI)
+    settings.set(vault=None, vault_dir=data_dir, network=HOODI)
     public_key_1 = faker.eth_address()
     public_key_2 = faker.eth_address()
 

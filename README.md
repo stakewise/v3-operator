@@ -318,7 +318,7 @@ There are several ways to run the Operator Service, depending on how you store p
 
 By default, the Operator Service runs with locally stored keystores.
 
-```./operator start-local --vaults=0x3320a...68 --consensus-endpoints=http://localhost:5052 --execution-endpoints=http://localhost:8545```
+```./operator start-local --vault=0x3320a...68 --consensus-endpoints=http://localhost:5052 --execution-endpoints=http://localhost:8545```
 
 If you **did not** use Operator Service to generate validator keys, you will need to add the following flag:
 
@@ -374,7 +374,7 @@ Check [API mode guide](https://docs.stakewise.io/for-operators/operator-service/
 You can start the Operator service using binary with the following command:
 
 ```bash
-./operator start --vaults=0x000...,0x111... --consensus-endpoints=http://localhost:5052 --execution-endpoints=http://localhost:8545
+./operator start --vault=0x000... --consensus-endpoints=http://localhost:5052 --execution-endpoints=http://localhost:8545
 ```
 
 #### Using docker
@@ -389,7 +389,7 @@ docker run --restart on-failure:10 \
 -v ~/.stakewise/:/data \
 europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v4.0.0 \
 src/main.py start \
---vaults=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
+--vault=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
 --data-dir=/data \
 --consensus-endpoints=http://localhost:5052 \
 --execution-endpoints=http://localhost:8545
@@ -399,7 +399,7 @@ src/main.py start \
 
 ```bash
 PYTHONPATH=. poetry run python src/main.py start \
---vaults=0x000... \
+--vault=0x000... \
 --consensus-endpoints=http://localhost:5052 \
 --execution-endpoints=http://localhost:8545
 ```
@@ -564,7 +564,7 @@ This command allows you to self-report your validator keys to the Rated Network,
 To use the `submit-rated-network` command, you will need to provide the following parameters:
 
 - `--data-dir`: Path where the vault data will be placed. Default is ~/.stakewise.
-- `--vaults`:  The comma separated list of your vault addresses.
+- `--vault`:  Your vault address.
 - `--network`: The network of your vault (e.g., mainnet, hoodi).
 - `--pool-tag`: The pool name listed on the Explorer (optional).
 - `--token`: OAuth token for authorization.
@@ -572,7 +572,7 @@ To use the `submit-rated-network` command, you will need to provide the followin
 Here's an example of how to use the command:
 
 ```bash
-python src/main.py submit-rated-network --vaults <your-vault-addresses> --network <network-name> --pool-tag <pool-tag> --token <your-oauth-token> --data-dir <path-to-data-dir>
+python src/main.py submit-rated-network --vault <your-vault-address> --network <network-name> --pool-tag <pool-tag> --token <your-oauth-token> --data-dir <path-to-data-dir>
 ```
 
 ## V4 Upgrade Guide
@@ -609,17 +609,6 @@ V4 Operator no longer requires pre-uploaded deposit data for validator registrat
 ⚠ Important: To support this new flow, you must assign your operator wallet as the Validators Manager in the vault settings.
 🔗 [How to Set Up Validators Manager](#step-4-setup-validators-manager-role)
 
-### Multivault Support
-
-The operator service can now manage multiple vaults simultaneously, reducing setup complexity for multi-vault users.
-
-Key Changes:
-
-- Single Wallet & Keystores – Shared across all vaults (no `--vault` flag needed for create-keys/create-wallets).
-- Migration – Existing setups will auto-migrate to the new structure on first launch.
-- Launch Command – Use `--vaults` with multiple addresses (e.g., `--vaults=0x1...23,0x4...56`).
-- All validator keys linked to the operator will be used for every connected vault.
-
 ### Automated rewards withdrawals
 
 It is possible to periodically withdraw rewards for the vault’s fee shareholders.
@@ -643,14 +632,8 @@ Check for more details in [Fee splitter section](#automated-withdrawals-fee-spli
 - Hashi Vault → Use `start-hashi-vault` command.
 - Relayer → Use `start-relayer` command.
 
-#### For Multivault
-
-- Pass comma-separated addresses in --vaults.
-- Recreate operator directory for clean migration.
-
 #### Main parameter changes
 
-- `--vault` → Now `--vaults` , `--vault` is deprecated.
 - Removed `--deposit-data-file` parameter
 - `HOT_WALLET_FILE` → renamed to `WALLET_FILE`
 - `HOT_WALLET_PASSWORD_FILE` → renamed to `WALLET_PASSWORD_FILE`

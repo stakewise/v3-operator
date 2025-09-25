@@ -5,7 +5,7 @@ from typing import cast
 
 import milagro_bls_binding as bls
 from aiohttp import ClientSession, ClientTimeout
-from eth_typing import BLSPubkey, BLSSignature, ChecksumAddress, HexAddress, HexStr
+from eth_typing import BLSPubkey, BLSSignature, HexStr
 from eth_utils import add_0x_prefix
 from sw_utils import get_exit_message_signing_root
 from sw_utils.common import urljoin
@@ -96,10 +96,9 @@ class RemoteSignerKeystore(BaseKeystore):
         self,
         public_key: HexStr,
         amount: int,
-        vault_address: ChecksumAddress,
     ) -> dict:
         fork_version = NETWORKS[settings.network].GENESIS_FORK_VERSION
-        withdrawal_credentials = get_withdrawal_credentials(cast(HexAddress, vault_address))
+        withdrawal_credentials = get_withdrawal_credentials()
         signing_root = self._get_deposit_signing_root(
             public_key=BLSPubkey(Web3.to_bytes(hexstr=public_key)),
             withdrawal_credentials=withdrawal_credentials,

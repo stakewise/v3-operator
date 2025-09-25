@@ -1,15 +1,17 @@
 import asyncio
 import logging
 import sys
+from pathlib import Path
 
 import click
-from eth_utils import to_checksum_address
+from eth_typing import ChecksumAddress
 from web3.types import Gwei
 
-from src.commands.start.base import load_operator_config, start_base
+from src.commands.start.base import start_base
 from src.commands.start.common_option import add_common_options, start_common_options
 from src.common.typings import ValidatorType
 from src.common.utils import log_verbose
+from src.config.config import OperatorConfig
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -26,7 +28,7 @@ logger = logging.getLogger(__name__)
 @click.command(help='Start operator service with the remote signer integration.')
 # pylint: disable-next=too-many-arguments,too-many-locals
 def start_remote_signer(
-    vaults: str,
+    vault: ChecksumAddress,
     consensus_endpoints: str,
     execution_endpoints: str,
     execution_jwt_secret: str | None,
@@ -43,7 +45,6 @@ def start_remote_signer(
     data_dir: str,
     log_level: str,
     log_format: str,
-    network: str | None,
     remote_signer_url: str | None,
     wallet_file: str | None,
     wallet_password_file: str | None,
@@ -52,20 +53,13 @@ def start_remote_signer(
     concurrency: int | None,
     min_deposit_amount_gwei: int,
     min_deposit_delay: int,
-    no_confirm: bool,
 ) -> None:
-    vault_addresses = [to_checksum_address(address) for address in vaults.split(',')]
-
-    operator_config = load_operator_config(
-        vaults=vault_addresses,
-        data_dir=data_dir,
-        network=network,
-        no_confirm=no_confirm,
-    )
+    operator_config = OperatorConfig(vault, Path(data_dir))
+    operator_config.load()
 
     settings.set(
-        vaults=vault_addresses,
-        data_dir=operator_config.data_dir,
+        vault=vault,
+        vault_dir=operator_config.vault_dir,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
         execution_jwt_secret=execution_jwt_secret,
