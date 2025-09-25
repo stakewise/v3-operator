@@ -23,7 +23,7 @@ from src.config.settings import DEFAULT_NETWORK, settings
 @click.option(
     '--vault',
     prompt='Enter your vault address',
-    help='The vault addresses.',
+    help='The vault address.',
     type=str,
     callback=validate_eth_address,
 )

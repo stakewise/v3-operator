@@ -40,6 +40,14 @@ logger = logging.getLogger(__name__)
     help='The base URL of the remote signer, e.g. https://signer:9000',
 )
 @click.option(
+    '--vault',
+    prompt='Enter your vault address',
+    help='Vault address',
+    type=str,
+    envvar='VAULT',
+    callback=validate_eth_address,
+)
+@click.option(
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
     envvar='DATA_DIR',
@@ -77,13 +85,6 @@ logger = logging.getLogger(__name__)
     is_flag=True,
 )
 @click.option(
-    '--vault',
-    help='Vault address (only needed if --dappnode flag is set).',
-    type=str,
-    envvar='VAULT',
-    callback=validate_eth_address,
-)
-@click.option(
     '--execution-endpoints',
     type=str,
     envvar='EXECUTION_ENDPOINTS',
@@ -104,9 +105,6 @@ def setup_remote_signer(
     vault: ChecksumAddress,
     execution_endpoints: str,
 ) -> None:
-    if dappnode and not vault:
-        raise click.ClickException('Enter your vault address for dappnode setup.')
-
     config = OperatorConfig(vault, Path(data_dir))
     config.load()
     settings.set(
