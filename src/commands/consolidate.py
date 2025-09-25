@@ -289,7 +289,7 @@ async def main(
         for target_validator, source_validator in target_source
     ]
     oracle_signatures = await poll_consolidation_signature(
-        target_source_public_keys=target_source_public_keys,
+        target_public_keys=list({public_key for public_key, _ in target_source_public_keys}),
         vault=vault_address,
         protocol_config=protocol_config,
     )

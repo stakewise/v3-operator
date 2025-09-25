@@ -105,7 +105,7 @@ async def poll_validation_approval(
 
 async def poll_consolidation_signature(
     protocol_config: ProtocolConfig,
-    target_source_public_keys: list[tuple[HexStr, HexStr]],
+    target_public_keys: list[HexStr],
     vault: ChecksumAddress,
 ) -> bytes:
     """
@@ -114,15 +114,8 @@ async def poll_consolidation_signature(
     approvals_min_interval = 1
     rate_limiter = RateLimiter(approvals_min_interval)
     votes_threshold = protocol_config.validators_threshold
-    from_public_keys = []
-    to_public_keys = []
-    for to_key, from_key in target_source_public_keys:
-        from_public_keys.append(from_key)
-        to_public_keys.append(to_key)
-
     consolidation_request = ConsolidationRequest(
-        from_public_keys=from_public_keys,
-        to_public_keys=to_public_keys,
+        public_keys=target_public_keys,
         vault_address=vault,
     )
     while True:
