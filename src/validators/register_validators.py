@@ -138,13 +138,17 @@ async def fund_validators(
 
 async def submit_consolidate_validators(
     validators: bytes,
-    oracle_signatures: bytes,
+    oracle_signatures: bytes | None,
     tx_fee: Gwei,
     validators_manager_signature: HexStr,
 ) -> HexStr | None:
     """Sends consolidate validators transaction to vault contract"""
     logger.info('Submitting consolidate validators transaction')
     vault_contract = VaultContract(settings.vault)
+
+    if oracle_signatures is None:
+        oracle_signatures = b''
+
     try:
         tx = await vault_contract.functions.consolidateValidators(
             validators,
