@@ -361,7 +361,6 @@ async def _check_public_keys(
                 f'It must be active for at least '
                 f'{settings.network_config.SHARD_COMMITTEE_PERIOD} epochs before consolidation.'
             )
-
         source_validators.append(source_validator)
 
     # Validate target public key
