@@ -312,7 +312,7 @@ async def _check_consensus_nodes_network() -> None:
         if settings.network_config.CHAIN_ID != consensus_chain_id:
             raise ValueError(
                 f'Consensus node network is {consensus_network or 'unknown'}, '
-                f'while {settings.network} is passed in "--network" parameter'
+                f'while {settings.network} is set in the vault config.'
             )
 
 
@@ -332,7 +332,7 @@ async def _check_execution_nodes_network() -> None:
         if settings.network_config.CHAIN_ID != execution_chain_id:
             raise ValueError(
                 f'Execution node network is {execution_network or 'unknown'}, '
-                f'while {settings.network} is passed in "--network" parameter'
+                f'while {settings.network}  is set in the vault config.'
             )
 
 
