@@ -25,7 +25,11 @@ from src.common.harvest import get_harvest_params
 from src.common.utils import format_error, round_down, warning_verbose
 from src.common.wallet import wallet
 from src.config.networks import NETWORKS
-from src.config.settings import ValidatorsRegistrationMode, settings
+from src.config.settings import (
+    WITHDRAWALS_INTERVAL,
+    ValidatorsRegistrationMode,
+    settings,
+)
 from src.validators.execution import get_withdrawable_assets
 from src.validators.keystores.local import LocalKeystore
 from src.validators.relayer import RelayerClient
@@ -109,6 +113,13 @@ async def startup_checks() -> None:
     if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
         logger.info('Checking Relayer endpoint %s...', settings.relayer_endpoint)
         await _check_relayer_endpoint()
+
+    protocol_config = await get_protocol_config()
+    if WITHDRAWALS_INTERVAL > protocol_config.force_withdrawals_period:
+        raise ValueError(
+            'WITHDRAWALS_INTERVAL setting should be less than '
+            f'force withdrawals period({protocol_config.force_withdrawals_period} seconds)'
+        )
 
 
 def validate_settings() -> None:

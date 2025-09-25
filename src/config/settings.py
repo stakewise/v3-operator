@@ -311,9 +311,9 @@ ORACLES_CONSOLIDATION_TIMEOUT: int = decouple_config(
     'ORACLES_CONSOLIDATION_TIMEOUT', default=10, cast=int
 )
 ORACLES_EXITS_TIMEOUT: int = decouple_config('ORACLES_EXITS_TIMEOUT', default=10, cast=int)
-# partial withdrawals
-PARTIAL_WITHDRAWALS_INTERVAL: int = decouple_config(
-    'PARTIAL_WITHDRAWALS_INTERVAL', default=43200, cast=int  # every 12 hr
+# withdrawals
+WITHDRAWALS_INTERVAL: int = decouple_config(
+    'WITHDRAWALS_INTERVAL', default=43200, cast=int  # every 12 hr
 )
 MIN_WITHDRAWAL_AMOUNT_GWEI: Gwei = Gwei(1)
 
