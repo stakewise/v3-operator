@@ -21,7 +21,7 @@ from src.common.utils import round_down
 from src.config.settings import (
     MAX_WITHDRAWAL_REQUEST_FEE,
     MIN_WITHDRAWAL_AMOUNT_GWEI,
-    PARTIAL_WITHDRAWALS_INTERVAL,
+    WITHDRAWALS_INTERVAL,
     ValidatorsRegistrationMode,
     settings,
 )
@@ -44,7 +44,7 @@ class WithdrawalIntervalMixin:
         last_withdrawals_block = app_state.partial_withdrawal_block
 
         partial_withdrawals_blocks_interval = (
-            PARTIAL_WITHDRAWALS_INTERVAL // settings.network_config.SECONDS_PER_BLOCK
+            WITHDRAWALS_INTERVAL // settings.network_config.SECONDS_PER_BLOCK
         )
         from_block = BlockNumber(chain_head.block_number - partial_withdrawals_blocks_interval)
         if not last_withdrawals_block:
@@ -105,7 +105,6 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
         metrics.queued_assets.labels(network=settings.network).set(int(queued_assets))
 
         if queued_assets < MIN_WITHDRAWAL_AMOUNT_GWEI:
-            app_state.partial_withdrawal_block = chain_head.block_number
             return
 
         current_fee = await get_execution_request_fee(
@@ -136,7 +135,6 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
                 'No eligible validators found for withdrawal of %s Gwei',
                 queued_assets,
             )
-            app_state.partial_withdrawal_block = chain_head.block_number
             return
 
         validators_manager_signature = HexStr('0x')
