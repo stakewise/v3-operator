@@ -324,6 +324,13 @@ async def _check_public_keys(
     if len(source_public_keys) != len(set(source_public_keys)):
         raise click.ClickException('Source public keys must be unique.')
 
+    # Validate the switch from 0x01 to 0x02 and consolidation to another validator
+    if len(source_public_keys) > 1 and target_public_key in source_public_keys:
+        raise click.ClickException(
+            'Cannot switch from 0x01 to 0x02 and consolidate '
+            'to another validator in the same request.'
+        )
+
     # Fetch source and target validators
     validators = await fetch_consensus_validators(source_public_keys + [target_public_key])
     pubkey_to_validator = {val.public_key: val for val in validators}
@@ -355,12 +362,6 @@ async def _check_public_keys(
                 f'{settings.network_config.SHARD_COMMITTEE_PERIOD} epochs before consolidation.'
             )
 
-        # Validate the switch from 0x01 to 0x02 and consolidation to another validator
-        if len(source_validators) > 0 and source_validator.public_key == target_public_key:
-            raise click.ClickException(
-                'Cannot switch from 0x01 to 0x02 and consolidate '
-                'to another validator in the same request.'
-            )
         source_validators.append(source_validator)
 
     # Validate target public key
