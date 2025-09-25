@@ -157,7 +157,8 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
         if not tx_hash:
             return
 
-        app_state.partial_withdrawal_block = chain_head.block_number
+        tx_data = await execution_client.eth.get_transaction(tx_hash)
+        app_state.partial_withdrawal_block = tx_data['blockNumber']
 
         withdrawn_assets = Web3.to_wei(queued_assets, 'gwei')
         if settings.network in GNO_NETWORKS:
