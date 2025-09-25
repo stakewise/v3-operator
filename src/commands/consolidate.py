@@ -356,7 +356,7 @@ async def _check_public_keys(
             )
 
         # Validate the switch from 0x01 to 0x02 and consolidation to another validator
-        if len(source_public_keys) > 1 and source_validator.public_key == target_public_key:
+        if len(source_public_keys) > 0 and source_validator.public_key == target_public_key:
             raise click.ClickException(
                 'Cannot switch from 0x01 to 0x02 and consolidate '
                 'to another validator in the same request.'
