@@ -33,10 +33,7 @@ from src.validators.oracles import poll_validation_approval
 from src.validators.register_validators import fund_validators, register_validators
 from src.validators.relayer import RelayerClient
 from src.validators.typings import NetworkValidator, Validator
-from src.validators.utils import (
-    get_validators_for_funding,
-    get_validators_for_registration,
-)
+from src.validators.utils import get_validators_for_registration
 from src.validators.validators_manager import get_validators_manager_signature
 
 logger = logging.getLogger(__name__)
@@ -89,7 +86,6 @@ class ValidatorRegistrationSubtask:
             try:
                 tx_hash = await fund_compounding_validators(
                     funding_amounts=funding_amounts,
-                    keystore=self.keystore,
                     harvest_params=harvest_params,
                     relayer=self.relayer,
                 )
@@ -109,7 +105,6 @@ class ValidatorRegistrationSubtask:
 
 
 async def fund_compounding_validators(
-    keystore: BaseKeystore | None,
     funding_amounts: dict[HexStr, Gwei],
     harvest_params: HarvestParams | None,
     relayer: RelayerClient | None = None,
@@ -119,23 +114,26 @@ async def fund_compounding_validators(
     """
     logger.info('Started funding of %d validator(s)', len(funding_amounts))
     validators_manager_signature = HexStr('0x')
-    if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
-        validators = await get_validators_for_funding(
-            funding_amounts=funding_amounts,
-            keystore=cast(BaseKeystore, keystore),
-        )
-    else:
+    if settings.validators_registration_mode != ValidatorsRegistrationMode.AUTO:
         # fetch validators and signature from relayer
         validators_response = await cast(RelayerClient, relayer).fund_validators(
             funding_amounts=funding_amounts,
         )
 
-        validators = validators_response.validators
-        if not validators:
-            logger.debug('Waiting for relayer validators')
-            raise EmptyRelayerResponseException()
         if validators_response.validators_manager_signature:
             validators_manager_signature = validators_response.validators_manager_signature
+
+    validators = []
+    # the signature is not checked for funding active validators
+    empty_signature = Web3.to_hex(bytes(96))
+    for public_key, amount in funding_amounts.items():
+        validators.append(
+            Validator(
+                public_key=public_key,
+                signature=empty_signature,
+                amount=amount,
+            )
+        )
 
     tx_hash = await fund_validators(
         harvest_params=harvest_params,
