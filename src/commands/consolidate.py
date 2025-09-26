@@ -59,7 +59,7 @@ logger = logging.getLogger(__name__)
     '--source-public-keys',
     type=HexStr,
     callback=validate_public_keys,
-    help='Public keys of validators to consolidate from.',
+    help='Comma separated list of public keys of validators to consolidate from.',
 )
 @click.option(
     '--source-public-keys-file',
@@ -275,11 +275,17 @@ async def main(
         (target_validator.public_key, source_validator.public_key)
         for target_validator, source_validator in target_source
     ]
-    oracle_signatures = await poll_consolidation_signature(
-        target_source_public_keys=target_source_public_keys,
-        vault=vault_address,
-        protocol_config=protocol_config,
-    )
+    oracle_signatures = None
+    if (
+        len(target_source_public_keys) == 1
+        and target_source_public_keys[0][0] == target_source_public_keys[0][1]
+    ):
+        # The oracles signatures are only required when switching from 0x01 to 0x02
+        oracle_signatures = await poll_consolidation_signature(
+            target_public_keys=[target_source_public_keys[0][0]],
+            vault=vault_address,
+            protocol_config=protocol_config,
+        )
 
     encoded_validators = _encode_validators(target_source_public_keys)
     validators_manager_signature = await get_validators_manager_signature(
@@ -301,6 +307,7 @@ async def main(
         )
 
 
+# pylint: disable-next=too-many-branches
 async def _check_public_keys(
     vault_address: ChecksumAddress,
     source_public_keys: list[HexStr],
@@ -317,11 +324,18 @@ async def _check_public_keys(
     if len(source_public_keys) != len(set(source_public_keys)):
         raise click.ClickException('Source public keys must be unique.')
 
+    # Validate the switch from 0x01 to 0x02 and consolidation to another validator
+    if len(source_public_keys) > 1 and target_public_key in source_public_keys:
+        raise click.ClickException(
+            'Cannot switch from 0x01 to 0x02 and consolidate '
+            'to another validator in the same request.'
+        )
+
     # Fetch source and target validators
     validators = await fetch_consensus_validators(source_public_keys + [target_public_key])
     pubkey_to_validator = {val.public_key: val for val in validators}
 
-    source_validators = []
+    source_validators: list[ConsensusValidator] = []
     max_activation_epoch = chain_head.epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
 
     # Validate source public keys
@@ -336,7 +350,8 @@ async def _check_public_keys(
         # Validate the source validator status
         if source_validator.status in EXITING_STATUSES:
             raise click.ClickException(
-                f'Validator {source_public_key} is in exiting status {source_validator.status}.'
+                f'Validator {source_public_key} is in exiting '
+                f'status {source_validator.status.value}.'
             )
 
         # Validate the source has been active long enough
@@ -356,7 +371,8 @@ async def _check_public_keys(
         )
     if target_validator.status in EXITING_STATUSES:
         raise click.ClickException(
-            f'Target validator {target_public_key} is in exiting status {target_validator.status}.'
+            f'Target validator {target_public_key} is in exiting '
+            f'status {target_validator.status.value}.'
         )
 
     # Validate that target validator is a compounding validator.

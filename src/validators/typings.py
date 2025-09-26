@@ -110,6 +110,5 @@ class ApprovalRequest:
 
 @dataclass
 class ConsolidationRequest:
-    from_public_keys: list[HexStr]
-    to_public_keys: list[HexStr]
+    public_keys: list[HexStr]
     vault_address: ChecksumAddress
