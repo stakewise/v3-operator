@@ -49,28 +49,17 @@ class RelayerClient:
 
     async def fund_validators(
         self, funding_amounts: dict[HexStr, Gwei]
-    ) -> RelayerValidatorsResponse:
+    ) -> RelayerSignatureResponse:
         relayer_response = await self._fund_validators(
             vault_address=settings.vault,
             public_keys=list(funding_amounts.keys()),
             amounts=list(funding_amounts.values()),
         )
-        validators: list[Validator] = []
-        for v in relayer_response.get('validators') or []:
-            public_key = add_0x_prefix(v['public_key'])
-            deposit_signature = add_0x_prefix(v['deposit_signature'])
-            validator = Validator(
-                public_key=public_key,
-                amount=v['amount'],
-                signature=deposit_signature,
-            )
-            validators.append(validator)
 
         validators_manager_signature = add_0x_prefix(
             relayer_response.get('validators_manager_signature') or HexStr('0x')
         )
-        return RelayerValidatorsResponse(
-            validators=validators,
+        return RelayerSignatureResponse(
             validators_manager_signature=validators_manager_signature,
         )
 
@@ -122,7 +111,7 @@ class RelayerClient:
             'amounts': amounts,
             'validator_type': settings.validator_type.value,
         }
-        return await self._send_post_request('validators', jsn)
+        return await self._send_post_request('register', jsn)
 
     async def _fund_validators(
         self, vault_address: ChecksumAddress, public_keys: list[HexStr], amounts: list[Gwei]
