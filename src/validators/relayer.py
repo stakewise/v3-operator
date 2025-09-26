@@ -111,7 +111,7 @@ class RelayerClient:
             'amounts': amounts,
             'validator_type': settings.validator_type.value,
         }
-        return await self._send_post_request('validators', jsn)
+        return await self._send_post_request('register', jsn)
 
     async def _fund_validators(
         self, vault_address: ChecksumAddress, public_keys: list[HexStr], amounts: list[Gwei]
