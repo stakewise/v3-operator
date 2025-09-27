@@ -44,7 +44,7 @@ NETWORKS: dict[str, NetworkConfig] = {
             '0x75AB6DdCe07556639333d3Df1eaa684F5735223e'
         ),
         VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x3b629aF425277FfD7cEB841a24e75d34F868651C'
+            '0xA89629B41477560d49dd56ef1a59BD214362aCDC'
         ),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
@@ -73,7 +73,7 @@ NETWORKS: dict[str, NetworkConfig] = {
             '0x93a3f880E07B27dacA6Ef2d3C23E77DBd6294487'
         ),
         VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x3b629aF425277FfD7cEB841a24e75d34F868651C'
+            '0xA89629B41477560d49dd56ef1a59BD214362aCDC'
         ),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
@@ -100,7 +100,7 @@ NETWORKS: dict[str, NetworkConfig] = {
             '0x58e16621B5c0786D6667D2d54E28A20940269E16'
         ),
         VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x3b629aF425277FfD7cEB841a24e75d34F868651C'
+            '0xA89629B41477560d49dd56ef1a59BD214362aCDC'
         ),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x99F07eA1Cf491319FF6a2eDbBfEC84F3A5eAbfB5'
@@ -129,7 +129,7 @@ NETWORKS: dict[str, NetworkConfig] = {
             '0xFAce8504462AEb9BB6ae7Ecb206BD7B1EdF7956D'
         ),
         VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x3b629aF425277FfD7cEB841a24e75d34F868651C'
+            '0xA89629B41477560d49dd56ef1a59BD214362aCDC'
         ),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
