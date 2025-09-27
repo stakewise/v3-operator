@@ -165,7 +165,7 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
             withdrawn_assets = convert_to_gno(withdrawn_assets)
 
         logger.info(
-            'Successfully withdrawn %s %s for validators with public keys %s, tx hash: %s',
+            'Successfully withdrew %s %s for validators with public key(s) %s, tx hash: %s',
             round_down(Web3.from_wei(withdrawn_assets, 'ether'), 2),
             settings.network_config.VAULT_BALANCE_SYMBOL,
             ', '.join(withdrawals.keys()),
