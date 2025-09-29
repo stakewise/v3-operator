@@ -1,4 +1,10 @@
-from sw_utils import GNO_NETWORKS, ChainHead, ValidatorStatus, convert_to_mgno
+from sw_utils import (
+    GNO_NETWORKS,
+    ChainHead,
+    ValidatorStatus,
+    convert_to_gno,
+    convert_to_mgno,
+)
 from web3 import Web3
 from web3.types import Gwei, Wei
 
@@ -33,7 +39,7 @@ async def get_queued_assets(
     oracle_exiting_validators: list[ConsensusValidator],
     chain_head: ChainHead,
 ) -> Gwei:
-    harvest_params = await get_harvest_params()
+    harvest_params = await get_harvest_params(chain_head.block_number)
 
     # Get exit queue cumulative tickets
     exit_queue_cumulative_ticket = (
@@ -51,7 +57,7 @@ async def get_queued_assets(
         slot=chain_head.slot,
     )
     # fetch active validators exits
-    consolidations = await consensus_client.get_pending_consolidations()
+    consolidations = await consensus_client.get_pending_consolidations(str(chain_head.slot))
     source_consolidations_indexes = {
         int(consolidation['source_index']) for consolidation in consolidations
     }
@@ -64,7 +70,9 @@ async def get_queued_assets(
     # Withdrawing assets are assets that are ready to cover the exit requests
     # but not yet used to fulfill exit requests.
     withdrawing_assets = Wei(pending_partial_withdrawals_amount + validators_exits_amount)
-
+    if settings.network in GNO_NETWORKS:
+        # apply mGNO -> GNO exchange rate
+        withdrawing_assets = convert_to_gno(withdrawing_assets)
     # Missing assets express how much assets are needed to cover the exit requests
     # until the exit queue cumulative ticket is reached
     queued_assets = await validators_checker_contract.get_exit_queue_missing_assets(
