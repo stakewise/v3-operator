@@ -37,6 +37,7 @@ class TestGetOraclesRequest:
             ),
         ):
             request = await _get_oracles_request(
+                vault=vault_address,
                 protocol_config=protocol_config,
                 keystore=LocalKeystore(Keys({test_validator_pubkey: test_validator_privkey})),
                 validators={123: test_validator_pubkey},
@@ -70,6 +71,7 @@ class TestGetOraclesRequest:
                 randint(0, int(1e6)): pubkey for pubkey in remote_signer_keystore.public_keys
             }
             request = await _get_oracles_request(
+                vault=vault_address,
                 protocol_config=protocol_config,
                 keystore=remote_signer_keystore,
                 validators=validators,
@@ -87,7 +89,7 @@ class TestGetOraclesRequest:
 class TestFetchLastExitSignatureUpdateBlock:
     async def test_normal(self):
         get_event_func = 'src.exits.tasks.keeper_contract.get_exit_signatures_updated_event'
-
+        vault_address = settings.vault
         # no events, checkpoint moved from None to 8
         with (
             mock.patch(get_event_func, return_value=None) as get_event_mock,
@@ -96,7 +98,7 @@ class TestFetchLastExitSignatureUpdateBlock:
             last_update_block = await _fetch_last_update_block()
 
         assert last_update_block is None
-        get_event_mock.assert_called_once_with(vault=settings.vault, from_block=None, to_block=8)
+        get_event_mock.assert_called_once_with(vault=vault_address, from_block=None, to_block=8)
 
         # no events, checkpoint moved to 9
         with (
@@ -106,7 +108,7 @@ class TestFetchLastExitSignatureUpdateBlock:
             last_update_block = await _fetch_last_update_block()
 
         assert last_update_block is None
-        get_event_mock.assert_called_once_with(vault=settings.vault, from_block=9, to_block=9)
+        get_event_mock.assert_called_once_with(vault=vault_address, from_block=9, to_block=9)
 
         # event is found, checkpoint moved to 15
         with (
@@ -116,7 +118,7 @@ class TestFetchLastExitSignatureUpdateBlock:
             last_update_block = await _fetch_last_update_block()
 
         assert last_update_block == 11
-        get_event_mock.assert_called_once_with(vault=settings.vault, from_block=10, to_block=15)
+        get_event_mock.assert_called_once_with(vault=vault_address, from_block=10, to_block=15)
 
         # no events, checkpoint moved to 20
         with (
@@ -126,7 +128,7 @@ class TestFetchLastExitSignatureUpdateBlock:
             last_update_block = await _fetch_last_update_block()
 
         assert last_update_block == 11
-        get_event_mock.assert_called_once_with(vault=settings.vault, from_block=16, to_block=20)
+        get_event_mock.assert_called_once_with(vault=vault_address, from_block=16, to_block=20)
 
 
 @contextlib.contextmanager

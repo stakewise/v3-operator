@@ -30,6 +30,7 @@ class TestCreateMnemonic:
 
     def test_bad_verify(self, mnemonic_mock, data_dir, runner: CliRunner):
         vault = faker.eth_address()
+
         args = [
             '--data-dir',
             str(data_dir),
@@ -48,14 +49,15 @@ class TestCreateMnemonic:
 
     def test_no_verify(self, mnemonic_mock, data_dir, runner: CliRunner):
         vault = faker.eth_address()
+
         args = [
             '--data-dir',
             str(data_dir),
             '--language',
             'english',
-            '--no-verify',
             '--vault',
             vault,
+            '--no-verify',
             '--network',
             'hoodi',
         ]

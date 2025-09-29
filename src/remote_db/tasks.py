@@ -12,12 +12,10 @@ from web3 import Web3
 
 from src.common.utils import greenify
 from src.config.settings import settings
-from src.remote_db.database import ConfigsCrud, KeyPairsCrud, get_db_connection
+from src.remote_db.database import KeyPairsCrud, get_db_connection
 from src.remote_db.typings import RemoteDatabaseKeyPair
-from src.validators.execution import check_deposit_data_root
 from src.validators.keystores.local import LocalKeystore
 from src.validators.typings import BLSPrivkey
-from src.validators.utils import generate_validators_tree
 
 CIPHER_KEY_LENGTH = 32
 VALIDATOR_DEFINITIONS_FILENAME = 'validator_definitions.yml'
@@ -32,16 +30,7 @@ def setup(db_url: str) -> str:
         keypairs_crud = KeyPairsCrud(db_connection=conn)
         keypairs_crud.create_table()
 
-        config_crud = ConfigsCrud(db_connection=conn)
-        config_crud.create_table()
-
         if keypairs_crud.get_keypairs_count() > 0:
-            raise click.ClickException(
-                'Error: the remote database is not empty. '
-                'Please clean up with "clean" command first.',
-            )
-
-        if config_crud.get_configs_count() > 0:
             raise click.ClickException(
                 'Error: the remote database is not empty. '
                 'Please clean up with "clean" command first.',
@@ -58,22 +47,10 @@ def cleanup(db_url: str) -> None:
         keypairs_crud = KeyPairsCrud(db_connection=conn)
         keypairs_crud.remove_keypairs()
 
-        config_crud = ConfigsCrud(db_connection=conn)
-        config_crud.remove_configs()
 
-
-# pylint: disable=too-many-locals
 async def upload_keypairs(db_url: str, b64_encrypt_key: str) -> None:
     """Uploads key-pairs to remote DB. Updates configs in the remote DB."""
     encryption_key = _check_encryption_key(db_url, b64_encrypt_key)
-
-    # load and check deposit data file
-    with open(settings.deposit_data_file, 'r', encoding='utf-8') as f:
-        deposit_data: list[dict] = json.load(f)
-
-    if not settings.disable_deposit_data_warnings:
-        deposit_data_tree, _ = generate_validators_tree(settings.vault, deposit_data)
-        await check_deposit_data_root(deposit_data_tree.root)
 
     click.echo(f'Loading keystores from {settings.keystores_dir}...')
     keystore = await LocalKeystore.load()
@@ -86,7 +63,6 @@ async def upload_keypairs(db_url: str, b64_encrypt_key: str) -> None:
         encrypted_priv_key, nonce = _encrypt_private_key(private_key, encryption_key)
         key_records.append(
             RemoteDatabaseKeyPair(
-                vault=settings.vault,
                 public_key=public_key,
                 private_key=Web3.to_hex(encrypted_priv_key),
                 nonce=Web3.to_hex(nonce),
@@ -98,10 +74,6 @@ async def upload_keypairs(db_url: str, b64_encrypt_key: str) -> None:
         keypairs_crud = KeyPairsCrud(db_connection=conn)
         # upload keypairs to remote db
         keypairs_crud.upload_keypairs(key_records)
-
-        # upload remote signer config to remote db
-        configs_crud = ConfigsCrud(db_connection=conn)
-        configs_crud.update_deposit_data(deposit_data)
 
 
 def setup_web3signer(db_url: str, b64_encrypt_key: str, output_dir: Path) -> None:
@@ -201,23 +173,6 @@ def setup_validator(
         f'Proposer config for Teku\\Prysm saved to '
         f'{greenify(proposer_config_filepath)} file.\n',
     )
-
-
-def setup_operator(db_url: str, output_dir: Path) -> None:
-    """Create operator remote signer configuration."""
-    config_crud = ConfigsCrud(db_url=db_url)
-
-    deposit_data = config_crud.get_deposit_data()
-    if deposit_data is None:
-        raise click.ClickException('No deposit data found in the remote db.')
-
-    if not output_dir.exists():
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-    output_file = output_dir / ConfigsCrud.deposit_data_name
-    with open(output_file, 'w', encoding='utf-8') as f:
-        json.dump(deposit_data, f)
-    click.secho(f'Operator deposit data saved to {greenify(output_file)} file.')
 
 
 def _check_encryption_key(db_url: str, b64_encrypt_key: str) -> bytes:

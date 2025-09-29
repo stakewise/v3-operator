@@ -57,9 +57,33 @@ class Metrics:
             namespace=settings.metrics_prefix,
             labelnames=['network'],
         )
+        self.last_registration_block = Gauge(
+            'last_registration_block',
+            'The block number of last registration of validators',
+            namespace=settings.metrics_prefix,
+            labelnames=['network'],
+        )
+        self.last_funding_block = Gauge(
+            'last_funding_block',
+            'The block number of last funding to validators',
+            namespace=settings.metrics_prefix,
+            labelnames=['network'],
+        )
         self.unused_validator_keys = Gauge(
             'unused_validator_keys',
-            'The number of unused validator keys in deposit data file',
+            'The number of unused validator keys in keystore',
+            namespace=settings.metrics_prefix,
+            labelnames=['network'],
+        )
+        self.queued_assets = Gauge(
+            'queued_assets',
+            'The amount of withdrawable assets',
+            namespace=settings.metrics_prefix,
+            labelnames=['network'],
+        )
+        self.last_withdrawal_block = Gauge(
+            'last_withdrawal_block',
+            'The block number of last withdrawal from validators',
             namespace=settings.metrics_prefix,
             labelnames=['network'],
         )

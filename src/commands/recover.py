@@ -3,35 +3,36 @@ import sys
 from pathlib import Path
 
 import click
-from eth_typing import HexAddress, HexStr
+from eth_typing import ChecksumAddress, HexStr
 from eth_utils import add_0x_prefix
 from sw_utils.consensus import EXITED_STATUSES, ValidatorStatus
 
 from src.common.clients import consensus_client, execution_client, setup_clients
-from src.common.contracts import vault_contract
+from src.common.contracts import VaultContract
 from src.common.credentials import CredentialManager
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.password import generate_password, get_or_create_password_file
 from src.common.utils import greenify, log_verbose
 from src.common.validators import validate_eth_address, validate_mnemonic
-from src.common.vault_config import VaultConfig
+from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_NETWORK, settings
 
 
-@click.command(help='Recover vault data directory and keystores.')
+@click.command(help='Recover config data directory and keystores.')
 @click.option(
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
     envvar='DATA_DIR',
-    help='Path where the vault data will be placed. Default is ~/.stakewise.',
+    help='Path where the keystores and config data will be placed. Default is ~/.stakewise.',
     type=click.Path(exists=False, file_okay=False, dir_okay=True),
 )
 @click.option(
     '--per-keystore-password',
     is_flag=True,
     default=False,
-    help='Creates separate password file for each keystore.',
+    help='Creates separate password file for each keystore.'
+    ' Creates a single password file by default.',
 )
 @click.option(
     '--no-confirm',
@@ -58,14 +59,14 @@ from src.config.settings import DEFAULT_NETWORK, settings
     '--execution-endpoints',
     type=str,
     envvar='EXECUTION_ENDPOINTS',
-    prompt='Enter comma separated list of API endpoints for execution nodes',
+    prompt='Enter the comma separated list of API endpoints for execution nodes',
     help='Comma separated list of API endpoints for execution nodes.',
 )
 @click.option(
     '--consensus-endpoints',
     type=str,
     envvar='CONSENSUS_ENDPOINTS',
-    prompt='Enter comma separated list of API endpoints for consensus nodes',
+    prompt='Enter the comma separated list of API endpoints for consensus nodes',
     help='Comma separated list of API endpoints for consensus nodes.',
 )
 @click.option(
@@ -91,7 +92,7 @@ from src.config.settings import DEFAULT_NETWORK, settings
 # pylint: disable-next=too-many-arguments
 def recover(
     data_dir: str,
-    vault: HexAddress,
+    vault: ChecksumAddress,
     network: str,
     mnemonic: str,
     consensus_endpoints: str,
@@ -101,24 +102,19 @@ def recover(
     log_level: str,
 ) -> None:
     # pylint: disable=duplicate-code
-    config = VaultConfig(
-        vault=vault,
-        data_dir=Path(data_dir),
+    operator_config = OperatorConfig(
+        vault,
+        Path(data_dir),
     )
-    if not config.vault_dir.exists():
-        # create vault dir if it does not exist
-        config.vault_dir.mkdir(parents=True)
-        click.secho(f'Vault directory {config.vault_dir} created.', bold=True, fg='green')
-
-    keystores_dir = config.vault_dir / 'keystores'
-    password_file = keystores_dir / 'password.txt'
+    if operator_config.config_path.is_file():
+        raise click.ClickException(f'Config directory {operator_config.vault_dir} already exists.')
 
     settings.set(
         execution_endpoints=execution_endpoints,
         consensus_endpoints=consensus_endpoints,
         vault=vault,
         network=network,
-        vault_dir=config.vault_dir,
+        vault_dir=operator_config.vault_dir,
         log_level=log_level,
     )
 
@@ -126,11 +122,9 @@ def recover(
         asyncio.run(
             main(
                 mnemonic=mnemonic,
-                keystores_dir=keystores_dir,
-                password_file=password_file,
                 per_keystore_password=per_keystore_password,
                 no_confirm=no_confirm,
-                config=config,
+                operator_config=operator_config,
             )
         )
     except Exception as e:
@@ -138,19 +132,19 @@ def recover(
         sys.exit(1)
 
 
-# pylint: disable-next=too-many-arguments
 async def main(
     mnemonic: str,
-    keystores_dir: Path,
-    password_file: Path,
     per_keystore_password: bool,
     no_confirm: bool,
-    config: VaultConfig,
+    operator_config: OperatorConfig,
 ) -> None:
     setup_logging()
     await setup_clients()
 
-    validators = await _fetch_registered_validators()
+    validators: dict[HexStr, ValidatorStatus | None] = await _fetch_registered_validators(
+        settings.vault
+    )
+
     if not validators:
         raise click.ClickException('No registered validators')
 
@@ -168,6 +162,7 @@ async def main(
             abort=True,
         )
 
+    keystores_dir = operator_config.keystores_dir
     if keystores_dir.exists():
         if no_confirm:
             click.secho(f'Removing existing {keystores_dir} keystores directory...')
@@ -177,7 +172,7 @@ async def main(
                 default=True,
                 abort=True,
             )
-        for file in keystores_dir.glob('*'):
+        for file in keystores_dir.iterdir():
             file.unlink()
     else:
         keystores_dir.mkdir(parents=True)
@@ -185,23 +180,25 @@ async def main(
     mnemonic_next_index = await _generate_keystores(
         mnemonic=mnemonic,
         keystores_dir=keystores_dir,
-        password_file=password_file,
+        password_file=operator_config.keystores_password_file,
         validator_statuses=validators,
         per_keystore_password=per_keystore_password,
     )
 
-    config.save(settings.network, mnemonic, mnemonic_next_index)
+    operator_config.save(settings.network, mnemonic, mnemonic_next_index)
     click.secho(
         f'Successfully recovered {greenify(mnemonic_next_index)} '
         f'keystores for vault {greenify(settings.vault)}',
     )
 
 
-# pylint: disable-next=too-many-locals
-async def _fetch_registered_validators() -> dict[HexStr, ValidatorStatus | None]:
+async def _fetch_registered_validators(
+    vault: ChecksumAddress,
+) -> dict[HexStr, ValidatorStatus | None]:
     """Fetch registered validators."""
-    click.secho('Fetching registered validators...', bold=True)
+    click.secho(f'Fetching registered validators for vault {vault}...', bold=True)
     current_block = await execution_client.eth.get_block_number()
+    vault_contract = VaultContract(vault)
     public_keys = await vault_contract.get_registered_validators_public_keys(
         from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
         to_block=current_block,
@@ -224,7 +221,6 @@ async def _fetch_registered_validators() -> dict[HexStr, ValidatorStatus | None]
     return validator_statuses
 
 
-# pylint: disable-next=too-many-arguments,too-many-locals
 async def _generate_keystores(
     mnemonic: str,
     keystores_dir: Path,
@@ -241,7 +237,6 @@ async def _generate_keystores(
         # generate credential
         credential = CredentialManager.generate_credential(
             network=settings.network,
-            vault=settings.vault,
             mnemonic=mnemonic,
             index=index,
         )

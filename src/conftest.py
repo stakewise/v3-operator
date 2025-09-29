@@ -15,14 +15,20 @@ from sw_utils.typings import Oracle, ProtocolConfig
 
 from src.commands.create_keys import create_keys
 from src.commands.create_wallet import create_wallet
-from src.commands.remote_signer_setup import remote_signer_setup
+from src.commands.setup_remote_signer import setup_remote_signer
 from src.common.credentials import CredentialManager
-from src.common.vault_config import VaultConfig
+from src.config.config import OperatorConfig
 from src.config.networks import HOODI
 from src.config.settings import settings
-from src.test_fixtures.hashi_vault import hashi_vault_url, mocked_hashi_vault  # noqa
-from src.test_fixtures.remote_signer import mocked_remote_signer, remote_signer_url
 from src.validators.keystores.remote import RemoteSignerKeystore
+from src.validators.keystores.tests.test_fixtures.hashi_vault import (
+    hashi_vault_url,
+    mocked_hashi_vault,
+)
+from src.validators.keystores.tests.test_fixtures.remote_signer import (
+    mocked_remote_signer,
+    remote_signer_url,
+)
 from src.validators.signing.tests.oracle_functions import OracleCommittee
 from src.validators.typings import BLSPrivkey
 
@@ -41,7 +47,18 @@ def data_dir(temp_dir: Path) -> Path:
 
 
 @pytest.fixture
-def keystores_dir(vault_dir: Path, _init_vault) -> Path:
+def vault_address() -> HexAddress:
+    return faker.eth_address()
+
+
+@pytest.fixture
+def vault_dir(data_dir: Path, vault_address: HexAddress) -> Path:
+    vault_dir = data_dir / vault_address.lower()
+    return vault_dir
+
+
+@pytest.fixture
+def keystores_dir(vault_dir: Path, _init_config) -> Path:
     keystores_dir = vault_dir / 'keystores'
     keystores_dir.mkdir(exist_ok=True)
     return keystores_dir
@@ -66,8 +83,8 @@ def test_mnemonic() -> str:
 
 
 @pytest.fixture
-def _init_vault(vault_address: HexAddress, data_dir: Path, test_mnemonic: str) -> None:
-    config = VaultConfig(vault=vault_address, data_dir=data_dir)
+def _init_config(vault_address: HexAddress, data_dir: Path, test_mnemonic: str) -> None:
+    config = OperatorConfig(vault=vault_address, data_dir=data_dir)
     config.save(HOODI, test_mnemonic)
 
 
@@ -97,7 +114,7 @@ def _create_keys(
             str(vault_address),
             '--data-dir',
             str(data_dir),
-            '--pool-size',
+            '--concurrency',
             '1',
         ],
     )
@@ -123,7 +140,7 @@ def _create_wallet(
 
 
 @pytest.fixture
-def _remote_signer_setup(
+def _setup_remote_signer(
     vault_address: HexAddress,
     data_dir: Path,
     keystores_dir: Path,
@@ -135,7 +152,7 @@ def _remote_signer_setup(
     _create_keys,
 ) -> None:
     result = runner.invoke(
-        remote_signer_setup,
+        setup_remote_signer,
         [
             '--vault',
             str(vault_address),
@@ -150,7 +167,7 @@ def _remote_signer_setup(
 
 
 @pytest.fixture
-async def remote_signer_keystore(_remote_signer_setup) -> RemoteSignerKeystore:
+async def remote_signer_keystore(_setup_remote_signer) -> RemoteSignerKeystore:
     return await RemoteSignerKeystore.load()
 
 
@@ -159,10 +176,10 @@ def vault_address() -> HexAddress:
     return faker.eth_address()
 
 
-@pytest.fixture
-def vault_dir(data_dir: Path, vault_address: HexAddress) -> Path:
-    vault_dir = data_dir / vault_address.lower()
-    return vault_dir
+# @pytest.fixture
+# def config_dir(data_dir: Path) -> Path:
+#     config_dir = data_dir / HOODI
+#     return config_dir
 
 
 @pytest.fixture
@@ -243,14 +260,11 @@ def mocked_protocol_config(
 
 
 @pytest.fixture
-def create_validator_keypair(
-    test_mnemonic: str, vault_address: HexAddress
-) -> Callable[[], tuple[BLSPrivkey, HexStr]]:
+def create_validator_keypair(test_mnemonic: str) -> Callable[[], tuple[BLSPrivkey, HexStr]]:
     def _generate_keypair_function() -> tuple[BLSPrivkey, HexStr]:
         """Returns a random validator keypair"""
         credential = CredentialManager.generate_credential(
             network=HOODI,
-            vault=vault_address,
             mnemonic=test_mnemonic,
             index=randint(0, 100_000),
         )

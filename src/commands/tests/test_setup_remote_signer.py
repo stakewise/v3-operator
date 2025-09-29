@@ -6,13 +6,13 @@ from click.testing import CliRunner
 from eth_typing import HexAddress
 
 from src.commands.create_keys import create_keys
-from src.commands.remote_signer_setup import remote_signer_setup
+from src.commands.setup_remote_signer import setup_remote_signer
 from src.config.settings import settings
 
 
 class TestOperatorRemoteSignerSetup:
     @pytest.mark.usefixtures(
-        '_init_vault',
+        '_init_config',
         '_create_keys',
         'mocked_remote_signer',
     )
@@ -28,15 +28,15 @@ class TestOperatorRemoteSignerSetup:
         key_count = 3
 
         args = [
-            '--vault',
-            str(vault_address),
             '--remote-signer-url',
             remote_signer_url,
+            '--vault',
+            str(vault_address),
             '--data-dir',
             str(data_dir),
         ]
 
-        result = runner.invoke(remote_signer_setup, args, input='y')
+        result = runner.invoke(setup_remote_signer, args, input='y')
         assert result.exit_code == 0
         for expected_output_message in [
             f'Successfully imported {key_count} keys into remote signer.',
@@ -54,7 +54,7 @@ class TestOperatorRemoteSignerSetup:
             pubkeys_remote_signer = {pubkey_dict.get('validating_pubkey') for pubkey_dict in data}
             assert len(pubkeys_remote_signer) == key_count
 
-    @pytest.mark.usefixtures('_init_vault', 'mocked_remote_signer')
+    @pytest.mark.usefixtures('_init_config', 'mocked_remote_signer')
     def test_add_more_keys_later(
         self,
         vault_address: HexAddress,
@@ -73,10 +73,10 @@ class TestOperatorRemoteSignerSetup:
             args = [
                 '--mnemonic',
                 test_mnemonic,
-                '--count',
-                str(key_count),
                 '--vault',
                 str(vault_address),
+                '--count',
+                str(key_count),
                 '--data-dir',
                 str(data_dir),
             ]
@@ -85,15 +85,15 @@ class TestOperatorRemoteSignerSetup:
             assert f'Done. Generated {key_count} keys' in result.output
 
             args = [
-                '--vault',
-                str(vault_address),
                 '--remote-signer-url',
                 remote_signer_url,
                 '--data-dir',
                 str(data_dir),
+                '--vault',
+                str(vault_address),
             ]
 
-            result = runner.invoke(remote_signer_setup, args, input='y')
+            result = runner.invoke(setup_remote_signer, args, input='y')
             assert result.exit_code == 0
             assert (
                 f'Done. Successfully configured operator to use remote signer for {key_count} public key(s)'

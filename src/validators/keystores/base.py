@@ -28,6 +28,10 @@ class BaseKeystore(abc.ABC):
     ) -> BLSSignature:
         raise NotImplementedError
 
+    @abc.abstractmethod
+    async def get_deposit_data(self, public_key: HexStr, amount: int) -> dict:
+        raise NotImplementedError
+
     @property
     @abc.abstractmethod
     def public_keys(self) -> list[HexStr]:

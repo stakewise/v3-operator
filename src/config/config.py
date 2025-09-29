@@ -11,7 +11,7 @@ from src.common.credentials import CredentialManager
 from src.config.networks import AVAILABLE_NETWORKS
 
 
-class VaultConfig:
+class OperatorConfig:
     network: str = ''
     mnemonic_next_index: int = 0
     first_public_key: str | None = None
@@ -24,6 +24,14 @@ class VaultConfig:
         self.vault = Web3.to_checksum_address(vault)
         self.vault_dir = Path(data_dir) / vault.lower()
         self.config_path = self.vault_dir / 'config.json'
+
+    @property
+    def keystores_dir(self) -> Path:
+        return self.vault_dir / 'keystores'
+
+    @property
+    def keystores_password_file(self) -> Path:
+        return self.vault_dir / 'keystores' / 'password.txt'
 
     @property
     def exists(self) -> bool:
@@ -56,7 +64,7 @@ class VaultConfig:
         self.network = network
         self.mnemonic_next_index = mnemonic_next_index
         self.first_public_key = CredentialManager.generate_credential_first_public_key(
-            self.network, self.vault, mnemonic
+            self.network, mnemonic
         )
 
         self._validate()
@@ -102,7 +110,7 @@ class VaultConfig:
 
         if mnemonic and self.first_public_key:
             first_public_key = CredentialManager.generate_credential_first_public_key(
-                self.network, self.vault, mnemonic
+                self.network, mnemonic
             )
             if first_public_key != self.first_public_key:
                 raise click.ClickException(

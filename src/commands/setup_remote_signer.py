@@ -9,18 +9,19 @@ from pathlib import Path
 import aiohttp
 import click
 from aiohttp import ClientTimeout
-from eth_typing import HexAddress
+from eth_typing import ChecksumAddress
+from sw_utils import chunkify
 
 from src.common.clients import setup_clients
-from src.common.contracts import vault_contract
+from src.common.contracts import VaultContract
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.startup_check import wait_for_execution_node
-from src.common.utils import chunkify, log_verbose
+from src.common.utils import log_verbose
 from src.common.validators import (
     validate_dappnode_execution_endpoints,
     validate_eth_address,
 )
-from src.common.vault_config import VaultConfig
+from src.config.config import OperatorConfig
 from src.config.settings import (
     REMOTE_SIGNER_TIMEOUT,
     REMOTE_SIGNER_UPLOAD_CHUNK_SIZE,
@@ -32,6 +33,13 @@ logger = logging.getLogger(__name__)
 
 
 @click.option(
+    '--remote-signer-url',
+    type=str,
+    envvar='REMOTE_SIGNER_URL',
+    prompt='Enter the URL of the remote signer (e.g. https://signer:9000)',
+    help='The base URL of the remote signer, e.g. https://signer:9000',
+)
+@click.option(
     '--vault',
     prompt='Enter your vault address',
     help='Vault address',
@@ -40,17 +48,10 @@ logger = logging.getLogger(__name__)
     callback=validate_eth_address,
 )
 @click.option(
-    '--remote-signer-url',
-    type=str,
-    envvar='REMOTE_SIGNER_URL',
-    required=True,
-    help='The base URL of the remote signer, e.g. http://signer:9000',
-)
-@click.option(
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
     envvar='DATA_DIR',
-    help='Path where the vault data will be placed. Default is ~/.stakewise.',
+    help='Path where the keystores and config data will be placed. Default is ~/.stakewise.',
     type=click.Path(file_okay=False, dir_okay=True),
 )
 @click.option(
@@ -87,24 +88,24 @@ logger = logging.getLogger(__name__)
     '--execution-endpoints',
     type=str,
     envvar='EXECUTION_ENDPOINTS',
-    help="""Comma separated list of API endpoints for execution nodes.
-Used to retrieve vault validator fee recipient (only needed if flag --dappnode is set).""",
+    help='Comma separated list of API endpoints for execution nodes.'
+    ' Used to retrieve vault validator fee recipient (only needed if --dappnode flag is set).',
     callback=validate_dappnode_execution_endpoints,
     default='',
 )
 @click.command(help='Uploads private keys to a remote signer.')
 # pylint: disable-next=too-many-arguments
-def remote_signer_setup(
-    vault: HexAddress,
+def setup_remote_signer(
     remote_signer_url: str,
     data_dir: str,
     keystores_dir: str | None,
     verbose: bool,
     log_level: str,
     dappnode: bool,
+    vault: ChecksumAddress,
     execution_endpoints: str,
 ) -> None:
-    config = VaultConfig(vault, Path(data_dir))
+    config = OperatorConfig(vault, Path(data_dir))
     config.load()
     settings.set(
         vault=vault,
@@ -125,11 +126,11 @@ def remote_signer_setup(
             asyncio.get_running_loop()
             # we need to create a separate thread so we can block before returning
             with ThreadPoolExecutor(1) as pool:
-                pool.submit(lambda: asyncio.run(main())).result()
+                pool.submit(lambda: asyncio.run(main(vault))).result()
         except RuntimeError as e:
             if 'no running event loop' == e.args[0]:
                 # no event loop running
-                asyncio.run(main())
+                asyncio.run(main(vault))
             else:
                 raise e
     except Exception as e:
@@ -137,7 +138,8 @@ def remote_signer_setup(
         sys.exit(1)
 
 
-async def main() -> None:
+# pylint: disable-next=too-many-locals
+async def main(vault: ChecksumAddress | None) -> None:
     setup_logging()
     await setup_clients()
 
@@ -164,7 +166,7 @@ async def main() -> None:
 
     if settings.dappnode:
         await wait_for_execution_node()
-
+        vault_contract = VaultContract(vault)
         fee_recipient = await vault_contract.mev_escrow()
         logger.info('Validator fee recipient retrieved from vault contract: %s', fee_recipient)
 

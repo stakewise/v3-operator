@@ -4,31 +4,35 @@ import socket
 import time
 from os import path
 
+import click
 from aiohttp import ClientSession, ClientTimeout
+from gql import gql
 from sw_utils import IpfsFetchClient, get_consensus_client, get_execution_client
+from sw_utils.graph.client import GraphClient as SWGraphClient
+from sw_utils.pectra import get_pectra_vault_version
 from web3 import Web3
+from web3.exceptions import BadFunctionCallOutput
 
 from src.common.clients import OPERATOR_USER_AGENT, db_client
+from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import (
+    VaultContract,
     keeper_contract,
     validators_registry_contract,
-    vault_contract,
 )
-from src.common.execution import (
-    check_hot_wallet_balance,
-    check_vault_address,
-    get_protocol_config,
-)
+from src.common.execution import check_wallet_balance, get_protocol_config
 from src.common.harvest import get_harvest_params
 from src.common.utils import format_error, round_down, warning_verbose
-from src.common.wallet import hot_wallet
+from src.common.wallet import wallet
 from src.config.networks import NETWORKS
-from src.config.settings import settings
-from src.validators.execution import check_deposit_data_root, get_withdrawable_assets
+from src.config.settings import (
+    WITHDRAWALS_INTERVAL,
+    ValidatorsRegistrationMode,
+    settings,
+)
+from src.validators.execution import get_withdrawable_assets
 from src.validators.keystores.local import LocalKeystore
-from src.validators.relayer import DvtRelayerClient
-from src.validators.typings import RelayerTypes, ValidatorsRegistrationMode
-from src.validators.utils import load_deposit_data
+from src.validators.relayer import RelayerClient
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +57,10 @@ async def startup_checks() -> None:
     logger.info('Checking consensus nodes network...')
     await _check_consensus_nodes_network()
 
+    if settings.claim_fee_splitter:
+        logger.info('Checking graph nodes...')
+        await wait_for_graph_node()
+
     logger.info('Checking execution nodes network...')
     await _check_execution_nodes_network()
 
@@ -60,10 +68,10 @@ async def startup_checks() -> None:
     await _check_events_logs()
 
     logger.info('Checking vault address %s...', settings.vault)
-    await check_vault_address()
+    await _check_vault_address()
 
     harvest_params = await get_harvest_params()
-    withdrawable_assets = await get_withdrawable_assets(harvest_params)
+    withdrawable_assets = await get_withdrawable_assets(harvest_params=harvest_params)
 
     # Note. We round down assets in the log message because of the case when assets
     # is slightly less than required amount to register validator.
@@ -74,8 +82,8 @@ async def startup_checks() -> None:
         settings.network_config.VAULT_BALANCE_SYMBOL,
     )
 
-    logger.info('Checking hot wallet balance %s...', hot_wallet.address)
-    await check_hot_wallet_balance()
+    logger.info('Checking wallet balance %s...', wallet.address)
+    await check_wallet_balance()
 
     logger.info('Checking connection to ipfs nodes...')
     healthy_ipfs_endpoints = await _check_ipfs_endpoints()
@@ -86,13 +94,11 @@ async def startup_checks() -> None:
     healthy_oracles = await collect_healthy_oracles()
     logger.info('Connected to oracles at %s', ', '.join(healthy_oracles))
 
+    await check_vault_version()
+
     if settings.enable_metrics:
         logger.info('Checking metrics server...')
         check_metrics_port()
-
-    if settings.need_deposit_data_file:
-        logger.info('Checking deposit data file...')
-        await wait_for_deposit_data_file()
 
     if (
         settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO
@@ -102,14 +108,18 @@ async def startup_checks() -> None:
         wait_for_keystores_dir()
         logger.info('Found keystores dir')
 
-    await _check_validators_manager()
+    await check_validators_manager()
 
-    if (
-        settings.validators_registration_mode == ValidatorsRegistrationMode.API
-        and settings.relayer_type == RelayerTypes.DVT
-    ):
-        logger.info('Checking DVT Relayer endpoint %s...', settings.relayer_endpoint)
-        await _check_dvt_relayer_endpoint()
+    if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
+        logger.info('Checking Relayer endpoint %s...', settings.relayer_endpoint)
+        await _check_relayer_endpoint()
+
+    protocol_config = await get_protocol_config()
+    if WITHDRAWALS_INTERVAL > protocol_config.force_withdrawals_period:
+        raise ValueError(
+            'WITHDRAWALS_INTERVAL setting should be less than '
+            f'force withdrawals period({protocol_config.force_withdrawals_period} seconds)'
+        )
 
 
 def validate_settings() -> None:
@@ -118,6 +128,9 @@ def validate_settings() -> None:
 
     if not settings.consensus_endpoints:
         raise ValueError('CONSENSUS_ENDPOINTS is missing')
+
+    if not settings.graph_endpoint and settings.claim_fee_splitter:
+        raise ValueError('GRAPH_ENDPOINT is missing')
 
 
 async def wait_for_consensus_node() -> None:
@@ -208,6 +221,43 @@ async def wait_for_execution_node() -> None:
         await asyncio.sleep(10)
 
 
+async def wait_for_graph_node() -> None:
+    """
+    Waits until graph node is available and synced to the finalized head of the chain.
+    """
+    graph_client = SWGraphClient(
+        endpoint=settings.graph_endpoint,
+        request_timeout=settings.graph_request_timeout,
+        retry_timeout=0,
+        page_size=settings.graph_page_size,
+    )
+    query = gql(
+        '''
+        query Meta {
+          _meta {
+            block {
+              number
+            }
+          }
+        }
+    '''
+    )
+    while True:
+        response = await graph_client.run_query(query)
+        graph_block_number = response['_meta']['block']['number']
+        chain_state = await get_chain_finalized_head()
+        if graph_block_number < chain_state.block_number:
+            logger.warning(
+                'The graph node node located at %s has not completed synchronization yet.',
+                settings.graph_endpoint,
+            )
+            await asyncio.sleep(10)
+            continue
+        return
+
+    return
+
+
 async def collect_healthy_oracles() -> list:
     oracles = (await get_protocol_config()).oracles
     endpoints = [oracle.endpoints for oracle in oracles]
@@ -258,23 +308,6 @@ def wait_for_keystores_dir() -> None:
         time.sleep(15)
 
 
-async def wait_for_deposit_data_file() -> None:
-    while not path.exists(settings.deposit_data_file):
-        logger.warning("Can't find deposit data file (%s)", settings.deposit_data_file)
-        time.sleep(15)
-    deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
-    logger.info('Found deposit data file %s', settings.deposit_data_file)
-
-    if not settings.disable_deposit_data_warnings:
-        while True:
-            try:
-                await check_deposit_data_root(deposit_data.tree.root)
-                break
-            except RuntimeError as e:
-                logger.warning(e)
-                time.sleep(15)
-
-
 async def _check_consensus_nodes_network() -> None:
     """
     Checks that consensus node network is the same as settings.network
@@ -290,7 +323,7 @@ async def _check_consensus_nodes_network() -> None:
         if settings.network_config.CHAIN_ID != consensus_chain_id:
             raise ValueError(
                 f'Consensus node network is {consensus_network or 'unknown'}, '
-                f'while {settings.network} is passed in "--network" parameter'
+                f'while {settings.network} is set in the vault config.'
             )
 
 
@@ -310,7 +343,7 @@ async def _check_execution_nodes_network() -> None:
         if settings.network_config.CHAIN_ID != execution_chain_id:
             raise ValueError(
                 f'Execution node network is {execution_network or 'unknown'}, '
-                f'while {settings.network} is passed in "--network" parameter'
+                f'while {settings.network}  is set in the vault config.'
             )
 
 
@@ -342,14 +375,22 @@ async def _check_ipfs_endpoints() -> list[str]:
     return healthy_ipfs_endpoints
 
 
-async def _check_validators_manager() -> None:
-    if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
-        if await vault_contract.version() > 1:
-            validators_manager = await vault_contract.validators_manager()
-            if validators_manager != settings.network_config.DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS:
-                raise RuntimeError(
-                    'validators manager address must equal to deposit data registry address'
-                )
+async def check_validators_manager() -> None:
+    if settings.validators_registration_mode != ValidatorsRegistrationMode.AUTO:
+        return
+    vault_contract = VaultContract(settings.vault)
+    validators_manager = await vault_contract.validators_manager()
+    if validators_manager != wallet.account.address:
+        raise RuntimeError(
+            f'The Validators Manager role must be assigned to the address {wallet.account.address}'
+            f' for the vault {settings.vault}. Please update it in the vault settings.'
+        )
+
+
+async def check_vault_version() -> None:
+    vault_contract = VaultContract(settings.vault)
+    if await vault_contract.version() < get_pectra_vault_version(settings.network, settings.vault):
+        raise RuntimeError(f'Please upgrade Vault {settings.vault} to the latest version.')
 
 
 async def _check_events_logs() -> None:
@@ -374,8 +415,8 @@ async def _check_events_logs() -> None:
         )
 
 
-async def _check_dvt_relayer_endpoint() -> None:
-    info = await DvtRelayerClient().get_info()
+async def _check_relayer_endpoint() -> None:
+    info = await RelayerClient().get_info()
 
     relayer_network = info['network']
     if relayer_network != settings.network:
@@ -383,3 +424,10 @@ async def _check_dvt_relayer_endpoint() -> None:
             f'Relayer network "{relayer_network}" does not match '
             f'Operator network "{settings.network}"'
         )
+
+
+async def _check_vault_address() -> None:
+    try:
+        await VaultContract(address=settings.vault).version()
+    except BadFunctionCallOutput as e:
+        raise click.ClickException(f'Invalid vault contract address {settings.vault}') from e

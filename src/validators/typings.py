@@ -1,15 +1,24 @@
 from dataclasses import dataclass
-from enum import Enum
-from typing import NewType, Sequence
+from typing import NewType
 
 from eth_typing import BlockNumber, BLSSignature, ChecksumAddress, HexStr
-from multiproof import MultiProof, StandardMerkleTree
+from eth_utils import add_0x_prefix
+from sw_utils import ValidatorStatus
+from web3.types import Gwei, Wei
+
+from src.config.settings import MIN_ACTIVATION_BALANCE_GWEI, settings
 
 BLSPrivkey = NewType('BLSPrivkey', bytes)
 
 
 @dataclass
 class NetworkValidator:
+    public_key: HexStr
+    block_number: BlockNumber
+
+
+@dataclass
+class VaultValidator:
     public_key: HexStr
     block_number: BlockNumber
 
@@ -24,36 +33,64 @@ class ExitSignatureShards:
 class Validator:
     public_key: HexStr
     signature: HexStr
-    amount_gwei: int
-    deposit_data_index: int | None = None
+    amount: Gwei
     exit_signature: BLSSignature | None = None
     exit_signature_shards: ExitSignatureShards | None = None
 
-    def copy(self) -> 'Validator':
-        return Validator(
-            public_key=self.public_key,
-            signature=self.signature,
-            amount_gwei=self.amount_gwei,
-            deposit_data_index=self.deposit_data_index,
-            exit_signature_shards=self.exit_signature_shards,
+    deposit_data_root: HexStr | None = None
+
+
+@dataclass
+class ConsensusValidator:
+    index: int
+    public_key: HexStr
+    balance: Gwei
+    withdrawal_credentials: HexStr
+    status: ValidatorStatus
+    activation_epoch: int
+
+    @property
+    def is_compounding(self) -> bool:
+        return self.withdrawal_credentials.startswith('0x02')
+
+    @property
+    def withdrawal_capacity(self) -> Gwei:
+        return Gwei(max(0, self.balance - MIN_ACTIVATION_BALANCE_GWEI))
+
+    def is_partially_withdrawable(self, epoch: int) -> bool:
+        return (
+            self.is_compounding
+            and self.status == ValidatorStatus.ACTIVE_ONGOING
+            and self.activation_epoch < epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
         )
+
+    @staticmethod
+    def from_consensus_data(beacon_validator: dict) -> 'ConsensusValidator':
+        return ConsensusValidator(
+            index=int(beacon_validator['index']),
+            public_key=add_0x_prefix(beacon_validator['validator']['pubkey']),
+            balance=Gwei(int(beacon_validator['balance'])),
+            withdrawal_credentials=beacon_validator['validator']['withdrawal_credentials'],
+            status=ValidatorStatus(beacon_validator['status']),
+            activation_epoch=int(beacon_validator['validator']['activation_epoch']),
+        )
+
+
+@dataclass
+class V2ValidatorEventData:
+    public_key: HexStr
+    amount: Wei
 
 
 @dataclass
 class RelayerValidatorsResponse:
     validators: list[Validator]
     validators_manager_signature: HexStr | None = None
-    multi_proof: MultiProof[tuple[bytes, int]] | None = None
 
 
 @dataclass
-class DepositData:
-    validators: Sequence[Validator]
-    tree: StandardMerkleTree
-
-    @property
-    def public_keys(self) -> list[HexStr]:
-        return [v.public_key for v in self.validators]
+class RelayerSignatureResponse:
+    validators_manager_signature: HexStr
 
 
 @dataclass
@@ -66,23 +103,12 @@ class ApprovalRequest:
     deposit_signatures: list[HexStr]
     public_key_shards: list[list[HexStr]]
     exit_signature_shards: list[list[HexStr]]
+    validators_manager_signature: HexStr
     deadline: int
-    proof: list[HexStr] | None
-    proof_flags: list[bool] | None
-    proof_indexes: list[int] | None
-    validators_manager_signature: HexStr | None = None
+    amounts: list[int] | None = None
 
 
-class ValidatorsRegistrationMode(Enum):
-    """
-    AUTO mode: validators are registered automatically when vault assets are enough.
-    API mode: validators registration is triggered by API request.
-    """
-
-    AUTO = 'AUTO'
-    API = 'API'
-
-
-class RelayerTypes:
-    DVT = 'DVT'
-    DEFAULT = 'DEFAULT'
+@dataclass
+class ConsolidationRequest:
+    public_keys: list[HexStr]
+    vault_address: ChecksumAddress

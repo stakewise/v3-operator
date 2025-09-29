@@ -7,12 +7,13 @@ from pathlib import Path
 from typing import NewType
 
 import milagro_bls_binding as bls
-from eth_typing import BLSSignature, HexStr
+from eth_typing import BLSPrivateKey, BLSSignature, HexStr
 from staking_deposit.key_handling.keystore import ScryptKeystore
 from sw_utils.signing import get_exit_message_signing_root
 from sw_utils.typings import ConsensusFork
 from web3 import Web3
 
+from src.common.credentials import CredentialManager
 from src.config.settings import settings
 from src.validators.exceptions import KeystoreException
 from src.validators.keystores.base import BaseKeystore
@@ -42,8 +43,8 @@ class LocalKeystore(BaseKeystore):
         """Extracts private keys from the keys."""
         keystore_files = LocalKeystore.list_keystore_files()
         logger.info('Loading keys from %s...', settings.keystores_dir)
-        keys = {}
-        with Pool(processes=settings.pool_size) as pool:
+        keystores_data = []
+        with Pool(processes=settings.concurrency) as pool:
             # pylint: disable-next=unused-argument
             def _stop_pool(*args, **kwargs):  # type: ignore
                 pool.close()
@@ -59,11 +60,14 @@ class LocalKeystore(BaseKeystore):
             for result in results:
                 result.wait()
                 try:
-                    pub_key, priv_key = result.get()
-                    keys[pub_key] = priv_key
+                    keystores_data.append(result.get())
                 except KeystoreException as e:
                     logger.error(e)
                     raise RuntimeError('Failed to load keys') from e
+
+        keys: dict[HexStr, BLSPrivkey] = {}
+        for pub_key, priv_key, _ in sorted(keystores_data, key=lambda x: x[2]):
+            keys[pub_key] = priv_key
 
         logger.info('Loaded %d keys', len(keys))
         return LocalKeystore(Keys(keys))
@@ -76,6 +80,17 @@ class LocalKeystore(BaseKeystore):
 
     def __len__(self) -> int:
         return len(self.keys)
+
+    async def get_deposit_data(self, public_key: HexStr, amount: int) -> dict:
+        private_key = self.keys[public_key]
+        credential = CredentialManager.load_credential(
+            network=settings.network,
+            private_key=BLSPrivateKey(Web3.to_int(private_key)),
+            vault=settings.vault,
+            validator_type=settings.validator_type,
+        )
+
+        return credential.get_deposit_datum_dict(amount)
 
     async def get_exit_signature(
         self, validator_index: int, public_key: HexStr, fork: ConsensusFork | None = None
@@ -119,7 +134,7 @@ class LocalKeystore(BaseKeystore):
     @staticmethod
     def _process_keystore_file(
         keystore_file: KeystoreFile, keystore_path: Path
-    ) -> tuple[HexStr, BLSPrivkey]:
+    ) -> tuple[HexStr, BLSPrivkey, int]:
         file_name = keystore_file.name
         keystores_password = keystore_file.password
         file_path = keystore_path / file_name
@@ -134,7 +149,7 @@ class LocalKeystore(BaseKeystore):
         except BaseException as e:
             raise KeystoreException(f'Invalid password for keystore "{file_name}"') from e
         public_key = Web3.to_hex(bls.SkToPk(private_key))
-        return public_key, private_key
+        return public_key, private_key, int(keystore.path.split('/')[3])
 
     @staticmethod
     def _load_keystores_password(password_path: Path) -> str:

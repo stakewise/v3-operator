@@ -1,41 +1,23 @@
+import asyncio
 import logging
 from typing import cast
 
-import click
-from eth_typing import BlockNumber
+from eth_typing import BlockNumber, ChecksumAddress
+from hexbytes import HexBytes
 from sw_utils import GasManager, InterruptHandler, ProtocolConfig, build_protocol_config
 from web3 import Web3
-from web3.exceptions import BadFunctionCallOutput
-from web3.types import Wei
+from web3.contract.async_contract import AsyncContractFunction
+from web3.types import Gwei, TxParams, Wei
 
 from src.common.app_state import AppState, OraclesCache
 from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.contracts import keeper_contract, multicall_contract
 from src.common.metrics import metrics
 from src.common.tasks import BaseTask
-from src.common.vault import Vault
-from src.common.wallet import hot_wallet
-from src.config.settings import settings
+from src.common.wallet import wallet
+from src.config.settings import ATTEMPTS_WITH_DEFAULT_GAS, settings
 
 logger = logging.getLogger(__name__)
-
-
-def build_gas_manager() -> GasManager:
-    min_effective_priority_fee_per_gas = settings.network_config.MIN_EFFECTIVE_PRIORITY_FEE_PER_GAS
-    return GasManager(
-        execution_client=execution_client,
-        max_fee_per_gas=Web3.to_wei(settings.max_fee_per_gas_gwei, 'gwei'),
-        priority_fee_num_blocks=settings.priority_fee_num_blocks,
-        priority_fee_percentile=settings.priority_fee_percentile,
-        min_effective_priority_fee_per_gas=min_effective_priority_fee_per_gas,
-    )
-
-
-async def check_vault_address() -> None:
-    try:
-        await Vault().get_validators_root()
-    except BadFunctionCallOutput as e:
-        raise click.ClickException('Invalid vault contract address') from e
 
 
 async def get_protocol_config() -> ProtocolConfig:
@@ -81,8 +63,8 @@ async def update_oracles_cache() -> None:
     validators_threshold_call = keeper_contract.encode_abi(fn_name='validatorsMinOracles', args=[])
     _, multicall_response = await multicall_contract.aggregate(
         [
-            (keeper_contract.address, rewards_threshold_call),
-            (keeper_contract.address, validators_threshold_call),
+            (keeper_contract.contract_address, rewards_threshold_call),
+            (keeper_contract.contract_address, validators_threshold_call),
         ],
         block_number=to_block,
     )
@@ -99,28 +81,79 @@ async def update_oracles_cache() -> None:
 
 class WalletTask(BaseTask):
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
-        await check_hot_wallet_balance()
+        await check_wallet_balance()
 
 
-async def check_hot_wallet_balance() -> None:
-    hot_wallet_min_balance = settings.network_config.HOT_WALLET_MIN_BALANCE
+async def check_wallet_balance() -> None:
+    wallet_min_balance = settings.network_config.WALLET_MIN_BALANCE
     symbol = settings.network_config.WALLET_BALANCE_SYMBOL
 
-    if hot_wallet_min_balance <= 0:
+    if wallet_min_balance <= 0:
         return
 
-    hot_wallet_balance = await get_hot_wallet_balance()
+    wallet_balance = await get_wallet_balance()
 
-    metrics.wallet_balance.labels(network=settings.network).set(hot_wallet_balance)
+    metrics.wallet_balance.labels(network=settings.network).set(wallet_balance)
 
-    if hot_wallet_balance < hot_wallet_min_balance:
+    if wallet_balance < wallet_min_balance:
         logger.warning(
             'Wallet %s balance is too low. At least %s %s is recommended.',
-            hot_wallet.address,
-            Web3.from_wei(hot_wallet_min_balance, 'ether'),
+            wallet.address,
+            Web3.from_wei(wallet_min_balance, 'ether'),
             symbol,
         )
 
 
-async def get_hot_wallet_balance() -> Wei:
-    return await execution_client.eth.get_balance(hot_wallet.address)
+async def get_wallet_balance() -> Wei:
+    return await execution_client.eth.get_balance(wallet.address)
+
+
+async def transaction_gas_wrapper(
+    tx_function: AsyncContractFunction, tx_params: TxParams | None = None
+) -> HexBytes:
+    """Handles periods with high gas in the network."""
+    if not tx_params:
+        tx_params = {}
+
+    # trying to submit with basic gas
+    for i in range(ATTEMPTS_WITH_DEFAULT_GAS):
+        try:
+            return await tx_function.transact(tx_params)
+        except ValueError as e:
+            # Handle only FeeTooLow error
+            code = None
+            if e.args and isinstance(e.args[0], dict):
+                code = e.args[0].get('code')
+            if not code or code != -32010:
+                raise e
+            if i < ATTEMPTS_WITH_DEFAULT_GAS - 1:  # skip last sleep
+                await asyncio.sleep(settings.network_config.SECONDS_PER_BLOCK)
+
+    # use high priority fee
+    gas_manager = build_gas_manager()
+    tx_params = tx_params | await gas_manager.get_high_priority_tx_params()
+    return await tx_function.transact(tx_params)
+
+
+def build_gas_manager() -> GasManager:
+    min_effective_priority_fee_per_gas = settings.network_config.MIN_EFFECTIVE_PRIORITY_FEE_PER_GAS
+    return GasManager(
+        execution_client=execution_client,
+        max_fee_per_gas=Web3.to_wei(settings.max_fee_per_gas_gwei, 'gwei'),
+        priority_fee_num_blocks=settings.priority_fee_num_blocks,
+        priority_fee_percentile=settings.priority_fee_percentile,
+        min_effective_priority_fee_per_gas=min_effective_priority_fee_per_gas,
+    )
+
+
+async def get_execution_request_fee(address: ChecksumAddress) -> Gwei:
+    """
+    Retrieves the current fee for an execution layer request.
+    """
+    tx_data: TxParams = {
+        'to': address,
+        'data': b'',
+    }
+
+    fee = await execution_client.eth.call(tx_data, block_identifier='latest')
+    return Gwei(Web3.to_int(fee))

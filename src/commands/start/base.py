@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from sw_utils import EventScanner, InterruptHandler
+from sw_utils import InterruptHandler
 
 import src
 from src.common.checks import wait_execution_catch_up_consensus
@@ -11,23 +11,29 @@ from src.common.execution import WalletTask, update_oracles_cache
 from src.common.logging import setup_logging
 from src.common.metrics import MetricsTask, metrics, metrics_server
 from src.common.startup_check import startup_checks
+from src.common.tasks import BaseTask
 from src.common.utils import get_build_version
-from src.config.settings import settings
+from src.config.settings import ValidatorsRegistrationMode, settings
 from src.exits.tasks import ExitSignatureTask
 from src.harvest.tasks import HarvestTask
-from src.validators.database import NetworkValidatorCrud
-from src.validators.execution import NetworkValidatorsStartupProcessor
+from src.reward_splitter.tasks import SplitRewardTask
+from src.validators.database import (
+    CheckpointCrud,
+    NetworkValidatorCrud,
+    VaultValidatorCrud,
+)
+from src.validators.execution import scan_validators_events
 from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
-from src.validators.relayer import RelayerAdapter, create_relayer_adapter
-from src.validators.tasks import ValidatorsTask, load_genesis_validators
-from src.validators.typings import DepositData, ValidatorsRegistrationMode
-from src.validators.utils import load_deposit_data
+from src.validators.relayer import RelayerClient
+from src.validators.tasks import ValidatorRegistrationSubtask, load_genesis_validators
+from src.withdrawals.tasks import ValidatorWithdrawalSubtask
 
 logger = logging.getLogger(__name__)
 
 
 async def start_base() -> None:
+    """Bootstrap operator service and start periodic tasks."""
     setup_logging()
     setup_sentry()
     await setup_clients()
@@ -41,33 +47,27 @@ async def start_base() -> None:
         await metrics_server()
 
     NetworkValidatorCrud().setup()
+    VaultValidatorCrud().setup()
+    CheckpointCrud().setup()
 
     # load network validators from ipfs dump
     await load_genesis_validators()
 
     keystore: BaseKeystore | None = None
-    deposit_data: DepositData | None = None
-    relayer_adapter: RelayerAdapter | None = None
+    relayer: RelayerClient | None = None
 
-    # load keystore and deposit data
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
         keystore = await load_keystore()
-
-        deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
-        logger.info('Loaded deposit data file %s', settings.deposit_data_file)
     else:
-        relayer_adapter = create_relayer_adapter()
+        relayer = RelayerClient()
 
     # start operator tasks
-
-    # scan network validator updates
-    network_validators_startup_processor = NetworkValidatorsStartupProcessor()
-    network_validators_scanner = EventScanner(network_validators_startup_processor)
-
-    logger.info('Syncing network validator events...')
     chain_state = await get_chain_finalized_head()
     await wait_execution_catch_up_consensus(chain_state)
-    await network_validators_scanner.process_new_events(chain_state.block_number)
+
+    CheckpointCrud().save_checkpoints()
+    logger.info('Syncing validator events...')
+    await scan_validators_events(chain_state.block_number, is_startup=True)
 
     logger.info('Updating oracles cache...')
     await update_oracles_cache()
@@ -79,10 +79,9 @@ async def start_base() -> None:
     metrics.service_started.labels(network=settings.network).set(1)
     with InterruptHandler() as interrupt_handler:
         tasks = [
-            ValidatorsTask(
+            ValidatorTask(
                 keystore=keystore,
-                deposit_data=deposit_data,
-                relayer_adapter=relayer_adapter,
+                relayer=relayer,
             ).run(interrupt_handler),
             ExitSignatureTask(
                 keystore=keystore,
@@ -92,8 +91,36 @@ async def start_base() -> None:
         ]
         if settings.harvest_vault:
             tasks.append(HarvestTask().run(interrupt_handler))
+        if settings.claim_fee_splitter:
+            tasks.append(SplitRewardTask().run(interrupt_handler))
 
         await asyncio.gather(*tasks)
+
+
+class ValidatorTask(BaseTask):
+    def __init__(
+        self,
+        keystore: BaseKeystore | None,
+        relayer: RelayerClient | None,
+    ):
+        self.validator_registration_subtask = ValidatorRegistrationSubtask(
+            keystore=keystore,
+            relayer=relayer,
+        )
+        self.validator_withdrawal_subtask = ValidatorWithdrawalSubtask(relayer)
+
+    async def process_block(self, interrupt_handler: InterruptHandler) -> None:
+        chain_head = await get_chain_finalized_head()
+        await wait_execution_catch_up_consensus(
+            chain_head=chain_head, interrupt_handler=interrupt_handler
+        )
+        await scan_validators_events(block_number=chain_head.block_number, is_startup=False)
+        subtasks = [
+            self.validator_registration_subtask.process(),
+        ]
+        if not settings.disable_withdrawals:
+            subtasks.append(self.validator_withdrawal_subtask.process())
+        await asyncio.gather(*subtasks)
 
 
 def log_start() -> None:
@@ -117,5 +144,4 @@ def setup_sentry() -> None:
             environment=settings.sentry_environment or settings.network,
         )
         sentry_sdk.set_tag('network', settings.network)
-        sentry_sdk.set_tag('vault', settings.vault)
         sentry_sdk.set_tag('project_version', src.__version__)

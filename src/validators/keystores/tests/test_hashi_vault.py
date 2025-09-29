@@ -1,11 +1,11 @@
 import pytest
 
 from src.config.settings import settings
-from src.test_fixtures.hashi_vault import HashiVaultStub
 from src.validators.keystores.hashi_vault import (
     HashiVaultConfiguration,
     HashiVaultKeystore,
 )
+from src.validators.keystores.tests.test_fixtures.hashi_vault import HashiVaultStub
 
 
 class TestHashiVault:

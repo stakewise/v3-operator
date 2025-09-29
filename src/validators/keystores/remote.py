@@ -6,16 +6,26 @@ from typing import cast
 import milagro_bls_binding as bls
 from aiohttp import ClientSession, ClientTimeout
 from eth_typing import BLSPubkey, BLSSignature, HexStr
+from eth_utils import add_0x_prefix
 from sw_utils import get_exit_message_signing_root
 from sw_utils.common import urljoin
+from sw_utils.signing import DepositData as SerializableDepositData
+from sw_utils.signing import DepositMessage as SerializableDepositMessage
+from sw_utils.signing import compute_deposit_domain, compute_signing_root
 from sw_utils.typings import ConsensusFork
 from web3 import Web3
 
+from src.config.networks import NETWORKS
 from src.config.settings import REMOTE_SIGNER_TIMEOUT, settings
 from src.validators.keystores.base import BaseKeystore
-from src.validators.utils import load_deposit_data
+from src.validators.utils import get_withdrawal_credentials
 
 logger = logging.getLogger(__name__)
+
+
+class RemoteSignerRequestType:
+    DEPOSIT = 'DEPOSIT'
+    VOLUNTARY_EXIT = 'VOLUNTARY_EXIT'
 
 
 @dataclass
@@ -45,16 +55,27 @@ class VoluntaryExitRequestModel:
     voluntary_exit: VoluntaryExitMessage
 
 
+@dataclass
+class DepositMessage:
+    pubkey: HexStr
+    withdrawal_credentials: HexStr
+    amount: str
+    genesis_fork_version: HexStr  # noqa
+
+
+@dataclass
+class DepositRequestModel:
+    deposit: DepositMessage
+    signing_root: HexStr
+    type: str
+
+
 class RemoteSignerKeystore(BaseKeystore):
     def __init__(self, public_keys: list[HexStr]):
         self._public_keys = public_keys
 
     @staticmethod
     async def load() -> 'BaseKeystore':
-        if settings.remote_signer_use_deposit_data:
-            deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
-            return RemoteSignerKeystore(deposit_data.public_keys)
-
         public_keys = await RemoteSignerKeystore._get_remote_signer_public_keys()
         return RemoteSignerKeystore(public_keys)
 
@@ -70,6 +91,41 @@ class RemoteSignerKeystore(BaseKeystore):
     @property
     def public_keys(self) -> list[HexStr]:
         return self._public_keys
+
+    async def get_deposit_data(
+        self,
+        public_key: HexStr,
+        amount: int,
+    ) -> dict:
+        fork_version = NETWORKS[settings.network].GENESIS_FORK_VERSION
+        withdrawal_credentials = get_withdrawal_credentials()
+        signing_root = self._get_deposit_signing_root(
+            public_key=BLSPubkey(Web3.to_bytes(hexstr=public_key)),
+            withdrawal_credentials=withdrawal_credentials,
+            amount=amount,
+            fork_version=fork_version,
+        )
+        signature = await self._sign_deposit_data_request(
+            public_key=public_key,
+            withdrawal_credentials=withdrawal_credentials,
+            amount=amount,
+            signing_root=signing_root,
+            fork_version=fork_version,
+        )
+        public_key_bytes = Web3.to_bytes(hexstr=public_key)
+        deposit_data = SerializableDepositData(
+            pubkey=public_key_bytes,
+            withdrawal_credentials=withdrawal_credentials,
+            amount=amount,
+            signature=signature,
+        )
+        return {
+            'pubkey': public_key_bytes,
+            'withdrawal_credentials': withdrawal_credentials,
+            'amount': amount,
+            'signature': signature,
+            'deposit_data_root': deposit_data.hash_tree_root,
+        }
 
     async def get_exit_signature(
         self, validator_index: int, public_key: HexStr, fork: ConsensusFork | None = None
@@ -87,7 +143,7 @@ class RemoteSignerKeystore(BaseKeystore):
             public_key_bytes, validator_index, fork, message
         )
 
-        bls.Verify(BLSPubkey(Web3.to_bytes(hexstr=public_key)), message, exit_signature)
+        bls.Verify(public_key_bytes, message, exit_signature)
         return exit_signature
 
     @staticmethod
@@ -113,21 +169,21 @@ class RemoteSignerKeystore(BaseKeystore):
         data = VoluntaryExitRequestModel(
             fork_info=ForkInfo(
                 fork=Fork(
-                    previous_version=HexStr(fork.version.hex()),
-                    current_version=HexStr(fork.version.hex()),
+                    previous_version=Web3.to_hex(fork.version),
+                    current_version=Web3.to_hex(fork.version),
                     epoch=fork.epoch,
                 ),
-                genesis_validators_root=HexStr(
-                    settings.network_config.GENESIS_VALIDATORS_ROOT.hex()
+                genesis_validators_root=Web3.to_hex(
+                    settings.network_config.GENESIS_VALIDATORS_ROOT
                 ),
             ),
-            signing_root=HexStr(message.hex()),
-            type='VOLUNTARY_EXIT',
+            signing_root=Web3.to_hex(message),
+            type=RemoteSignerRequestType.VOLUNTARY_EXIT,
             voluntary_exit=VoluntaryExitMessage(epoch=fork.epoch, validator_index=validator_index),
         )
 
         signer_base_url = cast(str, settings.remote_signer_url)
-        signer_url = urljoin(signer_base_url, f'/api/v1/eth2/sign/0x{public_key.hex()}')
+        signer_url = urljoin(signer_base_url, f'/api/v1/eth2/sign/{Web3.to_hex(public_key)}')
 
         async with ClientSession(timeout=ClientTimeout(REMOTE_SIGNER_TIMEOUT)) as session:
             response = await session.post(signer_url, json=dataclasses.asdict(data))
@@ -143,3 +199,51 @@ class RemoteSignerKeystore(BaseKeystore):
 
             signature = (await response.json())['signature']
         return BLSSignature(Web3.to_bytes(hexstr=signature))
+
+    @staticmethod
+    async def _sign_deposit_data_request(
+        public_key: HexStr,
+        amount: int,
+        withdrawal_credentials: bytes,
+        signing_root: bytes,
+        fork_version: bytes,
+    ) -> BLSSignature:
+        data = DepositRequestModel(
+            deposit=DepositMessage(
+                pubkey=public_key,
+                amount=str(amount),
+                withdrawal_credentials=Web3.to_hex(withdrawal_credentials),
+                genesis_fork_version=Web3.to_hex(fork_version),
+            ),
+            signing_root=Web3.to_hex(signing_root),
+            type=RemoteSignerRequestType.DEPOSIT,
+        )
+
+        signer_base_url = cast(str, settings.remote_signer_url)
+        signer_url = urljoin(signer_base_url, f'/api/v1/eth2/sign/{add_0x_prefix(public_key)}')
+
+        async with ClientSession(timeout=ClientTimeout(REMOTE_SIGNER_TIMEOUT)) as session:
+            response = await session.post(signer_url, json=dataclasses.asdict(data))
+
+            if response.status == 404:
+                # Pubkey not present on remote signer side
+                raise RuntimeError(
+                    f'Failed to sign deposit data for {public_key}.'
+                    f' Is this public key present in the remote signer?'
+                )
+
+            response.raise_for_status()
+
+            signature = (await response.json())['signature']
+        return BLSSignature(Web3.to_bytes(hexstr=signature))
+
+    def _get_deposit_signing_root(
+        self, public_key: BLSPubkey, amount: int, withdrawal_credentials: bytes, fork_version: bytes
+    ) -> bytes:
+        deposit_message = SerializableDepositMessage(
+            pubkey=public_key,
+            withdrawal_credentials=withdrawal_credentials,
+            amount=amount,
+        )
+        domain = compute_deposit_domain(fork_version)
+        return compute_signing_root(deposit_message, domain)

@@ -2,10 +2,12 @@
 import re
 
 import click
-from eth_typing import ChecksumAddress
-from eth_utils import is_address, to_checksum_address
+from eth_typing import ChecksumAddress, HexStr
+from eth_utils import is_address, is_hexstr, to_checksum_address
+from web3.types import Gwei
 
 from src.common.language import validate_mnemonic as verify_mnemonic
+from src.config.settings import DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI
 
 
 def validate_mnemonic(ctx: click.Context, param: click.Parameter, value: str) -> str:
@@ -44,3 +46,66 @@ def validate_dappnode_execution_endpoints(
         )
 
     return value
+
+
+def validate_min_deposit_amount_gwei(
+    ctx: click.Context, param: click.Parameter, value: int
+) -> Gwei | None:
+    value = Gwei(value)
+    if value < DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI:
+        raise click.BadParameter(
+            f'min-deposit-amount-gwei must be greater than or equal to '
+            f'{DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI} Gwei'
+        )
+
+    return value
+
+
+def validate_public_key(ctx: click.Context, param: click.Parameter, value: str) -> str | None:
+    if not value:
+        return None
+    if not _is_public_key(value):
+        raise click.BadParameter('Invalid validator public key')
+
+    return value
+
+
+def validate_public_keys(
+    ctx: click.Context, param: click.Parameter, value: str
+) -> list[HexStr] | None:
+    if not value:
+        return None
+    for key in value.split(','):
+        if not _is_public_key(key):
+            raise click.BadParameter('Invalid validator public key')
+
+    return [HexStr(address) for address in value.split(',')]
+
+
+def validate_public_keys_file(ctx: click.Context, param: click.Parameter, value: str) -> str | None:
+    if not value:
+        return None
+    with open(value, 'r', encoding='utf-8') as f:
+        for line in f:
+            key = line.strip()
+            if not _is_public_key(key):
+                raise click.BadParameter(f'Invalid validator public key: {key}')
+
+    return value
+
+
+def validate_indexes(ctx: click.Context, param: click.Parameter, value: str) -> list[int] | None:
+    if not value:
+        return None
+    for key in value.split(','):
+        try:
+            if int(key) < 0:
+                raise click.BadParameter('Invalid validator index')
+        except ValueError as e:
+            raise click.BadParameter('Indexes must be integers') from e
+    return [int(i) for i in value.split(',')]
+
+
+def _is_public_key(value: str) -> bool:
+    public_key_length = 98
+    return is_hexstr(value) and len(value) == public_key_length

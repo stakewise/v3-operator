@@ -4,12 +4,12 @@ from pathlib import Path
 
 import click
 from click import Context
-from eth_typing import ChecksumAddress, HexAddress
+from eth_typing import ChecksumAddress
 
 from src.common.clients import setup_clients
 from src.common.utils import greenify, log_verbose
 from src.common.validators import validate_db_uri, validate_eth_address
-from src.common.vault_config import VaultConfig
+from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import settings
 from src.remote_db import tasks
@@ -45,7 +45,7 @@ from src.remote_db.database import check_db_connection
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
     envvar='DATA_DIR',
-    help='Path where the vault data will be placed. Default is ~/.stakewise.',
+    help='Path where the keystores and config data will be placed. Default is ~/.stakewise.',
     type=click.Path(file_okay=False, dir_okay=True),
 )
 @click.option(
@@ -64,19 +64,19 @@ from src.remote_db.database import check_db_connection
     is_flag=True,
 )
 @click.pass_context
-# pylint: disable-next=too-many-arguments,too-many-locals
+# pylint: disable-next=too-many-arguments
 def remote_db_group(
     ctx: Context,
-    vault: HexAddress,
+    vault: ChecksumAddress,
     data_dir: str,
     keystores_dir: str | None,
     db_url: str,
-    network: str | None,
+    network: str,
     verbose: bool,
 ) -> None:
     ctx.ensure_object(dict)
 
-    config = VaultConfig(vault, Path(data_dir))
+    config = OperatorConfig(vault, Path(data_dir))
     if network is None:
         config.load()
         network = config.network
@@ -104,11 +104,11 @@ def setup(ctx: Context) -> None:
     )
 
 
-@remote_db_group.command(help='Removes all the entries for the vault from the database.')
+@remote_db_group.command(help='Removes all the entries from the database.')
 @click.pass_context
 def cleanup(ctx: Context) -> None:
     tasks.cleanup(ctx.obj['db_url'])
-    click.echo(f'Successfully removed all the entries for the {greenify(settings.vault)} vault.')
+    click.echo('Successfully removed all the entries from the database.')
 
 
 @remote_db_group.command(help='Uploads key-pairs to remote DB. Updates configs in the remote DB.')
@@ -123,20 +123,13 @@ def cleanup(ctx: Context) -> None:
     '--execution-endpoints',
     type=str,
     envvar='EXECUTION_ENDPOINTS',
-    prompt='Enter comma separated list of API endpoints for execution nodes',
+    prompt='Enter the comma separated list of API endpoints for execution nodes',
     help='Comma separated list of API endpoints for execution nodes.',
 )
 @click.option(
-    '--deposit-data-file',
-    type=click.Path(exists=True, file_okay=True, dir_okay=False),
-    envvar='DEPOSIT_DATA_FILE',
-    help='Path to the deposit_data.json file. '
-    'Default is the file generated with "create-keys" command.',
-)
-@click.option(
-    '--pool-size',
+    '--concurrency',
     help='Number of processes in a pool.',
-    envvar='POOL_SIZE',
+    envvar='CONCURRENCY',
     type=int,
 )
 @click.option(
@@ -147,29 +140,26 @@ def cleanup(ctx: Context) -> None:
     'when connecting to execution nodes.',
 )
 @click.pass_context
-# pylint: disable-next=too-many-arguments
 def upload_keypairs(
     ctx: Context,
     encrypt_key: str,
     execution_endpoints: str,
     execution_jwt_secret: str | None,
-    deposit_data_file: str | None,
-    pool_size: int | None,
+    concurrency: int | None,
 ) -> None:
     settings.set(
         vault=settings.vault,
         vault_dir=settings.vault_dir,
         network=settings.network,
         keystores_dir=str(settings.keystores_dir),
-        deposit_data_file=deposit_data_file,
         verbose=settings.verbose,
         execution_endpoints=execution_endpoints,
         execution_jwt_secret=execution_jwt_secret,
-        pool_size=pool_size,
+        concurrency=concurrency,
     )
     try:
         asyncio.run(_setup_clients_and_upload_keypairs(ctx.obj['db_url'], encrypt_key))
-        click.echo(f'Successfully uploaded keypairs for the {greenify(settings.vault)} vault.')
+        click.echo('Successfully uploaded keypairs to the database.')
     except Exception as e:
         log_verbose(e)
 
@@ -266,21 +256,3 @@ def setup_validator(
         output_dir=Path(output_dir),
     )
     click.echo('Successfully created validator configuration files.')
-
-
-@remote_db_group.command(help='Create operator remote signer configuration.')
-@click.option(
-    '--output-dir',
-    envvar='REMOTE_DB_OUTPUT_DIR',
-    help='The folder where configuration file will be saved.',
-    required=False,
-    type=click.Path(exists=False, file_okay=False, dir_okay=True),
-)
-@click.pass_context
-def setup_operator(ctx: Context, output_dir: str | None) -> None:
-    dest_dir = Path(output_dir) if output_dir is not None else settings.vault_dir
-    tasks.setup_operator(
-        db_url=ctx.obj['db_url'],
-        output_dir=dest_dir,
-    )
-    click.echo('Successfully created operator configuration file.')

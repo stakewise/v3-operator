@@ -5,7 +5,7 @@ from itertools import chain
 from random import shuffle
 
 from aiohttp import ClientError
-from eth_typing import BlockNumber
+from eth_typing import BlockNumber, ChecksumAddress
 from sw_utils import InterruptHandler
 from sw_utils.typings import Oracle, ProtocolConfig
 from tenacity import RetryError
@@ -47,16 +47,23 @@ class ExitSignatureTask(BaseTask):
         logger.debug('last exit signature update block %s', update_block)
 
         if update_block and not await is_block_finalized(update_block):
-            logger.info('Waiting for signatures update block %d to finalize...', update_block)
+            logger.info(
+                'Waiting for signatures update block %d for vault %s to finalize...',
+                update_block,
+                settings.vault,
+            )
             return
 
-        if update_block and not await _check_majority_oracles_synced(protocol_config, update_block):
+        if update_block and not await _check_majority_oracles_synced(
+            protocol_config, update_block, settings.vault
+        ):
             logger.info('Waiting for the majority of oracles to sync exit signatures')
             return
 
         outdated_indexes = await _fetch_outdated_indexes(protocol_config.oracles, update_block)
         if outdated_indexes:
             await _update_exit_signatures(
+                vault=settings.vault,
                 keystore=self.keystore,
                 protocol_config=protocol_config,
                 outdated_indexes=outdated_indexes,
@@ -64,13 +71,14 @@ class ExitSignatureTask(BaseTask):
 
 
 async def _check_majority_oracles_synced(
-    protocol_config: ProtocolConfig, update_block: BlockNumber
+    protocol_config: ProtocolConfig, update_block: BlockNumber, vault: ChecksumAddress
 ) -> bool:
     threshold = protocol_config.validators_threshold
     endpoints = [oracle.endpoints for oracle in protocol_config.oracles]
 
     pending = {
-        asyncio.create_task(_fetch_last_update_block_replicas(replicas)) for replicas in endpoints
+        asyncio.create_task(_fetch_last_update_block_replicas(replicas, vault=vault))
+        for replicas in endpoints
     }
     while pending:
         done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
@@ -86,9 +94,12 @@ async def _check_majority_oracles_synced(
     return False
 
 
-async def _fetch_last_update_block_replicas(replicas: list[str]) -> BlockNumber | None:
+async def _fetch_last_update_block_replicas(
+    replicas: list[str], vault: ChecksumAddress
+) -> BlockNumber | None:
     results = await asyncio.gather(
-        *[_fetch_exit_signature_block(endpoint) for endpoint in replicas], return_exceptions=True
+        *[_fetch_exit_signature_block(endpoint, vault=vault) for endpoint in replicas],
+        return_exceptions=True,
     )
     blocks: list[BlockNumber] = []
     for res in results:
@@ -127,11 +138,13 @@ async def _fetch_outdated_indexes(
     oracles: list[Oracle], update_block: BlockNumber | None
 ) -> list[int]:
     endpoints = list(chain.from_iterable([oracle.endpoints for oracle in oracles]))
-    shuffle(endpoints)
+    shuffle(endpoints)  # nosec
 
     for oracle_endpoint in endpoints:
         try:
-            response = await get_oracle_outdated_signatures_response(oracle_endpoint)
+            response = await get_oracle_outdated_signatures_response(
+                oracle_endpoint, vault=settings.vault
+            )
         except (ClientError, RetryError) as e:
             warning_verbose(str(e))
             continue
@@ -145,13 +158,13 @@ async def _fetch_outdated_indexes(
 
 
 async def _update_exit_signatures(
+    vault: ChecksumAddress,
     keystore: BaseKeystore,
     protocol_config: ProtocolConfig,
     outdated_indexes: list[int],
 ) -> None:
     """Fetches update signature requests from oracles."""
     logger.info('Starting exit signature rotation for %d validators', len(outdated_indexes))
-    # pylint: disable=duplicate-code
     validators = await get_validator_public_keys(outdated_indexes)
     approvals_min_interval = 1
     deadline: int | None = None
@@ -164,6 +177,7 @@ async def _update_exit_signatures(
         if not oracles_request or deadline is None or deadline <= current_timestamp:
             deadline = current_timestamp + protocol_config.signature_validity_period
             oracles_request = await _get_oracles_request(
+                vault=vault,
                 protocol_config=protocol_config,
                 keystore=keystore,
                 validators=validators,
@@ -187,7 +201,7 @@ async def _update_exit_signatures(
         approvals_time = time.time() - approval_start_time
         await asyncio.sleep(approvals_min_interval - approvals_time)
 
-    tx_hash = await submit_exit_signatures(oracles_approval)
+    tx_hash = await submit_exit_signatures(approval=oracles_approval, vault_address=vault)
     if not tx_hash:
         return
 
@@ -198,8 +212,10 @@ async def _update_exit_signatures(
     )
 
 
-async def _fetch_exit_signature_block(oracle_endpoint: str) -> BlockNumber | None:
-    data = await get_oracle_outdated_signatures_response(oracle_endpoint)
+async def _fetch_exit_signature_block(
+    oracle_endpoint: str, vault: ChecksumAddress
+) -> BlockNumber | None:
+    data = await get_oracle_outdated_signatures_response(oracle_endpoint, vault=vault)
     block_number = data['exit_signature_block_number']
     if block_number is None:
         return None
@@ -207,6 +223,7 @@ async def _fetch_exit_signature_block(oracle_endpoint: str) -> BlockNumber | Non
 
 
 async def _get_oracles_request(
+    vault: ChecksumAddress,
     protocol_config: ProtocolConfig,
     keystore: BaseKeystore,
     validators: dict[int, HexStr],
@@ -214,7 +231,7 @@ async def _get_oracles_request(
     """Fetches approval from oracles."""
     # get exit signature shards
     request = SignatureRotationRequest(
-        vault_address=settings.vault,
+        vault_address=vault,
         public_keys=[],
         public_key_shards=[],
         exit_signature_shards=[],

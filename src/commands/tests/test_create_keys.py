@@ -1,23 +1,21 @@
 import glob
-import json
 import os
 from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
-from eth_typing import HexAddress
-from staking_deposit.settings import DEPOSIT_CLI_VERSION
+from eth_typing import ChecksumAddress
 
 from src.commands.create_keys import create_keys
 
 
-@pytest.mark.usefixtures('_init_vault')
+@pytest.mark.usefixtures('_init_config')
 class TestCreateKeys:
     def test_basic(
         self,
         test_mnemonic: str,
         data_dir: Path,
-        vault_address: HexAddress,
+        vault_address: ChecksumAddress,
         vault_dir: Path,
         runner: CliRunner,
     ):
@@ -32,7 +30,7 @@ class TestCreateKeys:
             str(vault_address),
             '--data-dir',
             str(data_dir),
-            '--pool-size',
+            '--concurrency',
             '1',
         ]
         result = runner.invoke(create_keys, args)
@@ -40,19 +38,11 @@ class TestCreateKeys:
 
         output = (
             'Creating validator keys:\t\t\n'
-            'Generating deposit data JSON\t\t\n'
             'Exporting validator keystores\t\t\n'
-            f'Done. Generated 5 keys for {vault_address} vault.\n'
+            f'Done. Generated 5 keys for StakeWise operator.\n'
             f'Keystores saved to {vault_dir}/keystores file\n'
-            f'Deposit data saved to {vault_dir}/deposit_data.json file'
         )
         assert output.strip() == result.output.strip()
-        with open(f'{vault_dir}/deposit_data.json', encoding='utf-8') as f:
-            data = json.load(f)
-            assert count == len(data)
-            assert data[0].get('network_name') == 'hoodi'
-            assert data[0].get('fork_version') == '10000910'
-            assert data[0].get('deposit_cli_version') == DEPOSIT_CLI_VERSION
         with open(f'{vault_dir}/keystores/password.txt', encoding='utf-8') as f:
             assert len(f.readline()) == 20
 
@@ -62,9 +52,9 @@ class TestCreateKeys:
         self,
         test_mnemonic: str,
         data_dir: Path,
+        vault_address: ChecksumAddress,
         vault_dir: Path,
         keystores_dir: Path,
-        vault_address: HexAddress,
         runner: CliRunner,
     ):
         count = 5
@@ -78,7 +68,7 @@ class TestCreateKeys:
             str(vault_address),
             '--data-dir',
             str(data_dir),
-            '--pool-size',
+            '--concurrency',
             '1',
             '--per-keystore-password',
         ]
@@ -87,19 +77,11 @@ class TestCreateKeys:
 
         output = (
             'Creating validator keys:\t\t\n'
-            'Generating deposit data JSON\t\t\n'
             'Exporting validator keystores\t\t\n'
-            f'Done. Generated 5 keys for {vault_address} vault.\n'
+            f'Done. Generated 5 keys for StakeWise operator.\n'
             f'Keystores saved to {vault_dir}/keystores file\n'
-            f'Deposit data saved to {vault_dir}/deposit_data.json file'
         )
         assert output.strip() == result.output.strip()
-        with open(f'{vault_dir}/deposit_data.json', encoding='utf-8') as f:
-            data = json.load(f)
-            assert count == len(data)
-            assert data[0].get('network_name') == 'hoodi'
-            assert data[0].get('fork_version') == '10000910'
-            assert data[0].get('deposit_cli_version') == DEPOSIT_CLI_VERSION
         password_files = glob.glob(os.path.join(keystores_dir / '*.txt'))
         assert len(password_files) == count
         for password_file in password_files:
