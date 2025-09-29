@@ -14,6 +14,7 @@ from web3.types import BlockNumber, Gwei
 
 from src.common.app_state import AppState
 from src.common.clients import consensus_client, execution_client
+from src.common.consensus import get_chain_latest_head
 from src.common.contracts import VaultContract
 from src.common.execution import get_execution_request_fee, get_protocol_config
 from src.common.metrics import metrics
@@ -80,10 +81,11 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
     ):
         self.relayer = relayer
 
-    async def process(self, chain_head: ChainHead) -> None:
+    async def process(self) -> None:
         """
         Every N hours check the exit queue and submit partial withdrawals if needed.
         """
+        chain_head = await get_chain_latest_head()
         protocol_config = await get_protocol_config()
         app_state = AppState()
         if not await self._is_withdrawal_interval_passed(app_state, chain_head):
@@ -91,7 +93,8 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
 
         vault_validators = VaultValidatorCrud().get_vault_validators()
         consensus_validators = await fetch_consensus_validators(
-            [val.public_key for val in vault_validators]
+            [val.public_key for val in vault_validators],
+            slot=str(chain_head.slot),
         )
         oracle_exiting_validators = await _fetch_oracle_exiting_validators(
             consensus_validators, protocol_config

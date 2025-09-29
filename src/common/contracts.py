@@ -215,12 +215,15 @@ class KeeperContract(ContractWrapper):
             to_block=to_block or await self.execution_client.eth.get_block_number(),
         )
 
-    async def get_last_rewards_update(self) -> RewardVoteInfo | None:
+    async def get_last_rewards_update(
+        self, block_number: BlockNumber | None = None
+    ) -> RewardVoteInfo | None:
         """Fetches the last rewards update."""
+        to_block = block_number or await self.execution_client.eth.get_block_number()
         last_event = await self._get_last_event(
             self.events.RewardsUpdated,  # type: ignore
             from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
-            to_block=await self.execution_client.eth.get_block_number(),
+            to_block=to_block,
         )
         if not last_event:
             return None
@@ -249,8 +252,12 @@ class KeeperContract(ContractWrapper):
 
         return last_event
 
-    async def can_harvest(self, vault_address: ChecksumAddress) -> bool:
-        return await self.contract.functions.canHarvest(vault_address).call()
+    async def can_harvest(
+        self, vault_address: ChecksumAddress, block_number: BlockNumber | None = None
+    ) -> bool:
+        return await self.contract.functions.canHarvest(vault_address).call(
+            block_identifier=block_number
+        )
 
 
 class RewardSplitterContract(ContractWrapper):

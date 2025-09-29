@@ -1,7 +1,7 @@
 from hexbytes import HexBytes
 from sw_utils.networks import GNO_NETWORKS
 from web3 import Web3
-from web3.types import Wei
+from web3.types import BlockNumber, Wei
 
 from src.common.clients import ipfs_fetch_client
 from src.common.contracts import VaultContract, keeper_contract
@@ -9,11 +9,11 @@ from src.common.typings import HarvestParams
 from src.config.settings import settings
 
 
-async def get_harvest_params() -> HarvestParams | None:
-    if not await keeper_contract.can_harvest(settings.vault):
+async def get_harvest_params(block_number: BlockNumber | None = None) -> HarvestParams | None:
+    if not await keeper_contract.can_harvest(settings.vault, block_number):
         return None
 
-    last_rewards = await keeper_contract.get_last_rewards_update()
+    last_rewards = await keeper_contract.get_last_rewards_update(block_number)
     if last_rewards is None:
         return None
 

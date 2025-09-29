@@ -119,7 +119,7 @@ class ValidatorTask(BaseTask):
             self.validator_registration_subtask.process(),
         ]
         if not settings.disable_withdrawals:
-            subtasks.append(self.validator_withdrawal_subtask.process(chain_head))
+            subtasks.append(self.validator_withdrawal_subtask.process())
         await asyncio.gather(*subtasks)
 
 
