@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 class KeystoreFile:
     name: str
     password: str
-    file_path: str
+    file: Path
     password_file: Path
 
 
@@ -122,7 +122,7 @@ class LocalKeystore(BaseKeystore):
 
         for current_path, _, files in os.walk(keystores_dir):
             for f in files:
-                file_path = os.path.join(current_path, f)
+                file_path = Path(current_path) / f
                 if not (isfile(file_path) and f.startswith('keystore') and f.endswith('.json')):
                     continue
 
@@ -140,7 +140,7 @@ class LocalKeystore(BaseKeystore):
                 password = LocalKeystore._load_keystores_password(password_file)
                 res.append(
                     KeystoreFile(
-                        name=f, file_path=file_path, password=password, password_file=password_file
+                        name=f, file=file_path, password=password, password_file=password_file
                     )
                 )
         return res
@@ -150,7 +150,7 @@ class LocalKeystore(BaseKeystore):
         file_name = keystore_file.name
         keystores_password = keystore_file.password
         try:
-            keystore = ScryptKeystore.from_file(keystore_file.file_path)
+            keystore = ScryptKeystore.from_file(str(keystore_file.file))
         except BaseException as e:
             raise KeystoreException(f'Invalid keystore format in file "{file_name}"') from e
 
