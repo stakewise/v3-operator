@@ -129,13 +129,12 @@ class LocalKeystore(BaseKeystore):
                 # check for password file in the keystores_password_dir
                 password_file = keystores_password_dir / f.replace('.json', '.txt')
                 if not isfile(password_file):
-
                     # check for password file in the same directory as the keystore file
                     password_file = Path(current_path) / f.replace('.json', '.txt')
-                    if not isfile(password_file):
 
-                        # use password file from the keystores_password_file setting
-                        password_file = keystores_password_file
+                if not isfile(password_file):
+                    # use password file from the keystores_password_file setting
+                    password_file = keystores_password_file
 
                 password = LocalKeystore._load_keystores_password(password_file)
                 res.append(
