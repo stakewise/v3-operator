@@ -1,7 +1,7 @@
 import logging
-import os
 from dataclasses import dataclass
 from multiprocessing import Pool
+from os import walk
 from os.path import isfile
 from pathlib import Path
 from typing import NewType
@@ -120,7 +120,7 @@ class LocalKeystore(BaseKeystore):
 
         res: list[KeystoreFile] = []
 
-        for current_path, _, files in os.walk(keystores_dir):
+        for current_path, _, files in walk(keystores_dir):
             for f in files:
                 file_path = Path(current_path) / f
                 if not (isfile(file_path) and f.startswith('keystore') and f.endswith('.json')):
@@ -150,7 +150,7 @@ class LocalKeystore(BaseKeystore):
         file_name = keystore_file.name
         keystores_password = keystore_file.password
         try:
-            keystore = ScryptKeystore.from_file(str(keystore_file.file))
+            keystore = ScryptKeystore.from_file(keystore_file.file)
         except BaseException as e:
             raise KeystoreException(f'Invalid keystore format in file "{file_name}"') from e
 
