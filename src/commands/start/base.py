@@ -57,7 +57,11 @@ async def start_base() -> None:
     relayer: RelayerClient | None = None
 
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
-        keystore = await load_keystore()
+        if settings.disable_validator_registrations:
+            keystore = None
+        else:
+            keystore = await load_keystore()
+
     else:
         relayer = RelayerClient()
 
