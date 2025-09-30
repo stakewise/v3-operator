@@ -111,6 +111,9 @@ class Settings(metaclass=Singleton):
     disable_full_withdrawals: bool = decouple_config(
         'DISABLE_FULL_WITHDRAWALS', default=False, cast=bool
     )
+    disable_validator_registrations: bool = decouple_config(
+        'DISABLE_VALIDATOR_REGISTRATIONS', default=False, cast=bool
+    )
 
     min_deposit_amount_gwei: Gwei
     min_deposit_delay: int
