@@ -11,7 +11,7 @@ from web3.types import Gwei, Wei
 AVAILABLE_NETWORKS = [MAINNET, HOODI, GNOSIS, CHIADO]
 RATED_NETWORKS = [MAINNET]
 
-ZERO_CHECKSUM_ADDRESS = Web3.to_checksum_address(EMPTY_ADDR_HEX)  # noqa
+ZERO_CHECKSUM_ADDRESS = Web3.to_checksum_address(EMPTY_ADDR_HEX)  # noqa: E501
 
 
 @dataclass

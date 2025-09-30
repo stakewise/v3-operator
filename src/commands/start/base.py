@@ -115,9 +115,9 @@ class ValidatorTask(BaseTask):
             chain_head=chain_head, interrupt_handler=interrupt_handler
         )
         await scan_validators_events(block_number=chain_head.block_number, is_startup=False)
-        subtasks = [
-            self.validator_registration_subtask.process(),
-        ]
+        subtasks = []
+        if not settings.disable_validator_registrations:
+            subtasks.append(self.validator_registration_subtask.process())
         if not settings.disable_withdrawals:
             subtasks.append(self.validator_withdrawal_subtask.process())
         await asyncio.gather(*subtasks)
