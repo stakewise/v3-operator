@@ -1,7 +1,7 @@
 import logging
+import os
 from dataclasses import dataclass
 from multiprocessing import Pool
-from os import listdir
 from os.path import isfile
 from pathlib import Path
 from typing import NewType
@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 class KeystoreFile:
     name: str
     password: str
+    file_path: str
     password_file: Path
 
 
@@ -52,7 +53,7 @@ class LocalKeystore(BaseKeystore):
             results = [
                 pool.apply_async(
                     LocalKeystore._process_keystore_file,
-                    (keystore_file, settings.keystores_dir),
+                    (keystore_file,),
                     error_callback=_stop_pool,
                 )
                 for keystore_file in keystore_files
@@ -118,29 +119,38 @@ class LocalKeystore(BaseKeystore):
         keystores_password_file = settings.keystores_password_file
 
         res: list[KeystoreFile] = []
-        for f in listdir(keystores_dir):
-            if not (isfile(keystores_dir / f) and f.startswith('keystore') and f.endswith('.json')):
-                continue
 
-            password_file = keystores_password_dir / f.replace('.json', '.txt')
-            if not isfile(password_file):
-                password_file = keystores_password_file
+        for current_path, _, files in os.walk(keystores_dir):
+            for f in files:
+                file_path = os.path.join(current_path, f)
+                if not (isfile(file_path) and f.startswith('keystore') and f.endswith('.json')):
+                    continue
 
-            password = LocalKeystore._load_keystores_password(password_file)
-            res.append(KeystoreFile(name=f, password=password, password_file=password_file))
+                # check for password file in the keystores_password_dir
+                password_file = keystores_password_dir / f.replace('.json', '.txt')
+                if not isfile(password_file):
 
+                    # check for password file in the same directory as the keystore file
+                    password_file = Path(current_path) / f.replace('.json', '.txt')
+                    if not isfile(password_file):
+
+                        # use password file from the keystores_password_file setting
+                        password_file = keystores_password_file
+
+                password = LocalKeystore._load_keystores_password(password_file)
+                res.append(
+                    KeystoreFile(
+                        name=f, file_path=file_path, password=password, password_file=password_file
+                    )
+                )
         return res
 
     @staticmethod
-    def _process_keystore_file(
-        keystore_file: KeystoreFile, keystore_path: Path
-    ) -> tuple[HexStr, BLSPrivkey, int]:
+    def _process_keystore_file(keystore_file: KeystoreFile) -> tuple[HexStr, BLSPrivkey, int]:
         file_name = keystore_file.name
         keystores_password = keystore_file.password
-        file_path = keystore_path / file_name
-
         try:
-            keystore = ScryptKeystore.from_file(file_path)
+            keystore = ScryptKeystore.from_file(keystore_file.file_path)
         except BaseException as e:
             raise KeystoreException(f'Invalid keystore format in file "{file_name}"') from e
 
