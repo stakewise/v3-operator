@@ -140,12 +140,6 @@ use of flags is optional):
 PYTHONPATH=. poetry run python src/main.py COMMAND --flagA=123 --flagB=xyz
 ```
 
-### Kubernetes (advanced)
-
-A separate guide runs through the set-up of Operator Service via Kubernetes, designed to run large numbers of
-validators (up to 10,000). Visit
-the [Kubernetes setup](https://docs.stakewise.io/for-operators/kubernetes-staking-setup) for more details.
-
 ## Contacts
 
 - Dmitri Tsumak - <dmitri@stakewise.io>
