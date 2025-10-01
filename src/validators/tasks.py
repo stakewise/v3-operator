@@ -288,11 +288,10 @@ def _get_deposits_amounts(vault_assets: Gwei, validator_type: ValidatorType) -> 
     if validator_type == ValidatorType.V1:
         return [MIN_ACTIVATION_BALANCE_GWEI] * (vault_assets // MIN_ACTIVATION_BALANCE_GWEI)
     amounts = []
-    num_full_validators = vault_assets // MAX_EFFECTIVE_BALANCE_GWEI
+    num_full_validators, remainder = divmod(vault_assets, MAX_EFFECTIVE_BALANCE_GWEI)
     amounts.extend([MAX_EFFECTIVE_BALANCE_GWEI] * num_full_validators)
-    remainder = Gwei(vault_assets % MAX_EFFECTIVE_BALANCE_GWEI)
     if remainder >= MIN_ACTIVATION_BALANCE_GWEI:
-        amounts.append(remainder)
+        amounts.append(Gwei(remainder))
 
     return amounts
 
