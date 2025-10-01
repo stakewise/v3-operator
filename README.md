@@ -12,7 +12,7 @@ tasks:
 - Withdrawals processing
 - Vault State Update
 
-And many more. Check the [Documentation](https://docs.stakewise.io/operator/intro)for details.
+And many more. Check the [Documentation](https://docs.stakewise.io/operator/intro) for details.
 
 ## Prerequisites
 
