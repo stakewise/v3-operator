@@ -9,10 +9,10 @@ from web3.types import Gwei
 
 from src.commands.start.base import start_base
 from src.commands.start.common_option import add_common_options, start_common_options
-from src.common.typings import ValidatorType
+from src.common.typings import ValidatorsRegistrationMode, ValidatorType
 from src.common.utils import log_verbose
 from src.config.config import OperatorConfig
-from src.config.settings import ValidatorsRegistrationMode, settings
+from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
 

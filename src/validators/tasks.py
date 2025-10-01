@@ -13,11 +13,10 @@ from src.common.contracts import VaultContract, validators_registry_contract
 from src.common.execution import build_gas_manager, get_protocol_config
 from src.common.harvest import get_harvest_params
 from src.common.metrics import metrics
-from src.common.typings import HarvestParams, ValidatorType
+from src.common.typings import HarvestParams, ValidatorsRegistrationMode, ValidatorType
 from src.config.settings import (
     MAX_EFFECTIVE_BALANCE_GWEI,
     MIN_ACTIVATION_BALANCE_GWEI,
-    ValidatorsRegistrationMode,
     settings,
 )
 from src.validators.consensus import fetch_compounding_validators_balances
@@ -289,11 +288,12 @@ def _get_deposits_amounts(vault_assets: Gwei, validator_type: ValidatorType) -> 
     if validator_type == ValidatorType.V1:
         return [MIN_ACTIVATION_BALANCE_GWEI] * (vault_assets // MIN_ACTIVATION_BALANCE_GWEI)
     amounts = []
-    while vault_assets >= MAX_EFFECTIVE_BALANCE_GWEI:
-        amounts.append(MAX_EFFECTIVE_BALANCE_GWEI)
-        vault_assets = Gwei(vault_assets - MAX_EFFECTIVE_BALANCE_GWEI)
-    if vault_assets >= MIN_ACTIVATION_BALANCE_GWEI:
-        amounts.append(vault_assets)
+    num_full_validators = vault_assets // MAX_EFFECTIVE_BALANCE_GWEI
+    amounts.extend([MAX_EFFECTIVE_BALANCE_GWEI] * num_full_validators)
+    remainder = Gwei(vault_assets % MAX_EFFECTIVE_BALANCE_GWEI)
+    if remainder >= MIN_ACTIVATION_BALANCE_GWEI:
+        amounts.append(remainder)
+
     return amounts
 
 
