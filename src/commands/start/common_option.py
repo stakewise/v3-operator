@@ -129,13 +129,13 @@ start_common_options = [
     click.option(
         '--disable-validators-registration',
         is_flag=True,
-        envvar='disable-validators-registration',
+        envvar='DISABLE_VALIDATORS_REGISTRATION',
         help='Disable new validators registration. Default is false',
     ),
     click.option(
         '--disable-validators-funding',
         is_flag=True,
-        envvar='disable-validators-funding',
+        envvar='DISABLE_VALIDATORS_FUNDING',
         help='Disable funding into current validators. Default is false',
     ),
     click.option(
