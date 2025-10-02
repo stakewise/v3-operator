@@ -1,13 +1,10 @@
-from sw_utils.tests import faker
 import pytest
+from sw_utils.tests import faker
 
 from src.common.tests.utils import ether_to_gwei
 from src.common.typings import ValidatorType
 from src.config.networks import HOODI
-from src.config.settings import (  # MAX_EFFECTIVE_BALANCE_GWEI,
-    MIN_ACTIVATION_BALANCE_GWEI,
-    settings,
-)
+from src.config.settings import MIN_ACTIVATION_BALANCE_GWEI, settings
 from src.validators.tasks import _get_deposits_amounts, _get_funding_amounts
 
 
