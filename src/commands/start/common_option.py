@@ -7,7 +7,10 @@ from web3 import Web3
 
 from src.common.logging import LOG_LEVELS
 from src.common.typings import ValidatorType
-from src.common.validators import validate_eth_address, validate_min_deposit_amount_gwei
+from src.common.validators import (
+    validate_eth_address,
+    validate_max_validator_balance_gwei,
+)
 from src.config.networks import GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
     DEFAULT_METRICS_HOST,
@@ -191,7 +194,15 @@ start_common_options = [
         f' The default is {DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI} '
         f'({Web3.from_wei(DEFAULT_MIN_DEPOSIT_AMOUNT, 'ether')} ETH).',
         default=DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
-        callback=validate_min_deposit_amount_gwei,
+    ),
+    click.option(
+        '--max-validator-balance-gwei',
+        type=int,
+        envvar='MAX_VALIDATOR_BALANCE_GWEI',
+        help=f'The maximum validator balance in Gwei.'
+        f'Default is {NETWORKS[MAINNET].MAX_VALIDATOR_BALANCE_GWEI} Gwei for Ethereum, '
+        f'{NETWORKS[GNOSIS].MAX_VALIDATOR_BALANCE_GWEI} Gwei for Gnosis.',
+        callback=validate_max_validator_balance_gwei,
     ),
     click.option(
         '--min-deposit-delay',

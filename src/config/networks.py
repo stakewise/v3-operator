@@ -29,6 +29,7 @@ class NetworkConfig(BaseNetworkConfig):
     RATED_API_URL: str
     CONFIG_UPDATE_EVENT_BLOCK: BlockNumber
     MAX_FEE_PER_GAS_GWEI: Gwei
+    MAX_VALIDATOR_BALANCE_GWEI: Gwei
     SHARD_COMMITTEE_PERIOD: int
     PENDING_PARTIAL_WITHDRAWALS_LIMIT: int
     PENDING_CONSOLIDATIONS_LIMIT: int
@@ -60,6 +61,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(21471524),
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
+        MAX_VALIDATOR_BALANCE_GWEI=Gwei(int(Web3.from_wei(Web3.to_wei(1945, 'ether'), 'gwei'))),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
         PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
         PENDING_CONSOLIDATIONS_LIMIT=262144,
@@ -87,6 +89,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(94090),
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
+        MAX_VALIDATOR_BALANCE_GWEI=Gwei(int(Web3.from_wei(Web3.to_wei(1945, 'ether'), 'gwei'))),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
         PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
         PENDING_CONSOLIDATIONS_LIMIT=262144,
@@ -103,7 +106,7 @@ NETWORKS: dict[str, NetworkConfig] = {
             '0xA89629B41477560d49dd56ef1a59BD214362aCDC'
         ),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x99F07eA1Cf491319FF6a2eDbBfEC84F3A5eAbfB5'
+            '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
         ),
         WITHDRAWAL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x00000961Ef480Eb55e80D19ad83579A64c007002'
@@ -116,6 +119,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(37640206),
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
+        MAX_VALIDATOR_BALANCE_GWEI=Gwei(int(Web3.from_wei(Web3.to_wei(1800, 'ether'), 'gwei'))),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
         PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
         PENDING_CONSOLIDATIONS_LIMIT=262144,
@@ -145,6 +149,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(12896244),
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
+        MAX_VALIDATOR_BALANCE_GWEI=Gwei(int(Web3.from_wei(Web3.to_wei(1800, 'ether'), 'gwei'))),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
         PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
         PENDING_CONSOLIDATIONS_LIMIT=262144,

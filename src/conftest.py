@@ -18,7 +18,7 @@ from src.commands.create_wallet import create_wallet
 from src.commands.setup_remote_signer import setup_remote_signer
 from src.common.credentials import CredentialManager
 from src.config.config import OperatorConfig
-from src.config.networks import HOODI
+from src.config.networks import HOODI, NETWORKS
 from src.config.settings import settings
 from src.validators.keystores.remote import RemoteSignerKeystore
 from src.validators.keystores.tests.test_fixtures.hashi_vault import (
@@ -209,6 +209,7 @@ def fake_settings(
         network=HOODI,
         keystores_dir=str(keystores_dir),
         database_dir=str(data_dir),
+        max_validator_balance_gwei=NETWORKS[HOODI].MAX_VALIDATOR_BALANCE_GWEI,
     )
 
 

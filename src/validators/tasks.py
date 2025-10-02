@@ -14,11 +14,7 @@ from src.common.execution import build_gas_manager, get_protocol_config
 from src.common.harvest import get_harvest_params
 from src.common.metrics import metrics
 from src.common.typings import HarvestParams, ValidatorsRegistrationMode, ValidatorType
-from src.config.settings import (
-    MAX_EFFECTIVE_BALANCE_GWEI,
-    MIN_ACTIVATION_BALANCE_GWEI,
-    settings,
-)
+from src.config.settings import MIN_ACTIVATION_BALANCE_GWEI, settings
 from src.validators.consensus import fetch_compounding_validators_balances
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import (
@@ -288,8 +284,8 @@ def _get_deposits_amounts(vault_assets: Gwei, validator_type: ValidatorType) -> 
     if validator_type == ValidatorType.V1:
         return [MIN_ACTIVATION_BALANCE_GWEI] * (vault_assets // MIN_ACTIVATION_BALANCE_GWEI)
     amounts = []
-    num_full_validators, remainder = divmod(vault_assets, MAX_EFFECTIVE_BALANCE_GWEI)
-    amounts.extend([MAX_EFFECTIVE_BALANCE_GWEI] * num_full_validators)
+    num_full_validators, remainder = divmod(vault_assets, settings.max_validator_balance_gwei)
+    amounts.extend([settings.max_validator_balance_gwei] * num_full_validators)
     if remainder >= MIN_ACTIVATION_BALANCE_GWEI:
         amounts.append(Gwei(remainder))
 
@@ -303,7 +299,7 @@ def _get_funding_amounts(
     for public_key, balance in sorted(
         compounding_validators_balances.items(), key=lambda item: item[1], reverse=True
     ):
-        remaining_capacity = MAX_EFFECTIVE_BALANCE_GWEI - balance
+        remaining_capacity = settings.max_validator_balance_gwei - balance
         if remaining_capacity >= settings.min_deposit_amount_gwei:
             val_amount = min(remaining_capacity, vault_assets)
             result[public_key] = Gwei(val_amount)

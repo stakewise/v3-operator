@@ -21,17 +21,15 @@ from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import log_verbose
 from src.common.validators import (
     validate_eth_address,
+    validate_max_validator_balance_gwei,
     validate_public_key,
     validate_public_keys,
     validate_public_keys_file,
 )
 from src.common.wallet import wallet
 from src.config.config import OperatorConfig
-from src.config.settings import (
-    MAX_CONSOLIDATION_REQUEST_FEE,
-    MAX_EFFECTIVE_BALANCE_GWEI,
-    settings,
-)
+from src.config.networks import GNOSIS, MAINNET, NETWORKS
+from src.config.settings import MAX_CONSOLIDATION_REQUEST_FEE, settings
 from src.validators.consensus import EXITING_STATUSES, fetch_consensus_validators
 from src.validators.oracles import poll_consolidation_signature
 from src.validators.register_validators import submit_consolidate_validators
@@ -108,6 +106,15 @@ logger = logging.getLogger(__name__)
     envvar='RELAYER_ENDPOINT',
 )
 @click.option(
+    '--max-validator-balance-gwei',
+    type=int,
+    envvar='MAX_VALIDATOR_BALANCE_GWEI',
+    help=f'The maximum validator balance in Gwei.'
+    f'Default is {NETWORKS[MAINNET].MAX_VALIDATOR_BALANCE_GWEI} Gwei for Ethereum, '
+    f'{NETWORKS[GNOSIS].MAX_VALIDATOR_BALANCE_GWEI} Gwei for Gnosis.',
+    callback=validate_max_validator_balance_gwei,
+)
+@click.option(
     '-v',
     '--verbose',
     help='Enable debug mode. Default is false.',
@@ -149,6 +156,7 @@ def consolidate(
     source_public_keys_file: Path | None,
     target_public_key: HexStr | None = None,
     relayer_endpoint: str | None = None,
+    max_validator_balance_gwei: int | None = None,
 ) -> None:
     if all([source_public_keys, source_public_keys_file]):
         raise click.ClickException(
@@ -175,6 +183,9 @@ def consolidate(
         wallet_file=wallet_file,
         wallet_password_file=wallet_password_file,
         relayer_endpoint=relayer_endpoint,
+        max_validator_balance_gwei=(
+            Gwei(max_validator_balance_gwei) if max_validator_balance_gwei else None
+        ),
         verbose=verbose,
         log_level=log_level,
     )
@@ -401,10 +412,10 @@ async def _check_public_keys(
             )
 
     # Validate the total balance won't exceed the max effective balance
-    if sum(val.balance for val in validators) > MAX_EFFECTIVE_BALANCE_GWEI:
+    if sum(val.balance for val in validators) > settings.max_validator_balance_gwei:
         raise click.ClickException(
             'Cannot consolidate validators,'
-            f' total balance exceed {MAX_EFFECTIVE_BALANCE_GWEI} Gwei'
+            f' total balance exceed {settings.max_validator_balance_gwei} Gwei'
         )
 
     return [(target_validator, source_validator) for source_validator in source_validators]
@@ -508,7 +519,7 @@ async def _find_target_source_public_keys(
         for val in source_validators:
             if (
                 target_validator.balance + sum(v.balance for v in selected_source_validators)
-                > MAX_EFFECTIVE_BALANCE_GWEI
+                > settings.max_validator_balance_gwei
             ):
                 break
             selected_source_validators.append(val)
