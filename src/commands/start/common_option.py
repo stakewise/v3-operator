@@ -199,7 +199,7 @@ start_common_options = [
         '--max-validator-balance-gwei',
         type=int,
         envvar='MAX_VALIDATOR_BALANCE_GWEI',
-        help=f'The maximum validator balance in gwei.'
+        help=f'The maximum validator balance in Gwei.'
         f'Default is {NETWORKS[MAINNET].MAX_VALIDATOR_BALANCE_GWEI} Gwei for Ethereum, '
         f'{NETWORKS[GNOSIS].MAX_VALIDATOR_BALANCE_GWEI} Gwei for Gnosis.',
         callback=validate_max_validator_balance_gwei,
