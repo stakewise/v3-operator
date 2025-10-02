@@ -116,6 +116,7 @@ class Settings(metaclass=Singleton):
     )
 
     min_deposit_amount_gwei: Gwei
+    max_validator_balance_gwei: Gwei
     min_deposit_delay: int
 
     # pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements
@@ -157,6 +158,7 @@ class Settings(metaclass=Singleton):
         relayer_endpoint: str | None = None,
         validators_registration_mode: ValidatorsRegistrationMode = ValidatorsRegistrationMode.AUTO,
         min_deposit_amount_gwei: Gwei = DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
+        max_validator_balance_gwei: Gwei | None = None,
         min_deposit_delay: int = DEFAULT_MIN_DEPOSIT_DELAY,
     ) -> None:
         self.vault = vault
@@ -180,8 +182,12 @@ class Settings(metaclass=Singleton):
 
         if max_fee_per_gas_gwei is None:
             max_fee_per_gas_gwei = self.network_config.MAX_FEE_PER_GAS_GWEI
-
         self.max_fee_per_gas_gwei = Gwei(max_fee_per_gas_gwei)
+
+        if max_validator_balance_gwei is None:
+            max_validator_balance_gwei = self.network_config.MAX_VALIDATOR_BALANCE_GWEI
+        self.max_validator_balance_gwei = Gwei(max_validator_balance_gwei)
+
         self.min_deposit_amount_gwei = min_deposit_amount_gwei
         self.min_deposit_delay = min_deposit_delay
 
