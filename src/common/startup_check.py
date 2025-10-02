@@ -396,18 +396,18 @@ async def check_vault_version() -> None:
 
 async def _check_events_logs() -> None:
     """Check that EL client didn't prune logs"""
-    events = await keeper_contract.events.ConfigUpdated.get_logs(  # type: ignore
-        fromBlock=settings.network_config.CONFIG_UPDATE_EVENT_BLOCK,
-        toBlock=settings.network_config.CONFIG_UPDATE_EVENT_BLOCK,
+    events = await keeper_contract.events.ConfigUpdated.get_logs(
+        from_block=settings.network_config.CONFIG_UPDATE_EVENT_BLOCK,
+        to_block=settings.network_config.CONFIG_UPDATE_EVENT_BLOCK,
     )
     if not events:
         raise ValueError(
             "Can't find oracle config. Please, ensure that EL client didn't prune event logs."
         )
 
-    events = await validators_registry_contract.events.DepositEvent.get_logs(  # type: ignore
-        fromBlock=settings.network_config.GENESIS_VALIDATORS_LAST_BLOCK,
-        toBlock=settings.network_config.GENESIS_VALIDATORS_LAST_BLOCK,
+    events = await validators_registry_contract.events.DepositEvent.get_logs(
+        from_block=settings.network_config.GENESIS_VALIDATORS_LAST_BLOCK,
+        to_block=settings.network_config.GENESIS_VALIDATORS_LAST_BLOCK,
     )
     if not events:
         raise ValueError(

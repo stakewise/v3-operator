@@ -161,7 +161,7 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
     else:
         from_block = settings.network_config.VALIDATORS_REGISTRY_GENESIS_BLOCK
 
-    new_events = await validators_registry_contract.events.DepositEvent.get_logs(  # type: ignore
+    new_events = await validators_registry_contract.events.DepositEvent.get_logs(
         fromBlock=from_block
     )
     new_public_keys: Set[HexStr] = set()
@@ -183,9 +183,7 @@ async def get_latest_vault_v2_validator_public_keys(vault_address: ChecksumAddre
     else:
         from_block = settings.network_config.KEEPER_GENESIS_BLOCK
     vault_contract = VaultContract(vault_address)
-    events = await vault_contract.events.V2ValidatorRegistered.get_logs(  # type: ignore
-        fromBlock=from_block
-    )
+    events = await vault_contract.events.V2ValidatorRegistered.get_logs(fromBlock=from_block)
     return {Web3.to_hex(event['args']['publicKey']) for event in events}
 
 

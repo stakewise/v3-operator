@@ -12,7 +12,7 @@ from sw_utils import (
 )
 from sw_utils.graph.client import GraphClient as SWGraphClient
 from web3 import AsyncWeb3
-from web3.middleware.signing import async_construct_sign_and_send_raw_middleware
+from web3.middleware import SignAndSendRawMiddlewareBuilder
 
 import src
 from src.common.wallet import wallet
@@ -56,8 +56,8 @@ class ExecutionClient:
         # Account is required when emitting transactions.
         # For read-only queries account may be omitted.
         if wallet.can_load():
-            w3.middleware_onion.add(
-                await async_construct_sign_and_send_raw_middleware(wallet.account)
+            w3.middleware_onion.inject(
+                SignAndSendRawMiddlewareBuilder.build(wallet.account), layer=0
             )
             w3.eth.default_account = wallet.address
 
