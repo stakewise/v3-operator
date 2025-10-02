@@ -15,7 +15,6 @@ from src.common.harvest import get_harvest_params
 from src.common.metrics import metrics
 from src.common.typings import HarvestParams, ValidatorType
 from src.config.settings import (
-    MAX_EFFECTIVE_BALANCE_GWEI,
     MIN_ACTIVATION_BALANCE_GWEI,
     ValidatorsRegistrationMode,
     settings,
@@ -289,9 +288,9 @@ def _get_deposits_amounts(vault_assets: Gwei, validator_type: ValidatorType) -> 
     if validator_type == ValidatorType.V1:
         return [MIN_ACTIVATION_BALANCE_GWEI] * (vault_assets // MIN_ACTIVATION_BALANCE_GWEI)
     amounts = []
-    while vault_assets >= MAX_EFFECTIVE_BALANCE_GWEI:
-        amounts.append(MAX_EFFECTIVE_BALANCE_GWEI)
-        vault_assets = Gwei(vault_assets - MAX_EFFECTIVE_BALANCE_GWEI)
+    while vault_assets >= settings.max_validator_balance_gwei:
+        amounts.append(settings.max_validator_balance_gwei)
+        vault_assets = Gwei(vault_assets - settings.max_validator_balance_gwei)
     if vault_assets >= MIN_ACTIVATION_BALANCE_GWEI:
         amounts.append(vault_assets)
     return amounts
@@ -304,7 +303,7 @@ def _get_funding_amounts(
     for public_key, balance in sorted(
         compounding_validators_balances.items(), key=lambda item: item[1], reverse=True
     ):
-        remaining_capacity = MAX_EFFECTIVE_BALANCE_GWEI - balance
+        remaining_capacity = settings.max_validator_balance_gwei - balance
         if remaining_capacity >= settings.min_deposit_amount_gwei:
             val_amount = min(remaining_capacity, vault_assets)
             result[public_key] = Gwei(val_amount)

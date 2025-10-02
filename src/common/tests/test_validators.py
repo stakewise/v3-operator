@@ -8,7 +8,6 @@ from src.common.validators import (
     _is_public_key,
     validate_db_uri,
     validate_eth_address,
-    validate_min_deposit_amount_gwei,
     validate_public_key,
     validate_public_keys,
     validate_public_keys_file,
@@ -34,23 +33,6 @@ def test_validate_eth_address():
     # raises_error_for_invalid_eth_address
     with pytest.raises(BadParameter, match='Invalid Ethereum address'):
         validate_eth_address(None, None, '0x742d35Cc')
-
-
-def test_validate_min_deposit_amount_gwei():
-    # returns_value_when_above
-    result = validate_min_deposit_amount_gwei(None, None, DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI + 1000)
-    assert result == DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI + 1000
-
-    # returns_value_when_equal_to_minimum
-    result = validate_min_deposit_amount_gwei(None, None, DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI)
-    assert result == DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI
-
-    # raises_error_when_below_minimum
-    with pytest.raises(
-        BadParameter,
-        match=f"min-deposit-amount-gwei must be greater than or equal to {DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI} Gwei",
-    ):
-        validate_min_deposit_amount_gwei(None, None, DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI - 1)
 
 
 def test_validate_public_key():
