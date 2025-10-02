@@ -12,7 +12,6 @@ from src.common.validators import (
     validate_public_keys,
     validate_public_keys_file,
 )
-from src.config.settings import DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI
 
 
 def test_validate_eth_address():
@@ -105,7 +104,7 @@ def test_validate_public_keys_file():
     mock_file_content = public_key_1[:-2] + '\n' 'invalid_key\n'
     with patch('builtins.open', mock_open(read_data=mock_file_content)):
         with pytest.raises(
-            BadParameter, match=f"Invalid validator public key: {public_key_1[:-2]}"
+            BadParameter, match=f'Invalid validator public key: {public_key_1[:-2]}'
         ):
             validate_public_keys_file(None, None, 'mock_file_path')
 
