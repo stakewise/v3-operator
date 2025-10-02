@@ -103,7 +103,7 @@ NETWORKS: dict[str, NetworkConfig] = {
             '0xA89629B41477560d49dd56ef1a59BD214362aCDC'
         ),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x99F07eA1Cf491319FF6a2eDbBfEC84F3A5eAbfB5'
+            '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
         ),
         WITHDRAWAL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x00000961Ef480Eb55e80D19ad83579A64c007002'
