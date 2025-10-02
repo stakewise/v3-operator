@@ -56,6 +56,8 @@ class Settings(metaclass=Singleton):
     harvest_vault: bool
     claim_fee_splitter: bool
     disable_withdrawals: bool
+    disable_validators_registration: bool
+    disable_validators_funding: bool
     verbose: bool
     enable_metrics: bool
     metrics_host: str
@@ -111,9 +113,6 @@ class Settings(metaclass=Singleton):
     disable_full_withdrawals: bool = decouple_config(
         'DISABLE_FULL_WITHDRAWALS', default=False, cast=bool
     )
-    disable_validator_registrations: bool = decouple_config(
-        'DISABLE_VALIDATOR_REGISTRATIONS', default=False, cast=bool
-    )
 
     min_deposit_amount_gwei: Gwei
     max_validator_balance_gwei: Gwei
@@ -132,6 +131,8 @@ class Settings(metaclass=Singleton):
         harvest_vault: bool = False,
         claim_fee_splitter: bool = False,
         disable_withdrawals: bool = False,
+        disable_validators_registration: bool = False,
+        disable_validators_funding: bool = False,
         verbose: bool = False,
         enable_metrics: bool = False,
         metrics_port: int = DEFAULT_METRICS_PORT,
@@ -173,6 +174,8 @@ class Settings(metaclass=Singleton):
         self.harvest_vault = harvest_vault
         self.claim_fee_splitter = claim_fee_splitter
         self.disable_withdrawals = disable_withdrawals
+        self.disable_validators_registration = disable_validators_registration
+        self.disable_validators_funding = disable_validators_funding
         self.verbose = verbose
         self.enable_metrics = enable_metrics
         self.metrics_host = metrics_host
