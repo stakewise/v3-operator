@@ -4,11 +4,12 @@ from pathlib import Path
 
 import click
 import psutil
+from eth_typing import ChecksumAddress
 from sw_utils import get_consensus_client, get_execution_client
-from web3 import Web3
 
 from src.common.clients import setup_clients
-from src.common.validators import validate_eth_addresses
+from src.common.validators import validate_eth_address
+from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS, NETWORKS
 from src.config.settings import DEFAULT_NETWORK, LOG_DATE_FORMAT, settings
 from src.nodes.exceptions import NodeFailedToStartError
@@ -51,12 +52,11 @@ logger = logging.getLogger(__name__)
     help='Skips confirmation messages when provided.',
 )
 @click.option(
-    '--vaults',
     '--vault',
-    callback=validate_eth_addresses,
-    envvar='VAULTS',
-    prompt='Enter comma separated list of your vault addresses',
-    help='Addresses of the vaults to register validators for.',
+    callback=validate_eth_address,
+    envvar='VAULT',
+    prompt='Enter your vault address',
+    help='Address of the vault to register validators for.',
 )
 @click.option(
     '--print-execution-logs',
@@ -82,7 +82,7 @@ def node_start(
     data_dir: Path,
     network: str,
     no_confirm: bool,
-    vaults: str,
+    vault: ChecksumAddress,
     print_execution_logs: bool,
     print_consensus_logs: bool,
     print_validator_logs: bool,
@@ -96,11 +96,14 @@ def node_start(
     click.echo('Checking hardware requirements...')
     check_hardware_requirements(data_dir=data_dir, network=network, no_confirm=no_confirm)
 
+    operator_config = OperatorConfig(vault, Path(data_dir))
+    operator_config.load()
+
     # Minimal settings for the nodes
     settings.set(
-        vaults=[Web3.to_checksum_address(vault) for vault in vaults.split(',')],
+        vault=vault,
         network=network,
-        data_dir=data_dir / network,
+        vault_dir=operator_config.vault_dir,
     )
 
     asyncio.run(

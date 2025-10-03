@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import asdict, dataclass
 
 from ens.constants import EMPTY_ADDR_HEX
@@ -34,6 +36,15 @@ class NetworkConfig(BaseNetworkConfig):
     PENDING_PARTIAL_WITHDRAWALS_LIMIT: int
     PENDING_CONSOLIDATIONS_LIMIT: int
     MAX_WITHDRAWAL_REQUESTS_PER_BLOCK: int
+    NODE_CONFIG: NodeConfig
+
+
+@dataclass
+class NodeConfig:
+    CONSENSUS_CHECKPOINT_SYNC_URL: str
+    ERA_URL: str
+    MIN_MEMORY_GB: int
+    MIN_DISK_SPACE_TB: float
 
 
 NETWORKS: dict[str, NetworkConfig] = {
@@ -66,6 +77,12 @@ NETWORKS: dict[str, NetworkConfig] = {
         PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
         PENDING_CONSOLIDATIONS_LIMIT=262144,
         MAX_WITHDRAWAL_REQUESTS_PER_BLOCK=16,
+        NODE_CONFIG=NodeConfig(
+            CONSENSUS_CHECKPOINT_SYNC_URL='https://beaconstate.ethstaker.cc/',
+            ERA_URL='https://data.ethpandaops.io/era1/mainnet/',
+            MIN_MEMORY_GB=16,
+            MIN_DISK_SPACE_TB=2,
+        ),
     ),
     HOODI: NetworkConfig(
         **asdict(BASE_NETWORKS[HOODI]),
@@ -94,6 +111,12 @@ NETWORKS: dict[str, NetworkConfig] = {
         PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
         PENDING_CONSOLIDATIONS_LIMIT=262144,
         MAX_WITHDRAWAL_REQUESTS_PER_BLOCK=16,
+        NODE_CONFIG=NodeConfig(
+            CONSENSUS_CHECKPOINT_SYNC_URL='https://hoodi.beaconstate.ethstaker.cc/',
+            ERA_URL='',
+            MIN_MEMORY_GB=16,
+            MIN_DISK_SPACE_TB=0.1,  # 100 GB
+        ),
     ),
     GNOSIS: NetworkConfig(
         **asdict(BASE_NETWORKS[GNOSIS]),
@@ -124,6 +147,12 @@ NETWORKS: dict[str, NetworkConfig] = {
         PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
         PENDING_CONSOLIDATIONS_LIMIT=262144,
         MAX_WITHDRAWAL_REQUESTS_PER_BLOCK=16,
+        NODE_CONFIG=NodeConfig(
+            CONSENSUS_CHECKPOINT_SYNC_URL='https://beacon.gnosischain.com/',
+            ERA_URL='',
+            MIN_MEMORY_GB=16,
+            MIN_DISK_SPACE_TB=2,
+        ),
     ),
     CHIADO: NetworkConfig(
         **asdict(BASE_NETWORKS[CHIADO]),
@@ -154,5 +183,11 @@ NETWORKS: dict[str, NetworkConfig] = {
         PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
         PENDING_CONSOLIDATIONS_LIMIT=262144,
         MAX_WITHDRAWAL_REQUESTS_PER_BLOCK=16,
+        NODE_CONFIG=NodeConfig(
+            CONSENSUS_CHECKPOINT_SYNC_URL='https://beacon.chiadochain.net/',
+            ERA_URL='',
+            MIN_MEMORY_GB=16,
+            MIN_DISK_SPACE_TB=0.1,  # 100 GB
+        ),
     ),
 }

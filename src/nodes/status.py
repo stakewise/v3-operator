@@ -75,7 +75,7 @@ async def get_validator_activity_stats(consensus_client: ExtendedAsyncBeacon) ->
 
     # Read public keys from keystore files
     for keystore_file in keystore_files:
-        _, public_key = LocalKeystore.read_keystore_file(keystore_file)
+        _, public_key = LocalKeystore.parse_keystore_file(keystore_file)
         public_keys.append(public_key)
 
     stats['total'] = len(public_keys)

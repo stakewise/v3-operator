@@ -297,6 +297,11 @@ class Settings(metaclass=Singleton):
     def network_config(self) -> NetworkConfig:
         return NETWORKS[self.network]
 
+    @property
+    def nodes_dir(self) -> Path:
+        """Returns the nodes directory within the vault directory."""
+        return self.vault_dir / 'nodes'
+
 
 settings = Settings()
 

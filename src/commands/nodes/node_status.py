@@ -4,8 +4,11 @@ import logging
 from pathlib import Path
 
 import click
+from eth_typing import ChecksumAddress
 from sw_utils import get_consensus_client, get_execution_client
 
+from src.common.validators import validate_eth_address
+from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_NETWORK, settings
 from src.nodes.status import (
@@ -41,6 +44,13 @@ OUTPUT_FORMATS = ['text', 'json']
     show_default=True,
 )
 @click.option(
+    '--vault',
+    callback=validate_eth_address,
+    envvar='VAULT',
+    prompt='Enter your vault address',
+    help='Address of the vault to register validators for.',
+)
+@click.option(
     '--output-format',
     default='text',
     envvar='OUTPUT_FORMAT',
@@ -49,12 +59,17 @@ OUTPUT_FORMATS = ['text', 'json']
     show_default=True,
 )
 @click.command(help='Displays the status of the nodes.', name='node-status')
-def node_status_command(data_dir: Path, network: str, output_format: str) -> None:
+def node_status_command(
+    data_dir: Path, network: str, vault: ChecksumAddress, output_format: str
+) -> None:
     # Minimal settings for the nodes
+    operator_config = OperatorConfig(vault, Path(data_dir))
+    operator_config.load()
+
     settings.set(
-        vaults=[],
+        vault=vault,
         network=network,
-        data_dir=data_dir / network,
+        vault_dir=operator_config.vault_dir,
     )
     asyncio.run(main(output_format))
 

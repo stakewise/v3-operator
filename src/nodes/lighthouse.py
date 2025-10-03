@@ -22,14 +22,14 @@ def update_validator_definitions_file(
 
     # Read keystore files and create items for the YAML file
     for keystore_file in keystore_files:
-        key_index, public_key = LocalKeystore.read_keystore_file(keystore_file)
+        key_index, public_key = LocalKeystore.parse_keystore_file(keystore_file)
         current_items.append(
             {
                 'key_index': key_index,  # temporary, not used by Lighthouse
                 'enabled': True,
                 'voting_public_key': public_key,
                 'type': 'local_keystore',
-                'voting_keystore_path': str(keystore_file.path),
+                'voting_keystore_path': str(keystore_file.file),
                 'voting_keystore_password_path': str(keystore_file.password_file),
             }
         )

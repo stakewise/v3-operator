@@ -5,13 +5,10 @@ from pathlib import Path
 
 from eth_typing import BlockNumber, ChecksumAddress
 
+from src.common.checks import wait_execution_catch_up_consensus
 from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import VaultContract
-from src.common.startup_check import (
-    wait_execution_catch_up_consensus,
-    wait_for_consensus_node,
-    wait_for_execution_node,
-)
+from src.common.startup_check import wait_for_consensus_node, wait_for_execution_node
 from src.config.networks import NETWORKS
 from src.config.settings import settings
 from src.nodes.exceptions import NodeException, NodeFailedToStartError
@@ -308,18 +305,9 @@ class LighthouseVCProcessBuilder(ProcessBuilder):
         Fetches the fee recipient address from the vault contract.
         This is used to set the suggested fee recipient for the validator client.
         """
-        fee_recipients: set[ChecksumAddress] = set()
-        for vault in settings.vaults:
-            vault_contract = VaultContract(vault)
-            fee_recipients.add(await vault_contract.mev_escrow())
-
-        if len(fee_recipients) > 1:
-            raise NodeException(
-                'All vaults must either be connected to the MEV smoothing pool '
-                'or only a single vault must be provided.'
-            )
-
-        return fee_recipients.pop()
+        vault_contract = VaultContract(settings.vault)
+        fee_recipient = await vault_contract.mev_escrow()
+        return fee_recipient
 
 
 class ProcessRunner:
