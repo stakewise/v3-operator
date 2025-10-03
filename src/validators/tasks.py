@@ -59,16 +59,14 @@ class ValidatorRegistrationSubtask:
         if not await gas_manager.check_gas_price():
             return
 
-        if (
-            settings.validator_type == ValidatorType.V1
-            and not settings.disable_validators_registration
-        ):
-            await register_new_validators(
-                vault_assets=vault_assets,
-                harvest_params=harvest_params,
-                keystore=self.keystore,
-                relayer=self.relayer,
-            )
+        if settings.validator_type == ValidatorType.V1:
+            if not settings.disable_validators_registration:
+                await register_new_validators(
+                    vault_assets=vault_assets,
+                    harvest_params=harvest_params,
+                    keystore=self.keystore,
+                    relayer=self.relayer,
+                )
             return
 
         if not settings.disable_validators_funding:
