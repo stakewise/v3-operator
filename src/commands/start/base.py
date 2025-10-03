@@ -12,8 +12,9 @@ from src.common.logging import setup_logging
 from src.common.metrics import MetricsTask, metrics, metrics_server
 from src.common.startup_check import startup_checks
 from src.common.tasks import BaseTask
+from src.common.typings import ValidatorsRegistrationMode
 from src.common.utils import get_build_version
-from src.config.settings import ValidatorsRegistrationMode, settings
+from src.config.settings import settings
 from src.exits.tasks import ExitSignatureTask
 from src.harvest.tasks import HarvestTask
 from src.reward_splitter.tasks import SplitRewardTask

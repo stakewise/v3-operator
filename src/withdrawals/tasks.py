@@ -18,12 +18,12 @@ from src.common.consensus import get_chain_latest_head
 from src.common.contracts import VaultContract
 from src.common.execution import get_execution_request_fee, get_protocol_config
 from src.common.metrics import metrics
+from src.common.typings import ValidatorsRegistrationMode
 from src.common.utils import round_down
 from src.config.settings import (
     MAX_WITHDRAWAL_REQUEST_FEE,
     MIN_WITHDRAWAL_AMOUNT_GWEI,
     WITHDRAWALS_INTERVAL,
-    ValidatorsRegistrationMode,
     settings,
 )
 from src.validators.consensus import fetch_consensus_validators
