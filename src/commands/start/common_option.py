@@ -136,7 +136,7 @@ start_common_options = [
         '--disable-validators-funding',
         is_flag=True,
         envvar='DISABLE_VALIDATORS_FUNDING',
-        help='Disable funding into current validators. Default is false',
+        help='Disable funding of existing 0x02 validators. Default is false',
     ),
     click.option(
         '--execution-endpoints',
