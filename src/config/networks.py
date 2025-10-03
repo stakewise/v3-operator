@@ -29,6 +29,7 @@ class NetworkConfig(BaseNetworkConfig):
     RATED_API_URL: str
     CONFIG_UPDATE_EVENT_BLOCK: BlockNumber
     MAX_FEE_PER_GAS_GWEI: Gwei
+    MAX_VALIDATOR_BALANCE_GWEI: Gwei
     SHARD_COMMITTEE_PERIOD: int
     PENDING_PARTIAL_WITHDRAWALS_LIMIT: int
     PENDING_CONSOLIDATIONS_LIMIT: int
@@ -60,6 +61,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(21471524),
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
+        MAX_VALIDATOR_BALANCE_GWEI=Gwei(int(Web3.from_wei(Web3.to_wei(1945, 'ether'), 'gwei'))),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
         PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
         PENDING_CONSOLIDATIONS_LIMIT=262144,
@@ -87,6 +89,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(94090),
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
+        MAX_VALIDATOR_BALANCE_GWEI=Gwei(int(Web3.from_wei(Web3.to_wei(1945, 'ether'), 'gwei'))),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
         PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
         PENDING_CONSOLIDATIONS_LIMIT=262144,
@@ -116,6 +119,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(37640206),
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
+        MAX_VALIDATOR_BALANCE_GWEI=Gwei(int(Web3.from_wei(Web3.to_wei(1800, 'ether'), 'gwei'))),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
         PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
         PENDING_CONSOLIDATIONS_LIMIT=262144,
@@ -145,6 +149,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(12896244),
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
+        MAX_VALIDATOR_BALANCE_GWEI=Gwei(int(Web3.from_wei(Web3.to_wei(1800, 'ether'), 'gwei'))),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
         PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
         PENDING_CONSOLIDATIONS_LIMIT=262144,

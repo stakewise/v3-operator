@@ -9,10 +9,10 @@ from web3.types import Gwei
 
 from src.commands.start.base import start_base
 from src.commands.start.common_option import add_common_options, start_common_options
-from src.common.typings import ValidatorType
+from src.common.typings import ValidatorsRegistrationMode, ValidatorType
 from src.common.utils import log_verbose
 from src.config.config import OperatorConfig
-from src.config.settings import ValidatorsRegistrationMode, settings
+from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,8 @@ def start_relayer(
     harvest_vault: bool,
     claim_fee_splitter: bool,
     disable_withdrawals: bool,
+    disable_validators_registration: bool,
+    disable_validators_funding: bool,
     verbose: bool,
     enable_metrics: bool,
     metrics_host: str,
@@ -44,6 +46,7 @@ def start_relayer(
     validator_type: ValidatorType,
     concurrency: int | None,
     min_deposit_amount_gwei: int,
+    max_validator_balance_gwei: int | None,
     min_deposit_delay: int,
     data_dir: str,
     log_level: str,
@@ -69,6 +72,8 @@ def start_relayer(
         harvest_vault=harvest_vault,
         claim_fee_splitter=claim_fee_splitter,
         disable_withdrawals=disable_withdrawals,
+        disable_validators_registration=disable_validators_registration,
+        disable_validators_funding=disable_validators_funding,
         verbose=verbose,
         enable_metrics=enable_metrics,
         metrics_host=metrics_host,
@@ -86,6 +91,9 @@ def start_relayer(
         validators_registration_mode=validators_registration_mode,
         concurrency=concurrency,
         min_deposit_amount_gwei=Gwei(min_deposit_amount_gwei),
+        max_validator_balance_gwei=(
+            Gwei(max_validator_balance_gwei) if max_validator_balance_gwei else None
+        ),
         min_deposit_delay=min_deposit_delay,
     )
 

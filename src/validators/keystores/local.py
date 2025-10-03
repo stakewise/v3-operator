@@ -67,6 +67,7 @@ class LocalKeystore(BaseKeystore):
                     raise RuntimeError('Failed to load keys') from e
 
         keys: dict[HexStr, BLSPrivkey] = {}
+        # sort by index to have a deterministic order
         for pub_key, priv_key, _ in sorted(keystores_data, key=lambda x: x[2]):
             keys[pub_key] = priv_key
 
@@ -158,7 +159,10 @@ class LocalKeystore(BaseKeystore):
         except BaseException as e:
             raise KeystoreException(f'Invalid password for keystore "{file_name}"') from e
         public_key = Web3.to_hex(bls.SkToPk(private_key))
-        return public_key, private_key, int(keystore.path.split('/')[3])
+
+        # extract index from path: m/12381/3600/<index>/0/0
+        index = int(keystore.path.split('/')[3])
+        return public_key, private_key, index
 
     @staticmethod
     def _load_keystores_password(password_path: Path) -> str:

@@ -22,14 +22,11 @@ from src.common.contracts import (
 )
 from src.common.execution import check_wallet_balance, get_protocol_config
 from src.common.harvest import get_harvest_params
+from src.common.typings import ValidatorsRegistrationMode
 from src.common.utils import format_error, round_down, warning_verbose
 from src.common.wallet import wallet
 from src.config.networks import NETWORKS
-from src.config.settings import (
-    WITHDRAWALS_INTERVAL,
-    ValidatorsRegistrationMode,
-    settings,
-)
+from src.config.settings import WITHDRAWALS_INTERVAL, settings
 from src.validators.execution import get_withdrawable_assets
 from src.validators.keystores.local import LocalKeystore
 from src.validators.relayer import RelayerClient
@@ -103,7 +100,7 @@ async def startup_checks() -> None:
     if (
         settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO
         and settings.keystore_cls_str == LocalKeystore.__name__
-        and not settings.disable_validator_registrations
+        and not settings.disable_validators_registration
     ):
         logger.info('Checking keystores dir...')
         wait_for_keystores_dir()

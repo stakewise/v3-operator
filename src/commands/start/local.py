@@ -43,6 +43,8 @@ def start_local(
     harvest_vault: bool,
     claim_fee_splitter: bool,
     disable_withdrawals: bool,
+    disable_validators_registration: bool,
+    disable_validators_funding: bool,
     verbose: bool,
     enable_metrics: bool,
     metrics_host: str,
@@ -60,6 +62,7 @@ def start_local(
     database_dir: str | None,
     concurrency: int | None,
     min_deposit_amount_gwei: int,
+    max_validator_balance_gwei: int | None,
     min_deposit_delay: int,
 ) -> None:
     operator_config = OperatorConfig(vault, Path(data_dir))
@@ -75,6 +78,8 @@ def start_local(
         harvest_vault=harvest_vault,
         claim_fee_splitter=claim_fee_splitter,
         disable_withdrawals=disable_withdrawals,
+        disable_validators_registration=disable_validators_registration,
+        disable_validators_funding=disable_validators_funding,
         verbose=verbose,
         enable_metrics=enable_metrics,
         metrics_host=metrics_host,
@@ -92,6 +97,9 @@ def start_local(
         log_format=log_format,
         concurrency=concurrency,
         min_deposit_amount_gwei=Gwei(min_deposit_amount_gwei),
+        max_validator_balance_gwei=(
+            Gwei(max_validator_balance_gwei) if max_validator_balance_gwei else None
+        ),
         min_deposit_delay=min_deposit_delay,
     )
 

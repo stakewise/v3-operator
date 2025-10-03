@@ -1,4 +1,3 @@
-from enum import Enum
 from pathlib import Path
 
 from decouple import Csv
@@ -6,7 +5,7 @@ from decouple import config as decouple_config
 from web3 import Web3
 from web3.types import ChecksumAddress, Gwei, Wei
 
-from src.common.typings import Singleton, ValidatorType
+from src.common.typings import Singleton, ValidatorsRegistrationMode, ValidatorType
 from src.config.networks import MAINNET, NETWORKS, NetworkConfig
 
 DATA_DIR = Path.home() / '.stakewise'
@@ -22,16 +21,6 @@ DEFAULT_MIN_DEPOSIT_AMOUNT = Web3.to_wei(10, 'ether')
 DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI = Gwei(int(Web3.from_wei(DEFAULT_MIN_DEPOSIT_AMOUNT, 'gwei')))
 
 DEFAULT_MIN_DEPOSIT_DELAY = 3600  # 1 hour
-
-
-class ValidatorsRegistrationMode(Enum):
-    """
-    AUTO mode: validators are registered automatically when vault assets are enough.
-    API mode: validators registration is triggered by API request.
-    """
-
-    AUTO = 'AUTO'
-    API = 'API'
 
 
 # pylint: disable-next=too-many-public-methods,too-many-instance-attributes
@@ -56,6 +45,8 @@ class Settings(metaclass=Singleton):
     harvest_vault: bool
     claim_fee_splitter: bool
     disable_withdrawals: bool
+    disable_validators_registration: bool
+    disable_validators_funding: bool
     verbose: bool
     enable_metrics: bool
     metrics_host: str
@@ -111,11 +102,9 @@ class Settings(metaclass=Singleton):
     disable_full_withdrawals: bool = decouple_config(
         'DISABLE_FULL_WITHDRAWALS', default=False, cast=bool
     )
-    disable_validator_registrations: bool = decouple_config(
-        'DISABLE_VALIDATOR_REGISTRATIONS', default=False, cast=bool
-    )
 
     min_deposit_amount_gwei: Gwei
+    max_validator_balance_gwei: Gwei
     min_deposit_delay: int
 
     # pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements
@@ -131,6 +120,8 @@ class Settings(metaclass=Singleton):
         harvest_vault: bool = False,
         claim_fee_splitter: bool = False,
         disable_withdrawals: bool = False,
+        disable_validators_registration: bool = False,
+        disable_validators_funding: bool = False,
         verbose: bool = False,
         enable_metrics: bool = False,
         metrics_port: int = DEFAULT_METRICS_PORT,
@@ -157,6 +148,7 @@ class Settings(metaclass=Singleton):
         relayer_endpoint: str | None = None,
         validators_registration_mode: ValidatorsRegistrationMode = ValidatorsRegistrationMode.AUTO,
         min_deposit_amount_gwei: Gwei = DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
+        max_validator_balance_gwei: Gwei | None = None,
         min_deposit_delay: int = DEFAULT_MIN_DEPOSIT_DELAY,
     ) -> None:
         self.vault = vault
@@ -171,6 +163,8 @@ class Settings(metaclass=Singleton):
         self.harvest_vault = harvest_vault
         self.claim_fee_splitter = claim_fee_splitter
         self.disable_withdrawals = disable_withdrawals
+        self.disable_validators_registration = disable_validators_registration
+        self.disable_validators_funding = disable_validators_funding
         self.verbose = verbose
         self.enable_metrics = enable_metrics
         self.metrics_host = metrics_host
@@ -180,8 +174,12 @@ class Settings(metaclass=Singleton):
 
         if max_fee_per_gas_gwei is None:
             max_fee_per_gas_gwei = self.network_config.MAX_FEE_PER_GAS_GWEI
-
         self.max_fee_per_gas_gwei = Gwei(max_fee_per_gas_gwei)
+
+        if max_validator_balance_gwei is None:
+            max_validator_balance_gwei = self.network_config.MAX_VALIDATOR_BALANCE_GWEI
+        self.max_validator_balance_gwei = Gwei(max_validator_balance_gwei)
+
         self.min_deposit_amount_gwei = min_deposit_amount_gwei
         self.min_deposit_delay = min_deposit_delay
 

@@ -13,13 +13,8 @@ from src.common.contracts import VaultContract, validators_registry_contract
 from src.common.execution import build_gas_manager, get_protocol_config
 from src.common.harvest import get_harvest_params
 from src.common.metrics import metrics
-from src.common.typings import HarvestParams, ValidatorType
-from src.config.settings import (
-    MAX_EFFECTIVE_BALANCE_GWEI,
-    MIN_ACTIVATION_BALANCE_GWEI,
-    ValidatorsRegistrationMode,
-    settings,
-)
+from src.common.typings import HarvestParams, ValidatorsRegistrationMode, ValidatorType
+from src.config.settings import MIN_ACTIVATION_BALANCE_GWEI, settings
 from src.validators.consensus import fetch_compounding_validators_balances
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import (
@@ -65,43 +60,46 @@ class ValidatorRegistrationSubtask:
             return
 
         if settings.validator_type == ValidatorType.V1:
+            if not settings.disable_validators_registration:
+                await register_new_validators(
+                    vault_assets=vault_assets,
+                    harvest_params=harvest_params,
+                    keystore=self.keystore,
+                    relayer=self.relayer,
+                )
+            return
+
+        if not settings.disable_validators_funding:
+            compounding_validators_balances = await fetch_compounding_validators_balances()
+            funding_amounts = _get_funding_amounts(
+                compounding_validators_balances=compounding_validators_balances,
+                vault_assets=vault_assets,
+            )
+
+            if funding_amounts:
+                if not await _is_funding_interval_passed():
+                    return
+
+                try:
+                    tx_hash = await fund_compounding_validators(
+                        funding_amounts=funding_amounts,
+                        harvest_params=harvest_params,
+                        relayer=self.relayer,
+                    )
+                    if not tx_hash:
+                        return
+
+                    vault_assets = Gwei(max(vault_assets - sum(funding_amounts.values()), 0))
+                except EmptyRelayerResponseException:
+                    return
+
+        if not settings.disable_validators_registration:
             await register_new_validators(
                 vault_assets=vault_assets,
                 harvest_params=harvest_params,
                 keystore=self.keystore,
                 relayer=self.relayer,
             )
-            return
-
-        compounding_validators_balances = await fetch_compounding_validators_balances()
-        funding_amounts = _get_funding_amounts(
-            compounding_validators_balances=compounding_validators_balances,
-            vault_assets=vault_assets,
-        )
-
-        if funding_amounts:
-            if not await _is_funding_interval_passed():
-                return
-
-            try:
-                tx_hash = await fund_compounding_validators(
-                    funding_amounts=funding_amounts,
-                    harvest_params=harvest_params,
-                    relayer=self.relayer,
-                )
-                if not tx_hash:
-                    return
-
-                vault_assets = Gwei(max(vault_assets - sum(funding_amounts.values()), 0))
-            except EmptyRelayerResponseException:
-                return
-
-        await register_new_validators(
-            vault_assets=vault_assets,
-            harvest_params=harvest_params,
-            keystore=self.keystore,
-            relayer=self.relayer,
-        )
 
 
 async def fund_compounding_validators(
@@ -289,11 +287,11 @@ def _get_deposits_amounts(vault_assets: Gwei, validator_type: ValidatorType) -> 
     if validator_type == ValidatorType.V1:
         return [MIN_ACTIVATION_BALANCE_GWEI] * (vault_assets // MIN_ACTIVATION_BALANCE_GWEI)
     amounts = []
-    while vault_assets >= MAX_EFFECTIVE_BALANCE_GWEI:
-        amounts.append(MAX_EFFECTIVE_BALANCE_GWEI)
-        vault_assets = Gwei(vault_assets - MAX_EFFECTIVE_BALANCE_GWEI)
-    if vault_assets >= MIN_ACTIVATION_BALANCE_GWEI:
-        amounts.append(vault_assets)
+    num_full_validators, remainder = divmod(vault_assets, settings.max_validator_balance_gwei)
+    amounts.extend([settings.max_validator_balance_gwei] * num_full_validators)
+    if remainder >= MIN_ACTIVATION_BALANCE_GWEI:
+        amounts.append(Gwei(remainder))
+
     return amounts
 
 
@@ -304,7 +302,7 @@ def _get_funding_amounts(
     for public_key, balance in sorted(
         compounding_validators_balances.items(), key=lambda item: item[1], reverse=True
     ):
-        remaining_capacity = MAX_EFFECTIVE_BALANCE_GWEI - balance
+        remaining_capacity = settings.max_validator_balance_gwei - balance
         if remaining_capacity >= settings.min_deposit_amount_gwei:
             val_amount = min(remaining_capacity, vault_assets)
             result[public_key] = Gwei(val_amount)
