@@ -6,20 +6,15 @@ from sw_utils import IpfsFetchClient, convert_to_mgno
 from sw_utils.networks import GNO_NETWORKS
 from sw_utils.typings import Bytes32
 from web3 import Web3
-from web3.types import BlockNumber, ChecksumAddress, Gwei
+from web3.types import BlockNumber, Gwei
 
 from src.common.clients import execution_client
 from src.common.contracts import VaultContract, validators_registry_contract
 from src.common.execution import build_gas_manager, get_protocol_config
 from src.common.harvest import get_harvest_params
 from src.common.metrics import metrics
-from src.common.typings import HarvestParams, ValidatorType
-from src.config.settings import (
-    MAX_EFFECTIVE_BALANCE_GWEI,
-    MIN_ACTIVATION_BALANCE_GWEI,
-    ValidatorsRegistrationMode,
-    settings,
-)
+from src.common.typings import HarvestParams, ValidatorsRegistrationMode, ValidatorType
+from src.config.settings import MIN_ACTIVATION_BALANCE_GWEI, settings
 from src.validators.consensus import fetch_compounding_validators_balances
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import (
@@ -31,12 +26,9 @@ from src.validators.keystores.base import BaseKeystore
 from src.validators.metrics import update_unused_validator_keys_metric
 from src.validators.oracles import poll_validation_approval
 from src.validators.register_validators import fund_validators, register_validators
-from src.validators.relayer import RelayerAdapter
+from src.validators.relayer import RelayerClient
 from src.validators.typings import NetworkValidator, Validator
-from src.validators.utils import (
-    get_validators_for_funding,
-    get_validators_for_registration,
-)
+from src.validators.utils import get_validators_for_registration
 from src.validators.validators_manager import get_validators_manager_signature
 
 logger = logging.getLogger(__name__)
@@ -46,122 +38,102 @@ class ValidatorRegistrationSubtask:
     def __init__(
         self,
         keystore: BaseKeystore | None,
-        relayer_adapter: RelayerAdapter | None,
+        relayer: RelayerClient | None,
     ):
         self.keystore = keystore
-        self.relayer_adapter = relayer_adapter
+        self.relayer = relayer
 
     async def process(self) -> None:
         if self.keystore:
             await update_unused_validator_keys_metric(
                 keystore=self.keystore,
             )
-        # check and register new validators
-        for vault_address in settings.vaults:
-            await process_validators(
-                vault_address=vault_address,
-                keystore=self.keystore,
-                relayer_adapter=self.relayer_adapter,
-            )
+        harvest_params = await get_harvest_params()
 
+        vault_assets = await get_vault_assets(harvest_params=harvest_params)
 
-async def process_validators(
-    vault_address: ChecksumAddress,
-    keystore: BaseKeystore | None,
-    relayer_adapter: RelayerAdapter | None = None,
-) -> None:
-    """
-    Calculates vault assets, requests oracles approval, submits registration tx
-    """
-    harvest_params = await get_harvest_params(vault_address)
-
-    vault_assets = await get_vault_assets(
-        vault_address=vault_address, harvest_params=harvest_params
-    )
-
-    if vault_assets < settings.min_deposit_amount_gwei:
-        return None
-
-    gas_manager = build_gas_manager()
-    if not await gas_manager.check_gas_price():
-        return None
-
-    if settings.validator_type == ValidatorType.V1:
-        await register_new_validators(
-            vault_address=vault_address,
-            vault_assets=vault_assets,
-            harvest_params=harvest_params,
-            keystore=keystore,
-            relayer_adapter=relayer_adapter,
-        )
-        return
-
-    compounding_validators_balances = await fetch_compounding_validators_balances(vault_address)
-    funding_amounts = _get_funding_amounts(
-        compounding_validators_balances=compounding_validators_balances,
-        vault_assets=vault_assets,
-    )
-
-    if funding_amounts:
-        if not await _is_funding_interval_passed(vault_address):
+        if vault_assets < settings.min_deposit_amount_gwei:
             return
 
-        try:
-            tx_hash = await fund_compounding_validators(
-                vault_address=vault_address,
-                funding_amounts=funding_amounts,
-                keystore=keystore,
+        gas_manager = build_gas_manager()
+        if not await gas_manager.check_gas_price():
+            return
+
+        if settings.validator_type == ValidatorType.V1:
+            if not settings.disable_validators_registration:
+                await register_new_validators(
+                    vault_assets=vault_assets,
+                    harvest_params=harvest_params,
+                    keystore=self.keystore,
+                    relayer=self.relayer,
+                )
+            return
+
+        if not settings.disable_validators_funding:
+            compounding_validators_balances = await fetch_compounding_validators_balances()
+            funding_amounts = _get_funding_amounts(
+                compounding_validators_balances=compounding_validators_balances,
+                vault_assets=vault_assets,
+            )
+
+            if funding_amounts:
+                if not await _is_funding_interval_passed():
+                    return
+
+                try:
+                    tx_hash = await fund_compounding_validators(
+                        funding_amounts=funding_amounts,
+                        harvest_params=harvest_params,
+                        relayer=self.relayer,
+                    )
+                    if not tx_hash:
+                        return
+
+                    vault_assets = Gwei(max(vault_assets - sum(funding_amounts.values()), 0))
+                except EmptyRelayerResponseException:
+                    return
+
+        if not settings.disable_validators_registration:
+            await register_new_validators(
+                vault_assets=vault_assets,
                 harvest_params=harvest_params,
+                keystore=self.keystore,
+                relayer=self.relayer,
             )
-            if not tx_hash:
-                return
-
-            vault_assets = Gwei(max(vault_assets - sum(funding_amounts.values()), 0))
-        except EmptyRelayerResponseException:
-            return
-
-    await register_new_validators(
-        vault_address=vault_address,
-        vault_assets=vault_assets,
-        harvest_params=harvest_params,
-        keystore=keystore,
-        relayer_adapter=relayer_adapter,
-    )
 
 
 async def fund_compounding_validators(
-    vault_address: ChecksumAddress,
-    keystore: BaseKeystore | None,
     funding_amounts: dict[HexStr, Gwei],
     harvest_params: HarvestParams | None,
-    relayer_adapter: RelayerAdapter | None = None,
+    relayer: RelayerClient | None = None,
 ) -> HexStr | None:
     """
     Funds vault compounding validators with the specified amount.
     """
     logger.info('Started funding of %d validator(s)', len(funding_amounts))
     validators_manager_signature = HexStr('0x')
-    if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
-        validators = await get_validators_for_funding(
-            funding_amounts=funding_amounts,
-            keystore=cast(BaseKeystore, keystore),
-            vault_address=vault_address,
-        )
-    else:
+    if settings.validators_registration_mode != ValidatorsRegistrationMode.AUTO:
         # fetch validators and signature from relayer
-        validators_response = await cast(RelayerAdapter, relayer_adapter).fund_validators(
+        validators_response = await cast(RelayerClient, relayer).fund_validators(
             funding_amounts=funding_amounts,
         )
 
-        validators = validators_response.validators
-        if not validators:
-            logger.debug('Waiting for relayer validators')
-            raise EmptyRelayerResponseException()
         if validators_response.validators_manager_signature:
             validators_manager_signature = validators_response.validators_manager_signature
 
+    validators = []
+    # the signature is not checked for funding active validators
+    empty_signature = Web3.to_hex(bytes(96))
+    for public_key, amount in funding_amounts.items():
+        validators.append(
+            Validator(
+                public_key=public_key,
+                signature=empty_signature,
+                amount=amount,
+            )
+        )
+
     tx_hash = await fund_validators(
-        vault_address=vault_address,
         harvest_params=harvest_params,
         validators=validators,
         validators_manager_signature=validators_manager_signature,
@@ -169,16 +141,17 @@ async def fund_compounding_validators(
     if tx_hash:
         pub_keys = ', '.join(funding_amounts.keys())
         logger.info('Successfully funded validator(s) with public key(s) %s', pub_keys)
+        tx_data = await execution_client.eth.get_transaction(tx_hash)
+        metrics.last_funding_block.labels(network=settings.network).set(tx_data['blockNumber'])
     return tx_hash
 
 
 # pylint: disable-next=too-many-locals
 async def register_new_validators(
-    vault_address: ChecksumAddress,
     vault_assets: Gwei,
     harvest_params: HarvestParams | None,
     keystore: BaseKeystore | None,
-    relayer_adapter: RelayerAdapter | None = None,
+    relayer: RelayerClient | None = None,
 ) -> HexStr | None:
     validators_amounts = _get_deposits_amounts(vault_assets, settings.validator_type)
     validators_count = len(validators_amounts)
@@ -196,10 +169,9 @@ async def register_new_validators(
         validators = await get_validators_for_registration(
             keystore=cast(BaseKeystore, keystore),
             amounts=validators_amounts[:validators_batch_size],
-            vault_address=vault_address,
         )
         validators_manager_signature = get_validators_manager_signature(
-            vault=vault_address,
+            vault=settings.vault,
             validators_registry_root=await validators_registry_contract.get_registry_root(),
             validators=validators,
         )
@@ -207,15 +179,14 @@ async def register_new_validators(
             if not settings.disable_available_validators_warnings:
                 logger.warning(
                     'There are no available public keys '
-                    'in current keystores files'
                     'to proceed with registration. '
                     'To register additional validators, you must generate new keystores.',
                 )
             return None
     else:
         try:
-            validators_response = await cast(RelayerAdapter, relayer_adapter).get_validators(
-                validators_batch_size, validators_total=validators_count
+            validators_response = await cast(RelayerClient, relayer).register_validators(
+                amounts=validators_amounts[:validators_batch_size],
             )
         except MissingAvailableValidatorsException:
             if not settings.disable_available_validators_warnings:
@@ -233,7 +204,7 @@ async def register_new_validators(
         relayer_validators_manager_signature = validators_response.validators_manager_signature
         if not relayer_validators_manager_signature:
             relayer_validators_manager_signature = get_validators_manager_signature(
-                vault=vault_address,
+                vault=settings.vault,
                 validators_registry_root=await validators_registry_contract.get_registry_root(),
                 validators=validators,
             )
@@ -243,17 +214,17 @@ async def register_new_validators(
     if not await gas_manager.check_gas_price(high_priority=True):
         return None
 
-    logger.info('Started registration of %d validator(s)', len(validators))
+    logger.info(
+        'Started registration of %d %s validator(s)', len(validators), settings.validator_type.value
+    )
 
     oracles_request, oracles_approval = await poll_validation_approval(
-        vault_address=vault_address,
         keystore=keystore,
         validators=validators,
         validators_manager_signature=validators_manager_signature,
     )
     validators_registry_root = Bytes32(Web3.to_bytes(hexstr=oracles_request.validators_root))
     tx_hash = await register_validators(
-        vault_address=vault_address,
         approval=oracles_approval,
         validators=validators,
         harvest_params=harvest_params,
@@ -263,16 +234,14 @@ async def register_new_validators(
     if tx_hash:
         pub_keys = ', '.join([val.public_key for val in validators])
         logger.info('Successfully registered validator(s) with public key(s) %s', pub_keys)
+        tx_data = await execution_client.eth.get_transaction(tx_hash)
+        metrics.last_registration_block.labels(network=settings.network).set(tx_data['blockNumber'])
 
     return tx_hash
 
 
-async def get_vault_assets(
-    vault_address: ChecksumAddress, harvest_params: HarvestParams | None
-) -> Gwei:
-    vault_assets = await get_withdrawable_assets(
-        vault_address=vault_address, harvest_params=harvest_params
-    )
+async def get_vault_assets(harvest_params: HarvestParams | None) -> Gwei:
+    vault_assets = await get_withdrawable_assets(harvest_params=harvest_params)
     if settings.network in GNO_NETWORKS:
         # apply GNO -> mGNO exchange rate
         vault_assets = convert_to_mgno(vault_assets)
@@ -318,11 +287,11 @@ def _get_deposits_amounts(vault_assets: Gwei, validator_type: ValidatorType) -> 
     if validator_type == ValidatorType.V1:
         return [MIN_ACTIVATION_BALANCE_GWEI] * (vault_assets // MIN_ACTIVATION_BALANCE_GWEI)
     amounts = []
-    while vault_assets >= MAX_EFFECTIVE_BALANCE_GWEI:
-        amounts.append(MAX_EFFECTIVE_BALANCE_GWEI)
-        vault_assets = Gwei(vault_assets - MAX_EFFECTIVE_BALANCE_GWEI)
-    if vault_assets >= MIN_ACTIVATION_BALANCE_GWEI:
-        amounts.append(vault_assets)
+    num_full_validators, remainder = divmod(vault_assets, settings.max_validator_balance_gwei)
+    amounts.extend([settings.max_validator_balance_gwei] * num_full_validators)
+    if remainder >= MIN_ACTIVATION_BALANCE_GWEI:
+        amounts.append(Gwei(remainder))
+
     return amounts
 
 
@@ -333,7 +302,7 @@ def _get_funding_amounts(
     for public_key, balance in sorted(
         compounding_validators_balances.items(), key=lambda item: item[1], reverse=True
     ):
-        remaining_capacity = MAX_EFFECTIVE_BALANCE_GWEI - balance
+        remaining_capacity = settings.max_validator_balance_gwei - balance
         if remaining_capacity >= settings.min_deposit_amount_gwei:
             val_amount = min(remaining_capacity, vault_assets)
             result[public_key] = Gwei(val_amount)
@@ -343,7 +312,7 @@ def _get_funding_amounts(
     return result
 
 
-async def _is_funding_interval_passed(vault_address: ChecksumAddress) -> bool:
+async def _is_funding_interval_passed() -> bool:
     """
     Check if the required interval has passed since the last funding event.
     Mitigate gas griefing attack
@@ -351,5 +320,5 @@ async def _is_funding_interval_passed(vault_address: ChecksumAddress) -> bool:
     blocks_delay = settings.min_deposit_delay // settings.network_config.SECONDS_PER_BLOCK
     to_block = await execution_client.eth.get_block_number()
     from_block = BlockNumber(to_block - blocks_delay)
-    funding_events = await VaultContract(vault_address).get_funding_events(from_block, to_block)
+    funding_events = await VaultContract(settings.vault).get_funding_events(from_block, to_block)
     return len(funding_events) == 0

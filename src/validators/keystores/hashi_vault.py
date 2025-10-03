@@ -155,6 +155,8 @@ class HashiVaultBundledKeysLoader(HashiVaultKeysLoader):
             sk_bytes = Web3.to_bytes(hexstr=sk)
             keys.append((add_0x_prefix(HexStr(pk)), BLSPrivkey(sk_bytes)))
         validator_keys = Keys(dict(keys))
+
+        logger.info('Loaded %d keys from %s', len(validator_keys), secret_url)
         return validator_keys
 
 

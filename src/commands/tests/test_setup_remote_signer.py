@@ -20,7 +20,7 @@ class TestOperatorRemoteSignerSetup:
         self,
         vault_address: HexAddress,
         data_dir: Path,
-        config_dir: Path,
+        vault_dir: Path,
         keystores_dir: Path,
         remote_signer_url: str,
         runner: CliRunner,
@@ -30,6 +30,8 @@ class TestOperatorRemoteSignerSetup:
         args = [
             '--remote-signer-url',
             remote_signer_url,
+            '--vault',
+            str(vault_address),
             '--data-dir',
             str(data_dir),
         ]
@@ -58,7 +60,7 @@ class TestOperatorRemoteSignerSetup:
         vault_address: HexAddress,
         test_mnemonic: str,
         data_dir: Path,
-        config_dir: Path,
+        vault_dir: Path,
         remote_signer_url: str,
         keystores_dir: Path,
         runner: CliRunner,
@@ -71,6 +73,8 @@ class TestOperatorRemoteSignerSetup:
             args = [
                 '--mnemonic',
                 test_mnemonic,
+                '--vault',
+                str(vault_address),
                 '--count',
                 str(key_count),
                 '--data-dir',
@@ -85,6 +89,8 @@ class TestOperatorRemoteSignerSetup:
                 remote_signer_url,
                 '--data-dir',
                 str(data_dir),
+                '--vault',
+                str(vault_address),
             ]
 
             result = runner.invoke(setup_remote_signer, args, input='y')

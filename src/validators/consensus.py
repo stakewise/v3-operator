@@ -1,6 +1,6 @@
 import logging
 
-from eth_typing import ChecksumAddress, HexStr
+from eth_typing import HexStr
 from sw_utils import ValidatorStatus, chunkify
 from sw_utils.consensus import EXITED_STATUSES
 from web3.types import Gwei
@@ -16,18 +16,14 @@ EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
 logger = logging.getLogger(__name__)
 
 
-async def fetch_compounding_validators_balances(
-    vault_address: ChecksumAddress,
-) -> dict[HexStr, Gwei]:
+async def fetch_compounding_validators_balances() -> dict[HexStr, Gwei]:
     """
     Retrieves the actual balances of compounding validators in the vault.
     Also includes balances from pending deposits
     that have not yet been processed by the consensus node.
     """
-    vault_public_keys = {
-        key.public_key for key in VaultValidatorCrud().get_vault_validators(vault_address)
-    }
-    non_finalized_public_keys = await get_latest_vault_v2_validator_public_keys(vault_address)
+    vault_public_keys = {key.public_key for key in VaultValidatorCrud().get_vault_validators()}
+    non_finalized_public_keys = await get_latest_vault_v2_validator_public_keys(settings.vault)
     vault_public_keys.update(non_finalized_public_keys)
     if not vault_public_keys:
         return {}
@@ -58,10 +54,10 @@ async def fetch_compounding_validators_balances(
 
 
 async def fetch_consensus_validators(
-    public_keys: list[HexStr], slot: str = 'head'
+    validator_ids: list[HexStr] | list[str], slot: str = 'head'
 ) -> list[ConsensusValidator]:
     validators = []
-    for chunk_keys in chunkify(public_keys, settings.validators_fetch_chunk_size):
+    for chunk_keys in chunkify(validator_ids, settings.validators_fetch_chunk_size):
         beacon_validators = await consensus_client.get_validators_by_ids(
             validator_ids=chunk_keys, state_id=slot
         )

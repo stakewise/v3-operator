@@ -1,15 +1,17 @@
 import asyncio
 import logging
 import sys
+from pathlib import Path
 
 import click
-from eth_utils import to_checksum_address
+from eth_typing import ChecksumAddress
 from web3.types import Gwei
 
-from src.commands.start.base import load_operator_config, start_base
+from src.commands.start.base import start_base
 from src.commands.start.common_option import add_common_options, start_common_options
 from src.common.typings import ValidatorType
 from src.common.utils import log_verbose
+from src.config.config import OperatorConfig
 from src.config.settings import DEFAULT_HASHI_VAULT_PARALLELISM, settings
 
 logger = logging.getLogger(__name__)
@@ -18,17 +20,20 @@ logger = logging.getLogger(__name__)
 @click.option(
     '--hashi-vault-url',
     envvar='HASHI_VAULT_URL',
-    help='The base URL of the vault service, e.g. http://vault:8200.',
+    help='The base URL of the Hashi vault, e.g. https://vault:8200.',
+    prompt='Enter the base URL of the Hashi vault (e.g. https://vault:8200)',
 )
 @click.option(
     '--hashi-vault-token',
     envvar='HASHI_VAULT_TOKEN',
     help='Authentication token for accessing Hashi vault.',
+    prompt='Enter the authentication token for accessing Hashi vault',
 )
 @click.option(
     '--hashi-vault-key-path',
     envvar='HASHI_VAULT_KEY_PATH',
     multiple=True,
+    required=True,
     help='Key path(s) in the K/V secret engine where validator signing keys are stored.',
 )
 @click.option(
@@ -47,7 +52,7 @@ logger = logging.getLogger(__name__)
 @click.command(help='Start operator service with Hashi Vault integration')
 # pylint: disable-next=too-many-arguments,too-many-locals
 def start_hashi_vault(
-    vaults: str,
+    vault: ChecksumAddress,
     consensus_endpoints: str,
     execution_endpoints: str,
     execution_jwt_secret: str | None,
@@ -55,6 +60,8 @@ def start_hashi_vault(
     harvest_vault: bool,
     claim_fee_splitter: bool,
     disable_withdrawals: bool,
+    disable_validators_registration: bool,
+    disable_validators_funding: bool,
     verbose: bool,
     enable_metrics: bool,
     metrics_host: str,
@@ -64,7 +71,6 @@ def start_hashi_vault(
     data_dir: str,
     log_level: str,
     log_format: str,
-    network: str | None,
     hashi_vault_key_path: list[str] | None,
     hashi_vault_key_prefix: list[str] | None,
     hashi_vault_token: str | None,
@@ -76,20 +82,15 @@ def start_hashi_vault(
     database_dir: str | None,
     concurrency: int | None,
     min_deposit_amount_gwei: int,
+    max_validator_balance_gwei: int | None,
     min_deposit_delay: int,
-    no_confirm: bool,
 ) -> None:
-    vault_addresses = [to_checksum_address(address) for address in vaults.split(',')]
-    operator_config = load_operator_config(
-        vaults=vault_addresses,
-        data_dir=data_dir,
-        network=network,
-        no_confirm=no_confirm,
-    )
+    operator_config = OperatorConfig(vault, Path(data_dir))
+    operator_config.load()
 
     settings.set(
-        vaults=vault_addresses,
-        data_dir=operator_config.data_dir,
+        vault=vault,
+        vault_dir=operator_config.vault_dir,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
         execution_jwt_secret=execution_jwt_secret,
@@ -97,6 +98,8 @@ def start_hashi_vault(
         harvest_vault=harvest_vault,
         claim_fee_splitter=claim_fee_splitter,
         disable_withdrawals=disable_withdrawals,
+        disable_validators_registration=disable_validators_registration,
+        disable_validators_funding=disable_validators_funding,
         verbose=verbose,
         enable_metrics=enable_metrics,
         metrics_host=metrics_host,
@@ -117,6 +120,9 @@ def start_hashi_vault(
         log_format=log_format,
         concurrency=concurrency,
         min_deposit_amount_gwei=Gwei(min_deposit_amount_gwei),
+        max_validator_balance_gwei=(
+            Gwei(max_validator_balance_gwei) if max_validator_balance_gwei else None
+        ),
         min_deposit_delay=min_deposit_delay,
     )
 

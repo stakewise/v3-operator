@@ -43,7 +43,7 @@ class TestRemoteDbSetup:
     ):
         db_url = 'postgresql://user:password@localhost:5432/dbname'
 
-        args = ['--db-url', db_url, '--data-dir', str(data_dir), 'setup']
+        args = ['--db-url', db_url, '--vault', vault_address, '--data-dir', str(data_dir), 'setup']
         with (
             mock.patch.object(
                 KeyPairsCrud, 'get_keypairs_count', return_value=0
@@ -70,6 +70,8 @@ class TestRemoteDbSetup:
         args = [
             '--db-url',
             db_url,
+            '--vault',
+            vault_address,
             '--data-dir',
             str(data_dir),
             'cleanup',
@@ -89,7 +91,7 @@ class TestRemoteDbSetup:
     ):
         db_url = 'postgresql://user:password@localhost:5432/dbname'
 
-        args = ['--db-url', db_url, '--data-dir', str(data_dir), 'setup']
+        args = ['--db-url', db_url, '--vault', vault_address, '--data-dir', str(data_dir), 'setup']
         with mock.patch.object(
             KeyPairsCrud, 'get_keypairs_count', return_value=1
         ) as get_keypairs_count_mock:
@@ -110,7 +112,7 @@ class TestRemoteDbSetup:
     ):
         db_url = 'postgresql://user:password@localhost:5432/dbname'
 
-        args = ['--db-url', db_url, '--data-dir', str(data_dir), 'setup']
+        args = ['--db-url', db_url, '--vault', vault_address, '--data-dir', str(data_dir), 'setup']
         with (mock.patch.object(KeyPairsCrud, 'get_keypairs_count', return_value=1),):
             result = runner.invoke(remote_db_group, args)
 
@@ -140,6 +142,8 @@ class TestRemoteDbUploadKeypairs:
         args = [
             '--db-url',
             db_url,
+            '--vault',
+            vault_address,
             '--data-dir',
             str(data_dir),
             'upload-keypairs',
@@ -174,6 +178,8 @@ class TestRemoteDbSetupWeb3Signer:
         args = [
             '--db-url',
             db_url,
+            '--vault',
+            vault_address,
             '--data-dir',
             str(data_dir),
             'setup-web3signer',
@@ -212,6 +218,8 @@ class TestRemoteDbSetupValidator:
         args = [
             '--db-url',
             db_url,
+            '--vault',
+            vault_address,
             '--data-dir',
             str(data_dir),
             'setup-validator',

@@ -1,4 +1,3 @@
-from enum import Enum
 from pathlib import Path
 
 from decouple import Csv
@@ -6,7 +5,7 @@ from decouple import config as decouple_config
 from web3 import Web3
 from web3.types import ChecksumAddress, Gwei, Wei
 
-from src.common.typings import Singleton, ValidatorType
+from src.common.typings import Singleton, ValidatorsRegistrationMode, ValidatorType
 from src.config.networks import MAINNET, NETWORKS, NetworkConfig
 
 DATA_DIR = Path.home() / '.stakewise'
@@ -18,34 +17,16 @@ DEFAULT_METRICS_PREFIX = 'sw_operator'
 DEFAULT_HASHI_VAULT_PARALLELISM = 8
 DEFAULT_HASHI_VAULT_ENGINE_NAME = 'secret'
 
-DEFAULT_MIN_DEPOSIT_AMOUNT = Web3.to_wei(1, 'ether')
+DEFAULT_MIN_DEPOSIT_AMOUNT = Web3.to_wei(10, 'ether')
 DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI = Gwei(int(Web3.from_wei(DEFAULT_MIN_DEPOSIT_AMOUNT, 'gwei')))
-
-DEFAULT_CONSENSUS_ENDPOINT = 'http://localhost:5052'
-DEFAULT_EXECUTION_ENDPOINT = 'http://localhost:8545'
 
 DEFAULT_MIN_DEPOSIT_DELAY = 3600  # 1 hour
 
 
-class ValidatorsRegistrationMode(Enum):
-    """
-    AUTO mode: validators are registered automatically when vault assets are enough.
-    API mode: validators registration is triggered by API request.
-    """
-
-    AUTO = 'AUTO'
-    API = 'API'
-
-
-class RelayerTypes:
-    DVT = 'DVT'
-    DEFAULT = 'DEFAULT'
-
-
 # pylint: disable-next=too-many-public-methods,too-many-instance-attributes
 class Settings(metaclass=Singleton):
-    vaults: list[ChecksumAddress]
-    data_dir: Path
+    vault: ChecksumAddress
+    vault_dir: Path
     network: str
     consensus_endpoints: list[str]
     consensus_timeout: int
@@ -64,6 +45,8 @@ class Settings(metaclass=Singleton):
     harvest_vault: bool
     claim_fee_splitter: bool
     disable_withdrawals: bool
+    disable_validators_registration: bool
+    disable_validators_funding: bool
     verbose: bool
     enable_metrics: bool
     metrics_host: str
@@ -102,7 +85,6 @@ class Settings(metaclass=Singleton):
     sentry_environment: str
     concurrency: int | None
 
-    relayer_type: str
     relayer_endpoint: str
     relayer_timeout: int
     validators_registration_mode: ValidatorsRegistrationMode
@@ -122,15 +104,14 @@ class Settings(metaclass=Singleton):
     )
 
     min_deposit_amount_gwei: Gwei
+    max_validator_balance_gwei: Gwei
     min_deposit_delay: int
-
-    run_nodes: bool
 
     # pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements
     def set(
         self,
-        vaults: list[ChecksumAddress],
-        data_dir: Path,
+        vault: ChecksumAddress,
+        vault_dir: Path,
         network: str,
         consensus_endpoints: str = '',
         execution_endpoints: str = '',
@@ -139,6 +120,8 @@ class Settings(metaclass=Singleton):
         harvest_vault: bool = False,
         claim_fee_splitter: bool = False,
         disable_withdrawals: bool = False,
+        disable_validators_registration: bool = False,
+        disable_validators_funding: bool = False,
         verbose: bool = False,
         enable_metrics: bool = False,
         metrics_port: int = DEFAULT_METRICS_PORT,
@@ -162,33 +145,26 @@ class Settings(metaclass=Singleton):
         log_level: str | None = None,
         log_format: str | None = None,
         concurrency: int | None = None,
-        relayer_type: str = RelayerTypes.DEFAULT,
         relayer_endpoint: str | None = None,
         validators_registration_mode: ValidatorsRegistrationMode = ValidatorsRegistrationMode.AUTO,
         min_deposit_amount_gwei: Gwei = DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
+        max_validator_balance_gwei: Gwei | None = None,
         min_deposit_delay: int = DEFAULT_MIN_DEPOSIT_DELAY,
-        run_nodes: bool = False,
     ) -> None:
-        self.vaults = vaults
-        data_dir.mkdir(parents=True, exist_ok=True)
-        self.data_dir = data_dir
+        self.vault = vault
+        vault_dir.mkdir(parents=True, exist_ok=True)
+        self.vault_dir = vault_dir
         self.network = network
 
-        if consensus_endpoints:
-            self.consensus_endpoints = [node.strip() for node in consensus_endpoints.split(',')]
-        else:
-            self.consensus_endpoints = [DEFAULT_CONSENSUS_ENDPOINT]
-
-        if execution_endpoints:
-            self.execution_endpoints = [node.strip() for node in execution_endpoints.split(',')]
-        else:
-            self.execution_endpoints = [DEFAULT_EXECUTION_ENDPOINT]
-
+        self.consensus_endpoints = [node.strip() for node in consensus_endpoints.split(',')]
+        self.execution_endpoints = [node.strip() for node in execution_endpoints.split(',')]
         self.execution_jwt_secret = execution_jwt_secret
         self.graph_endpoint = graph_endpoint or self.network_config.STAKEWISE_GRAPH_ENDPOINT
         self.harvest_vault = harvest_vault
         self.claim_fee_splitter = claim_fee_splitter
         self.disable_withdrawals = disable_withdrawals
+        self.disable_validators_registration = disable_validators_registration
+        self.disable_validators_funding = disable_validators_funding
         self.verbose = verbose
         self.enable_metrics = enable_metrics
         self.metrics_host = metrics_host
@@ -198,22 +174,26 @@ class Settings(metaclass=Singleton):
 
         if max_fee_per_gas_gwei is None:
             max_fee_per_gas_gwei = self.network_config.MAX_FEE_PER_GAS_GWEI
-
         self.max_fee_per_gas_gwei = Gwei(max_fee_per_gas_gwei)
+
+        if max_validator_balance_gwei is None:
+            max_validator_balance_gwei = self.network_config.MAX_VALIDATOR_BALANCE_GWEI
+        self.max_validator_balance_gwei = Gwei(max_validator_balance_gwei)
+
         self.min_deposit_amount_gwei = min_deposit_amount_gwei
         self.min_deposit_delay = min_deposit_delay
 
         # keystores
-        self.keystores_dir = Path(keystores_dir) if keystores_dir else data_dir / 'keystores'
+        self.keystores_dir = Path(keystores_dir) if keystores_dir else vault_dir / 'keystores'
         self.keystores_password_dir = decouple_config(
             'KEYSTORES_PASSWORD_DIR',
             cast=Path,
-            default=data_dir / 'keystores',
+            default=vault_dir / 'keystores',
         )
         self.keystores_password_file = (
             Path(keystores_password_file)
             if keystores_password_file
-            else data_dir / 'keystores' / 'password.txt'
+            else vault_dir / 'keystores' / 'password.txt'
         )
 
         # remote signer configuration
@@ -236,14 +216,16 @@ class Settings(metaclass=Singleton):
         self.hashi_vault_parallelism = hashi_vault_parallelism
 
         # wallet
-        self.wallet_file = Path(wallet_file) if wallet_file else data_dir / 'wallet' / 'wallet.json'
+        self.wallet_file = (
+            Path(wallet_file) if wallet_file else vault_dir / 'wallet' / 'wallet.json'
+        )
         self.wallet_password_file = (
             Path(wallet_password_file)
             if wallet_password_file
-            else data_dir / 'wallet' / 'password.txt'
+            else vault_dir / 'wallet' / 'password.txt'
         )
 
-        db_dir = Path(database_dir) if database_dir else data_dir
+        db_dir = Path(database_dir) if database_dir else vault_dir
         self.database = db_dir / 'operator.db'
 
         self.log_level = log_level or 'INFO'
@@ -296,14 +278,12 @@ class Settings(metaclass=Singleton):
         self.graph_request_timeout = decouple_config('GRAPH_REQUEST_TIMEOUT', default=10, cast=int)
         self.graph_retry_timeout = decouple_config('GRAPH_RETRY_TIMEOUT', default=60, cast=int)
         self.graph_page_size = decouple_config('GRAPH_PAGE_SIZE', default=100, cast=int)
-        self.relayer_type = relayer_type
         self.relayer_endpoint = relayer_endpoint or ''
         self.relayer_timeout = decouple_config('RELAYER_TIMEOUT', default=10, cast=int)
 
         self.validators_registration_mode = validators_registration_mode
 
         self.skip_startup_checks = decouple_config('SKIP_STARTUP_CHECKS', default=False, cast=bool)
-        self.run_nodes = run_nodes
 
     @property
     def keystore_cls_str(self) -> str:
@@ -316,11 +296,6 @@ class Settings(metaclass=Singleton):
     @property
     def network_config(self) -> NetworkConfig:
         return NETWORKS[self.network]
-
-    @property
-    def nodes_dir(self) -> Path:
-        """Returns the nodes directory within the data directory."""
-        return self.data_dir / 'nodes'
 
 
 settings = Settings()
@@ -337,9 +312,9 @@ ORACLES_CONSOLIDATION_TIMEOUT: int = decouple_config(
     'ORACLES_CONSOLIDATION_TIMEOUT', default=10, cast=int
 )
 ORACLES_EXITS_TIMEOUT: int = decouple_config('ORACLES_EXITS_TIMEOUT', default=10, cast=int)
-# partial withdrawals
-PARTIAL_WITHDRAWALS_INTERVAL: int = decouple_config(
-    'PARTIAL_WITHDRAWALS_INTERVAL', default=86400, cast=int  # every 24 hr
+# withdrawals
+WITHDRAWALS_INTERVAL: int = decouple_config(
+    'WITHDRAWALS_INTERVAL', default=43200, cast=int  # every 12 hr
 )
 MIN_WITHDRAWAL_AMOUNT_GWEI: Gwei = Gwei(1)
 
@@ -372,11 +347,11 @@ HASHI_VAULT_TIMEOUT = 10
 ATTEMPTS_WITH_DEFAULT_GAS: int = decouple_config('ATTEMPTS_WITH_DEFAULT_GAS', default=3, cast=int)
 
 # Minimum amount of rewards to process reward splitter
-REWARD_SPLITTER_MIN_ASSETS: int = decouple_config(
-    'REWARD_SPLITTER_MIN_ASSETS', default=Web3.to_wei('0.001', 'ether'), cast=int
+FEE_SPLITTER_MIN_ASSETS: int = decouple_config(
+    'FEE_SPLITTER_MIN_ASSETS', default=Web3.to_wei('0.001', 'ether'), cast=int
 )
-REWARD_SPLITTER_INTERVAL: int = decouple_config(
-    'REWARD_SPLITTER_INTERVAL', default=86400, cast=int  # every 24 hr
+FEE_SPLITTER_INTERVAL: int = decouple_config(
+    'FEE_SPLITTER_INTERVAL', default=86400, cast=int  # every 24 hr
 )
 # logging
 LOG_PLAIN = 'plain'

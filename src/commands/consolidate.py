@@ -2,7 +2,6 @@ import asyncio
 import logging
 import sys
 from pathlib import Path
-from typing import cast
 
 import click
 from eth_typing import ChecksumAddress, HexStr
@@ -19,38 +18,27 @@ from src.common.execution import (
     get_protocol_config,
 )
 from src.common.logging import LOG_LEVELS, setup_logging
-from src.common.utils import find_first, log_verbose
+from src.common.utils import log_verbose
 from src.common.validators import (
     validate_eth_address,
+    validate_max_validator_balance_gwei,
     validate_public_key,
     validate_public_keys,
     validate_public_keys_file,
 )
 from src.common.wallet import wallet
 from src.config.config import OperatorConfig
-from src.config.networks import AVAILABLE_NETWORKS
-from src.config.settings import (
-    MAX_CONSOLIDATION_REQUEST_FEE,
-    MAX_EFFECTIVE_BALANCE_GWEI,
-    settings,
-)
+from src.config.networks import GNOSIS, MAINNET, NETWORKS
+from src.config.settings import MAX_CONSOLIDATION_REQUEST_FEE, settings
 from src.validators.consensus import EXITING_STATUSES, fetch_consensus_validators
 from src.validators.oracles import poll_consolidation_signature
 from src.validators.register_validators import submit_consolidate_validators
+from src.validators.relayer import RelayerClient
 from src.validators.typings import ConsensusValidator
 
 logger = logging.getLogger(__name__)
 
 
-@click.option(
-    '--network',
-    type=click.Choice(
-        AVAILABLE_NETWORKS,
-        case_sensitive=False,
-    ),
-    envvar='NETWORK',
-    help='The network of the vault. Default is the network specified at "init" command.',
-)
 @click.option(
     '--data-dir',
     default=str(Path.home() / '.stakewise'),
@@ -69,7 +57,7 @@ logger = logging.getLogger(__name__)
     '--source-public-keys',
     type=HexStr,
     callback=validate_public_keys,
-    help='Public keys of validators to consolidate from.',
+    help='Comma separated list of public keys of validators to consolidate from.',
 )
 @click.option(
     '--source-public-keys-file',
@@ -94,7 +82,7 @@ logger = logging.getLogger(__name__)
     '--execution-endpoints',
     type=str,
     envvar='EXECUTION_ENDPOINTS',
-    prompt='Enter comma separated list of API endpoints for execution nodes',
+    prompt='Enter the comma separated list of API endpoints for execution nodes',
     help='Comma separated list of API endpoints for execution nodes.',
 )
 @click.option(
@@ -110,6 +98,21 @@ logger = logging.getLogger(__name__)
     envvar='WALLET_FILE',
     help='Absolute path to the wallet. '
     'Default is the file generated with "create-wallet" command.',
+)
+@click.option(
+    '--relayer-endpoint',
+    type=str,
+    help='Relayer endpoint.',
+    envvar='RELAYER_ENDPOINT',
+)
+@click.option(
+    '--max-validator-balance-gwei',
+    type=int,
+    envvar='MAX_VALIDATOR_BALANCE_GWEI',
+    help=f'The maximum validator balance in Gwei.'
+    f'Default is {NETWORKS[MAINNET].MAX_VALIDATOR_BALANCE_GWEI} Gwei for Ethereum, '
+    f'{NETWORKS[GNOSIS].MAX_VALIDATOR_BALANCE_GWEI} Gwei for Gnosis.',
+    callback=validate_max_validator_balance_gwei,
 )
 @click.option(
     '-v',
@@ -138,9 +141,8 @@ logger = logging.getLogger(__name__)
     help='Performs a vault validators consolidation from 0x01 validators to 0x02 validator. '
     'Switches a validator from 0x01 to 0x02 if the source and target keys are identical.'
 )
-# pylint: disable-next=too-many-arguments
+# pylint: disable-next=too-many-arguments,too-many-locals
 def consolidate(
-    network: str,
     vault: ChecksumAddress,
     execution_endpoints: str,
     consensus_endpoints: str,
@@ -153,6 +155,8 @@ def consolidate(
     source_public_keys: list[HexStr] | None,
     source_public_keys_file: Path | None,
     target_public_key: HexStr | None = None,
+    relayer_endpoint: str | None = None,
+    max_validator_balance_gwei: int | None = None,
 ) -> None:
     if all([source_public_keys, source_public_keys_file]):
         raise click.ClickException(
@@ -167,17 +171,21 @@ def consolidate(
     if source_public_keys_file:
         source_public_keys = _load_public_keys(source_public_keys_file)
 
-    operator_config = OperatorConfig(Path(data_dir))
-    operator_config.load(network=network)
+    operator_config = OperatorConfig(vault, Path(data_dir))
+    operator_config.load()
 
     settings.set(
-        vaults=[vault],
+        vault=vault,
         network=operator_config.network,
-        data_dir=operator_config.data_dir,
+        vault_dir=operator_config.vault_dir,
         execution_endpoints=execution_endpoints,
         consensus_endpoints=consensus_endpoints,
         wallet_file=wallet_file,
         wallet_password_file=wallet_password_file,
+        relayer_endpoint=relayer_endpoint,
+        max_validator_balance_gwei=(
+            Gwei(max_validator_balance_gwei) if max_validator_balance_gwei else None
+        ),
         verbose=verbose,
         log_level=log_level,
     )
@@ -236,10 +244,15 @@ async def main(
             )
 
     for target_validator, source_validator in target_source:
-        click.secho(
-            f'Consolidating from validator with index {source_validator.index} '
-            f'to validator with index {target_validator.index}'
-        )
+        if source_validator.index == target_validator.index:
+            click.secho(
+                f'Switching validator with index {source_validator.index} to compounding',
+            )
+        else:
+            click.secho(
+                f'Consolidating from validator with index {source_validator.index} '
+                f'to validator with index {target_validator.index}'
+            )
     if not no_confirm:
         click.confirm(
             'Proceed consolidation?',
@@ -273,18 +286,28 @@ async def main(
         (target_validator.public_key, source_validator.public_key)
         for target_validator, source_validator in target_source
     ]
-    oracle_signatures = await poll_consolidation_signature(
-        target_source_public_keys=target_source_public_keys,
-        vault=vault_address,
-        protocol_config=protocol_config,
-    )
+    oracle_signatures = None
+    if (
+        len(target_source_public_keys) == 1
+        and target_source_public_keys[0][0] == target_source_public_keys[0][1]
+    ):
+        # The oracles signatures are only required when switching from 0x01 to 0x02
+        oracle_signatures = await poll_consolidation_signature(
+            target_public_keys=[target_source_public_keys[0][0]],
+            vault=vault_address,
+            protocol_config=protocol_config,
+        )
 
     encoded_validators = _encode_validators(target_source_public_keys)
+    validators_manager_signature = await get_validators_manager_signature(
+        vault_address, target_source_public_keys
+    )
+
     tx_hash = await submit_consolidate_validators(
-        vault_address=vault_address,
         validators=encoded_validators,
         oracle_signatures=oracle_signatures,
         tx_fee=tx_fee,
+        validators_manager_signature=validators_manager_signature,
     )
 
     if tx_hash:
@@ -295,6 +318,7 @@ async def main(
         )
 
 
+# pylint: disable-next=too-many-branches
 async def _check_public_keys(
     vault_address: ChecksumAddress,
     source_public_keys: list[HexStr],
@@ -306,46 +330,76 @@ async def _check_public_keys(
     and returns the target and source validators info.
     """
     logger.info('Checking selected validators for consolidation...')
-    all_public_keys = source_public_keys + [target_public_key]
-    active_validators = await fetch_consensus_validators(source_public_keys + [target_public_key])
-    active_public_keys = {
-        val.public_key for val in active_validators if val.status not in EXITING_STATUSES
-    }
-    non_active_public_keys = set(all_public_keys) - active_public_keys
-    for key in non_active_public_keys:
-        raise click.ClickException(f'Trying to consolidate non-active validator {key}.')
 
-    source_validators = set()
-    # Verify the source has been active long enough
+    # Validate that source public keys are unique
+    if len(source_public_keys) != len(set(source_public_keys)):
+        raise click.ClickException('Source public keys must be unique.')
+
+    # Validate the switch from 0x01 to 0x02 and consolidation to another validator
+    if len(source_public_keys) > 1 and target_public_key in source_public_keys:
+        raise click.ClickException(
+            'Cannot switch from 0x01 to 0x02 and consolidate '
+            'to another validator in the same request.'
+        )
+
+    # Fetch source and target validators
+    validators = await fetch_consensus_validators(source_public_keys + [target_public_key])
+    pubkey_to_validator = {val.public_key: val for val in validators}
+
+    source_validators: list[ConsensusValidator] = []
     max_activation_epoch = chain_head.epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
-    for validator in active_validators:
-        if validator.public_key in source_public_keys:
-            source_validators.add(validator)
-            if validator.activation_epoch > max_activation_epoch:
-                raise click.ClickException(
-                    f'Validator {validator.public_key} is not active enough for consolidation. '
-                    f'It must be active for at least '
-                    f'{settings.network_config.SHARD_COMMITTEE_PERIOD} epochs before consolidation.'
-                )
 
-    #  Verify the source validators has no pending withdrawals in the queue
-    await _check_pending_balance_to_withdraw(
-        validator_indexes={val.index for val in source_validators}
-    )
+    # Validate source public keys
+    for source_public_key in source_public_keys:
+        source_validator = pubkey_to_validator.get(source_public_key)
 
-    # validate that target_public_key is a compounding validator.
-    # Not required for a single validator consolidation
-    target_validator = find_first(
-        active_validators, lambda val: val.public_key == target_public_key
-    )
-    # `target_validator` is not None, because of validation above
-    target_validator = cast(ConsensusValidator, target_validator)
+        if not source_validator:
+            raise click.ClickException(
+                f'Validator {source_public_key} not found in the consensus layer.'
+            )
+
+        # Validate the source validator status
+        if source_validator.status in EXITING_STATUSES:
+            raise click.ClickException(
+                f'Validator {source_public_key} is in exiting '
+                f'status {source_validator.status.value}.'
+            )
+
+        # Validate the source has been active long enough
+        if source_validator.activation_epoch > max_activation_epoch:
+            raise click.ClickException(
+                f'Validator {source_validator.public_key} is not active enough for consolidation. '
+                f'It must be active for at least '
+                f'{settings.network_config.SHARD_COMMITTEE_PERIOD} epochs before consolidation.'
+            )
+        source_validators.append(source_validator)
+
+    # Validate target public key
+    target_validator = pubkey_to_validator.get(target_public_key)
+    if not target_validator:
+        raise click.ClickException(
+            f'Target validator {target_public_key} not found in the consensus layer.'
+        )
+    if target_validator.status in EXITING_STATUSES:
+        raise click.ClickException(
+            f'Target validator {target_public_key} is in exiting '
+            f'status {target_validator.status.value}.'
+        )
+
+    # Validate that target validator is a compounding validator.
+    # Not required for a switch from 0x01 to 0x02.
     if not _is_switch_to_compounding(source_public_keys, target_public_key):
         if not target_validator.is_compounding:
             raise click.ClickException(
                 f'The target validator {target_public_key} is not a compounding validator.'
             )
 
+    # Validate the source validators has no pending withdrawals in the queue
+    await _check_pending_balance_to_withdraw(
+        validator_indexes={val.index for val in source_validators}
+    )
+
+    # Validate the source and target validators are in the vault
     logger.info('Fetching vault validators...')
     vault_validators = await VaultContract(vault_address).get_registered_validators_public_keys(
         from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
@@ -356,15 +410,20 @@ async def _check_public_keys(
             raise click.ClickException(
                 f'Validator {public_keys} is not registered in the vault {vault_address}.'
             )
-    if sum(val.balance for val in active_validators) > MAX_EFFECTIVE_BALANCE_GWEI:
+
+    # Validate the total balance won't exceed the max effective balance
+    if sum(val.balance for val in validators) > settings.max_validator_balance_gwei:
         raise click.ClickException(
             'Cannot consolidate validators,'
-            f' total balance exceed {MAX_EFFECTIVE_BALANCE_GWEI} Gwei'
+            f' total balance exceed {settings.max_validator_balance_gwei} Gwei'
         )
+
     return [(target_validator, source_validator) for source_validator in source_validators]
 
 
 async def _check_validators_manager(vault_address: ChecksumAddress) -> None:
+    if settings.relayer_endpoint:
+        return
     vault_contract = VaultContract(vault_address)
     validators_manager = await vault_contract.validators_manager()
     if validators_manager != wallet.account.address:
@@ -460,7 +519,7 @@ async def _find_target_source_public_keys(
         for val in source_validators:
             if (
                 target_validator.balance + sum(v.balance for v in selected_source_validators)
-                > MAX_EFFECTIVE_BALANCE_GWEI
+                > settings.max_validator_balance_gwei
             ):
                 break
             selected_source_validators.append(val)
@@ -493,3 +552,20 @@ async def get_source_validators(
         source_validators.append(val)
 
     return source_validators
+
+
+async def get_validators_manager_signature(
+    vault_address: ChecksumAddress, target_source_public_keys: list[tuple[HexStr, HexStr]]
+) -> HexStr:
+    if not settings.relayer_endpoint:
+        return HexStr('0x')
+    relayer = RelayerClient()
+    # fetch validator manager signature from relayer
+    relayer_response = await relayer.consolidate_validators(
+        vault_address=vault_address,
+        target_source_public_keys=target_source_public_keys,
+    )
+    if not relayer_response.validators_manager_signature:
+        raise click.ClickException('Could not get validator manager signature from relayer')
+
+    return relayer_response.validators_manager_signature

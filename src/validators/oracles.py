@@ -46,7 +46,6 @@ logger = logging.getLogger(__name__)
 
 
 async def poll_validation_approval(
-    vault_address: ChecksumAddress,
     keystore: BaseKeystore | None,
     validators: Sequence[Validator],
     validators_manager_signature: HexStr,
@@ -81,7 +80,6 @@ async def poll_validation_approval(
             deadline = current_timestamp + protocol_config.signature_validity_period
 
             oracles_request = await create_approval_request(
-                vault_address=vault_address,
                 protocol_config=protocol_config,
                 keystore=keystore,
                 validators=validators,
@@ -105,7 +103,7 @@ async def poll_validation_approval(
 
 async def poll_consolidation_signature(
     protocol_config: ProtocolConfig,
-    target_source_public_keys: list[tuple[HexStr, HexStr]],
+    target_public_keys: list[HexStr],
     vault: ChecksumAddress,
 ) -> bytes:
     """
@@ -114,15 +112,8 @@ async def poll_consolidation_signature(
     approvals_min_interval = 1
     rate_limiter = RateLimiter(approvals_min_interval)
     votes_threshold = protocol_config.validators_threshold
-    from_public_keys = []
-    to_public_keys = []
-    for to_key, from_key in target_source_public_keys:
-        from_public_keys.append(from_key)
-        to_public_keys.append(to_key)
-
     consolidation_request = ConsolidationRequest(
-        from_public_keys=from_public_keys,
-        to_public_keys=to_public_keys,
+        public_keys=target_public_keys,
         vault_address=vault,
     )
     while True:
@@ -202,7 +193,6 @@ async def send_approval_requests(
 
 # pylint: disable-next=too-many-arguments
 async def create_approval_request(
-    vault_address: ChecksumAddress,
     protocol_config: ProtocolConfig,
     keystore: BaseKeystore | None,
     validators: Sequence[Validator],
@@ -219,7 +209,7 @@ async def create_approval_request(
     # get exit signature shards
     request = ApprovalRequest(
         validator_index=validators_start_index,
-        vault_address=vault_address,
+        vault_address=settings.vault,
         validators_root=Web3.to_hex(registry_root),
         public_keys=[],
         deposit_signatures=[],

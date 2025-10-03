@@ -1,7 +1,7 @@
 import logging
 from typing import Sequence
 
-from eth_typing import ChecksumAddress, HexAddress, HexStr
+from eth_typing import HexStr
 from sw_utils import get_v1_withdrawal_credentials, get_v2_withdrawal_credentials
 from sw_utils.typings import Bytes32
 from web3 import Web3
@@ -20,7 +20,6 @@ logger = logging.getLogger(__name__)
 async def get_validators_for_registration(
     keystore: BaseKeystore,
     amounts: list[Gwei],
-    vault_address: ChecksumAddress,
 ) -> Sequence[Validator]:
     """Returns list of available validators for registration."""
     available_public_keys = await _filter_nonregistered_public_keys(
@@ -29,9 +28,7 @@ async def get_validators_for_registration(
     )
     validators = []
     for amount, public_key in zip(amounts, available_public_keys):
-        deposit_data = await keystore.get_deposit_data(
-            public_key=public_key, amount=amount, vault_address=vault_address
-        )
+        deposit_data = await keystore.get_deposit_data(public_key=public_key, amount=amount)
         validators.append(
             Validator(
                 public_key=Web3.to_hex(deposit_data['pubkey']),
@@ -44,34 +41,11 @@ async def get_validators_for_registration(
     return validators
 
 
-async def get_validators_for_funding(
-    keystore: BaseKeystore,
-    funding_amounts: dict[HexStr, Gwei],
-    vault_address: ChecksumAddress,
-) -> list[Validator]:
-    validators = []
-    for public_key, amount in funding_amounts.items():
-        if public_key not in keystore:
-            raise RuntimeError(f'Public key {public_key} not found in keystores')
-        deposit_data = await keystore.get_deposit_data(
-            public_key=public_key, amount=amount, vault_address=vault_address
-        )
-        validators.append(
-            Validator(
-                public_key=Web3.to_hex(deposit_data['pubkey']),
-                signature=Web3.to_hex(deposit_data['signature']),
-                amount=amount,
-                deposit_data_root=Web3.to_hex(deposit_data['deposit_data_root']),
-            )
-        )
-    return validators
-
-
-def get_withdrawal_credentials(vault_address: HexAddress) -> Bytes32:
-    """Returns withdrawal credentials based on the vault address and validator type."""
+def get_withdrawal_credentials() -> Bytes32:
+    """Returns withdrawal credentials based on the validator type."""
     if settings.validator_type == ValidatorType.V1:
-        return get_v1_withdrawal_credentials(vault_address)
-    return get_v2_withdrawal_credentials(vault_address)
+        return get_v1_withdrawal_credentials(settings.vault)
+    return get_v2_withdrawal_credentials(settings.vault)
 
 
 async def _filter_nonregistered_public_keys(

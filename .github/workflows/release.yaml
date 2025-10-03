@@ -35,7 +35,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - OS: ubuntu-22.04
+          - OS: ubuntu-24.04
             PYTHON_VERSION: 3.12.8
             BUILD_CMD: |
               export PYTHONHASHSEED=42
@@ -50,7 +50,7 @@ jobs:
               cp ${BUILD_FILE_NAME}.tar.gz /tmp/artifacts;
               sha256sum ${BUILD_FILE_NAME}.tar.gz | head -c 64 > /tmp/artifacts/${BUILD_FILE_NAME}.sha256;
 
-          - OS: linux-arm-runner
+          - OS: ubuntu-24.04-arm
             PYTHON_VERSION: 3.12.8
             BUILD_CMD: |
               export PYTHONHASHSEED=42
@@ -105,7 +105,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y build-essential curl libpq-dev postgresql-client
-        if: matrix.os == 'linux-arm-runner'
+        if: matrix.os == 'ubuntu-24.04-arm'
 
       - name: Install build dependencies for MacOS
         run: |
@@ -169,10 +169,10 @@ jobs:
         with:
           fail_on_unmatched_files: true
           files: |
-            /tmp/artifacts/ubuntu-22.04/operator-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz
-            /tmp/artifacts/ubuntu-22.04/operator-${{ steps.get_version.outputs.VERSION }}-linux-amd64.sha256
-            /tmp/artifacts/linux-arm-runner/operator-${{ steps.get_version.outputs.VERSION }}-linux-arm64.tar.gz
-            /tmp/artifacts/linux-arm-runner/operator-${{ steps.get_version.outputs.VERSION }}-linux-arm64.sha256
+            /tmp/artifacts/ubuntu-24.04/operator-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz
+            /tmp/artifacts/ubuntu-24.04/operator-${{ steps.get_version.outputs.VERSION }}-linux-amd64.sha256
+            /tmp/artifacts/ubuntu-24.04-arm/operator-${{ steps.get_version.outputs.VERSION }}-linux-arm64.tar.gz
+            /tmp/artifacts/ubuntu-24.04-arm/operator-${{ steps.get_version.outputs.VERSION }}-linux-arm64.sha256
             /tmp/artifacts/macos-14/operator-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.tar.gz
             /tmp/artifacts/macos-14/operator-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.sha256
             /tmp/artifacts/windows-latest/operator-${{ steps.get_version.outputs.VERSION }}-windows-amd64.zip

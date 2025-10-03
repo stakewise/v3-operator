@@ -42,35 +42,32 @@ class ExitSignatureTask(BaseTask):
             return
 
         protocol_config = await get_protocol_config()
-        for vault in settings.vaults:
-            update_block = await _fetch_last_update_block(vault)
+        update_block = await _fetch_last_update_block()
 
-            logger.debug('last exit signature update block %s for vault %s', update_block, vault)
+        logger.debug('last exit signature update block %s', update_block)
 
-            if update_block and not await is_block_finalized(update_block):
-                logger.info(
-                    'Waiting for signatures update block %d for vault %s to finalize...',
-                    update_block,
-                    vault,
-                )
-                return
-
-            if update_block and not await _check_majority_oracles_synced(
-                protocol_config, update_block, vault
-            ):
-                logger.info('Waiting for the majority of oracles to sync exit signatures')
-                return
-
-            outdated_indexes = await _fetch_outdated_indexes(
-                protocol_config.oracles, update_block, vault=vault
+        if update_block and not await is_block_finalized(update_block):
+            logger.info(
+                'Waiting for signatures update block %d for vault %s to finalize...',
+                update_block,
+                settings.vault,
             )
-            if outdated_indexes:
-                await _update_exit_signatures(
-                    vault=vault,
-                    keystore=self.keystore,
-                    protocol_config=protocol_config,
-                    outdated_indexes=outdated_indexes,
-                )
+            return
+
+        if update_block and not await _check_majority_oracles_synced(
+            protocol_config, update_block, settings.vault
+        ):
+            logger.info('Waiting for the majority of oracles to sync exit signatures')
+            return
+
+        outdated_indexes = await _fetch_outdated_indexes(protocol_config.oracles, update_block)
+        if outdated_indexes:
+            await _update_exit_signatures(
+                vault=settings.vault,
+                keystore=self.keystore,
+                protocol_config=protocol_config,
+                outdated_indexes=outdated_indexes,
+            )
 
 
 async def _check_majority_oracles_synced(
@@ -113,9 +110,9 @@ async def _fetch_last_update_block_replicas(
     return None
 
 
-async def _fetch_last_update_block(vault: ChecksumAddress) -> BlockNumber | None:
+async def _fetch_last_update_block() -> BlockNumber | None:
     app_state = AppState()
-    update_cache = app_state.exit_signature_update_cache[vault]
+    update_cache = app_state.exit_signature_update_cache
 
     from_block: BlockNumber | None = None
     if (checkpoint_block := update_cache.checkpoint_block) is not None:
@@ -127,7 +124,7 @@ async def _fetch_last_update_block(vault: ChecksumAddress) -> BlockNumber | None
         return update_cache.last_event_block
 
     last_event = await keeper_contract.get_exit_signatures_updated_event(
-        vault=vault, from_block=from_block, to_block=to_block
+        vault=settings.vault, from_block=from_block, to_block=to_block
     )
     update_cache.checkpoint_block = to_block
 
@@ -138,14 +135,16 @@ async def _fetch_last_update_block(vault: ChecksumAddress) -> BlockNumber | None
 
 
 async def _fetch_outdated_indexes(
-    oracles: list[Oracle], update_block: BlockNumber | None, vault: ChecksumAddress
+    oracles: list[Oracle], update_block: BlockNumber | None
 ) -> list[int]:
     endpoints = list(chain.from_iterable([oracle.endpoints for oracle in oracles]))
     shuffle(endpoints)  # nosec
 
     for oracle_endpoint in endpoints:
         try:
-            response = await get_oracle_outdated_signatures_response(oracle_endpoint, vault=vault)
+            response = await get_oracle_outdated_signatures_response(
+                oracle_endpoint, vault=settings.vault
+            )
         except (ClientError, RetryError) as e:
             warning_verbose(str(e))
             continue

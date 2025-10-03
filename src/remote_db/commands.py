@@ -9,7 +9,7 @@ from eth_typing import ChecksumAddress
 from src.common.clients import setup_clients
 from src.common.utils import greenify, log_verbose
 from src.common.validators import validate_db_uri, validate_eth_address
-from src.config.config import OperatorConfig, OperatorConfigException
+from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import settings
 from src.remote_db import tasks
@@ -17,6 +17,13 @@ from src.remote_db.database import check_db_connection
 
 
 @click.group('remote-db', help='Manages Postgres database encrypted keystores.')
+@click.option(
+    '--vault',
+    prompt='Enter your vault address',
+    help='The vault address',
+    type=str,
+    callback=validate_eth_address,
+)
 @click.option(
     '--network',
     type=click.Choice(
@@ -60,25 +67,23 @@ from src.remote_db.database import check_db_connection
 # pylint: disable-next=too-many-arguments
 def remote_db_group(
     ctx: Context,
+    vault: ChecksumAddress,
     data_dir: str,
     keystores_dir: str | None,
     db_url: str,
-    network: str | None,
+    network: str,
     verbose: bool,
 ) -> None:
     ctx.ensure_object(dict)
 
-    config = OperatorConfig(Path(data_dir))
+    config = OperatorConfig(vault, Path(data_dir))
     if network is None:
-        try:
-            config.load(network=network)
-        except OperatorConfigException as e:
-            raise click.ClickException(str(e))
+        config.load()
         network = config.network
 
     settings.set(
-        vaults=[],
-        data_dir=config.data_dir,
+        vault=vault,
+        vault_dir=config.vault_dir,
         network=network,
         keystores_dir=keystores_dir,
         verbose=verbose,
@@ -118,7 +123,7 @@ def cleanup(ctx: Context) -> None:
     '--execution-endpoints',
     type=str,
     envvar='EXECUTION_ENDPOINTS',
-    prompt='Enter comma separated list of API endpoints for execution nodes',
+    prompt='Enter the comma separated list of API endpoints for execution nodes',
     help='Comma separated list of API endpoints for execution nodes.',
 )
 @click.option(
@@ -143,8 +148,8 @@ def upload_keypairs(
     concurrency: int | None,
 ) -> None:
     settings.set(
-        vaults=[],
-        data_dir=settings.data_dir,
+        vault=settings.vault,
+        vault_dir=settings.vault_dir,
         network=settings.network,
         keystores_dir=str(settings.keystores_dir),
         verbose=settings.verbose,

@@ -51,7 +51,7 @@ from src.config.settings import DEFAULT_NETWORK, settings
 @click.option(
     '--vault',
     prompt='Enter your vault address',
-    help='Vault addresses',
+    help='Vault address',
     type=str,
     callback=validate_eth_address,
 )
@@ -59,14 +59,14 @@ from src.config.settings import DEFAULT_NETWORK, settings
     '--execution-endpoints',
     type=str,
     envvar='EXECUTION_ENDPOINTS',
-    prompt='Enter comma separated list of API endpoints for execution nodes',
+    prompt='Enter the comma separated list of API endpoints for execution nodes',
     help='Comma separated list of API endpoints for execution nodes.',
 )
 @click.option(
     '--consensus-endpoints',
     type=str,
     envvar='CONSENSUS_ENDPOINTS',
-    prompt='Enter comma separated list of API endpoints for consensus nodes',
+    prompt='Enter the comma separated list of API endpoints for consensus nodes',
     help='Comma separated list of API endpoints for consensus nodes.',
 )
 @click.option(
@@ -103,19 +103,18 @@ def recover(
 ) -> None:
     # pylint: disable=duplicate-code
     operator_config = OperatorConfig(
+        vault,
         Path(data_dir),
     )
-    if operator_config.is_network_config_exists(network):
-        raise click.ClickException(
-            f'Config directory {operator_config.data_dir / network} already exists.'
-        )
+    if operator_config.config_path.is_file():
+        raise click.ClickException(f'Config directory {operator_config.vault_dir} already exists.')
 
     settings.set(
         execution_endpoints=execution_endpoints,
         consensus_endpoints=consensus_endpoints,
-        vaults=[vault],
+        vault=vault,
         network=network,
-        data_dir=operator_config.data_dir,
+        vault_dir=operator_config.vault_dir,
         log_level=log_level,
     )
 
@@ -142,10 +141,9 @@ async def main(
     setup_logging()
     await setup_clients()
 
-    validators: dict[HexStr, ValidatorStatus | None] = {}
-    for vault in settings.vaults:
-        vault_validators = await _fetch_registered_validators(vault)
-        validators.update(vault_validators)
+    validators: dict[HexStr, ValidatorStatus | None] = await _fetch_registered_validators(
+        settings.vault
+    )
 
     if not validators:
         raise click.ClickException('No registered validators')
@@ -174,7 +172,7 @@ async def main(
                 default=True,
                 abort=True,
             )
-        for file in keystores_dir.glob('*'):
+        for file in keystores_dir.iterdir():
             file.unlink()
     else:
         keystores_dir.mkdir(parents=True)
@@ -190,7 +188,7 @@ async def main(
     operator_config.save(settings.network, mnemonic, mnemonic_next_index)
     click.secho(
         f'Successfully recovered {greenify(mnemonic_next_index)} '
-        f'keystores for vaults {greenify(', '.join(settings.vaults))}',
+        f'keystores for vault {greenify(settings.vault)}',
     )
 
 

@@ -1,14 +1,13 @@
 import logging
 from dataclasses import dataclass
 from multiprocessing import Pool
-from os import listdir
+from os import walk
 from os.path import isfile
 from pathlib import Path
 from typing import NewType
 
 import milagro_bls_binding as bls
-from eth_typing import BLSPrivateKey, BLSSignature, ChecksumAddress, HexStr
-from eth_utils import add_0x_prefix
+from eth_typing import BLSPrivateKey, BLSSignature, HexStr
 from staking_deposit.key_handling.keystore import ScryptKeystore
 from sw_utils.signing import get_exit_message_signing_root
 from sw_utils.typings import ConsensusFork
@@ -26,8 +25,8 @@ logger = logging.getLogger(__name__)
 @dataclass
 class KeystoreFile:
     name: str
-    path: Path
     password: str
+    file: Path
     password_file: Path
 
 
@@ -68,6 +67,7 @@ class LocalKeystore(BaseKeystore):
                     raise RuntimeError('Failed to load keys') from e
 
         keys: dict[HexStr, BLSPrivkey] = {}
+        # sort by index to have a deterministic order
         for pub_key, priv_key, _ in sorted(keystores_data, key=lambda x: x[2]):
             keys[pub_key] = priv_key
 
@@ -83,14 +83,12 @@ class LocalKeystore(BaseKeystore):
     def __len__(self) -> int:
         return len(self.keys)
 
-    async def get_deposit_data(
-        self, public_key: HexStr, amount: int, vault_address: ChecksumAddress
-    ) -> dict:
+    async def get_deposit_data(self, public_key: HexStr, amount: int) -> dict:
         private_key = self.keys[public_key]
         credential = CredentialManager.load_credential(
             network=settings.network,
             private_key=BLSPrivateKey(Web3.to_int(private_key)),
-            vault=vault_address,
+            vault=settings.vault,
             validator_type=settings.validator_type,
         )
 
@@ -122,53 +120,49 @@ class LocalKeystore(BaseKeystore):
         keystores_password_file = settings.keystores_password_file
 
         res: list[KeystoreFile] = []
-        for f in listdir(keystores_dir):
-            if not (isfile(keystores_dir / f) and f.startswith('keystore') and f.endswith('.json')):
-                continue
 
-            password_file = keystores_password_dir / f.replace('.json', '.txt')
-            if not isfile(password_file):
-                password_file = keystores_password_file
+        for current_path, _, files in walk(keystores_dir):
+            for f in files:
+                file_path = Path(current_path) / f
+                if not (isfile(file_path) and f.startswith('keystore') and f.endswith('.json')):
+                    continue
 
-            password = LocalKeystore._load_keystores_password(password_file)
-            res.append(
-                KeystoreFile(
-                    name=f, path=keystores_dir / f, password=password, password_file=password_file
+                # check for password file in the keystores_password_dir
+                password_file = keystores_password_dir / f.replace('.json', '.txt')
+                if not isfile(password_file):
+                    # check for password file in the same directory as the keystore file
+                    password_file = Path(current_path) / f.replace('.json', '.txt')
+
+                if not isfile(password_file):
+                    # use password file from the keystores_password_file setting
+                    password_file = keystores_password_file
+
+                password = LocalKeystore._load_keystores_password(password_file)
+                res.append(
+                    KeystoreFile(
+                        name=f, file=file_path, password=password, password_file=password_file
+                    )
                 )
-            )
-
         return res
 
     @staticmethod
-    def read_keystore_file(keystore_file: KeystoreFile) -> tuple[int, HexStr]:
-        """Light keystore reading. Return tuple of keystore index and public key."""
-        file_path = keystore_file.path
-        try:
-            keystore = ScryptKeystore.from_file(file_path)
-            index = keystore.path.split('/')[-3]
-            return int(index), add_0x_prefix(HexStr(keystore.pubkey))
-        except BaseException as e:
-            raise KeystoreException(
-                f'Invalid keystore format in file "{keystore_file.name}"'
-            ) from e
-
-    @staticmethod
     def _process_keystore_file(keystore_file: KeystoreFile) -> tuple[HexStr, BLSPrivkey, int]:
+        file_name = keystore_file.name
         keystores_password = keystore_file.password
-
         try:
-            keystore = ScryptKeystore.from_file(keystore_file.path)
+            keystore = ScryptKeystore.from_file(keystore_file.file)
         except BaseException as e:
-            raise KeystoreException(
-                f'Invalid keystore format in file "{keystore_file.name}"'
-            ) from e
+            raise KeystoreException(f'Invalid keystore format in file "{file_name}"') from e
 
         try:
             private_key = BLSPrivkey(keystore.decrypt(keystores_password))
         except BaseException as e:
-            raise KeystoreException(f'Invalid password for keystore "{keystore_file.name}"') from e
+            raise KeystoreException(f'Invalid password for keystore "{file_name}"') from e
         public_key = Web3.to_hex(bls.SkToPk(private_key))
-        return public_key, private_key, int(keystore.path.split('/')[3])
+
+        # extract index from path: m/12381/3600/<index>/0/0
+        index = int(keystore.path.split('/')[3])
+        return public_key, private_key, index
 
     @staticmethod
     def _load_keystores_password(password_path: Path) -> str:

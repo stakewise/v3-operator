@@ -1,11 +1,18 @@
-from sw_utils import ChainHead, ValidatorStatus
+from sw_utils import (
+    GNO_NETWORKS,
+    ChainHead,
+    ValidatorStatus,
+    convert_to_gno,
+    convert_to_mgno,
+)
 from web3 import Web3
-from web3.types import ChecksumAddress, Gwei, Wei
+from web3.types import Gwei, Wei
 
 from src.common.clients import consensus_client
 from src.common.contracts import validators_checker_contract
 from src.common.harvest import get_harvest_params
 from src.common.typings import ExitQueueMissingAssetsParams
+from src.config.settings import settings
 from src.validators.typings import ConsensusValidator
 
 CAN_BE_EXITED_STATUSES = [
@@ -28,17 +35,16 @@ EXITING_STATUSES = [
 
 
 async def get_queued_assets(
-    vault_address: ChecksumAddress,
     consensus_validators: list[ConsensusValidator],
     oracle_exiting_validators: list[ConsensusValidator],
     chain_head: ChainHead,
 ) -> Gwei:
-    harvest_params = await get_harvest_params(vault_address)
+    harvest_params = await get_harvest_params(chain_head.block_number)
 
     # Get exit queue cumulative tickets
     exit_queue_cumulative_ticket = (
         await validators_checker_contract.get_exit_queue_cumulative_tickets(
-            vault_address=vault_address,
+            vault_address=settings.vault,
             harvest_params=harvest_params,
             block_number=chain_head.block_number,
         )
@@ -51,7 +57,7 @@ async def get_queued_assets(
         slot=chain_head.slot,
     )
     # fetch active validators exits
-    consolidations = await consensus_client.get_pending_consolidations()
+    consolidations = await consensus_client.get_pending_consolidations(str(chain_head.slot))
     source_consolidations_indexes = {
         int(consolidation['source_index']) for consolidation in consolidations
     }
@@ -64,18 +70,25 @@ async def get_queued_assets(
     # Withdrawing assets are assets that are ready to cover the exit requests
     # but not yet used to fulfill exit requests.
     withdrawing_assets = Wei(pending_partial_withdrawals_amount + validators_exits_amount)
-
+    if settings.network in GNO_NETWORKS:
+        # apply mGNO -> GNO exchange rate
+        withdrawing_assets = convert_to_gno(withdrawing_assets)
     # Missing assets express how much assets are needed to cover the exit requests
     # until the exit queue cumulative ticket is reached
     queued_assets = await validators_checker_contract.get_exit_queue_missing_assets(
         exit_queue_missing_assets_params=ExitQueueMissingAssetsParams(
-            vault=vault_address,
+            vault=settings.vault,
             withdrawing_assets=withdrawing_assets,
             exit_queue_cumulative_ticket=exit_queue_cumulative_ticket,
         ),
         harvest_params=harvest_params,
         block_number=chain_head.block_number,
     )
+
+    if settings.network in GNO_NETWORKS:
+        # apply GNO -> mGNO exchange rate
+        queued_assets = convert_to_mgno(queued_assets)
+
     return Gwei(int(Web3.from_wei(queued_assets, 'gwei')))
 
 
@@ -107,21 +120,22 @@ def _calculate_validators_exits_amount(
     source_consolidations_indexes: set[int],
 ) -> Wei:
     """
-    Calculate the sum of exiting validators balances. Calculated from two components:
-    1. Active exits from oracles.
-    2. Manually exited validators.
+    Calculate the sum of exiting validators balances. Exiting validators are:
+    1) Validators with exiting status
+    2) Validators that are in active exits according to oracles
+    3) Exclude validators that are consolidating
     """
-    # 1. Validator exits
-    # validator status can be not changed yet, so use active exits from oracles
-    oracle_exiting_balance = sum(val.balance for val in oracle_exiting_validators)
+    oracle_exiting_indexes = set()
+    total_exiting_amount = 0
+    for val in oracle_exiting_validators:
+        if val.index in oracle_exiting_indexes:
+            continue
+        oracle_exiting_indexes.add(val.index)
+        total_exiting_amount += val.balance
 
-    # 2. Validator manually exits
-    manually_exiting_balance = sum(
-        val.balance
-        for val in consensus_validators
-        if val.status in EXITING_STATUSES
-        and val.index not in oracle_exiting_validators
-        and val.index not in source_consolidations_indexes
-    )
+    excluded_indexes = source_consolidations_indexes.union(oracle_exiting_indexes)
+    for val in consensus_validators:
+        if val.index not in excluded_indexes and val.status in EXITING_STATUSES:
+            total_exiting_amount += val.balance
 
-    return Web3.to_wei(oracle_exiting_balance + manually_exiting_balance, 'gwei')
+    return Web3.to_wei(total_exiting_amount, 'gwei')

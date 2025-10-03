@@ -1,59 +1,57 @@
 import logging
+from typing import cast
 
-from eth_typing import ChecksumAddress, HexStr
-from sw_utils import ChainHead, ProtocolConfig, ValidatorStatus
+from eth_typing import HexStr
+from sw_utils import (
+    GNO_NETWORKS,
+    ChainHead,
+    ProtocolConfig,
+    ValidatorStatus,
+    convert_to_gno,
+)
 from web3 import Web3
 from web3.types import BlockNumber, Gwei
 
 from src.common.app_state import AppState
-from src.common.clients import consensus_client
+from src.common.clients import consensus_client, execution_client
+from src.common.consensus import get_chain_latest_head
 from src.common.contracts import VaultContract
 from src.common.execution import get_execution_request_fee, get_protocol_config
-from src.common.utils import calc_slot_by_block_number, round_down
+from src.common.metrics import metrics
+from src.common.typings import ValidatorsRegistrationMode
+from src.common.utils import round_down
 from src.config.settings import (
     MAX_WITHDRAWAL_REQUEST_FEE,
-    MIN_ACTIVATION_BALANCE_GWEI,
     MIN_WITHDRAWAL_AMOUNT_GWEI,
-    PARTIAL_WITHDRAWALS_INTERVAL,
+    WITHDRAWALS_INTERVAL,
     settings,
 )
 from src.validators.consensus import fetch_consensus_validators
 from src.validators.database import VaultValidatorCrud
+from src.validators.exceptions import EmptyRelayerResponseException
 from src.validators.oracles import poll_active_exits
+from src.validators.relayer import RelayerClient
 from src.validators.typings import ConsensusValidator
 from src.withdrawals.assets import get_queued_assets
 from src.withdrawals.execution import submit_withdraw_validators
-from src.withdrawals.typings import WithdrawalEvent
 
 logger = logging.getLogger(__name__)
 
 
-class LastWithdrawalNotProcessedError(ValueError):
-    """
-    Raised when the pending partial withdrawals is not finalized or withdrawals queue is full.
-    This means that the vault cannot process any more partial withdrawals
-    until some of the existing requests are processed.
-    """
-
-
 class WithdrawalIntervalMixin:
     async def _is_withdrawal_interval_passed(
-        self, app_state: AppState, vault_address: ChecksumAddress, chain_head: ChainHead
+        self, app_state: AppState, chain_head: ChainHead
     ) -> bool:
-        last_withdrawals_block = app_state.partial_withdrawal_cache.get(vault_address)
+        last_withdrawals_block = app_state.partial_withdrawal_block
 
         partial_withdrawals_blocks_interval = (
-            PARTIAL_WITHDRAWALS_INTERVAL // settings.network_config.SECONDS_PER_BLOCK
+            WITHDRAWALS_INTERVAL // settings.network_config.SECONDS_PER_BLOCK
         )
         from_block = BlockNumber(chain_head.block_number - partial_withdrawals_blocks_interval)
         if not last_withdrawals_block:
-            try:
-                last_withdrawals_block = await self._fetch_last_withdrawals_block(
-                    vault_address, from_block, chain_head.slot
-                )
-                app_state.partial_withdrawal_cache[vault_address] = last_withdrawals_block
-            except LastWithdrawalNotProcessedError:
-                return False
+            last_withdrawals_block = await self._fetch_last_withdrawals_block(from_block)
+            app_state.partial_withdrawal_block = last_withdrawals_block
+
         if (
             last_withdrawals_block
             and last_withdrawals_block + partial_withdrawals_blocks_interval
@@ -62,119 +60,54 @@ class WithdrawalIntervalMixin:
             return False
         return True
 
-    async def _fetch_last_withdrawals_block(
-        self, vault_address: ChecksumAddress, from_block: BlockNumber, current_slot: int
-    ) -> BlockNumber | None:
+    async def _fetch_last_withdrawals_block(self, from_block: BlockNumber) -> BlockNumber | None:
         """
         Fetches withdrawal events within the specified interval.
-        Finds the most recent withdrawal request that
-        was successfully processed by the consensus layer.
-        Returns the block number of the corresponding withdrawal event, or None if not found.
+        Returns the block number of the last withdrawal event, or None if not found.
         """
-        vault_contract = VaultContract(vault_address)
+        vault_contract = VaultContract(settings.vault)
         events = await vault_contract.get_validator_withdrawal_submitted_events(from_block)
-        if not events:
-            return None
-        consensus_validators = await fetch_consensus_validators(
-            [event.public_key for event in events]
-        )
-        public_key_to_index = {val.public_key: val.index for val in consensus_validators}
-
-        for event in events[::-1]:  # reverse order to get the latest event
-            if await WithdrawalIntervalMixin.is_event_withdrawal_processed(
-                event=event,
-                current_slot=current_slot,
-                public_key_to_index=public_key_to_index,
-            ):
-                return event.block_number
+        if events:
+            return events[-1].block_number
 
         return None
 
-    @staticmethod
-    async def is_event_withdrawal_processed(
-        event: WithdrawalEvent, current_slot: int, public_key_to_index: dict[HexStr, int]
-    ) -> bool:
-        # pylint: disable=line-too-long
-        """
-        Check that the event withdrawal was successfully processed by the consensus layer.
-        - A request that passed the execution layer can still be reverted in the consensus layer
-        https://github.com/ethereum/consensus-specs/blob/dev/specs/electra/beacon-chain.md#new-process_withdrawal_request
-        - The request may also enter the execution layer's withdrawal queue before being processed by the consensus layer
-        https://github.com/ethereum/EIPs/blob/master/EIPS/eip-7002.md#message-queue
-        """
-        event_slot = await calc_slot_by_block_number(event.block_number)
-
-        for withdrawal_slot in range(event_slot, current_slot + 1):
-            pending_partial_withdrawals = await consensus_client.get_pending_partial_withdrawals(
-                withdrawal_slot
-            )
-            # check if the event withdrawal is in the pending partial withdrawals
-            for withdrawal in pending_partial_withdrawals:
-                if (
-                    int(withdrawal['validator_index']) == public_key_to_index[event.public_key]
-                    and Web3.to_wei(withdrawal['amount'], 'gwei') == event.amount
-                ):
-                    return True
-
-            # Withdrawal queue can be full, check that request was added on this slot
-            # Otherwise check next slot
-            consensus_block = await consensus_client.get_block(str(withdrawal_slot))
-            execution_withdrawals = consensus_block['data']['message']['body'][
-                'execution_requests'
-            ]['withdrawals']
-            for request in execution_withdrawals:
-                # request was added but reverted by consensus layer
-                if (
-                    request['validator_pubkey'] == event.public_key
-                    and Web3.to_wei(request['amount'], 'gwei') == event.amount
-                ):
-                    return False
-
-        # event block is not finalized or withdrawal is still processing via execution client layer
-        raise LastWithdrawalNotProcessedError
-
 
 class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
-    async def process(self, chain_head: ChainHead) -> None:
+
+    def __init__(
+        self,
+        relayer: RelayerClient | None,
+    ):
+        self.relayer = relayer
+
+    async def process(self) -> None:
         """
         Every N hours check the exit queue and submit partial withdrawals if needed.
         """
+        chain_head = await get_chain_latest_head()
         protocol_config = await get_protocol_config()
-        for vault_address in settings.vaults:
-            await self.process_vault(
-                vault_address=vault_address,
-                chain_head=chain_head,
-                protocol_config=protocol_config,
-            )
-
-    async def process_vault(
-        self,
-        vault_address: ChecksumAddress,
-        chain_head: ChainHead,
-        protocol_config: ProtocolConfig,
-    ) -> None:
         app_state = AppState()
-        if not await self._is_withdrawal_interval_passed(app_state, vault_address, chain_head):
+        if not await self._is_withdrawal_interval_passed(app_state, chain_head):
             return
 
-        vault_validators = VaultValidatorCrud().get_vault_validators(
-            vault_address=vault_address,
-        )
+        vault_validators = VaultValidatorCrud().get_vault_validators()
         consensus_validators = await fetch_consensus_validators(
-            [val.public_key for val in vault_validators]
+            [val.public_key for val in vault_validators],
+            slot=str(chain_head.slot),
         )
         oracle_exiting_validators = await _fetch_oracle_exiting_validators(
             consensus_validators, protocol_config
         )
 
         queued_assets = await get_queued_assets(
-            vault_address=vault_address,
             consensus_validators=consensus_validators,
             oracle_exiting_validators=oracle_exiting_validators,
             chain_head=chain_head,
         )
+        metrics.queued_assets.labels(network=settings.network).set(int(queued_assets))
+
         if queued_assets < MIN_WITHDRAWAL_AMOUNT_GWEI:
-            app_state.partial_withdrawal_cache[vault_address] = chain_head.block_number
             return
 
         current_fee = await get_execution_request_fee(
@@ -200,23 +133,49 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
             validator_min_active_epochs=protocol_config.validator_min_active_epochs,
             oracle_exit_indexes={val.index for val in oracle_exiting_validators},
         )
+        if not withdrawals:
+            logger.info(
+                'No eligible validators found for withdrawal of %s Gwei',
+                queued_assets,
+            )
+            return
+
+        validators_manager_signature = HexStr('0x')
+        if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
+            # fetch validator manager signature from relayer
+            relayer_response = await cast(RelayerClient, self.relayer).withdraw_validators(
+                withdrawals=withdrawals,
+            )
+            if not relayer_response.validators_manager_signature:
+                logger.debug('Waiting for relayer validator manager signature')
+                raise EmptyRelayerResponseException()
+
+            validators_manager_signature = relayer_response.validators_manager_signature
+
         tx_hash = await submit_withdraw_validators(
-            vault_address=vault_address,
             withdrawals=withdrawals,
             tx_fee=current_fee,
+            validators_manager_signature=validators_manager_signature,
         )
         if not tx_hash:
             return
 
-        app_state.partial_withdrawal_cache[vault_address] = chain_head.block_number
+        app_state.partial_withdrawal_block = chain_head.block_number
+
+        withdrawn_assets = Web3.to_wei(queued_assets, 'gwei')
+        if settings.network in GNO_NETWORKS:
+            # apply mGNO -> GNO exchange rate
+            withdrawn_assets = convert_to_gno(withdrawn_assets)
 
         logger.info(
-            'Successfully withdrawn %s %s for validators with public keys %s, tx hash: %s',
-            round_down(Web3.from_wei(Web3.to_wei(queued_assets, 'gwei'), 'ether'), 2),
+            'Successfully withdrew %s %s for validators with public key(s) %s, tx hash: %s',
+            round_down(Web3.from_wei(withdrawn_assets, 'ether'), 2),
             settings.network_config.VAULT_BALANCE_SYMBOL,
             ', '.join(withdrawals.keys()),
             tx_hash,
         )
+        tx_data = await execution_client.eth.get_transaction(tx_hash)
+        metrics.last_withdrawal_block.labels(network=settings.network).set(tx_data['blockNumber'])
 
 
 async def _get_withdrawals(
@@ -226,17 +185,18 @@ async def _get_withdrawals(
     validator_min_active_epochs: int,
     oracle_exit_indexes: set[int],
 ) -> dict[HexStr, Gwei]:
+    if queued_assets <= 0:
+        return {}
+
     # Find all partial-withdrawable validators
     partial_validators = [
-        v for v in consensus_validators if _is_partial_withdrawable_validator(v, chain_head.epoch)
+        v for v in consensus_validators if v.is_partially_withdrawable(chain_head.epoch)
     ]
     partial_capacity = sum(v.withdrawal_capacity for v in partial_validators)
 
     # If enough partials, use only them
     if partial_capacity >= queued_assets or settings.disable_full_withdrawals:
-        return _get_partial_withdrawals(
-            {v.public_key: v.balance for v in partial_validators}, queued_assets
-        )
+        return _get_partial_withdrawals(partial_validators, queued_assets)
 
     # Otherwise, add full withdrawals as needed
     max_activation_epoch = min(
@@ -252,58 +212,45 @@ async def _get_withdrawals(
 
     withdrawals: dict[HexStr, Gwei] = {}
     for validator in exitable_validators:
+        if queued_assets <= 0:
+            break
+
         withdrawals[validator.public_key] = Gwei(0)  # full withdrawal
-        queued_assets = Gwei(queued_assets - validator.balance)
+        queued_assets = Gwei(max(0, queued_assets - validator.balance))
+
         # Remove exited validator from partials
         partial_capacity = Gwei(partial_capacity - validator.withdrawal_capacity)
         if partial_capacity >= queued_assets:
             partials = _get_partial_withdrawals(
-                {
-                    p.public_key: p.balance
-                    for p in partial_validators
-                    if p.public_key not in withdrawals
-                },
+                [p for p in partial_validators if p.public_key not in withdrawals],
                 queued_assets,
             )
             withdrawals.update(partials)
-            break
+            queued_assets = Gwei(max(0, queued_assets - sum(partials.values())))
 
     return withdrawals
 
 
 def _get_partial_withdrawals(
-    validator_balances: dict[HexStr, Gwei], queued_assets: Gwei
+    partial_validators: list[ConsensusValidator], queued_assets: Gwei
 ) -> dict[HexStr, Gwei]:
     withdrawals: dict[HexStr, Gwei] = {}
 
     if queued_assets <= 0:
         return withdrawals
-    for public_key, balance in sorted(
-        validator_balances.items(), key=lambda item: item[1], reverse=True
-    ):
-        available = balance - MIN_ACTIVATION_BALANCE_GWEI
+    for validator in sorted(partial_validators, key=lambda item: item.balance, reverse=True):
+        available = validator.withdrawal_capacity
         if available <= 0:
             continue
 
         amount = Gwei(min(available, queued_assets))
-        withdrawals[public_key] = amount
+        withdrawals[validator.public_key] = amount
         queued_assets = Gwei(queued_assets - amount)
 
         if queued_assets <= 0:
             break
 
     return withdrawals
-
-
-def _is_partial_withdrawable_validator(validator: ConsensusValidator, epoch: int) -> bool:
-    if not validator.is_compounding:
-        return False
-    if validator.status != ValidatorStatus.ACTIVE_ONGOING:
-        return False
-    # Filter validator that has been active long enough
-    if epoch < validator.activation_epoch + settings.network_config.SHARD_COMMITTEE_PERIOD:
-        return False
-    return True
 
 
 def _filter_exitable_validators(

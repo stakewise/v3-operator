@@ -6,7 +6,7 @@ from eth_utils import add_0x_prefix
 from sw_utils import ValidatorStatus
 from web3.types import Gwei, Wei
 
-from src.config.settings import MIN_ACTIVATION_BALANCE_GWEI
+from src.config.settings import MIN_ACTIVATION_BALANCE_GWEI, settings
 
 BLSPrivkey = NewType('BLSPrivkey', bytes)
 
@@ -19,7 +19,6 @@ class NetworkValidator:
 
 @dataclass
 class VaultValidator:
-    vault_address: HexStr
     public_key: HexStr
     block_number: BlockNumber
 
@@ -56,7 +55,14 @@ class ConsensusValidator:
 
     @property
     def withdrawal_capacity(self) -> Gwei:
-        return Gwei(self.balance - MIN_ACTIVATION_BALANCE_GWEI)
+        return Gwei(max(0, self.balance - MIN_ACTIVATION_BALANCE_GWEI))
+
+    def is_partially_withdrawable(self, epoch: int) -> bool:
+        return (
+            self.is_compounding
+            and self.status == ValidatorStatus.ACTIVE_ONGOING
+            and self.activation_epoch < epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
+        )
 
     @staticmethod
     def from_consensus_data(beacon_validator: dict) -> 'ConsensusValidator':
@@ -83,6 +89,11 @@ class RelayerValidatorsResponse:
 
 
 @dataclass
+class RelayerSignatureResponse:
+    validators_manager_signature: HexStr
+
+
+@dataclass
 # pylint: disable-next=too-many-instance-attributes
 class ApprovalRequest:
     validator_index: int
@@ -99,6 +110,5 @@ class ApprovalRequest:
 
 @dataclass
 class ConsolidationRequest:
-    from_public_keys: list[HexStr]
-    to_public_keys: list[HexStr]
+    public_keys: list[HexStr]
     vault_address: ChecksumAddress

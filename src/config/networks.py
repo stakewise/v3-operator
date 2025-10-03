@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from dataclasses import asdict, dataclass
 
 from ens.constants import EMPTY_ADDR_HEX
@@ -13,7 +11,7 @@ from web3.types import Gwei, Wei
 AVAILABLE_NETWORKS = [MAINNET, HOODI, GNOSIS, CHIADO]
 RATED_NETWORKS = [MAINNET]
 
-ZERO_CHECKSUM_ADDRESS = Web3.to_checksum_address(EMPTY_ADDR_HEX)  # noqa
+ZERO_CHECKSUM_ADDRESS = Web3.to_checksum_address(EMPTY_ADDR_HEX)  # noqa: E501
 
 
 @dataclass
@@ -30,21 +28,12 @@ class NetworkConfig(BaseNetworkConfig):
     STAKEWISE_GRAPH_ENDPOINT: str
     RATED_API_URL: str
     CONFIG_UPDATE_EVENT_BLOCK: BlockNumber
-    DEFAULT_DVT_RELAYER_ENDPOINT: str
     MAX_FEE_PER_GAS_GWEI: Gwei
+    MAX_VALIDATOR_BALANCE_GWEI: Gwei
     SHARD_COMMITTEE_PERIOD: int
     PENDING_PARTIAL_WITHDRAWALS_LIMIT: int
     PENDING_CONSOLIDATIONS_LIMIT: int
     MAX_WITHDRAWAL_REQUESTS_PER_BLOCK: int
-    NODE_CONFIG: NodeConfig
-
-
-@dataclass
-class NodeConfig:
-    CONSENSUS_CHECKPOINT_SYNC_URL: str
-    ERA_URL: str
-    MIN_MEMORY_GB: int
-    MIN_DISK_SPACE_TB: float
 
 
 NETWORKS: dict[str, NetworkConfig] = {
@@ -56,7 +45,7 @@ NETWORKS: dict[str, NetworkConfig] = {
             '0x75AB6DdCe07556639333d3Df1eaa684F5735223e'
         ),
         VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xaC9125646185Cb58e86E77d5f402eFa3fAfAFc84'
+            '0xA89629B41477560d49dd56ef1a59BD214362aCDC'
         ),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
@@ -71,18 +60,12 @@ NETWORKS: dict[str, NetworkConfig] = {
         ),
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(21471524),
-        DEFAULT_DVT_RELAYER_ENDPOINT='https://mainnet-dvt-relayer.stakewise.io',
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
+        MAX_VALIDATOR_BALANCE_GWEI=Gwei(int(Web3.from_wei(Web3.to_wei(1945, 'ether'), 'gwei'))),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
         PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
         PENDING_CONSOLIDATIONS_LIMIT=262144,
         MAX_WITHDRAWAL_REQUESTS_PER_BLOCK=16,
-        NODE_CONFIG=NodeConfig(
-            CONSENSUS_CHECKPOINT_SYNC_URL='https://beaconstate.ethstaker.cc/',
-            ERA_URL='https://data.ethpandaops.io/era1/mainnet/',
-            MIN_MEMORY_GB=16,
-            MIN_DISK_SPACE_TB=2,
-        ),
     ),
     HOODI: NetworkConfig(
         **asdict(BASE_NETWORKS[HOODI]),
@@ -92,7 +75,7 @@ NETWORKS: dict[str, NetworkConfig] = {
             '0x93a3f880E07B27dacA6Ef2d3C23E77DBd6294487'
         ),
         VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x08A48Ee1940152595670D84477664DeDbFe61597'
+            '0xA89629B41477560d49dd56ef1a59BD214362aCDC'
         ),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
@@ -105,18 +88,12 @@ NETWORKS: dict[str, NetworkConfig] = {
         STAKEWISE_GRAPH_ENDPOINT='https://graphs.stakewise.io/hoodi/subgraphs/name/stakewise/prod',
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(94090),
-        DEFAULT_DVT_RELAYER_ENDPOINT='https://hoodi-dvt-relayer.stakewise.io',
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
+        MAX_VALIDATOR_BALANCE_GWEI=Gwei(int(Web3.from_wei(Web3.to_wei(1945, 'ether'), 'gwei'))),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
         PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
         PENDING_CONSOLIDATIONS_LIMIT=262144,
         MAX_WITHDRAWAL_REQUESTS_PER_BLOCK=16,
-        NODE_CONFIG=NodeConfig(
-            CONSENSUS_CHECKPOINT_SYNC_URL='https://hoodi.beaconstate.ethstaker.cc/',
-            ERA_URL='',
-            MIN_MEMORY_GB=16,
-            MIN_DISK_SPACE_TB=0.1,  # 100 GB
-        ),
     ),
     GNOSIS: NetworkConfig(
         **asdict(BASE_NETWORKS[GNOSIS]),
@@ -126,7 +103,7 @@ NETWORKS: dict[str, NetworkConfig] = {
             '0x58e16621B5c0786D6667D2d54E28A20940269E16'
         ),
         VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x3E2CC1584a2fB4FB2D4f4aF68AE47B57BE76dC65'
+            '0xA89629B41477560d49dd56ef1a59BD214362aCDC'
         ),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
@@ -141,18 +118,12 @@ NETWORKS: dict[str, NetworkConfig] = {
         ),
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(37640206),
-        DEFAULT_DVT_RELAYER_ENDPOINT='gnosis-dvt-relayer.stakewise.io',
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
+        MAX_VALIDATOR_BALANCE_GWEI=Gwei(int(Web3.from_wei(Web3.to_wei(1800, 'ether'), 'gwei'))),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
         PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
         PENDING_CONSOLIDATIONS_LIMIT=262144,
         MAX_WITHDRAWAL_REQUESTS_PER_BLOCK=16,
-        NODE_CONFIG=NodeConfig(
-            CONSENSUS_CHECKPOINT_SYNC_URL='https://beacon.gnosischain.com/',
-            ERA_URL='',
-            MIN_MEMORY_GB=16,
-            MIN_DISK_SPACE_TB=2,
-        ),
     ),
     CHIADO: NetworkConfig(
         **asdict(BASE_NETWORKS[CHIADO]),
@@ -162,7 +133,7 @@ NETWORKS: dict[str, NetworkConfig] = {
             '0xFAce8504462AEb9BB6ae7Ecb206BD7B1EdF7956D'
         ),
         VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x46429718dbe176129C53d32faB2949fD6C402E4F'
+            '0xA89629B41477560d49dd56ef1a59BD214362aCDC'
         ),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
@@ -177,17 +148,11 @@ NETWORKS: dict[str, NetworkConfig] = {
         ),
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(12896244),
-        DEFAULT_DVT_RELAYER_ENDPOINT='chiado-dvt-relayer.stakewise.io',
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
+        MAX_VALIDATOR_BALANCE_GWEI=Gwei(int(Web3.from_wei(Web3.to_wei(1800, 'ether'), 'gwei'))),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
         PENDING_PARTIAL_WITHDRAWALS_LIMIT=134217728,
         PENDING_CONSOLIDATIONS_LIMIT=262144,
         MAX_WITHDRAWAL_REQUESTS_PER_BLOCK=16,
-        NODE_CONFIG=NodeConfig(
-            CONSENSUS_CHECKPOINT_SYNC_URL='https://beacon.chiadochain.net/',
-            ERA_URL='',
-            MIN_MEMORY_GB=16,
-            MIN_DISK_SPACE_TB=0.1,  # 100 GB
-        ),
     ),
 }

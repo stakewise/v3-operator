@@ -3,17 +3,16 @@ from typing import Callable
 
 import click
 from click.decorators import FC
+from web3 import Web3
 
 from src.common.logging import LOG_LEVELS
 from src.common.typings import ValidatorType
 from src.common.validators import (
-    validate_eth_addresses,
-    validate_min_deposit_amount_gwei,
+    validate_eth_address,
+    validate_max_validator_balance_gwei,
 )
-from src.config.networks import AVAILABLE_NETWORKS, GNOSIS, MAINNET, NETWORKS
+from src.config.networks import GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
-    DEFAULT_CONSENSUS_ENDPOINT,
-    DEFAULT_EXECUTION_ENDPOINT,
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
     DEFAULT_METRICS_PREFIX,
@@ -62,15 +61,6 @@ start_common_options = [
         'Default is the file generated with "create-wallet" command.',
     ),
     click.option(
-        '--network',
-        type=click.Choice(
-            AVAILABLE_NETWORKS,
-            case_sensitive=False,
-        ),
-        envvar='NETWORK',
-        help='The network of the vault. Default is the network specified at "init" command.',
-    ),
-    click.option(
         '--enable-metrics',
         is_flag=True,
         envvar='ENABLE_METRICS',
@@ -103,11 +93,12 @@ start_common_options = [
         f' {ValidatorType.V1.value} or {ValidatorType.V2.value}.'
         f' Default is {ValidatorType.V2.value}.',
         envvar='VALIDATOR_TYPE',
-        default=ValidatorType.V2,
+        default=ValidatorType.V2.value,
         type=click.Choice(
-            ValidatorType,
+            [x.value for x in ValidatorType],
             case_sensitive=False,
         ),
+        callback=lambda ctx, param, value: ValidatorType(value),
     ),
     click.option(
         '-v',
@@ -136,12 +127,23 @@ start_common_options = [
         help='Disable submitting validator withdrawals through the vault contract.',
     ),
     click.option(
+        '--disable-validators-registration',
+        is_flag=True,
+        envvar='DISABLE_VALIDATORS_REGISTRATION',
+        help='Disable registration of new validators. Default is false',
+    ),
+    click.option(
+        '--disable-validators-funding',
+        is_flag=True,
+        envvar='DISABLE_VALIDATORS_FUNDING',
+        help='Disable funding of existing 0x02 validators. Default is false',
+    ),
+    click.option(
         '--execution-endpoints',
         type=str,
         envvar='EXECUTION_ENDPOINTS',
-        default=DEFAULT_EXECUTION_ENDPOINT,
+        prompt='Enter the comma separated list of API endpoints for execution nodes',
         help='Comma separated list of API endpoints for execution nodes.',
-        show_default=True,
     ),
     click.option(
         '--execution-jwt-secret',
@@ -154,9 +156,8 @@ start_common_options = [
         '--consensus-endpoints',
         type=str,
         envvar='CONSENSUS_ENDPOINTS',
-        default=DEFAULT_CONSENSUS_ENDPOINT,
+        prompt='Enter the comma separated list of API endpoints for consensus nodes',
         help='Comma separated list of API endpoints for consensus nodes.',
-        show_default=True,
     ),
     click.option(
         '--graph-endpoint',
@@ -165,12 +166,11 @@ start_common_options = [
         help='API endpoint for graph node.',
     ),
     click.option(
-        '--vaults',
         '--vault',
-        callback=validate_eth_addresses,
-        envvar='VAULTS',
-        prompt='Enter comma separated list of your vault addresses',
-        help='Addresses of the vaults to register validators for.',
+        callback=validate_eth_address,
+        envvar='VAULT',
+        prompt='Enter your vault address',
+        help='Address of the vault to register validators for.',
     ),
     click.option(
         '--log-format',
@@ -204,9 +204,17 @@ start_common_options = [
         envvar='MIN_DEPOSIT_AMOUNT_GWEI',
         help=f'Minimum amount in gwei to deposit into validator.'
         f' The default is {DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI} '
-        f'({DEFAULT_MIN_DEPOSIT_AMOUNT} ETH).',
+        f'({Web3.from_wei(DEFAULT_MIN_DEPOSIT_AMOUNT, 'ether')} ETH).',
         default=DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
-        callback=validate_min_deposit_amount_gwei,
+    ),
+    click.option(
+        '--max-validator-balance-gwei',
+        type=int,
+        envvar='MAX_VALIDATOR_BALANCE_GWEI',
+        help=f'The maximum validator balance in Gwei.'
+        f'Default is {NETWORKS[MAINNET].MAX_VALIDATOR_BALANCE_GWEI} Gwei for Ethereum, '
+        f'{NETWORKS[GNOSIS].MAX_VALIDATOR_BALANCE_GWEI} Gwei for Gnosis.',
+        callback=validate_max_validator_balance_gwei,
     ),
     click.option(
         '--min-deposit-delay',
@@ -215,12 +223,6 @@ start_common_options = [
         help=f'Minimum delay for validator funding in seconds.'
         f' The default is {DEFAULT_MIN_DEPOSIT_DELAY}',
         default=DEFAULT_MIN_DEPOSIT_DELAY,
-    ),
-    click.option(
-        '--no-confirm',
-        is_flag=True,
-        default=False,
-        help='Skips confirmation messages when provided.',
     ),
 ]
 

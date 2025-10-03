@@ -8,13 +8,10 @@ from src.common.validators import (
     _is_public_key,
     validate_db_uri,
     validate_eth_address,
-    validate_eth_addresses,
-    validate_min_deposit_amount_gwei,
     validate_public_key,
     validate_public_keys,
     validate_public_keys_file,
 )
-from src.config.settings import DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI
 
 
 def test_validate_eth_address():
@@ -35,44 +32,6 @@ def test_validate_eth_address():
     # raises_error_for_invalid_eth_address
     with pytest.raises(BadParameter, match='Invalid Ethereum address'):
         validate_eth_address(None, None, '0x742d35Cc')
-
-
-def test_validate_eth_addresses():
-    # returns_none_for_empty_eth_addresses
-    result = validate_eth_addresses(None, None, None)
-    assert result is None
-
-    # returns_valid_eth_addresses_as_string
-    address_1 = faker.eth_address()
-    address_2 = faker.eth_address()
-
-    result = validate_eth_addresses(None, None, ','.join([address_1, address_2.lower()]))
-    assert result == ','.join([address_1, address_2.lower()])
-
-    # raises_error_for_invalid_eth_address_in_list
-    with pytest.raises(BadParameter, match='Invalid Ethereum address'):
-        validate_eth_addresses(None, None, ','.join([address_1, 'invalid_address']))
-
-    # raises_error_for_all_invalid_eth_addresses
-    with pytest.raises(BadParameter, match='Invalid Ethereum address'):
-        validate_eth_addresses(None, None, 'invalid_address1,invalid_address2')
-
-
-def test_validate_min_deposit_amount_gwei():
-    # returns_value_when_above
-    result = validate_min_deposit_amount_gwei(None, None, DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI + 1000)
-    assert result == DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI + 1000
-
-    # returns_value_when_equal_to_minimum
-    result = validate_min_deposit_amount_gwei(None, None, DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI)
-    assert result == DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI
-
-    # raises_error_when_below_minimum
-    with pytest.raises(
-        BadParameter,
-        match=f"min-deposit-amount-gwei must be greater than or equal to {DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI} Gwei",
-    ):
-        validate_min_deposit_amount_gwei(None, None, DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI - 1)
 
 
 def test_validate_public_key():
@@ -145,7 +104,7 @@ def test_validate_public_keys_file():
     mock_file_content = public_key_1[:-2] + '\n' 'invalid_key\n'
     with patch('builtins.open', mock_open(read_data=mock_file_content)):
         with pytest.raises(
-            BadParameter, match=f"Invalid validator public key: {public_key_1[:-2]}"
+            BadParameter, match=f'Invalid validator public key: {public_key_1[:-2]}'
         ):
             validate_public_keys_file(None, None, 'mock_file_path')
 

@@ -1,20 +1,17 @@
-import asyncio
 import logging
-from typing import cast
 
 import aiohttp
 from aiohttp import ClientTimeout
-from eth_typing import BLSSignature, HexStr
+from eth_typing import BLSSignature, ChecksumAddress, HexStr
 from eth_utils import add_0x_prefix
 from sw_utils.common import urljoin
 from web3 import Web3
 from web3.types import Gwei
 
-from src.config.settings import MIN_ACTIVATION_BALANCE_GWEI, RelayerTypes, settings
-from src.validators.exceptions import MissingAvailableValidatorsException
+from src.config.settings import settings
 from src.validators.execution import get_validators_start_index
 from src.validators.typings import (
-    ExitSignatureShards,
+    RelayerSignatureResponse,
     RelayerValidatorsResponse,
     Validator,
 )
@@ -22,115 +19,11 @@ from src.validators.typings import (
 logger = logging.getLogger(__name__)
 
 
-class DefaultRelayerClient:
-    async def get_validators(
-        self, validators_start_index: int, validators_batch_size: int, validators_total: int
-    ) -> dict:
-        """
-        :param validators_start_index: - validator index for the first validator in a batch.
-         Relayer should increment this index for each validator except the first one
-        :param validators_batch_size: - number of validators in a batch. Relayer is expected
-         to return `validators_batch_size` validators at most
-        :param validators_total: - total number of validators supplied by vault assets.
-         Should be more than or equal to `validators_batch_size`.
-         Relayer may use `validators_total` to create larger portions of validators in background.
-        """
-        url = urljoin(settings.relayer_endpoint, 'validators')
-        jsn = {
-            'validators_start_index': validators_start_index,
-            'validators_batch_size': validators_batch_size,
-            'validators_total': validators_total,
-        }
-        async with aiohttp.ClientSession(
-            timeout=ClientTimeout(settings.relayer_timeout)
-        ) as session:
-            resp = await session.post(url, json=jsn)
-            if 400 <= resp.status < 500:
-                logger.debug('Relayer response: %s', await resp.read())
-            resp.raise_for_status()
-            return await resp.json()
-
-    async def fund_validators(self, funding_amounts: dict[HexStr, Gwei]) -> dict:
-        url = urljoin(settings.relayer_endpoint, 'fund')
-        async with aiohttp.ClientSession(
-            timeout=ClientTimeout(settings.relayer_timeout)
-        ) as session:
-            resp = await session.post(url, json=funding_amounts)
-            if 400 <= resp.status < 500:
-                logger.debug('Relayer response: %s', await resp.read())
-            resp.raise_for_status()
-            return await resp.json()
-
-
-class DvtRelayerClient:
-    async def get_info(self) -> dict:
-        url = urljoin(settings.relayer_endpoint, 'info')
-        async with aiohttp.ClientSession(
-            timeout=ClientTimeout(settings.relayer_timeout)
-        ) as session:
-            resp = await session.get(url)
-            if 400 <= resp.status < 500:
-                logger.debug('Relayer response: %s', await resp.read())
-            resp.raise_for_status()
-            return await resp.json()
-
-    async def get_validators(self, public_keys: list[HexStr]) -> dict:
-        url = urljoin(settings.relayer_endpoint, 'validators')
-        jsn = {'public_keys': public_keys}
-        async with aiohttp.ClientSession(
-            timeout=ClientTimeout(settings.relayer_timeout)
-        ) as session:
-            resp = await session.post(url, json=jsn)
-            if 400 <= resp.status < 500:
-                logger.debug('Relayer response: %s', await resp.read())
-            resp.raise_for_status()
-            return await resp.json()
-
-    async def fund_validators(self, funding_amounts: dict[HexStr, Gwei]) -> dict:
-        url = urljoin(settings.relayer_endpoint, 'fund')
-        async with aiohttp.ClientSession(
-            timeout=ClientTimeout(settings.relayer_timeout)
-        ) as session:
-            resp = await session.post(url, json=funding_amounts)
-            if 400 <= resp.status < 500:
-                logger.debug('Relayer response: %s', await resp.read())
-            resp.raise_for_status()
-            return await resp.json()
-
-
-class RelayerAdapter:
-    def __init__(
-        self,
-        relayer: DefaultRelayerClient | DvtRelayerClient,
-    ):
-        self.relayer = relayer
-
-    async def get_validators(
-        self, validators_batch_size: int, validators_total: int
-    ) -> RelayerValidatorsResponse:
-        if isinstance(self.relayer, DefaultRelayerClient):
-            return await self._get_validators_from_default_relayer(
-                validators_batch_size, validators_total
-            )
-        if isinstance(self.relayer, DvtRelayerClient):
-            return await self._get_validators_from_dvt_relayer(validators_batch_size)
-        raise RuntimeError('Unknown relayer type', type(self.relayer))
-
-    async def fund_validators(
-        self, funding_amounts: dict[HexStr, Gwei]
-    ) -> RelayerValidatorsResponse:
-        if isinstance(self.relayer, DefaultRelayerClient):
-            return await self._fund_validators_with_default_relayer(funding_amounts)
-        if isinstance(self.relayer, DvtRelayerClient):
-            return await self._fund_validators_with_dvt_relayer(funding_amounts)
-        raise RuntimeError('Unknown relayer type', type(self.relayer))
-
-    async def _get_validators_from_default_relayer(
-        self, validators_batch_size: int, validators_total: int
-    ) -> RelayerValidatorsResponse:
+class RelayerClient:
+    async def register_validators(self, amounts: list[Gwei]) -> RelayerValidatorsResponse:
         validators_start_index = await get_validators_start_index()
-        relayer_response = await cast(DefaultRelayerClient, self.relayer).get_validators(
-            validators_start_index, validators_batch_size, validators_total
+        relayer_response = await self._register_validators(
+            settings.vault, validators_start_index, amounts
         )
         validators: list[Validator] = []
         for v in relayer_response.get('validators') or []:
@@ -140,7 +33,7 @@ class RelayerAdapter:
 
             validator = Validator(
                 public_key=public_key,
-                amount=v['amount_gwei'],
+                amount=v['amount'],
                 signature=deposit_signature,
                 exit_signature=BLSSignature(Web3.to_bytes(hexstr=exit_signature)),
             )
@@ -154,101 +47,126 @@ class RelayerAdapter:
             validators_manager_signature=validators_manager_signature,
         )
 
-    async def _get_validators_from_dvt_relayer(
-        self, validators_batch_size: int
-    ) -> RelayerValidatorsResponse:
-
-        public_keys = [][:validators_batch_size]  # type: ignore
-        if not public_keys:
-            raise MissingAvailableValidatorsException()
-
-        # submit request
-        logger.info('Waiting for validators from Relayer...')
-        while True:
-            relayer_response = await cast(DvtRelayerClient, self.relayer).get_validators(
-                public_keys
-            )
-            if all(v['oracles_exit_signature_shares'] for v in relayer_response['validators']):
-                break
-            await asyncio.sleep(1)
-        logger.debug('relayer_response %s', relayer_response)
-
-        # handle response
-        validators: list[Validator] = []
-        for v in relayer_response['validators']:
-            public_key = add_0x_prefix(v['public_key'])
-
-            exit_signature_shards = None
-            if oracle_shares := v['oracles_exit_signature_shares']:
-                exit_signatures = [
-                    add_0x_prefix(s) for s in oracle_shares['encrypted_exit_signatures']
-                ]
-                public_keys = [add_0x_prefix(s) for s in oracle_shares['public_keys']]
-                exit_signature_shards = ExitSignatureShards(
-                    public_keys=public_keys,
-                    exit_signatures=exit_signatures,
-                )
-
-            validator = Validator(
-                public_key=public_key,
-                signature=add_0x_prefix(v['deposit_signature']),
-                amount=MIN_ACTIVATION_BALANCE_GWEI,
-                exit_signature_shards=exit_signature_shards,
-            )
-            validators.append(validator)
-
-        return RelayerValidatorsResponse(
-            validators=validators,
-        )
-
-    async def _fund_validators_with_default_relayer(
+    async def fund_validators(
         self, funding_amounts: dict[HexStr, Gwei]
-    ) -> RelayerValidatorsResponse:
-        relayer_response = await cast(DefaultRelayerClient, self.relayer).fund_validators(
-            funding_amounts
+    ) -> RelayerSignatureResponse:
+        relayer_response = await self._fund_validators(
+            vault_address=settings.vault,
+            public_keys=list(funding_amounts.keys()),
+            amounts=list(funding_amounts.values()),
         )
-        validators: list[Validator] = []
-        for v in relayer_response.get('validators') or []:
-            validator = Validator(
-                public_key=add_0x_prefix(v['public_key']),
-                amount=v['amount_gwei'],
-                signature=add_0x_prefix(v['deposit_signature']),
-            )
-            validators.append(validator)
 
         validators_manager_signature = add_0x_prefix(
             relayer_response.get('validators_manager_signature') or HexStr('0x')
         )
-        return RelayerValidatorsResponse(
-            validators=validators,
+        return RelayerSignatureResponse(
             validators_manager_signature=validators_manager_signature,
         )
 
-    async def _fund_validators_with_dvt_relayer(
-        self, funding_amounts: dict[HexStr, Gwei]
-    ) -> RelayerValidatorsResponse:
-        logger.info('Waiting for validators from Relayer...')
-        relayer_response = await cast(DvtRelayerClient, self.relayer).fund_validators(
-            funding_amounts
+    async def withdraw_validators(
+        self, withdrawals: dict[HexStr, Gwei]
+    ) -> RelayerSignatureResponse:
+        relayer_response = await self._withdraw_validators(
+            vault_address=settings.vault,
+            public_keys=list(withdrawals.keys()),
+            amounts=list(withdrawals.values()),
         )
-        validators: list[Validator] = []
-        for v in relayer_response['validators']:
-            validator = Validator(
-                public_key=add_0x_prefix(v['public_key']),
-                signature=add_0x_prefix(v['deposit_signature']),
-                amount=v['amount_gwei'],
+        validators_manager_signature = add_0x_prefix(
+            relayer_response.get('validators_manager_signature') or HexStr('0x')
+        )
+        return RelayerSignatureResponse(
+            validators_manager_signature=validators_manager_signature,
+        )
+
+    async def consolidate_validators(
+        self,
+        vault_address: ChecksumAddress,
+        target_source_public_keys: list[tuple[HexStr, HexStr]],
+    ) -> RelayerSignatureResponse:
+        source_public_keys, target_public_keys = [], []
+        for source, target in target_source_public_keys:
+            source_public_keys.append(source)
+            target_public_keys.append(target)
+        relayer_response = await self._consolidate_validators(
+            vault_address=vault_address,
+            source_public_keys=source_public_keys,
+            target_public_keys=target_public_keys,
+        )
+        validators_manager_signature = add_0x_prefix(
+            relayer_response.get('validators_manager_signature') or HexStr('0x')
+        )
+        return RelayerSignatureResponse(
+            validators_manager_signature=validators_manager_signature,
+        )
+
+    async def _register_validators(
+        self,
+        vault_address: ChecksumAddress,
+        validators_start_index: int,
+        amounts: list[Gwei],
+    ) -> dict:
+        jsn = {
+            'vault': vault_address,
+            'validators_start_index': validators_start_index,
+            'amounts': amounts,
+            'validator_type': settings.validator_type.value,
+        }
+        return await self._send_post_request('register', jsn)
+
+    async def _fund_validators(
+        self, vault_address: ChecksumAddress, public_keys: list[HexStr], amounts: list[Gwei]
+    ) -> dict:
+        jsn = {
+            'vault': vault_address,
+            'public_keys': public_keys,
+            'amounts': amounts,
+        }
+        return await self._send_post_request('fund', jsn)
+
+    async def _consolidate_validators(
+        self,
+        vault_address: ChecksumAddress,
+        source_public_keys: list[HexStr],
+        target_public_keys: list[HexStr],
+    ) -> dict:
+        jsn = {
+            'vault': vault_address,
+            'source_public_keys': source_public_keys,
+            'target_public_keys': target_public_keys,
+        }
+        return await self._send_post_request('consolidate', jsn)
+
+    async def _withdraw_validators(
+        self, vault_address: ChecksumAddress, public_keys: list[HexStr], amounts: list[Gwei]
+    ) -> dict:
+        jsn = {
+            'vault': vault_address,
+            'public_keys': public_keys,
+            'amounts': amounts,
+        }
+        return await self._send_post_request('withdraw', jsn)
+
+    async def get_info(self) -> dict:
+        url = urljoin(settings.relayer_endpoint, 'info')
+        async with aiohttp.ClientSession(
+            timeout=ClientTimeout(settings.relayer_timeout)
+        ) as session:
+            resp = await session.get(url)
+            if 400 <= resp.status < 500:
+                logger.debug('Relayer response: %s', await resp.read())
+            resp.raise_for_status()
+            return await resp.json()
+
+    async def _send_post_request(self, endpoint: str, json: dict) -> dict:
+        url = urljoin(settings.relayer_endpoint, endpoint)
+        async with aiohttp.ClientSession(
+            timeout=ClientTimeout(settings.relayer_timeout)
+        ) as session:
+            resp = await session.post(
+                url,
+                json=json,
             )
-            validators.append(validator)
-
-        return RelayerValidatorsResponse(
-            validators=validators,
-        )
-
-
-def create_relayer_adapter() -> RelayerAdapter:
-    if settings.relayer_type == RelayerTypes.DVT:
-        dvt_relayer = DvtRelayerClient()
-        return RelayerAdapter(dvt_relayer)
-
-    relayer = DefaultRelayerClient()
-    return RelayerAdapter(relayer)
+            if 400 <= resp.status < 500:
+                logger.debug('Relayer response: %s', await resp.read())
+            resp.raise_for_status()
+            return await resp.json()
