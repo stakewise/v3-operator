@@ -60,43 +60,46 @@ class ValidatorRegistrationSubtask:
             return
 
         if settings.validator_type == ValidatorType.V1:
+            if not settings.disable_validators_registration:
+                await register_new_validators(
+                    vault_assets=vault_assets,
+                    harvest_params=harvest_params,
+                    keystore=self.keystore,
+                    relayer=self.relayer,
+                )
+            return
+
+        if not settings.disable_validators_funding:
+            compounding_validators_balances = await fetch_compounding_validators_balances()
+            funding_amounts = _get_funding_amounts(
+                compounding_validators_balances=compounding_validators_balances,
+                vault_assets=vault_assets,
+            )
+
+            if funding_amounts:
+                if not await _is_funding_interval_passed():
+                    return
+
+                try:
+                    tx_hash = await fund_compounding_validators(
+                        funding_amounts=funding_amounts,
+                        harvest_params=harvest_params,
+                        relayer=self.relayer,
+                    )
+                    if not tx_hash:
+                        return
+
+                    vault_assets = Gwei(max(vault_assets - sum(funding_amounts.values()), 0))
+                except EmptyRelayerResponseException:
+                    return
+
+        if not settings.disable_validators_registration:
             await register_new_validators(
                 vault_assets=vault_assets,
                 harvest_params=harvest_params,
                 keystore=self.keystore,
                 relayer=self.relayer,
             )
-            return
-
-        compounding_validators_balances = await fetch_compounding_validators_balances()
-        funding_amounts = _get_funding_amounts(
-            compounding_validators_balances=compounding_validators_balances,
-            vault_assets=vault_assets,
-        )
-
-        if funding_amounts:
-            if not await _is_funding_interval_passed():
-                return
-
-            try:
-                tx_hash = await fund_compounding_validators(
-                    funding_amounts=funding_amounts,
-                    harvest_params=harvest_params,
-                    relayer=self.relayer,
-                )
-                if not tx_hash:
-                    return
-
-                vault_assets = Gwei(max(vault_assets - sum(funding_amounts.values()), 0))
-            except EmptyRelayerResponseException:
-                return
-
-        await register_new_validators(
-            vault_assets=vault_assets,
-            harvest_params=harvest_params,
-            keystore=self.keystore,
-            relayer=self.relayer,
-        )
 
 
 async def fund_compounding_validators(

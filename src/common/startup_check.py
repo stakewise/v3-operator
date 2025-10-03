@@ -100,7 +100,7 @@ async def startup_checks() -> None:
     if (
         settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO
         and settings.keystore_cls_str == LocalKeystore.__name__
-        and not settings.disable_validator_registrations
+        and not settings.disable_validators_registration
     ):
         logger.info('Checking keystores dir...')
         wait_for_keystores_dir()

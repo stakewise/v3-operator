@@ -127,6 +127,18 @@ start_common_options = [
         help='Disable submitting validator withdrawals through the vault contract.',
     ),
     click.option(
+        '--disable-validators-registration',
+        is_flag=True,
+        envvar='DISABLE_VALIDATORS_REGISTRATION',
+        help='Disable registration of new validators. Default is false',
+    ),
+    click.option(
+        '--disable-validators-funding',
+        is_flag=True,
+        envvar='DISABLE_VALIDATORS_FUNDING',
+        help='Disable funding of existing 0x02 validators. Default is false',
+    ),
+    click.option(
         '--execution-endpoints',
         type=str,
         envvar='EXECUTION_ENDPOINTS',

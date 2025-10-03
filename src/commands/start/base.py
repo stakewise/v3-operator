@@ -58,7 +58,7 @@ async def start_base() -> None:
     relayer: RelayerClient | None = None
 
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
-        if settings.disable_validator_registrations:
+        if settings.disable_validators_registration:
             keystore = None
         else:
             keystore = await load_keystore()
@@ -120,9 +120,7 @@ class ValidatorTask(BaseTask):
             chain_head=chain_head, interrupt_handler=interrupt_handler
         )
         await scan_validators_events(block_number=chain_head.block_number, is_startup=False)
-        subtasks = []
-        if not settings.disable_validator_registrations:
-            subtasks.append(self.validator_registration_subtask.process())
+        subtasks = [self.validator_registration_subtask.process()]
         if not settings.disable_withdrawals:
             subtasks.append(self.validator_withdrawal_subtask.process())
         await asyncio.gather(*subtasks)
