@@ -10,8 +10,8 @@ from sw_utils import get_consensus_client, get_execution_client
 from src.common.clients import setup_clients
 from src.common.validators import validate_eth_address
 from src.config.config import OperatorConfig
-from src.config.networks import AVAILABLE_NETWORKS, NETWORKS
-from src.config.settings import DEFAULT_NETWORK, LOG_DATE_FORMAT, settings
+from src.config.networks import NETWORKS
+from src.config.settings import LOG_DATE_FORMAT, settings
 from src.nodes.exceptions import NodeFailedToStartError
 from src.nodes.process import (
     LighthouseProcessBuilder,
@@ -31,18 +31,6 @@ logger = logging.getLogger(__name__)
     envvar='DATA_DIR',
     help='Path where the nodes data will be placed',
     type=click.Path(exists=False, file_okay=False, dir_okay=True, path_type=Path),
-    show_default=True,
-)
-@click.option(
-    '--network',
-    default=DEFAULT_NETWORK,
-    envvar='NETWORK',
-    help='The network of your nodes.',
-    prompt='Enter the network name',
-    type=click.Choice(
-        AVAILABLE_NETWORKS,
-        case_sensitive=False,
-    ),
     show_default=True,
 )
 @click.option(
@@ -80,7 +68,6 @@ logger = logging.getLogger(__name__)
 # pylint: disable=too-many-arguments
 def node_start(
     data_dir: Path,
-    network: str,
     no_confirm: bool,
     vault: ChecksumAddress,
     print_execution_logs: bool,
@@ -93,16 +80,18 @@ def node_start(
         level='INFO',
     )
 
-    click.echo('Checking hardware requirements...')
-    check_hardware_requirements(data_dir=data_dir, network=network, no_confirm=no_confirm)
-
     operator_config = OperatorConfig(vault, Path(data_dir))
     operator_config.load()
+
+    click.echo('Checking hardware requirements...')
+    check_hardware_requirements(
+        data_dir=data_dir, network=operator_config.network, no_confirm=no_confirm
+    )
 
     # Minimal settings for the nodes
     settings.set(
         vault=vault,
-        network=network,
+        network=operator_config.network,
         vault_dir=operator_config.vault_dir,
     )
 

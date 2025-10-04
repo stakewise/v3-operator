@@ -9,8 +9,7 @@ from sw_utils import get_consensus_client, get_execution_client
 
 from src.common.validators import validate_eth_address
 from src.config.config import OperatorConfig
-from src.config.networks import AVAILABLE_NETWORKS
-from src.config.settings import DEFAULT_NETWORK, settings
+from src.config.settings import settings
 from src.nodes.status import (
     get_consensus_node_status,
     get_execution_node_status,
@@ -32,18 +31,6 @@ OUTPUT_FORMATS = ['text', 'json']
     show_default=True,
 )
 @click.option(
-    '--network',
-    default=DEFAULT_NETWORK,
-    envvar='NETWORK',
-    help='The network of your nodes.',
-    prompt='Enter the network name',
-    type=click.Choice(
-        AVAILABLE_NETWORKS,
-        case_sensitive=False,
-    ),
-    show_default=True,
-)
-@click.option(
     '--vault',
     callback=validate_eth_address,
     envvar='VAULT',
@@ -59,16 +46,14 @@ OUTPUT_FORMATS = ['text', 'json']
     show_default=True,
 )
 @click.command(help='Displays the status of the nodes.', name='node-status')
-def node_status_command(
-    data_dir: Path, network: str, vault: ChecksumAddress, output_format: str
-) -> None:
+def node_status_command(data_dir: Path, vault: ChecksumAddress, output_format: str) -> None:
     # Minimal settings for the nodes
     operator_config = OperatorConfig(vault, Path(data_dir))
     operator_config.load()
 
     settings.set(
         vault=vault,
-        network=network,
+        network=operator_config.network,
         vault_dir=operator_config.vault_dir,
     )
     asyncio.run(main(output_format))

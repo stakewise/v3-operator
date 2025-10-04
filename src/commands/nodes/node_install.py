@@ -12,8 +12,7 @@ from eth_typing import ChecksumAddress
 from src.common.utils import greenify
 from src.common.validators import validate_eth_address
 from src.config.config import OperatorConfig
-from src.config.networks import AVAILABLE_NETWORKS
-from src.config.settings import DEFAULT_NETWORK, settings
+from src.config.settings import settings
 from src.nodes.typings import Release
 
 DEFAULT_REQUESTS_TIMEOUT = 60
@@ -28,18 +27,6 @@ LATEST_LIGHTHOUSE_VERSION = 'v7.1.0'
     envvar='DATA_DIR',
     help='Path where the nodes data will be placed',
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
-    show_default=True,
-)
-@click.option(
-    '--network',
-    default=DEFAULT_NETWORK,
-    envvar='NETWORK',
-    help='The network of your nodes.',
-    prompt='Enter the network name',
-    type=click.Choice(
-        AVAILABLE_NETWORKS,
-        case_sensitive=False,
-    ),
     show_default=True,
 )
 @click.option(
@@ -68,7 +55,7 @@ LATEST_LIGHTHOUSE_VERSION = 'v7.1.0'
     help='Installs execution node and consensus node to the data dir.',
 )
 def node_install(
-    data_dir: Path, network: str, vault: ChecksumAddress, reth_version: str, lighthouse_version: str
+    data_dir: Path, vault: ChecksumAddress, reth_version: str, lighthouse_version: str
 ) -> None:
     """
     Downloads and unpacks pre-built binaries for both execution and consensus nodes.
@@ -79,7 +66,7 @@ def node_install(
     # Minimal settings for the nodes
     settings.set(
         vault=vault,
-        network=network,
+        network=operator_config.network,
         vault_dir=operator_config.vault_dir,
     )
 
