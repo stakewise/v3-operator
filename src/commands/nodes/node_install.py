@@ -7,10 +7,13 @@ from pathlib import Path
 
 import click
 import requests
+from eth_typing import ChecksumAddress
 
 from src.common.utils import greenify
+from src.common.validators import validate_eth_address
+from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
-from src.config.settings import DEFAULT_NETWORK
+from src.config.settings import DEFAULT_NETWORK, settings
 from src.nodes.typings import Release
 
 DEFAULT_REQUESTS_TIMEOUT = 60
@@ -40,6 +43,13 @@ LATEST_LIGHTHOUSE_VERSION = 'v7.1.0'
     show_default=True,
 )
 @click.option(
+    '--vault',
+    callback=validate_eth_address,
+    envvar='VAULT',
+    prompt='Enter your vault address',
+    help='Address of the vault to register validators for.',
+)
+@click.option(
     '--reth-version',
     default=LATEST_RETH_VERSION,
     help='Version of the Reth binary to install.',
@@ -57,14 +67,25 @@ LATEST_LIGHTHOUSE_VERSION = 'v7.1.0'
 @click.command(
     help='Installs execution node and consensus node to the data dir.',
 )
-def node_install(data_dir: Path, network: str, reth_version: str, lighthouse_version: str) -> None:
+def node_install(
+    data_dir: Path, network: str, vault: ChecksumAddress, reth_version: str, lighthouse_version: str
+) -> None:
     """
-    Downloads and unpacks pre-built binaries for both execution and consensus clients.
+    Downloads and unpacks pre-built binaries for both execution and consensus nodes.
     """
+    operator_config = OperatorConfig(vault, Path(data_dir))
+    operator_config.load()
+
+    # Minimal settings for the nodes
+    settings.set(
+        vault=vault,
+        network=network,
+        vault_dir=operator_config.vault_dir,
+    )
+
     # Define the path to the nodes installation directories
-    nodes_dir = data_dir / network / 'nodes'
-    reth_dir = nodes_dir / 'reth'
-    lighthouse_dir = nodes_dir / 'lighthouse'
+    reth_dir = settings.nodes_dir / 'reth'
+    lighthouse_dir = settings.nodes_dir / 'lighthouse'
 
     # Create the directories if they do not exist
     makedirs(reth_dir, exist_ok=True)
@@ -129,7 +150,7 @@ def install_binary_release(release: Release, dir_to_install: Path) -> None:
     # Download the binary, displaying a progress bar
     content = download_binary_with_progress(binary_url)
     response_len_mb = round(len(content) / 1024 / 1024, 1)
-    click.echo(f'Download complete. {response_len_mb} MB. Extracting...')
+    click.echo(f'Download complete. {response_len_mb} MB. Extracting to {dir_to_install}...')
 
     # Extract the binary from tar.gz
     # Extract only targeted file because of security reasons

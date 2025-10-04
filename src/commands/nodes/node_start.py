@@ -106,6 +106,11 @@ def node_start(
         vault_dir=operator_config.vault_dir,
     )
 
+    # Check that nodes are installed
+    check_consensus_node_installed()
+    check_execution_node_installed()
+
+    # Start the nodes
     asyncio.run(
         main(
             print_execution_logs=print_execution_logs,
@@ -202,6 +207,20 @@ def check_hardware_requirements(data_dir: Path, network: str, no_confirm: bool) 
             default=False,
         ):
             raise click.Abort()
+
+
+def check_execution_node_installed() -> None:
+    if not (settings.nodes_dir / 'reth' / 'reth').exists():
+        raise click.ClickException(
+            'Execution node is not installed. Please run "node-install" command first.'
+        )
+
+
+def check_consensus_node_installed() -> None:
+    if not (settings.nodes_dir / 'lighthouse' / 'lighthouse').exists():
+        raise click.ClickException(
+            'Consensus node is not installed. Please run "node-install" command first.'
+        )
 
 
 def _get_reth_runner(show_output: bool) -> ProcessRunner:
