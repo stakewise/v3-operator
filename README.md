@@ -25,8 +25,6 @@ Any execution client that supports [ETH Execution API specification](https://eth
 - [Erigon](https://launchpad.ethereum.org/en/erigon) (Ethereum, Gnosis)
 - [Geth](https://launchpad.ethereum.org/en/geth) (Ethereum)
 
-Built-in node management commands will simplify the process of installation and running execution and consensus nodes. Refer to the "nodes" section below for details.
-
 ### Consensus node
 
 Any consensus client that supports [ETH Beacon Node API specification](https://ethereum.github.io/beacon-APIs/#/) can be used:
@@ -36,8 +34,6 @@ Any consensus client that supports [ETH Beacon Node API specification](https://e
 - [Prysm](https://launchpad.ethereum.org/en/prysm) (Ethereum)
 - [Teku](https://launchpad.ethereum.org/en/teku) (Ethereum, Gnosis)
 - [Lodestar](https://launchpad.ethereum.org/en/lodestar) (Ethereum, Gnosis)
-
-Built-in node management commands make it easy to install and run both execution and consensus nodes. Refer to the "nodes" section below for details.
 
 ### Vault
 
@@ -143,86 +139,6 @@ use of flags is optional):
 ```bash
 PYTHONPATH=. poetry run python src/main.py COMMAND --flagA=123 --flagB=xyz
 ```
-
-## V4 Upgrade Guide
-
-### Pectra Upgrade Support
-
-Ensure your vault is updated to version 5 for Ethereum network or version 3 for Gnosis network for full Pectra compatibility.
-
-After the upgrade, validator balances are no longer limited to 32 ETH or 1 GNO. By default, the 0x02 validators are registered. To register 0x01 validators, add the flag `--validators-type=v1`. Note that funding will be disabled when using this validator type.
-
-When replenishing validators, funds first top up existing 0x02 validators up to 2048 ETH or 64 GNO. New validators are registered once the vault accumulates another 32 ETH or 1 GNO.
-
-To migrate 0x01 validators to 0x02, use the consolidate command (see [reference](#validators-consolidation)).
-
-Also, partial withdrawals for compound validators are now supported. Partial withdrawals are significantly faster and more efficient than full validator exits. Even full validator exits now can be processed via execution request call.
-To disable this, use the flag `--disable-withdrawals` — in this case, funds will be withdrawn via full exits using oracles.
-
-Partial withdrawals run every 24 hours by default, processing available ETH from validators with balances exceeding 32 ETH or 1 GNO. The operator prioritizes validators with higher balances first.
-
-If partial withdrawal capacity is insufficient or no validators have balances above 32 ETH or 1 GNO, the operator triggers a full validator exit.
-
-If the operator does not initiate partial or full withdrawals, the oracle will automatically execute full withdrawal after 24 hours.
-
-### Start Command
-
-We've streamlined the launch process by separating setup flows for Hashi Vault, Web3Signer and relayers — each now has its own dedicated command.
-
-📖 Docs: [Start Operator Service](#step-5-start-operator-service)
-
-### No More Deposit Data File
-
-V4 Operator no longer requires pre-uploaded deposit data for validator registration — it generates deposit data automatically during registration.
-
-⚠ Important: To support this new flow, you must assign your operator wallet as the Validators Manager in the vault settings.
-🔗 [How to Set Up Validators Manager](#step-4-setup-validators-manager-role)
-
-### Multivault Support
-
-The operator service can now manage multiple vaults simultaneously, reducing setup complexity for multi-vault users.
-
-Key Changes:
-
-- Single Wallet & Keystores – Shared across all vaults (no `--vault` flag needed for create-keys/create-wallets).
-- Migration – Existing setups will auto-migrate to the new structure on first launch.
-- Launch Command – Use `--vaults` with multiple addresses (e.g., `--vaults=0x1...23,0x4...56`).
-- All validator keys linked to the operator will be used for every connected vault.
-
-### Automated rewards withdrawals
-
-It is possible to periodically withdraw rewards for the vault’s fee shareholders.
-Check for more details in [Reward splitter section](#automated-withdrawals-reward-splitter)
-
-### TL;DR – Quick Setup Checklist
-
-#### Mandatory
-
-- Upgrade vault to version 5 for Ethereum or version 3 for Gnosis.
-- Set Validator Manager role in vault UI.
-
-#### For Pectra
-
-- Use consolidate command for legacy validators.
-
-#### Per Setup Type
-
-- Default Mode → No changes needed.
-- Remote Signer → Use `start-remote-signer` command.
-- Hashi Vault → Use `start-hashi-vault` command.
-- Relayer → Use `start-relayer` command.
-
-#### For Multivault
-
-- Pass comma-separated addresses in --vaults.
-- Recreate operator directory for clean migration.
-
-#### Main parameter changes
-
-- `--vault` → Now `--vaults` , `--vault` is deprecated.
-- Removed `--deposit-data-file` parameter
-- `HOT_WALLET_FILE` → renamed to `WALLET_FILE`
-- `HOT_WALLET_PASSWORD_FILE` → renamed to `WALLET_PASSWORD_FILE`
 
 ## Contacts
 
