@@ -308,7 +308,6 @@ def _get_funding_amounts(
     compounding_validators_balances: dict[HexStr, Gwei], vault_assets: Gwei
 ) -> dict[HexStr, Gwei]:
     result = {}
-    validators_count = 0
     for public_key, balance in sorted(
         compounding_validators_balances.items(), key=lambda item: item[1], reverse=True
     ):
@@ -317,7 +316,6 @@ def _get_funding_amounts(
             val_amount = min(remaining_capacity, vault_assets)
             result[public_key] = Gwei(val_amount)
             vault_assets = Gwei(vault_assets - val_amount)
-            validators_count += 1
         if vault_assets < settings.min_deposit_amount_gwei:
             break
     return result
