@@ -177,7 +177,8 @@ async def main(
     if withdrawal_request_fee > MAX_WITHDRAWAL_REQUEST_FEE:
         raise click.ClickException(
             'Validator exits are skipped due to high withdrawal fee. '
-            f'The current fee is {withdrawal_request_fee}.'
+            f'The current fee is {withdrawal_request_fee} Wei. '
+            f'You can override the limit with MAX_WITHDRAWAL_REQUEST_FEE environment variable.'
         )
 
     chain_head = await get_chain_justified_head()

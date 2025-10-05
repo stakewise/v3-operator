@@ -2,7 +2,7 @@ import logging
 
 from eth_typing import HexStr
 from web3 import Web3
-from web3.types import Gwei
+from web3.types import Gwei, Wei
 
 from src.common.clients import execution_client
 from src.common.contracts import VaultContract
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 async def submit_withdraw_validators(
     withdrawals: dict[HexStr, Gwei],
-    tx_fee: Gwei,
+    tx_fee: Wei,
     validators_manager_signature: HexStr,
 ) -> HexStr | None:
     """Sends withdrawValidators transaction to vault contract"""
@@ -24,7 +24,7 @@ async def submit_withdraw_validators(
         tx = await vault_contract.functions.withdrawValidators(
             _encode_withdrawals(withdrawals),
             Web3.to_bytes(hexstr=validators_manager_signature),
-        ).transact({'value': Web3.to_wei(tx_fee, 'gwei')})
+        ).transact({'value': tx_fee})
     except Exception as e:
         logger.info('Failed to withdraw from validators: %s', format_error(e))
         return None

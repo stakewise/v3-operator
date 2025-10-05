@@ -7,7 +7,7 @@ import click
 from eth_typing import ChecksumAddress, HexStr
 from sw_utils import ChainHead
 from web3 import Web3
-from web3.types import Gwei
+from web3.types import Gwei, Wei
 
 from src.common.clients import consensus_client, setup_clients
 from src.common.consensus import get_chain_justified_head
@@ -278,16 +278,15 @@ async def main(
     )
     if consolidation_request_fee > MAX_CONSOLIDATION_REQUEST_FEE:
         logger.info(
-            'The current consolidation fee per one consolidation (%s Gwei) exceeds the maximum allowed (%s Gwei). '
-            'You can override the limit using '
-            'the MAX_CONSOLIDATION_REQUEST_FEE environment variable.',
+            'The current consolidation fee per one consolidation (%s Wei) exceeds the maximum allowed (%s Wei). '
+            'You can override the limit using the MAX_CONSOLIDATION_REQUEST_FEE environment variable.',
             consolidation_request_fee,
             MAX_CONSOLIDATION_REQUEST_FEE,
         )
         return
     # Current fee calculated for the number of validators consolidated + gap
     # in case there are some other consolidations in the network.
-    tx_fee = Gwei(consolidation_request_fee * len(target_source) + consolidation_request_fee)
+    tx_fee = Wei(consolidation_request_fee * len(target_source) + consolidation_request_fee)
 
     gas_manager = build_gas_manager()
     if not await gas_manager.check_gas_price():

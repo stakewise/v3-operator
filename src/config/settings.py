@@ -325,11 +325,11 @@ MIN_ACTIVATION_BALANCE_GWEI: Gwei = Gwei(int(Web3.from_wei(MIN_ACTIVATION_BALANC
 MAX_EFFECTIVE_BALANCE: Wei = Web3.to_wei(2048, 'ether')
 MAX_EFFECTIVE_BALANCE_GWEI: Gwei = Gwei(int(Web3.from_wei(MAX_EFFECTIVE_BALANCE, 'gwei')))
 
-MAX_CONSOLIDATION_REQUEST_FEE: Gwei = decouple_config(
-    'MAX_CONSOLIDATION_REQUEST_FEE', default=10, cast=int
+MAX_CONSOLIDATION_REQUEST_FEE: Wei = decouple_config(
+    'MAX_CONSOLIDATION_REQUEST_FEE', default=Web3.to_wei(10, 'gwei'), cast=int
 )
-MAX_WITHDRAWAL_REQUEST_FEE: Gwei = decouple_config(
-    'MAX_WITHDRAWAL_REQUEST_FEE', default=10, cast=int
+MAX_WITHDRAWAL_REQUEST_FEE: Wei = decouple_config(
+    'MAX_WITHDRAWAL_REQUEST_FEE', default=Web3.to_wei(10, 'gwei'), cast=int
 )
 
 # Backoff retries
