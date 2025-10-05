@@ -346,6 +346,11 @@ HASHI_VAULT_TIMEOUT = 10
 
 ATTEMPTS_WITH_DEFAULT_GAS: int = decouple_config('ATTEMPTS_WITH_DEFAULT_GAS', default=3, cast=int)
 
+# Validators funding batch size
+VALIDATORS_FUNDING_BATCH_SIZE = decouple_config(
+    'VALIDATORS_FUNDING_BATCH_SIZE', cast=int, default=10
+)
+
 # Minimum amount of rewards to process reward splitter
 FEE_SPLITTER_MIN_ASSETS: int = decouple_config(
     'FEE_SPLITTER_MIN_ASSETS', default=Web3.to_wei('0.001', 'ether'), cast=int
