@@ -122,6 +122,12 @@ logger = logging.getLogger(__name__)
     is_flag=True,
 )
 @click.option(
+    '--no-switch-consolidation',
+    is_flag=True,
+    default=False,
+    help='Disables switching a 0x01 validator to 0x02 when no public keys are provided.',
+)
+@click.option(
     '--no-confirm',
     is_flag=True,
     default=False,
@@ -150,6 +156,7 @@ def consolidate(
     wallet_file: str | None,
     wallet_password_file: str | None,
     verbose: bool,
+    no_switch_consolidation: bool,
     no_confirm: bool,
     log_level: str,
     source_public_keys: list[HexStr] | None,
@@ -195,6 +202,7 @@ def consolidate(
                 vault_address=vault,
                 source_public_keys=source_public_keys,
                 target_public_key=target_public_key,
+                no_switch_consolidation=no_switch_consolidation,
                 no_confirm=no_confirm,
             )
         )
@@ -208,6 +216,7 @@ async def main(
     vault_address: ChecksumAddress,
     source_public_keys: list[HexStr] | None,
     target_public_key: HexStr | None,
+    no_switch_consolidation: bool,
     no_confirm: bool,
 ) -> None:
     # pylint: disable=line-too-long
@@ -245,6 +254,10 @@ async def main(
 
     for target_validator, source_validator in target_source:
         if source_validator.index == target_validator.index:
+            if no_switch_consolidation:
+                raise click.ClickException(
+                    f'Validator with index {source_validator.index} can\'t be consolidated as switching is disabled.'
+                )
             click.secho(
                 f'Switching validator with index {source_validator.index} to compounding',
             )
