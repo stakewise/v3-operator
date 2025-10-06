@@ -7,9 +7,9 @@ import click
 from eth_typing import ChecksumAddress, HexStr
 from sw_utils import ChainHead
 from web3 import Web3
-from web3.types import Gwei
+from web3.types import BlockNumber, Gwei
 
-from src.common.clients import consensus_client, setup_clients
+from src.common.clients import consensus_client, execution_client, setup_clients
 from src.common.consensus import get_chain_justified_head
 from src.common.contracts import VaultContract
 from src.common.execution import (
@@ -37,6 +37,8 @@ from src.validators.relayer import RelayerClient
 from src.validators.typings import ConsensusValidator
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_CONSOLIDATIONS_EPOCH_INTERVAL = 5
 
 
 @click.option(
@@ -106,6 +108,13 @@ logger = logging.getLogger(__name__)
     envvar='RELAYER_ENDPOINT',
 )
 @click.option(
+    '--consolidations-epoch-interval',
+    type=int,
+    help='Minimum interval in epochs between two consolidations for the same vault.',
+    envvar='consolidations-epoch-interval',
+    default=DEFAULT_CONSOLIDATIONS_EPOCH_INTERVAL,
+)
+@click.option(
     '--max-validator-balance-gwei',
     type=int,
     envvar='MAX_VALIDATOR_BALANCE_GWEI',
@@ -152,6 +161,7 @@ def consolidate(
     verbose: bool,
     no_confirm: bool,
     log_level: str,
+    consolidations_epoch_interval: int,
     source_public_keys: list[HexStr] | None,
     source_public_keys_file: Path | None,
     target_public_key: HexStr | None = None,
@@ -196,6 +206,7 @@ def consolidate(
                 source_public_keys=source_public_keys,
                 target_public_key=target_public_key,
                 no_confirm=no_confirm,
+                consolidations_epoch_interval=consolidations_epoch_interval,
             )
         )
     except Exception as e:
@@ -209,6 +220,7 @@ async def main(
     source_public_keys: list[HexStr] | None,
     target_public_key: HexStr | None,
     no_confirm: bool,
+    consolidations_epoch_interval: int,
 ) -> None:
     # pylint: disable=line-too-long
     """
@@ -223,6 +235,7 @@ async def main(
 
     await _check_validators_manager(vault_address)
     await _check_consolidations_queue()
+    await _check_consolidations_interval(vault_address, consolidations_epoch_interval)
 
     if source_public_keys is not None and target_public_key is not None:
         # keys provided by the user
@@ -439,6 +452,26 @@ async def _check_consolidations_queue() -> None:
     if queue_length >= settings.network_config.PENDING_CONSOLIDATIONS_LIMIT:
         raise click.ClickException(
             'Pending consolidations queue has exceeded its limit. Please try again later.'
+        )
+
+
+async def _check_consolidations_interval(
+    vault_address: ChecksumAddress, consolidations_epoch_interval: int
+) -> None:
+    vault_contract = VaultContract(vault_address)
+
+    to_block = await execution_client.eth.get_block_number()
+    from_block = BlockNumber(
+        to_block - consolidations_epoch_interval * settings.network_config.SLOTS_PER_EPOCH
+    )
+    last_event = await vault_contract.get_last_consolidation_event(
+        from_block=from_block,
+        to_block=to_block,
+    )
+    if last_event:
+        raise click.ClickException(
+            f'Consolidation requests are limited '
+            f'to once every {consolidations_epoch_interval} epochs.'
         )
 
 

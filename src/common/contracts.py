@@ -154,6 +154,15 @@ class VaultContract(ContractWrapper, VaultStateMixin):
             for event in events
         ]
 
+    async def get_last_consolidation_event(
+        self, from_block: BlockNumber, to_block: BlockNumber
+    ) -> EventData | None:
+        return await self._get_last_event(
+            event=self.events.ValidatorConsolidated,  # type: ignore
+            from_block=from_block,
+            to_block=to_block,
+        )
+
     async def mev_escrow(self) -> ChecksumAddress:
         return await self.contract.functions.mevEscrow().call()
 
