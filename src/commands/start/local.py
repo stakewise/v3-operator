@@ -101,6 +101,7 @@ def start_local(
             Gwei(max_validator_balance_gwei) if max_validator_balance_gwei else None
         ),
         min_deposit_delay=min_deposit_delay,
+        nodes_dir=Path(data_dir) / operator_config.network / 'nodes',
     )
 
     try:

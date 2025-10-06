@@ -109,6 +109,7 @@ class Settings(metaclass=Singleton):
     min_deposit_amount_gwei: Gwei
     max_validator_balance_gwei: Gwei
     min_deposit_delay: int
+    nodes_dir: Path
 
     # pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements
     def set(
@@ -153,6 +154,7 @@ class Settings(metaclass=Singleton):
         min_deposit_amount_gwei: Gwei = DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
         max_validator_balance_gwei: Gwei | None = None,
         min_deposit_delay: int = DEFAULT_MIN_DEPOSIT_DELAY,
+        nodes_dir: Path = Path(''),
     ) -> None:
         self.vault = vault
         vault_dir.mkdir(parents=True, exist_ok=True)
@@ -295,6 +297,7 @@ class Settings(metaclass=Singleton):
         self.validators_registration_mode = validators_registration_mode
 
         self.skip_startup_checks = decouple_config('SKIP_STARTUP_CHECKS', default=False, cast=bool)
+        self.nodes_dir = nodes_dir
 
     @property
     def keystore_cls_str(self) -> str:
@@ -307,11 +310,6 @@ class Settings(metaclass=Singleton):
     @property
     def network_config(self) -> NetworkConfig:
         return NETWORKS[self.network]
-
-    @property
-    def nodes_dir(self) -> Path:
-        """Returns the nodes directory within the vault directory."""
-        return self.vault_dir / 'nodes'
 
 
 settings = Settings()

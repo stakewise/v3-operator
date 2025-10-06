@@ -55,6 +55,7 @@ def node_status_command(data_dir: Path, vault: ChecksumAddress, output_format: s
         vault=vault,
         network=operator_config.network,
         vault_dir=operator_config.vault_dir,
+        nodes_dir=data_dir / operator_config.network / 'nodes',
     )
     asyncio.run(main(output_format))
 

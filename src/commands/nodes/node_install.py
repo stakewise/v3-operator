@@ -68,6 +68,7 @@ def node_install(
         vault=vault,
         network=operator_config.network,
         vault_dir=operator_config.vault_dir,
+        nodes_dir=data_dir / operator_config.network / 'nodes',
     )
 
     # Define the path to the nodes installation directories
