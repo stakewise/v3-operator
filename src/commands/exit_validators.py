@@ -6,6 +6,7 @@ from pathlib import Path
 
 import click
 from eth_typing import ChecksumAddress, HexStr
+from web3 import Web3
 from web3.types import Gwei
 
 from src.common.clients import setup_clients
@@ -17,7 +18,7 @@ from src.common.startup_check import check_validators_manager, check_vault_versi
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_address, validate_indexes
 from src.config.config import OperatorConfig
-from src.config.settings import MAX_WITHDRAWAL_REQUEST_FEE, settings
+from src.config.settings import MAX_WITHDRAWAL_REQUEST_FEE_GWEI, settings
 from src.validators.consensus import EXITING_STATUSES, fetch_consensus_validators
 from src.validators.relayer import RelayerClient
 from src.validators.typings import ConsensusValidator
@@ -174,11 +175,11 @@ async def main(
     withdrawal_request_fee = await get_execution_request_fee(
         settings.network_config.WITHDRAWAL_CONTRACT_ADDRESS,
     )
-    if withdrawal_request_fee > MAX_WITHDRAWAL_REQUEST_FEE:
+    if withdrawal_request_fee > Web3.to_wei(MAX_WITHDRAWAL_REQUEST_FEE_GWEI, 'gwei'):
         raise click.ClickException(
             'Validator exits are skipped due to high withdrawal fee. '
-            f'The current fee is {withdrawal_request_fee} Wei. '
-            f'You can override the limit with MAX_WITHDRAWAL_REQUEST_FEE environment variable.'
+            f'The current fee is {Web3.from_wei(withdrawal_request_fee, 'gwei')} Gwei. '
+            f'You can override the limit with MAX_WITHDRAWAL_REQUEST_FEE_GWEI environment variable.'
         )
 
     chain_head = await get_chain_justified_head()

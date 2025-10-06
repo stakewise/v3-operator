@@ -29,7 +29,7 @@ from src.common.validators import (
 from src.common.wallet import wallet
 from src.config.config import OperatorConfig
 from src.config.networks import GNOSIS, MAINNET, NETWORKS
-from src.config.settings import MAX_CONSOLIDATION_REQUEST_FEE, settings
+from src.config.settings import MAX_CONSOLIDATION_REQUEST_FEE_GWEI, settings
 from src.validators.consensus import EXITING_STATUSES, fetch_consensus_validators
 from src.validators.oracles import poll_consolidation_signature
 from src.validators.register_validators import submit_consolidate_validators
@@ -276,12 +276,12 @@ async def main(
     consolidation_request_fee = await get_execution_request_fee(
         settings.network_config.CONSOLIDATION_CONTRACT_ADDRESS,
     )
-    if consolidation_request_fee > MAX_CONSOLIDATION_REQUEST_FEE:
+    if consolidation_request_fee > Web3.to_wei(MAX_CONSOLIDATION_REQUEST_FEE_GWEI, 'gwei'):
         logger.info(
-            'The current consolidation fee per one consolidation (%s Wei) exceeds the maximum allowed (%s Wei). '
-            'You can override the limit using the MAX_CONSOLIDATION_REQUEST_FEE environment variable.',
-            consolidation_request_fee,
-            MAX_CONSOLIDATION_REQUEST_FEE,
+            'The current consolidation fee per one consolidation (%s Gwei) exceeds the maximum allowed (%s Gwei). '
+            'You can override the limit using the MAX_CONSOLIDATION_REQUEST_FEE_GWEI environment variable.',
+            Web3.from_wei(consolidation_request_fee, 'gwei'),
+            MAX_CONSOLIDATION_REQUEST_FEE_GWEI,
         )
         return
     # Current fee calculated for the number of validators consolidated + gap
