@@ -460,7 +460,7 @@ async def _check_consolidations_interval(
 ) -> None:
     vault_contract = VaultContract(vault_address)
 
-    previous_epoch = chain_head.epoch - consolidations_epoch_interval
+    previous_epoch = max(chain_head.epoch - consolidations_epoch_interval, 0)
     previous_chain_head = await get_get_chain_epoch_head(previous_epoch)
     last_event = await vault_contract.get_last_consolidation_event(
         from_block=previous_chain_head.block_number,
