@@ -16,7 +16,12 @@ datas += collect_data_files('eth_utils')
 
 block_cipher = None
 
-hiddenimports=['multiaddr.codecs.uint16be', 'multiaddr.codecs.idna', 'pkg_resources.extern']
+hiddenimports = [
+    'multiaddr.codecs.uint16be',
+    'multiaddr.codecs.idna',
+    'multiaddr.codecs.domain',
+    'pkg_resources.extern'
+]
 
 # tomli
 hiddenimports += [
