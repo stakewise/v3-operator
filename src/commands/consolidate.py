@@ -7,10 +7,10 @@ import click
 from eth_typing import ChecksumAddress, HexStr
 from sw_utils import ChainHead
 from web3 import Web3
-from web3.types import BlockNumber, Gwei
+from web3.types import Gwei
 
 from src.common.clients import consensus_client, execution_client, setup_clients
-from src.common.consensus import get_chain_justified_head
+from src.common.consensus import get_chain_justified_head, get_get_chain_epoch_head
 from src.common.contracts import VaultContract
 from src.common.execution import (
     build_gas_manager,
@@ -235,7 +235,7 @@ async def main(
 
     await _check_validators_manager(vault_address)
     await _check_consolidations_queue()
-    await _check_consolidations_interval(vault_address, consolidations_epoch_interval)
+    await _check_consolidations_interval(vault_address, chain_head, consolidations_epoch_interval)
 
     if source_public_keys is not None and target_public_key is not None:
         # keys provided by the user
@@ -456,17 +456,15 @@ async def _check_consolidations_queue() -> None:
 
 
 async def _check_consolidations_interval(
-    vault_address: ChecksumAddress, consolidations_epoch_interval: int
+    vault_address: ChecksumAddress, chain_head: ChainHead, consolidations_epoch_interval: int
 ) -> None:
     vault_contract = VaultContract(vault_address)
 
-    to_block = await execution_client.eth.get_block_number()
-    from_block = BlockNumber(
-        to_block - consolidations_epoch_interval * settings.network_config.SLOTS_PER_EPOCH
-    )
+    previous_epoch = chain_head.epoch - consolidations_epoch_interval
+    previous_chain_head = await get_get_chain_epoch_head(previous_epoch)
     last_event = await vault_contract.get_last_consolidation_event(
-        from_block=from_block,
-        to_block=to_block,
+        from_block=previous_chain_head.block_number,
+        to_block=await execution_client.eth.get_block_number(),
     )
     if last_event:
         raise click.ClickException(
