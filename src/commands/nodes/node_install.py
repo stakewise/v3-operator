@@ -17,8 +17,8 @@ from src.nodes.typings import Release
 
 DEFAULT_REQUESTS_TIMEOUT = 60
 
-LATEST_RETH_VERSION = 'v1.5.1'
-LATEST_LIGHTHOUSE_VERSION = 'v7.1.0'
+DEFAULT_RETH_VERSION = 'v1.5.1'
+DEFAULT_LIGHTHOUSE_VERSION = 'v7.1.0'
 
 
 @click.option(
@@ -38,14 +38,14 @@ LATEST_LIGHTHOUSE_VERSION = 'v7.1.0'
 )
 @click.option(
     '--reth-version',
-    default=LATEST_RETH_VERSION,
+    default=DEFAULT_RETH_VERSION,
     help='Version of the Reth binary to install.',
     type=str,
     show_default=True,
 )
 @click.option(
     '--lighthouse-version',
-    default=LATEST_LIGHTHOUSE_VERSION,
+    default=DEFAULT_LIGHTHOUSE_VERSION,
     envvar='LIGHTHOUSE_VERSION',
     help='Version of the Lighthouse binary to install.',
     type=str,

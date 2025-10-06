@@ -17,7 +17,6 @@ def update_validator_definitions_file(
         keystore_files (list[KeystoreFile]): List of keystore file objects.
         output_path (Path): Path to the validator definitions YAML file.
     """
-    keystore_files = LocalKeystore.list_keystore_files()
     current_items: list[dict] = []
 
     # Read keystore files and create items for the YAML file

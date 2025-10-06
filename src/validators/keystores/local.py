@@ -179,7 +179,7 @@ class LocalKeystore(BaseKeystore):
         keystore = ScryptKeystore.from_file(keystore_file.file)
 
         # extract index from path: m/12381/3600/<index>/0/0
-        key_index = keystore.path.split('/')[-3]
+        key_index = int(keystore.path.split('/')[-3])
         public_key = add_0x_prefix(HexStr(keystore.pubkey))
 
         return key_index, public_key
