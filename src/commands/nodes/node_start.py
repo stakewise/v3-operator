@@ -19,7 +19,7 @@ from src.nodes.process import (
     ProcessRunner,
     RethProcessBuilder,
 )
-from src.nodes.status import SyncStatusHistory
+from src.nodes.status_history import SyncStatusHistory
 from src.nodes.typings import StdStreams
 
 logger = logging.getLogger(__name__)
