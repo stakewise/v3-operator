@@ -5,7 +5,7 @@ from eth_typing import HexStr
 from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.exceptions import ContractLogicError
-from web3.types import Gwei
+from web3.types import Wei
 
 from src.common.clients import execution_client
 from src.common.contracts import VaultContract
@@ -139,7 +139,7 @@ async def fund_validators(
 async def submit_consolidate_validators(
     validators: bytes,
     oracle_signatures: bytes | None,
-    tx_fee: Gwei,
+    tx_fee: Wei,
     validators_manager_signature: HexStr,
 ) -> HexStr | None:
     """Sends consolidate validators transaction to vault contract"""
@@ -154,7 +154,7 @@ async def submit_consolidate_validators(
             validators,
             Web3.to_bytes(hexstr=validators_manager_signature),
             oracle_signatures,
-        ).transact({'value': Web3.to_wei(tx_fee, 'gwei')})
+        ).transact({'value': tx_fee})
     except Exception as e:
         logger.info('Failed to submit consolidate validators transaction: %s', format_error(e))
         return None

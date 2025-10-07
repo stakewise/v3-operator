@@ -7,7 +7,7 @@ from hexbytes import HexBytes
 from sw_utils import GasManager, InterruptHandler, ProtocolConfig, build_protocol_config
 from web3 import Web3
 from web3.contract.async_contract import AsyncContractFunction
-from web3.types import Gwei, TxParams, Wei
+from web3.types import TxParams, Wei
 
 from src.common.app_state import AppState, OraclesCache
 from src.common.clients import execution_client, ipfs_fetch_client
@@ -146,7 +146,7 @@ def build_gas_manager() -> GasManager:
     )
 
 
-async def get_execution_request_fee(address: ChecksumAddress) -> Gwei:
+async def get_execution_request_fee(address: ChecksumAddress) -> Wei:
     """
     Retrieves the current fee for an execution layer request.
     """
@@ -156,4 +156,4 @@ async def get_execution_request_fee(address: ChecksumAddress) -> Gwei:
     }
 
     fee = await execution_client.eth.call(tx_data, block_identifier='latest')
-    return Gwei(Web3.to_int(fee))
+    return Wei(Web3.to_int(fee))

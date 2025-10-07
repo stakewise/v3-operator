@@ -325,11 +325,11 @@ MIN_ACTIVATION_BALANCE_GWEI: Gwei = Gwei(int(Web3.from_wei(MIN_ACTIVATION_BALANC
 MAX_EFFECTIVE_BALANCE: Wei = Web3.to_wei(2048, 'ether')
 MAX_EFFECTIVE_BALANCE_GWEI: Gwei = Gwei(int(Web3.from_wei(MAX_EFFECTIVE_BALANCE, 'gwei')))
 
-MAX_CONSOLIDATION_REQUEST_FEE: Gwei = decouple_config(
-    'MAX_CONSOLIDATION_REQUEST_FEE', default=10, cast=int
+MAX_CONSOLIDATION_REQUEST_FEE_GWEI: Gwei = decouple_config(
+    'MAX_CONSOLIDATION_REQUEST_FEE_GWEI', default=1000, cast=int
 )
-MAX_WITHDRAWAL_REQUEST_FEE: Gwei = decouple_config(
-    'MAX_WITHDRAWAL_REQUEST_FEE', default=10, cast=int
+MAX_WITHDRAWAL_REQUEST_FEE_GWEI: Gwei = decouple_config(
+    'MAX_WITHDRAWAL_REQUEST_FEE_GWEI', default=1000, cast=int
 )
 
 CONSOLIDATIONS_PROCESSING_EPOCHS_INTERVAL: int = decouple_config(
@@ -349,6 +349,11 @@ REMOTE_SIGNER_TIMEOUT = decouple_config('REMOTE_SIGNER_TIMEOUT', cast=int, defau
 HASHI_VAULT_TIMEOUT = 10
 
 ATTEMPTS_WITH_DEFAULT_GAS: int = decouple_config('ATTEMPTS_WITH_DEFAULT_GAS', default=3, cast=int)
+
+# Validators funding batch size
+VALIDATORS_FUNDING_BATCH_SIZE = decouple_config(
+    'VALIDATORS_FUNDING_BATCH_SIZE', cast=int, default=10
+)
 
 # Minimum amount of rewards to process reward splitter
 FEE_SPLITTER_MIN_ASSETS: int = decouple_config(

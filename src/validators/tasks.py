@@ -2,7 +2,7 @@ import logging
 from typing import Sequence, cast
 
 from eth_typing import HexStr
-from sw_utils import IpfsFetchClient, convert_to_mgno
+from sw_utils import IpfsFetchClient, chunkify, convert_to_mgno
 from sw_utils.networks import GNO_NETWORKS
 from sw_utils.typings import Bytes32
 from web3 import Web3
@@ -14,7 +14,11 @@ from src.common.execution import build_gas_manager, get_protocol_config
 from src.common.harvest import get_harvest_params
 from src.common.metrics import metrics
 from src.common.typings import HarvestParams, ValidatorsRegistrationMode, ValidatorType
-from src.config.settings import MIN_ACTIVATION_BALANCE_GWEI, settings
+from src.config.settings import (
+    MIN_ACTIVATION_BALANCE_GWEI,
+    VALIDATORS_FUNDING_BATCH_SIZE,
+    settings,
+)
 from src.validators.consensus import fetch_compounding_validators_balances
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import (
@@ -80,18 +84,22 @@ class ValidatorRegistrationSubtask:
                 if not await _is_funding_interval_passed():
                     return
 
-                try:
-                    tx_hash = await fund_compounding_validators(
-                        funding_amounts=funding_amounts,
-                        harvest_params=harvest_params,
-                        relayer=self.relayer,
-                    )
-                    if not tx_hash:
-                        return
+                for validator_fundings_chunk in chunkify(
+                    list(funding_amounts.items()), VALIDATORS_FUNDING_BATCH_SIZE
+                ):
+                    try:
+                        tx_hash = await fund_compounding_validators(
+                            validator_fundings=validator_fundings_chunk,
+                            harvest_params=harvest_params,
+                            relayer=self.relayer,
+                        )
+                        if not tx_hash:
+                            return
 
-                    vault_assets = Gwei(max(vault_assets - sum(funding_amounts.values()), 0))
-                except EmptyRelayerResponseException:
-                    return
+                        total_funded = sum(amount for _, amount in validator_fundings_chunk)
+                        vault_assets = Gwei(max(vault_assets - total_funded, 0))
+                    except EmptyRelayerResponseException:
+                        return
 
         if not settings.disable_validators_registration:
             await register_new_validators(
@@ -103,19 +111,19 @@ class ValidatorRegistrationSubtask:
 
 
 async def fund_compounding_validators(
-    funding_amounts: dict[HexStr, Gwei],
+    validator_fundings: list[tuple[HexStr, Gwei]],
     harvest_params: HarvestParams | None,
     relayer: RelayerClient | None = None,
 ) -> HexStr | None:
     """
     Funds vault compounding validators with the specified amount.
     """
-    logger.info('Started funding of %d validator(s)', len(funding_amounts))
+    logger.info('Started funding of %d validator(s)', len(validator_fundings))
     validators_manager_signature = HexStr('0x')
     if settings.validators_registration_mode != ValidatorsRegistrationMode.AUTO:
         # fetch validators and signature from relayer
         validators_response = await cast(RelayerClient, relayer).fund_validators(
-            funding_amounts=funding_amounts,
+            validator_fundings=validator_fundings,
         )
 
         if validators_response.validators_manager_signature:
@@ -124,7 +132,8 @@ async def fund_compounding_validators(
     validators = []
     # the signature is not checked for funding active validators
     empty_signature = Web3.to_hex(bytes(96))
-    for public_key, amount in funding_amounts.items():
+    pub_keys = []
+    for public_key, amount in validator_fundings:
         validators.append(
             Validator(
                 public_key=public_key,
@@ -132,6 +141,7 @@ async def fund_compounding_validators(
                 amount=amount,
             )
         )
+        pub_keys.append(public_key)
 
     tx_hash = await fund_validators(
         harvest_params=harvest_params,
@@ -139,8 +149,7 @@ async def fund_compounding_validators(
         validators_manager_signature=validators_manager_signature,
     )
     if tx_hash:
-        pub_keys = ', '.join(funding_amounts.keys())
-        logger.info('Successfully funded validator(s) with public key(s) %s', pub_keys)
+        logger.info('Successfully funded validator(s) with public key(s) %s', ', '.join(pub_keys))
         tx_data = await execution_client.eth.get_transaction(tx_hash)
         metrics.last_funding_block.labels(network=settings.network).set(tx_data['blockNumber'])
     return tx_hash
