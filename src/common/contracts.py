@@ -194,13 +194,6 @@ class VaultContract(ContractWrapper, VaultStateMixin):
         ]
 
 
-class GnoVaultContract(ContractWrapper, VaultStateMixin):
-    abi_path = 'abi/IGnoVault.json'
-
-    def get_swap_xdai_call(self) -> HexStr:
-        return self.encode_abi(fn_name='swapXdaiToGno', args=[])
-
-
 class ValidatorsRegistryContract(ContractWrapper):
     abi_path = 'abi/IValidatorsRegistry.json'
     settings_key = 'VALIDATORS_REGISTRY_CONTRACT_ADDRESS'
