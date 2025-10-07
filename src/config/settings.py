@@ -332,6 +332,10 @@ MAX_WITHDRAWAL_REQUEST_FEE: Gwei = decouple_config(
     'MAX_WITHDRAWAL_REQUEST_FEE', default=10, cast=int
 )
 
+CONSOLIDATIONS_PROCESSING_EPOCHS_INTERVAL: int = decouple_config(
+    'CONSOLIDATIONS_PROCESSING_EPOCHS_INTERVAL', cast=int, default=5
+)
+
 # Backoff retries
 DEFAULT_RETRY_TIME = 60
 
