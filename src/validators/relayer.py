@@ -48,12 +48,13 @@ class RelayerClient:
         )
 
     async def fund_validators(
-        self, funding_amounts: dict[HexStr, Gwei]
+        self, validator_fundings: list[tuple[HexStr, Gwei]]
     ) -> RelayerSignatureResponse:
+        public_keys, funding_amounts = zip(*validator_fundings)
         relayer_response = await self._fund_validators(
             vault_address=settings.vault,
-            public_keys=list(funding_amounts.keys()),
-            amounts=list(funding_amounts.values()),
+            public_keys=list(public_keys),
+            amounts=list(funding_amounts),
         )
 
         validators_manager_signature = add_0x_prefix(
