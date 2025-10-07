@@ -26,7 +26,7 @@ async def get_chain_latest_head() -> ChainHead:
     )
 
 
-async def get_get_chain_epoch_head(epoch: int) -> ChainHead:
+async def get_chain_epoch_head(epoch: int) -> ChainHead:
     return await sw_get_chain_epoch_head(
         epoch=epoch,
         consensus_client=consensus_client,
