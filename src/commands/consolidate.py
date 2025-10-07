@@ -7,7 +7,7 @@ import click
 from eth_typing import ChecksumAddress, HexStr
 from sw_utils import ChainHead
 from web3 import Web3
-from web3.types import Gwei
+from web3.types import Gwei, Wei
 
 from src.common.clients import consensus_client, setup_clients
 from src.common.consensus import get_chain_justified_head
@@ -29,7 +29,7 @@ from src.common.validators import (
 from src.common.wallet import wallet
 from src.config.config import OperatorConfig
 from src.config.networks import GNOSIS, MAINNET, NETWORKS
-from src.config.settings import MAX_CONSOLIDATION_REQUEST_FEE, settings
+from src.config.settings import MAX_CONSOLIDATION_REQUEST_FEE_GWEI, settings
 from src.validators.consensus import EXITING_STATUSES, fetch_consensus_validators
 from src.validators.oracles import poll_consolidation_signature
 from src.validators.register_validators import submit_consolidate_validators
@@ -122,6 +122,12 @@ logger = logging.getLogger(__name__)
     is_flag=True,
 )
 @click.option(
+    '--no-switch-consolidation',
+    is_flag=True,
+    default=False,
+    help='Disables switching a 0x01 validator to 0x02 when no public keys are provided.',
+)
+@click.option(
     '--no-confirm',
     is_flag=True,
     default=False,
@@ -150,6 +156,7 @@ def consolidate(
     wallet_file: str | None,
     wallet_password_file: str | None,
     verbose: bool,
+    no_switch_consolidation: bool,
     no_confirm: bool,
     log_level: str,
     source_public_keys: list[HexStr] | None,
@@ -195,6 +202,7 @@ def consolidate(
                 vault_address=vault,
                 source_public_keys=source_public_keys,
                 target_public_key=target_public_key,
+                no_switch_consolidation=no_switch_consolidation,
                 no_confirm=no_confirm,
             )
         )
@@ -208,6 +216,7 @@ async def main(
     vault_address: ChecksumAddress,
     source_public_keys: list[HexStr] | None,
     target_public_key: HexStr | None,
+    no_switch_consolidation: bool,
     no_confirm: bool,
 ) -> None:
     # pylint: disable=line-too-long
@@ -245,6 +254,10 @@ async def main(
 
     for target_validator, source_validator in target_source:
         if source_validator.index == target_validator.index:
+            if no_switch_consolidation:
+                raise click.ClickException(
+                    f'Validator with index {source_validator.index} can\'t be consolidated as switching is disabled.'
+                )
             click.secho(
                 f'Switching validator with index {source_validator.index} to compounding',
             )
@@ -263,18 +276,17 @@ async def main(
     consolidation_request_fee = await get_execution_request_fee(
         settings.network_config.CONSOLIDATION_CONTRACT_ADDRESS,
     )
-    if consolidation_request_fee > MAX_CONSOLIDATION_REQUEST_FEE:
+    if consolidation_request_fee > Web3.to_wei(MAX_CONSOLIDATION_REQUEST_FEE_GWEI, 'gwei'):
         logger.info(
             'The current consolidation fee per one consolidation (%s Gwei) exceeds the maximum allowed (%s Gwei). '
-            'You can override the limit using '
-            'the MAX_CONSOLIDATION_REQUEST_FEE environment variable.',
-            consolidation_request_fee,
-            MAX_CONSOLIDATION_REQUEST_FEE,
+            'You can override the limit using the MAX_CONSOLIDATION_REQUEST_FEE_GWEI environment variable.',
+            Web3.from_wei(consolidation_request_fee, 'gwei'),
+            MAX_CONSOLIDATION_REQUEST_FEE_GWEI,
         )
         return
     # Current fee calculated for the number of validators consolidated + gap
     # in case there are some other consolidations in the network.
-    tx_fee = Gwei(consolidation_request_fee * len(target_source) + consolidation_request_fee)
+    tx_fee = Wei(consolidation_request_fee * len(target_source) + consolidation_request_fee)
 
     gas_manager = build_gas_manager()
     if not await gas_manager.check_gas_price():
