@@ -119,6 +119,7 @@ def start_local(
         ),
         min_deposit_delay=min_deposit_delay,
         run_nodes=run_nodes,
+        nodes_dir=Path(data_dir) / operator_config.network / 'nodes',
     )
     validate_settings()
 
