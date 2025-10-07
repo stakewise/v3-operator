@@ -4,12 +4,10 @@ import logging
 from pathlib import Path
 
 import click
-from eth_typing import ChecksumAddress
 from sw_utils import get_consensus_client, get_execution_client
 
-from src.common.validators import validate_eth_address
-from src.config.config import OperatorConfig
-from src.config.settings import settings
+from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
+from src.config.settings import DEFAULT_NETWORK, settings
 from src.nodes.status import (
     get_consensus_node_status,
     get_execution_node_status,
@@ -31,11 +29,14 @@ OUTPUT_FORMATS = ['text', 'json']
     show_default=True,
 )
 @click.option(
-    '--vault',
-    callback=validate_eth_address,
-    envvar='VAULT',
-    prompt='Enter your vault address',
-    help='Address of the vault to register validators for.',
+    '--network',
+    default=DEFAULT_NETWORK,
+    help='The network of your vault.',
+    prompt='Enter the network name',
+    type=click.Choice(
+        AVAILABLE_NETWORKS,
+        case_sensitive=False,
+    ),
 )
 @click.option(
     '--output-format',
@@ -46,16 +47,16 @@ OUTPUT_FORMATS = ['text', 'json']
     show_default=True,
 )
 @click.command(help='Displays the status of the nodes.', name='node-status')
-def node_status_command(data_dir: Path, vault: ChecksumAddress, output_format: str) -> None:
-    # Minimal settings for the nodes
-    operator_config = OperatorConfig(vault, Path(data_dir))
-    operator_config.load()
+def node_status_command(data_dir: Path, network: str, output_format: str) -> None:
+    # Using zero address since vault directory is not required for this command
+    vault_address = ZERO_CHECKSUM_ADDRESS
 
+    # Minimal settings for the nodes
     settings.set(
-        vault=vault,
-        network=operator_config.network,
-        vault_dir=operator_config.vault_dir,
-        nodes_dir=data_dir / operator_config.network / 'nodes',
+        vault=vault_address,
+        network=network,
+        vault_dir=data_dir / vault_address,
+        nodes_dir=data_dir / network / 'nodes',
     )
     asyncio.run(main(output_format))
 

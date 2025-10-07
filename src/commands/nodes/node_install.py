@@ -7,12 +7,10 @@ from pathlib import Path
 
 import click
 import requests
-from eth_typing import ChecksumAddress
 
 from src.common.utils import greenify
-from src.common.validators import validate_eth_address
-from src.config.config import OperatorConfig
-from src.config.settings import settings
+from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
+from src.config.settings import DEFAULT_NETWORK, settings
 from src.nodes.typings import Release
 
 DEFAULT_REQUESTS_TIMEOUT = 60
@@ -30,11 +28,14 @@ DEFAULT_LIGHTHOUSE_VERSION = 'v7.1.0'
     show_default=True,
 )
 @click.option(
-    '--vault',
-    callback=validate_eth_address,
-    envvar='VAULT',
-    prompt='Enter your vault address',
-    help='Address of the vault to register validators for.',
+    '--network',
+    default=DEFAULT_NETWORK,
+    help='The network of your vault.',
+    prompt='Enter the network name',
+    type=click.Choice(
+        AVAILABLE_NETWORKS,
+        case_sensitive=False,
+    ),
 )
 @click.option(
     '--reth-version',
@@ -54,21 +55,19 @@ DEFAULT_LIGHTHOUSE_VERSION = 'v7.1.0'
 @click.command(
     help='Installs execution node and consensus node to the data dir.',
 )
-def node_install(
-    data_dir: Path, vault: ChecksumAddress, reth_version: str, lighthouse_version: str
-) -> None:
+def node_install(data_dir: Path, network: str, reth_version: str, lighthouse_version: str) -> None:
     """
     Downloads and unpacks pre-built binaries for both execution and consensus nodes.
     """
-    operator_config = OperatorConfig(vault, Path(data_dir))
-    operator_config.load()
+    # Using zero address since vault directory is not required for this command
+    vault_address = ZERO_CHECKSUM_ADDRESS
 
     # Minimal settings for the nodes
     settings.set(
-        vault=vault,
-        network=operator_config.network,
-        vault_dir=operator_config.vault_dir,
-        nodes_dir=data_dir / operator_config.network / 'nodes',
+        vault=vault_address,
+        network=network,
+        vault_dir=data_dir / vault_address,
+        nodes_dir=data_dir / network / 'nodes',
     )
 
     # Define the path to the nodes installation directories
