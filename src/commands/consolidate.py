@@ -38,7 +38,7 @@ from src.validators.typings import ConsensusValidator
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CONSOLIDATIONS_EPOCH_INTERVAL = 5
+DEFAULT_CONSOLIDATIONS_PROCESSING_INTERVAL = 5
 
 
 @click.option(
@@ -108,11 +108,11 @@ DEFAULT_CONSOLIDATIONS_EPOCH_INTERVAL = 5
     envvar='RELAYER_ENDPOINT',
 )
 @click.option(
-    '--consolidations-epoch-interval',
+    '--consolidations-processing-interval',
     type=int,
-    help='Minimum interval in epochs between two consolidations for the same vault.',
-    envvar='CONSOLIDATIONS_EPOCH_INTERVAL',
-    default=DEFAULT_CONSOLIDATIONS_EPOCH_INTERVAL,
+    help='Minimum interval in epochs to check for new consolidations to process.',
+    envvar='CONSOLIDATIONS_PROCESSING_INTERVAL',
+    default=DEFAULT_CONSOLIDATIONS_PROCESSING_INTERVAL,
 )
 @click.option(
     '--max-validator-balance-gwei',
@@ -161,7 +161,7 @@ def consolidate(
     verbose: bool,
     no_confirm: bool,
     log_level: str,
-    consolidations_epoch_interval: int,
+    consolidations_processing_interval: int,
     source_public_keys: list[HexStr] | None,
     source_public_keys_file: Path | None,
     target_public_key: HexStr | None = None,
@@ -206,7 +206,7 @@ def consolidate(
                 source_public_keys=source_public_keys,
                 target_public_key=target_public_key,
                 no_confirm=no_confirm,
-                consolidations_epoch_interval=consolidations_epoch_interval,
+                consolidations_processing_interval=consolidations_processing_interval,
             )
         )
     except Exception as e:
@@ -220,7 +220,7 @@ async def main(
     source_public_keys: list[HexStr] | None,
     target_public_key: HexStr | None,
     no_confirm: bool,
-    consolidations_epoch_interval: int,
+    consolidations_processing_interval: int,
 ) -> None:
     # pylint: disable=line-too-long
     """
@@ -236,7 +236,7 @@ async def main(
     await _check_validators_manager(vault_address)
     await _check_consolidations_queue()
     last_submitted_consolidations = await _fetch_last_contract_submitted_consolidations(
-        vault_address, chain_head, consolidations_epoch_interval
+        vault_address, chain_head, consolidations_processing_interval
     )
     if source_public_keys is not None and target_public_key is not None:
         # keys provided by the user
@@ -245,7 +245,7 @@ async def main(
             source_public_keys=source_public_keys,
             target_public_key=target_public_key,
             last_submitted_consolidations=last_submitted_consolidations,
-            consolidations_epoch_interval=consolidations_epoch_interval,
+            consolidations_processing_interval=consolidations_processing_interval,
             chain_head=chain_head,
         )
 
@@ -341,7 +341,7 @@ async def _check_public_keys(
     source_public_keys: list[HexStr],
     target_public_key: HexStr,
     last_submitted_consolidations: set[HexStr],
-    consolidations_epoch_interval: int,
+    consolidations_processing_interval: int,
     chain_head: ChainHead,
 ) -> list[tuple[ConsensusValidator, ConsensusValidator]]:
     """
@@ -363,13 +363,13 @@ async def _check_public_keys(
     if target_public_key in last_submitted_consolidations:
         raise click.ClickException(
             f'Target validator {target_public_key} was involved in a consolidation '
-            f'in the last {consolidations_epoch_interval} epochs.'
+            f'in the last {consolidations_processing_interval} epochs.'
         )
     for source_public_key in source_public_keys:
         if source_public_key in last_submitted_consolidations:
             raise click.ClickException(
                 f'Source validator {source_public_key} was involved in a consolidation '
-                f'in the last {consolidations_epoch_interval} epochs.'
+                f'in the last {consolidations_processing_interval} epochs.'
             )
     # Fetch source and target validators
     validators = await fetch_consensus_validators(source_public_keys + [target_public_key])
@@ -472,11 +472,11 @@ async def _check_consolidations_queue() -> None:
 
 
 async def _fetch_last_contract_submitted_consolidations(
-    vault_address: ChecksumAddress, chain_head: ChainHead, consolidations_epoch_interval: int
+    vault_address: ChecksumAddress, chain_head: ChainHead, consolidations_processing_interval: int
 ) -> set[HexStr]:
     vault_contract = VaultContract(vault_address)
 
-    previous_epoch = max(chain_head.epoch - consolidations_epoch_interval, 0)
+    previous_epoch = max(chain_head.epoch - consolidations_processing_interval, 0)
     previous_chain_head = await get_chain_epoch_head(previous_epoch)
     last_events = await vault_contract.get_consolidation_events(
         from_block=previous_chain_head.block_number,
