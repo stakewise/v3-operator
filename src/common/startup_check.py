@@ -89,17 +89,7 @@ async def startup_checks() -> None:
     logger.info('Checking vault address %s...', settings.vault)
     await _check_vault_address()
 
-    harvest_params = await get_harvest_params()
-    withdrawable_assets = await get_withdrawable_assets(harvest_params=harvest_params)
-
-    # Note. We round down assets in the log message because of the case when assets
-    # is slightly less than required amount to register validator.
-    # Standard rounding will show that we have enough assets, but in fact we don't.
-    logger.info(
-        'Vault withdrawable assets: %s %s',
-        round_down(Web3.from_wei(withdrawable_assets, 'ether'), 2),
-        settings.network_config.VAULT_BALANCE_SYMBOL,
-    )
+    await _check_vault_withdrawable_assets()
 
     logger.info('Checking wallet balance %s...', wallet.address)
     await check_wallet_balance()
@@ -201,7 +191,7 @@ async def wait_for_consensus_node() -> None:
                 )
         if done:
             return
-        logger.warning('Failed to connect to consensus nodes. Retrying in 10 seconds...')
+        logger.warning('Consensus nodes are not ready. Retrying in 10 seconds...')
         await asyncio.sleep(10)
 
 
@@ -249,7 +239,7 @@ async def wait_for_execution_node() -> None:
                 )
         if done:
             return
-        logger.warning('Failed to connect to execution nodes. Retrying in 10 seconds...')
+        logger.warning('Execution nodes are not ready. Retrying in 10 seconds...')
         await asyncio.sleep(10)
 
 
@@ -477,6 +467,20 @@ async def _check_events_logs() -> None:
             "Can't find network validator events. "
             "Please, ensure that EL client didn't prune event logs."
         )
+
+
+async def _check_vault_withdrawable_assets() -> None:
+    harvest_params = await get_harvest_params()
+    withdrawable_assets = await get_withdrawable_assets(harvest_params=harvest_params)
+
+    # Note. We round down assets in the log message because of the case when assets
+    # is slightly less than required amount to register validator.
+    # Standard rounding will show that we have enough assets, but in fact we don't.
+    logger.info(
+        'Vault withdrawable assets: %s %s',
+        round_down(Web3.from_wei(withdrawable_assets, 'ether'), 2),
+        settings.network_config.VAULT_BALANCE_SYMBOL,
+    )
 
 
 async def _check_relayer_endpoint() -> None:
