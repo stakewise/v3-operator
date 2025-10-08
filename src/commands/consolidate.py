@@ -31,7 +31,7 @@ from src.config.config import OperatorConfig
 from src.config.networks import GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
     CONSOLIDATIONS_PROCESSING_EPOCHS_INTERVAL,
-    MAX_CONSOLIDATION_REQUEST_FEE_GWEI,
+    DEFAULT_MAX_CONSOLIDATION_REQUEST_FEE_GWEI,
     settings,
 )
 from src.validators.consensus import EXITING_STATUSES, fetch_consensus_validators
@@ -119,6 +119,14 @@ logger = logging.getLogger(__name__)
     callback=validate_max_validator_balance_gwei,
 )
 @click.option(
+    '--max-consolidation-request-fee-gwei',
+    type=int,
+    envvar='MAX_CONSOLIDATION_REQUEST_FEE_GWEI',
+    help='The maximum consolidation request fee in Gwei. '
+    f'Default is {DEFAULT_MAX_CONSOLIDATION_REQUEST_FEE_GWEI} Gwei.',
+    default=DEFAULT_MAX_CONSOLIDATION_REQUEST_FEE_GWEI,
+)
+@click.option(
     '-v',
     '--verbose',
     help='Enable debug mode. Default is false.',
@@ -163,6 +171,7 @@ def consolidate(
     no_switch_consolidation: bool,
     no_confirm: bool,
     log_level: str,
+    max_consolidation_request_fee_gwei: int,
     source_public_keys: list[HexStr] | None,
     source_public_keys_file: Path | None,
     target_public_key: HexStr | None = None,
@@ -207,6 +216,7 @@ def consolidate(
                 source_public_keys=source_public_keys,
                 target_public_key=target_public_key,
                 no_switch_consolidation=no_switch_consolidation,
+                max_consolidation_request_fee_gwei=Gwei(max_consolidation_request_fee_gwei),
                 no_confirm=no_confirm,
             )
         )
@@ -215,12 +225,13 @@ def consolidate(
         sys.exit(1)
 
 
-# pylint: disable-next=too-many-locals
+# pylint: disable-next=too-many-locals,too-many-arguments
 async def main(
     vault_address: ChecksumAddress,
     source_public_keys: list[HexStr] | None,
     target_public_key: HexStr | None,
     no_switch_consolidation: bool,
+    max_consolidation_request_fee_gwei: Gwei,
     no_confirm: bool,
 ) -> None:
     # pylint: disable=line-too-long
@@ -284,12 +295,12 @@ async def main(
     consolidation_request_fee = await get_execution_request_fee(
         settings.network_config.CONSOLIDATION_CONTRACT_ADDRESS,
     )
-    if consolidation_request_fee > Web3.to_wei(MAX_CONSOLIDATION_REQUEST_FEE_GWEI, 'gwei'):
+    if consolidation_request_fee > Web3.to_wei(max_consolidation_request_fee_gwei, 'gwei'):
         logger.info(
             'The current consolidation fee per one consolidation (%s Gwei) exceeds the maximum allowed (%s Gwei). '
             'You can override the limit using the MAX_CONSOLIDATION_REQUEST_FEE_GWEI environment variable.',
             Web3.from_wei(consolidation_request_fee, 'gwei'),
-            MAX_CONSOLIDATION_REQUEST_FEE_GWEI,
+            max_consolidation_request_fee_gwei,
         )
         return
     # Current fee calculated for the number of validators consolidated + gap
