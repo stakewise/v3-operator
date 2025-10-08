@@ -8,6 +8,7 @@ from typing import NewType
 
 import milagro_bls_binding as bls
 from eth_typing import BLSPrivateKey, BLSSignature, HexStr
+from eth_utils import add_0x_prefix
 from staking_deposit.key_handling.keystore import ScryptKeystore
 from sw_utils.signing import get_exit_message_signing_root
 from sw_utils.typings import ConsensusFork
@@ -168,3 +169,17 @@ class LocalKeystore(BaseKeystore):
     def _load_keystores_password(password_path: Path) -> str:
         with open(password_path, 'r', encoding='utf-8') as f:
             return f.read().strip()
+
+    @staticmethod
+    def parse_keystore_file(keystore_file: KeystoreFile) -> tuple[int, HexStr]:
+        """
+        Extracts the key index and public key from a keystore file.
+        Does not decrypt the keystore.
+        """
+        keystore = ScryptKeystore.from_file(keystore_file.file)
+
+        # extract index from path: m/12381/3600/<index>/0/0
+        key_index = int(keystore.path.split('/')[-3])
+        public_key = add_0x_prefix(HexStr(keystore.pubkey))
+
+        return key_index, public_key
