@@ -156,4 +156,4 @@ async def get_execution_request_fee(address: ChecksumAddress) -> Wei:
     }
 
     fee = await execution_client.eth.call(tx_data, block_identifier='latest')
-    return Wei(Web3.to_int(fee))
+    return Wei(Web3.to_wei(Web3.to_int(fee), 'gwei'))
