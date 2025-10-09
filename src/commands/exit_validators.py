@@ -18,7 +18,7 @@ from src.common.startup_check import check_validators_manager, check_vault_versi
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_address, validate_indexes
 from src.config.config import OperatorConfig
-from src.config.settings import MAX_WITHDRAWAL_REQUEST_FEE_GWEI, settings
+from src.config.settings import DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI, settings
 from src.validators.consensus import EXITING_STATUSES, fetch_consensus_validators
 from src.validators.relayer import RelayerClient
 from src.validators.typings import ConsensusValidator
@@ -73,6 +73,14 @@ logger = logging.getLogger(__name__)
     envvar='RELAYER_ENDPOINT',
 )
 @click.option(
+    '--max-withdrawal-request-fee-gwei',
+    type=int,
+    envvar='MAX_WITHDRAWAL_REQUEST_FEE_GWEI',
+    help='The maximum withdrawal request fee in Gwei. '
+    f'The default is {DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI}',
+    default=DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI,
+)
+@click.option(
     '-v',
     '--verbose',
     help='Enable debug mode. Default is false.',
@@ -103,6 +111,7 @@ def exit_validators(
     count: int | None,
     consensus_endpoints: str,
     execution_endpoints: str,
+    max_withdrawal_request_fee_gwei: int,
     data_dir: str,
     verbose: bool,
     no_confirm: bool,
@@ -124,6 +133,7 @@ def exit_validators(
         network=operator_config.network,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
+        max_withdrawal_request_fee_gwei=Gwei(max_withdrawal_request_fee_gwei),
         relayer_endpoint=relayer_endpoint,
         verbose=verbose,
         log_level=log_level,
@@ -175,7 +185,7 @@ async def main(
     withdrawal_request_fee = await get_execution_request_fee(
         settings.network_config.WITHDRAWAL_CONTRACT_ADDRESS,
     )
-    if withdrawal_request_fee > Web3.to_wei(MAX_WITHDRAWAL_REQUEST_FEE_GWEI, 'gwei'):
+    if withdrawal_request_fee > Web3.to_wei(settings.max_withdrawal_request_fee_gwei, 'gwei'):
         raise click.ClickException(
             'Validator exits are skipped due to high withdrawal fee. '
             f'The current fee is {Web3.from_wei(withdrawal_request_fee, 'gwei')} Gwei. '
