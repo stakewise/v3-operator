@@ -13,6 +13,7 @@ from src.common.validators import (
 )
 from src.config.networks import GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
+    DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI,
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
     DEFAULT_METRICS_PREFIX,
@@ -223,6 +224,14 @@ start_common_options = [
         help=f'Minimum delay for validator funding in seconds.'
         f' The default is {DEFAULT_MIN_DEPOSIT_DELAY}',
         default=DEFAULT_MIN_DEPOSIT_DELAY,
+    ),
+    click.option(
+        '--max-withdrawal-request-fee-gwei',
+        type=int,
+        envvar='MAX_WITHDRAWAL_REQUEST_FEE_GWEI',
+        help='The maximum withdrawal request fee in Gwei. '
+        f'The default is {DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI}',
+        default=DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI,
     ),
 ]
 

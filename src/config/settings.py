@@ -23,6 +23,10 @@ DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI = Gwei(int(Web3.from_wei(DEFAULT_MIN_DEPOSIT_AMO
 DEFAULT_MIN_DEPOSIT_DELAY = 3600  # 1 hour
 
 
+DEFAULT_MAX_CONSOLIDATION_REQUEST_FEE_GWEI = Gwei(1000)
+DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI = Gwei(1000)
+
+
 # pylint: disable-next=too-many-public-methods,too-many-instance-attributes
 class Settings(metaclass=Singleton):
     vault: ChecksumAddress
@@ -106,6 +110,7 @@ class Settings(metaclass=Singleton):
     min_deposit_amount_gwei: Gwei
     max_validator_balance_gwei: Gwei
     min_deposit_delay: int
+    max_withdrawal_request_fee_gwei: Gwei
 
     # pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements
     def set(
@@ -150,6 +155,7 @@ class Settings(metaclass=Singleton):
         min_deposit_amount_gwei: Gwei = DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
         max_validator_balance_gwei: Gwei | None = None,
         min_deposit_delay: int = DEFAULT_MIN_DEPOSIT_DELAY,
+        max_withdrawal_request_fee_gwei: Gwei = DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI,
     ) -> None:
         self.vault = vault
         vault_dir.mkdir(parents=True, exist_ok=True)
@@ -182,6 +188,7 @@ class Settings(metaclass=Singleton):
 
         self.min_deposit_amount_gwei = min_deposit_amount_gwei
         self.min_deposit_delay = min_deposit_delay
+        self.max_withdrawal_request_fee_gwei = max_withdrawal_request_fee_gwei
 
         # keystores
         self.keystores_dir = Path(keystores_dir) if keystores_dir else vault_dir / 'keystores'
@@ -324,13 +331,6 @@ MIN_ACTIVATION_BALANCE_GWEI: Gwei = Gwei(int(Web3.from_wei(MIN_ACTIVATION_BALANC
 
 MAX_EFFECTIVE_BALANCE: Wei = Web3.to_wei(2048, 'ether')
 MAX_EFFECTIVE_BALANCE_GWEI: Gwei = Gwei(int(Web3.from_wei(MAX_EFFECTIVE_BALANCE, 'gwei')))
-
-MAX_CONSOLIDATION_REQUEST_FEE_GWEI: Gwei = decouple_config(
-    'MAX_CONSOLIDATION_REQUEST_FEE_GWEI', default=1000, cast=int
-)
-MAX_WITHDRAWAL_REQUEST_FEE_GWEI: Gwei = decouple_config(
-    'MAX_WITHDRAWAL_REQUEST_FEE_GWEI', default=1000, cast=int
-)
 
 CONSOLIDATIONS_PROCESSING_EPOCHS_INTERVAL: int = decouple_config(
     'CONSOLIDATIONS_PROCESSING_EPOCHS_INTERVAL', cast=int, default=5

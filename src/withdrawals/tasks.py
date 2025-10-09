@@ -21,7 +21,6 @@ from src.common.metrics import metrics
 from src.common.typings import ValidatorsRegistrationMode
 from src.common.utils import round_down
 from src.config.settings import (
-    MAX_WITHDRAWAL_REQUEST_FEE_GWEI,
     MIN_WITHDRAWAL_AMOUNT_GWEI,
     WITHDRAWALS_INTERVAL,
     settings,
@@ -113,7 +112,7 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
         current_fee = await get_execution_request_fee(
             settings.network_config.WITHDRAWAL_CONTRACT_ADDRESS,
         )
-        if current_fee > Web3.to_wei(MAX_WITHDRAWAL_REQUEST_FEE_GWEI, 'gwei'):
+        if current_fee > Web3.to_wei(settings.max_withdrawal_request_fee_gwei, 'gwei'):
             logger.info(
                 'Partial withdrawals are skipped due to high withdrawal fee, '
                 'the current fee is %s Gwei. You can adjust the maximum allowed fee'
