@@ -14,7 +14,7 @@ from src.common.consensus import get_chain_epoch_head, get_chain_justified_head
 from src.common.contracts import VaultContract
 from src.common.execution import (
     build_gas_manager,
-    get_execution_request_fee,
+    get_consolidation_request_fee,
     get_protocol_config,
 )
 from src.common.logging import LOG_LEVELS, setup_logging
@@ -292,21 +292,6 @@ async def main(
             abort=True,
         )
 
-    consolidation_request_fee = await get_execution_request_fee(
-        settings.network_config.CONSOLIDATION_CONTRACT_ADDRESS,
-    )
-    if consolidation_request_fee > Web3.to_wei(max_consolidation_request_fee_gwei, 'gwei'):
-        logger.info(
-            'The current consolidation fee per one consolidation (%s Gwei) exceeds the maximum allowed (%s Gwei). '
-            'You can override the limit using the MAX_CONSOLIDATION_REQUEST_FEE_GWEI environment variable.',
-            Web3.from_wei(consolidation_request_fee, 'gwei'),
-            max_consolidation_request_fee_gwei,
-        )
-        return
-    # Current fee calculated for the number of validators consolidated + gap
-    # in case there are some other consolidations in the network.
-    tx_fee = Wei(consolidation_request_fee * len(target_source) + consolidation_request_fee)
-
     gas_manager = build_gas_manager()
     if not await gas_manager.check_gas_price():
         return
@@ -317,6 +302,18 @@ async def main(
         (target_validator.public_key, source_validator.public_key)
         for target_validator, source_validator in target_source
     ]
+    consolidations_count = len(target_source_public_keys)
+
+    consolidation_request_fee = await get_consolidation_request_fee(count=consolidations_count)
+    if consolidation_request_fee > Web3.to_wei(max_consolidation_request_fee_gwei, 'gwei'):
+        logger.info(
+            'The current consolidation fee per one consolidation (%s Gwei) exceeds the maximum allowed (%s Gwei). '
+            'You can override the limit using the MAX_CONSOLIDATION_REQUEST_FEE_GWEI environment variable.',
+            Web3.from_wei(consolidation_request_fee, 'gwei'),
+            max_consolidation_request_fee_gwei,
+        )
+        return
+
     oracle_signatures = None
     if (
         len(target_source_public_keys) == 1
@@ -337,7 +334,7 @@ async def main(
     tx_hash = await submit_consolidate_validators(
         validators=encoded_validators,
         oracle_signatures=oracle_signatures,
-        tx_fee=tx_fee,
+        tx_fee=Wei(consolidation_request_fee * consolidations_count),
         validators_manager_signature=validators_manager_signature,
     )
 
