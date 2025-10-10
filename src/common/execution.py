@@ -2,7 +2,7 @@ import asyncio
 import logging
 from typing import cast
 
-from eth_typing import BlockNumber, ChecksumAddress
+from eth_typing import BlockNumber
 from hexbytes import HexBytes
 from sw_utils import GasManager, InterruptHandler, ProtocolConfig, build_protocol_config
 from web3 import Web3
@@ -146,14 +146,86 @@ def build_gas_manager() -> GasManager:
     )
 
 
-async def get_execution_request_fee(address: ChecksumAddress) -> Wei:
+async def get_withdrawal_request_fee(count: int = 1, gap_count: int = 10) -> Wei:
     """
-    Retrieves the current fee for an execution layer request.
+    Calculates the current withdrawal request fee.
+    For more details see: https://eips.ethereum.org/EIPS/eip-7002
     """
-    tx_data: TxParams = {
-        'to': address,
-        'data': b'',
-    }
+    previous_excess_bytes = await execution_client.eth.get_storage_at(
+        settings.network_config.WITHDRAWAL_CONTRACT_ADDRESS,
+        settings.network_config.EXCESS_EXECUTION_REQUESTS_STORAGE_SLOT,
+    )
+    previous_excess = Web3.to_int(previous_excess_bytes)
 
-    fee = await execution_client.eth.call(tx_data, block_identifier='latest')
-    return Wei(Web3.to_wei(Web3.to_int(fee), 'gwei'))
+    count += await get_withdrawal_requests_count()
+    count += gap_count
+
+    excess = 0
+    target_withdrawal_requests_per_block = (
+        settings.network_config.TARGET_WITHDRAWAL_REQUESTS_PER_BLOCK
+    )
+    if previous_excess + count > target_withdrawal_requests_per_block:
+        excess = previous_excess + count - target_withdrawal_requests_per_block
+
+    per_validator_fee = fake_exponential(
+        settings.network_config.MIN_EXECUTION_REQUEST_FEE,
+        excess,
+        settings.network_config.EXECUTION_REQUEST_FEE_UPDATE_FRACTION,
+    )
+    return Wei(per_validator_fee)
+
+
+async def get_consolidation_request_fee(count: int = 1, gap_count: int = 5) -> Wei:
+    """
+    Calculates the current consolidation request fee.
+    For more details see: https://eips.ethereum.org/EIPS/eip-7251
+    """
+    previous_excess_bytes = await execution_client.eth.get_storage_at(
+        settings.network_config.CONSOLIDATION_CONTRACT_ADDRESS,
+        settings.network_config.EXCESS_EXECUTION_REQUESTS_STORAGE_SLOT,
+    )
+    previous_excess = Web3.to_int(previous_excess_bytes)
+
+    count += await get_consolidation_requests_count()
+    count += gap_count
+
+    excess = 0
+    target_consolidation_requests_per_block = (
+        settings.network_config.TARGET_CONSOLIDATION_REQUESTS_PER_BLOCK
+    )
+    if previous_excess + count > target_consolidation_requests_per_block:
+        excess = previous_excess + count - target_consolidation_requests_per_block
+
+    per_validator_fee = fake_exponential(
+        settings.network_config.MIN_EXECUTION_REQUEST_FEE,
+        excess,
+        settings.network_config.EXECUTION_REQUEST_FEE_UPDATE_FRACTION,
+    )
+    return Wei(per_validator_fee)
+
+
+async def get_withdrawal_requests_count() -> int:
+    count_bytes = await execution_client.eth.get_storage_at(
+        settings.network_config.WITHDRAWAL_CONTRACT_ADDRESS,
+        settings.network_config.EXECUTION_REQUEST_COUNT_STORAGE_SLOT,
+    )
+    return Web3.to_int(count_bytes)
+
+
+async def get_consolidation_requests_count() -> int:
+    count_bytes = await execution_client.eth.get_storage_at(
+        settings.network_config.CONSOLIDATION_CONTRACT_ADDRESS,
+        settings.network_config.EXECUTION_REQUEST_COUNT_STORAGE_SLOT,
+    )
+    return Web3.to_int(count_bytes)
+
+
+def fake_exponential(factor: int, numerator: int, denominator: int) -> int:
+    i = 1
+    output = 0
+    numerator_accum = factor * denominator
+    while numerator_accum > 0:
+        output += numerator_accum
+        numerator_accum = (numerator_accum * numerator) // (denominator * i)
+        i += 1
+    return output // denominator
