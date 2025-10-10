@@ -15,6 +15,7 @@ from src.common.contracts import VaultContract
 from src.common.execution import (
     build_gas_manager,
     get_consolidation_request_fee,
+    get_consolidation_requests_count,
     get_protocol_config,
 )
 from src.common.logging import LOG_LEVELS, setup_logging
@@ -473,8 +474,9 @@ async def _check_validators_manager(vault_address: ChecksumAddress) -> None:
 
 
 async def _check_consolidations_queue() -> None:
-    pending_consolidations = await consensus_client.get_pending_consolidations()
-    queue_length = len(pending_consolidations)
+    pending_consolidations_consensus = await consensus_client.get_pending_consolidations()
+    pending_consolidations_execution_count = await get_consolidation_requests_count()
+    queue_length = len(pending_consolidations_consensus) + pending_consolidations_execution_count
     if queue_length >= settings.network_config.PENDING_CONSOLIDATIONS_LIMIT:
         raise click.ClickException(
             'Pending consolidations queue has exceeded its limit. Please try again later.'

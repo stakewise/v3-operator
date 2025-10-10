@@ -16,7 +16,11 @@ from src.common.app_state import AppState
 from src.common.clients import consensus_client, execution_client
 from src.common.consensus import get_chain_latest_head
 from src.common.contracts import VaultContract
-from src.common.execution import get_protocol_config, get_withdrawal_request_fee
+from src.common.execution import (
+    get_protocol_config,
+    get_withdrawal_request_fee,
+    get_withdrawal_requests_count,
+)
 from src.common.metrics import metrics
 from src.common.typings import ValidatorsRegistrationMode
 from src.common.utils import round_down
@@ -290,6 +294,9 @@ async def _fetch_oracle_exiting_validators(
 
 
 async def _is_pending_partial_withdrawals_queue_full() -> bool:
-    pending_partial_withdrawals = await consensus_client.get_pending_partial_withdrawals()
-    queue_length = len(pending_partial_withdrawals)
+    pending_partial_withdrawals_consensus = await consensus_client.get_pending_partial_withdrawals()
+    pending_partial_withdrawals_execution_count = await get_withdrawal_requests_count()
+    queue_length = (
+        len(pending_partial_withdrawals_consensus) + pending_partial_withdrawals_execution_count
+    )
     return queue_length >= settings.network_config.PENDING_PARTIAL_WITHDRAWALS_LIMIT
