@@ -18,7 +18,6 @@ from src.common.contracts import (
 )
 from src.common.typings import HarvestParams
 from src.config.settings import settings
-from src.harvest.execution import get_update_state_calls
 from src.validators.database import (
     CheckpointCrud,
     NetworkValidatorCrud,
@@ -213,9 +212,9 @@ async def get_withdrawable_assets(harvest_params: HarvestParams | None) -> Wei:
     if harvest_params is None:
         return await vault_contract.functions.withdrawableAssets().call()
 
-    calls = await get_update_state_calls(
-        vault_address=vault_contract.contract_address, harvest_params=harvest_params
-    )
+    calls = [
+        (vault_contract.contract_address, vault_contract.get_update_state_call(harvest_params))
+    ]
     withdrawable_assets_call = vault_contract.encode_abi(fn_name='withdrawableAssets', args=[])
     calls.append((vault_contract.contract_address, withdrawable_assets_call))
 

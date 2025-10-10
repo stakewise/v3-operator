@@ -154,6 +154,15 @@ class VaultContract(ContractWrapper, VaultStateMixin):
             for event in events
         ]
 
+    async def get_consolidation_events(
+        self, from_block: BlockNumber, to_block: BlockNumber
+    ) -> list[EventData]:
+        return await self._get_events(
+            event=self.events.ValidatorConsolidationSubmitted,  # type: ignore
+            from_block=from_block,
+            to_block=to_block,
+        )
+
     async def mev_escrow(self) -> ChecksumAddress:
         return await self.contract.functions.mevEscrow().call()
 
@@ -183,13 +192,6 @@ class VaultContract(ContractWrapper, VaultStateMixin):
             )
             for event in events
         ]
-
-
-class GnoVaultContract(ContractWrapper, VaultStateMixin):
-    abi_path = 'abi/IGnoVault.json'
-
-    def get_swap_xdai_call(self) -> HexStr:
-        return self.encode_abi(fn_name='swapXdaiToGno', args=[])
 
 
 class ValidatorsRegistryContract(ContractWrapper):
