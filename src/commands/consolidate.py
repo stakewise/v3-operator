@@ -9,13 +9,15 @@ from sw_utils import ChainHead
 from web3 import Web3
 from web3.types import Gwei, Wei
 
-from src.common.clients import consensus_client, execution_client, setup_clients
-from src.common.consensus import get_chain_epoch_head, get_chain_justified_head
+from src.common.clients import setup_clients
+from src.common.consensus import get_chain_justified_head
 from src.common.contracts import VaultContract
 from src.common.execution import (
     build_gas_manager,
     get_consolidation_request_fee,
-    get_consolidation_requests_count,
+    get_consolidations_count,
+    get_pending_consolidations,
+    get_pending_partial_withdrawals,
     get_protocol_config,
 )
 from src.common.logging import LOG_LEVELS, setup_logging
@@ -30,11 +32,7 @@ from src.common.validators import (
 from src.common.wallet import wallet
 from src.config.config import OperatorConfig
 from src.config.networks import GNOSIS, MAINNET, NETWORKS
-from src.config.settings import (
-    CONSOLIDATIONS_PROCESSING_EPOCHS_INTERVAL,
-    DEFAULT_MAX_CONSOLIDATION_REQUEST_FEE_GWEI,
-    settings,
-)
+from src.config.settings import DEFAULT_MAX_CONSOLIDATION_REQUEST_FEE_GWEI, settings
 from src.validators.consensus import EXITING_STATUSES, fetch_consensus_validators
 from src.validators.oracles import poll_consolidation_signature
 from src.validators.register_validators import submit_consolidate_validators
@@ -248,23 +246,18 @@ async def main(
 
     await _check_validators_manager(vault_address)
     await _check_consolidations_queue()
-    last_submitted_consolidations = await _fetch_last_contract_submitted_consolidations(
-        vault_address, chain_head
-    )
     if source_public_keys is not None and target_public_key is not None:
         # keys provided by the user
         target_source = await _check_public_keys(
             vault_address=vault_address,
             source_public_keys=source_public_keys,
             target_public_key=target_public_key,
-            last_submitted_consolidations=last_submitted_consolidations,
             chain_head=chain_head,
         )
 
     else:
         target_source = await _find_target_source_public_keys(
             vault_address=vault_address,
-            last_submitted_consolidations=last_submitted_consolidations,
             chain_head=chain_head,
         )
         if not target_source:
@@ -309,7 +302,7 @@ async def main(
     if consolidation_request_fee > Web3.to_wei(max_consolidation_request_fee_gwei, 'gwei'):
         logger.info(
             'The current consolidation fee per one consolidation (%s Gwei) exceeds the maximum allowed (%s Gwei). '
-            'You can override the limit using the MAX_CONSOLIDATION_REQUEST_FEE_GWEI environment variable.',
+            'You can override the limit using --max-consolidation-request-fee-gwei flag.',
             Web3.from_wei(consolidation_request_fee, 'gwei'),
             max_consolidation_request_fee_gwei,
         )
@@ -352,7 +345,6 @@ async def _check_public_keys(
     vault_address: ChecksumAddress,
     source_public_keys: list[HexStr],
     target_public_key: HexStr,
-    last_submitted_consolidations: set[HexStr],
     chain_head: ChainHead,
 ) -> list[tuple[ConsensusValidator, ConsensusValidator]]:
     """
@@ -371,17 +363,7 @@ async def _check_public_keys(
             'Cannot switch from 0x01 to 0x02 and consolidate '
             'to another validator in the same request.'
         )
-    if target_public_key in last_submitted_consolidations:
-        raise click.ClickException(
-            f'Target validator {target_public_key} has submitted consolidation '
-            f'in the last {CONSOLIDATIONS_PROCESSING_EPOCHS_INTERVAL} epochs.'
-        )
-    for source_public_key in source_public_keys:
-        if source_public_key in last_submitted_consolidations:
-            raise click.ClickException(
-                f'Source validator {source_public_key} has submitted consolidation '
-                f'in the last {CONSOLIDATIONS_PROCESSING_EPOCHS_INTERVAL} epochs.'
-            )
+
     # Fetch source and target validators
     validators = await fetch_consensus_validators(source_public_keys + [target_public_key])
     pubkey_to_validator = {val.public_key: val for val in validators}
@@ -435,9 +417,7 @@ async def _check_public_keys(
             )
 
     # Validate the source validators has no pending withdrawals in the queue
-    await _check_pending_balance_to_withdraw(
-        validator_indexes={val.index for val in source_validators}
-    )
+    await _check_pending_balance_to_withdraw(chain_head, source_validators)
 
     # Validate the source and target validators are in the vault
     logger.info('Fetching vault validators...')
@@ -474,42 +454,23 @@ async def _check_validators_manager(vault_address: ChecksumAddress) -> None:
 
 
 async def _check_consolidations_queue() -> None:
-    pending_consolidations_consensus = await consensus_client.get_pending_consolidations()
-    pending_consolidations_execution_count = await get_consolidation_requests_count()
-    queue_length = len(pending_consolidations_consensus) + pending_consolidations_execution_count
+    queue_length = await get_consolidations_count()
     if queue_length >= settings.network_config.PENDING_CONSOLIDATIONS_LIMIT:
         raise click.ClickException(
             'Pending consolidations queue has exceeded its limit. Please try again later.'
         )
 
 
-async def _fetch_last_contract_submitted_consolidations(
-    vault_address: ChecksumAddress, chain_head: ChainHead
-) -> set[HexStr]:
-    vault_contract = VaultContract(vault_address)
-
-    previous_epoch = max(chain_head.epoch - CONSOLIDATIONS_PROCESSING_EPOCHS_INTERVAL, 0)
-    previous_chain_head = await get_chain_epoch_head(previous_epoch)
-    last_events = await vault_contract.get_consolidation_events(
-        from_block=previous_chain_head.block_number,
-        to_block=await execution_client.eth.get_block_number(),
-    )
-    public_keys = set()
-    for event in last_events:
-        public_keys.add(Web3.to_hex(event['args']['fromPublicKey']))
-        public_keys.add(Web3.to_hex(event['args']['toPublicKey']))
-    return public_keys
-
-
-async def _check_pending_balance_to_withdraw(validator_indexes: set[int]) -> None:
+async def _check_pending_balance_to_withdraw(
+    chain_head: ChainHead, validators: list[ConsensusValidator]
+) -> None:
     """Verify the source validators has no pending withdrawals in the queue"""
-    pending_partial_withdrawals = await consensus_client.get_pending_partial_withdrawals()
-    for withdrawal in pending_partial_withdrawals:
-        if int(withdrawal['validator_index']) in validator_indexes and withdrawal['amount']:
-            raise click.ClickException(
-                f'Validator {withdrawal['validator_index']} '
-                f'has pending partial withdrawals in the queue. '
-            )
+    pending_partial_withdrawals = await get_pending_partial_withdrawals(chain_head, validators)
+    if pending_partial_withdrawals:
+        indexes = ', '.join(str(w.validator_index) for w in pending_partial_withdrawals)
+        raise click.ClickException(
+            f'Validators with indexes {indexes} have pending partial withdrawals in the queue. '
+        )
 
 
 def _encode_validators(target_source_public_keys: list[tuple[HexStr, HexStr]]) -> bytes:
@@ -535,7 +496,6 @@ def _load_public_keys(public_keys_file: Path) -> list[HexStr]:
 async def _find_target_source_public_keys(
     vault_address: ChecksumAddress,
     chain_head: ChainHead,
-    last_submitted_consolidations: set[HexStr],
 ) -> list[tuple[ConsensusValidator, ConsensusValidator]]:
     """
     If there are no 0x02 validators,
@@ -544,12 +504,6 @@ async def _find_target_source_public_keys(
     take the oldest 0x01 validators to top up its balance to 2048 ETH / 64 GNO.
     """
     max_activation_epoch = chain_head.epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
-
-    current_consolidations = await consensus_client.get_pending_consolidations()
-    consolidating_indexes = set()
-    for cons in current_consolidations:
-        consolidating_indexes.add(int(cons['source_index']))
-        consolidating_indexes.add(int(cons['target_index']))
 
     logger.info('Fetching vault validators...')
     vault_contract = VaultContract(vault_address)
@@ -561,11 +515,18 @@ async def _find_target_source_public_keys(
         val
         for val in await fetch_consensus_validators(public_keys)
         if val.status not in EXITING_STATUSES
-        and val.index not in consolidating_indexes
-        and val.public_key not in last_submitted_consolidations
     ]
 
+    current_consolidations = await get_pending_consolidations(chain_head, active_validators)
+    consolidating_indexes = set()
+    for cons in current_consolidations:
+        consolidating_indexes.add(cons.source_index)
+        consolidating_indexes.add(cons.target_index)
+
+    active_validators = [val for val in active_validators if val.index not in consolidating_indexes]
+
     source_validators = await _get_source_validators(
+        chain_head=chain_head,
         active_validators=active_validators,
         max_activation_epoch=max_activation_epoch,
     )
@@ -595,13 +556,13 @@ async def _find_target_source_public_keys(
 
 
 async def _get_source_validators(
-    active_validators: list[ConsensusValidator], max_activation_epoch: int
+    chain_head: ChainHead, active_validators: list[ConsensusValidator], max_activation_epoch: int
 ) -> list[ConsensusValidator]:
-    pending_partial_withdrawals = await consensus_client.get_pending_partial_withdrawals()
+    pending_partial_withdrawals = await get_pending_partial_withdrawals(
+        chain_head=chain_head, consensus_validators=active_validators
+    )
     pending_partial_withdrawals_indexes = {
-        int(withdrawal['validator_index'])
-        for withdrawal in pending_partial_withdrawals
-        if withdrawal['amount']
+        withdrawal.validator_index for withdrawal in pending_partial_withdrawals
     }
 
     source_validators = []

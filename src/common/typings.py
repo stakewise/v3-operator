@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from hexbytes import HexBytes
-from web3.types import ChecksumAddress, Wei
+from web3.types import ChecksumAddress, Gwei, Wei
 
 
 @dataclass
@@ -38,6 +38,18 @@ class ExitQueueMissingAssetsParams:
     vault: ChecksumAddress
     withdrawing_assets: Wei
     exit_queue_cumulative_ticket: int
+
+
+@dataclass
+class PendingConsolidation:
+    source_index: int
+    target_index: int
+
+
+@dataclass
+class PendingPartialWithdrawal:
+    validator_index: int
+    amount: Gwei
 
 
 class ValidatorType(Enum):
