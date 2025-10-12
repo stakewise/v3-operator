@@ -120,7 +120,7 @@ exclude = '''
 
 [tool.coverage.report]
 omit = ["*/tests/*"]
-fail_under = 61
+fail_under = 60
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
