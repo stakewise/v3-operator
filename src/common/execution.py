@@ -416,7 +416,7 @@ async def get_withdrawal_request_fee(count: int = 1, gap_count: int = 10) -> Wei
 async def get_withdrawals_count() -> int:
     count = await get_execution_withdrawals_count()
     pending_partial_withdrawals = await consensus_client.get_pending_partial_withdrawals()
-    return len(pending_partial_withdrawals) + Web3.to_int(count)
+    return len(pending_partial_withdrawals) + count
 
 
 async def get_execution_withdrawals_count() -> int:
