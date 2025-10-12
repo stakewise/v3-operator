@@ -286,7 +286,7 @@ async def get_consolidation_request_fee(count: int = 1, gap_count: int = 5) -> W
 async def get_consolidations_count() -> int:
     count = await get_execution_consolidations_count()
     consensus_consolidations = await consensus_client.get_pending_consolidations()
-    return len(consensus_consolidations) + Web3.to_int(count)
+    return len(consensus_consolidations) + count
 
 
 async def get_execution_consolidations_count() -> int:
