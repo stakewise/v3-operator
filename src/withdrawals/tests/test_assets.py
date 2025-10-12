@@ -1,61 +1,60 @@
 from unittest.mock import AsyncMock
 
 import pytest
-from sw_utils import ValidatorStatus
+from sw_utils import HOODI, ValidatorStatus
 from web3 import Web3
 
+from src.common.tests.factories import create_chain_head
+from src.common.typings import PendingPartialWithdrawal
+from src.config.settings import settings
 from src.validators.tests.factories import create_consensus_validator
+from src.withdrawals import assets
 from src.withdrawals.assets import (
     _calculate_validators_exits_amount,
     _get_pending_partial_withdrawals_amount,
-    consensus_client,
 )
 
 
 @pytest.mark.asyncio
-async def test_get_pending_partial_withdrawals():
-    consensus_client.get_pending_partial_withdrawals = AsyncMock(return_value=[])
-    result = await _get_pending_partial_withdrawals_amount(['1', '2'], 12345)
+async def test_get_pending_partial_withdrawals(data_dir):
+    settings.set(vault=None, vault_dir=data_dir, network=HOODI)
+    assets.get_pending_partial_withdrawals = AsyncMock(return_value=[])
+    validators = [
+        create_consensus_validator(index=1, balance=32),
+        create_consensus_validator(index=2, balance=48),
+    ]
+    chain_head = create_chain_head(block_number=12345)
+    result = await _get_pending_partial_withdrawals_amount(validators, chain_head)
     assert result == Web3.to_wei(0, 'gwei')
 
     # sums amounts for matching validator indexes
-    consensus_client.get_pending_partial_withdrawals = AsyncMock(
+    assets.get_pending_partial_withdrawals = AsyncMock(
         return_value=[
-            {'validator_index': '1', 'amount': '10'},
-            {'validator_index': '2', 'amount': '20'},
+            PendingPartialWithdrawal(validator_index=1, amount=10),
+            PendingPartialWithdrawal(validator_index=2, amount=20),
         ]
     )
-    result = await _get_pending_partial_withdrawals_amount(['1', '2'], 12345)
+    result = await _get_pending_partial_withdrawals_amount(validators, chain_head)
     assert result == Web3.to_wei(30, 'gwei')
 
-    # ignores non matching validator indexes
-    consensus_client.get_pending_partial_withdrawals = AsyncMock(
-        return_value=[
-            {'validator_index': '3', 'amount': '10'},
-            {'validator_index': '4', 'amount': '20'},
-        ]
-    )
-    result = await _get_pending_partial_withdrawals_amount(['1', '2'], 12345)
-    assert result == Web3.to_wei(0, 'gwei')
-
     # handles empty validator indexes list
-    consensus_client.get_pending_partial_withdrawals = AsyncMock(
+    assets.get_pending_partial_withdrawals = AsyncMock(
         return_value=[
-            {'validator_index': '1', 'amount': '10'},
-            {'validator_index': '2', 'amount': '20'},
+            PendingPartialWithdrawal(validator_index=1, amount=10),
+            PendingPartialWithdrawal(validator_index=2, amount=20),
         ]
     )
-    result = await _get_pending_partial_withdrawals_amount([], 12345)
+    result = await _get_pending_partial_withdrawals_amount([], chain_head)
     assert result == Web3.to_wei(0, 'gwei')
 
     # handles large amounts correctly
-    consensus_client.get_pending_partial_withdrawals = AsyncMock(
+    assets.get_pending_partial_withdrawals = AsyncMock(
         return_value=[
-            {'validator_index': '1', 'amount': str(2**60)},
-            {'validator_index': '2', 'amount': str(2**60)},
+            PendingPartialWithdrawal(validator_index=1, amount=2**60),
+            PendingPartialWithdrawal(validator_index=2, amount=2**60),
         ]
     )
-    result = await _get_pending_partial_withdrawals_amount(['1', '2'], 12345)
+    result = await _get_pending_partial_withdrawals_amount(validators, chain_head)
     assert result == Web3.to_wei(2**61, 'gwei')
 
 
