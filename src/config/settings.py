@@ -246,10 +246,9 @@ class Settings(metaclass=Singleton):
         self.ipfs_fetch_endpoints = decouple_config(
             'IPFS_FETCH_ENDPOINTS',
             cast=Csv(),
-            default='https://gateway.pinata.cloud,'
-            'https://ipfs.io,'
+            default='https://ipfs.io,'
             'https://stakewise.myfilebase.com,'
-            'https://stakewise-ipfs.quicknode-ipfs.com',
+            'https://stakewise-ipfs.quicknode-ipfs.com'
         )
         self.ipfs_timeout = decouple_config('IPFS_TIMEOUT', default=60, cast=int)
         self.ipfs_retry_timeout = decouple_config('IPFS_RETRY_TIMEOUT', default=120, cast=int)
