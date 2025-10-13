@@ -95,12 +95,6 @@ adjust_os() {
   # adjust archive name based on OS
   true
 }
-adjust_arch() {
-  if [ "$OS" = "darwin" ] && [ "$ARCH" = "arm64" ]; then
-    ARCH="amd64"
-  fi
-  true
-}
 
 cat /dev/null <<EOF
 ------------------------------------------------------------------------
@@ -361,8 +355,6 @@ tag_to_version
 adjust_format
 
 adjust_os
-
-adjust_arch
 
 log_info "found version: ${VERSION} for ${OS}/${ARCH}"
 
