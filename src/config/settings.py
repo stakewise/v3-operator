@@ -246,8 +246,7 @@ class Settings(metaclass=Singleton):
         self.ipfs_fetch_endpoints = decouple_config(
             'IPFS_FETCH_ENDPOINTS',
             cast=Csv(),
-            default='https://gateway.pinata.cloud,'
-            'https://ipfs.io,'
+            default='https://ipfs.io,'
             'https://stakewise.myfilebase.com,'
             'https://stakewise-ipfs.quicknode-ipfs.com',
         )
