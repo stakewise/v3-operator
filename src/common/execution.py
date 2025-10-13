@@ -2,7 +2,7 @@ import asyncio
 import logging
 from typing import cast
 
-from eth_typing import BlockNumber
+from eth_typing import BlockNumber, HexStr
 from hexbytes import HexBytes
 from sw_utils import (
     ChainHead,
@@ -160,43 +160,44 @@ async def get_pending_consolidations(
     consensus_consolidations = await consensus_client.get_pending_consolidations(
         str(chain_head.slot)
     )
-    indexes = set()
-    public_key_to_index = {}
+    indexes: set[int] = set()
+    public_key_to_index: dict[HexStr, int] = {}
     for val in consensus_validators:
         indexes.add(val.index)
         public_key_to_index[val.public_key] = val.index
 
-    result = []
+    result: list[PendingConsolidation] = []
     for cons in consensus_consolidations:
-        source_idx = cons['source_index']
-        target_idx = cons['target_index']
+        source_index = int(cons['source_index'])
+        target_index = int(cons['target_index'])
 
-        has_source = source_idx in indexes
-        has_target = target_idx in indexes
+        has_source = source_index in indexes
+        has_target = target_index in indexes
         if not has_source and not has_target:
             continue
 
         if has_source and not has_target:
-            raise ValueError(f'Target validator index {target_idx} not found in vault validators')
+            raise ValueError(f'Target validator index {target_index} not found in vault validators')
 
-        result.append(PendingConsolidation(source_index=source_idx, target_index=target_idx))
+        result.append(PendingConsolidation(source_index=source_index, target_index=target_index))
 
     execution_consolidations = await get_execution_consolidations(chain_head.block_number)
     for cons in execution_consolidations:
         source_pubkey = cons['source_pubkey']
         target_pubkey = cons['target_pubkey']
 
-        source_idx = public_key_to_index.get(source_pubkey, None)
-        target_idx = public_key_to_index.get(target_pubkey, None)
-        if source_idx is None and target_idx is None:
+        if source_pubkey not in public_key_to_index and target_pubkey not in public_key_to_index:
             continue
 
-        if source_idx is not None and target_idx is None:
+        source_index = public_key_to_index[source_pubkey]
+        target_index = public_key_to_index[target_pubkey]
+
+        if source_index is not None and target_index is None:
             raise ValueError(
                 f'Target validator pubkey {target_pubkey} not found in vault validators'
             )
 
-        result.append(PendingConsolidation(source_index=source_idx, target_index=target_idx))
+        result.append(PendingConsolidation(source_index=source_index, target_index=target_index))
 
     return result
 
@@ -245,7 +246,7 @@ async def get_execution_consolidations(block_number: BlockNumber | None = None) 
         )
         execution_consolidations.append(
             {
-                'source_address': Web3.to_checksum_address(storage_slot0[0:20]),
+                'source_address': Web3.to_checksum_address(storage_slot0[12:32]),
                 'source_pubkey': Web3.to_hex(storage_slot1[0:32] + storage_slot2[0:16]),
                 'target_pubkey': Web3.to_hex(storage_slot2[16:32] + storage_slot3[0:32]),
             }
@@ -283,16 +284,19 @@ async def get_consolidation_request_fee(count: int = 1, gap_count: int = 5) -> W
     return Wei(per_validator_fee)
 
 
-async def get_consolidations_count() -> int:
-    count = await get_execution_consolidations_count()
-    consensus_consolidations = await consensus_client.get_pending_consolidations()
+async def get_consolidations_count(chain_head: ChainHead) -> int:
+    count = await get_execution_consolidations_count(chain_head.block_number)
+    consensus_consolidations = await consensus_client.get_pending_consolidations(
+        str(chain_head.slot)
+    )
     return len(consensus_consolidations) + count
 
 
-async def get_execution_consolidations_count() -> int:
+async def get_execution_consolidations_count(block_number: BlockNumber | None = None) -> int:
     count_bytes = await execution_client.eth.get_storage_at(
         settings.network_config.CONSOLIDATION_CONTRACT_ADDRESS,
         settings.network_config.EXECUTION_REQUEST_COUNT_STORAGE_SLOT,
+        block_identifier=block_number,
     )
     return Web3.to_int(count_bytes)
 
@@ -300,17 +304,17 @@ async def get_execution_consolidations_count() -> int:
 async def get_pending_partial_withdrawals(
     chain_head: ChainHead, consensus_validators: list[ConsensusValidator]
 ) -> list[PendingPartialWithdrawal]:
-    pending_withdrawals = await consensus_client.get_pending_partial_withdrawals(
+    consensus_withdrawals = await consensus_client.get_pending_partial_withdrawals(
         str(chain_head.slot)
     )
-    indexes = set()
-    public_key_to_index = {}
+    indexes: set[int] = set()
+    public_key_to_index: dict[HexStr, int] = {}
     for val in consensus_validators:
         indexes.add(val.index)
         public_key_to_index[val.public_key] = val.index
 
-    result = []
-    for withdrawal in pending_withdrawals:
+    result: list[PendingPartialWithdrawal] = []
+    for withdrawal in consensus_withdrawals:
         validator_index = int(withdrawal['validator_index'])
         if validator_index not in indexes:
             continue
@@ -375,7 +379,7 @@ async def get_execution_partial_withdrawals(block_number: BlockNumber | None = N
         )
         execution_withdrawals.append(
             {
-                'source_address': Web3.to_checksum_address(storage_slot0[0:20]),
+                'source_address': Web3.to_checksum_address(storage_slot0[20:32]),
                 'public_key': Web3.to_hex(storage_slot1[0:32] + storage_slot2[0:16]),
                 'amount': int.from_bytes(storage_slot2[16:24], byteorder='little'),
             }
@@ -413,16 +417,19 @@ async def get_withdrawal_request_fee(count: int = 1, gap_count: int = 10) -> Wei
     return Wei(per_validator_fee)
 
 
-async def get_withdrawals_count() -> int:
-    count = await get_execution_withdrawals_count()
-    pending_partial_withdrawals = await consensus_client.get_pending_partial_withdrawals()
+async def get_withdrawals_count(chain_head: ChainHead) -> int:
+    count = await get_execution_withdrawals_count(chain_head.block_number)
+    pending_partial_withdrawals = await consensus_client.get_pending_partial_withdrawals(
+        str(chain_head.slot)
+    )
     return len(pending_partial_withdrawals) + count
 
 
-async def get_execution_withdrawals_count() -> int:
+async def get_execution_withdrawals_count(block_number: BlockNumber | None = None) -> int:
     count_bytes = await execution_client.eth.get_storage_at(
         settings.network_config.WITHDRAWAL_CONTRACT_ADDRESS,
         settings.network_config.EXECUTION_REQUEST_COUNT_STORAGE_SLOT,
+        block_identifier=block_number,
     )
     return Web3.to_int(count_bytes)
 

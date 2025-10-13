@@ -245,7 +245,7 @@ async def main(
     chain_head = await get_chain_justified_head()
 
     await _check_validators_manager(vault_address)
-    await _check_consolidations_queue()
+    await _check_consolidations_queue(chain_head)
     if source_public_keys is not None and target_public_key is not None:
         # keys provided by the user
         target_source = await _check_public_keys(
@@ -340,7 +340,7 @@ async def main(
         )
 
 
-# pylint: disable-next=too-many-branches
+# pylint: disable-next=too-many-branches,too-many-locals
 async def _check_public_keys(
     vault_address: ChecksumAddress,
     source_public_keys: list[HexStr],
@@ -371,6 +371,11 @@ async def _check_public_keys(
     source_validators: list[ConsensusValidator] = []
     max_activation_epoch = chain_head.epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
 
+    current_consolidations = await get_pending_consolidations(chain_head, validators)
+    consolidating_indexes: set[int] = set()
+    for cons in current_consolidations:
+        consolidating_indexes.add(cons.source_index)
+
     # Validate source public keys
     for source_public_key in source_public_keys:
         source_validator = pubkey_to_validator.get(source_public_key)
@@ -394,6 +399,12 @@ async def _check_public_keys(
                 f'It must be active for at least '
                 f'{settings.network_config.SHARD_COMMITTEE_PERIOD} epochs before consolidation.'
             )
+
+        # Validate the source validator is not consolidating
+        if source_validator.index in consolidating_indexes:
+            raise click.ClickException(
+                f'Validator {source_validator.public_key} is consolidating to another validator.'
+            )
         source_validators.append(source_validator)
 
     # Validate target public key
@@ -406,6 +417,10 @@ async def _check_public_keys(
         raise click.ClickException(
             f'Target validator {target_public_key} is in exiting '
             f'status {target_validator.status.value}.'
+        )
+    if target_validator.index in consolidating_indexes:
+        raise click.ClickException(
+            f'Target validator {target_public_key} is consolidating to another validator.'
         )
 
     # Validate that target validator is a compounding validator.
@@ -453,8 +468,8 @@ async def _check_validators_manager(vault_address: ChecksumAddress) -> None:
         )
 
 
-async def _check_consolidations_queue() -> None:
-    queue_length = await get_consolidations_count()
+async def _check_consolidations_queue(chain_head: ChainHead) -> None:
+    queue_length = await get_consolidations_count(chain_head)
     if queue_length >= settings.network_config.PENDING_CONSOLIDATIONS_LIMIT:
         raise click.ClickException(
             'Pending consolidations queue has exceeded its limit. Please try again later.'
@@ -518,7 +533,7 @@ async def _find_target_source_public_keys(
     ]
 
     current_consolidations = await get_pending_consolidations(chain_head, active_validators)
-    consolidating_indexes = set()
+    consolidating_indexes: set[int] = set()
     for cons in current_consolidations:
         consolidating_indexes.add(cons.source_index)
         consolidating_indexes.add(cons.target_index)

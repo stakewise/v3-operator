@@ -114,7 +114,7 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
         if queued_assets < MIN_WITHDRAWAL_AMOUNT_GWEI:
             return
 
-        if await _is_pending_partial_withdrawals_queue_full():
+        if await _is_pending_partial_withdrawals_queue_full(chain_head):
             logger.info(
                 'Partial withdrawals are currently skipped because '
                 'the pending partial withdrawals queue has exceeded its limit.'
@@ -293,6 +293,6 @@ async def _fetch_oracle_exiting_validators(
     return [val for val in consensus_validators if val.index in vault_oracles_exiting_indexes]
 
 
-async def _is_pending_partial_withdrawals_queue_full() -> bool:
-    queue_length = await get_withdrawals_count()
+async def _is_pending_partial_withdrawals_queue_full(chain_head: ChainHead) -> bool:
+    queue_length = await get_withdrawals_count(chain_head)
     return queue_length >= settings.network_config.PENDING_PARTIAL_WITHDRAWALS_LIMIT
