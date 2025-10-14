@@ -174,7 +174,7 @@ uname_os() {
     cygwin*) os="windows" ;;
     win*) os="windows" ;;
   esac
-  echo linux
+  echo "$os"
 }
 uname_arch() {
   arch=$(uname -m)
