@@ -93,7 +93,20 @@ adjust_format() {
 }
 adjust_os() {
   # adjust archive name based on OS
-  true
+  if [ "$OS" = "linux" ]; then
+    if [ -f /etc/os-release ]; then
+      . /etc/os-release
+      if [ "$ID" != "ubuntu" ]; then
+        log_crit "Only Ubuntu is supported for Linux. Detected: $ID"
+        exit 1
+      fi
+      VERSION_ID=${VERSION_ID:-}
+      echo "ubuntu-${VERSION_ID}"
+    else
+      log_crit "/etc/os-release not found. Cannot determine Linux distribution."
+      exit 1
+    fi
+  fi
 }
 
 cat /dev/null <<EOF
@@ -161,7 +174,7 @@ uname_os() {
     cygwin*) os="windows" ;;
     win*) os="windows" ;;
   esac
-  echo "$os"
+  echo linux
 }
 uname_arch() {
   arch=$(uname -m)
