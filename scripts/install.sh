@@ -93,7 +93,20 @@ adjust_format() {
 }
 adjust_os() {
   # adjust archive name based on OS
-  true
+  if [ "$OS" = "linux" ]; then
+    if [ -f /etc/os-release ]; then
+      LINUX_ID=$(grep '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
+      UBUNTU_VERSION_ID=$(grep '^VERSION_ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
+      if [ "$LINUX_ID" != "ubuntu" ]; then
+        log_crit "Only Ubuntu is supported for Linux. Detected: $LINUX_ID"
+        exit 1
+      fi
+      OS="ubuntu-${UBUNTU_VERSION_ID}"
+    else
+      log_crit "/etc/os-release not found. Cannot determine Linux distribution."
+      exit 1
+    fi
+  fi
 }
 
 cat /dev/null <<EOF
