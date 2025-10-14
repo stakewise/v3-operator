@@ -186,17 +186,11 @@ async def get_pending_consolidations(
         source_pubkey = cons['source_pubkey']
         target_pubkey = cons['target_pubkey']
 
-        if source_pubkey not in public_key_to_index and target_pubkey not in public_key_to_index:
+        if source_pubkey not in public_key_to_index or target_pubkey not in public_key_to_index:
             continue
 
         source_index = public_key_to_index[source_pubkey]
         target_index = public_key_to_index[target_pubkey]
-
-        if source_index is not None and target_index is None:
-            raise ValueError(
-                f'Target validator pubkey {target_pubkey} not found in vault validators'
-            )
-
         result.append(PendingConsolidation(source_index=source_index, target_index=target_index))
 
     return result
@@ -379,9 +373,9 @@ async def get_execution_partial_withdrawals(block_number: BlockNumber | None = N
         )
         execution_withdrawals.append(
             {
-                'source_address': Web3.to_checksum_address(storage_slot0[20:32]),
+                'source_address': Web3.to_checksum_address(storage_slot0[12:32]),
                 'public_key': Web3.to_hex(storage_slot1[0:32] + storage_slot2[0:16]),
-                'amount': int.from_bytes(storage_slot2[16:24], byteorder='little'),
+                'amount': int.from_bytes(storage_slot2[16:24]),
             }
         )
 
