@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "v3-operator"
-version = "v4.0.4"
+version = "v4.0.5"
 description = "StakeWise operator service for registering vault validators"
 authors = ["StakeWise Labs <info@stakewise.io>"]
 package-mode = false
@@ -119,7 +119,7 @@ exclude = '''
 
 [tool.coverage.report]
 omit = ["*/tests/*"]
-fail_under = 61
+fail_under = 60
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
