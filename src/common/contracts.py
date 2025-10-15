@@ -57,7 +57,7 @@ class ContractWrapper:
         return self.contract.events
 
     def encode_abi(self, fn_name: str, args: list | None = None) -> HexStr:
-        return self.contract.encodeABI(fn_name=fn_name, args=args)
+        return self.contract.encode_abi(fn_name, args=args)
 
     async def _get_last_event(
         self,
@@ -69,8 +69,8 @@ class ContractWrapper:
         blocks_range = settings.events_blocks_range_interval
         while to_block >= from_block:
             events = await event.get_logs(
-                fromBlock=BlockNumber(max(to_block - blocks_range, from_block)),
-                toBlock=to_block,
+                from_block=BlockNumber(max(to_block - blocks_range, from_block)),
+                to_block=to_block,
                 argument_filters=argument_filters,
             )
             if events:
@@ -88,8 +88,8 @@ class ContractWrapper:
         blocks_range = settings.events_blocks_range_interval
         while to_block >= from_block:
             range_events = await event.get_logs(
-                fromBlock=from_block,
-                toBlock=BlockNumber(min(from_block + blocks_range, to_block)),
+                from_block=from_block,
+                to_block=BlockNumber(min(from_block + blocks_range, to_block)),
             )
             if range_events:
                 events.extend(range_events)

@@ -5,7 +5,7 @@ from sw_utils import InterruptHandler
 
 import src
 from src.common.checks import wait_execution_catch_up_consensus
-from src.common.clients import setup_clients
+from src.common.clients import close_clients, setup_clients
 from src.common.consensus import get_chain_finalized_head
 from src.common.execution import WalletTask, update_oracles_cache
 from src.common.logging import setup_logging
@@ -37,10 +37,15 @@ async def start_base() -> None:
     """Bootstrap operator service and start periodic tasks."""
     setup_logging()
     setup_sentry()
-    await setup_clients()
-
     log_start()
+    await setup_clients()
+    try:
+        await process()
+    finally:
+        await close_clients()
 
+
+async def process() -> None:
     if not settings.skip_startup_checks:
         await startup_checks()
 
@@ -69,11 +74,9 @@ async def start_base() -> None:
     # start operator tasks
     chain_state = await get_chain_finalized_head()
     await wait_execution_catch_up_consensus(chain_state)
-
     CheckpointCrud().save_checkpoints()
     logger.info('Syncing validator events...')
     await scan_validators_events(chain_state.block_number, is_startup=True)
-
     logger.info('Updating oracles cache...')
     await update_oracles_cache()
 
