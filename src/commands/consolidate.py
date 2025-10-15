@@ -10,7 +10,7 @@ from web3 import Web3
 from web3.types import Gwei, Wei
 
 from src.common.clients import setup_clients
-from src.common.consensus import get_chain_justified_head
+from src.common.consensus import get_chain_latest_head
 from src.common.contracts import VaultContract
 from src.common.execution import (
     build_gas_manager,
@@ -242,7 +242,7 @@ async def main(
     """
     setup_logging()
     await setup_clients()
-    chain_head = await get_chain_justified_head()
+    chain_head = await get_chain_latest_head()
 
     await _check_validators_manager(vault_address)
     await _check_consolidations_queue(chain_head)
@@ -526,13 +526,10 @@ async def _find_target_source_public_keys(
         from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
         to_block=chain_head.block_number,
     )
-    active_validators = [
-        val
-        for val in await fetch_consensus_validators(public_keys)
-        if val.status not in EXITING_STATUSES
-    ]
+    all_validators = await fetch_consensus_validators(public_keys)
+    active_validators = [val for val in all_validators if val.status not in EXITING_STATUSES]
 
-    current_consolidations = await get_pending_consolidations(chain_head, active_validators)
+    current_consolidations = await get_pending_consolidations(chain_head, all_validators)
     consolidating_indexes: set[int] = set()
     for cons in current_consolidations:
         consolidating_indexes.add(cons.source_index)
