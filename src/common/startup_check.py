@@ -128,11 +128,11 @@ async def wait_for_consensus_node() -> None:
     done = False
     while True:
         for consensus_endpoint in settings.consensus_endpoints:
+            consensus_client = get_consensus_client(
+                [consensus_endpoint],
+                user_agent=OPERATOR_USER_AGENT,
+            )
             try:
-                consensus_client = get_consensus_client(
-                    [consensus_endpoint],
-                    user_agent=OPERATOR_USER_AGENT,
-                )
                 syncing = await consensus_client.get_syncing()
                 if syncing['data']['is_syncing'] is True:
                     logger.warning(
@@ -155,6 +155,8 @@ async def wait_for_consensus_node() -> None:
                     consensus_endpoint,
                     e,
                 )
+            finally:
+                await consensus_client.disconnect()
         if done:
             return
         logger.warning('Consensus nodes are not ready. Retrying in 10 seconds...')
@@ -168,13 +170,12 @@ async def wait_for_execution_node() -> None:
     done = False
     while True:
         for execution_endpoint in settings.execution_endpoints:
+            execution_client = get_execution_client(
+                [execution_endpoint],
+                jwt_secret=settings.execution_jwt_secret,
+                user_agent=OPERATOR_USER_AGENT,
+            )
             try:
-                execution_client = get_execution_client(
-                    [execution_endpoint],
-                    jwt_secret=settings.execution_jwt_secret,
-                    user_agent=OPERATOR_USER_AGENT,
-                )
-
                 syncing = await execution_client.eth.syncing
                 if syncing is True:
                     logger.warning(
@@ -203,6 +204,8 @@ async def wait_for_execution_node() -> None:
                     execution_endpoint,
                     e,
                 )
+            finally:
+                await execution_client.provider.disconnect()
         if done:
             return
         logger.warning('Execution nodes are not ready. Retrying in 10 seconds...')
@@ -306,6 +309,7 @@ async def _check_consensus_nodes_network() -> None:
             [consensus_endpoint], user_agent=OPERATOR_USER_AGENT
         )
         deposit_contract_data = (await consensus_client.get_deposit_contract())['data']
+        await consensus_client.disconnect()
         consensus_chain_id = int(deposit_contract_data['chain_id'])
         consensus_network = chain_id_to_network.get(consensus_chain_id)
         if settings.network_config.CHAIN_ID != consensus_chain_id:
@@ -327,6 +331,7 @@ async def _check_execution_nodes_network() -> None:
             user_agent=OPERATOR_USER_AGENT,
         )
         execution_chain_id = await execution_client.eth.chain_id
+        await execution_client.provider.disconnect()
         execution_network = chain_id_to_network.get(execution_chain_id)
         if settings.network_config.CHAIN_ID != execution_chain_id:
             raise ValueError(

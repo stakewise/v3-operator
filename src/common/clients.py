@@ -57,7 +57,9 @@ class ExecutionClient:
         # For read-only queries account may be omitted.
         if wallet.can_load():
             w3.middleware_onion.inject(
-                SignAndSendRawMiddlewareBuilder.build(wallet.account), layer=0
+                # pylint: disable-next=no-value-for-parameter
+                SignAndSendRawMiddlewareBuilder.build(wallet.account),
+                layer=0,
             )
             w3.eth.default_account = wallet.address
 
@@ -126,3 +128,9 @@ ipfs_fetch_client = IpfsLazyFetchClient()
 async def setup_clients() -> None:
     await execution_client.setup()  # type: ignore
     await execution_non_retry_client.setup()  # type: ignore
+
+
+async def close_clients() -> None:
+    await execution_client.provider.disconnect()
+    await execution_non_retry_client.provider.disconnect()
+    await consensus_client.disconnect()
