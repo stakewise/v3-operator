@@ -71,7 +71,7 @@ async def start_base() -> None:
         await wait_execution_catch_up_consensus(chain_state)
         CheckpointCrud().save_checkpoints()
         logger.info('Syncing validator events...')
-        # await scan_validators_events(chain_state.block_number, is_startup=True)
+        await scan_validators_events(chain_state.block_number, is_startup=True)
         logger.info('Updating oracles cache...')
         await update_oracles_cache()
 
@@ -80,7 +80,6 @@ async def start_base() -> None:
 
         logger.info('Started operator service')
         metrics.service_started.labels(network=settings.network).set(1)
-        # async with  AInterruptHandler() as interrupt_handler:
         with InterruptHandler() as interrupt_handler:
             tasks = [
                 ValidatorTask(

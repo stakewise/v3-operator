@@ -1,6 +1,4 @@
 import time
-
-# from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from functools import cached_property
 from multiprocessing import Pool
@@ -17,8 +15,6 @@ from staking_deposit.key_handling.key_derivation.tree import (
     derive_child_SK,
     derive_master_SK,
 )
-
-# from sw_utils.http_session_manager import HTTPSessionManager
 from staking_deposit.key_handling.keystore import Keystore, ScryptKeystore
 from staking_deposit.settings import DEPOSIT_CLI_VERSION
 from sw_utils import chunkify
@@ -35,9 +31,6 @@ from web3 import Web3
 
 from src.common.typings import ValidatorType
 from src.config.networks import NETWORKS
-
-# from web3._utils import request
-
 
 # Set path as EIP-2334 format
 # https://eips.ethereum.org/EIPS/eip-2334
@@ -179,7 +172,6 @@ class CredentialManager:
     ) -> list[Credential]:
         # Hack to run web3 sessions in multiprocessing mode
         # pylint: disable-next=protected-access
-        # request._async_session_pool = ThreadPoolExecutor(max_workers=1)
 
         credentials: list[Credential] = []
         for index in indexes:
