@@ -37,69 +37,72 @@ async def start_base() -> None:
     """Bootstrap operator service and start periodic tasks."""
     setup_logging()
     setup_sentry()
+    log_start()
     await setup_clients()
     try:
-        log_start()
-
-        if not settings.skip_startup_checks:
-            await startup_checks()
-
-        if settings.enable_metrics:
-            await metrics_server()
-
-        NetworkValidatorCrud().setup()
-        VaultValidatorCrud().setup()
-        CheckpointCrud().setup()
-
-        # load network validators from ipfs dump
-        await load_genesis_validators()
-
-        keystore: BaseKeystore | None = None
-        relayer: RelayerClient | None = None
-
-        if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
-            if settings.disable_validators_registration:
-                keystore = None
-            else:
-                keystore = await load_keystore()
-
-        else:
-            relayer = RelayerClient()
-
-        # start operator tasks
-        chain_state = await get_chain_finalized_head()
-        await wait_execution_catch_up_consensus(chain_state)
-        CheckpointCrud().save_checkpoints()
-        logger.info('Syncing validator events...')
-        await scan_validators_events(chain_state.block_number, is_startup=True)
-        logger.info('Updating oracles cache...')
-        await update_oracles_cache()
-
-        if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
-            logger.info('Starting api mode')
-
-        logger.info('Started operator service')
-        metrics.service_started.labels(network=settings.network).set(1)
-        with InterruptHandler() as interrupt_handler:
-            tasks = [
-                ValidatorTask(
-                    keystore=keystore,
-                    relayer=relayer,
-                ).run(interrupt_handler),
-                ExitSignatureTask(
-                    keystore=keystore,
-                ).run(interrupt_handler),
-                MetricsTask().run(interrupt_handler),
-                WalletTask().run(interrupt_handler),
-            ]
-            if settings.harvest_vault:
-                tasks.append(HarvestTask().run(interrupt_handler))
-            if settings.claim_fee_splitter:
-                tasks.append(SplitRewardTask().run(interrupt_handler))
-
-            await asyncio.gather(*tasks)
+        await process()
     finally:
         await close_clients()
+
+
+async def process() -> None:
+    if not settings.skip_startup_checks:
+        await startup_checks()
+
+    if settings.enable_metrics:
+        await metrics_server()
+
+    NetworkValidatorCrud().setup()
+    VaultValidatorCrud().setup()
+    CheckpointCrud().setup()
+
+    # load network validators from ipfs dump
+    await load_genesis_validators()
+
+    keystore: BaseKeystore | None = None
+    relayer: RelayerClient | None = None
+
+    if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
+        if settings.disable_validators_registration:
+            keystore = None
+        else:
+            keystore = await load_keystore()
+
+    else:
+        relayer = RelayerClient()
+
+    # start operator tasks
+    chain_state = await get_chain_finalized_head()
+    await wait_execution_catch_up_consensus(chain_state)
+    CheckpointCrud().save_checkpoints()
+    logger.info('Syncing validator events...')
+    await scan_validators_events(chain_state.block_number, is_startup=True)
+    logger.info('Updating oracles cache...')
+    await update_oracles_cache()
+
+    if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
+        logger.info('Starting api mode')
+
+    logger.info('Started operator service')
+    metrics.service_started.labels(network=settings.network).set(1)
+    with InterruptHandler() as interrupt_handler:
+        tasks = [
+            ValidatorTask(
+                keystore=keystore,
+                relayer=relayer,
+            ).run(interrupt_handler),
+            ExitSignatureTask(
+                keystore=keystore,
+            ).run(interrupt_handler),
+            MetricsTask().run(interrupt_handler),
+            WalletTask().run(interrupt_handler),
+        ]
+        if settings.harvest_vault:
+            tasks.append(HarvestTask().run(interrupt_handler))
+        if settings.claim_fee_splitter:
+            tasks.append(SplitRewardTask().run(interrupt_handler))
+
+        await asyncio.gather(*tasks)
 
 
 class ValidatorTask(BaseTask):

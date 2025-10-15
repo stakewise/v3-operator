@@ -12,7 +12,7 @@ from aiohttp import ClientTimeout
 from eth_typing import ChecksumAddress
 from sw_utils import chunkify
 
-from src.common.clients import setup_clients
+from src.common.clients import close_clients, setup_clients
 from src.common.contracts import VaultContract
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.startup_check import wait_for_execution_node
@@ -138,11 +138,17 @@ def setup_remote_signer(
         sys.exit(1)
 
 
-# pylint: disable-next=too-many-locals
 async def main(vault: ChecksumAddress | None) -> None:
     setup_logging()
     await setup_clients()
+    try:
+        await process(vault)
+    finally:
+        await close_clients()
 
+
+# pylint: disable-next=too-many-locals
+async def process(vault: ChecksumAddress | None) -> None:
     keystore_files = LocalKeystore.list_keystore_files()
     if len(keystore_files) == 0:
         raise click.ClickException('Keystores not found.')

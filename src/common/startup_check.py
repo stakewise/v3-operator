@@ -308,8 +308,10 @@ async def _check_consensus_nodes_network() -> None:
         consensus_client = get_consensus_client(
             [consensus_endpoint], user_agent=OPERATOR_USER_AGENT
         )
-        deposit_contract_data = (await consensus_client.get_deposit_contract())['data']
-        await consensus_client.disconnect()
+        try:
+            deposit_contract_data = (await consensus_client.get_deposit_contract())['data']
+        finally:
+            await consensus_client.disconnect()
         consensus_chain_id = int(deposit_contract_data['chain_id'])
         consensus_network = chain_id_to_network.get(consensus_chain_id)
         if settings.network_config.CHAIN_ID != consensus_chain_id:
@@ -330,8 +332,10 @@ async def _check_execution_nodes_network() -> None:
             jwt_secret=settings.execution_jwt_secret,
             user_agent=OPERATOR_USER_AGENT,
         )
-        execution_chain_id = await execution_client.eth.chain_id
-        await execution_client.provider.disconnect()
+        try:
+            execution_chain_id = await execution_client.eth.chain_id
+        finally:
+            await execution_client.provider.disconnect()
         execution_network = chain_id_to_network.get(execution_chain_id)
         if settings.network_config.CHAIN_ID != execution_chain_id:
             raise ValueError(
