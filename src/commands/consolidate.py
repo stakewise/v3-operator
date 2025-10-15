@@ -529,6 +529,8 @@ async def _find_target_source_public_keys(
     all_validators = await fetch_consensus_validators(public_keys)
     active_validators = [val for val in all_validators if val.status not in EXITING_STATUSES]
 
+    # use all validators to fetch all the consolidations
+    # including the ones were source validator is exiting
     current_consolidations = await get_pending_consolidations(chain_head, all_validators)
     consolidating_indexes: set[int] = set()
     for cons in current_consolidations:
