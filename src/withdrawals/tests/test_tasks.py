@@ -448,29 +448,31 @@ def test_is_partial_withdrawable_validator():
 
 async def test_is_pending_partial_withdrawals_queue_full():
     limit = 100
-    with mock.patch.object(
-        settings.network_config, 'PENDING_PARTIAL_WITHDRAWALS_LIMIT', new=limit
-    ), mock.patch(
-        'src.withdrawals.tasks.consensus_client.get_pending_partial_withdrawals',
-        return_value=[{'validator_index': i, 'amount': 1} for i in range(limit - 1)],
-    ):
-        assert await _is_pending_partial_withdrawals_queue_full() is False
+    chain_head = create_chain_head(epoch=500)
 
     with mock.patch.object(
         settings.network_config, 'PENDING_PARTIAL_WITHDRAWALS_LIMIT', new=limit
     ), mock.patch(
-        'src.withdrawals.tasks.consensus_client.get_pending_partial_withdrawals',
-        return_value=[{'validator_index': i, 'amount': 1} for i in range(limit)],
+        'src.withdrawals.tasks.get_withdrawals_count',
+        return_value=limit - 1,
     ):
-        assert await _is_pending_partial_withdrawals_queue_full() is True
+        assert await _is_pending_partial_withdrawals_queue_full(chain_head) is False
 
     with mock.patch.object(
         settings.network_config, 'PENDING_PARTIAL_WITHDRAWALS_LIMIT', new=limit
     ), mock.patch(
-        'src.withdrawals.tasks.consensus_client.get_pending_partial_withdrawals',
-        return_value=[{'validator_index': i, 'amount': 1} for i in range(limit + 1)],
+        'src.withdrawals.tasks.get_withdrawals_count',
+        return_value=limit,
     ):
-        assert await _is_pending_partial_withdrawals_queue_full() is True
+        assert await _is_pending_partial_withdrawals_queue_full(chain_head) is True
+
+    with mock.patch.object(
+        settings.network_config, 'PENDING_PARTIAL_WITHDRAWALS_LIMIT', new=limit
+    ), mock.patch(
+        'src.withdrawals.tasks.get_withdrawals_count',
+        return_value=limit + 1,
+    ):
+        assert await _is_pending_partial_withdrawals_queue_full(chain_head) is True
 
 
 def test_filter_exitable_validators():

@@ -10,18 +10,21 @@ from sw_utils import (
     convert_to_gno,
 )
 from web3 import Web3
-from web3.types import BlockNumber, Gwei
+from web3.types import BlockNumber, Gwei, Wei
 
 from src.common.app_state import AppState
-from src.common.clients import consensus_client, execution_client
+from src.common.clients import execution_client
 from src.common.consensus import get_chain_latest_head
 from src.common.contracts import VaultContract
-from src.common.execution import get_execution_request_fee, get_protocol_config
+from src.common.execution import (
+    get_protocol_config,
+    get_withdrawal_request_fee,
+    get_withdrawals_count,
+)
 from src.common.metrics import metrics
 from src.common.typings import ValidatorsRegistrationMode
 from src.common.utils import round_down
 from src.config.settings import (
-    MAX_WITHDRAWAL_REQUEST_FEE_GWEI,
     MIN_WITHDRAWAL_AMOUNT_GWEI,
     WITHDRAWALS_INTERVAL,
     settings,
@@ -81,6 +84,7 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
     ):
         self.relayer = relayer
 
+    # pylint: disable-next=too-many-locals
     async def process(self) -> None:
         """
         Every N hours check the exit queue and submit partial withdrawals if needed.
@@ -110,18 +114,7 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
         if queued_assets < MIN_WITHDRAWAL_AMOUNT_GWEI:
             return
 
-        current_fee = await get_execution_request_fee(
-            settings.network_config.WITHDRAWAL_CONTRACT_ADDRESS,
-        )
-        if current_fee > Web3.to_wei(MAX_WITHDRAWAL_REQUEST_FEE_GWEI, 'gwei'):
-            logger.info(
-                'Partial withdrawals are skipped due to high withdrawal fee, '
-                'the current fee is %s Gwei. You can adjust the maximum allowed fee'
-                ' by changing MAX_WITHDRAWAL_REQUEST_FEE_GWEI environment variable.',
-                Web3.from_wei(current_fee, 'gwei'),
-            )
-            return
-        if await _is_pending_partial_withdrawals_queue_full():
+        if await _is_pending_partial_withdrawals_queue_full(chain_head):
             logger.info(
                 'Partial withdrawals are currently skipped because '
                 'the pending partial withdrawals queue has exceeded its limit.'
@@ -153,9 +146,20 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
 
             validators_manager_signature = relayer_response.validators_manager_signature
 
+        withdrawals_count = len(withdrawals)
+        per_validator_fee = await get_withdrawal_request_fee(count=withdrawals_count)
+        if per_validator_fee > Web3.to_wei(settings.max_withdrawal_request_fee_gwei, 'gwei'):
+            logger.info(
+                'Partial withdrawals are skipped due to high withdrawal fee, '
+                'the current fee is %s Gwei. You can adjust the maximum allowed fee'
+                ' by adding --max-withdrawal-request-fee-gwei flag.',
+                Web3.from_wei(per_validator_fee, 'gwei'),
+            )
+            return
+
         tx_hash = await submit_withdraw_validators(
             withdrawals=withdrawals,
-            tx_fee=current_fee,
+            tx_fee=Wei(per_validator_fee * withdrawals_count),
             validators_manager_signature=validators_manager_signature,
         )
         if not tx_hash:
@@ -289,7 +293,6 @@ async def _fetch_oracle_exiting_validators(
     return [val for val in consensus_validators if val.index in vault_oracles_exiting_indexes]
 
 
-async def _is_pending_partial_withdrawals_queue_full() -> bool:
-    pending_partial_withdrawals = await consensus_client.get_pending_partial_withdrawals()
-    queue_length = len(pending_partial_withdrawals)
+async def _is_pending_partial_withdrawals_queue_full(chain_head: ChainHead) -> bool:
+    queue_length = await get_withdrawals_count(chain_head)
     return queue_length >= settings.network_config.PENDING_PARTIAL_WITHDRAWALS_LIMIT

@@ -7,18 +7,18 @@ from pathlib import Path
 import click
 from eth_typing import ChecksumAddress, HexStr
 from web3 import Web3
-from web3.types import Gwei
+from web3.types import Gwei, Wei
 
 from src.common.clients import setup_clients
 from src.common.consensus import get_chain_justified_head
 from src.common.contracts import VaultContract
-from src.common.execution import get_execution_request_fee
+from src.common.execution import get_withdrawal_request_fee
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.startup_check import check_validators_manager, check_vault_version
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_address, validate_indexes
 from src.config.config import OperatorConfig
-from src.config.settings import MAX_WITHDRAWAL_REQUEST_FEE_GWEI, settings
+from src.config.settings import DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI, settings
 from src.validators.consensus import EXITING_STATUSES, fetch_consensus_validators
 from src.validators.relayer import RelayerClient
 from src.validators.typings import ConsensusValidator
@@ -73,6 +73,14 @@ logger = logging.getLogger(__name__)
     envvar='RELAYER_ENDPOINT',
 )
 @click.option(
+    '--max-withdrawal-request-fee-gwei',
+    type=int,
+    envvar='MAX_WITHDRAWAL_REQUEST_FEE_GWEI',
+    help='The maximum withdrawal request fee in Gwei. '
+    f'The default is {DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI}',
+    default=DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI,
+)
+@click.option(
     '-v',
     '--verbose',
     help='Enable debug mode. Default is false.',
@@ -103,6 +111,7 @@ def exit_validators(
     count: int | None,
     consensus_endpoints: str,
     execution_endpoints: str,
+    max_withdrawal_request_fee_gwei: int,
     data_dir: str,
     verbose: bool,
     no_confirm: bool,
@@ -124,6 +133,7 @@ def exit_validators(
         network=operator_config.network,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
+        max_withdrawal_request_fee_gwei=Gwei(max_withdrawal_request_fee_gwei),
         relayer_endpoint=relayer_endpoint,
         verbose=verbose,
         log_level=log_level,
@@ -172,16 +182,6 @@ async def main(
     await check_vault_version()
     await check_validators_manager()
 
-    withdrawal_request_fee = await get_execution_request_fee(
-        settings.network_config.WITHDRAWAL_CONTRACT_ADDRESS,
-    )
-    if withdrawal_request_fee > Web3.to_wei(MAX_WITHDRAWAL_REQUEST_FEE_GWEI, 'gwei'):
-        raise click.ClickException(
-            'Validator exits are skipped due to high withdrawal fee. '
-            f'The current fee is {Web3.from_wei(withdrawal_request_fee, 'gwei')} Gwei. '
-            f'You can override the limit with MAX_WITHDRAWAL_REQUEST_FEE_GWEI environment variable.'
-        )
-
     chain_head = await get_chain_justified_head()
     max_activation_epoch = chain_head.epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
 
@@ -214,10 +214,20 @@ async def main(
             abort=True,
         )
     withdrawals = {val.public_key: Gwei(0) for val in active_validators}
+
+    withdrawals_count = len(withdrawals)
+    withdrawal_request_fee = await get_withdrawal_request_fee(count=withdrawals_count)
+    if withdrawal_request_fee > Web3.to_wei(settings.max_withdrawal_request_fee_gwei, 'gwei'):
+        raise click.ClickException(
+            'Validator exits are skipped due to high withdrawal fee. '
+            f'The current fee is {Web3.from_wei(withdrawal_request_fee, 'gwei')} Gwei. '
+            f'You can override the limit with MAX_WITHDRAWAL_REQUEST_FEE_GWEI environment variable.'
+        )
+
     validators_manager_signature = await get_validators_manager_signature(withdrawals)
     tx_hash = await submit_withdraw_validators(
         withdrawals=withdrawals,
-        tx_fee=withdrawal_request_fee,
+        tx_fee=Wei(withdrawal_request_fee * withdrawals_count),
         validators_manager_signature=validators_manager_signature,
     )
     if tx_hash:

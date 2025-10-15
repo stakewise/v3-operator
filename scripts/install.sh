@@ -93,13 +93,20 @@ adjust_format() {
 }
 adjust_os() {
   # adjust archive name based on OS
-  true
-}
-adjust_arch() {
-  if [ "$OS" = "darwin" ] && [ "$ARCH" = "arm64" ]; then
-    ARCH="amd64"
+  if [ "$OS" = "linux" ]; then
+    if [ -f /etc/os-release ]; then
+      LINUX_ID=$(grep '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
+      UBUNTU_VERSION_ID=$(grep '^VERSION_ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
+      if [ "$LINUX_ID" != "ubuntu" ]; then
+        log_crit "Only Ubuntu is supported for Linux. Detected: $LINUX_ID"
+        exit 1
+      fi
+      OS="ubuntu-${UBUNTU_VERSION_ID}"
+    else
+      log_crit "/etc/os-release not found. Cannot determine Linux distribution."
+      exit 1
+    fi
   fi
-  true
 }
 
 cat /dev/null <<EOF
@@ -281,7 +288,7 @@ http_copy() {
 github_release() {
   owner_repo=$1
   version=$2
-  test -z "$version" && version="v4.0.3"
+  test -z "$version" && version="v4.0.5"
   giturl="https://github.com/${owner_repo}/releases/${version}"
   json=$(http_copy "$giturl" "Accept:application/json")
   test -z "$json" && return 1
@@ -361,8 +368,6 @@ tag_to_version
 adjust_format
 
 adjust_os
-
-adjust_arch
 
 log_info "found version: ${VERSION} for ${OS}/${ARCH}"
 

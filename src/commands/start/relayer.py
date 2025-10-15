@@ -56,6 +56,7 @@ def start_relayer(
     max_fee_per_gas_gwei: int | None,
     database_dir: str | None,
     relayer_endpoint: str,
+    max_withdrawal_request_fee_gwei: int,
 ) -> None:
     operator_config = OperatorConfig(vault, Path(data_dir))
     operator_config.load()
@@ -95,6 +96,7 @@ def start_relayer(
             Gwei(max_validator_balance_gwei) if max_validator_balance_gwei else None
         ),
         min_deposit_delay=min_deposit_delay,
+        max_withdrawal_request_fee_gwei=Gwei(max_withdrawal_request_fee_gwei),
     )
 
     try:

@@ -18,9 +18,7 @@ block_cipher = None
 
 hiddenimports = [
     'multiaddr.codecs.uint16be',
-    'multiaddr.codecs.idna',
     'multiaddr.codecs.domain',
-    'pkg_resources.extern'
 ]
 
 # tomli

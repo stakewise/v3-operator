@@ -33,9 +33,9 @@ def _patch_check_validators_manager() -> Generator:
 
 
 @pytest.fixture
-def _patch_get_execution_request_fee() -> Generator:
+def _patch_get_withdrawal_request_fee() -> Generator:
     with mock.patch(
-        'src.commands.exit_validators.get_execution_request_fee',
+        'src.commands.exit_validators.get_withdrawal_request_fee',
         return_value=WITHDRAWAL_REQUEST_FEE,
     ):
         yield
@@ -62,7 +62,7 @@ def _patch_get_chain_justified_head() -> Generator:
 @pytest.mark.usefixtures(
     '_patch_check_vault_version',
     '_patch_check_validators_manager',
-    '_patch_get_execution_request_fee',
+    '_patch_get_withdrawal_request_fee',
     '_patch_get_chain_justified_head',
 )
 @pytest.mark.usefixtures('_init_config')

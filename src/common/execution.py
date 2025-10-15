@@ -2,20 +2,28 @@ import asyncio
 import logging
 from typing import cast
 
-from eth_typing import BlockNumber, ChecksumAddress
+from eth_typing import BlockNumber, HexStr
 from hexbytes import HexBytes
-from sw_utils import GasManager, InterruptHandler, ProtocolConfig, build_protocol_config
+from sw_utils import (
+    ChainHead,
+    GasManager,
+    InterruptHandler,
+    ProtocolConfig,
+    build_protocol_config,
+)
 from web3 import Web3
 from web3.contract.async_contract import AsyncContractFunction
-from web3.types import TxParams, Wei
+from web3.types import Gwei, TxParams, Wei
 
 from src.common.app_state import AppState, OraclesCache
-from src.common.clients import execution_client, ipfs_fetch_client
+from src.common.clients import consensus_client, execution_client, ipfs_fetch_client
 from src.common.contracts import keeper_contract, multicall_contract
 from src.common.metrics import metrics
 from src.common.tasks import BaseTask
+from src.common.typings import PendingConsolidation, PendingPartialWithdrawal
 from src.common.wallet import wallet
 from src.config.settings import ATTEMPTS_WITH_DEFAULT_GAS, settings
+from src.validators.typings import ConsensusValidator
 
 logger = logging.getLogger(__name__)
 
@@ -146,14 +154,286 @@ def build_gas_manager() -> GasManager:
     )
 
 
-async def get_execution_request_fee(address: ChecksumAddress) -> Wei:
-    """
-    Retrieves the current fee for an execution layer request.
-    """
-    tx_data: TxParams = {
-        'to': address,
-        'data': b'',
-    }
+async def get_pending_consolidations(
+    chain_head: ChainHead, consensus_validators: list[ConsensusValidator]
+) -> list[PendingConsolidation]:
+    consensus_consolidations = await consensus_client.get_pending_consolidations(
+        str(chain_head.slot)
+    )
+    indexes: set[int] = set()
+    public_key_to_index: dict[HexStr, int] = {}
+    for val in consensus_validators:
+        indexes.add(val.index)
+        public_key_to_index[val.public_key] = val.index
 
-    fee = await execution_client.eth.call(tx_data, block_identifier='latest')
-    return Wei(Web3.to_int(fee))
+    result: list[PendingConsolidation] = []
+    for cons in consensus_consolidations:
+        source_index = int(cons['source_index'])
+        target_index = int(cons['target_index'])
+
+        has_source = source_index in indexes
+        has_target = target_index in indexes
+        if not has_source and not has_target:
+            continue
+
+        if has_source and not has_target:
+            raise ValueError(f'Target validator index {target_index} not found in vault validators')
+
+        result.append(PendingConsolidation(source_index=source_index, target_index=target_index))
+
+    execution_consolidations = await get_execution_consolidations(chain_head.block_number)
+    for cons in execution_consolidations:
+        source_pubkey = cons['source_pubkey']
+        target_pubkey = cons['target_pubkey']
+
+        if source_pubkey not in public_key_to_index or target_pubkey not in public_key_to_index:
+            continue
+
+        source_index = public_key_to_index[source_pubkey]
+        target_index = public_key_to_index[target_pubkey]
+        result.append(PendingConsolidation(source_index=source_index, target_index=target_index))
+
+    return result
+
+
+async def get_execution_consolidations(block_number: BlockNumber | None = None) -> list[dict]:
+    queue_head_index_bytes = await execution_client.eth.get_storage_at(
+        settings.network_config.CONSOLIDATION_CONTRACT_ADDRESS,
+        settings.network_config.EXECUTION_REQUEST_QUEUE_HEAD_STORAGE_SLOT,
+        block_identifier=block_number,
+    )
+    queue_head_index = Web3.to_int(queue_head_index_bytes)
+
+    queue_tail_index_bytes = await execution_client.eth.get_storage_at(
+        settings.network_config.CONSOLIDATION_CONTRACT_ADDRESS,
+        settings.network_config.EXECUTION_REQUEST_QUEUE_TAIL_STORAGE_SLOT,
+        block_identifier=block_number,
+    )
+    queue_tail_index = Web3.to_int(queue_tail_index_bytes)
+    queue_length = queue_tail_index - queue_head_index
+
+    execution_consolidations = []
+    for i in range(queue_length):
+        queue_storage_slot = (
+            settings.network_config.EXECUTION_REQUEST_QUEUE_STORAGE_OFFSET
+            + (queue_head_index + i) * 4
+        )
+        storage_slot0 = await execution_client.eth.get_storage_at(
+            settings.network_config.CONSOLIDATION_CONTRACT_ADDRESS,
+            queue_storage_slot,
+            block_identifier=block_number,
+        )
+        storage_slot1 = await execution_client.eth.get_storage_at(
+            settings.network_config.CONSOLIDATION_CONTRACT_ADDRESS,
+            queue_storage_slot + 1,
+            block_identifier=block_number,
+        )
+        storage_slot2 = await execution_client.eth.get_storage_at(
+            settings.network_config.CONSOLIDATION_CONTRACT_ADDRESS,
+            queue_storage_slot + 2,
+            block_identifier=block_number,
+        )
+        storage_slot3 = await execution_client.eth.get_storage_at(
+            settings.network_config.CONSOLIDATION_CONTRACT_ADDRESS,
+            queue_storage_slot + 3,
+            block_identifier=block_number,
+        )
+        execution_consolidations.append(
+            {
+                'source_address': Web3.to_checksum_address(storage_slot0[12:32]),
+                'source_pubkey': Web3.to_hex(storage_slot1[0:32] + storage_slot2[0:16]),
+                'target_pubkey': Web3.to_hex(storage_slot2[16:32] + storage_slot3[0:32]),
+            }
+        )
+
+    return execution_consolidations
+
+
+async def get_consolidation_request_fee(count: int = 1, gap_count: int = 5) -> Wei:
+    """
+    Calculates the current consolidation request fee.
+    For more details see: https://eips.ethereum.org/EIPS/eip-7251
+    """
+    previous_excess_bytes = await execution_client.eth.get_storage_at(
+        settings.network_config.CONSOLIDATION_CONTRACT_ADDRESS,
+        settings.network_config.EXCESS_EXECUTION_REQUESTS_STORAGE_SLOT,
+    )
+    previous_excess = Web3.to_int(previous_excess_bytes)
+
+    count += await get_execution_consolidations_count()
+    count += gap_count
+
+    excess = 0
+    target_consolidation_requests_per_block = (
+        settings.network_config.TARGET_CONSOLIDATION_REQUESTS_PER_BLOCK
+    )
+    if previous_excess + count > target_consolidation_requests_per_block:
+        excess = previous_excess + count - target_consolidation_requests_per_block
+
+    per_validator_fee = _fake_exponential(
+        settings.network_config.MIN_EXECUTION_REQUEST_FEE,
+        excess,
+        settings.network_config.EXECUTION_REQUEST_FEE_UPDATE_FRACTION,
+    )
+    return Wei(per_validator_fee)
+
+
+async def get_consolidations_count(chain_head: ChainHead) -> int:
+    count = await get_execution_consolidations_count(chain_head.block_number)
+    consensus_consolidations = await consensus_client.get_pending_consolidations(
+        str(chain_head.slot)
+    )
+    return len(consensus_consolidations) + count
+
+
+async def get_execution_consolidations_count(block_number: BlockNumber | None = None) -> int:
+    count_bytes = await execution_client.eth.get_storage_at(
+        settings.network_config.CONSOLIDATION_CONTRACT_ADDRESS,
+        settings.network_config.EXECUTION_REQUEST_COUNT_STORAGE_SLOT,
+        block_identifier=block_number,
+    )
+    return Web3.to_int(count_bytes)
+
+
+async def get_pending_partial_withdrawals(
+    chain_head: ChainHead, consensus_validators: list[ConsensusValidator]
+) -> list[PendingPartialWithdrawal]:
+    consensus_withdrawals = await consensus_client.get_pending_partial_withdrawals(
+        str(chain_head.slot)
+    )
+    indexes: set[int] = set()
+    public_key_to_index: dict[HexStr, int] = {}
+    for val in consensus_validators:
+        indexes.add(val.index)
+        public_key_to_index[val.public_key] = val.index
+
+    result: list[PendingPartialWithdrawal] = []
+    for withdrawal in consensus_withdrawals:
+        validator_index = int(withdrawal['validator_index'])
+        if validator_index not in indexes:
+            continue
+
+        result.append(
+            PendingPartialWithdrawal(
+                validator_index=validator_index, amount=Gwei(int(withdrawal['amount']))
+            )
+        )
+
+    execution_withdrawals = await get_execution_partial_withdrawals(chain_head.block_number)
+    for withdrawal in execution_withdrawals:
+        public_key = withdrawal['public_key']
+        if public_key not in public_key_to_index:
+            continue
+
+        result.append(
+            PendingPartialWithdrawal(
+                validator_index=public_key_to_index[public_key], amount=Gwei(withdrawal['amount'])
+            )
+        )
+
+    return result
+
+
+async def get_execution_partial_withdrawals(block_number: BlockNumber | None = None) -> list[dict]:
+    queue_head_index_bytes = await execution_client.eth.get_storage_at(
+        settings.network_config.WITHDRAWAL_CONTRACT_ADDRESS,
+        settings.network_config.EXECUTION_REQUEST_QUEUE_HEAD_STORAGE_SLOT,
+        block_identifier=block_number,
+    )
+    queue_head_index = Web3.to_int(queue_head_index_bytes)
+
+    queue_tail_index_bytes = await execution_client.eth.get_storage_at(
+        settings.network_config.WITHDRAWAL_CONTRACT_ADDRESS,
+        settings.network_config.EXECUTION_REQUEST_QUEUE_TAIL_STORAGE_SLOT,
+        block_identifier=block_number,
+    )
+    queue_tail_index = Web3.to_int(queue_tail_index_bytes)
+    queue_length = queue_tail_index - queue_head_index
+
+    execution_withdrawals = []
+    for i in range(queue_length):
+        queue_storage_slot = (
+            settings.network_config.EXECUTION_REQUEST_QUEUE_STORAGE_OFFSET
+            + (queue_head_index + i) * 3
+        )
+        storage_slot0 = await execution_client.eth.get_storage_at(
+            settings.network_config.WITHDRAWAL_CONTRACT_ADDRESS,
+            queue_storage_slot,
+            block_identifier=block_number,
+        )
+        storage_slot1 = await execution_client.eth.get_storage_at(
+            settings.network_config.WITHDRAWAL_CONTRACT_ADDRESS,
+            queue_storage_slot + 1,
+            block_identifier=block_number,
+        )
+        storage_slot2 = await execution_client.eth.get_storage_at(
+            settings.network_config.WITHDRAWAL_CONTRACT_ADDRESS,
+            queue_storage_slot + 2,
+            block_identifier=block_number,
+        )
+        execution_withdrawals.append(
+            {
+                'source_address': Web3.to_checksum_address(storage_slot0[12:32]),
+                'public_key': Web3.to_hex(storage_slot1[0:32] + storage_slot2[0:16]),
+                'amount': int.from_bytes(storage_slot2[16:24]),
+            }
+        )
+
+    return execution_withdrawals
+
+
+async def get_withdrawal_request_fee(count: int = 1, gap_count: int = 10) -> Wei:
+    """
+    Calculates the current withdrawal request fee.
+    For more details see: https://eips.ethereum.org/EIPS/eip-7002
+    """
+    previous_excess_bytes = await execution_client.eth.get_storage_at(
+        settings.network_config.WITHDRAWAL_CONTRACT_ADDRESS,
+        settings.network_config.EXCESS_EXECUTION_REQUESTS_STORAGE_SLOT,
+    )
+    previous_excess = Web3.to_int(previous_excess_bytes)
+
+    count += await get_execution_withdrawals_count()
+    count += gap_count
+
+    excess = 0
+    target_withdrawal_requests_per_block = (
+        settings.network_config.TARGET_WITHDRAWAL_REQUESTS_PER_BLOCK
+    )
+    if previous_excess + count > target_withdrawal_requests_per_block:
+        excess = previous_excess + count - target_withdrawal_requests_per_block
+
+    per_validator_fee = _fake_exponential(
+        settings.network_config.MIN_EXECUTION_REQUEST_FEE,
+        excess,
+        settings.network_config.EXECUTION_REQUEST_FEE_UPDATE_FRACTION,
+    )
+    return Wei(per_validator_fee)
+
+
+async def get_withdrawals_count(chain_head: ChainHead) -> int:
+    count = await get_execution_withdrawals_count(chain_head.block_number)
+    pending_partial_withdrawals = await consensus_client.get_pending_partial_withdrawals(
+        str(chain_head.slot)
+    )
+    return len(pending_partial_withdrawals) + count
+
+
+async def get_execution_withdrawals_count(block_number: BlockNumber | None = None) -> int:
+    count_bytes = await execution_client.eth.get_storage_at(
+        settings.network_config.WITHDRAWAL_CONTRACT_ADDRESS,
+        settings.network_config.EXECUTION_REQUEST_COUNT_STORAGE_SLOT,
+        block_identifier=block_number,
+    )
+    return Web3.to_int(count_bytes)
+
+
+def _fake_exponential(factor: int, numerator: int, denominator: int) -> int:
+    i = 1
+    output = 0
+    numerator_accum = factor * denominator
+    while numerator_accum > 0:
+        output += numerator_accum
+        numerator_accum = (numerator_accum * numerator) // (denominator * i)
+        i += 1
+    return output // denominator
