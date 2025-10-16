@@ -5,7 +5,6 @@ and that properly handles closed session connectors.
 Fix RuntimeError: Task ... running at ... got Future ... attached to a different loop
 """
 import asyncio
-import logging
 import threading
 from typing import Optional
 
@@ -22,8 +21,6 @@ from web3._utils.request import (
     _async_session_pool,
 )
 
-logger = logging.getLogger(__name__)
-
 
 async def async_cache_and_return_session_patched(
     endpoint_uri: URI,
@@ -31,7 +28,7 @@ async def async_cache_and_return_session_patched(
 ) -> ClientSession:
     # cache key should have a unique thread identifier
     cache_key = generate_cache_key(
-        f"{threading.get_ident()}{asyncio.get_running_loop()}:{endpoint_uri}"
+        f"{threading.get_ident()}{id(asyncio.get_event_loop())}:{endpoint_uri}"
     )
 
     evicted_items = None
