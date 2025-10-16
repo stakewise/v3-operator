@@ -2,7 +2,7 @@
 """
 Patch web3.py to use a session cache that is unique per event loop
 and that properly handles closed session connectors.
-Fix RuntimeError: Task ... running at ... got Future ... attached to a different loop
+Fix RuntimeError: attached to a different loop
 """
 import asyncio
 import threading
