@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 from functools import cached_property
@@ -20,7 +21,11 @@ from src.common.typings import (
     HarvestParams,
     RewardVoteInfo,
 )
-from src.config.settings import settings
+from src.config.settings import (
+    EVENTS_CONCURRENCY_CHUNK,
+    EVENTS_CONCURRENCY_LIMIT,
+    settings,
+)
 from src.validators.typings import V2ValidatorEventData
 from src.withdrawals.typings import WithdrawalEvent
 
@@ -123,20 +128,42 @@ class VaultContract(ContractWrapper, VaultStateMixin):
     ) -> list[HexStr]:
         """Fetches the validator registered events."""
         v1_validators_from_block = max(from_block, settings.network_config.KEEPER_GENESIS_BLOCK)
-        events = await self._get_events(
-            event=self.events.ValidatorRegistered,  # type: ignore
-            from_block=v1_validators_from_block,
-            to_block=to_block,
-        )
-        result = [Web3.to_hex(event['args']['publicKey']) for event in events]
         v2_validators_from_block = max(from_block, settings.network_config.PECTRA_BLOCK)
-        events = await self._get_events(
-            event=self.events.V2ValidatorRegistered,  # type: ignore
-            from_block=v2_validators_from_block,
-            to_block=to_block,
-        )
-        result.extend([Web3.to_hex(event['args']['publicKey']) for event in events])
-        return result
+        semaphore = asyncio.BoundedSemaphore(EVENTS_CONCURRENCY_LIMIT)
+        pending = set()
+        for block_number in range(v1_validators_from_block, to_block + 1, EVENTS_CONCURRENCY_CHUNK):
+            task = asyncio.create_task(
+                self._get_public_keys_chunk(
+                    event=self.events.ValidatorRegistered,  # type: ignore
+                    from_block=BlockNumber(block_number),
+                    to_block=BlockNumber(
+                        min(block_number + EVENTS_CONCURRENCY_CHUNK - 1, to_block)
+                    ),
+                    semaphore=semaphore,
+                )
+            )
+            pending.add(task)
+
+        for block_number in range(v2_validators_from_block, to_block + 1, EVENTS_CONCURRENCY_CHUNK):
+            task = asyncio.create_task(
+                self._get_public_keys_chunk(
+                    event=self.events.V2ValidatorRegistered,  # type: ignore
+                    from_block=BlockNumber(block_number),
+                    to_block=BlockNumber(
+                        min(block_number + EVENTS_CONCURRENCY_CHUNK - 1, to_block)
+                    ),
+                    semaphore=semaphore,
+                )
+            )
+            pending.add(task)
+
+        keys: list[HexStr] = []
+        while pending:
+            done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+            for task in done:
+                keys.extend(task.result())
+
+        return keys
 
     async def get_funding_events(
         self, from_block: BlockNumber, to_block: BlockNumber
@@ -183,6 +210,21 @@ class VaultContract(ContractWrapper, VaultStateMixin):
             )
             for event in events
         ]
+
+    async def _get_public_keys_chunk(
+        self,
+        event: type[AsyncContractEvent],
+        from_block: BlockNumber,
+        to_block: BlockNumber,
+        semaphore: asyncio.BoundedSemaphore,
+    ) -> list[HexStr]:
+        async with semaphore:
+            events = await self._get_events(
+                event=event,
+                from_block=from_block,
+                to_block=to_block,
+            )
+            return [Web3.to_hex(event['args']['publicKey']) for event in events]
 
 
 class ValidatorsRegistryContract(ContractWrapper):
