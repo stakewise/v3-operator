@@ -63,4 +63,6 @@ if __name__ == '__main__':
         # pylint: disable-next=protected-access,no-member
         os.environ['SSL_CERT_FILE'] = os.path.join(sys._MEIPASS, 'certifi', 'cacert.pem')
 
+    import src.common.web3
+
     cli()
