@@ -131,27 +131,23 @@ class VaultContract(ContractWrapper, VaultStateMixin):
         v2_validators_from_block = max(from_block, settings.network_config.PECTRA_BLOCK)
         semaphore = asyncio.BoundedSemaphore(EVENTS_CONCURRENCY_LIMIT)
         pending = set()
-        for block_number in range(v1_validators_from_block, to_block + 1, EVENTS_CONCURRENCY_CHUNK):
+        for block_number in range(v1_validators_from_block, to_block, EVENTS_CONCURRENCY_CHUNK):
             task = asyncio.create_task(
                 self._get_public_keys_chunk(
                     event=self.events.ValidatorRegistered,  # type: ignore
                     from_block=BlockNumber(block_number),
-                    to_block=BlockNumber(
-                        min(block_number + EVENTS_CONCURRENCY_CHUNK, to_block + 1)
-                    ),
+                    to_block=BlockNumber(min(block_number + EVENTS_CONCURRENCY_CHUNK, to_block)),
                     semaphore=semaphore,
                 )
             )
             pending.add(task)
 
-        for block_number in range(v2_validators_from_block, to_block + 1, EVENTS_CONCURRENCY_CHUNK):
+        for block_number in range(v2_validators_from_block, to_block, EVENTS_CONCURRENCY_CHUNK):
             task = asyncio.create_task(
                 self._get_public_keys_chunk(
                     event=self.events.V2ValidatorRegistered,  # type: ignore
                     from_block=BlockNumber(block_number),
-                    to_block=BlockNumber(
-                        min(block_number + EVENTS_CONCURRENCY_CHUNK, to_block + 1)
-                    ),
+                    to_block=BlockNumber(min(block_number + EVENTS_CONCURRENCY_CHUNK, to_block)),
                     semaphore=semaphore,
                 )
             )
