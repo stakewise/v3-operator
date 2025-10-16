@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "v3-operator"
-version = "v4.0.5"
+version = "v4.0.6"
 description = "StakeWise operator service for registering vault validators"
 authors = ["StakeWise Labs <info@stakewise.io>"]
 package-mode = false
@@ -136,5 +136,6 @@ ignore_names = [
     "contract_event", "get_from_block", "process_events",  # event processor
     "validators_root",  # ApprovalRequest
     "previous_version", "current_version", "genesis_validators_root", "fork_info", "voluntary_exit", "deposit",  # remote.py
-    "rounding"  # decimal context
+    "rounding",  # decimal context
+    "async_cache_and_return_session"  # web3py patch
 ]
