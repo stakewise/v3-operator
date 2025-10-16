@@ -332,7 +332,7 @@ MAX_EFFECTIVE_BALANCE: Wei = Web3.to_wei(2048, 'ether')
 MAX_EFFECTIVE_BALANCE_GWEI: Gwei = Gwei(int(Web3.from_wei(MAX_EFFECTIVE_BALANCE, 'gwei')))
 
 EVENTS_CONCURRENCY_CHUNK: int = decouple_config(
-    'EVENTS_CONCURRENCY_CHUNK', default=500_000, cast=int
+    'EVENTS_CONCURRENCY_CHUNK', default=50_000, cast=int
 )
 EVENTS_CONCURRENCY_LIMIT: int = decouple_config('EVENTS_CONCURRENCY_LIMIT', default=10, cast=int)
 
