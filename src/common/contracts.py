@@ -136,7 +136,9 @@ class VaultContract(ContractWrapper, VaultStateMixin):
                 self._get_public_keys_chunk(
                     event=self.events.ValidatorRegistered,  # type: ignore
                     from_block=BlockNumber(block_number),
-                    to_block=BlockNumber(min(block_number + EVENTS_CONCURRENCY_CHUNK, to_block)),
+                    to_block=BlockNumber(
+                        min(block_number + EVENTS_CONCURRENCY_CHUNK - 1, to_block)
+                    ),
                     semaphore=semaphore,
                 )
             )
@@ -147,7 +149,9 @@ class VaultContract(ContractWrapper, VaultStateMixin):
                 self._get_public_keys_chunk(
                     event=self.events.V2ValidatorRegistered,  # type: ignore
                     from_block=BlockNumber(block_number),
-                    to_block=BlockNumber(min(block_number + EVENTS_CONCURRENCY_CHUNK, to_block)),
+                    to_block=BlockNumber(
+                        min(block_number + EVENTS_CONCURRENCY_CHUNK - 1, to_block)
+                    ),
                     semaphore=semaphore,
                 )
             )
