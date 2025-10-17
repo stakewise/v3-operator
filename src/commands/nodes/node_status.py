@@ -79,60 +79,85 @@ async def main(output_format: str) -> None:
     )
 
     # Log statuses
-    _log_consensus_node_status(node_status=consensus_node_status, output_format=output_format)
-    _log_execution_node_status(node_status=execution_node_status, output_format=output_format)
+    _log_nodes_status(
+        execution_node_status=execution_node_status,
+        consensus_node_status=consensus_node_status,
+        output_format=output_format,
+    )
 
     if consensus_node_status.get('is_syncing') is False:
         validator_activity_stats = await get_validator_activity_stats(consensus_client)
         _log_validator_activity_stats(validator_activity_stats, output_format)
 
 
-def _log_consensus_node_status(node_status: dict, output_format: str) -> None:
+def _log_nodes_status(
+    execution_node_status: dict, consensus_node_status: dict, output_format: str
+) -> None:
     if output_format == 'json':
-        click.echo(json.dumps({'consensus_node': node_status}))
+        _log_nodes_status_json(
+            execution_node_status=execution_node_status,
+            consensus_node_status=consensus_node_status,
+        )
     else:
-        if not node_status:
-            click.echo('Consensus node status: unavailable.')
-            return
-
-        status_message = [
-            'Consensus node status:',
-            f'  Is syncing: {node_status['is_syncing']}',
-            f'  Head slot: {node_status['head_slot']}',
-            f'  Sync distance: {node_status['sync_distance']}',
-        ]
-        eta = node_status.get('eta')
-
-        if node_status['is_syncing'] and eta is not None:
-            status_message.append(f'  Estimated time to sync: {_format_eta(eta)}')
-        elif node_status['is_syncing'] and eta is None:
-            status_message.append('  Estimated time to sync: unavailable')
-
-        click.echo('\n'.join(status_message))
+        _log_nodes_status_text(
+            execution_node_status=execution_node_status,
+            consensus_node_status=consensus_node_status,
+        )
 
 
-def _log_execution_node_status(node_status: dict, output_format: str) -> None:
-    if output_format == 'json':
-        click.echo(json.dumps({'execution_node': node_status}))
-    else:
-        if not node_status:
-            click.echo('Execution node status: unavailable.')
-            return
+def _log_nodes_status_json(execution_node_status: dict, consensus_node_status: dict) -> None:
+    combined_status = {
+        'consensus_node': consensus_node_status,
+        'execution_node': execution_node_status,
+    }
+    click.echo(json.dumps(combined_status))
 
-        status_message = [
-            'Execution node status:',
-            f'  Is syncing: {node_status['is_syncing']}',
-            f'  Block number: {node_status['latest_block_number']}',
-            f'  Sync distance: {node_status['sync_distance']}',
-        ]
-        eta = node_status.get('eta')
 
-        if node_status['is_syncing'] and eta is not None:
-            status_message.append(f'  Estimated time to sync: {_format_eta(eta)}')
-        elif node_status['is_syncing'] and eta is None:
-            status_message.append('  Estimated time to sync: unavailable')
+def _log_nodes_status_text(execution_node_status: dict, consensus_node_status: dict) -> None:
+    _log_consensus_node_status_text(node_status=consensus_node_status)
+    _log_execution_node_status_text(node_status=execution_node_status)
 
-        click.echo('\n'.join(status_message))
+
+def _log_consensus_node_status_text(node_status: dict) -> None:
+    if not node_status:
+        click.echo('Consensus node status: unavailable.')
+        return
+
+    status_message = [
+        'Consensus node status:',
+        f'  Is syncing: {node_status['is_syncing']}',
+        f'  Head slot: {node_status['head_slot']}',
+        f'  Sync distance: {node_status['sync_distance']}',
+    ]
+    eta = node_status.get('eta')
+
+    if node_status['is_syncing'] and eta is not None:
+        status_message.append(f'  Estimated time to sync: {_format_eta(eta)}')
+    elif node_status['is_syncing'] and eta is None:
+        status_message.append('  Estimated time to sync: unavailable')
+
+    click.echo('\n'.join(status_message))
+
+
+def _log_execution_node_status_text(node_status: dict) -> None:
+    if not node_status:
+        click.echo('Execution node status: unavailable.')
+        return
+
+    status_message = [
+        'Execution node status:',
+        f'  Is syncing: {node_status['is_syncing']}',
+        f'  Block number: {node_status['latest_block_number']}',
+        f'  Sync distance: {node_status['sync_distance']}',
+    ]
+    eta = node_status.get('eta')
+
+    if node_status['is_syncing'] and eta is not None:
+        status_message.append(f'  Estimated time to sync: {_format_eta(eta)}')
+    elif node_status['is_syncing'] and eta is None:
+        status_message.append('  Estimated time to sync: unavailable')
+
+    click.echo('\n'.join(status_message))
 
 
 def _format_eta(eta: int) -> str:
