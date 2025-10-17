@@ -12,11 +12,20 @@ from src.commands.start.common_option import add_common_options, start_common_op
 from src.common.typings import ValidatorType
 from src.common.utils import log_verbose
 from src.config.config import OperatorConfig
+from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
 
+@click.option(
+    '--network',
+    help='The network of the vault. Default is the network specified at "init" command.',
+    type=click.Choice(
+        AVAILABLE_NETWORKS,
+        case_sensitive=False,
+    ),
+)
 @click.option(
     '--remote-signer-url',
     type=str,
@@ -47,6 +56,7 @@ def start_remote_signer(
     data_dir: str,
     log_level: str,
     log_format: str,
+    network: str | None,
     remote_signer_url: str | None,
     wallet_file: str | None,
     wallet_password_file: str | None,
@@ -59,7 +69,9 @@ def start_remote_signer(
     max_withdrawal_request_fee_gwei: int,
 ) -> None:
     operator_config = OperatorConfig(vault, Path(data_dir))
-    operator_config.load()
+    if network is None:
+        operator_config.load()
+        network = operator_config.network
 
     settings.set(
         vault=vault,
@@ -78,7 +90,7 @@ def start_remote_signer(
         metrics_host=metrics_host,
         metrics_port=metrics_port,
         metrics_prefix=metrics_prefix,
-        network=operator_config.network,
+        network=network,
         validator_type=validator_type,
         remote_signer_url=remote_signer_url,
         wallet_file=wallet_file,
