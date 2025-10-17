@@ -12,6 +12,7 @@ from src.commands.start.common_option import add_common_options, start_common_op
 from src.common.typings import ValidatorsRegistrationMode, ValidatorType
 from src.common.utils import log_verbose
 from src.config.config import OperatorConfig
+from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,14 @@ logger = logging.getLogger(__name__)
     help='Relayer endpoint.',
     prompt='Enter the relayer endpoint',
     envvar='RELAYER_ENDPOINT',
+)
+@click.option(
+    '--network',
+    help='The network of the vault. Default is the network specified at "init" command.',
+    type=click.Choice(
+        AVAILABLE_NETWORKS,
+        case_sensitive=False,
+    ),
 )
 @add_common_options(start_common_options)
 @click.command(help='Start operator service in API mode')
@@ -55,11 +64,14 @@ def start_relayer(
     wallet_password_file: str | None,
     max_fee_per_gas_gwei: int | None,
     database_dir: str | None,
+    network: str | None,
     relayer_endpoint: str,
     max_withdrawal_request_fee_gwei: int,
 ) -> None:
     operator_config = OperatorConfig(vault, Path(data_dir))
-    operator_config.load()
+    if network is None:
+        operator_config.load()
+        network = operator_config.network
 
     validators_registration_mode = ValidatorsRegistrationMode.API
 
@@ -81,7 +93,7 @@ def start_relayer(
         metrics_port=metrics_port,
         metrics_prefix=metrics_prefix,
         validator_type=validator_type,
-        network=operator_config.network,
+        network=network,
         wallet_file=wallet_file,
         wallet_password_file=wallet_password_file,
         max_fee_per_gas_gwei=max_fee_per_gas_gwei,
