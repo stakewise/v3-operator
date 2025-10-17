@@ -65,7 +65,7 @@ class SyncStatusHistory:
         self._dump_history(sync_status_history)
 
     def load_history(self) -> list[StatusHistoryRecord]:
-        sync_status_path = settings.vault_dir / 'sync_status.csv'
+        sync_status_path = settings.nodes_dir / 'sync_status.csv'
 
         if not sync_status_path.exists():
             return []
@@ -86,7 +86,7 @@ class SyncStatusHistory:
         return records
 
     def _dump_history(self, sync_status_history: list[StatusHistoryRecord]) -> None:
-        sync_status_path = settings.vault_dir / 'sync_status.csv'
+        sync_status_path = settings.nodes_dir / 'sync_status.csv'
 
         with sync_status_path.open('w') as f:
             writer = DictWriter(f, fieldnames=SYNC_STATUS_FIELDNAMES)
