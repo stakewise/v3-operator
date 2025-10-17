@@ -12,11 +12,20 @@ from src.commands.start.common_option import add_common_options, start_common_op
 from src.common.typings import ValidatorType
 from src.common.utils import log_verbose
 from src.config.config import OperatorConfig
+from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_HASHI_VAULT_PARALLELISM, settings
 
 logger = logging.getLogger(__name__)
 
 
+@click.option(
+    '--network',
+    help='The network of the vault. Default is the network specified at "init" command.',
+    type=click.Choice(
+        AVAILABLE_NETWORKS,
+        case_sensitive=False,
+    ),
+)
 @click.option(
     '--hashi-vault-url',
     envvar='HASHI_VAULT_URL',
@@ -71,6 +80,7 @@ def start_hashi_vault(
     data_dir: str,
     log_level: str,
     log_format: str,
+    network: str | None,
     hashi_vault_key_path: list[str] | None,
     hashi_vault_key_prefix: list[str] | None,
     hashi_vault_token: str | None,
@@ -87,7 +97,9 @@ def start_hashi_vault(
     max_withdrawal_request_fee_gwei: int,
 ) -> None:
     operator_config = OperatorConfig(vault, Path(data_dir))
-    operator_config.load()
+    if network is None:
+        operator_config.load()
+        network = operator_config.network
 
     settings.set(
         vault=vault,
@@ -106,7 +118,7 @@ def start_hashi_vault(
         metrics_host=metrics_host,
         metrics_port=metrics_port,
         metrics_prefix=metrics_prefix,
-        network=operator_config.network,
+        network=network,
         validator_type=validator_type,
         hashi_vault_token=hashi_vault_token,
         hashi_vault_key_paths=hashi_vault_key_path,
