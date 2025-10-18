@@ -55,7 +55,7 @@ class NodeConfig:
     ERA_URL: str
     MIN_MEMORY_GB: int
     MIN_DISK_SPACE_TB: float
-    INITIAL_SYNC_TIME: timedelta
+    INITIAL_SYNC_ETA: timedelta
 
 
 NETWORKS: dict[str, NetworkConfig] = {
@@ -102,7 +102,7 @@ NETWORKS: dict[str, NetworkConfig] = {
             ERA_URL='https://data.ethpandaops.io/era1/mainnet/',
             MIN_MEMORY_GB=16,
             MIN_DISK_SPACE_TB=2,
-            INITIAL_SYNC_TIME=timedelta(hours=48),
+            INITIAL_SYNC_ETA=timedelta(hours=48),
         ),
     ),
     HOODI: NetworkConfig(
@@ -146,7 +146,7 @@ NETWORKS: dict[str, NetworkConfig] = {
             ERA_URL='',
             MIN_MEMORY_GB=16,
             MIN_DISK_SPACE_TB=0.1,  # 100 GB
-            INITIAL_SYNC_TIME=timedelta(hours=8),
+            INITIAL_SYNC_ETA=timedelta(hours=8),
         ),
     ),
     GNOSIS: NetworkConfig(
@@ -192,7 +192,7 @@ NETWORKS: dict[str, NetworkConfig] = {
             ERA_URL='',
             MIN_MEMORY_GB=16,
             MIN_DISK_SPACE_TB=2,
-            INITIAL_SYNC_TIME=timedelta(hours=48),
+            INITIAL_SYNC_ETA=timedelta(hours=48),
         ),
     ),
     CHIADO: NetworkConfig(
@@ -238,7 +238,7 @@ NETWORKS: dict[str, NetworkConfig] = {
             ERA_URL='',
             MIN_MEMORY_GB=16,
             MIN_DISK_SPACE_TB=0.1,  # 100 GB
-            INITIAL_SYNC_TIME=timedelta(hours=8),
+            INITIAL_SYNC_ETA=timedelta(hours=8),
         ),
     ),
 }

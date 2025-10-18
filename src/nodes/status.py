@@ -52,15 +52,16 @@ async def get_execution_node_status(execution_client: AsyncWeb3) -> dict:
 
     # Assume initial sync is 90% of the total sync process
     initial_sync_ratio = 0.9
-    initial_sync_time = settings.network_config.NODE_CONFIG.INITIAL_SYNC_TIME.total_seconds()
-    eta: int | None
+    initial_sync_eta = settings.network_config.NODE_CONFIG.INITIAL_SYNC_ETA.total_seconds()
+    regular_sync_eta = (1 - initial_sync_ratio) * initial_sync_eta
+    eta: float
     progress: float
 
     if is_initial_sync:
         initial_progress = await _calc_initial_execution_sync_progress(execution_client)
         progress = initial_sync_ratio * initial_progress
-        initial_eta = initial_sync_time * (1 - initial_progress)
-        eta = int(initial_eta + (1 - initial_sync_ratio) * initial_sync_time)
+        initial_eta = initial_sync_eta * (1 - initial_progress)
+        eta = initial_eta + (1 - initial_sync_ratio) * initial_sync_eta
     elif is_syncing:
         regular_progress = await _calc_regular_execution_sync_progress(
             execution_client=execution_client,
@@ -68,10 +69,13 @@ async def get_execution_node_status(execution_client: AsyncWeb3) -> dict:
             latest_block=latest_block,
         )
         progress = initial_sync_ratio + (1 - initial_sync_ratio) * regular_progress
-        eta = await _calc_regular_execution_eta(
-            execution_client=execution_client,
-            sync_status_history=sync_status_history,
-            latest_block=latest_block,
+        eta = (
+            await _calc_regular_execution_eta(
+                execution_client=execution_client,
+                sync_status_history=sync_status_history,
+                latest_block=latest_block,
+            )
+            or regular_sync_eta
         )
     else:
         progress = 1.0
@@ -81,7 +85,7 @@ async def get_execution_node_status(execution_client: AsyncWeb3) -> dict:
         'is_syncing': is_syncing,
         'latest_block_number': latest_block['number'],
         'sync_distance': sync_distance,
-        'eta': eta,
+        'eta': int(eta),
         'progress': round(progress * 100),  # percentage
     }
 
@@ -145,7 +149,7 @@ async def _calc_regular_execution_eta(
     execution_client: AsyncWeb3,
     sync_status_history: list[StatusHistoryRecord],
     latest_block: BlockData,
-) -> int | None:
+) -> float | None:
     if len(sync_status_history) < 2:
         return None
 
@@ -160,7 +164,7 @@ async def _calc_regular_execution_eta(
         return None
 
     # Calculate ETA
-    execution_eta = int((head_slot - latest_block_slot) / execution_speed)
+    execution_eta = (head_slot - latest_block_slot) / execution_speed
     return execution_eta
 
 
