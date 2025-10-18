@@ -31,7 +31,7 @@ async def get_consensus_node_status(consensus_client: ExtendedAsyncBeacon) -> di
         'is_syncing': syncing['is_syncing'],
         'head_slot': int(syncing['head_slot']),
         'sync_distance': int(syncing['sync_distance']),
-        'eta': eta,
+        'eta': int(eta) if eta is not None else None,
     }
 
 
@@ -132,7 +132,7 @@ async def _get_number_of_active_validators(
 
 async def _calc_consensus_eta(
     consensus_syncing: dict, sync_status_history: list[StatusHistoryRecord]
-) -> int | None:
+) -> float | None:
     if len(sync_status_history) < 2:
         return None
 
@@ -140,7 +140,7 @@ async def _calc_consensus_eta(
     allowed_delay = 1
 
     if sync_distance <= allowed_delay:
-        return 0
+        return 0.0
 
     first_record = sync_status_history[-2]
     last_record = sync_status_history[-1]
@@ -153,7 +153,7 @@ async def _calc_consensus_eta(
 
     consensus_speed = (last_slot - first_slot) / (last_timestamp - first_timestamp)
 
-    consensus_eta = int(sync_distance / consensus_speed) if consensus_speed > 0 else None
+    consensus_eta = sync_distance / consensus_speed if consensus_speed > 0 else None
     return consensus_eta
 
 
