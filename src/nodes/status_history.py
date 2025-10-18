@@ -12,7 +12,7 @@ from src.nodes.typings import StatusHistoryRecord
 logger = logging.getLogger(__name__)
 
 
-SYNC_STATUS_HISTORY_LEN = 10
+SYNC_STATUS_HISTORY_LEN = 100
 SYNC_STATUS_FIELDNAMES = ['timestamp', 'block_number', 'slot']
 SYNC_STATUS_INTERVAL = 60
 
