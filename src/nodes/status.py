@@ -106,16 +106,28 @@ async def get_validator_activity_stats(consensus_client: ExtendedAsyncBeacon) ->
 
     stats['total'] = len(public_keys)
 
-    # Get validator statuses
+    stats['active'] = await _get_number_of_active_validators(
+        public_keys=public_keys, consensus_client=consensus_client
+    )
+
+    return stats
+
+
+async def _get_number_of_active_validators(
+    public_keys: list[str], consensus_client: ExtendedAsyncBeacon
+) -> int:
+    if not public_keys:
+        return 0
+
+    active_count = 0
     validators = (await consensus_client.get_validators_by_ids(public_keys))['data']
 
-    # Calc number of active validators
     for validator in validators:
         status = ValidatorStatus(validator['status'])
         if status in ACTIVE_STATUSES:
-            stats['active'] += 1
+            active_count += 1
 
-    return stats
+    return active_count
 
 
 async def _calc_consensus_eta(
