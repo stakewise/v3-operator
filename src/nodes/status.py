@@ -202,7 +202,8 @@ async def _calc_regular_execution_eta(
         return None
 
     latest_block_slot = calc_slot_by_block_timestamp(latest_block['timestamp'])
-    head_slot = calc_slot_by_block_timestamp(Timestamp(int(time.time())))
+    cur_ts = int(time.time())
+    head_slot = calc_slot_by_block_timestamp(Timestamp(cur_ts))
 
     execution_speed = await _calc_execution_speed_slots(
         execution_sync_history=execution_sync_history,
@@ -218,6 +219,7 @@ async def _calc_regular_execution_eta(
 
     if last_record and last_record.block_number == latest_block['number']:
         execution_eta -= last_record.duration
+        execution_eta -= cur_ts - last_record.update_timestamp
 
     return max(0.0, execution_eta)
 
@@ -249,18 +251,15 @@ async def _calc_execution_speed_slots(
     if len(execution_sync_history) <= 2:
         return None
 
-    for record_index in range(len(execution_sync_history) - 1):
+    # Skip first and last records because they may be incomplete
+    # Go in reverse order to get more recent data
+    for record_index in range(len(execution_sync_history) - 2, 0, -1):
         cur_record = execution_sync_history[record_index]
         next_record = execution_sync_history[record_index + 1]
 
         # Ignore records made while initial sync
         if cur_record.block_number == 0:
-            next_record = cur_record
-            continue
-
-        # Skip latest record because it's in the middle of syncing
-        if record_index == len(execution_sync_history) - 1:
-            continue
+            return None
 
         # Take the record which was syncing long enough
         if cur_record.duration > 2 * EXECUTION_SYNC_INTERVAL:

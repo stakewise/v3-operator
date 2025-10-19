@@ -57,13 +57,20 @@ class ExecutionSyncHistory:
         cur_block_number = await execution_client.eth.block_number
 
         if not last_record or last_record.block_number != cur_block_number:
-            sync_history.append(ExecutionSyncRecord(block_number=cur_block_number, duration=0))
+            sync_history.append(
+                ExecutionSyncRecord(
+                    block_number=cur_block_number, duration=0, update_timestamp=cur_ts
+                )
+            )
 
         if last_record and self.last_update_ts is not None:
             duration_delta = cur_ts - self.last_update_ts
             last_record.duration += duration_delta
 
         self.last_update_ts = cur_ts
+
+        if last_record and last_record.block_number == cur_block_number:
+            last_record.update_timestamp = cur_ts
 
         sync_history = sync_history[-EXECUTION_SYNC_HISTORY_LEN:]
         self._dump_history(sync_history)
@@ -84,6 +91,7 @@ class ExecutionSyncHistory:
                     ExecutionSyncRecord(
                         block_number=int(row['block_number']),
                         duration=int(row['duration']),
+                        update_timestamp=int(row['update_timestamp'] or 0),
                     )
                 )
         return records

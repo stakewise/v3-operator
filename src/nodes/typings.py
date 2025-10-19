@@ -94,3 +94,4 @@ class StatusHistoryRecord:
 class ExecutionSyncRecord:
     block_number: int
     duration: int
+    update_timestamp: int
