@@ -22,12 +22,12 @@ class ExecutionSyncHistory:
         self.last_update_ts: int | None = None
 
     @property
-    def sync_status_path(self) -> Path:
-        return settings.nodes_dir / 'sync_status.csv'
+    def execution_sync_path(self) -> Path:
+        return settings.nodes_dir / 'execution_sync.csv'
 
     async def update_periodically(self, execution_client: AsyncWeb3) -> None:
         """
-        Periodically updates the synchronization status history of the nodes.
+        Periodically updates the execution synchronization status history of the nodes.
         History is saved to a CSV file.
         """
         # Give the nodes some time to start
@@ -68,15 +68,15 @@ class ExecutionSyncHistory:
         sync_history = sync_history[-EXECUTION_SYNC_HISTORY_LEN:]
         self._dump_history(sync_history)
 
-    def load_history(self, sync_status_path: Path | None = None) -> list[ExecutionSyncRecord]:
-        sync_status_path = sync_status_path or self.sync_status_path
+    def load_history(self, execution_sync_path: Path | None = None) -> list[ExecutionSyncRecord]:
+        execution_sync_path = execution_sync_path or self.execution_sync_path
 
-        if not sync_status_path.exists():
+        if not execution_sync_path.exists():
             return []
 
         records: list[ExecutionSyncRecord] = []
 
-        with sync_status_path.open('r') as f:
+        with execution_sync_path.open('r') as f:
             reader = DictReader(f, fieldnames=EXECUTION_SYNC_FIELDNAMES)
             next(reader)  # skip header
             for row in reader:
@@ -88,8 +88,8 @@ class ExecutionSyncHistory:
                 )
         return records
 
-    def _dump_history(self, sync_status_history: list[ExecutionSyncRecord]) -> None:
-        with self.sync_status_path.open('w') as f:
+    def _dump_history(self, execution_sync_history: list[ExecutionSyncRecord]) -> None:
+        with self.execution_sync_path.open('w') as f:
             writer = DictWriter(f, fieldnames=EXECUTION_SYNC_FIELDNAMES)
             writer.writeheader()
-            writer.writerows([record.__dict__ for record in sync_status_history])
+            writer.writerows([record.__dict__ for record in execution_sync_history])
