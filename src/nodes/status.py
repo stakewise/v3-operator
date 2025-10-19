@@ -9,8 +9,12 @@ from web3.types import BlockData, Timestamp
 
 from src.common.utils import calc_slot_by_block_number, calc_slot_by_block_timestamp
 from src.config.settings import settings
+from src.nodes.execution_sync_history import (
+    EXECUTION_SYNC_INTERVAL,
+    ExecutionSyncHistory,
+)
 from src.nodes.status_history import SYNC_STATUS_INTERVAL, SyncStatusHistory
-from src.nodes.typings import StatusHistoryRecord
+from src.nodes.typings import ExecutionSyncRecord, StatusHistoryRecord
 from src.validators.keystores.local import LocalKeystore
 
 logger = logging.getLogger(__name__)
@@ -46,7 +50,7 @@ async def get_execution_node_status(execution_client: AsyncWeb3) -> dict:
     ) // settings.network_config.SECONDS_PER_BLOCK
     allowed_delay = 5
     is_syncing = sync_distance > allowed_delay
-    sync_status_history = SyncStatusHistory().load_history()
+    execution_sync_history = ExecutionSyncHistory().load_history()
 
     is_initial_sync = latest_block['number'] == 0
 
@@ -58,21 +62,21 @@ async def get_execution_node_status(execution_client: AsyncWeb3) -> dict:
     progress: float
 
     if is_initial_sync:
-        initial_progress = await _calc_initial_execution_sync_progress(execution_client)
+        initial_progress = await _calc_initial_execution_sync_progress()
         progress = initial_sync_ratio * initial_progress
         initial_eta = initial_sync_eta * (1 - initial_progress)
         eta = initial_eta + (1 - initial_sync_ratio) * initial_sync_eta
     elif is_syncing:
         regular_progress = await _calc_regular_execution_sync_progress(
             execution_client=execution_client,
-            sync_status_history=sync_status_history,
+            execution_sync_history=execution_sync_history,
             latest_block=latest_block,
         )
         progress = initial_sync_ratio + (1 - initial_sync_ratio) * regular_progress
         eta = (
             await _calc_regular_execution_eta(
                 execution_client=execution_client,
-                sync_status_history=sync_status_history,
+                execution_sync_history=execution_sync_history,
                 latest_block=latest_block,
             )
             or regular_sync_eta
@@ -191,107 +195,109 @@ def _calc_consensus_speed(sync_status_history: list[StatusHistoryRecord]) -> flo
 
 async def _calc_regular_execution_eta(
     execution_client: AsyncWeb3,
-    sync_status_history: list[StatusHistoryRecord],
+    execution_sync_history: list[ExecutionSyncRecord],
     latest_block: BlockData,
 ) -> float | None:
-    if len(sync_status_history) < 2:
+    if len(execution_sync_history) < 2:
         return None
 
     latest_block_slot = calc_slot_by_block_timestamp(latest_block['timestamp'])
     head_slot = calc_slot_by_block_timestamp(Timestamp(int(time.time())))
 
     execution_speed = await _calc_execution_speed_slots(
-        sync_status_history=sync_status_history,
+        execution_sync_history=execution_sync_history,
         execution_client=execution_client,
     )
     if execution_speed is None or execution_speed <= 0:
-        return None
+        execution_speed = 2.0  # Put reasonable value for a speed
 
     # Calculate ETA
     execution_eta = (head_slot - latest_block_slot) / execution_speed
-    return execution_eta
+
+    last_record = execution_sync_history[-1] if execution_sync_history else None
+
+    if last_record and last_record.block_number == latest_block['number']:
+        execution_eta -= last_record.duration
+
+    return max(0.0, execution_eta)
 
 
 async def _calc_regular_execution_sync_progress(
     execution_client: AsyncWeb3,
-    sync_status_history: list[StatusHistoryRecord],
+    execution_sync_history: list[ExecutionSyncRecord],
     latest_block: BlockData,
 ) -> float:
     """Calculate regular sync progress based on timestamps. Assumes that initial sync is done."""
-    latest_ts = latest_block['timestamp']
-    head_ts = int(time.time())
-    first_block = await execution_client.eth.get_block(sync_status_history[0].block_number)
-    first_ts = first_block['timestamp']
-    progress = (latest_ts - first_ts) / (head_ts - first_ts)
+    if not execution_sync_history:
+        return 0.0
 
-    return progress
+    record = execution_sync_history[-1]
+
+    if record.duration == 0:
+        return 0.0
+
+    return 1.0
 
 
 async def _calc_execution_speed_slots(
-    sync_status_history: list[StatusHistoryRecord], execution_client: AsyncWeb3
+    execution_sync_history: list[ExecutionSyncRecord], execution_client: AsyncWeb3
 ) -> float | None:
-    last_record = sync_status_history[-1]
-    first_record: StatusHistoryRecord | None = None
+    # Find the record representing 'syncing' status of the node
+    cur_record: ExecutionSyncRecord | None = None
+    next_record: ExecutionSyncRecord | None = None
 
-    # Too old records are not useful for speed calculation
-    max_time_diff = 3600  # 1 hour
-
-    for record in reversed(sync_status_history):
-        # Ignore records made while initial sync
-        if record.block_number == 0:
-            return None
-
-        # Find the last record with a different block number
-        # and within the max_time_diff
-        if (
-            record.block_number != last_record.block_number
-            and last_record.timestamp - record.timestamp < max_time_diff
-        ):
-            first_record = record
-            break
-
-    if first_record is None:
+    if len(execution_sync_history) <= 2:
         return None
 
-    # Get first and last blocks from the history
-    first_block_number = BlockNumber(int(first_record.block_number))
-    last_block_number = BlockNumber(int(last_record.block_number))
+    for record_index in range(len(execution_sync_history) - 1):
+        cur_record = execution_sync_history[record_index]
+        next_record = execution_sync_history[record_index + 1]
+
+        # Ignore records made while initial sync
+        if cur_record.block_number == 0:
+            next_record = cur_record
+            continue
+
+        # Skip latest record because it's in the middle of syncing
+        if record_index == len(execution_sync_history) - 1:
+            continue
+
+        # Take the record which was syncing long enough
+        if cur_record.duration > 2 * EXECUTION_SYNC_INTERVAL:
+            break
+
+    if cur_record is None or next_record is None:
+        return None
+
+    cur_block_number = BlockNumber(int(cur_record.block_number))
+    next_block_number = BlockNumber(int(next_record.block_number))
 
     # Calculate execution speed in slots per second (not blocks per second)
     try:
-        first_block_slot = await calc_slot_by_block_number(
-            first_block_number, execution_client=execution_client
+        cur_block_slot = await calc_slot_by_block_number(
+            cur_block_number, execution_client=execution_client
         )
-        last_block_slot = await calc_slot_by_block_number(
-            last_block_number, execution_client=execution_client
+        next_block_slot = await calc_slot_by_block_number(
+            next_block_number, execution_client=execution_client
         )
     except Exception:
         return None
 
-    first_timestamp = int(first_record.timestamp)
-    last_timestamp = int(last_record.timestamp)
-    execution_speed = (last_block_slot - first_block_slot) / (last_timestamp - first_timestamp)
-    return execution_speed
+    return (next_block_slot - cur_block_slot) / cur_record.duration
 
 
-async def _calc_initial_execution_sync_progress(execution_client: AsyncWeb3) -> float:
+async def _calc_initial_execution_sync_progress() -> float:
     """
-    Calculate initial sync progress based on syncing stages.
+    Calculate initial sync progress based on sync duration.
     """
-    syncing = await execution_client.eth.syncing
-    stages_ready = 0
-    stages_total = 0
-
-    for stage in syncing['stages']:  # type: ignore
-        if not settings.network_config.NODE_CONFIG.ERA_URL and stage['name'] == 'Era':
-            continue
-
-        stages_total += 1
-
-        if stage['block'] != '0x0':
-            stages_ready += 1
-
-    if stages_total == 0:
+    execution_sync_history = ExecutionSyncHistory().load_history()
+    if not execution_sync_history:
         return 0.0
 
-    return stages_ready / stages_total
+    last_record = execution_sync_history[-1]
+    if last_record.block_number != 0:
+        # probably stale file, current block number is not written yet
+        return 0.0
+
+    initial_sync_eta = settings.network_config.NODE_CONFIG.INITIAL_SYNC_ETA.total_seconds()
+    return min(1.0, last_record.duration / initial_sync_eta)
