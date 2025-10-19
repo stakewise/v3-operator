@@ -9,7 +9,7 @@ from web3.types import BlockData, Timestamp
 
 from src.common.utils import calc_slot_by_block_number, calc_slot_by_block_timestamp
 from src.config.settings import settings
-from src.nodes.status_history import SyncStatusHistory
+from src.nodes.status_history import SYNC_STATUS_INTERVAL, SyncStatusHistory
 from src.nodes.typings import StatusHistoryRecord
 from src.validators.keystores.local import LocalKeystore
 
@@ -142,8 +142,41 @@ async def _calc_consensus_eta(
     if sync_distance <= allowed_delay:
         return 0.0
 
-    first_record = sync_status_history[-2]
-    last_record = sync_status_history[-1]
+    consensus_speed = _calc_consensus_speed(sync_status_history)
+
+    if consensus_speed is None or consensus_speed <= 0:
+        return None
+
+    return sync_distance / consensus_speed
+
+
+def _calc_consensus_speed(sync_status_history: list[StatusHistoryRecord]) -> float | None:
+    if len(sync_status_history) < 2:
+        return None
+
+    # Find two consecutive records with timestamp difference close to the sync interval
+    # Ensure the node was working between records
+    # Also avoid small time differences
+    sync_interval_max_diff = 3.0
+    first_record = None
+    last_record = None
+
+    for i in range(len(sync_status_history) - 1, 0, -1):
+        curr = sync_status_history[i]
+        prev = sync_status_history[i - 1]
+        sync_interval_diff = abs(curr.timestamp - prev.timestamp - SYNC_STATUS_INTERVAL)
+
+        # Find the moment when the node was actually syncing
+        slots_diff = curr.slot - prev.slot
+        slots_diff_min = 2 * SYNC_STATUS_INTERVAL / settings.network_config.SECONDS_PER_SLOT
+
+        if sync_interval_diff < sync_interval_max_diff and slots_diff > slots_diff_min:
+            first_record = prev
+            last_record = curr
+            break
+
+    if first_record is None or last_record is None:
+        return None
 
     first_timestamp = first_record.timestamp
     last_timestamp = last_record.timestamp
@@ -153,8 +186,7 @@ async def _calc_consensus_eta(
 
     consensus_speed = (last_slot - first_slot) / (last_timestamp - first_timestamp)
 
-    consensus_eta = sync_distance / consensus_speed if consensus_speed > 0 else None
-    return consensus_eta
+    return consensus_speed
 
 
 async def _calc_regular_execution_eta(

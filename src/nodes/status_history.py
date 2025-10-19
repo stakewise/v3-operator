@@ -2,6 +2,7 @@ import asyncio
 import logging
 import time
 from csv import DictReader, DictWriter
+from pathlib import Path
 
 from sw_utils import ExtendedAsyncBeacon
 from web3 import AsyncWeb3
@@ -64,8 +65,8 @@ class SyncStatusHistory:
 
         self._dump_history(sync_status_history)
 
-    def load_history(self) -> list[StatusHistoryRecord]:
-        sync_status_path = settings.nodes_dir / 'sync_status.csv'
+    def load_history(self, sync_status_path: Path | None = None) -> list[StatusHistoryRecord]:
+        sync_status_path = sync_status_path or (settings.nodes_dir / 'sync_status.csv')
 
         if not sync_status_path.exists():
             return []
