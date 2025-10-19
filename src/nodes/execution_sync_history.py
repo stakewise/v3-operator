@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 EXECUTION_SYNC_HISTORY_LEN = 100
-EXECUTION_SYNC_FIELDNAMES = ['block_number', 'duration']
+EXECUTION_SYNC_FIELDNAMES = ['block_number', 'duration', 'update_timestamp']
 EXECUTION_SYNC_INTERVAL = 60
 
 
