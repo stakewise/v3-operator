@@ -35,9 +35,12 @@ class ExecutionSyncHistory:
         await asyncio.sleep(startup_interval)
 
         while True:
-            await self._update_sync_status(
-                execution_client=execution_client,
-            )
+            try:
+                await self._update_sync_status(
+                    execution_client=execution_client,
+                )
+            except Exception as e:
+                logger.error('Error updating execution sync status: %s', e)
             await asyncio.sleep(EXECUTION_SYNC_INTERVAL)
 
     async def _update_sync_status(self, execution_client: AsyncWeb3) -> None:

@@ -31,10 +31,13 @@ class SyncStatusHistory:
         await asyncio.sleep(startup_interval)
 
         while True:
-            await self._update_sync_status(
-                execution_client=execution_client,
-                consensus_client=consensus_client,
-            )
+            try:
+                await self._update_sync_status(
+                    execution_client=execution_client,
+                    consensus_client=consensus_client,
+                )
+            except Exception as e:
+                logger.error('Error updating sync status: %s', e)
             await asyncio.sleep(SYNC_STATUS_INTERVAL)
 
     async def _update_sync_status(
