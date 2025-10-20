@@ -204,6 +204,8 @@ async def _calc_regular_execution_eta(
     if execution_speed is None or execution_speed <= 0:
         execution_speed = 2.0  # Put reasonable value for a speed
 
+    logger.info('execution_speed slots/sec: %.2f', execution_speed)
+
     # Calculate ETA
     execution_eta = (head_slot - latest_block_slot) / execution_speed
 
