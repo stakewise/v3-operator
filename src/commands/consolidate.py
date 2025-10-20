@@ -31,7 +31,7 @@ from src.common.validators import (
 )
 from src.common.wallet import wallet
 from src.config.config import OperatorConfig
-from src.config.networks import GNOSIS, MAINNET, NETWORKS
+from src.config.networks import AVAILABLE_NETWORKS, GNOSIS, MAINNET, NETWORKS
 from src.config.settings import DEFAULT_MAX_CONSOLIDATION_REQUEST_FEE_GWEI, settings
 from src.validators.consensus import EXITING_STATUSES, fetch_consensus_validators
 from src.validators.oracles import poll_consolidation_signature
@@ -48,6 +48,14 @@ logger = logging.getLogger(__name__)
     envvar='DATA_DIR',
     help='Path where the config data is placed. Default is ~/.stakewise.',
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
+)
+@click.option(
+    '--network',
+    help='The network of the vault. Default is the network specified at "init" command.',
+    type=click.Choice(
+        AVAILABLE_NETWORKS,
+        case_sensitive=False,
+    ),
 )
 @click.option(
     '--vault',
@@ -166,6 +174,7 @@ def consolidate(
     data_dir: str,
     wallet_file: str | None,
     wallet_password_file: str | None,
+    network: str | None,
     verbose: bool,
     no_switch_consolidation: bool,
     no_confirm: bool,
@@ -191,11 +200,13 @@ def consolidate(
         source_public_keys = _load_public_keys(source_public_keys_file)
 
     operator_config = OperatorConfig(vault, Path(data_dir))
-    operator_config.load()
+    if network is None:
+        operator_config.load()
+        network = operator_config.network
 
     settings.set(
         vault=vault,
-        network=operator_config.network,
+        network=network,
         vault_dir=operator_config.vault_dir,
         execution_endpoints=execution_endpoints,
         consensus_endpoints=consensus_endpoints,
