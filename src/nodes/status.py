@@ -138,7 +138,7 @@ async def _calc_consensus_eta(
     consensus_speed = _calc_consensus_speed(sync_status_history)
 
     if consensus_speed is None or consensus_speed <= 0:
-        return None
+        consensus_speed = 1.5  # Put reasonable value for a speed
 
     return sync_distance / consensus_speed
 
