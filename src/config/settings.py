@@ -20,6 +20,9 @@ DEFAULT_HASHI_VAULT_ENGINE_NAME = 'secret'
 DEFAULT_MIN_DEPOSIT_AMOUNT = Web3.to_wei(10, 'ether')
 DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI = Gwei(int(Web3.from_wei(DEFAULT_MIN_DEPOSIT_AMOUNT, 'gwei')))
 
+DEFAULT_CONSENSUS_ENDPOINT = 'http://localhost:5052'
+DEFAULT_EXECUTION_ENDPOINT = 'http://localhost:8545'
+
 DEFAULT_MIN_DEPOSIT_DELAY = 3600  # 1 hour
 
 
@@ -111,6 +114,9 @@ class Settings(metaclass=Singleton):
     max_validator_balance_gwei: Gwei
     min_deposit_delay: int
     max_withdrawal_request_fee_gwei: Gwei
+    nodes_dir: Path
+
+    run_nodes: bool
 
     # pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements
     def set(
@@ -156,14 +162,24 @@ class Settings(metaclass=Singleton):
         max_validator_balance_gwei: Gwei | None = None,
         min_deposit_delay: int = DEFAULT_MIN_DEPOSIT_DELAY,
         max_withdrawal_request_fee_gwei: Gwei = DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI,
+        nodes_dir: Path = Path(''),
+        run_nodes: bool = False,
     ) -> None:
         self.vault = vault
         vault_dir.mkdir(parents=True, exist_ok=True)
         self.vault_dir = vault_dir
         self.network = network
 
-        self.consensus_endpoints = [node.strip() for node in consensus_endpoints.split(',')]
-        self.execution_endpoints = [node.strip() for node in execution_endpoints.split(',')]
+        if consensus_endpoints:
+            self.consensus_endpoints = [node.strip() for node in consensus_endpoints.split(',')]
+        else:
+            self.consensus_endpoints = [DEFAULT_CONSENSUS_ENDPOINT]
+
+        if execution_endpoints:
+            self.execution_endpoints = [node.strip() for node in execution_endpoints.split(',')]
+        else:
+            self.execution_endpoints = [DEFAULT_EXECUTION_ENDPOINT]
+
         self.execution_jwt_secret = execution_jwt_secret
         self.graph_endpoint = graph_endpoint or self.network_config.STAKEWISE_GRAPH_ENDPOINT
         self.harvest_vault = harvest_vault
@@ -290,6 +306,8 @@ class Settings(metaclass=Singleton):
         self.validators_registration_mode = validators_registration_mode
 
         self.skip_startup_checks = decouple_config('SKIP_STARTUP_CHECKS', default=False, cast=bool)
+        self.nodes_dir = nodes_dir
+        self.run_nodes = run_nodes
 
     @property
     def keystore_cls_str(self) -> str:
