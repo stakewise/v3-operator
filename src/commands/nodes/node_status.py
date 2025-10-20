@@ -149,7 +149,6 @@ def _log_execution_node_status_text(node_status: dict) -> None:
         f'  Is syncing: {node_status['is_syncing']}',
         f'  Block number: {node_status['latest_block_number']}',
         f'  Sync distance: {node_status['sync_distance']}',
-        f'  Sync progress: {node_status['progress']}%',
     ]
     eta = node_status.get('eta')
 
