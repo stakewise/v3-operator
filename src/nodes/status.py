@@ -199,7 +199,7 @@ async def _calc_regular_execution_eta(
         execution_client=execution_client,
     )
     if execution_speed is None or execution_speed <= 0:
-        execution_speed = 2.0  # Put reasonable value for a speed
+        execution_speed = 1.5  # Put reasonable value for a speed
 
     logger.info('execution_speed slots/sec: %.2f', execution_speed)
 
