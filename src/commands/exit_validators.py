@@ -18,6 +18,7 @@ from src.common.startup_check import check_validators_manager, check_vault_versi
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_address, validate_indexes
 from src.config.config import OperatorConfig
+from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI, settings
 from src.validators.consensus import EXITING_STATUSES, fetch_consensus_validators
 from src.validators.relayer import RelayerClient
@@ -33,6 +34,14 @@ logger = logging.getLogger(__name__)
     envvar='DATA_DIR',
     help='Path where the config data is placed. Default is ~/.stakewise.',
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
+)
+@click.option(
+    '--network',
+    help='The network of the vault. Default is the network specified at "init" command.',
+    type=click.Choice(
+        AVAILABLE_NETWORKS,
+        case_sensitive=False,
+    ),
 )
 @click.option(
     '--vault',
@@ -113,6 +122,7 @@ def exit_validators(
     execution_endpoints: str,
     max_withdrawal_request_fee_gwei: int,
     data_dir: str,
+    network: str | None,
     verbose: bool,
     no_confirm: bool,
     log_level: str,
@@ -125,12 +135,14 @@ def exit_validators(
     if all([indexes, count]):
         raise click.ClickException('Please provide either --indexes or --count, not both.')
     operator_config = OperatorConfig(vault, Path(data_dir))
-    operator_config.load()
+    if network is None:
+        operator_config.load()
+        network = operator_config.network
 
     settings.set(
         vault=vault,
         vault_dir=operator_config.vault_dir,
-        network=operator_config.network,
+        network=network,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
         max_withdrawal_request_fee_gwei=Gwei(max_withdrawal_request_fee_gwei),
