@@ -9,10 +9,7 @@ from web3.types import BlockData, Timestamp
 
 from src.common.utils import calc_slot_by_block_number, calc_slot_by_block_timestamp
 from src.config.settings import settings
-from src.nodes.execution_sync_history import (
-    EXECUTION_SYNC_INTERVAL,
-    ExecutionSyncHistory,
-)
+from src.nodes.execution_sync_history import ExecutionSyncHistory
 from src.nodes.status_history import SYNC_STATUS_INTERVAL, SyncStatusHistory
 from src.nodes.typings import ExecutionSyncRecord, StatusHistoryRecord
 from src.validators.keystores.local import LocalKeystore
@@ -221,45 +218,31 @@ async def _calc_regular_execution_eta(
 async def _calc_execution_speed_slots(
     execution_sync_history: list[ExecutionSyncRecord], execution_client: AsyncWeb3
 ) -> float | None:
-    # Find the record representing 'syncing' status of the node
-    cur_record: ExecutionSyncRecord | None = None
-    next_record: ExecutionSyncRecord | None = None
-
     if len(execution_sync_history) <= 2:
         return None
 
     # Skip first and last records because they may be incomplete
-    # Go in reverse order to get more recent data
-    for record_index in range(len(execution_sync_history) - 2, 0, -1):
-        cur_record = execution_sync_history[record_index]
-        next_record = execution_sync_history[record_index + 1]
+    first_record = execution_sync_history[1]
+    last_record = execution_sync_history[-1]
 
-        # Ignore records made while initial sync
-        if cur_record.block_number == 0:
-            return None
+    # total duration from first to last records
+    duration_sum = sum(r.duration for r in execution_sync_history[1:-1])
 
-        # Take the record which was syncing long enough
-        if cur_record.duration > 2 * EXECUTION_SYNC_INTERVAL:
-            break
-
-    if cur_record is None or next_record is None:
-        return None
-
-    cur_block_number = BlockNumber(int(cur_record.block_number))
-    next_block_number = BlockNumber(int(next_record.block_number))
+    first_block_number = BlockNumber(int(first_record.block_number))
+    last_block_number = BlockNumber(int(last_record.block_number))
 
     # Calculate execution speed in slots per second (not blocks per second)
     try:
-        cur_block_slot = await calc_slot_by_block_number(
-            cur_block_number, execution_client=execution_client
+        first_block_slot = await calc_slot_by_block_number(
+            first_block_number, execution_client=execution_client
         )
-        next_block_slot = await calc_slot_by_block_number(
-            next_block_number, execution_client=execution_client
+        last_block_slot = await calc_slot_by_block_number(
+            last_block_number, execution_client=execution_client
         )
     except Exception:
         return None
 
-    return (next_block_slot - cur_block_slot) / cur_record.duration
+    return (last_block_slot - first_block_slot) / duration_sum
 
 
 async def _calc_initial_execution_sync_progress(execution_client: AsyncWeb3) -> float:
