@@ -519,6 +519,7 @@ def _load_public_keys(public_keys_file: Path) -> list[HexStr]:
     return public_keys
 
 
+# pylint: disable-next=too-many-locals
 async def _find_target_source_public_keys(
     vault_address: ChecksumAddress,
     chain_head: ChainHead,
@@ -566,10 +567,12 @@ async def _find_target_source_public_keys(
         target_validator = min(compounding_validators, key=lambda val: val.balance)
         selected_source_validators: list[ConsensusValidator] = []
         for val in source_validators:
-            if (
-                target_validator.balance + sum(v.balance for v in selected_source_validators)
-                > settings.max_validator_balance_gwei
-            ):
+            current_balance = (
+                val.balance
+                + target_validator.balance
+                + sum(v.balance for v in selected_source_validators)
+            )
+            if current_balance > settings.max_validator_balance_gwei:
                 break
             selected_source_validators.append(val)
 
