@@ -54,8 +54,17 @@ OUTPUT_FORMATS = ['text', 'json']
     envvar='VERBOSE',
     is_flag=True,
 )
+@click.option(
+    '--enable-file-logging',
+    help='Enable logging command output to a file in the nodes directory. Default is false.',
+    envvar='ENABLE_FILE_LOGGING',
+    is_flag=True,
+    default=False,
+)
 @click.command(help='Displays the status of the nodes.', name='node-status')
-def node_status_command(data_dir: Path, network: str, output_format: str, verbose: bool) -> None:
+def node_status_command(
+    data_dir: Path, network: str, output_format: str, verbose: bool, enable_file_logging: bool
+) -> None:
     # Using zero address since vault directory is not required for this command
     vault_address = ZERO_CHECKSUM_ADDRESS
 
@@ -67,6 +76,8 @@ def node_status_command(data_dir: Path, network: str, output_format: str, verbos
         nodes_dir=data_dir / network / 'nodes',
         verbose=verbose,
         log_format=LOG_PLAIN,
+        enable_file_logging=enable_file_logging,
+        log_file_path=data_dir / 'operator.log',
     )
     setup_logging()
 

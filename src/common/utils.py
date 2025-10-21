@@ -43,13 +43,6 @@ def log_verbose(e: Exception) -> None:
         logger.error(format_error(e))
 
 
-def error_verbose(msg: str, e: Exception) -> None:
-    if settings.verbose:
-        logger.exception(msg, exc_info=e)
-    else:
-        logger.error(format_error(e))
-
-
 def warning_verbose(msg: str, *args) -> None:  # type: ignore
     if settings.verbose:
         logger.warning(msg, *args)

@@ -10,8 +10,8 @@ from web3.types import BlockData, Timestamp
 from src.common.utils import (
     calc_slot_by_block_number,
     calc_slot_by_block_timestamp,
-    error_verbose,
     info_verbose,
+    warning_verbose,
 )
 from src.config.settings import settings
 from src.nodes.execution_sync_history import ExecutionSyncHistory
@@ -26,7 +26,7 @@ async def get_consensus_node_status(consensus_client: ExtendedAsyncBeacon) -> di
     try:
         syncing = (await consensus_client.get_syncing())['data']
     except Exception as e:
-        error_verbose('Error fetching consensus node status', e)
+        warning_verbose('Error fetching consensus node status: %s', e)
         return {}
 
     eta = await _calc_consensus_eta(
@@ -144,17 +144,27 @@ async def _calc_consensus_eta(
     allowed_delay = 1
 
     if sync_distance <= allowed_delay:
+        info_verbose('Consensus node is nearly synced. No ETA needed.')
         return 0.0
 
     consensus_speed = _calc_consensus_speed(sync_status_history)
+    default_consensus_speed = 1.0  # Put reasonable value for a speed
 
-    if consensus_speed is None or consensus_speed <= 0:
-        default_consensus_speed = 1.5  # Put reasonable value for a speed
+    if consensus_speed is None:
         info_verbose(
             'Unable to calculate consensus speed from history. Using default value %s.',
             default_consensus_speed,
         )
+        consensus_speed = default_consensus_speed
 
+    # If node is synced then calculated consensus_speed can be very low
+    # which is not realistic, so we set a minimum threshold
+    if consensus_speed < default_consensus_speed:
+        info_verbose(
+            'Calculated consensus speed %.2f is too low. Using default value %s.',
+            consensus_speed,
+            default_consensus_speed,
+        )
         consensus_speed = default_consensus_speed
 
     info_verbose('consensus_speed slots/sec: %.2f', consensus_speed)
@@ -166,37 +176,30 @@ def _calc_consensus_speed(sync_status_history: list[StatusHistoryRecord]) -> flo
     if len(sync_status_history) < 2:
         return None
 
-    # Find two consecutive records with timestamp difference close to the sync interval
-    # Ensure the node was working between records
-    # Also avoid small time differences
-    sync_interval_max_diff = 3.0
-    first_record = None
-    last_record = None
+    first_record = sync_status_history[0]
+    last_record = sync_status_history[-1]
+    idle_duration = 0
 
-    for i in range(len(sync_status_history) - 1, 0, -1):
+    for i in range(1, len(sync_status_history)):
         curr = sync_status_history[i]
         prev = sync_status_history[i - 1]
-        sync_interval_diff = abs(curr.timestamp - prev.timestamp - SYNC_STATUS_INTERVAL)
+        idle_time = max(curr.timestamp - prev.timestamp - SYNC_STATUS_INTERVAL, 0)
+        idle_duration += idle_time
 
-        # Find the moment when the node was actually syncing
-        slots_diff = curr.slot - prev.slot
-        slots_diff_min = 2 * SYNC_STATUS_INTERVAL / settings.network_config.SECONDS_PER_SLOT
-
-        if sync_interval_diff < sync_interval_max_diff and slots_diff > slots_diff_min:
-            first_record = prev
-            last_record = curr
-            break
-
-    if first_record is None or last_record is None:
-        return None
+    info_verbose('Total idle duration in consensus sync history: %d seconds', int(idle_duration))
 
     first_timestamp = first_record.timestamp
     last_timestamp = last_record.timestamp
 
     first_slot = first_record.slot
     last_slot = last_record.slot
+    duration = last_timestamp - first_timestamp - idle_duration
 
-    consensus_speed = (last_slot - first_slot) / (last_timestamp - first_timestamp)
+    if duration <= 0:
+        info_verbose('No valid duration to calculate consensus speed.')
+        return None
+
+    consensus_speed = (last_slot - first_slot) / duration
 
     return consensus_speed
 
