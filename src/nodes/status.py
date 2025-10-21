@@ -106,8 +106,7 @@ async def get_validator_activity_stats(consensus_client: ExtendedAsyncBeacon) ->
 
     stats['total'] = len(public_keys)
 
-    if settings.verbose:
-        logger.info('Fetching validator activity stats...')
+    info_verbose('Fetching validator activity stats...')
 
     stats['active'] = await _get_number_of_active_validators(
         public_keys=public_keys, consensus_client=consensus_client
@@ -223,7 +222,7 @@ async def _calc_regular_execution_eta(
     if execution_speed is None or execution_speed <= 0:
         execution_speed = 1.5  # Put reasonable value for a speed
 
-    logger.info('execution_speed slots/sec: %.2f', execution_speed)
+    info_verbose('execution_speed slots/sec: %.2f', execution_speed)
 
     # Calculate ETA
     execution_eta = (head_slot - latest_block_slot) / execution_speed
