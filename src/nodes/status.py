@@ -7,7 +7,12 @@ from sw_utils.consensus import ACTIVE_STATUSES, ValidatorStatus
 from web3 import AsyncWeb3
 from web3.types import BlockData, Timestamp
 
-from src.common.utils import calc_slot_by_block_number, calc_slot_by_block_timestamp
+from src.common.utils import (
+    calc_slot_by_block_number,
+    calc_slot_by_block_timestamp,
+    error_verbose,
+    info_verbose,
+)
 from src.config.settings import settings
 from src.nodes.execution_sync_history import ExecutionSyncHistory
 from src.nodes.status_history import SYNC_STATUS_INTERVAL, SyncStatusHistory
@@ -20,13 +25,15 @@ logger = logging.getLogger(__name__)
 async def get_consensus_node_status(consensus_client: ExtendedAsyncBeacon) -> dict:
     try:
         syncing = (await consensus_client.get_syncing())['data']
-    except Exception:
+    except Exception as e:
+        error_verbose('Error fetching consensus node status', e)
         return {}
 
     eta = await _calc_consensus_eta(
         consensus_syncing=syncing,
         sync_status_history=SyncStatusHistory().load_history(),
     )
+    info_verbose('consensus_eta seconds: %s', int(eta) if eta is not None else 'unavailable')
 
     return {
         'is_syncing': syncing['is_syncing'],
@@ -99,6 +106,9 @@ async def get_validator_activity_stats(consensus_client: ExtendedAsyncBeacon) ->
 
     stats['total'] = len(public_keys)
 
+    if settings.verbose:
+        logger.info('Fetching validator activity stats...')
+
     stats['active'] = await _get_number_of_active_validators(
         public_keys=public_keys, consensus_client=consensus_client
     )
@@ -127,6 +137,7 @@ async def _calc_consensus_eta(
     consensus_syncing: dict, sync_status_history: list[StatusHistoryRecord]
 ) -> float | None:
     if len(sync_status_history) < 2:
+        info_verbose('Not enough consensus sync status history to calculate ETA.')
         return None
 
     sync_distance = int(consensus_syncing['sync_distance'])
@@ -138,7 +149,15 @@ async def _calc_consensus_eta(
     consensus_speed = _calc_consensus_speed(sync_status_history)
 
     if consensus_speed is None or consensus_speed <= 0:
-        consensus_speed = 1.5  # Put reasonable value for a speed
+        default_consensus_speed = 1.5  # Put reasonable value for a speed
+        info_verbose(
+            'Unable to calculate consensus speed from history. Using default value %s.',
+            default_consensus_speed,
+        )
+
+        consensus_speed = default_consensus_speed
+
+    info_verbose('consensus_speed slots/sec: %.2f', consensus_speed)
 
     return sync_distance / consensus_speed
 

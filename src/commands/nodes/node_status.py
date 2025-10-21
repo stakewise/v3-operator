@@ -6,8 +6,9 @@ from pathlib import Path
 import click
 from sw_utils import get_consensus_client, get_execution_client
 
+from src.common.logging import setup_logging
 from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
-from src.config.settings import DEFAULT_NETWORK, settings
+from src.config.settings import DEFAULT_NETWORK, LOG_PLAIN, settings
 from src.nodes.status import (
     get_consensus_node_status,
     get_execution_node_status,
@@ -46,8 +47,15 @@ OUTPUT_FORMATS = ['text', 'json']
     type=click.Choice(OUTPUT_FORMATS, case_sensitive=False),
     show_default=True,
 )
+@click.option(
+    '-v',
+    '--verbose',
+    help='Enable debug mode. Default is false.',
+    envvar='VERBOSE',
+    is_flag=True,
+)
 @click.command(help='Displays the status of the nodes.', name='node-status')
-def node_status_command(data_dir: Path, network: str, output_format: str) -> None:
+def node_status_command(data_dir: Path, network: str, output_format: str, verbose: bool) -> None:
     # Using zero address since vault directory is not required for this command
     vault_address = ZERO_CHECKSUM_ADDRESS
 
@@ -57,7 +65,11 @@ def node_status_command(data_dir: Path, network: str, output_format: str) -> Non
         network=network,
         vault_dir=data_dir / vault_address,
         nodes_dir=data_dir / network / 'nodes',
+        verbose=verbose,
+        log_format=LOG_PLAIN,
     )
+    setup_logging()
+
     asyncio.run(main(output_format))
 
 
@@ -78,44 +90,59 @@ async def main(output_format: str) -> None:
         get_execution_node_status(execution_client),
     )
 
+    if consensus_node_status.get('is_syncing') is False:
+        validator_activity_stats = await get_validator_activity_stats(consensus_client)
+    else:
+        validator_activity_stats = {}
+
     # Log statuses
     _log_nodes_status(
         execution_node_status=execution_node_status,
         consensus_node_status=consensus_node_status,
+        validator_activity_stats=validator_activity_stats,
         output_format=output_format,
     )
 
-    if consensus_node_status.get('is_syncing') is False:
-        validator_activity_stats = await get_validator_activity_stats(consensus_client)
-        _log_validator_activity_stats(validator_activity_stats, output_format)
-
 
 def _log_nodes_status(
-    execution_node_status: dict, consensus_node_status: dict, output_format: str
+    execution_node_status: dict,
+    consensus_node_status: dict,
+    validator_activity_stats: dict,
+    output_format: str,
 ) -> None:
     if output_format == 'json':
         _log_nodes_status_json(
             execution_node_status=execution_node_status,
             consensus_node_status=consensus_node_status,
+            validator_activity_stats=validator_activity_stats,
         )
     else:
         _log_nodes_status_text(
             execution_node_status=execution_node_status,
             consensus_node_status=consensus_node_status,
+            validator_activity_stats=validator_activity_stats,
         )
 
 
-def _log_nodes_status_json(execution_node_status: dict, consensus_node_status: dict) -> None:
+def _log_nodes_status_json(
+    execution_node_status: dict, consensus_node_status: dict, validator_activity_stats: dict
+) -> None:
     combined_status = {
         'consensus_node': consensus_node_status,
         'execution_node': execution_node_status,
+        'validator_activity': validator_activity_stats,
     }
     click.echo(json.dumps(combined_status))
 
 
-def _log_nodes_status_text(execution_node_status: dict, consensus_node_status: dict) -> None:
+def _log_nodes_status_text(
+    execution_node_status: dict, consensus_node_status: dict, validator_activity_stats: dict
+) -> None:
     _log_consensus_node_status_text(node_status=consensus_node_status)
     _log_execution_node_status_text(node_status=execution_node_status)
+
+    if validator_activity_stats:
+        _log_validator_activity_stats_text(validator_activity_stats=validator_activity_stats)
 
 
 def _log_consensus_node_status_text(node_status: dict) -> None:
@@ -181,12 +208,9 @@ def _format_eta(eta: int) -> str:
     return ' '.join(parts)
 
 
-def _log_validator_activity_stats(validator_activity_stats: dict, output_format: str) -> None:
-    if output_format == 'json':
-        click.echo(json.dumps({'validator_activity': validator_activity_stats}))
-    else:
-        click.echo(
-            f'Validator activity:\n'
-            f'  Active validators: {validator_activity_stats['active']}\n'
-            f'  Total validators: {validator_activity_stats['total']}'
-        )
+def _log_validator_activity_stats_text(validator_activity_stats: dict) -> None:
+    click.echo(
+        f'Validator activity:\n'
+        f'  Active validators: {validator_activity_stats['active']}\n'
+        f'  Total validators: {validator_activity_stats['total']}'
+    )
