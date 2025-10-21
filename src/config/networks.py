@@ -68,7 +68,7 @@ NETWORKS: dict[str, NetworkConfig] = {
             'https://graphs.stakewise.io/mainnet/subgraphs/name/stakewise/prod'
         ),
         RATED_API_URL='https://api.rated.network',
-        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(21471524),
+        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(23582611),
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
         MAX_VALIDATOR_BALANCE_GWEI=Gwei(int(Web3.from_wei(Web3.to_wei(1945, 'ether'), 'gwei'))),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
@@ -105,7 +105,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         STAKEWISE_API_URL='https://hoodi-api.stakewise.io/graphql',
         STAKEWISE_GRAPH_ENDPOINT='https://graphs.stakewise.io/hoodi/subgraphs/name/stakewise/prod',
         RATED_API_URL='https://api.rated.network',
-        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(94090),
+        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(1279009),
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
         MAX_VALIDATOR_BALANCE_GWEI=Gwei(int(Web3.from_wei(Web3.to_wei(1945, 'ether'), 'gwei'))),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
@@ -144,7 +144,7 @@ NETWORKS: dict[str, NetworkConfig] = {
             'https://graphs.stakewise.io/gnosis/subgraphs/name/stakewise/prod'
         ),
         RATED_API_URL='https://api.rated.network',
-        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(37640206),
+        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(42392284),
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
         MAX_VALIDATOR_BALANCE_GWEI=Gwei(int(Web3.from_wei(Web3.to_wei(1800, 'ether'), 'gwei'))),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
@@ -183,7 +183,7 @@ NETWORKS: dict[str, NetworkConfig] = {
             'https://graphs.stakewise.io/chiado/subgraphs/name/stakewise/prod'
         ),
         RATED_API_URL='https://api.rated.network',
-        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(12896244),
+        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(17945344),
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
         MAX_VALIDATOR_BALANCE_GWEI=Gwei(int(Web3.from_wei(Web3.to_wei(1800, 'ether'), 'gwei'))),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
