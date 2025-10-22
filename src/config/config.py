@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 
 import click
-from eth_typing import HexAddress
+from eth_typing import BlockNumber, HexAddress
 from web3 import Web3
 
 from src.common.credentials import CredentialManager
@@ -15,6 +15,7 @@ class OperatorConfig:
     network: str = ''
     mnemonic_next_index: int = 0
     first_public_key: str | None = None
+    first_block: BlockNumber | None = None
 
     def __init__(
         self,
@@ -54,6 +55,7 @@ class OperatorConfig:
             self.network = config.get('network')
             self.mnemonic_next_index = config.get('mnemonic_next_index')
             self.first_public_key = config.get('first_public_key')
+            self.first_block = config.get('first_block')
         else:
             raise click.ClickException(
                 f'Config for vault {self.vault} does not exist. Please run "init" command.'

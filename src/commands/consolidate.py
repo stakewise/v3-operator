@@ -218,6 +218,7 @@ def consolidate(
         ),
         verbose=verbose,
         log_level=log_level,
+        vault_first_block=operator_config.first_block,
     )
     try:
         asyncio.run(
@@ -448,7 +449,7 @@ async def _check_public_keys(
     # Validate the source and target validators are in the vault
     logger.info('Fetching vault validators...')
     vault_validators = await VaultContract(vault_address).get_registered_validators_public_keys(
-        from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
+        from_block=settings.vault_first_block,
         to_block=chain_head.block_number,
     )
     for public_keys in source_public_keys + [target_public_key]:
@@ -535,7 +536,7 @@ async def _find_target_source_public_keys(
     logger.info('Fetching vault validators...')
     vault_contract = VaultContract(vault_address)
     public_keys = await vault_contract.get_registered_validators_public_keys(
-        from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
+        from_block=settings.vault_first_block,
         to_block=chain_head.block_number,
     )
     all_validators = await fetch_consensus_validators(public_keys)

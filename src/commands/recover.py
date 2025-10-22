@@ -116,6 +116,7 @@ def recover(
         network=network,
         vault_dir=operator_config.vault_dir,
         log_level=log_level,
+        vault_first_block=operator_config.first_block,
     )
 
     try:
@@ -200,7 +201,7 @@ async def _fetch_registered_validators(
     current_block = await execution_client.eth.get_block_number()
     vault_contract = VaultContract(vault)
     public_keys = await vault_contract.get_registered_validators_public_keys(
-        from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
+        from_block=settings.vault_first_block,
         to_block=current_block,
     )
     click.secho(f'Fetched {len(public_keys)} registered validators', bold=True)
