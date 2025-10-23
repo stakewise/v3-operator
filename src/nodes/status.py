@@ -10,6 +10,7 @@ from web3.types import BlockData, Timestamp
 from src.common.utils import (
     calc_slot_by_block_number,
     calc_slot_by_block_timestamp,
+    format_error,
     info_verbose,
     warning_verbose,
 )
@@ -26,7 +27,7 @@ async def get_consensus_node_status(consensus_client: ExtendedAsyncBeacon) -> di
     try:
         syncing = (await consensus_client.get_syncing())['data']
     except Exception as e:
-        warning_verbose('Error fetching consensus node status: %s', e)
+        warning_verbose('Error fetching consensus node status: %s', format_error(e))
         return {}
 
     eta = await _calc_consensus_eta(
@@ -121,8 +122,13 @@ async def _get_number_of_active_validators(
     if not public_keys:
         return 0
 
+    try:
+        validators = (await consensus_client.get_validators_by_ids(public_keys))['data']
+    except Exception as e:
+        warning_verbose('Error fetching validators: %s', format_error(e))
+        return 0
+
     active_count = 0
-    validators = (await consensus_client.get_validators_by_ids(public_keys))['data']
 
     for validator in validators:
         status = ValidatorStatus(validator['status'])

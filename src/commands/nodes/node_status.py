@@ -101,10 +101,7 @@ async def main(output_format: str) -> None:
         get_execution_node_status(execution_client),
     )
 
-    if consensus_node_status.get('is_syncing') is False:
-        validator_activity_stats = await get_validator_activity_stats(consensus_client)
-    else:
-        validator_activity_stats = {}
+    validator_activity_stats = await get_validator_activity_stats(consensus_client)
 
     # Log statuses
     _log_nodes_status(
@@ -151,9 +148,7 @@ def _log_nodes_status_text(
 ) -> None:
     _log_consensus_node_status_text(node_status=consensus_node_status)
     _log_execution_node_status_text(node_status=execution_node_status)
-
-    if validator_activity_stats:
-        _log_validator_activity_stats_text(validator_activity_stats=validator_activity_stats)
+    _log_validator_activity_stats_text(validator_activity_stats=validator_activity_stats)
 
 
 def _log_consensus_node_status_text(node_status: dict) -> None:
