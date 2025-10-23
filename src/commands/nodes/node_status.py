@@ -73,7 +73,7 @@ def node_status_command(
     settings.set(
         vault=Web3.to_checksum_address(vault),
         network=network,
-        vault_dir=data_dir / vault,
+        vault_dir=operator_config.vault_dir,
         nodes_dir=data_dir / network / 'nodes',
         verbose=verbose,
         log_format=LOG_PLAIN,
