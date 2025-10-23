@@ -566,7 +566,6 @@ async def _find_target_source_public_keys(
         to_block=chain_head.block_number,
     )
     all_validators = await fetch_consensus_validators(public_keys)
-    active_validators = [val for val in all_validators if val.status not in EXITING_STATUSES]
 
     # use all validators to fetch all the consolidations
     # including the ones were source validator is exiting
@@ -576,26 +575,31 @@ async def _find_target_source_public_keys(
         consolidating_indexes.add(cons.source_index)
         consolidating_indexes.add(cons.target_index)
 
-    active_validators = [val for val in active_validators if val.index not in consolidating_indexes]
+    # Candidates on the role of either source or target validator
+    validator_candidates: list[ConsensusValidator] = []
+
+    for val in all_validators:
+        if val.status in EXITING_STATUSES:
+            continue
+        if val.index in consolidating_indexes:
+            continue
+        if val.public_key in exclude_public_keys:
+            continue
+        validator_candidates.append(val)
+
+    if not validator_candidates:
+        return []
 
     source_validators = await _get_source_validators(
         chain_head=chain_head,
-        active_validators=active_validators,
+        validator_candidates=validator_candidates,
         max_activation_epoch=max_activation_epoch,
-        exclude_public_keys=exclude_public_keys,
     )
     if not source_validators:
         return []
 
     source_validators.sort(key=lambda val: val.activation_epoch)
-    target_validator_candidates: list[ConsensusValidator] = []
-
-    for val in active_validators:
-        if not val.is_compounding:
-            continue
-        if val.public_key in exclude_public_keys:
-            continue
-        target_validator_candidates.append(val)
+    target_validator_candidates = [val for val in validator_candidates if val.is_compounding]
 
     if not target_validator_candidates:
         # there are no 0x02 validators, switch the oldest 0x01 to 0x02
@@ -622,26 +626,23 @@ async def _find_target_source_public_keys(
 
 async def _get_source_validators(
     chain_head: ChainHead,
-    active_validators: list[ConsensusValidator],
+    validator_candidates: list[ConsensusValidator],
     max_activation_epoch: int,
-    exclude_public_keys: set[HexStr],
 ) -> list[ConsensusValidator]:
     pending_partial_withdrawals = await get_pending_partial_withdrawals(
-        chain_head=chain_head, consensus_validators=active_validators
+        chain_head=chain_head, consensus_validators=validator_candidates
     )
     pending_partial_withdrawals_indexes = {
         withdrawal.validator_index for withdrawal in pending_partial_withdrawals
     }
 
     source_validators = []
-    for val in active_validators:
+    for val in validator_candidates:
         if val.is_compounding:
             continue
         if val.activation_epoch >= max_activation_epoch:
             continue
         if val.index in pending_partial_withdrawals_indexes:
-            continue
-        if val.public_key in exclude_public_keys:
             continue
         source_validators.append(val)
 
