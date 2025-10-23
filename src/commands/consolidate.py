@@ -225,7 +225,7 @@ def consolidate(
         ),
         verbose=verbose,
         log_level=log_level,
-        vault_first_block=vault_first_block or operator_config.first_block,
+        vault_first_block=vault_first_block,
     )
     try:
         asyncio.run(
