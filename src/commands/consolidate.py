@@ -83,6 +83,12 @@ logger = logging.getLogger(__name__)
     help='Public key of validator to consolidate to.',
 )
 @click.option(
+    '--exclude-public-keys-file',
+    type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
+    callback=validate_public_keys_file,
+    help='File with public keys of validators to exclude from consolidation.',
+)
+@click.option(
     '--consensus-endpoints',
     help='Comma separated list of API endpoints for consensus nodes',
     prompt='Enter the comma separated list of API endpoints for consensus nodes',
@@ -189,22 +195,31 @@ def consolidate(
     source_public_keys: list[HexStr] | None,
     source_public_keys_file: Path | None,
     target_public_key: HexStr | None,
+    exclude_public_keys_file: Path | None,
     relayer_endpoint: str | None,
     max_validator_balance_gwei: int | None,
     vault_first_block: BlockNumber | None,
 ) -> None:
     if all([source_public_keys, source_public_keys_file]):
         raise click.ClickException(
-            'Provide only one parameter: either --from-public-keys-file or --from-public-keys.'
+            'Provide only one parameter: either --source-public-keys-file or --source-public-keys.'
         )
     if not any([source_public_keys, source_public_keys_file]) and target_public_key:
         raise click.ClickException(
             'One of these parameters must be provided with target-public-key:'
-            ' --from-public-keys-file or --from-public-keys.'
+            ' --source-public-keys-file or --source-public-keys.'
         )
 
     if source_public_keys_file:
         source_public_keys = _load_public_keys(source_public_keys_file)
+
+    exclude_public_keys: set[HexStr] = set()
+
+    if exclude_public_keys_file:
+        exclude_public_keys = set(_load_public_keys(exclude_public_keys_file))
+
+        if source_public_keys:
+            source_public_keys = [pk for pk in source_public_keys if pk not in exclude_public_keys]
 
     operator_config = OperatorConfig(vault, Path(data_dir))
     if network is None:
@@ -233,6 +248,7 @@ def consolidate(
                 vault_address=vault,
                 source_public_keys=source_public_keys,
                 target_public_key=target_public_key,
+                exclude_public_keys=exclude_public_keys,
                 no_switch_consolidation=no_switch_consolidation,
                 max_consolidation_request_fee_gwei=Gwei(max_consolidation_request_fee_gwei),
                 no_confirm=no_confirm,
@@ -248,6 +264,7 @@ async def main(
     vault_address: ChecksumAddress,
     source_public_keys: list[HexStr] | None,
     target_public_key: HexStr | None,
+    exclude_public_keys: set[HexStr],
     no_switch_consolidation: bool,
     max_consolidation_request_fee_gwei: Gwei,
     no_confirm: bool,
@@ -278,6 +295,7 @@ async def main(
         target_source = await _find_target_source_public_keys(
             vault_address=vault_address,
             chain_head=chain_head,
+            exclude_public_keys=exclude_public_keys,
         )
         if not target_source:
             raise click.ClickException(
@@ -531,6 +549,7 @@ def _load_public_keys(public_keys_file: Path) -> list[HexStr]:
 async def _find_target_source_public_keys(
     vault_address: ChecksumAddress,
     chain_head: ChainHead,
+    exclude_public_keys: set[HexStr],
 ) -> list[tuple[ConsensusValidator, ConsensusValidator]]:
     """
     If there are no 0x02 validators,
@@ -563,36 +582,49 @@ async def _find_target_source_public_keys(
         chain_head=chain_head,
         active_validators=active_validators,
         max_activation_epoch=max_activation_epoch,
+        exclude_public_keys=exclude_public_keys,
     )
     if not source_validators:
         return []
 
     source_validators.sort(key=lambda val: val.activation_epoch)
+    target_validator_candidates: list[ConsensusValidator] = []
 
-    compounding_validators = [val for val in active_validators if val.is_compounding]
-    if compounding_validators:
-        # there is at least one 0x02 validator, top up from the one with smallest balance
-        target_validator = min(compounding_validators, key=lambda val: val.balance)
-        selected_source_validators: list[ConsensusValidator] = []
-        for val in source_validators:
-            current_balance = (
-                val.balance
-                + target_validator.balance
-                + sum(v.balance for v in selected_source_validators)
-            )
-            if current_balance > settings.max_validator_balance_gwei:
-                break
-            selected_source_validators.append(val)
+    for val in active_validators:
+        if not val.is_compounding:
+            continue
+        if val.public_key in exclude_public_keys:
+            continue
+        target_validator_candidates.append(val)
 
-        if selected_source_validators:
-            return [(target_validator, val) for val in selected_source_validators]
+    if not target_validator_candidates:
+        # there are no 0x02 validators, switch the oldest 0x01 to 0x02
+        return [(source_validators[0], source_validators[0])]
 
-    # there are no 0x02 validators, switch the oldest 0x01 to 0x02
+    # there is at least one 0x02 validator, top up the one with smallest balance
+    target_validator = min(target_validator_candidates, key=lambda val: val.balance)
+
+    selected_source_validators: list[ConsensusValidator] = []
+    target_balance = target_validator.balance
+
+    for val in source_validators:
+        if target_balance + val.balance > settings.max_validator_balance_gwei:
+            break
+        selected_source_validators.append(val)
+        target_balance += val.balance  # type: ignore
+
+    if selected_source_validators:
+        return [(target_validator, val) for val in selected_source_validators]
+
+    # Target validator is almost full, switch the oldest 0x01 to 0x02
     return [(source_validators[0], source_validators[0])]
 
 
 async def _get_source_validators(
-    chain_head: ChainHead, active_validators: list[ConsensusValidator], max_activation_epoch: int
+    chain_head: ChainHead,
+    active_validators: list[ConsensusValidator],
+    max_activation_epoch: int,
+    exclude_public_keys: set[HexStr],
 ) -> list[ConsensusValidator]:
     pending_partial_withdrawals = await get_pending_partial_withdrawals(
         chain_head=chain_head, consensus_validators=active_validators
@@ -608,6 +640,8 @@ async def _get_source_validators(
         if val.activation_epoch >= max_activation_epoch:
             continue
         if val.index in pending_partial_withdrawals_indexes:
+            continue
+        if val.public_key in exclude_public_keys:
             continue
         source_validators.append(val)
 
