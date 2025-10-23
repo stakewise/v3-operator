@@ -4,11 +4,14 @@ import logging
 from pathlib import Path
 
 import click
+from eth_typing import HexAddress
 from sw_utils import get_consensus_client, get_execution_client
+from web3 import Web3
 
 from src.common.logging import setup_logging
-from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
-from src.config.settings import DEFAULT_NETWORK, LOG_PLAIN, settings
+from src.common.validators import validate_eth_address
+from src.config.config import OperatorConfig
+from src.config.settings import LOG_PLAIN, settings
 from src.nodes.status import (
     get_consensus_node_status,
     get_execution_node_status,
@@ -30,14 +33,11 @@ OUTPUT_FORMATS = ['text', 'json']
     show_default=True,
 )
 @click.option(
-    '--network',
-    default=DEFAULT_NETWORK,
-    help='The network of your vault.',
-    prompt='Enter the network name',
-    type=click.Choice(
-        AVAILABLE_NETWORKS,
-        case_sensitive=False,
-    ),
+    '--vault',
+    callback=validate_eth_address,
+    envvar='VAULT',
+    prompt='Enter your vault address',
+    help='Address of the vault to register validators for.',
 )
 @click.option(
     '--output-format',
@@ -63,16 +63,17 @@ OUTPUT_FORMATS = ['text', 'json']
 )
 @click.command(help='Displays the status of the nodes.', name='node-status')
 def node_status_command(
-    data_dir: Path, network: str, output_format: str, verbose: bool, enable_file_logging: bool
+    data_dir: Path, vault: HexAddress, output_format: str, verbose: bool, enable_file_logging: bool
 ) -> None:
-    # Using zero address since vault directory is not required for this command
-    vault_address = ZERO_CHECKSUM_ADDRESS
+    operator_config = OperatorConfig(vault, Path(data_dir))
+    operator_config.load()
+    network = operator_config.network
 
     # Minimal settings for the nodes
     settings.set(
-        vault=vault_address,
+        vault=Web3.to_checksum_address(vault),
         network=network,
-        vault_dir=data_dir / vault_address,
+        vault_dir=data_dir / vault,
         nodes_dir=data_dir / network / 'nodes',
         verbose=verbose,
         log_format=LOG_PLAIN,
