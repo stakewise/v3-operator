@@ -2,6 +2,7 @@ from pathlib import Path
 
 from decouple import Csv
 from decouple import config as decouple_config
+from eth_typing import BlockNumber
 from web3 import Web3
 from web3.types import ChecksumAddress, Gwei, Wei
 
@@ -112,6 +113,8 @@ class Settings(metaclass=Singleton):
     min_deposit_delay: int
     max_withdrawal_request_fee_gwei: Gwei
 
+    vault_first_block: BlockNumber
+
     # pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements
     def set(
         self,
@@ -156,6 +159,7 @@ class Settings(metaclass=Singleton):
         max_validator_balance_gwei: Gwei | None = None,
         min_deposit_delay: int = DEFAULT_MIN_DEPOSIT_DELAY,
         max_withdrawal_request_fee_gwei: Gwei = DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI,
+        vault_first_block: BlockNumber | None = None,
     ) -> None:
         self.vault = vault
         vault_dir.mkdir(parents=True, exist_ok=True)
@@ -290,6 +294,7 @@ class Settings(metaclass=Singleton):
         self.validators_registration_mode = validators_registration_mode
 
         self.skip_startup_checks = decouple_config('SKIP_STARTUP_CHECKS', default=False, cast=bool)
+        self.vault_first_block = vault_first_block or self.network_config.KEEPER_GENESIS_BLOCK
 
     @property
     def keystore_cls_str(self) -> str:
