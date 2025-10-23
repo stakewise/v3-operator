@@ -85,6 +85,13 @@ class StdStreams:
 
 @dataclass
 class StatusHistoryRecord:
-    timestamp: int
+    timestamp: int  # timestamp when the record was created, not the block timestamp
     block_number: int
     slot: int
+
+
+@dataclass
+class ExecutionSyncRecord:
+    block_number: int
+    duration: int
+    update_timestamp: int

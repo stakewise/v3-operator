@@ -14,19 +14,26 @@ LOG_LEVELS = [
 
 
 def setup_logging() -> None:
+    handler: logging.Handler
+
+    if settings.enable_file_logging and settings.log_file_path is not None:
+        handler = logging.FileHandler(settings.log_file_path)
+    else:
+        handler = logging.StreamHandler()
+
     if settings.log_format == LOG_JSON:
         formatter = JsonFormatter('%(timestamp)s %(level)s %(name)s %(message)s')
-        logHandler = logging.StreamHandler()
-        logHandler.setFormatter(formatter)
+        handler.setFormatter(formatter)
         logging.basicConfig(
             level=settings.log_level,
-            handlers=[logHandler],
+            handlers=[handler],
         )
     else:
         logging.basicConfig(
             format='%(asctime)s %(levelname)-8s %(message)s',
             datefmt=LOG_DATE_FORMAT,
             level=settings.log_level,
+            handlers=[handler],
         )
     if not settings.verbose:
         logging.getLogger('sw_utils.execution').setLevel(logging.ERROR)

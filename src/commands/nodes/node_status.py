@@ -4,10 +4,14 @@ import logging
 from pathlib import Path
 
 import click
+from eth_typing import HexAddress
 from sw_utils import get_consensus_client, get_execution_client
+from web3 import Web3
 
-from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
-from src.config.settings import DEFAULT_NETWORK, settings
+from src.common.logging import setup_logging
+from src.common.validators import validate_eth_address
+from src.config.config import OperatorConfig
+from src.config.settings import LOG_PLAIN, settings
 from src.nodes.status import (
     get_consensus_node_status,
     get_execution_node_status,
@@ -29,14 +33,11 @@ OUTPUT_FORMATS = ['text', 'json']
     show_default=True,
 )
 @click.option(
-    '--network',
-    default=DEFAULT_NETWORK,
-    help='The network of your vault.',
-    prompt='Enter the network name',
-    type=click.Choice(
-        AVAILABLE_NETWORKS,
-        case_sensitive=False,
-    ),
+    '--vault',
+    callback=validate_eth_address,
+    envvar='VAULT',
+    prompt='Enter your vault address',
+    help='Address of the vault to register validators for.',
 )
 @click.option(
     '--output-format',
@@ -46,18 +47,41 @@ OUTPUT_FORMATS = ['text', 'json']
     type=click.Choice(OUTPUT_FORMATS, case_sensitive=False),
     show_default=True,
 )
+@click.option(
+    '-v',
+    '--verbose',
+    help='Enable debug mode. Default is false.',
+    envvar='VERBOSE',
+    is_flag=True,
+)
+@click.option(
+    '--enable-file-logging',
+    help='Enable logging command output to a file in the nodes directory. Default is false.',
+    envvar='ENABLE_FILE_LOGGING',
+    is_flag=True,
+    default=False,
+)
 @click.command(help='Displays the status of the nodes.', name='node-status')
-def node_status_command(data_dir: Path, network: str, output_format: str) -> None:
-    # Using zero address since vault directory is not required for this command
-    vault_address = ZERO_CHECKSUM_ADDRESS
+def node_status_command(
+    data_dir: Path, vault: HexAddress, output_format: str, verbose: bool, enable_file_logging: bool
+) -> None:
+    operator_config = OperatorConfig(vault, Path(data_dir))
+    operator_config.load()
+    network = operator_config.network
 
     # Minimal settings for the nodes
     settings.set(
-        vault=vault_address,
+        vault=Web3.to_checksum_address(vault),
         network=network,
-        vault_dir=data_dir / vault_address,
+        vault_dir=operator_config.vault_dir,
         nodes_dir=data_dir / network / 'nodes',
+        verbose=verbose,
+        log_format=LOG_PLAIN,
+        enable_file_logging=enable_file_logging,
+        log_file_path=data_dir / 'operator.log',
     )
+    setup_logging()
+
     asyncio.run(main(output_format))
 
 
@@ -78,44 +102,54 @@ async def main(output_format: str) -> None:
         get_execution_node_status(execution_client),
     )
 
+    validator_activity_stats = await get_validator_activity_stats(consensus_client)
+
     # Log statuses
     _log_nodes_status(
         execution_node_status=execution_node_status,
         consensus_node_status=consensus_node_status,
+        validator_activity_stats=validator_activity_stats,
         output_format=output_format,
     )
 
-    if consensus_node_status.get('is_syncing') is False:
-        validator_activity_stats = await get_validator_activity_stats(consensus_client)
-        _log_validator_activity_stats(validator_activity_stats, output_format)
-
 
 def _log_nodes_status(
-    execution_node_status: dict, consensus_node_status: dict, output_format: str
+    execution_node_status: dict,
+    consensus_node_status: dict,
+    validator_activity_stats: dict,
+    output_format: str,
 ) -> None:
     if output_format == 'json':
         _log_nodes_status_json(
             execution_node_status=execution_node_status,
             consensus_node_status=consensus_node_status,
+            validator_activity_stats=validator_activity_stats,
         )
     else:
         _log_nodes_status_text(
             execution_node_status=execution_node_status,
             consensus_node_status=consensus_node_status,
+            validator_activity_stats=validator_activity_stats,
         )
 
 
-def _log_nodes_status_json(execution_node_status: dict, consensus_node_status: dict) -> None:
+def _log_nodes_status_json(
+    execution_node_status: dict, consensus_node_status: dict, validator_activity_stats: dict
+) -> None:
     combined_status = {
         'consensus_node': consensus_node_status,
         'execution_node': execution_node_status,
+        'validator_activity': validator_activity_stats,
     }
     click.echo(json.dumps(combined_status))
 
 
-def _log_nodes_status_text(execution_node_status: dict, consensus_node_status: dict) -> None:
+def _log_nodes_status_text(
+    execution_node_status: dict, consensus_node_status: dict, validator_activity_stats: dict
+) -> None:
     _log_consensus_node_status_text(node_status=consensus_node_status)
     _log_execution_node_status_text(node_status=execution_node_status)
+    _log_validator_activity_stats_text(validator_activity_stats=validator_activity_stats)
 
 
 def _log_consensus_node_status_text(node_status: dict) -> None:
@@ -181,12 +215,9 @@ def _format_eta(eta: int) -> str:
     return ' '.join(parts)
 
 
-def _log_validator_activity_stats(validator_activity_stats: dict, output_format: str) -> None:
-    if output_format == 'json':
-        click.echo(json.dumps({'validator_activity': validator_activity_stats}))
-    else:
-        click.echo(
-            f'Validator activity:\n'
-            f'  Active validators: {validator_activity_stats['active']}\n'
-            f'  Total validators: {validator_activity_stats['total']}'
-        )
+def _log_validator_activity_stats_text(validator_activity_stats: dict) -> None:
+    click.echo(
+        f'Validator activity:\n'
+        f'  Active validators: {validator_activity_stats['active']}\n'
+        f'  Total validators: {validator_activity_stats['total']}'
+    )
