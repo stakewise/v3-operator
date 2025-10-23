@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import click
-from eth_typing import ChecksumAddress, HexStr
+from eth_typing import BlockNumber, ChecksumAddress, HexStr
 from web3 import Web3
 from web3.types import Gwei, Wei
 
@@ -112,8 +112,14 @@ logger = logging.getLogger(__name__)
     default=False,
     help='Skips confirmation messages when provided.',
 )
+@click.option(
+    '--vault-first-block',
+    type=int,
+    envvar='VAULT_FIRST_BLOCK',
+    help='The block number where the vault was created. Used to optimize fetching vault events.',
+)
 @click.command(help='Performs a voluntary exit for active vault validators.')
-# pylint: disable-next=too-many-arguments
+# pylint: disable-next=too-many-arguments,too-many-locals
 def exit_validators(
     vault: ChecksumAddress,
     indexes: list[int],
@@ -126,7 +132,8 @@ def exit_validators(
     verbose: bool,
     no_confirm: bool,
     log_level: str,
-    relayer_endpoint: str | None = None,
+    relayer_endpoint: str | None,
+    vault_first_block: BlockNumber | None,
 ) -> None:
     """
     Trigger vault validator exits via vault contract.
@@ -149,7 +156,7 @@ def exit_validators(
         relayer_endpoint=relayer_endpoint,
         verbose=verbose,
         log_level=log_level,
-        vault_first_block=operator_config.first_block,
+        vault_first_block=vault_first_block or operator_config.first_block,
     )
     try:
         # Try-catch to enable async calls in test - an event loop

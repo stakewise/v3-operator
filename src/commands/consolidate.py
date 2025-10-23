@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 import click
-from eth_typing import ChecksumAddress, HexStr
+from eth_typing import BlockNumber, ChecksumAddress, HexStr
 from sw_utils import ChainHead
 from web3 import Web3
 from web3.types import Gwei, Wei
@@ -162,6 +162,13 @@ logger = logging.getLogger(__name__)
     envvar='LOG_LEVEL',
     help='The log level.',
 )
+@click.option(
+    '--vault-first-block',
+    type=int,
+    default=0,
+    envvar='VAULT_FIRST_BLOCK',
+    help='The block number where the vault was created. Used to optimize fetching vault events.',
+)
 @click.command(
     help='Performs a vault validators consolidation from 0x01 validators to 0x02 validator. '
     'Switches a validator from 0x01 to 0x02 if the source and target keys are identical.'
@@ -182,9 +189,10 @@ def consolidate(
     max_consolidation_request_fee_gwei: int,
     source_public_keys: list[HexStr] | None,
     source_public_keys_file: Path | None,
-    target_public_key: HexStr | None = None,
-    relayer_endpoint: str | None = None,
-    max_validator_balance_gwei: int | None = None,
+    target_public_key: HexStr | None,
+    relayer_endpoint: str | None,
+    max_validator_balance_gwei: int | None,
+    vault_first_block: BlockNumber | None,
 ) -> None:
     if all([source_public_keys, source_public_keys_file]):
         raise click.ClickException(
@@ -218,7 +226,7 @@ def consolidate(
         ),
         verbose=verbose,
         log_level=log_level,
-        vault_first_block=operator_config.first_block,
+        vault_first_block=vault_first_block or operator_config.first_block,
     )
     try:
         asyncio.run(
