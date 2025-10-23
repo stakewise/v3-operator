@@ -165,7 +165,6 @@ logger = logging.getLogger(__name__)
 @click.option(
     '--vault-first-block',
     type=int,
-    default=0,
     envvar='VAULT_FIRST_BLOCK',
     help='The block number where the vault was created. Used to optimize fetching vault events.',
 )
