@@ -557,8 +557,6 @@ async def _find_target_source_public_keys(
     If there is 0x02 validator,
     take the oldest 0x01 validators to top up its balance to 2048 ETH / 64 GNO.
     """
-    max_activation_epoch = chain_head.epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
-
     logger.info('Fetching vault validators...')
     vault_contract = VaultContract(vault_address)
     public_keys = await vault_contract.get_registered_validators_public_keys(
@@ -593,7 +591,6 @@ async def _find_target_source_public_keys(
     source_validators = await _get_source_validators(
         chain_head=chain_head,
         validator_candidates=validator_candidates,
-        max_activation_epoch=max_activation_epoch,
     )
     if not source_validators:
         return []
@@ -627,8 +624,9 @@ async def _find_target_source_public_keys(
 async def _get_source_validators(
     chain_head: ChainHead,
     validator_candidates: list[ConsensusValidator],
-    max_activation_epoch: int,
 ) -> list[ConsensusValidator]:
+    max_activation_epoch = chain_head.epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
+
     pending_partial_withdrawals = await get_pending_partial_withdrawals(
         chain_head=chain_head, consensus_validators=validator_candidates
     )
