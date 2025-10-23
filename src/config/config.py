@@ -77,7 +77,7 @@ class OperatorConfig:
         }
         self.vault_dir.mkdir(parents=True, exist_ok=True)
         with self.config_path.open('w') as f:
-            json.dump(config, f)
+            json.dump(config, f, indent=2)
 
     def increment_mnemonic_index(self, count: int) -> None:
         self.mnemonic_next_index += count
