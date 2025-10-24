@@ -5,6 +5,7 @@ from pathlib import Path
 
 import click
 from eth_typing import BlockNumber, ChecksumAddress, HexStr
+from eth_utils import add_0x_prefix
 from sw_utils import ChainHead
 from web3 import Web3
 from web3.types import Gwei, Wei
@@ -218,8 +219,10 @@ def consolidate(
     if exclude_public_keys_file:
         exclude_public_keys = set(_load_public_keys(exclude_public_keys_file))
 
-        if source_public_keys:
-            source_public_keys = [pk for pk in source_public_keys if pk not in exclude_public_keys]
+    if source_public_keys and exclude_public_keys:
+        raise click.ClickException(
+            '--exclude-public-keys and --source-public-keys are mutually exclusive.'
+        )
 
     operator_config = OperatorConfig(vault, Path(data_dir))
     if network is None:
@@ -540,7 +543,7 @@ def _is_switch_to_compounding(source_public_keys: list[HexStr], target_public_ke
 def _load_public_keys(public_keys_file: Path) -> list[HexStr]:
     """Loads public keys from file."""
     with open(public_keys_file, 'r', encoding='utf-8') as f:
-        public_keys = [HexStr(line.rstrip()) for line in f]
+        public_keys = [add_0x_prefix(HexStr(line.rstrip())) for line in f]
 
     return public_keys
 
