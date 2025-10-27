@@ -50,7 +50,6 @@ async def get_queued_assets(
             block_number=chain_head.block_number,
         )
     )
-    # fetch current pending partial withdrawals from consensus client
     pending_partial_withdrawals_amount_gwei = sum(
         withdrawal.amount for withdrawal in pending_partial_withdrawals
     )

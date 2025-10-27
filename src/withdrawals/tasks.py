@@ -316,9 +316,7 @@ def _filter_exitable_validators(
         if validator.index in validator_partial_withdrawals:
             continue
         can_be_exited_validators.append(validator)
-    can_be_exited_validators.sort(
-        key=lambda x: (x.balance - validator_partial_withdrawals.get(x.index, 0), x.index)
-    )
+    can_be_exited_validators.sort(key=lambda x: (x.balance, x.index))
 
     return can_be_exited_validators
 
