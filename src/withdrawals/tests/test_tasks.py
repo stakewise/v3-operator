@@ -445,7 +445,7 @@ async def test_get_withdrawals(data_dir):
     expected = {'0x2': ether_to_gwei(0)}
     assert result == expected
 
-    # substract existing partial withdrawals from balances
+    # subtract existing partial withdrawals from balances
     chain_head = create_chain_head(epoch=500)
     queued_assets = ether_to_gwei(60)
     consensus_validators = [

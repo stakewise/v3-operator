@@ -105,12 +105,10 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
         oracle_exiting_validators = await _fetch_oracle_exiting_validators(
             consensus_validators, protocol_config
         )
-
+        active_validators = [v for v in consensus_validators if v.status in CAN_BE_EXITED_STATUSES]
         pending_partial_withdrawals = await get_pending_partial_withdrawals(
             chain_head=chain_head,
-            consensus_validators=[
-                v for v in consensus_validators if v.status in CAN_BE_EXITED_STATUSES
-            ],
+            consensus_validators=active_validators,
         )
         queued_assets = await get_queued_assets(
             consensus_validators=consensus_validators,
@@ -219,6 +217,7 @@ async def _get_withdrawals(
         v.withdrawal_capacity - validator_partial_withdrawals.get(v.index, 0)
         for v in partial_validators
     )
+    partial_capacity = Gwei(max(0, partial_capacity))
 
     # If enough partials, use only them
     if partial_capacity >= queued_assets or settings.disable_full_withdrawals:
