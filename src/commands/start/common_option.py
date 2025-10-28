@@ -13,6 +13,8 @@ from src.common.validators import (
 )
 from src.config.networks import GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
+    DEFAULT_FROZEN_AMOUNT,
+    DEFAULT_FROZEN_AMOUNT_GWEI,
     DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI,
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
@@ -207,6 +209,15 @@ start_common_options = [
         f' The default is {DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI} '
         f'({Web3.from_wei(DEFAULT_MIN_DEPOSIT_AMOUNT, 'ether')} ETH).',
         default=DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
+    ),
+    click.option(
+        '--frozen-amount-gwei',
+        type=int,
+        envvar='FROZEN_AMOUNT_GWEI',
+        help=f'Amount in gwei is left unstaked to handle exit queue requests smoothly'
+        f' The default is {DEFAULT_FROZEN_AMOUNT_GWEI} '
+        f'({Web3.from_wei(DEFAULT_FROZEN_AMOUNT, 'ether')} ETH).',
+        default=DEFAULT_FROZEN_AMOUNT_GWEI,
     ),
     click.option(
         '--max-validator-balance-gwei',

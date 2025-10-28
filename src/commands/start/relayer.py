@@ -55,6 +55,7 @@ def start_relayer(
     validator_type: ValidatorType,
     concurrency: int | None,
     min_deposit_amount_gwei: int,
+    frozen_amount_gwei: int,
     max_validator_balance_gwei: int | None,
     min_deposit_delay: int,
     data_dir: str,
@@ -104,6 +105,7 @@ def start_relayer(
         validators_registration_mode=validators_registration_mode,
         concurrency=concurrency,
         min_deposit_amount_gwei=Gwei(min_deposit_amount_gwei),
+        frozen_amount_gwei=Gwei(frozen_amount_gwei),
         max_validator_balance_gwei=(
             Gwei(max_validator_balance_gwei) if max_validator_balance_gwei else None
         ),
