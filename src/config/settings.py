@@ -21,8 +21,8 @@ DEFAULT_HASHI_VAULT_ENGINE_NAME = 'secret'
 DEFAULT_MIN_DEPOSIT_AMOUNT = Web3.to_wei(10, 'ether')
 DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI = Gwei(int(Web3.from_wei(DEFAULT_MIN_DEPOSIT_AMOUNT, 'gwei')))
 
-DEFAULT_FROZEN_AMOUNT = Web3.to_wei(0, 'ether')
-DEFAULT_FROZEN_AMOUNT_GWEI = Gwei(int(Web3.from_wei(DEFAULT_FROZEN_AMOUNT, 'gwei')))
+DEFAULT_VAULT_MIN_BALANCE = Web3.to_wei(0, 'ether')
+DEFAULT_VAULT_MIN_BALANCE_GWEI = Gwei(int(Web3.from_wei(DEFAULT_VAULT_MIN_BALANCE, 'gwei')))
 
 DEFAULT_MIN_DEPOSIT_DELAY = 3600  # 1 hour
 
@@ -112,7 +112,7 @@ class Settings(metaclass=Singleton):
     )
 
     min_deposit_amount_gwei: Gwei
-    frozen_amount_gwei: Gwei
+    vault_min_balance_gwei: Gwei
     max_validator_balance_gwei: Gwei
     min_deposit_delay: int
     max_withdrawal_request_fee_gwei: Gwei
@@ -160,7 +160,7 @@ class Settings(metaclass=Singleton):
         relayer_endpoint: str | None = None,
         validators_registration_mode: ValidatorsRegistrationMode = ValidatorsRegistrationMode.AUTO,
         min_deposit_amount_gwei: Gwei = DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
-        frozen_amount_gwei: Gwei = DEFAULT_FROZEN_AMOUNT_GWEI,
+        vault_min_balance_gwei: Gwei = DEFAULT_VAULT_MIN_BALANCE_GWEI,
         max_validator_balance_gwei: Gwei | None = None,
         min_deposit_delay: int = DEFAULT_MIN_DEPOSIT_DELAY,
         max_withdrawal_request_fee_gwei: Gwei = DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI,
@@ -196,7 +196,7 @@ class Settings(metaclass=Singleton):
         self.max_validator_balance_gwei = Gwei(max_validator_balance_gwei)
 
         self.min_deposit_amount_gwei = min_deposit_amount_gwei
-        self.frozen_amount_gwei = frozen_amount_gwei
+        self.vault_min_balance_gwei = vault_min_balance_gwei
         self.min_deposit_delay = min_deposit_delay
         self.max_withdrawal_request_fee_gwei = max_withdrawal_request_fee_gwei
 

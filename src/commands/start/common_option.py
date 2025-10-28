@@ -13,8 +13,6 @@ from src.common.validators import (
 )
 from src.config.networks import GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
-    DEFAULT_FROZEN_AMOUNT,
-    DEFAULT_FROZEN_AMOUNT_GWEI,
     DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI,
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
@@ -22,6 +20,8 @@ from src.config.settings import (
     DEFAULT_MIN_DEPOSIT_AMOUNT,
     DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
     DEFAULT_MIN_DEPOSIT_DELAY,
+    DEFAULT_VAULT_MIN_BALANCE,
+    DEFAULT_VAULT_MIN_BALANCE_GWEI,
     LOG_FORMATS,
     LOG_PLAIN,
 )
@@ -211,13 +211,14 @@ start_common_options = [
         default=DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
     ),
     click.option(
-        '--frozen-amount-gwei',
+        '--vault-min-balance',
         type=int,
-        envvar='FROZEN_AMOUNT_GWEI',
-        help=f'Amount in gwei to be left unstaked to handle exit queue requests smoothly'
-        f' The default is {DEFAULT_FROZEN_AMOUNT_GWEI} '
-        f'({Web3.from_wei(DEFAULT_FROZEN_AMOUNT, 'ether')} ETH).',
-        default=DEFAULT_FROZEN_AMOUNT_GWEI,
+        envvar='VAULT_MIN_BALANCE_GWEI',
+        help='The amount of assets (ETH/GNO) '
+        'that should be kept in the vault and not sent for staking.'
+        f' The default is {DEFAULT_VAULT_MIN_BALANCE_GWEI} '
+        f'({Web3.from_wei(DEFAULT_VAULT_MIN_BALANCE, 'ether')} ETH).',
+        default=DEFAULT_VAULT_MIN_BALANCE_GWEI,
     ),
     click.option(
         '--max-validator-balance-gwei',

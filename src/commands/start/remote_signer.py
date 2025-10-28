@@ -64,7 +64,7 @@ def start_remote_signer(
     database_dir: str | None,
     concurrency: int | None,
     min_deposit_amount_gwei: int,
-    frozen_amount_gwei: int,
+    vault_min_balance_gwei: int,
     max_validator_balance_gwei: int | None,
     min_deposit_delay: int,
     max_withdrawal_request_fee_gwei: int,
@@ -102,7 +102,7 @@ def start_remote_signer(
         log_format=log_format,
         concurrency=concurrency,
         min_deposit_amount_gwei=Gwei(min_deposit_amount_gwei),
-        frozen_amount_gwei=Gwei(frozen_amount_gwei),
+        vault_min_balance_gwei=Gwei(vault_min_balance_gwei),
         max_validator_balance_gwei=(
             Gwei(max_validator_balance_gwei) if max_validator_balance_gwei else None
         ),

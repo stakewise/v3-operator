@@ -55,7 +55,7 @@ class ValidatorRegistrationSubtask:
         harvest_params = await get_harvest_params()
 
         vault_assets = await get_vault_assets(harvest_params=harvest_params)
-        vault_assets = Gwei(max(0, vault_assets - settings.frozen_amount_gwei))
+        vault_assets = Gwei(max(0, vault_assets - settings.vault_min_balance_gwei))
 
         if vault_assets < settings.min_deposit_amount_gwei:
             return
