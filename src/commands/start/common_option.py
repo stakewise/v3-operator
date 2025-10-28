@@ -20,7 +20,6 @@ from src.config.settings import (
     DEFAULT_MIN_DEPOSIT_AMOUNT,
     DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
     DEFAULT_MIN_DEPOSIT_DELAY,
-    DEFAULT_VAULT_MIN_BALANCE,
     DEFAULT_VAULT_MIN_BALANCE_GWEI,
     LOG_FORMATS,
     LOG_PLAIN,
@@ -214,10 +213,9 @@ start_common_options = [
         '--vault-min-balance',
         type=int,
         envvar='VAULT_MIN_BALANCE_GWEI',
-        help='The amount of assets (ETH/GNO) '
+        help='The amount of assets (ETH/GNO) in Gwei '
         'that should be kept in the vault and not sent for staking.'
-        f' The default is {DEFAULT_VAULT_MIN_BALANCE_GWEI} '
-        f'({Web3.from_wei(DEFAULT_VAULT_MIN_BALANCE, 'ether')} ETH).',
+        f'The default is {DEFAULT_VAULT_MIN_BALANCE_GWEI}.',
         default=DEFAULT_VAULT_MIN_BALANCE_GWEI,
     ),
     click.option(
