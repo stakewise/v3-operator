@@ -238,7 +238,7 @@ async def _get_withdrawals(
         consensus_validators=consensus_validators,
         max_activation_epoch=max(max_activation_epoch, 0),
         oracle_exit_indexes=oracle_exit_indexes,
-        validator_partial_withdrawals=validator_partial_withdrawals,
+        partial_withdrawal_indexes=set(validator_partial_withdrawals.keys()),
     )
 
     withdrawals: dict[HexStr, Gwei] = {}
@@ -299,7 +299,7 @@ def _filter_exitable_validators(
     consensus_validators: list[ConsensusValidator],
     max_activation_epoch: int,
     oracle_exit_indexes: set[int],
-    validator_partial_withdrawals: dict[int, Gwei],
+    partial_withdrawal_indexes: set[int],
 ) -> list[ConsensusValidator]:
     """
     Return validators eligible for exit,
@@ -313,7 +313,7 @@ def _filter_exitable_validators(
             continue
         if validator.index in oracle_exit_indexes:
             continue
-        if validator.index in validator_partial_withdrawals:
+        if validator.index in partial_withdrawal_indexes:
             continue
         can_be_exited_validators.append(validator)
     can_be_exited_validators.sort(key=lambda x: (x.balance, x.index))

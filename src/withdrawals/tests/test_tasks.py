@@ -737,7 +737,7 @@ def test_filter_exitable_validators():
         validators,
         max_activation_epoch=12,
         oracle_exit_indexes=set(),
-        validator_partial_withdrawals={},
+        partial_withdrawal_indexes=set(),
     )
     assert len(result) == 1
     assert result[0].index == 1
@@ -755,7 +755,7 @@ def test_filter_exitable_validators():
         validators,
         max_activation_epoch=12,
         oracle_exit_indexes=set(),
-        validator_partial_withdrawals={},
+        partial_withdrawal_indexes=set(),
     )
     assert len(result) == 1
     assert result[0].index == 1
@@ -773,7 +773,7 @@ def test_filter_exitable_validators():
         validators,
         max_activation_epoch=12,
         oracle_exit_indexes={2},
-        validator_partial_withdrawals={},
+        partial_withdrawal_indexes=set(),
     )
     assert len(result) == 1
     assert result[0].index == 1
@@ -790,8 +790,8 @@ def test_filter_exitable_validators():
     result = _filter_exitable_validators(
         validators,
         max_activation_epoch=12,
-        oracle_exit_indexes={},
-        validator_partial_withdrawals={2: 10 * 10**9},
+        oracle_exit_indexes=set(),
+        partial_withdrawal_indexes={2},
     )
     assert len(result) == 1
     assert result[0].index == 1
@@ -812,7 +812,7 @@ def test_filter_exitable_validators():
         validators,
         max_activation_epoch=12,
         oracle_exit_indexes=set(),
-        validator_partial_withdrawals={},
+        partial_withdrawal_indexes=set(),
     )
     assert len(result) == 3
     assert result[0].index == 2
@@ -832,6 +832,6 @@ def test_filter_exitable_validators():
         validators,
         max_activation_epoch=12,
         oracle_exit_indexes={1},
-        validator_partial_withdrawals={},
+        partial_withdrawal_indexes=set(),
     )
     assert len(result) == 0
