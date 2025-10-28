@@ -214,7 +214,7 @@ start_common_options = [
         '--frozen-amount-gwei',
         type=int,
         envvar='FROZEN_AMOUNT_GWEI',
-        help=f'Amount in gwei is left unstaked to handle exit queue requests smoothly'
+        help=f'Amount in gwei to be left unstaked to handle exit queue requests smoothly'
         f' The default is {DEFAULT_FROZEN_AMOUNT_GWEI} '
         f'({Web3.from_wei(DEFAULT_FROZEN_AMOUNT, 'ether')} ETH).',
         default=DEFAULT_FROZEN_AMOUNT_GWEI,
