@@ -256,7 +256,7 @@ async def test_get_withdrawals(data_dir):
         chain_head=chain_head,
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
-        pending_partial_withdrawals={},
+        pending_partial_withdrawals=[],
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
     )
@@ -284,7 +284,7 @@ async def test_get_withdrawals(data_dir):
         chain_head=chain_head,
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
-        pending_partial_withdrawals={},
+        pending_partial_withdrawals=[],
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
     )
@@ -315,7 +315,7 @@ async def test_get_withdrawals(data_dir):
         chain_head=chain_head,
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
-        pending_partial_withdrawals={},
+        pending_partial_withdrawals=[],
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
     )
@@ -343,7 +343,7 @@ async def test_get_withdrawals(data_dir):
         chain_head=chain_head,
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
-        pending_partial_withdrawals={},
+        pending_partial_withdrawals=[],
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
     )
@@ -371,7 +371,7 @@ async def test_get_withdrawals(data_dir):
         chain_head=chain_head,
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
-        pending_partial_withdrawals={},
+        pending_partial_withdrawals=[],
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
     )
@@ -405,7 +405,7 @@ async def test_get_withdrawals(data_dir):
         chain_head=chain_head,
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
-        pending_partial_withdrawals={},
+        pending_partial_withdrawals=[],
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
     )
@@ -499,7 +499,7 @@ async def test_get_withdrawals(data_dir):
         chain_head=chain_head,
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
-        pending_partial_withdrawals={},
+        pending_partial_withdrawals=[],
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
     )
@@ -527,7 +527,7 @@ async def test_get_withdrawals(data_dir):
         chain_head=chain_head,
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
-        pending_partial_withdrawals={},
+        pending_partial_withdrawals=[],
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
     )
@@ -556,7 +556,7 @@ async def test_get_withdrawals(data_dir):
         chain_head=chain_head,
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
-        pending_partial_withdrawals={},
+        pending_partial_withdrawals=[],
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
     )
@@ -586,7 +586,7 @@ async def test_get_withdrawals(data_dir):
         chain_head=chain_head,
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
-        pending_partial_withdrawals={},
+        pending_partial_withdrawals=[],
         validator_min_active_epochs=10,
         oracle_exit_indexes={1},
     )
@@ -616,7 +616,7 @@ async def test_get_withdrawals(data_dir):
         chain_head=chain_head,
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
-        pending_partial_withdrawals={},
+        pending_partial_withdrawals=[],
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
     )
@@ -639,7 +639,7 @@ async def test_get_withdrawals(data_dir):
         chain_head=chain_head,
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
-        pending_partial_withdrawals={},
+        pending_partial_withdrawals=[],
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
     )
@@ -654,7 +654,7 @@ async def test_get_withdrawals(data_dir):
         chain_head=chain_head,
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
-        pending_partial_withdrawals={},
+        pending_partial_withdrawals=[],
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
     )
