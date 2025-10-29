@@ -211,7 +211,7 @@ start_common_options = [
         type=int,
         envvar='VAULT_MIN_BALANCE_GWEI',
         help='The amount of assets (ETH/GNO) in Gwei '
-        'that should be kept in the vault and not sent for staking.'
+        'that should be kept in the vault and not sent for staking. '
         f'The default is {DEFAULT_VAULT_MIN_BALANCE_GWEI}.',
         default=DEFAULT_VAULT_MIN_BALANCE_GWEI,
     ),
