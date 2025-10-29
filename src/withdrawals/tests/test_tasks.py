@@ -5,6 +5,7 @@ from sw_utils import ValidatorStatus
 
 from src.common.tests.factories import create_chain_head
 from src.common.tests.utils import ether_to_gwei
+from src.common.typings import PendingPartialWithdrawal
 from src.config.networks import HOODI
 from src.config.settings import settings
 from src.validators.tests.factories import create_consensus_validator
@@ -27,12 +28,20 @@ def test_get_partial_withdrawals():
     ]
     withdrawals_amount = ether_to_gwei(0)
     expected = {}
-    result = _get_partial_withdrawals(validators, withdrawals_amount)
+    result = _get_partial_withdrawals(
+        partial_validators=validators,
+        queued_assets=withdrawals_amount,
+        validator_partial_withdrawals={},
+    )
     assert result == expected
 
     withdrawals_amount = ether_to_gwei(8)
     expected = {'0x1': ether_to_gwei(8)}
-    result = _get_partial_withdrawals(validators, withdrawals_amount)
+    result = _get_partial_withdrawals(
+        partial_validators=validators,
+        queued_assets=withdrawals_amount,
+        validator_partial_withdrawals={},
+    )
     assert result == expected
 
     validators = [
@@ -63,7 +72,11 @@ def test_get_partial_withdrawals():
     ]
     withdrawals_amount = ether_to_gwei(18)
     expected = {'0x3': ether_to_gwei(18)}
-    result = _get_partial_withdrawals(validators, withdrawals_amount)
+    result = _get_partial_withdrawals(
+        partial_validators=validators,
+        queued_assets=withdrawals_amount,
+        validator_partial_withdrawals={},
+    )
     assert result == expected
 
     validators = [
@@ -88,18 +101,30 @@ def test_get_partial_withdrawals():
     ]
     withdrawals_amount = ether_to_gwei(20)
     expected = {'0x3': ether_to_gwei(18), '0x2': ether_to_gwei(2)}
-    result = _get_partial_withdrawals(validators, withdrawals_amount)
+    result = _get_partial_withdrawals(
+        partial_validators=validators,
+        queued_assets=withdrawals_amount,
+        validator_partial_withdrawals={},
+    )
     assert result == expected
 
     withdrawals_amount = ether_to_gwei(27)
     expected = {'0x3': ether_to_gwei(18), '0x2': ether_to_gwei(8), '0x1': ether_to_gwei(1)}
-    result = _get_partial_withdrawals(validators, withdrawals_amount)
+    result = _get_partial_withdrawals(
+        partial_validators=validators,
+        queued_assets=withdrawals_amount,
+        validator_partial_withdrawals={},
+    )
     assert result == expected
 
     validators = []
     withdrawals_amount = 10
     expected = {}
-    result = _get_partial_withdrawals(validators, withdrawals_amount)
+    result = _get_partial_withdrawals(
+        partial_validators=validators,
+        queued_assets=withdrawals_amount,
+        validator_partial_withdrawals={},
+    )
     assert result == expected
 
     # use single validator withdrawals
@@ -121,7 +146,71 @@ def test_get_partial_withdrawals():
     expected = {
         '0x2': ether_to_gwei(18),
     }
-    result = _get_partial_withdrawals(validators, queued_assets)
+    result = _get_partial_withdrawals(
+        partial_validators=validators, queued_assets=queued_assets, validator_partial_withdrawals={}
+    )
+    assert result == expected
+
+    # with existing partial withdrawals
+    validators = [
+        create_consensus_validator(
+            public_key='0x1',
+            index=1,
+            balance=ether_to_gwei(45),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=200,
+        ),
+        create_consensus_validator(
+            public_key='0x2',
+            index=2,
+            balance=ether_to_gwei(50),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=200,
+        ),
+    ]
+    queued_assets = ether_to_gwei(5)
+    validator_partial_withdrawals = {2: ether_to_gwei(18)}
+    expected = {
+        '0x1': ether_to_gwei(5),
+    }
+    result = _get_partial_withdrawals(
+        partial_validators=validators,
+        queued_assets=queued_assets,
+        validator_partial_withdrawals=validator_partial_withdrawals,
+    )
+    assert result == expected
+
+    # with existing partial withdrawals, correct order
+    validators = [
+        create_consensus_validator(
+            public_key='0x1',
+            index=1,
+            balance=ether_to_gwei(45),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=200,
+        ),
+        create_consensus_validator(
+            public_key='0x2',
+            index=2,
+            balance=ether_to_gwei(50),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=200,
+        ),
+    ]
+    queued_assets = ether_to_gwei(15)
+    validator_partial_withdrawals = {
+        1: ether_to_gwei(1),
+        2: ether_to_gwei(8),
+    }
+    expected = {
+        '0x1': ether_to_gwei(12),
+        '0x2': ether_to_gwei(3),
+    }
+    result = _get_partial_withdrawals(
+        partial_validators=validators,
+        queued_assets=queued_assets,
+        validator_partial_withdrawals=validator_partial_withdrawals,
+    )
     assert result == expected
 
     # no validators have sufficient balance
@@ -135,7 +224,9 @@ def test_get_partial_withdrawals():
     ]
     queued_assets = ether_to_gwei(40)
     expected = {}
-    result = _get_partial_withdrawals(validators, queued_assets)
+    result = _get_partial_withdrawals(
+        partial_validators=validators, queued_assets=queued_assets, validator_partial_withdrawals={}
+    )
     assert result == expected
 
 
@@ -161,7 +252,14 @@ async def test_get_withdrawals(data_dir):
             activation_epoch=200,
         ),
     ]
-    result = await _get_withdrawals(chain_head, queued_assets, consensus_validators, 10, set())
+    result = await _get_withdrawals(
+        chain_head=chain_head,
+        queued_assets=queued_assets,
+        consensus_validators=consensus_validators,
+        pending_partial_withdrawals=[],
+        validator_min_active_epochs=10,
+        oracle_exit_indexes=set(),
+    )
     expected = {'0x1': ether_to_gwei(2), '0x2': ether_to_gwei(18)}
     assert result == expected
 
@@ -182,7 +280,14 @@ async def test_get_withdrawals(data_dir):
             activation_epoch=85,
         ),
     ]
-    result = await _get_withdrawals(chain_head, queued_assets, consensus_validators, 10, set())
+    result = await _get_withdrawals(
+        chain_head=chain_head,
+        queued_assets=queued_assets,
+        consensus_validators=consensus_validators,
+        pending_partial_withdrawals=[],
+        validator_min_active_epochs=10,
+        oracle_exit_indexes=set(),
+    )
     expected = {'0x1': ether_to_gwei(0), '0x2': ether_to_gwei(0)}
 
     assert result == expected
@@ -206,7 +311,14 @@ async def test_get_withdrawals(data_dir):
             activation_epoch=85,
         ),
     ]
-    result = await _get_withdrawals(chain_head, queued_assets, consensus_validators, 10, set())
+    result = await _get_withdrawals(
+        chain_head=chain_head,
+        queued_assets=queued_assets,
+        consensus_validators=consensus_validators,
+        pending_partial_withdrawals=[],
+        validator_min_active_epochs=10,
+        oracle_exit_indexes=set(),
+    )
     assert result == {'0x1': ether_to_gwei(8), '0x2': ether_to_gwei(18)}
     settings.disable_full_withdrawals = False
 
@@ -227,7 +339,14 @@ async def test_get_withdrawals(data_dir):
             activation_epoch=85,
         ),
     ]
-    result = await _get_withdrawals(chain_head, queued_assets, consensus_validators, 10, set())
+    result = await _get_withdrawals(
+        chain_head=chain_head,
+        queued_assets=queued_assets,
+        consensus_validators=consensus_validators,
+        pending_partial_withdrawals=[],
+        validator_min_active_epochs=10,
+        oracle_exit_indexes=set(),
+    )
     expected = {'0x1': ether_to_gwei(0)}
     assert result == expected
 
@@ -248,7 +367,14 @@ async def test_get_withdrawals(data_dir):
             activation_epoch=85,
         ),
     ]
-    result = await _get_withdrawals(chain_head, queued_assets, consensus_validators, 10, set())
+    result = await _get_withdrawals(
+        chain_head=chain_head,
+        queued_assets=queued_assets,
+        consensus_validators=consensus_validators,
+        pending_partial_withdrawals=[],
+        validator_min_active_epochs=10,
+        oracle_exit_indexes=set(),
+    )
     expected = {'0x1': ether_to_gwei(0), '0x2': ether_to_gwei(10)}
     assert result == expected
 
@@ -275,8 +401,81 @@ async def test_get_withdrawals(data_dir):
             activation_epoch=80,
         ),
     ]
-    result = await _get_withdrawals(chain_head, queued_assets, consensus_validators, 10, set())
+    result = await _get_withdrawals(
+        chain_head=chain_head,
+        queued_assets=queued_assets,
+        consensus_validators=consensus_validators,
+        pending_partial_withdrawals=[],
+        validator_min_active_epochs=10,
+        oracle_exit_indexes=set(),
+    )
     expected = {'0x1': ether_to_gwei(0), '0x2': ether_to_gwei(18), '0x3': ether_to_gwei(28)}
+    assert result == expected
+
+    # skip full for validators with existing partial withdrawals
+    chain_head = create_chain_head(epoch=500)
+    queued_assets = ether_to_gwei(33)
+    consensus_validators = [
+        create_consensus_validator(
+            public_key='0x1',
+            index=1,
+            balance=ether_to_gwei(32),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=90,
+        ),
+        create_consensus_validator(
+            public_key='0x2',
+            index=2,
+            balance=ether_to_gwei(40),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=85,
+        ),
+    ]
+    pending_partial_withdrawals = [
+        PendingPartialWithdrawal(validator_index=1, amount=ether_to_gwei(1))
+    ]
+    result = await _get_withdrawals(
+        chain_head=chain_head,
+        queued_assets=queued_assets,
+        consensus_validators=consensus_validators,
+        pending_partial_withdrawals=pending_partial_withdrawals,
+        validator_min_active_epochs=10,
+        oracle_exit_indexes=set(),
+    )
+    expected = {'0x2': ether_to_gwei(0)}
+    assert result == expected
+
+    # subtract existing partial withdrawals from balances
+    chain_head = create_chain_head(epoch=500)
+    queued_assets = ether_to_gwei(60)
+    consensus_validators = [
+        create_consensus_validator(
+            public_key='0x1',
+            index=1,
+            balance=ether_to_gwei(96),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=90,
+        ),
+        create_consensus_validator(
+            public_key='0x2',
+            index=2,
+            balance=ether_to_gwei(46),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=85,
+        ),
+    ]
+    pending_partial_withdrawals = [
+        PendingPartialWithdrawal(validator_index=1, amount=ether_to_gwei(15))
+    ]
+    result = await _get_withdrawals(
+        chain_head=chain_head,
+        queued_assets=queued_assets,
+        consensus_validators=consensus_validators,
+        pending_partial_withdrawals=pending_partial_withdrawals,
+        validator_min_active_epochs=10,
+        oracle_exit_indexes=set(),
+    )
+    expected = {'0x1': ether_to_gwei(49), '0x2': ether_to_gwei(11)}
     assert result == expected
 
     # full withdrawals when partial withdrawals capacity is zero
@@ -296,7 +495,14 @@ async def test_get_withdrawals(data_dir):
             activation_epoch=85,
         ),
     ]
-    result = await _get_withdrawals(chain_head, queued_assets, consensus_validators, 10, set())
+    result = await _get_withdrawals(
+        chain_head=chain_head,
+        queued_assets=queued_assets,
+        consensus_validators=consensus_validators,
+        pending_partial_withdrawals=[],
+        validator_min_active_epochs=10,
+        oracle_exit_indexes=set(),
+    )
     expected = {'0x1': ether_to_gwei(0)}
     assert result == expected
 
@@ -317,7 +523,14 @@ async def test_get_withdrawals(data_dir):
             activation_epoch=85,
         ),
     ]
-    result = await _get_withdrawals(chain_head, queued_assets, consensus_validators, 10, set())
+    result = await _get_withdrawals(
+        chain_head=chain_head,
+        queued_assets=queued_assets,
+        consensus_validators=consensus_validators,
+        pending_partial_withdrawals=[],
+        validator_min_active_epochs=10,
+        oracle_exit_indexes=set(),
+    )
     expected = {'0x1': ether_to_gwei(0), '0x2': ether_to_gwei(0)}
     assert result == expected
 
@@ -339,7 +552,14 @@ async def test_get_withdrawals(data_dir):
             activation_epoch=85,
         ),
     ]
-    result = await _get_withdrawals(chain_head, queued_assets, consensus_validators, 10, set())
+    result = await _get_withdrawals(
+        chain_head=chain_head,
+        queued_assets=queued_assets,
+        consensus_validators=consensus_validators,
+        pending_partial_withdrawals=[],
+        validator_min_active_epochs=10,
+        oracle_exit_indexes=set(),
+    )
     expected = {'0x1': 0}
     assert result == expected
 
@@ -362,7 +582,14 @@ async def test_get_withdrawals(data_dir):
             index=2,
         ),
     ]
-    result = await _get_withdrawals(chain_head, queued_assets, consensus_validators, 10, {1})
+    result = await _get_withdrawals(
+        chain_head=chain_head,
+        queued_assets=queued_assets,
+        consensus_validators=consensus_validators,
+        pending_partial_withdrawals=[],
+        validator_min_active_epochs=10,
+        oracle_exit_indexes={1},
+    )
     expected = {'0x2': ether_to_gwei(0)}
     assert result == expected
 
@@ -385,7 +612,14 @@ async def test_get_withdrawals(data_dir):
             index=2,
         ),
     ]
-    result = await _get_withdrawals(chain_head, queued_assets, consensus_validators, 10, set())
+    result = await _get_withdrawals(
+        chain_head=chain_head,
+        queued_assets=queued_assets,
+        consensus_validators=consensus_validators,
+        pending_partial_withdrawals=[],
+        validator_min_active_epochs=10,
+        oracle_exit_indexes=set(),
+    )
     expected = {'0x2': ether_to_gwei(0)}
     assert result == expected
 
@@ -401,7 +635,14 @@ async def test_get_withdrawals(data_dir):
             activation_epoch=200,
         ),
     ]
-    result = await _get_withdrawals(chain_head, queued_assets, consensus_validators, 10, set())
+    result = await _get_withdrawals(
+        chain_head=chain_head,
+        queued_assets=queued_assets,
+        consensus_validators=consensus_validators,
+        pending_partial_withdrawals=[],
+        validator_min_active_epochs=10,
+        oracle_exit_indexes=set(),
+    )
     expected = {}
     assert result == expected
     # handles case with no active validators
@@ -409,7 +650,14 @@ async def test_get_withdrawals(data_dir):
     queued_assets = ether_to_gwei(20)
     consensus_validators = []
 
-    result = await _get_withdrawals(chain_head, queued_assets, consensus_validators, 10, set())
+    result = await _get_withdrawals(
+        chain_head=chain_head,
+        queued_assets=queued_assets,
+        consensus_validators=consensus_validators,
+        pending_partial_withdrawals=[],
+        validator_min_active_epochs=10,
+        oracle_exit_indexes=set(),
+    )
     assert result == {}
 
 
@@ -486,7 +734,10 @@ def test_filter_exitable_validators():
         ),
     ]
     result = _filter_exitable_validators(
-        validators, max_activation_epoch=12, oracle_exit_indexes=set()
+        validators,
+        max_activation_epoch=12,
+        oracle_exit_indexes=set(),
+        partial_withdrawal_indexes=set(),
     )
     assert len(result) == 1
     assert result[0].index == 1
@@ -501,7 +752,10 @@ def test_filter_exitable_validators():
         ),
     ]
     result = _filter_exitable_validators(
-        validators, max_activation_epoch=12, oracle_exit_indexes=set()
+        validators,
+        max_activation_epoch=12,
+        oracle_exit_indexes=set(),
+        partial_withdrawal_indexes=set(),
     )
     assert len(result) == 1
     assert result[0].index == 1
@@ -516,7 +770,28 @@ def test_filter_exitable_validators():
         ),
     ]
     result = _filter_exitable_validators(
-        validators, max_activation_epoch=12, oracle_exit_indexes={2}
+        validators,
+        max_activation_epoch=12,
+        oracle_exit_indexes={2},
+        partial_withdrawal_indexes=set(),
+    )
+    assert len(result) == 1
+    assert result[0].index == 1
+
+    # validators_with_partial_withdrawals_are_excluded
+    validators = [
+        create_consensus_validator(
+            index=1, activation_epoch=10, status=ValidatorStatus.ACTIVE_ONGOING, balance=32
+        ),
+        create_consensus_validator(
+            index=2, activation_epoch=10, status=ValidatorStatus.ACTIVE_ONGOING, balance=32
+        ),
+    ]
+    result = _filter_exitable_validators(
+        validators,
+        max_activation_epoch=12,
+        oracle_exit_indexes=set(),
+        partial_withdrawal_indexes={2},
     )
     assert len(result) == 1
     assert result[0].index == 1
@@ -534,7 +809,10 @@ def test_filter_exitable_validators():
         ),
     ]
     result = _filter_exitable_validators(
-        validators, max_activation_epoch=12, oracle_exit_indexes=set()
+        validators,
+        max_activation_epoch=12,
+        oracle_exit_indexes=set(),
+        partial_withdrawal_indexes=set(),
     )
     assert len(result) == 3
     assert result[0].index == 2
@@ -551,6 +829,9 @@ def test_filter_exitable_validators():
         ),
     ]
     result = _filter_exitable_validators(
-        validators, max_activation_epoch=12, oracle_exit_indexes={1}
+        validators,
+        max_activation_epoch=12,
+        oracle_exit_indexes={1},
+        partial_withdrawal_indexes=set(),
     )
     assert len(result) == 0

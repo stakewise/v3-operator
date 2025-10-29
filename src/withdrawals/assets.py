@@ -9,12 +9,9 @@ from web3 import Web3
 from web3.types import Gwei, Wei
 
 from src.common.contracts import validators_checker_contract
-from src.common.execution import (
-    get_pending_consolidations,
-    get_pending_partial_withdrawals,
-)
+from src.common.execution import get_pending_consolidations
 from src.common.harvest import get_harvest_params
-from src.common.typings import ExitQueueMissingAssetsParams
+from src.common.typings import ExitQueueMissingAssetsParams, PendingPartialWithdrawal
 from src.config.settings import settings
 from src.validators.typings import ConsensusValidator
 
@@ -40,6 +37,7 @@ EXITING_STATUSES = [
 async def get_queued_assets(
     consensus_validators: list[ConsensusValidator],
     oracle_exiting_validators: list[ConsensusValidator],
+    pending_partial_withdrawals: list[PendingPartialWithdrawal],
     chain_head: ChainHead,
 ) -> Gwei:
     harvest_params = await get_harvest_params(chain_head.block_number)
@@ -52,11 +50,13 @@ async def get_queued_assets(
             block_number=chain_head.block_number,
         )
     )
-    # fetch current pending partial withdrawals from consensus client
-    pending_partial_withdrawals_amount = await _get_pending_partial_withdrawals_amount(
-        validators=[v for v in consensus_validators if v.status in CAN_BE_EXITED_STATUSES],
-        chain_head=chain_head,
+    pending_partial_withdrawals_amount_gwei = sum(
+        withdrawal.amount for withdrawal in pending_partial_withdrawals
     )
+    pending_partial_withdrawals_amount = Web3.to_wei(
+        pending_partial_withdrawals_amount_gwei, 'gwei'
+    )
+
     # fetch active validators exits
     consolidations = await get_pending_consolidations(chain_head, consensus_validators)
     source_consolidations_indexes = {cons.source_index for cons in consolidations}
@@ -89,24 +89,6 @@ async def get_queued_assets(
         queued_assets = convert_to_mgno(queued_assets)
 
     return Gwei(int(Web3.from_wei(queued_assets, 'gwei')))
-
-
-async def _get_pending_partial_withdrawals_amount(
-    validators: list[ConsensusValidator],
-    chain_head: ChainHead,
-) -> Wei:
-    """
-    Calculate the sum of pending partial withdrawals at the specified slot
-    """
-    if not validators:
-        return Wei(0)
-
-    total_pending_withdrawals = 0
-    pending_withdrawals = await get_pending_partial_withdrawals(chain_head, validators)
-    for pending_withdrawal in pending_withdrawals:
-        total_pending_withdrawals += pending_withdrawal.amount
-
-    return Web3.to_wei(total_pending_withdrawals, 'gwei')
 
 
 def _calculate_validators_exits_amount(
