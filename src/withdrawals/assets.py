@@ -9,9 +9,12 @@ from web3 import Web3
 from web3.types import Gwei, Wei
 
 from src.common.contracts import validators_checker_contract
-from src.common.execution import get_pending_consolidations
 from src.common.harvest import get_harvest_params
-from src.common.typings import ExitQueueMissingAssetsParams, PendingPartialWithdrawal
+from src.common.typings import (
+    ExitQueueMissingAssetsParams,
+    PendingConsolidation,
+    PendingPartialWithdrawal,
+)
 from src.config.settings import settings
 from src.validators.typings import ConsensusValidator
 
@@ -37,6 +40,7 @@ EXITING_STATUSES = [
 async def get_queued_assets(
     consensus_validators: list[ConsensusValidator],
     oracle_exiting_validators: list[ConsensusValidator],
+    consolidations: list[PendingConsolidation],
     pending_partial_withdrawals: list[PendingPartialWithdrawal],
     chain_head: ChainHead,
 ) -> Gwei:
@@ -58,7 +62,6 @@ async def get_queued_assets(
     )
 
     # fetch active validators exits
-    consolidations = await get_pending_consolidations(chain_head, consensus_validators)
     source_consolidations_indexes = {cons.source_index for cons in consolidations}
     validators_exits_amount = _calculate_validators_exits_amount(
         consensus_validators=consensus_validators,
