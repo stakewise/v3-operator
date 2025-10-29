@@ -49,6 +49,7 @@ class Settings(metaclass=Singleton):
 
     harvest_vault: bool
     claim_fee_splitter: bool
+    process_metavault: bool
     disable_withdrawals: bool
     disable_validators_registration: bool
     disable_validators_funding: bool
@@ -127,6 +128,7 @@ class Settings(metaclass=Singleton):
         graph_endpoint: str = '',
         harvest_vault: bool = False,
         claim_fee_splitter: bool = False,
+        process_metavault: bool = False,
         disable_withdrawals: bool = False,
         disable_validators_registration: bool = False,
         disable_validators_funding: bool = False,
@@ -172,6 +174,7 @@ class Settings(metaclass=Singleton):
         self.graph_endpoint = graph_endpoint or self.network_config.STAKEWISE_GRAPH_ENDPOINT
         self.harvest_vault = harvest_vault
         self.claim_fee_splitter = claim_fee_splitter
+        self.process_metavault = process_metavault
         self.disable_withdrawals = disable_withdrawals
         self.disable_validators_registration = disable_validators_registration
         self.disable_validators_funding = disable_validators_funding
@@ -367,6 +370,15 @@ FEE_SPLITTER_MIN_ASSETS: int = decouple_config(
 FEE_SPLITTER_INTERVAL: int = decouple_config(
     'FEE_SPLITTER_INTERVAL', default=86400, cast=int  # every 24 hr
 )
+
+# Metavault
+META_VAULT_MIN_DEPOSIT_AMOUNT: Wei = decouple_config(
+    'META_VAULT_MIN_DEPOSIT_AMOUNT', default=MIN_ACTIVATION_BALANCE, cast=int
+)
+META_VAULT_UPDATE_INTERVAL: int = decouple_config(
+    'META_VAULT_UPDATE_INTERVAL', default=6 * 60 * 60, cast=int  # every 24 hr
+)
+
 # logging
 LOG_PLAIN = 'plain'
 LOG_JSON = 'json'

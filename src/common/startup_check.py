@@ -54,7 +54,7 @@ async def startup_checks() -> None:
     logger.info('Checking consensus nodes network...')
     await _check_consensus_nodes_network()
 
-    if settings.claim_fee_splitter:
+    if settings.claim_fee_splitter or settings.process_metavault:
         logger.info('Checking graph nodes...')
         await wait_for_graph_node()
 
@@ -117,7 +117,7 @@ def validate_settings() -> None:
     if not settings.consensus_endpoints:
         raise ValueError('CONSENSUS_ENDPOINTS is missing')
 
-    if not settings.graph_endpoint and settings.claim_fee_splitter:
+    if not settings.graph_endpoint and (settings.claim_fee_splitter or settings.process_metavault):
         raise ValueError('GRAPH_ENDPOINT is missing')
 
 

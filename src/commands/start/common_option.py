@@ -122,6 +122,13 @@ start_common_options = [
         ' Default is false.',
     ),
     click.option(
+        '--process-metavault',
+        is_flag=True,
+        envvar='PROCESS_METAVAULT',
+        help='Process subvault states and deposits, applies only to metavaults.'
+        ' Default is false.',
+    ),
+    click.option(
         '--disable-withdrawals',
         is_flag=True,
         envvar='DISABLE_WITHDRAWALS',
