@@ -213,11 +213,11 @@ async def _get_withdrawals(
     partial_validators = [
         v for v in consensus_validators if v.is_partially_withdrawable(chain_head.epoch)
     ]
-    partial_capacity = sum(
-        v.withdrawal_capacity - validator_partial_withdrawals.get(v.index, 0)
-        for v in partial_validators
-    )
-    partial_capacity = Gwei(max(0, partial_capacity))
+    partial_capacity = 0
+    for validator in partial_validators:
+        partial_withdrawals = validator_partial_withdrawals.get(validator.index, 0)
+        if partial_withdrawals < validator.withdrawal_capacity:
+            partial_capacity += validator.withdrawal_capacity - partial_withdrawals
 
     # If enough partials, use only them
     if partial_capacity >= queued_assets or settings.disable_full_withdrawals:
