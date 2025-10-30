@@ -207,7 +207,7 @@ start_common_options = [
         default=DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
     ),
     click.option(
-        '--vault-min-balance',
+        '--vault-min-balance-gwei',
         type=int,
         envvar='VAULT_MIN_BALANCE_GWEI',
         help='The amount of assets (ETH/GNO) in Gwei '
