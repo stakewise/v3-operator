@@ -1,16 +1,15 @@
 from contextlib import contextmanager
 from unittest import mock
 
+import pytest
 from eth_typing import ChecksumAddress
-from periodic_tasks.common.typings import Vault
-from periodic_tasks.meta_vault.tasks import (
-    meta_vault_tree_update_state,
-    multicall_contract,
-)
-from periodic_tasks.meta_vault.tests.factories import create_vault
-from sw_utils.graph import GraphClient
+
+from src.meta_vault.tasks import meta_vault_tree_update_state, multicall_contract
+from src.meta_vault.tests.factories import create_vault
+from src.meta_vault.typings import Vault
 
 
+@pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
 class TestMetaVaultTreeUpdateStateCalls:
     async def test_basic(self):
         # Arrange
@@ -256,17 +255,17 @@ class TestMetaVaultTreeUpdateStateCalls:
     @contextmanager
     def patch(self, graph_mock: 'GraphMock'):
         with mock.patch(
-            'periodic_tasks.meta_vault.tasks.graph_get_vaults',
+            'src.meta_vault.tasks.graph_get_vaults',
             graph_mock.graph_get_vaults,
         ), mock.patch(
-            'periodic_tasks.meta_vault.tasks.get_claimable_sub_vault_exit_requests', return_value=[]
+            'src.meta_vault.tasks.get_claimable_sub_vault_exit_requests', return_value=[]
         ), mock.patch(
-            'periodic_tasks.meta_vault.tasks.is_meta_vault_rewards_nonce_outdated',
+            'src.meta_vault.tasks.is_meta_vault_rewards_nonce_outdated',
             return_value=False,
         ), mock.patch.object(
             multicall_contract, 'tx_aggregate', return_value='0x123'
         ) as tx_aggregate_mock, mock.patch(
-            'periodic_tasks.meta_vault.tasks.wait_for_tx_confirmation',
+            'src.meta_vault.tasks.execution_client.eth.wait_for_transaction_receipt',
         ):
             yield tx_aggregate_mock
 
@@ -275,9 +274,7 @@ class GraphMock:
     def __init__(self, vaults: list[ChecksumAddress]):
         self._vaults = {vault.address: vault for vault in vaults}
 
-    async def graph_get_vaults(
-        self, graph_client: GraphClient, vaults: list[ChecksumAddress]
-    ) -> dict[ChecksumAddress, Vault]:
+    async def graph_get_vaults(self, vaults: list[ChecksumAddress]) -> dict[ChecksumAddress, Vault]:
         """
         Simulate fetching vaults from the graph
         """

@@ -1,7 +1,8 @@
 from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
-from periodic_tasks.common.typings import Vault
 from sw_utils.tests import faker
+
+from src.meta_vault.typings import Vault
 
 
 def create_vault(

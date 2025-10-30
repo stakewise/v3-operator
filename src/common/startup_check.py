@@ -27,6 +27,7 @@ from src.common.utils import format_error, round_down, warning_verbose
 from src.common.wallet import wallet
 from src.config.networks import NETWORKS
 from src.config.settings import WITHDRAWALS_INTERVAL, settings
+from src.meta_vault.graph import graph_get_vaults
 from src.validators.execution import get_withdrawable_assets
 from src.validators.keystores.local import LocalKeystore
 from src.validators.relayer import RelayerClient
@@ -108,6 +109,8 @@ async def startup_checks() -> None:
             'WITHDRAWALS_INTERVAL setting should be less than '
             f'force withdrawals period({protocol_config.force_withdrawals_period} seconds)'
         )
+    if settings.process_metavault:
+        await _check_is_metavault()
 
 
 def validate_settings() -> None:
@@ -433,3 +436,9 @@ async def _check_vault_address() -> None:
         await VaultContract(address=settings.vault).version()
     except BadFunctionCallOutput as e:
         raise click.ClickException(f'Invalid vault contract address {settings.vault}') from e
+
+
+async def _check_is_metavault() -> None:
+    meta_vaults = await graph_get_vaults(is_meta_vault=True)
+    if settings.vault not in meta_vaults.keys():
+        raise ValueError(f'Vault {settings.vault} is not a metavault')
