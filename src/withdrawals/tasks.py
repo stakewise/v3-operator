@@ -18,6 +18,7 @@ from src.common.clients import execution_client
 from src.common.consensus import get_chain_latest_head
 from src.common.contracts import VaultContract
 from src.common.execution import (
+    get_pending_consolidations,
     get_pending_partial_withdrawals,
     get_protocol_config,
     get_withdrawal_request_fee,
@@ -105,6 +106,8 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
         oracle_exiting_validators = await _fetch_oracle_exiting_validators(
             consensus_validators, protocol_config
         )
+        consolidations = await get_pending_consolidations(chain_head, consensus_validators)
+
         active_validators = [v for v in consensus_validators if v.status in CAN_BE_EXITED_STATUSES]
         pending_partial_withdrawals = await get_pending_partial_withdrawals(
             chain_head=chain_head,
@@ -114,6 +117,7 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
             consensus_validators=consensus_validators,
             oracle_exiting_validators=oracle_exiting_validators,
             pending_partial_withdrawals=pending_partial_withdrawals,
+            consolidations=consolidations,
             chain_head=chain_head,
         )
         metrics.queued_assets.labels(network=settings.network).set(int(queued_assets))
@@ -134,6 +138,7 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
             pending_partial_withdrawals=pending_partial_withdrawals,
             validator_min_active_epochs=protocol_config.validator_min_active_epochs,
             oracle_exit_indexes={val.index for val in oracle_exiting_validators},
+            consolidation_target_indexes={c.target_index for c in consolidations},
         )
         if not withdrawals:
             logger.info(
@@ -199,6 +204,7 @@ async def _get_withdrawals(
     pending_partial_withdrawals: list[PendingPartialWithdrawal],
     validator_min_active_epochs: int,
     oracle_exit_indexes: set[int],
+    consolidation_target_indexes: set[int],
 ) -> dict[HexStr, Gwei]:
     if queued_assets <= 0:
         return {}
@@ -238,6 +244,7 @@ async def _get_withdrawals(
         max_activation_epoch=max(max_activation_epoch, 0),
         oracle_exit_indexes=oracle_exit_indexes,
         partial_withdrawal_indexes=set(validator_partial_withdrawals.keys()),
+        consolidation_target_indexes=consolidation_target_indexes,
     )
 
     withdrawals: dict[HexStr, Gwei] = {}
@@ -299,6 +306,7 @@ def _filter_exitable_validators(
     max_activation_epoch: int,
     oracle_exit_indexes: set[int],
     partial_withdrawal_indexes: set[int],
+    consolidation_target_indexes: set[int],
 ) -> list[ConsensusValidator]:
     """
     Return validators eligible for exit,
@@ -313,6 +321,8 @@ def _filter_exitable_validators(
         if validator.index in oracle_exit_indexes:
             continue
         if validator.index in partial_withdrawal_indexes:
+            continue
+        if validator.index in consolidation_target_indexes:
             continue
         can_be_exited_validators.append(validator)
     can_be_exited_validators.sort(key=lambda x: (x.balance, x.index))
