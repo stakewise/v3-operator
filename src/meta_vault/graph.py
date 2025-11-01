@@ -83,7 +83,7 @@ async def graph_get_exit_requests_for_meta_vault(
         query exitRequestQuery($owner: String, $first: Int, $skip: Int) {
           exitRequests(
             where: { owner: $owner, isClaimed: false, exitedAssets_gt: 0 },
-            orderBy: id,
+            orderBy: positionTicket,
             first: $first,
             skip: $skip
           ) {
