@@ -1,4 +1,4 @@
-from src.meta_vault.typings import ExitRequest
+from src.common.typings import ExitRequest
 
 
 class ClaimDelayNotPassedException(Exception):

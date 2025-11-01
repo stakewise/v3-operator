@@ -21,6 +21,10 @@ from src.config.config import OperatorConfig
 from src.config.networks import HOODI, NETWORKS
 from src.config.settings import settings
 from src.validators.keystores.remote import RemoteSignerKeystore
+from src.validators.keystores.tests.test_fixtures.hashi_vault import (
+    hashi_vault_url,
+    mocked_hashi_vault,
+)
 from src.validators.keystores.tests.test_fixtures.remote_signer import (
     mocked_remote_signer,
     remote_signer_url,
@@ -170,12 +174,6 @@ async def remote_signer_keystore(_setup_remote_signer) -> RemoteSignerKeystore:
 @pytest.fixture
 def vault_address() -> HexAddress:
     return faker.eth_address()
-
-
-# @pytest.fixture
-# def config_dir(data_dir: Path) -> Path:
-#     config_dir = data_dir / HOODI
-#     return config_dir
 
 
 @pytest.fixture
