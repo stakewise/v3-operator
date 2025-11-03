@@ -75,7 +75,7 @@ class OperatorConfig:
         }
         self.vault_dir.mkdir(parents=True, exist_ok=True)
         with self.config_path.open('w') as f:
-            json.dump(config, f)
+            json.dump(config, f, indent=2)
 
     def increment_mnemonic_index(self, count: int) -> None:
         self.mnemonic_next_index += count
@@ -86,7 +86,7 @@ class OperatorConfig:
             'first_public_key': self.first_public_key,
         }
         with self.config_path.open('w') as f:
-            json.dump(config, f)
+            json.dump(config, f, indent=2)
 
     def _validate(self, mnemonic: str | None = None) -> None:
         """Validates the loaded configuration data."""

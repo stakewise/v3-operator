@@ -4,7 +4,8 @@ import sys
 from pathlib import Path
 
 import click
-from eth_typing import ChecksumAddress, HexStr
+from eth_typing import BlockNumber, ChecksumAddress, HexStr
+from eth_utils import add_0x_prefix
 from sw_utils import ChainHead
 from web3 import Web3
 from web3.types import Gwei, Wei
@@ -31,7 +32,7 @@ from src.common.validators import (
 )
 from src.common.wallet import wallet
 from src.config.config import OperatorConfig
-from src.config.networks import GNOSIS, MAINNET, NETWORKS
+from src.config.networks import AVAILABLE_NETWORKS, GNOSIS, MAINNET, NETWORKS
 from src.config.settings import DEFAULT_MAX_CONSOLIDATION_REQUEST_FEE_GWEI, settings
 from src.validators.consensus import EXITING_STATUSES, fetch_consensus_validators
 from src.validators.oracles import poll_consolidation_signature
@@ -48,6 +49,14 @@ logger = logging.getLogger(__name__)
     envvar='DATA_DIR',
     help='Path where the config data is placed. Default is ~/.stakewise.',
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
+)
+@click.option(
+    '--network',
+    help='The network of the vault. Default is the network specified at "init" command.',
+    type=click.Choice(
+        AVAILABLE_NETWORKS,
+        case_sensitive=False,
+    ),
 )
 @click.option(
     '--vault',
@@ -73,6 +82,12 @@ logger = logging.getLogger(__name__)
     type=HexStr,
     callback=validate_public_key,
     help='Public key of validator to consolidate to.',
+)
+@click.option(
+    '--exclude-public-keys-file',
+    type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
+    callback=validate_public_keys_file,
+    help='File with public keys of validators to exclude from consolidation.',
 )
 @click.option(
     '--consensus-endpoints',
@@ -154,6 +169,12 @@ logger = logging.getLogger(__name__)
     envvar='LOG_LEVEL',
     help='The log level.',
 )
+@click.option(
+    '--vault-first-block',
+    type=int,
+    envvar='VAULT_FIRST_BLOCK',
+    help='The block number where the vault was created. Used to optimize fetching vault events.',
+)
 @click.command(
     help='Performs a vault validators consolidation from 0x01 validators to 0x02 validator. '
     'Switches a validator from 0x01 to 0x02 if the source and target keys are identical.'
@@ -166,6 +187,7 @@ def consolidate(
     data_dir: str,
     wallet_file: str | None,
     wallet_password_file: str | None,
+    network: str | None,
     verbose: bool,
     no_switch_consolidation: bool,
     no_confirm: bool,
@@ -173,29 +195,43 @@ def consolidate(
     max_consolidation_request_fee_gwei: int,
     source_public_keys: list[HexStr] | None,
     source_public_keys_file: Path | None,
-    target_public_key: HexStr | None = None,
-    relayer_endpoint: str | None = None,
-    max_validator_balance_gwei: int | None = None,
+    target_public_key: HexStr | None,
+    exclude_public_keys_file: Path | None,
+    relayer_endpoint: str | None,
+    max_validator_balance_gwei: int | None,
+    vault_first_block: BlockNumber | None,
 ) -> None:
     if all([source_public_keys, source_public_keys_file]):
         raise click.ClickException(
-            'Provide only one parameter: either --from-public-keys-file or --from-public-keys.'
+            'Provide only one parameter: either --source-public-keys-file or --source-public-keys.'
         )
     if not any([source_public_keys, source_public_keys_file]) and target_public_key:
         raise click.ClickException(
             'One of these parameters must be provided with target-public-key:'
-            ' --from-public-keys-file or --from-public-keys.'
+            ' --source-public-keys-file or --source-public-keys.'
         )
 
     if source_public_keys_file:
         source_public_keys = _load_public_keys(source_public_keys_file)
 
+    exclude_public_keys: set[HexStr] = set()
+
+    if exclude_public_keys_file:
+        exclude_public_keys = set(_load_public_keys(exclude_public_keys_file))
+
+    if source_public_keys and exclude_public_keys:
+        raise click.ClickException(
+            '--exclude-public-keys and --source-public-keys are mutually exclusive.'
+        )
+
     operator_config = OperatorConfig(vault, Path(data_dir))
-    operator_config.load()
+    if network is None:
+        operator_config.load()
+        network = operator_config.network
 
     settings.set(
         vault=vault,
-        network=operator_config.network,
+        network=network,
         vault_dir=operator_config.vault_dir,
         execution_endpoints=execution_endpoints,
         consensus_endpoints=consensus_endpoints,
@@ -207,6 +243,7 @@ def consolidate(
         ),
         verbose=verbose,
         log_level=log_level,
+        vault_first_block=vault_first_block,
     )
     try:
         asyncio.run(
@@ -214,6 +251,7 @@ def consolidate(
                 vault_address=vault,
                 source_public_keys=source_public_keys,
                 target_public_key=target_public_key,
+                exclude_public_keys=exclude_public_keys,
                 no_switch_consolidation=no_switch_consolidation,
                 max_consolidation_request_fee_gwei=Gwei(max_consolidation_request_fee_gwei),
                 no_confirm=no_confirm,
@@ -229,6 +267,7 @@ async def main(
     vault_address: ChecksumAddress,
     source_public_keys: list[HexStr] | None,
     target_public_key: HexStr | None,
+    exclude_public_keys: set[HexStr],
     no_switch_consolidation: bool,
     max_consolidation_request_fee_gwei: Gwei,
     no_confirm: bool,
@@ -259,6 +298,7 @@ async def main(
         target_source = await _find_target_source_public_keys(
             vault_address=vault_address,
             chain_head=chain_head,
+            exclude_public_keys=exclude_public_keys,
         )
         if not target_source:
             raise click.ClickException(
@@ -437,7 +477,7 @@ async def _check_public_keys(
     # Validate the source and target validators are in the vault
     logger.info('Fetching vault validators...')
     vault_validators = await VaultContract(vault_address).get_registered_validators_public_keys(
-        from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
+        from_block=settings.vault_first_block,
         to_block=chain_head.block_number,
     )
     for public_keys in source_public_keys + [target_public_key]:
@@ -503,14 +543,16 @@ def _is_switch_to_compounding(source_public_keys: list[HexStr], target_public_ke
 def _load_public_keys(public_keys_file: Path) -> list[HexStr]:
     """Loads public keys from file."""
     with open(public_keys_file, 'r', encoding='utf-8') as f:
-        public_keys = [HexStr(line.rstrip()) for line in f]
+        public_keys = [add_0x_prefix(HexStr(line.rstrip())) for line in f]
 
     return public_keys
 
 
+# pylint: disable-next=too-many-locals
 async def _find_target_source_public_keys(
     vault_address: ChecksumAddress,
     chain_head: ChainHead,
+    exclude_public_keys: set[HexStr],
 ) -> list[tuple[ConsensusValidator, ConsensusValidator]]:
     """
     If there are no 0x02 validators,
@@ -518,16 +560,13 @@ async def _find_target_source_public_keys(
     If there is 0x02 validator,
     take the oldest 0x01 validators to top up its balance to 2048 ETH / 64 GNO.
     """
-    max_activation_epoch = chain_head.epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
-
     logger.info('Fetching vault validators...')
     vault_contract = VaultContract(vault_address)
     public_keys = await vault_contract.get_registered_validators_public_keys(
-        from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
+        from_block=settings.vault_first_block,
         to_block=chain_head.block_number,
     )
     all_validators = await fetch_consensus_validators(public_keys)
-    active_validators = [val for val in all_validators if val.status not in EXITING_STATUSES]
 
     # use all validators to fetch all the consolidations
     # including the ones were source validator is exiting
@@ -537,50 +576,69 @@ async def _find_target_source_public_keys(
         consolidating_indexes.add(cons.source_index)
         consolidating_indexes.add(cons.target_index)
 
-    active_validators = [val for val in active_validators if val.index not in consolidating_indexes]
+    # Candidates on the role of either source or target validator
+    validator_candidates: list[ConsensusValidator] = []
+
+    for val in all_validators:
+        if val.status in EXITING_STATUSES:
+            continue
+        if val.index in consolidating_indexes:
+            continue
+        if val.public_key in exclude_public_keys:
+            continue
+        validator_candidates.append(val)
+
+    if not validator_candidates:
+        return []
 
     source_validators = await _get_source_validators(
         chain_head=chain_head,
-        active_validators=active_validators,
-        max_activation_epoch=max_activation_epoch,
+        validator_candidates=validator_candidates,
     )
     if not source_validators:
         return []
 
     source_validators.sort(key=lambda val: val.activation_epoch)
+    target_validator_candidates = [val for val in validator_candidates if val.is_compounding]
 
-    compounding_validators = [val for val in active_validators if val.is_compounding]
-    if compounding_validators:
-        # there is at least one 0x02 validator, top up from the one with smallest balance
-        target_validator = min(compounding_validators, key=lambda val: val.balance)
-        selected_source_validators: list[ConsensusValidator] = []
-        for val in source_validators:
-            if (
-                target_validator.balance + sum(v.balance for v in selected_source_validators)
-                > settings.max_validator_balance_gwei
-            ):
-                break
-            selected_source_validators.append(val)
+    if not target_validator_candidates:
+        # there are no 0x02 validators, switch the oldest 0x01 to 0x02
+        return [(source_validators[0], source_validators[0])]
 
-        if selected_source_validators:
-            return [(target_validator, val) for val in selected_source_validators]
+    # there is at least one 0x02 validator, top up the one with smallest balance
+    target_validator = min(target_validator_candidates, key=lambda val: val.balance)
 
-    # there are no 0x02 validators, switch the oldest 0x01 to 0x02
+    selected_source_validators: list[ConsensusValidator] = []
+    target_balance = target_validator.balance
+
+    for val in source_validators:
+        if target_balance + val.balance > settings.max_validator_balance_gwei:
+            break
+        selected_source_validators.append(val)
+        target_balance += val.balance  # type: ignore
+
+    if selected_source_validators:
+        return [(target_validator, val) for val in selected_source_validators]
+
+    # Target validator is almost full, switch the oldest 0x01 to 0x02
     return [(source_validators[0], source_validators[0])]
 
 
 async def _get_source_validators(
-    chain_head: ChainHead, active_validators: list[ConsensusValidator], max_activation_epoch: int
+    chain_head: ChainHead,
+    validator_candidates: list[ConsensusValidator],
 ) -> list[ConsensusValidator]:
+    max_activation_epoch = chain_head.epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
+
     pending_partial_withdrawals = await get_pending_partial_withdrawals(
-        chain_head=chain_head, consensus_validators=active_validators
+        chain_head=chain_head, consensus_validators=validator_candidates
     )
     pending_partial_withdrawals_indexes = {
         withdrawal.validator_index for withdrawal in pending_partial_withdrawals
     }
 
     source_validators = []
-    for val in active_validators:
+    for val in validator_candidates:
         if val.is_compounding:
             continue
         if val.activation_epoch >= max_activation_epoch:
