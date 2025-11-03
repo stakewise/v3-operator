@@ -127,8 +127,12 @@ class VaultContract(ContractWrapper, VaultStateMixin):
         self, from_block: BlockNumber, to_block: BlockNumber
     ) -> list[HexStr]:
         """Fetches the validator registered events."""
-        v1_validators_from_block = max(from_block, settings.network_config.KEEPER_GENESIS_BLOCK)
-        v2_validators_from_block = max(from_block, settings.network_config.PECTRA_BLOCK)
+        v1_validators_from_block = max(
+            from_block, settings.network_config.KEEPER_GENESIS_BLOCK, settings.vault_first_block
+        )
+        v2_validators_from_block = max(
+            from_block, settings.network_config.PECTRA_BLOCK, settings.vault_first_block
+        )
         semaphore = asyncio.BoundedSemaphore(EVENTS_CONCURRENCY_LIMIT)
         pending = set()
         for block_number in range(v1_validators_from_block, to_block + 1, EVENTS_CONCURRENCY_CHUNK):
