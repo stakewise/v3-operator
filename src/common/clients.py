@@ -39,6 +39,9 @@ class ExecutionClient:
         self.use_retries = use_retries
 
     async def setup(self) -> None:
+        if self.is_set_up:
+            return None
+
         if not any(settings.execution_endpoints):
             return
 
