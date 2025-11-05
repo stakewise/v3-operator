@@ -8,6 +8,7 @@ from sw_utils.common import urljoin
 from web3 import Web3
 from web3.types import Gwei
 
+from src.common.clients import OPERATOR_USER_AGENT
 from src.config.settings import settings
 from src.validators.execution import get_validators_start_index
 from src.validators.typings import (
@@ -150,7 +151,8 @@ class RelayerClient:
     async def get_info(self) -> dict:
         url = urljoin(settings.relayer_endpoint, 'info')
         async with aiohttp.ClientSession(
-            timeout=ClientTimeout(settings.relayer_timeout)
+            timeout=ClientTimeout(settings.relayer_timeout),
+            headers={'User-Agent': OPERATOR_USER_AGENT},
         ) as session:
             resp = await session.get(url)
             if 400 <= resp.status < 500:
@@ -161,7 +163,8 @@ class RelayerClient:
     async def _send_post_request(self, endpoint: str, json: dict) -> dict:
         url = urljoin(settings.relayer_endpoint, endpoint)
         async with aiohttp.ClientSession(
-            timeout=ClientTimeout(settings.relayer_timeout)
+            timeout=ClientTimeout(settings.relayer_timeout),
+            headers={'User-Agent': OPERATOR_USER_AGENT},
         ) as session:
             resp = await session.post(
                 url,
