@@ -78,15 +78,13 @@ class ExecutionSyncHistory:
         sync_history = sync_history[-EXECUTION_SYNC_HISTORY_LEN:]
         self._dump_history(sync_history)
 
-    def load_history(self, execution_sync_path: Path | None = None) -> list[ExecutionSyncRecord]:
-        execution_sync_path = execution_sync_path or self.execution_sync_path
-
-        if not execution_sync_path.exists():
+    def load_history(self) -> list[ExecutionSyncRecord]:
+        if not self.execution_sync_path.exists():
             return []
 
         records: list[ExecutionSyncRecord] = []
 
-        with execution_sync_path.open('r') as f:
+        with self.execution_sync_path.open('r') as f:
             reader = DictReader(f, fieldnames=EXECUTION_SYNC_FIELDNAMES)
             next(reader)  # skip header
             for row in reader:

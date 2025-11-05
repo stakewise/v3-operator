@@ -19,6 +19,10 @@ SYNC_STATUS_INTERVAL = 60
 
 
 class SyncStatusHistory:
+    @property
+    def sync_status_path(self) -> Path:
+        return settings.nodes_dir / 'sync_status.csv'
+
     async def update_periodically(
         self, execution_client: AsyncWeb3, consensus_client: ExtendedAsyncBeacon
     ) -> None:
@@ -68,15 +72,13 @@ class SyncStatusHistory:
 
         self._dump_history(sync_status_history)
 
-    def load_history(self, sync_status_path: Path | None = None) -> list[StatusHistoryRecord]:
-        sync_status_path = sync_status_path or (settings.nodes_dir / 'sync_status.csv')
-
-        if not sync_status_path.exists():
+    def load_history(self) -> list[StatusHistoryRecord]:
+        if not self.sync_status_path.exists():
             return []
 
         records: list[StatusHistoryRecord] = []
 
-        with sync_status_path.open('r') as f:
+        with self.sync_status_path.open('r') as f:
             reader = DictReader(f, fieldnames=SYNC_STATUS_FIELDNAMES)
             next(reader)  # skip header
             for row in reader:
@@ -90,9 +92,7 @@ class SyncStatusHistory:
         return records
 
     def _dump_history(self, sync_status_history: list[StatusHistoryRecord]) -> None:
-        sync_status_path = settings.nodes_dir / 'sync_status.csv'
-
-        with sync_status_path.open('w') as f:
+        with self.sync_status_path.open('w') as f:
             writer = DictWriter(f, fieldnames=SYNC_STATUS_FIELDNAMES)
             writer.writeheader()
             writer.writerows([record.__dict__ for record in sync_status_history])
