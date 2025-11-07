@@ -86,7 +86,7 @@ class RelayerClient:
         target_source_public_keys: list[tuple[HexStr, HexStr]],
     ) -> RelayerSignatureResponse:
         source_public_keys, target_public_keys = [], []
-        for source, target in target_source_public_keys:
+        for target, source in target_source_public_keys:
             source_public_keys.append(source)
             target_public_keys.append(target)
         relayer_response = await self._consolidate_validators(
