@@ -154,8 +154,10 @@ async def _calc_consensus_eta(
 
     consensus_speed = _calc_consensus_speed(sync_status_history)
     default_consensus_speed = 1.0  # Default consensus sync speed in slots/second.
-    # This value is chosen because, during sync, nodes typically process slots much faster than the normal slot time (12s/slot).
-    # Using 1.0 slots/second is a conservative estimate for sync speed when historical data is unavailable or unreliable.
+    # This value is chosen because, during sync, nodes typically process slots
+    # much faster than the normal slot time (12s/slot).
+    # Using 1.0 slots/second is a conservative estimate for sync speed
+    # when historical data is unavailable or unreliable.
 
     if consensus_speed is None:
         info_verbose(
@@ -228,7 +230,9 @@ async def _calc_regular_execution_eta(
         execution_client=execution_client,
     )
     if execution_speed is None or execution_speed <= 0:
-        execution_speed = 1.5  # Fallback to 1.5 slots/second if speed cannot be determined; this is a conservative estimate based on typical observed sync rates.
+        execution_speed = 1.5
+        # Fallback to 1.5 slots/second if speed cannot be determined;
+        # this is a conservative estimate based on typical observed sync rates.
 
     info_verbose('execution_speed slots/sec: %.2f', execution_speed)
 
