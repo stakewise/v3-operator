@@ -153,7 +153,9 @@ async def _calc_consensus_eta(
         return 0.0
 
     consensus_speed = _calc_consensus_speed(sync_status_history)
-    default_consensus_speed = 1.0  # Put reasonable value for a speed
+    default_consensus_speed = 1.0  # Default consensus sync speed in slots/second.
+    # This value is chosen because, during sync, nodes typically process slots much faster than the normal slot time (12s/slot).
+    # Using 1.0 slots/second is a conservative estimate for sync speed when historical data is unavailable or unreliable.
 
     if consensus_speed is None:
         info_verbose(
