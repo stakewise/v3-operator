@@ -55,8 +55,6 @@ class ProcessMetavaultTask(BaseTask):
             is_meta_vault=True,
         )
 
-        vaults_updated_previously: set[ChecksumAddress] = set()
-
         logger.info('Processing meta vault: %s', settings.vault)
 
         root_meta_vault = meta_vaults_map.get(settings.vault)
@@ -77,10 +75,9 @@ class ProcessMetavaultTask(BaseTask):
 
         # Update the state for the entire meta vault tree
         try:
-            vaults_updated_in_tree = await meta_vault_tree_update_state(
+            await meta_vault_tree_update_state(
                 root_meta_vault=root_meta_vault,
                 meta_vaults_map=meta_vaults_map,
-                vaults_updated_previously=vaults_updated_previously,
             )
         except ClaimDelayNotPassedException as e:
             logger.error(
@@ -91,10 +88,9 @@ class ProcessMetavaultTask(BaseTask):
             )
             return
 
-        vaults_updated_previously.update(vaults_updated_in_tree)
-
         # Deposit to sub vaults if there are withdrawable assets
         await process_deposit_to_sub_vaults(meta_vault_address=settings.vault)
+
         app_state.metavault_update_block = block['number']
 
 
@@ -114,18 +110,10 @@ async def _check_metavault_block(app_state: AppState, block_number: BlockNumber)
 async def meta_vault_tree_update_state(
     root_meta_vault: Vault,
     meta_vaults_map: dict[ChecksumAddress, Vault],
-    vaults_updated_previously: set[ChecksumAddress],
-) -> set[ChecksumAddress]:
+) -> None:
     """
     Update the state for the root meta vault and all its sub vaults.
     Sub vaults may themselves be meta vaults, so the update traverses the entire meta vault tree.
-
-    `vaults_updated_previously` is a set of vault addresses that have already been updated
-    as a part of another meta vault tree. This is to avoid duplicate updates.
-    Subgraph may not sync fast enough to reflect the state changes made by previous transactions,
-    so we need to keep track of the vaults that have already been updated.
-
-    Returns a set of vault addresses that were updated in this call.
     """
     calls_with_description = await _get_meta_vault_tree_update_state_calls(
         root_meta_vault=root_meta_vault,
@@ -136,21 +124,14 @@ async def meta_vault_tree_update_state(
     tx_steps: list[str] = []
     vaults_updated: set[ChecksumAddress] = set()
 
-    # Filter out calls for vaults that have already been updated
     for c in calls_with_description:
-        if c.address in vaults_updated_previously:
-            logger.info(
-                'Vault %s is already updated as a part of another meta vault tree',
-                c.address,
-            )
-            continue
         calls.append((c.address, c.data))
         tx_steps.append(c.description)
         vaults_updated.add(c.address)
 
     if not calls:
         logger.info('Meta vault %s state is up-to-date, no updates needed', root_meta_vault.address)
-        return set()
+        return
 
     # Submit the transaction
     logger.info(
@@ -170,8 +151,6 @@ async def meta_vault_tree_update_state(
             f'Failed to confirm tx: {tx_hash}',
         )
     logger.info('Transaction %s confirmed', tx_hash)
-
-    return vaults_updated
 
 
 async def _get_meta_vault_tree_update_state_calls(
