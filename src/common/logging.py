@@ -40,7 +40,7 @@ def setup_logging() -> None:
             handlers=[logHandler],
         )
     else:
-        formatter = TokenPlainFormatter('%(asctime)s %(levelname)-8s %(message)s')
+        formatter = TokenPlainFormatter()
         logHandler = logging.StreamHandler()
         logHandler.setFormatter(formatter)
         logging.basicConfig(
@@ -70,9 +70,11 @@ def hide_tokens(msg: str) -> str:
         if endpoint in msg:
             parsed_endpoint = urlparse(endpoint)
             scheme = parsed_endpoint.scheme or ''
+            if scheme:
+                scheme += '://'
             hostname = parsed_endpoint.hostname or ''
             msg = msg.replace(
                 endpoint,
-                scheme + '://' + hostname + '/<hidden>',
+                scheme + hostname + '/<hidden>',
             )
     return msg
