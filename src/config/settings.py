@@ -378,3 +378,6 @@ LOG_PLAIN = 'plain'
 LOG_JSON = 'json'
 LOG_FORMATS = [LOG_PLAIN, LOG_JSON]
 LOG_DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
+LOG_WHITELISTED_DOMAINS = decouple_config(
+    'LOG_WHITELISTED_DOMAINS', cast=Csv(), default='stakewise.io'
+)
