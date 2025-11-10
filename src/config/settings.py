@@ -382,7 +382,7 @@ META_VAULT_MIN_DEPOSIT_AMOUNT: Wei = decouple_config(
     'META_VAULT_MIN_DEPOSIT_AMOUNT', default=MIN_ACTIVATION_BALANCE, cast=int
 )
 META_VAULT_UPDATE_INTERVAL: int = decouple_config(
-    'META_VAULT_UPDATE_INTERVAL', default=6 * 60 * 60, cast=int  # every 24 hr
+    'META_VAULT_UPDATE_INTERVAL', default=6 * 60 * 60, cast=int  # every 6 hr
 )
 
 # logging
