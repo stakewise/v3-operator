@@ -12,6 +12,7 @@ from src.common.validators import validate_eth_address
 from src.config.config import OperatorConfig
 from src.config.settings import LOG_DATE_FORMAT, settings
 from src.nodes.exceptions import NodeFailedToStartError
+from src.nodes.execution_sync_history import ExecutionSyncHistory
 from src.nodes.process import (
     LighthouseProcessBuilder,
     LighthouseVCProcessBuilder,
@@ -132,6 +133,7 @@ async def main(
     lighthouse_runner = _get_lighthouse_runner(print_consensus_logs)
     lighthouse_vc_runner = _get_lighthouse_vc_runner(print_validator_logs)
     sync_status_history = SyncStatusHistory()
+    execution_sync_history = ExecutionSyncHistory()
 
     try:
         await asyncio.gather(
@@ -141,6 +143,7 @@ async def main(
             sync_status_history.update_periodically(
                 execution_client=execution_client, consensus_client=consensus_client
             ),
+            execution_sync_history.update_periodically(execution_client=execution_client),
         )
     except NodeFailedToStartError as e:
         click.echo(str(e))

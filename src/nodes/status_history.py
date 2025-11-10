@@ -2,6 +2,7 @@ import asyncio
 import logging
 import time
 from csv import DictReader, DictWriter
+from pathlib import Path
 
 from sw_utils import ExtendedAsyncBeacon
 from web3 import AsyncWeb3
@@ -12,12 +13,16 @@ from src.nodes.typings import StatusHistoryRecord
 logger = logging.getLogger(__name__)
 
 
-SYNC_STATUS_HISTORY_LEN = 10
+SYNC_STATUS_HISTORY_LEN = 100
 SYNC_STATUS_FIELDNAMES = ['timestamp', 'block_number', 'slot']
 SYNC_STATUS_INTERVAL = 60
 
 
 class SyncStatusHistory:
+    @property
+    def sync_status_path(self) -> Path:
+        return settings.nodes_dir / 'sync_status.csv'
+
     async def update_periodically(
         self, execution_client: AsyncWeb3, consensus_client: ExtendedAsyncBeacon
     ) -> None:
@@ -30,10 +35,13 @@ class SyncStatusHistory:
         await asyncio.sleep(startup_interval)
 
         while True:
-            await self._update_sync_status(
-                execution_client=execution_client,
-                consensus_client=consensus_client,
-            )
+            try:
+                await self._update_sync_status(
+                    execution_client=execution_client,
+                    consensus_client=consensus_client,
+                )
+            except Exception as e:
+                logger.error('Error updating sync status: %s', e)
             await asyncio.sleep(SYNC_STATUS_INTERVAL)
 
     async def _update_sync_status(
@@ -65,14 +73,12 @@ class SyncStatusHistory:
         self._dump_history(sync_status_history)
 
     def load_history(self) -> list[StatusHistoryRecord]:
-        sync_status_path = settings.vault_dir / 'sync_status.csv'
-
-        if not sync_status_path.exists():
+        if not self.sync_status_path.exists():
             return []
 
         records: list[StatusHistoryRecord] = []
 
-        with sync_status_path.open('r') as f:
+        with self.sync_status_path.open('r') as f:
             reader = DictReader(f, fieldnames=SYNC_STATUS_FIELDNAMES)
             next(reader)  # skip header
             for row in reader:
@@ -86,9 +92,7 @@ class SyncStatusHistory:
         return records
 
     def _dump_history(self, sync_status_history: list[StatusHistoryRecord]) -> None:
-        sync_status_path = settings.vault_dir / 'sync_status.csv'
-
-        with sync_status_path.open('w') as f:
+        with self.sync_status_path.open('w') as f:
             writer = DictWriter(f, fieldnames=SYNC_STATUS_FIELDNAMES)
             writer.writeheader()
             writer.writerows([record.__dict__ for record in sync_status_history])

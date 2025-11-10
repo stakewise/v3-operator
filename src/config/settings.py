@@ -123,6 +123,8 @@ class Settings(metaclass=Singleton):
     nodes_dir: Path
 
     run_nodes: bool
+    enable_file_logging: bool
+    log_file_path: Path | None
 
     # pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements
     def set(
@@ -172,6 +174,8 @@ class Settings(metaclass=Singleton):
         vault_first_block: BlockNumber | None = None,
         nodes_dir: Path = Path(''),
         run_nodes: bool = False,
+        enable_file_logging: bool = False,
+        log_file_path: Path | None = None,
     ) -> None:
         self.vault = vault
         vault_dir.mkdir(parents=True, exist_ok=True)
@@ -318,6 +322,8 @@ class Settings(metaclass=Singleton):
         self.vault_first_block = vault_first_block or self.network_config.KEEPER_GENESIS_BLOCK
         self.nodes_dir = nodes_dir
         self.run_nodes = run_nodes
+        self.enable_file_logging = enable_file_logging
+        self.log_file_path = log_file_path
 
     @property
     def keystore_cls_str(self) -> str:
