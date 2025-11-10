@@ -83,7 +83,7 @@ def _create_hidden_endpoints() -> dict[str, str]:
         hidden_endpoint = urlunparse(
             (
                 parsed_endpoint.scheme,
-                parsed_endpoint.hostname,  # Only keep the hostname
+                parsed_endpoint.netloc,  # Keep hostname and port
                 '<hidden>',  # Replace the path with '<hidden>'
                 '',
                 '',
