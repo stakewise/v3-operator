@@ -1,6 +1,7 @@
 import logging
 import warnings
-from urllib.parse import urlparse
+from functools import lru_cache
+from urllib.parse import urlparse, urlunparse
 
 from src.common.utils import JsonFormatter
 from src.config.settings import (
@@ -63,18 +64,31 @@ def setup_logging() -> None:
 
 
 def hide_tokens(msg: str) -> str:
+    endpoint_to_hidden_endpoint = _create_hidden_endpoints()
+    for endpoint, hidden_endpoint in endpoint_to_hidden_endpoint.items():
+        if endpoint in msg:
+            msg = msg.replace(endpoint, hidden_endpoint)
+    return msg
+
+
+@lru_cache(maxsize=1)
+def _create_hidden_endpoints() -> dict[str, str]:
+    results = {}
     endpoints = settings.execution_endpoints + settings.consensus_endpoints
     for endpoint in endpoints:
         if any(e in endpoint for e in LOG_WHITELISTED_DOMAINS):
             continue
-        if endpoint in msg:
-            parsed_endpoint = urlparse(endpoint)
-            scheme = parsed_endpoint.scheme or ''
-            if scheme:
-                scheme += '://'
-            hostname = parsed_endpoint.hostname or ''
-            msg = msg.replace(
-                endpoint,
-                scheme + hostname + '/<hidden>',
+        parsed_endpoint = urlparse(endpoint)
+        # Reconstruct the URL with the token hidden
+        hidden_endpoint = urlunparse(
+            (
+                parsed_endpoint.scheme,
+                parsed_endpoint.hostname,  # Only keep the hostname
+                '<hidden>',  # Replace the path with '<hidden>'
+                '',
+                '',
+                '',  # Clear params, query, and fragment
             )
-    return msg
+        )
+        results[endpoint] = hidden_endpoint
+    return results
