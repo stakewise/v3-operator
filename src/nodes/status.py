@@ -1,5 +1,8 @@
 import logging
+import re
 import time
+from datetime import datetime, timezone
+from pathlib import Path
 
 from eth_typing import BlockNumber
 from sw_utils import ExtendedAsyncBeacon
@@ -17,7 +20,7 @@ from src.common.utils import (
 from src.config.settings import settings
 from src.nodes.execution_sync_history import ExecutionSyncHistory
 from src.nodes.status_history import SYNC_STATUS_INTERVAL, SyncStatusHistory
-from src.nodes.typings import ExecutionSyncRecord, StatusHistoryRecord
+from src.nodes.typings import ExecutionSyncRecord, StageProgress, StatusHistoryRecord
 from src.validators.keystores.local import LocalKeystore
 
 logger = logging.getLogger(__name__)
@@ -305,3 +308,98 @@ async def _calc_initial_execution_sync_progress_using_stages(execution_client: A
         return 0.0
 
     return stages_ready / stages_total
+
+
+def calc_stage_eta(log_file: Path) -> float | None:
+    last_lines = read_last_lines(log_file, 1000)
+
+    # Find last 2 stage progress entries
+    # Collect last 2 valid StageProgress entries
+    stage_progress_entries = []
+    for line in reversed(last_lines):
+        try:
+            stage_progress = parse_stage_progress(line)
+        except Exception as e:
+            logger.debug('Failed to parse log line for stage ETA: %s', format_error(e))
+            continue
+
+        if stage_progress is not None:
+            stage_progress_entries.append(stage_progress)
+            if len(stage_progress_entries) == 2:
+                break
+
+    if len(stage_progress_entries) < 2:
+        return None
+
+    # Use the two most recent entries to calculate ETA
+    sp_new, sp_old = stage_progress_entries[0], stage_progress_entries[1]
+
+    if sp_new.current_block >= sp_new.target_block:
+        return 0.0
+
+    time_diff = (sp_new.created_at - sp_old.created_at).total_seconds()
+    block_diff = sp_new.current_block - sp_old.current_block
+
+    if time_diff <= 0 or block_diff <= 0:
+        return None
+
+    blocks_per_second = block_diff / time_diff
+    remaining_blocks = sp_new.target_block - sp_new.current_block
+    eta_seconds = remaining_blocks / blocks_per_second
+
+    return eta_seconds
+
+
+def read_last_lines(file_path: Path, num_lines: int) -> list[str]:
+    """Read the last `num_lines` lines from a file efficiently."""
+    lines: list[str] = []
+
+    with file_path.open('rb') as f:  # Open in binary mode for efficient seeking
+        f.seek(0, 2)  # Move to the end of the file
+        buffer = bytearray()
+        pointer_location = f.tell()
+
+        while pointer_location >= 0 and len(lines) < num_lines:
+            f.seek(pointer_location)
+            byte = f.read(1)
+            if byte == b'\n':  # Newline found
+                line = buffer.decode('utf-8')[::-1]  # Decode and reverse the buffer
+                lines.append(line)
+                buffer = bytearray()
+            else:
+                buffer.extend(byte)
+            pointer_location -= 1
+
+        # Add the last line if the file doesn't end with a newline
+        if buffer:
+            lines.append(buffer.decode('utf-8')[::-1])
+
+    return lines[-num_lines:]  # Return the last `num_lines`
+
+
+def parse_stage_progress(log_line: str) -> StageProgress | None:
+    # Regular expression to extract log_time, stage_name, checkpoint, and target
+    pattern = (
+        r'^(?P<log_time>[\d\-T:.Z]+).*'
+        r'stage=(?P<stage_name>\w+).*'
+        r'checkpoint=(?P<checkpoint>\d+).*'
+        r'target=(?P<target>\d+)'
+    )
+    match = re.match(pattern, log_line)
+
+    if not match:
+        return None
+
+    # Extract values from the match
+    log_time_str = match.group('log_time')
+    stage_name = match.group('stage_name')
+    checkpoint = int(match.group('checkpoint'))
+    target = int(match.group('target'))
+
+    # Convert log_time to a datetime object
+    # Note: timezone may not be UTC, but it does not matter for ETA calculation
+    log_time = datetime.strptime(log_time_str, '%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=timezone.utc)
+
+    return StageProgress(
+        stage_name=stage_name, created_at=log_time, current_block=checkpoint, target_block=target
+    )
