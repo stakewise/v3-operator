@@ -69,9 +69,7 @@ async def get_execution_node_status(execution_client: AsyncWeb3) -> dict:
     eta: float
 
     if is_initial_sync:
-        initial_progress = await _calc_initial_execution_sync_progress(
-            execution_client=execution_client
-        )
+        initial_progress = await _calc_initial_execution_sync_progress()
         initial_eta = initial_sync_eta * (1 - initial_progress)
         eta = initial_eta + (1 - initial_sync_ratio) * initial_sync_eta
     elif is_syncing:
@@ -281,33 +279,69 @@ async def _calc_execution_speed_slots(
     return (last_block_slot - first_block_slot) / duration_sum
 
 
-async def _calc_initial_execution_sync_progress(execution_client: AsyncWeb3) -> float:
-    return await _calc_initial_execution_sync_progress_using_stages(
-        execution_client=execution_client
-    )
+async def _calc_initial_execution_sync_progress() -> float:
+    return await _calc_initial_execution_sync_progress_using_stages()
 
 
-async def _calc_initial_execution_sync_progress_using_stages(execution_client: AsyncWeb3) -> float:
+async def _calc_initial_execution_sync_progress_using_stages() -> float:
     """
     Calculate initial sync progress based on syncing stages.
     """
-    syncing = await execution_client.eth.syncing
     stages_ready = 0
     stages_total = 0
 
-    for stage in syncing['stages']:  # type: ignore
-        if not settings.network_config.NODE_CONFIG.ERA_URL and stage['name'] == 'Era':
-            continue
+    # Stages in the order of execution, with weights indicating their relative difficulty
+    stage_weights = {
+        'Era': 0,
+        'Headers': 0,
+        'Bodies': 0,
+        'SenderRecovery': 0,
+        'Execution': 50,  # hardest stage
+        'PruneSenderRecovery': 0,
+        'MerkleUnwind': 0,
+        'AccountHashing': 0,
+        'StorageHashing': 1,
+        'MerkleExecute': 2,
+        'TransactionLookup': 0,
+        'IndexStorageHistory': 0,
+        'IndexAccountHistory': 0,
+        'Prune': 0,
+        'Finish': 0,
+    }
+    reth_log_file = (
+        settings.nodes_dir / 'reth' / 'logs' / settings.network / 'reth.log'
+    )
+    current_stage = _get_current_stage(reth_log_file)
 
-        stages_total += 1
+    # Define stage order for comparison
+    stage_order = list(stage_weights.keys())
 
-        if stage['block'] != '0x0':
-            stages_ready += 1
+    if current_stage == 'Execution':
+        stage_eta = calc_stage_eta(reth_log_file)
+        return stage_eta or 0.0
 
-    if stages_total == 0:
-        return 0.0
+    if current_stage is not None:
+        execution_index = stage_order.index('Execution')
+
+        if stage_order.index(current_stage) < execution_index:
+            return 0.0
+        if stage_order.index(current_stage) > execution_index:
+            return 1.0
 
     return stages_ready / stages_total
+
+
+def _get_current_stage(log_file: Path) -> str | None:
+    last_lines = read_last_lines(log_file, 100)
+
+    stage_re = re.compile(r'stage=([a-zA-Z0-9_]+)')
+
+    for line in reversed(last_lines):
+        stage_match = stage_re.search(line)
+        if stage_match:
+            return stage_match.group(1)
+
+    return None
 
 
 def calc_stage_eta(log_file: Path) -> float | None:
