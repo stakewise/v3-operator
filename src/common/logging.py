@@ -41,11 +41,10 @@ def setup_logging() -> None:
             handlers=[logHandler],
         )
     else:
-        formatter = TokenPlainFormatter()
+        formatter = TokenPlainFormatter('%(asctime)s %(levelname)-8s %(message)s')
         logHandler = logging.StreamHandler()
         logHandler.setFormatter(formatter)
         logging.basicConfig(
-            format='%(asctime)s %(levelname)-8s %(message)s',
             datefmt=LOG_DATE_FORMAT,
             level=settings.log_level,
             handlers=[logHandler],
