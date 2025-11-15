@@ -62,16 +62,12 @@ async def get_execution_node_status(execution_client: AsyncWeb3) -> dict:
 
     is_initial_sync = latest_block['number'] == 0
 
-    # Assume initial sync is 90% of the total sync process
-    initial_sync_ratio = 0.9
-    initial_sync_eta = settings.network_config.NODE_CONFIG.INITIAL_SYNC_ETA.total_seconds()
-    regular_sync_eta = (1 - initial_sync_ratio) * initial_sync_eta
+    default_regular_sync_eta = calc_default_regular_sync_eta()
     eta: float
 
     if is_initial_sync:
-        initial_progress = await _calc_initial_execution_sync_progress()
-        initial_eta = initial_sync_eta * (1 - initial_progress)
-        eta = initial_eta + (1 - initial_sync_ratio) * initial_sync_eta
+        initial_eta = await _calc_initial_execution_sync_eta()
+        eta = initial_eta + default_regular_sync_eta
     elif is_syncing:
         eta = (
             await _calc_regular_execution_eta(
@@ -79,7 +75,7 @@ async def get_execution_node_status(execution_client: AsyncWeb3) -> dict:
                 execution_sync_history=execution_sync_history,
                 latest_block=latest_block,
             )
-            or regular_sync_eta
+            or default_regular_sync_eta
         )
     else:
         eta = 0
@@ -90,6 +86,18 @@ async def get_execution_node_status(execution_client: AsyncWeb3) -> dict:
         'sync_distance': sync_distance,
         'eta': int(eta),
     }
+
+
+def calc_default_regular_sync_eta() -> float:
+    """
+    After initial sync is complete, another sync iteration is needed to fully catch up.
+    Calculate default regular sync ETA based on network config.
+    """
+    # Assume initial sync is 90% of the total sync process
+    initial_sync_ratio = 0.9
+    initial_sync_eta = settings.network_config.NODE_CONFIG.INITIAL_SYNC_ETA.total_seconds()
+    regular_sync_eta = (1 - initial_sync_ratio) * initial_sync_eta
+    return regular_sync_eta
 
 
 async def get_validator_activity_stats(consensus_client: ExtendedAsyncBeacon) -> dict:
@@ -279,56 +287,57 @@ async def _calc_execution_speed_slots(
     return (last_block_slot - first_block_slot) / duration_sum
 
 
-async def _calc_initial_execution_sync_progress() -> float:
-    return await _calc_initial_execution_sync_progress_using_stages()
-
-
-async def _calc_initial_execution_sync_progress_using_stages() -> float:
+async def _calc_initial_execution_sync_eta() -> float:
     """
-    Calculate initial sync progress based on syncing stages.
+    Calculate initial sync ETA based on syncing stages.
     """
-    stages_ready = 0
-    stages_total = 0
-
-    # Stages in the order of execution, with weights indicating their relative difficulty
-    stage_weights = {
-        'Era': 0,
-        'Headers': 0,
-        'Bodies': 0,
-        'SenderRecovery': 0,
-        'Execution': 50,  # hardest stage
-        'PruneSenderRecovery': 0,
-        'MerkleUnwind': 0,
-        'AccountHashing': 0,
-        'StorageHashing': 1,
-        'MerkleExecute': 2,
-        'TransactionLookup': 0,
-        'IndexStorageHistory': 0,
-        'IndexAccountHistory': 0,
-        'Prune': 0,
-        'Finish': 0,
-    }
-    reth_log_file = (
-        settings.nodes_dir / 'reth' / 'logs' / settings.network / 'reth.log'
-    )
+    # Stages in the order of execution
+    stages = [
+        'Era',
+        'Headers',
+        'Bodies',
+        'SenderRecovery',
+        'Execution',
+        'PruneSenderRecovery',
+        'MerkleUnwind',
+        'AccountHashing',
+        'StorageHashing',
+        'MerkleExecute',
+        'TransactionLookup',
+        'IndexStorageHistory',
+        'IndexAccountHistory',
+        'Prune',
+        'Finish',
+    ]
+    reth_log_file = settings.nodes_dir / 'reth' / 'logs' / settings.network / 'reth.log'
     current_stage = _get_current_stage(reth_log_file)
 
-    # Define stage order for comparison
-    stage_order = list(stage_weights.keys())
+    # Get stage order and eta mapping from config
+    initial_stage_to_eta = settings.network_config.NODE_CONFIG.INITIAL_SYNC_STAGE_TO_ETA
+    stages = list(initial_stage_to_eta.keys())
 
-    if current_stage == 'Execution':
-        stage_eta = calc_stage_eta(reth_log_file)
-        return stage_eta or 0.0
+    if current_stage is None:
+        # If can't detect stage, fallback to sum of all default ETAs
+        return sum(eta.total_seconds() for eta in initial_stage_to_eta.values())
 
-    if current_stage is not None:
-        execution_index = stage_order.index('Execution')
+    current_index = stages.index(current_stage) if current_stage in stages else None
+    total_eta = 0.0
 
-        if stage_order.index(current_stage) < execution_index:
-            return 0.0
-        if stage_order.index(current_stage) > execution_index:
-            return 1.0
+    for idx, stage in enumerate(stages):
+        if current_index is not None:
+            if idx < current_index:
+                continue  # skip past stages
+            if idx == current_index:
+                eta = calc_stage_eta(reth_log_file)
+                total_eta += eta if eta is not None else initial_stage_to_eta[stage].total_seconds()
+            else:
+                total_eta += initial_stage_to_eta[stage].total_seconds()
+        else:
+            # If current stage not in list, fallback to sum of all default ETAs
+            total_eta = sum(eta.total_seconds() for eta in initial_stage_to_eta.values())
+            break
 
-    return stages_ready / stages_total
+    return total_eta
 
 
 def _get_current_stage(log_file: Path) -> str | None:
