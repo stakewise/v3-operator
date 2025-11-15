@@ -359,6 +359,7 @@ def calc_stage_eta(log_file: Path) -> float | None:
     # Find last 2 stage progress entries
     # Collect last 2 valid StageProgress entries
     stage_progress_entries = []
+    last_stage_progress = None
     for line in reversed(last_lines):
         try:
             stage_progress = parse_stage_progress(line)
@@ -367,15 +368,23 @@ def calc_stage_eta(log_file: Path) -> float | None:
             continue
 
         if stage_progress is not None:
-            stage_progress_entries.append(stage_progress)
-            if len(stage_progress_entries) == 2:
+            if last_stage_progress is None:
+                last_stage_progress = stage_progress
+                stage_progress_entries.append(last_stage_progress)
+            elif (
+                stage_progress.stage_name == last_stage_progress.stage_name
+                and stage_progress.current_block != last_stage_progress.current_block
+            ):
+                stage_progress_entries.append(stage_progress)
                 break
 
     if len(stage_progress_entries) < 2:
+        info_verbose('Not enough stage progress entries to calculate ETA.')
         return None
 
     # Use the two most recent entries to calculate ETA
     sp_new, sp_old = stage_progress_entries[0], stage_progress_entries[1]
+    info_verbose('Calculating stage ETA using entries: %s and %s', sp_old, sp_new)
 
     if sp_new.current_block >= sp_new.target_block:
         return 0.0
