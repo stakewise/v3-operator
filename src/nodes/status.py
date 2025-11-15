@@ -394,30 +394,30 @@ def calc_stage_eta(log_file: Path) -> float | None:
 
 
 def read_last_lines(file_path: Path, num_lines: int) -> list[str]:
-    """Read the last `num_lines` lines from a file efficiently."""
-    lines: list[str] = []
+    """Read the last `num_lines` lines from a file efficiently and safely."""
+    lines: list[bytes] = []
 
-    with file_path.open('rb') as f:  # Open in binary mode for efficient seeking
-        f.seek(0, 2)  # Move to the end of the file
-        buffer = bytearray()
-        pointer_location = f.tell()
-
-        while pointer_location >= 0 and len(lines) < num_lines:
-            f.seek(pointer_location)
-            byte = f.read(1)
-            if byte == b'\n':  # Newline found
-                line = buffer.decode('utf-8')[::-1]  # Decode and reverse the buffer
-                lines.append(line)
-                buffer = bytearray()
-            else:
-                buffer.extend(byte)
-            pointer_location -= 1
-
-        # Add the last line if the file doesn't end with a newline
-        if buffer:
-            lines.append(buffer.decode('utf-8')[::-1])
-
-    return lines[-num_lines:]  # Return the last `num_lines`
+    with file_path.open('rb') as f:
+        f.seek(0, 2)
+        file_size = f.tell()
+        buffer = b''
+        block_size = 4096
+        pointer = file_size
+        while pointer > 0 and len(lines) < num_lines:
+            read_size = min(block_size, pointer)
+            pointer -= read_size
+            f.seek(pointer)
+            data = f.read(read_size)
+            buffer = data + buffer
+            lines = buffer.split(b'\n')
+        # Decode last lines safely
+        result = []
+        for line in lines[-num_lines:]:
+            try:
+                result.append(line.decode('utf-8', errors='replace'))
+            except Exception:
+                result.append('')
+        return result
 
 
 def parse_stage_progress(log_line: str) -> StageProgress | None:
