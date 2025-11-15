@@ -384,7 +384,9 @@ def calc_stage_eta(log_file: Path) -> float | None:
 
     # Use the two most recent entries to calculate ETA
     sp_new, sp_old = stage_progress_entries[0], stage_progress_entries[1]
-    info_verbose('Calculating stage ETA using entries: %s and %s', sp_old, sp_new)
+    info_verbose('Calculating stage ETA using entries:')
+    info_verbose('first entry: %s', sp_old)
+    info_verbose('second entry: %s', sp_new)
 
     if sp_new.current_block >= sp_new.target_block:
         return 0.0
