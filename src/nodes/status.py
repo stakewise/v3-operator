@@ -356,34 +356,33 @@ def _get_current_stage(log_file: Path) -> str | None:
 def calc_stage_eta(log_file: Path) -> float | None:
     last_lines = read_last_lines(log_file, 1000)
 
-    # Find last 2 stage progress entries
-    # Collect last 2 valid StageProgress entries
-    stage_progress_entries = []
-    last_stage_progress = None
-    for line in reversed(last_lines):
-        try:
-            stage_progress = parse_stage_progress(line)
-        except Exception as e:
-            logger.debug('Failed to parse log line for stage ETA: %s', format_error(e))
-            continue
+    # Find earliest and latest stage progress entries with the same stage name
+    earliest_stage_progress = None
+    latest_stage_progress = None
+    stage_name = None
 
+    # Find the latest stage_progress (from end)
+    for line in reversed(last_lines):
+        stage_progress = parse_stage_progress(line)
         if stage_progress is not None:
-            if last_stage_progress is None:
-                last_stage_progress = stage_progress
-                stage_progress_entries.append(last_stage_progress)
-            elif (
-                stage_progress.stage_name == last_stage_progress.stage_name
-                and stage_progress.current_block != last_stage_progress.current_block
-            ):
-                stage_progress_entries.append(stage_progress)
+            latest_stage_progress = stage_progress
+            stage_name = stage_progress.stage_name
+            break
+
+    # Find the earliest stage_progress with the same stage name (from start)
+    if stage_name is not None:
+        for line in last_lines:
+            stage_progress = parse_stage_progress(line)
+            if stage_progress is not None and stage_progress.stage_name == stage_name:
+                earliest_stage_progress = stage_progress
                 break
 
-    if len(stage_progress_entries) < 2:
+    if not earliest_stage_progress or not latest_stage_progress:
         info_verbose('Not enough stage progress entries to calculate ETA.')
         return None
 
-    # Use the two most recent entries to calculate ETA
-    sp_new, sp_old = stage_progress_entries[0], stage_progress_entries[1]
+    sp_old = earliest_stage_progress
+    sp_new = latest_stage_progress
     info_verbose('Calculating stage ETA using entries:')
     info_verbose('first entry: %s', sp_old)
     info_verbose('second entry: %s', sp_new)
