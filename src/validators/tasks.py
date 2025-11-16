@@ -82,7 +82,7 @@ class ValidatorRegistrationSubtask:
                     harvest_params=harvest_params,
                 )
             except FundingException as e:
-                logger.error('Funding failed: %s', e)
+                logger.warning('Funding failed: %s', e)
                 return
 
         if not settings.disable_validators_registration:
