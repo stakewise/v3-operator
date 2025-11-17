@@ -124,13 +124,14 @@ class ValidatorRegistrationSubtask:
                     harvest_params=harvest_params,
                     relayer=self.relayer,
                 )
-                if not tx_hash:
-                    raise FundingException('Funding transaction failed')
-
-                total_funded = sum(amount for _, amount in validator_fundings_chunk)
-                vault_assets = Gwei(max(vault_assets - total_funded, 0))
             except EmptyRelayerResponseException as e:
                 raise FundingException('Empty response from relayer') from e
+
+            if not tx_hash:
+                raise FundingException('Funding transaction failed')
+
+            total_funded = sum(amount for _, amount in validator_fundings_chunk)
+            vault_assets = Gwei(max(vault_assets - total_funded, 0))
 
         return vault_assets
 
