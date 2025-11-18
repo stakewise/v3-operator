@@ -98,14 +98,14 @@ operator COMMAND --flagA=123 --flagB=xyz
 Pull the latest docker Operator docker image:
 
 ```bash
-docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v4.0.12
+docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v4.0.14
 ```
 
 You can also build the docker image from source by cloning this repo and executing the following command from within
 the `v3-operator` folder:
 
 ```bash
-docker build --pull -t europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v4.0.12 .
+docker build --pull -t europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v4.0.14 .
 ```
 
 You will execute Operator Service commands using the format below (note the use of flags are optional):
@@ -114,7 +114,7 @@ You will execute Operator Service commands using the format below (note the use 
 docker run --rm -ti \
 -u $(id -u):$(id -g) \
 -v ~/.stakewise/:/data \
-europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v4.0.12 \
+europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v4.0.14 \
 src/main.py COMMAND \
 --flagA=123 \
 --flagB=xyz

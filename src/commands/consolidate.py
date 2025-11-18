@@ -405,7 +405,9 @@ async def _check_public_keys(
         )
 
     # Fetch source and target validators
-    validators = await fetch_consensus_validators(source_public_keys + [target_public_key])
+    validators = await fetch_consensus_validators(
+        list(set(source_public_keys + [target_public_key]))
+    )
     pubkey_to_validator = {val.public_key: val for val in validators}
 
     source_validators: list[ConsensusValidator] = []
