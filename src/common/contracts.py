@@ -216,6 +216,9 @@ class VaultContract(ContractWrapper, VaultStateMixin):
     async def validators_manager(self) -> ChecksumAddress:
         return await self.contract.functions.validatorsManager().call()
 
+    async def get_exit_queue_index(self, position_ticket: int) -> int:
+        return await self.contract.functions.getExitQueueIndex(position_ticket).call()
+
     async def get_validator_withdrawal_submitted_events(
         self,
         from_block: BlockNumber,
@@ -379,6 +382,9 @@ class MetaVaultContract(ContractWrapper):
 
     async def withdrawable_assets(self) -> Wei:
         return await self.contract.functions.withdrawableAssets().call()
+
+    async def get_exit_queue_index(self, position_ticket: int) -> int:
+        return await self.contract.functions.getExitQueueIndex(position_ticket).call()
 
     async def deposit_to_sub_vaults(self) -> HexStr:
         tx_hash = await self.contract.functions.depositToSubVaults().transact()

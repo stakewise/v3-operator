@@ -93,7 +93,12 @@ class ExitRequest:
         but the claim delay has not passed yet.
         Relevant for testnets with short exit queues (e.g., Chiado)
         """
-        return self.exited_assets > 0 and not self.is_claimable and not self.is_claimed
+        return self.has_exit_queue_index and not self.is_claimable and not self.is_claimed
+
+    @property
+    def has_exit_queue_index(self) -> bool:
+        """Missing exit queue index may equal to None or -1"""
+        return self.exit_queue_index is not None and self.exit_queue_index >= 0
 
     @staticmethod
     def from_graph(data: dict) -> 'ExitRequest':

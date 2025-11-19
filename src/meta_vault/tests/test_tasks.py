@@ -10,7 +10,7 @@ from src.meta_vault.typings import Vault
 
 
 @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
-class TestMetaVaultTreeUpdateStateCalls:
+class TestMetaVaultUpdateStateCalls:
     async def test_basic(self):
         # Arrange
         meta_vault = create_vault(is_meta_vault=True, sub_vaults_count=2)
