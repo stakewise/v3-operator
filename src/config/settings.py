@@ -26,6 +26,8 @@ DEFAULT_VAULT_MIN_BALANCE_GWEI = Gwei(int(Web3.from_wei(DEFAULT_VAULT_MIN_BALANC
 
 DEFAULT_MIN_DEPOSIT_DELAY = 3600  # 1 hour
 
+DEFAULT_METAVAULT_UPDATE_INTERVAL = 6 * 60 * 60  # 6 hour
+
 
 DEFAULT_MAX_CONSOLIDATION_REQUEST_FEE_GWEI = Gwei(1000)
 DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI = Gwei(1000)
@@ -52,6 +54,7 @@ class Settings(metaclass=Singleton):
 
     harvest_vault: bool
     claim_fee_splitter: bool
+    process_metavault: bool
     disable_withdrawals: bool
     disable_validators_registration: bool
     disable_validators_funding: bool
@@ -98,6 +101,10 @@ class Settings(metaclass=Singleton):
     validators_registration_mode: ValidatorsRegistrationMode
     skip_startup_checks: bool
 
+    # metavault
+    metavault_min_deposit_amount_gwei: Gwei
+    metavault_update_interval: int
+
     # high priority fee
     priority_fee_num_blocks: int = decouple_config('PRIORITY_FEE_NUM_BLOCKS', default=10, cast=int)
     priority_fee_percentile: float = decouple_config(
@@ -131,6 +138,7 @@ class Settings(metaclass=Singleton):
         graph_endpoint: str = '',
         harvest_vault: bool = False,
         claim_fee_splitter: bool = False,
+        process_metavault: bool = False,
         disable_withdrawals: bool = False,
         disable_validators_registration: bool = False,
         disable_validators_funding: bool = False,
@@ -165,6 +173,8 @@ class Settings(metaclass=Singleton):
         min_deposit_delay: int = DEFAULT_MIN_DEPOSIT_DELAY,
         max_withdrawal_request_fee_gwei: Gwei = DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI,
         vault_first_block: BlockNumber | None = None,
+        metavault_min_deposit_amount_gwei: Gwei = DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
+        metavault_update_interval: int = DEFAULT_METAVAULT_UPDATE_INTERVAL,
     ) -> None:
         self.vault = vault
         vault_dir.mkdir(parents=True, exist_ok=True)
@@ -177,6 +187,7 @@ class Settings(metaclass=Singleton):
         self.graph_endpoint = graph_endpoint or self.network_config.STAKEWISE_GRAPH_ENDPOINT
         self.harvest_vault = harvest_vault
         self.claim_fee_splitter = claim_fee_splitter
+        self.process_metavault = process_metavault
         self.disable_withdrawals = disable_withdrawals
         self.disable_validators_registration = disable_validators_registration
         self.disable_validators_funding = disable_validators_funding
@@ -301,6 +312,8 @@ class Settings(metaclass=Singleton):
 
         self.skip_startup_checks = decouple_config('SKIP_STARTUP_CHECKS', default=False, cast=bool)
         self.vault_first_block = vault_first_block or self.network_config.KEEPER_GENESIS_BLOCK
+        self.metavault_min_deposit_amount_gwei = metavault_min_deposit_amount_gwei
+        self.metavault_update_interval = metavault_update_interval
 
     @property
     def keystore_cls_str(self) -> str:
@@ -373,6 +386,7 @@ FEE_SPLITTER_MIN_ASSETS: int = decouple_config(
 FEE_SPLITTER_INTERVAL: int = decouple_config(
     'FEE_SPLITTER_INTERVAL', default=86400, cast=int  # every 24 hr
 )
+
 # logging
 LOG_PLAIN = 'plain'
 LOG_JSON = 'json'
