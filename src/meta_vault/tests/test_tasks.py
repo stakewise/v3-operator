@@ -10,7 +10,7 @@ from src.meta_vault.typings import Vault
 
 
 @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
-class TestMetaVaultUpdateStateCalls:
+class TestMetaVaultTreeUpdateStateCalls:
     async def test_basic(self):
         # Arrange
         meta_vault = create_vault(is_meta_vault=True, sub_vaults_count=2)
@@ -79,13 +79,17 @@ class TestMetaVaultUpdateStateCalls:
             )
 
         # Assert
-        calls = tx_aggregate_mock.call_args[0][0]
-        assert [c[0] for c in calls] == [
-            sub_vault_2.address,
-            sub_vault_3.address,
-            sub_vault_0.address,
-            sub_vault_1.address,
-            meta_vault.address,
+        calls = [c[0][0] for c in tx_aggregate_mock.call_args_list]
+        assert [[addr for addr, _ in c] for c in calls] == [
+            [
+                sub_vault_2.address,
+                sub_vault_3.address,
+                sub_vault_0.address,
+            ],
+            [
+                sub_vault_1.address,
+                meta_vault.address,
+            ],
         ]
 
     @contextmanager
