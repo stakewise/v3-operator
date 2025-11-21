@@ -18,11 +18,7 @@ from src.common.execution import build_gas_manager
 from src.common.tasks import BaseTask
 from src.common.typings import ExitRequest
 from src.config.networks import ZERO_CHECKSUM_ADDRESS
-from src.config.settings import (
-    META_VAULT_MIN_DEPOSIT_AMOUNT,
-    META_VAULT_UPDATE_INTERVAL,
-    settings,
-)
+from src.config.settings import settings
 from src.meta_vault.exceptions import ClaimDelayNotPassedException
 from src.meta_vault.graph import (
     graph_get_exit_requests_for_meta_vault,
@@ -51,7 +47,7 @@ class ProcessMetavaultTask(BaseTask):
         if not await _check_metavault_block(app_state, block['number']):
             return
 
-        logger.info('Fetching fee splitters')
+        logger.info('Fetching meta vaults')
         meta_vaults_map = await graph_get_vaults(
             is_meta_vault=True,
         )
@@ -98,7 +94,7 @@ class ProcessMetavaultTask(BaseTask):
 async def _check_metavault_block(app_state: AppState, block_number: BlockNumber) -> bool:
     last_processed_block = app_state.metavault_update_block
     metavault_update_blocks_interval = (
-        META_VAULT_UPDATE_INTERVAL // settings.network_config.SECONDS_PER_BLOCK
+        settings.metavault_update_interval // settings.network_config.SECONDS_PER_BLOCK
     )
     if (
         last_processed_block
@@ -401,7 +397,7 @@ async def process_deposit_to_sub_vaults(meta_vault_address: ChecksumAddress) -> 
         settings.network_config.VAULT_BALANCE_SYMBOL,
     )
 
-    if withdrawable_assets < META_VAULT_MIN_DEPOSIT_AMOUNT:
+    if withdrawable_assets < Web3.to_wei(settings.metavault_min_deposit_amount_gwei, 'gwei'):
         return
 
     logger.info('Depositing to sub vaults for meta vault %s', meta_vault_address)

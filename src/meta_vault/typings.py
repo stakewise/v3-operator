@@ -97,7 +97,7 @@ class SubVaultExitRequest:
     @staticmethod
     def from_exit_request(exit_request: ExitRequest) -> 'SubVaultExitRequest':
         if exit_request.exit_queue_index is None:
-            raise ValueError('Exit request does not have an exit queue index')
+            raise ValueError(f'Exit request {exit_request.id} does not have an exit queue index')
 
         return SubVaultExitRequest(
             exit_queue_index=exit_request.exit_queue_index,

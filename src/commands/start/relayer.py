@@ -69,6 +69,8 @@ def start_relayer(
     network: str | None,
     relayer_endpoint: str,
     max_withdrawal_request_fee_gwei: int,
+    metavault_min_deposit_amount_gwei: int,
+    metavault_update_interval: int,
 ) -> None:
     operator_config = OperatorConfig(vault, Path(data_dir))
     if network is None:
@@ -113,6 +115,8 @@ def start_relayer(
         ),
         min_deposit_delay=min_deposit_delay,
         max_withdrawal_request_fee_gwei=Gwei(max_withdrawal_request_fee_gwei),
+        metavault_min_deposit_amount_gwei=Gwei(metavault_min_deposit_amount_gwei),
+        metavault_update_interval=metavault_update_interval,
     )
 
     try:

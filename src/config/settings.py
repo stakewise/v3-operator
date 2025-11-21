@@ -26,6 +26,8 @@ DEFAULT_VAULT_MIN_BALANCE_GWEI = Gwei(int(Web3.from_wei(DEFAULT_VAULT_MIN_BALANC
 
 DEFAULT_MIN_DEPOSIT_DELAY = 3600  # 1 hour
 
+DEFAULT_METAVAULT_UPDATE_INTERVAL = 6 * 60 * 60  # 6 hour
+
 
 DEFAULT_MAX_CONSOLIDATION_REQUEST_FEE_GWEI = Gwei(1000)
 DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI = Gwei(1000)
@@ -99,6 +101,10 @@ class Settings(metaclass=Singleton):
     validators_registration_mode: ValidatorsRegistrationMode
     skip_startup_checks: bool
 
+    # metavault
+    metavault_min_deposit_amount_gwei: Gwei
+    metavault_update_interval: int
+
     # high priority fee
     priority_fee_num_blocks: int = decouple_config('PRIORITY_FEE_NUM_BLOCKS', default=10, cast=int)
     priority_fee_percentile: float = decouple_config(
@@ -167,6 +173,8 @@ class Settings(metaclass=Singleton):
         min_deposit_delay: int = DEFAULT_MIN_DEPOSIT_DELAY,
         max_withdrawal_request_fee_gwei: Gwei = DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI,
         vault_first_block: BlockNumber | None = None,
+        metavault_min_deposit_amount_gwei: Gwei = DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
+        metavault_update_interval: int = DEFAULT_METAVAULT_UPDATE_INTERVAL,
     ) -> None:
         self.vault = vault
         vault_dir.mkdir(parents=True, exist_ok=True)
@@ -304,6 +312,8 @@ class Settings(metaclass=Singleton):
 
         self.skip_startup_checks = decouple_config('SKIP_STARTUP_CHECKS', default=False, cast=bool)
         self.vault_first_block = vault_first_block or self.network_config.KEEPER_GENESIS_BLOCK
+        self.metavault_min_deposit_amount_gwei = metavault_min_deposit_amount_gwei
+        self.metavault_update_interval = metavault_update_interval
 
     @property
     def keystore_cls_str(self) -> str:
@@ -375,14 +385,6 @@ FEE_SPLITTER_MIN_ASSETS: int = decouple_config(
 )
 FEE_SPLITTER_INTERVAL: int = decouple_config(
     'FEE_SPLITTER_INTERVAL', default=86400, cast=int  # every 24 hr
-)
-
-# Metavault
-META_VAULT_MIN_DEPOSIT_AMOUNT: Wei = decouple_config(
-    'META_VAULT_MIN_DEPOSIT_AMOUNT', default=MIN_ACTIVATION_BALANCE, cast=int
-)
-META_VAULT_UPDATE_INTERVAL: int = decouple_config(
-    'META_VAULT_UPDATE_INTERVAL', default=6 * 60 * 60, cast=int  # every 6 hr
 )
 
 # logging
