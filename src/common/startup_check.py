@@ -440,5 +440,5 @@ async def _check_vault_address() -> None:
 
 async def _check_is_metavault() -> None:
     meta_vaults = await graph_get_vaults(is_meta_vault=True)
-    if settings.vault not in meta_vaults.keys():
+    if settings.vault not in meta_vaults:
         raise ValueError(f'Vault {settings.vault} is not a metavault')

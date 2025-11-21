@@ -34,12 +34,11 @@ class ProcessMetavaultTask(BaseTask):
     # pylint: disable-next=too-many-locals
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         """
-        Processes reward splitters for the vault specified in settings.
-
+        Processes the meta vault.
         This function performs the following steps:
-        - Retrieves reward splitters associated with the vault from Subgraph.
-        - Retrieves claimable exit requests for the reward splitters.
-        - Calls reward splitter contracts and waits for transactions confirmations.
+        - Fetches meta vaults from the subgraph.
+        - Updates the state for the entire meta vault tree.
+        - Deposits to sub vaults if there are withdrawable assets.
         """
         block = await execution_client.eth.get_block('finalized')
 
