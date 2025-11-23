@@ -20,7 +20,11 @@ from src.common.utils import (
 from src.config.settings import settings
 from src.nodes.execution_sync_history import ExecutionSyncHistory
 from src.nodes.status_history import SYNC_STATUS_INTERVAL, SyncStatusHistory
-from src.nodes.typings import ExecutionSyncRecord, StageProgress, StatusHistoryRecord
+from src.nodes.typings import (
+    ExecutionSyncRecord,
+    StatusHistoryRecord,
+    SyncStageProgress,
+)
 from src.validators.keystores.local import LocalKeystore
 
 logger = logging.getLogger(__name__)
@@ -95,7 +99,7 @@ def calc_default_regular_sync_eta() -> float:
     """
     # Assume initial sync is 90% of the total sync process
     initial_sync_ratio = 0.9
-    initial_sync_eta = settings.network_config.NODE_CONFIG.INITIAL_SYNC_ETA.total_seconds()
+    initial_sync_eta = settings.network_config.NODE_CONFIG.INITIAL_SYNC_ETA
     regular_sync_eta = (1 - initial_sync_ratio) * initial_sync_eta
     return regular_sync_eta
 
@@ -291,34 +295,17 @@ async def _calc_initial_execution_sync_eta() -> float:
     """
     Calculate initial sync ETA based on syncing stages.
     """
-    # Stages in the order of execution
-    stages = [
-        'Era',
-        'Headers',
-        'Bodies',
-        'SenderRecovery',
-        'Execution',
-        'PruneSenderRecovery',
-        'MerkleUnwind',
-        'AccountHashing',
-        'StorageHashing',
-        'MerkleExecute',
-        'TransactionLookup',
-        'IndexStorageHistory',
-        'IndexAccountHistory',
-        'Prune',
-        'Finish',
-    ]
     reth_log_file = settings.nodes_dir / 'reth' / 'logs' / settings.network / 'reth.log'
     current_stage = _get_current_stage(reth_log_file)
 
     # Get stage order and eta mapping from config
-    initial_stage_to_eta = settings.network_config.NODE_CONFIG.INITIAL_SYNC_STAGE_TO_ETA
+    node_config = settings.network_config.NODE_CONFIG
+    initial_stage_to_eta = node_config.INITIAL_SYNC_STAGE_TO_ETA
     stages = list(initial_stage_to_eta.keys())
 
     if current_stage is None:
         # If can't detect stage, fallback to sum of all default ETAs
-        return sum(eta.total_seconds() for eta in initial_stage_to_eta.values())
+        return node_config.INITIAL_SYNC_ETA
 
     current_index = stages.index(current_stage) if current_stage in stages else None
     total_eta = 0.0
@@ -329,12 +316,12 @@ async def _calc_initial_execution_sync_eta() -> float:
                 continue  # skip past stages
             if idx == current_index:
                 eta = calc_stage_eta(reth_log_file)
-                total_eta += eta if eta is not None else initial_stage_to_eta[stage].total_seconds()
+                total_eta += eta if eta is not None else initial_stage_to_eta[stage]
             else:
-                total_eta += initial_stage_to_eta[stage].total_seconds()
+                total_eta += initial_stage_to_eta[stage]
         else:
             # If current stage not in list, fallback to sum of all default ETAs
-            total_eta = sum(eta.total_seconds() for eta in initial_stage_to_eta.values())
+            total_eta = node_config.INITIAL_SYNC_ETA
             break
 
     return total_eta
@@ -430,7 +417,7 @@ def read_last_lines(file_path: Path, num_lines: int) -> list[str]:
         return result
 
 
-def parse_stage_progress(log_line: str) -> StageProgress | None:
+def parse_stage_progress(log_line: str) -> SyncStageProgress | None:
     # Regular expression to extract log_time, stage_name, checkpoint, and target
     pattern = (
         r'^(?P<log_time>[\d\-T:.Z]+).*'
@@ -453,6 +440,6 @@ def parse_stage_progress(log_line: str) -> StageProgress | None:
     # Note: timezone may not be UTC, but it does not matter for ETA calculation
     log_time = datetime.strptime(log_time_str, '%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=timezone.utc)
 
-    return StageProgress(
+    return SyncStageProgress(
         stage_name=stage_name, created_at=log_time, current_block=checkpoint, target_block=target
     )

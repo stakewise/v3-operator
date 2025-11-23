@@ -99,7 +99,7 @@ class ExecutionSyncRecord:
 
 
 @dataclass
-class StageProgress:
+class SyncStageProgress:
     stage_name: str
     created_at: datetime
     current_block: int
