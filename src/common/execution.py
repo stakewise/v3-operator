@@ -22,6 +22,7 @@ from src.common.metrics import metrics
 from src.common.tasks import BaseTask
 from src.common.typings import PendingConsolidation, PendingPartialWithdrawal
 from src.common.wallet import wallet
+from src.config.networks import HOODI
 from src.config.settings import ATTEMPTS_WITH_DEFAULT_GAS, settings
 from src.validators.typings import ConsensusValidator
 
@@ -123,24 +124,35 @@ async def transaction_gas_wrapper(
     if not tx_params:
         tx_params = {}
 
-    # trying to submit with basic gas
-    for i in range(ATTEMPTS_WITH_DEFAULT_GAS):
-        try:
-            return await tx_function.transact(tx_params)
-        except ValueError as e:
-            # Handle only FeeTooLow error
-            code = None
-            if e.args and isinstance(e.args[0], dict):
-                code = e.args[0].get('code')
-            if not code or code != -32010:
-                raise e
-            if i < ATTEMPTS_WITH_DEFAULT_GAS - 1:  # skip last sleep
-                await asyncio.sleep(settings.network_config.SECONDS_PER_BLOCK)
+    # trying to submit with basic gas,
+    # ignore for testnets, also Alchemy not support eth_maxPriorityFeePerGas for Hoodi
+    if settings.network not in [HOODI]:
+        for i in range(ATTEMPTS_WITH_DEFAULT_GAS):
+            try:
+                return await tx_function.transact(tx_params)
+            except ValueError as e:
+                # Handle only FeeTooLow error
+                code = None
+                if e.args and isinstance(e.args[0], dict):
+                    code = e.args[0].get('code')
+                if not code or code != -32010:
+                    raise e
+                if i < ATTEMPTS_WITH_DEFAULT_GAS - 1:  # skip last sleep
+                    await asyncio.sleep(settings.network_config.SECONDS_PER_BLOCK)
 
     # use high priority fee
     gas_manager = build_gas_manager()
     tx_params = tx_params | await gas_manager.get_high_priority_tx_params()
     return await tx_function.transact(tx_params)
+
+
+async def check_gas_price(high_priority: bool = False) -> bool:
+    gas_manager = build_gas_manager()
+    # ignore for testnets, also Alchemy not support eth_maxPriorityFeePerGas for Hoodi
+    if settings.network in [HOODI]:
+        return True
+
+    return await gas_manager.check_gas_price(high_priority)
 
 
 def build_gas_manager() -> GasManager:

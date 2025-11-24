@@ -10,7 +10,7 @@ from web3.types import BlockNumber, Gwei
 
 from src.common.clients import execution_client
 from src.common.contracts import VaultContract, validators_registry_contract
-from src.common.execution import build_gas_manager, get_protocol_config
+from src.common.execution import check_gas_price, get_protocol_config
 from src.common.harvest import get_harvest_params
 from src.common.metrics import metrics
 from src.common.typings import HarvestParams, ValidatorsRegistrationMode, ValidatorType
@@ -61,8 +61,7 @@ class ValidatorRegistrationSubtask:
         if vault_assets < settings.min_deposit_amount_gwei:
             return
 
-        gas_manager = build_gas_manager()
-        if not await gas_manager.check_gas_price():
+        if not await check_gas_price():
             return
 
         if settings.validator_type == ValidatorType.V1:
@@ -245,8 +244,7 @@ async def register_new_validators(
             )
         validators_manager_signature = relayer_validators_manager_signature
 
-    gas_manager = build_gas_manager()
-    if not await gas_manager.check_gas_price(high_priority=True):
+    if not await check_gas_price(high_priority=True):
         return None
 
     logger.info(
