@@ -7,7 +7,7 @@ from web3.types import BlockNumber, ChecksumAddress, HexStr, Wei
 from src.common.app_state import AppState
 from src.common.clients import execution_client
 from src.common.contracts import RewardSplitterContract, RewardSplitterEncoder
-from src.common.execution import build_gas_manager
+from src.common.execution import check_gas_price, transaction_gas_wrapper
 from src.common.harvest import get_harvest_params
 from src.common.tasks import BaseTask
 from src.common.typings import ExitRequest, HarvestParams
@@ -40,9 +40,6 @@ class SplitRewardTask(BaseTask):
         app_state = AppState()
         if not await _check_reward_splitter_block(app_state, block['number']):
             return
-
-        # check current gas prices
-        gas_manager = build_gas_manager()
 
         logger.info('Fetching fee splitters')
         reward_splitters = await graph_get_reward_splitters(
@@ -83,7 +80,8 @@ class SplitRewardTask(BaseTask):
             app_state.reward_splitter_block = block['number']
             return
 
-        if not await gas_manager.check_gas_price():
+        # check current gas prices
+        if not await check_gas_price():
             return
 
         logger.info('Processing fee splitter calls')
@@ -92,10 +90,8 @@ class SplitRewardTask(BaseTask):
                 address=address,
                 execution_client=execution_client,
             )
-            contract_func = contract.functions.multicall(address_calls)
-
-            # Send transaction
-            tx = await contract_func.transact()
+            tx_function = contract.functions.multicall(address_calls)
+            tx = await transaction_gas_wrapper(tx_function=tx_function)
             tx_hash = Web3.to_hex(tx)
             logger.info('Waiting for transaction %s confirmation', tx_hash)
 
