@@ -6,6 +6,7 @@ from web3.types import Gwei, Wei
 
 from src.common.clients import execution_client
 from src.common.contracts import VaultContract
+from src.common.execution import transaction_gas_wrapper
 from src.common.utils import format_error
 from src.config.settings import settings
 
@@ -21,10 +22,11 @@ async def submit_withdraw_validators(
     logger.info('Submitting a withdrawal from validator(s) transaction')
     vault_contract = VaultContract(settings.vault)
     try:
-        tx = await vault_contract.functions.withdrawValidators(
+        tx_function = vault_contract.functions.withdrawValidators(
             _encode_withdrawals(withdrawals),
             Web3.to_bytes(hexstr=validators_manager_signature),
-        ).transact({'value': tx_fee})
+        )
+        tx = await transaction_gas_wrapper(tx_function=tx_function, tx_params={'value': tx_fee})
     except Exception as e:
         logger.info('Failed to withdraw from validators: %s', format_error(e))
         return None
