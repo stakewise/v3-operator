@@ -368,23 +368,19 @@ def calc_stage_eta(log_file: Path) -> float | None:
         info_verbose('Not enough stage progress entries to calculate ETA.')
         return None
 
-    sp_old = earliest_stage_progress
-    sp_new = latest_stage_progress
-    info_verbose('Calculating stage ETA using entries:')
-    info_verbose('first entry: %s', sp_old)
-    info_verbose('second entry: %s', sp_new)
-
-    if sp_new.current_block >= sp_new.target_block:
+    if latest_stage_progress.current_block >= latest_stage_progress.target_block:
         return 0.0
 
-    time_diff = (sp_new.created_at - sp_old.created_at).total_seconds()
-    block_diff = sp_new.current_block - sp_old.current_block
+    time_diff = (
+        latest_stage_progress.created_at - earliest_stage_progress.created_at
+    ).total_seconds()
+    block_diff = latest_stage_progress.current_block - earliest_stage_progress.current_block
 
     if time_diff <= 0 or block_diff <= 0:
         return None
 
     blocks_per_second = block_diff / time_diff
-    remaining_blocks = sp_new.target_block - sp_new.current_block
+    remaining_blocks = latest_stage_progress.target_block - latest_stage_progress.current_block
     eta_seconds = remaining_blocks / blocks_per_second
 
     return eta_seconds
