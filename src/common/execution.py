@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from typing import cast
+from urllib.parse import urlparse
 
 from eth_typing import BlockNumber, HexStr
 from hexbytes import HexBytes
@@ -27,6 +28,8 @@ from src.config.settings import ATTEMPTS_WITH_DEFAULT_GAS, settings
 from src.validators.typings import ConsensusValidator
 
 logger = logging.getLogger(__name__)
+
+ALCHEMY_DOMAIN = '.alchemy.com'
 
 
 async def get_protocol_config() -> ProtocolConfig:
@@ -124,21 +127,22 @@ async def transaction_gas_wrapper(
     if not tx_params:
         tx_params = {}
 
-    # trying to submit with basic gas,
-    # skip for testnets, also Alchemy does not support eth_maxPriorityFeePerGas for Hoodi
-    if settings.network not in [HOODI]:
-        for i in range(ATTEMPTS_WITH_DEFAULT_GAS):
-            try:
-                return await tx_function.transact(tx_params)
-            except ValueError as e:
-                # Handle only FeeTooLow error
-                code = None
-                if e.args and isinstance(e.args[0], dict):
-                    code = e.args[0].get('code')
-                if not code or code != -32010:
-                    raise e
-                if i < ATTEMPTS_WITH_DEFAULT_GAS - 1:  # skip last sleep
-                    await asyncio.sleep(settings.network_config.SECONDS_PER_BLOCK)
+    # trying to submit with basic gas
+    attempts_with_default_gas = ATTEMPTS_WITH_DEFAULT_GAS
+
+    # Alchemy does not support eth_maxPriorityFeePerGas for Hoodi
+    if settings.network == HOODI and _is_alchemy_used():
+        attempts_with_default_gas = 0
+
+    for i in range(attempts_with_default_gas):
+        try:
+            return await tx_function.transact(tx_params)
+        except ValueError as e:
+            # Handle only FeeTooLow error
+            if not _is_fee_to_low_error(e):
+                raise e
+            if i < attempts_with_default_gas - 1:  # skip last sleep
+                await asyncio.sleep(settings.network_config.SECONDS_PER_BLOCK)
 
     # use high priority fee
     gas_manager = build_gas_manager()
@@ -148,8 +152,8 @@ async def transaction_gas_wrapper(
 
 async def check_gas_price(high_priority: bool = False) -> bool:
     gas_manager = build_gas_manager()
-    # ignore for testnets, also Alchemy does not support eth_maxPriorityFeePerGas for Hoodi
-    if settings.network in [HOODI]:
+    # Alchemy does not support eth_maxPriorityFeePerGas for Hoodi, skip
+    if settings.network == HOODI and _is_alchemy_used():
         return True
 
     return await gas_manager.check_gas_price(high_priority)
@@ -449,3 +453,18 @@ def _fake_exponential(factor: int, numerator: int, denominator: int) -> int:
         numerator_accum = (numerator_accum * numerator) // (denominator * i)
         i += 1
     return output // denominator
+
+
+def _is_fee_to_low_error(e: ValueError) -> bool:
+    code = None
+    if e.args and isinstance(e.args[0], dict):
+        code = e.args[0].get('code')
+    return code == -32010
+
+
+def _is_alchemy_used() -> bool:
+    for endpoint in settings.execution_endpoints:
+        domain = urlparse(endpoint).netloc
+        if domain.lower().endswith(ALCHEMY_DOMAIN):
+            return True
+    return False
