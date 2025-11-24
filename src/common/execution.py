@@ -139,7 +139,7 @@ async def transaction_gas_wrapper(
             return await tx_function.transact(tx_params)
         except ValueError as e:
             # Handle only FeeTooLow error
-            if not _is_fee_to_low_error(e):
+            if not _is_fee_too_low_error(e):
                 raise e
             if i < attempts_with_default_gas - 1:  # skip last sleep
                 await asyncio.sleep(settings.network_config.SECONDS_PER_BLOCK)
@@ -455,7 +455,7 @@ def _fake_exponential(factor: int, numerator: int, denominator: int) -> int:
     return output // denominator
 
 
-def _is_fee_to_low_error(e: ValueError) -> bool:
+def _is_fee_too_low_error(e: ValueError) -> bool:
     code = None
     if e.args and isinstance(e.args[0], dict):
         code = e.args[0].get('code')
