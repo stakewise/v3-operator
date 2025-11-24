@@ -125,7 +125,7 @@ async def transaction_gas_wrapper(
         tx_params = {}
 
     # trying to submit with basic gas,
-    # ignore for testnets, also Alchemy not support eth_maxPriorityFeePerGas for Hoodi
+    # skip for testnets, also Alchemy does not support eth_maxPriorityFeePerGas for Hoodi
     if settings.network not in [HOODI]:
         for i in range(ATTEMPTS_WITH_DEFAULT_GAS):
             try:
@@ -148,7 +148,7 @@ async def transaction_gas_wrapper(
 
 async def check_gas_price(high_priority: bool = False) -> bool:
     gas_manager = build_gas_manager()
-    # ignore for testnets, also Alchemy not support eth_maxPriorityFeePerGas for Hoodi
+    # ignore for testnets, also Alchemy does not support eth_maxPriorityFeePerGas for Hoodi
     if settings.network in [HOODI]:
         return True
 
