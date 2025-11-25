@@ -29,7 +29,7 @@ from src.meta_vault.typings import ContractCall, SubVaultExitRequest, Vault
 logger = logging.getLogger(__name__)
 
 
-class ProcessMetavaultTask(BaseTask):
+class ProcessMetaVaultTask(BaseTask):
 
     # pylint: disable-next=too-many-locals
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
@@ -43,7 +43,7 @@ class ProcessMetavaultTask(BaseTask):
         block = await execution_client.eth.get_block('finalized')
 
         app_state = AppState()
-        if not await _check_metavault_block(app_state, block['number']):
+        if not await _check_meta_vault_block(app_state, block['number']):
             return
 
         logger.info('Fetching meta vaults')
@@ -55,13 +55,13 @@ class ProcessMetavaultTask(BaseTask):
 
         root_meta_vault = meta_vaults_map.get(settings.vault)
         if not root_meta_vault:
-            app_state.metavault_update_block = block['number']
+            app_state.meta_vault_update_block = block['number']
             logger.error('Meta vault %s not found in subgraph', settings.vault)
             return
 
         if not root_meta_vault.sub_vaults:
             logger.info('Meta vault %s has no sub vaults. Skipping.', settings.vault)
-            app_state.metavault_update_block = block['number']
+            app_state.meta_vault_update_block = block['number']
             return
 
         # check current gas prices
@@ -86,17 +86,17 @@ class ProcessMetavaultTask(BaseTask):
         # Deposit to sub vaults if there are withdrawable assets
         await process_deposit_to_sub_vaults(meta_vault_address=settings.vault)
 
-        app_state.metavault_update_block = block['number']
+        app_state.meta_vault_update_block = block['number']
 
 
-async def _check_metavault_block(app_state: AppState, block_number: BlockNumber) -> bool:
-    last_processed_block = app_state.metavault_update_block
-    metavault_update_blocks_interval = (
-        settings.metavault_update_interval // settings.network_config.SECONDS_PER_BLOCK
+async def _check_meta_vault_block(app_state: AppState, block_number: BlockNumber) -> bool:
+    last_processed_block = app_state.meta_vault_update_block
+    meta_vault_update_blocks_interval = (
+        settings.meta_vault_update_interval // settings.network_config.SECONDS_PER_BLOCK
     )
     if (
         last_processed_block
-        and last_processed_block + metavault_update_blocks_interval >= block_number
+        and last_processed_block + meta_vault_update_blocks_interval >= block_number
     ):
         return False
     return True
@@ -395,7 +395,7 @@ async def process_deposit_to_sub_vaults(meta_vault_address: ChecksumAddress) -> 
         settings.network_config.VAULT_BALANCE_SYMBOL,
     )
 
-    if withdrawable_assets < Web3.to_wei(settings.metavault_min_deposit_amount_gwei, 'gwei'):
+    if withdrawable_assets < Web3.to_wei(settings.meta_vault_min_deposit_amount_gwei, 'gwei'):
         return
 
     logger.info('Depositing to sub vaults for meta vault %s', meta_vault_address)

@@ -56,7 +56,7 @@ async def startup_checks() -> None:
     logger.info('Checking consensus nodes network...')
     await _check_consensus_nodes_network()
 
-    if settings.claim_fee_splitter or settings.process_metavault:
+    if settings.claim_fee_splitter or settings.process_meta_vault:
         logger.info('Checking graph nodes...')
         await wait_for_graph_node()
 
@@ -110,8 +110,8 @@ async def startup_checks() -> None:
             'WITHDRAWALS_INTERVAL setting should be less than '
             f'force withdrawals period({protocol_config.force_withdrawals_period} seconds)'
         )
-    if settings.process_metavault:
-        await _check_is_metavault()
+    if settings.process_meta_vault:
+        await _check_is_meta_vault()
 
 
 def validate_settings() -> None:
@@ -121,7 +121,7 @@ def validate_settings() -> None:
     if not settings.consensus_endpoints:
         raise ValueError('CONSENSUS_ENDPOINTS is missing')
 
-    if not settings.graph_endpoint and (settings.claim_fee_splitter or settings.process_metavault):
+    if not settings.graph_endpoint and (settings.claim_fee_splitter or settings.process_meta_vault):
         raise ValueError('GRAPH_ENDPOINT is missing')
 
 
@@ -439,7 +439,7 @@ async def _check_vault_address() -> None:
         raise click.ClickException(f'Invalid vault contract address {settings.vault}') from e
 
 
-async def _check_is_metavault() -> None:
+async def _check_is_meta_vault() -> None:
     meta_vaults = await graph_get_vaults(is_meta_vault=True)
     if settings.vault not in meta_vaults:
-        raise ValueError(f'Vault {settings.vault} is not a metavault')
+        raise ValueError(f'Vault {settings.vault} is not a meta vault')
