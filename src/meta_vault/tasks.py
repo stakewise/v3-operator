@@ -14,7 +14,7 @@ from src.common.contracts import (
     keeper_contract,
     multicall_contract,
 )
-from src.common.execution import build_gas_manager
+from src.common.execution import check_gas_price
 from src.common.tasks import BaseTask
 from src.common.typings import ExitRequest
 from src.config.networks import ZERO_CHECKSUM_ADDRESS
@@ -65,8 +65,7 @@ class ProcessMetavaultTask(BaseTask):
             return
 
         # check current gas prices
-        gas_manager = build_gas_manager()
-        if not await gas_manager.check_gas_price():
+        if not await check_gas_price():
             return
 
         # Update the state for the entire meta vault tree

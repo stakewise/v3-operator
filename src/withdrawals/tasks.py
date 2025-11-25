@@ -20,11 +20,11 @@ from src.common.contracts import VaultContract
 from src.common.execution import (
     get_pending_consolidations,
     get_pending_partial_withdrawals,
-    get_protocol_config,
     get_withdrawal_request_fee,
     get_withdrawals_count,
 )
 from src.common.metrics import metrics
+from src.common.protocol_config import get_protocol_config
 from src.common.typings import PendingPartialWithdrawal, ValidatorsRegistrationMode
 from src.common.utils import round_down
 from src.config.settings import (

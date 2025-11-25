@@ -20,8 +20,9 @@ from src.common.contracts import (
     keeper_contract,
     validators_registry_contract,
 )
-from src.common.execution import check_wallet_balance, get_protocol_config
+from src.common.execution import check_wallet_balance
 from src.common.harvest import get_harvest_params
+from src.common.protocol_config import get_protocol_config
 from src.common.typings import ValidatorsRegistrationMode
 from src.common.utils import format_error, round_down, warning_verbose
 from src.common.wallet import wallet

@@ -91,7 +91,7 @@ class SplitRewardTask(BaseTask):
                 execution_client=execution_client,
             )
             tx_function = contract.functions.multicall(address_calls)
-            tx = await transaction_gas_wrapper(tx_function=tx_function)
+            tx = await transaction_gas_wrapper(tx_function)
             tx_hash = Web3.to_hex(tx)
             logger.info('Waiting for transaction %s confirmation', tx_hash)
 
