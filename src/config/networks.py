@@ -55,7 +55,24 @@ class NodeConfig:
     ERA_URL: str
     MIN_MEMORY_GB: int
     MIN_DISK_SPACE_TB: float
-    INITIAL_SYNC_ETA: timedelta
+    INITIAL_SYNC_STAGE_TO_ETA_TIMEDELTA: dict[str, timedelta]
+
+    @property
+    def INITIAL_SYNC_STAGE_TO_ETA(self) -> dict[str, int]:
+        """
+        Returns initial sync stage to ETA mapping in seconds.
+        """
+        return {
+            stage: int(delta.total_seconds())
+            for stage, delta in self.INITIAL_SYNC_STAGE_TO_ETA_TIMEDELTA.items()
+        }
+
+    @property
+    def INITIAL_SYNC_ETA(self) -> int:
+        """
+        Returns the total initial sync ETA in seconds.
+        """
+        return sum(self.INITIAL_SYNC_STAGE_TO_ETA.values())
 
 
 NETWORKS: dict[str, NetworkConfig] = {
@@ -102,7 +119,11 @@ NETWORKS: dict[str, NetworkConfig] = {
             ERA_URL='https://data.ethpandaops.io/era1/mainnet/',
             MIN_MEMORY_GB=16,
             MIN_DISK_SPACE_TB=2,
-            INITIAL_SYNC_ETA=timedelta(hours=48),
+            INITIAL_SYNC_STAGE_TO_ETA_TIMEDELTA={
+                'Execution': timedelta(hours=46),
+                'StorageHashing': timedelta(hours=1),
+                'MerkleExecute': timedelta(hours=1),
+            },
         ),
     ),
     HOODI: NetworkConfig(
@@ -146,7 +167,11 @@ NETWORKS: dict[str, NetworkConfig] = {
             ERA_URL='',
             MIN_MEMORY_GB=16,
             MIN_DISK_SPACE_TB=0.1,  # 100 GB
-            INITIAL_SYNC_ETA=timedelta(hours=8),
+            INITIAL_SYNC_STAGE_TO_ETA_TIMEDELTA={
+                'Execution': timedelta(hours=7),
+                'StorageHashing': timedelta(minutes=30),
+                'MerkleExecute': timedelta(minutes=30),
+            },
         ),
     ),
     GNOSIS: NetworkConfig(
@@ -192,7 +217,11 @@ NETWORKS: dict[str, NetworkConfig] = {
             ERA_URL='',
             MIN_MEMORY_GB=16,
             MIN_DISK_SPACE_TB=2,
-            INITIAL_SYNC_ETA=timedelta(hours=48),
+            INITIAL_SYNC_STAGE_TO_ETA_TIMEDELTA={
+                'Execution': timedelta(hours=46),
+                'StorageHashing': timedelta(hours=1),
+                'MerkleExecute': timedelta(hours=1),
+            },
         ),
     ),
     CHIADO: NetworkConfig(
@@ -238,7 +267,11 @@ NETWORKS: dict[str, NetworkConfig] = {
             ERA_URL='',
             MIN_MEMORY_GB=16,
             MIN_DISK_SPACE_TB=0.1,  # 100 GB
-            INITIAL_SYNC_ETA=timedelta(hours=8),
+            INITIAL_SYNC_STAGE_TO_ETA_TIMEDELTA={
+                'Execution': timedelta(hours=7),
+                'StorageHashing': timedelta(minutes=30),
+                'MerkleExecute': timedelta(minutes=30),
+            },
         ),
     ),
 }

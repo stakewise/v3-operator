@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from typing import IO, Any, Union
 
 IO_Any = Union[IO[Any], int, None]
@@ -95,3 +96,11 @@ class ExecutionSyncRecord:
     block_number: int
     duration: int
     update_timestamp: int
+
+
+@dataclass
+class SyncStageProgress:
+    stage_name: str
+    created_at: datetime
+    current_block: int
+    target_block: int

@@ -1,5 +1,8 @@
 import logging
+import re
 import time
+from datetime import datetime, timezone
+from pathlib import Path
 
 from eth_typing import BlockNumber
 from sw_utils import ExtendedAsyncBeacon
@@ -17,7 +20,11 @@ from src.common.utils import (
 from src.config.settings import settings
 from src.nodes.execution_sync_history import ExecutionSyncHistory
 from src.nodes.status_history import SYNC_STATUS_INTERVAL, SyncStatusHistory
-from src.nodes.typings import ExecutionSyncRecord, StatusHistoryRecord
+from src.nodes.typings import (
+    ExecutionSyncRecord,
+    StatusHistoryRecord,
+    SyncStageProgress,
+)
 from src.validators.keystores.local import LocalKeystore
 
 logger = logging.getLogger(__name__)
@@ -59,18 +66,12 @@ async def get_execution_node_status(execution_client: AsyncWeb3) -> dict:
 
     is_initial_sync = latest_block['number'] == 0
 
-    # Assume initial sync is 90% of the total sync process
-    initial_sync_ratio = 0.9
-    initial_sync_eta = settings.network_config.NODE_CONFIG.INITIAL_SYNC_ETA.total_seconds()
-    regular_sync_eta = (1 - initial_sync_ratio) * initial_sync_eta
+    default_regular_sync_eta = calc_default_regular_sync_eta()
     eta: float
 
     if is_initial_sync:
-        initial_progress = await _calc_initial_execution_sync_progress(
-            execution_client=execution_client
-        )
-        initial_eta = initial_sync_eta * (1 - initial_progress)
-        eta = initial_eta + (1 - initial_sync_ratio) * initial_sync_eta
+        initial_eta = await _calc_initial_execution_sync_eta()
+        eta = initial_eta + default_regular_sync_eta
     elif is_syncing:
         eta = (
             await _calc_regular_execution_eta(
@@ -78,7 +79,7 @@ async def get_execution_node_status(execution_client: AsyncWeb3) -> dict:
                 execution_sync_history=execution_sync_history,
                 latest_block=latest_block,
             )
-            or regular_sync_eta
+            or default_regular_sync_eta
         )
     else:
         eta = 0
@@ -89,6 +90,18 @@ async def get_execution_node_status(execution_client: AsyncWeb3) -> dict:
         'sync_distance': sync_distance,
         'eta': int(eta),
     }
+
+
+def calc_default_regular_sync_eta() -> float:
+    """
+    After initial sync is complete, another sync iteration is needed to fully catch up.
+    Calculate default regular sync ETA based on network config.
+    """
+    # Assume initial sync is 90% of the total sync process
+    initial_sync_ratio = 0.9
+    initial_sync_eta = settings.network_config.NODE_CONFIG.INITIAL_SYNC_ETA
+    regular_sync_eta = (1 - initial_sync_ratio) * initial_sync_eta
+    return regular_sync_eta
 
 
 async def get_validator_activity_stats(consensus_client: ExtendedAsyncBeacon) -> dict:
@@ -278,30 +291,151 @@ async def _calc_execution_speed_slots(
     return (last_block_slot - first_block_slot) / duration_sum
 
 
-async def _calc_initial_execution_sync_progress(execution_client: AsyncWeb3) -> float:
-    return await _calc_initial_execution_sync_progress_using_stages(
-        execution_client=execution_client
-    )
-
-
-async def _calc_initial_execution_sync_progress_using_stages(execution_client: AsyncWeb3) -> float:
+async def _calc_initial_execution_sync_eta() -> float:
     """
-    Calculate initial sync progress based on syncing stages.
+    Calculate initial sync ETA based on syncing stages.
     """
-    syncing = await execution_client.eth.syncing
-    stages_ready = 0
-    stages_total = 0
+    reth_log_file = settings.nodes_dir / 'reth' / 'logs' / settings.network / 'reth.log'
+    current_stage = _get_current_stage(reth_log_file)
 
-    for stage in syncing['stages']:  # type: ignore
-        if not settings.network_config.NODE_CONFIG.ERA_URL and stage['name'] == 'Era':
-            continue
+    # Get stage order and eta mapping from config
+    node_config = settings.network_config.NODE_CONFIG
+    initial_stage_to_eta = node_config.INITIAL_SYNC_STAGE_TO_ETA
+    stages = list(initial_stage_to_eta.keys())
 
-        stages_total += 1
+    if current_stage is None:
+        # If can't detect stage, fallback to sum of all default ETAs
+        return node_config.INITIAL_SYNC_ETA
 
-        if stage['block'] != '0x0':
-            stages_ready += 1
+    current_index = stages.index(current_stage) if current_stage in stages else None
+    total_eta = 0.0
 
-    if stages_total == 0:
+    for idx, stage in enumerate(stages):
+        if current_index is not None:
+            if idx < current_index:
+                continue  # skip past stages
+            if idx == current_index:
+                eta = calc_stage_eta(reth_log_file)
+                total_eta += eta if eta is not None else initial_stage_to_eta[stage]
+            else:
+                total_eta += initial_stage_to_eta[stage]
+        else:
+            # If current stage not in list, fallback to sum of all default ETAs
+            total_eta = node_config.INITIAL_SYNC_ETA
+            break
+
+    return total_eta
+
+
+def _get_current_stage(log_file: Path) -> str | None:
+    last_lines = read_last_lines(log_file, 100)
+
+    stage_re = re.compile(r'stage=([a-zA-Z0-9_]+)')
+
+    for line in reversed(last_lines):
+        stage_match = stage_re.search(line)
+        if stage_match:
+            return stage_match.group(1)
+
+    return None
+
+
+def calc_stage_eta(log_file: Path) -> float | None:
+    last_lines = read_last_lines(log_file, 1000)
+
+    # Find earliest and latest stage progress entries with the same stage name
+    earliest_stage_progress = None
+    latest_stage_progress = None
+    stage_name = None
+
+    # Find the latest stage_progress (from end)
+    for line in reversed(last_lines):
+        stage_progress = parse_stage_progress(line)
+        if stage_progress is not None:
+            latest_stage_progress = stage_progress
+            stage_name = stage_progress.stage_name
+            break
+
+    # Find the earliest stage_progress with the same stage name (from start)
+    if stage_name is not None:
+        for line in last_lines:
+            stage_progress = parse_stage_progress(line)
+            if stage_progress is not None and stage_progress.stage_name == stage_name:
+                earliest_stage_progress = stage_progress
+                break
+
+    if not earliest_stage_progress or not latest_stage_progress:
+        info_verbose('Not enough stage progress entries to calculate ETA.')
+        return None
+
+    if latest_stage_progress.current_block >= latest_stage_progress.target_block:
         return 0.0
 
-    return stages_ready / stages_total
+    time_diff = (
+        latest_stage_progress.created_at - earliest_stage_progress.created_at
+    ).total_seconds()
+    block_diff = latest_stage_progress.current_block - earliest_stage_progress.current_block
+
+    if time_diff <= 0 or block_diff <= 0:
+        return None
+
+    blocks_per_second = block_diff / time_diff
+    remaining_blocks = latest_stage_progress.target_block - latest_stage_progress.current_block
+    eta_seconds = remaining_blocks / blocks_per_second
+
+    return eta_seconds
+
+
+def read_last_lines(file_path: Path, num_lines: int) -> list[str]:
+    """Read the last `num_lines` lines from a file efficiently and safely."""
+    lines: list[bytes] = []
+
+    with file_path.open('rb') as f:
+        f.seek(0, 2)
+        file_size = f.tell()
+        buffer = b''
+        block_size = 4096
+        pointer = file_size
+        while pointer > 0 and len(lines) < num_lines:
+            read_size = min(block_size, pointer)
+            pointer -= read_size
+            f.seek(pointer)
+            data = f.read(read_size)
+            buffer = data + buffer
+            lines = buffer.split(b'\n')
+        # Decode last lines safely
+        result = []
+        for line in lines[-num_lines:]:
+            try:
+                result.append(line.decode('utf-8', errors='replace'))
+            except Exception:
+                result.append('')
+        return result
+
+
+def parse_stage_progress(log_line: str) -> SyncStageProgress | None:
+    # Regular expression to extract log_time, stage_name, checkpoint, and target
+    pattern = (
+        r'^(?P<log_time>[\d\-T:.Z]+).*'
+        r'stage=(?P<stage_name>\w+).*'
+        r'checkpoint=(?P<checkpoint>\d+).*'
+        r'target=(?P<target>\d+)'
+    )
+    match = re.match(pattern, log_line)
+
+    if not match:
+        return None
+
+    # Extract values from the match
+    log_time_str = match.group('log_time')
+    stage_name = match.group('stage_name')
+    checkpoint = int(match.group('checkpoint'))
+    target = int(match.group('target'))
+
+    # Convert log_time to a datetime object
+    # Note: timezone may not be UTC, but it does not matter for ETA calculation
+    log_time = datetime.strptime(log_time_str, '%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=timezone.utc)
+
+    return SyncStageProgress(
+        stage_name=stage_name, created_at=log_time, current_block=checkpoint, target_block=target
+    )
