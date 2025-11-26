@@ -30,6 +30,11 @@ logger = logging.getLogger(__name__)
 
 
 class ProcessMetaVaultTask(BaseTask):
+    def __init__(
+        self,
+        vaults: list[ChecksumAddress],
+    ):
+        self.vaults = vaults
 
     # pylint: disable-next=too-many-locals
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
@@ -50,41 +55,41 @@ class ProcessMetaVaultTask(BaseTask):
         meta_vaults_map = await graph_get_vaults(
             is_meta_vault=True,
         )
+        for vault in self.vaults:
+            logger.info('Processing meta vault: %s', vault)
 
-        logger.info('Processing meta vault: %s', settings.vault)
+            root_meta_vault = meta_vaults_map.get(vault)
+            if not root_meta_vault:
+                app_state.meta_vault_update_block = block['number']
+                logger.error('Meta vault %s not found in subgraph', vault)
+                return
 
-        root_meta_vault = meta_vaults_map.get(settings.vault)
-        if not root_meta_vault:
-            app_state.meta_vault_update_block = block['number']
-            logger.error('Meta vault %s not found in subgraph', settings.vault)
-            return
+            if not root_meta_vault.sub_vaults:
+                logger.info('Meta vault %s has no sub vaults. Skipping.', vault)
+                app_state.meta_vault_update_block = block['number']
+                return
 
-        if not root_meta_vault.sub_vaults:
-            logger.info('Meta vault %s has no sub vaults. Skipping.', settings.vault)
-            app_state.meta_vault_update_block = block['number']
-            return
+            # check current gas prices
+            if not await check_gas_price():
+                return
 
-        # check current gas prices
-        if not await check_gas_price():
-            return
+            # Update the state for the entire meta vault tree
+            try:
+                await meta_vault_tree_update_state(
+                    root_meta_vault=root_meta_vault,
+                    meta_vaults_map=meta_vaults_map,
+                )
+            except ClaimDelayNotPassedException as e:
+                logger.error(
+                    'Can not process meta vault %s because claim delay for exit request with '
+                    'position ticket %s has not passed yet',
+                    root_meta_vault.address,
+                    e.exit_request.position_ticket,
+                )
+                return
 
-        # Update the state for the entire meta vault tree
-        try:
-            await meta_vault_tree_update_state(
-                root_meta_vault=root_meta_vault,
-                meta_vaults_map=meta_vaults_map,
-            )
-        except ClaimDelayNotPassedException as e:
-            logger.error(
-                'Can not process meta vault %s because claim delay for exit request with '
-                'position ticket %s has not passed yet',
-                root_meta_vault.address,
-                e.exit_request.position_ticket,
-            )
-            return
-
-        # Deposit to sub vaults if there are withdrawable assets
-        await process_deposit_to_sub_vaults(meta_vault_address=settings.vault)
+            # Deposit to sub vaults if there are withdrawable assets
+            await process_deposit_to_sub_vaults(meta_vault_address=vault)
 
         app_state.meta_vault_update_block = block['number']
 

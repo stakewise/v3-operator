@@ -18,7 +18,6 @@ from src.common.utils import get_build_version
 from src.config.settings import settings
 from src.exits.tasks import ExitSignatureTask
 from src.harvest.tasks import HarvestTask
-from src.meta_vault.tasks import ProcessMetaVaultTask
 from src.reward_splitter.tasks import SplitRewardTask
 from src.validators.database import (
     CheckpointCrud,
@@ -100,8 +99,6 @@ async def start_base() -> None:
             tasks.append(HarvestTask().run(interrupt_handler))
         if settings.claim_fee_splitter:
             tasks.append(SplitRewardTask().run(interrupt_handler))
-        if settings.process_meta_vault:
-            tasks.append(ProcessMetaVaultTask().run(interrupt_handler))
 
         await asyncio.gather(*tasks)
 

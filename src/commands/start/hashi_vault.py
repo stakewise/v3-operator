@@ -68,7 +68,6 @@ def start_hashi_vault(
     graph_endpoint: str,
     harvest_vault: bool,
     claim_fee_splitter: bool,
-    process_meta_vault: bool,
     disable_withdrawals: bool,
     disable_validators_registration: bool,
     disable_validators_funding: bool,
@@ -97,8 +96,6 @@ def start_hashi_vault(
     max_validator_balance_gwei: int | None,
     min_deposit_delay: int,
     max_withdrawal_request_fee_gwei: int,
-    meta_vault_min_deposit_amount_gwei: int,
-    meta_vault_update_interval: int,
 ) -> None:
     operator_config = OperatorConfig(vault, Path(data_dir))
     if network is None:
@@ -114,7 +111,6 @@ def start_hashi_vault(
         graph_endpoint=graph_endpoint,
         harvest_vault=harvest_vault,
         claim_fee_splitter=claim_fee_splitter,
-        process_meta_vault=process_meta_vault,
         disable_withdrawals=disable_withdrawals,
         disable_validators_registration=disable_validators_registration,
         disable_validators_funding=disable_validators_funding,
@@ -144,8 +140,6 @@ def start_hashi_vault(
         ),
         min_deposit_delay=min_deposit_delay,
         max_withdrawal_request_fee_gwei=Gwei(max_withdrawal_request_fee_gwei),
-        meta_vault_min_deposit_amount_gwei=Gwei(meta_vault_min_deposit_amount_gwei),
-        meta_vault_update_interval=meta_vault_update_interval,
     )
 
     try:

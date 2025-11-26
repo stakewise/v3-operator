@@ -13,7 +13,6 @@ from src.common.validators import (
 from src.config.networks import GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
     DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI,
-    DEFAULT_META_VAULT_UPDATE_INTERVAL,
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
     DEFAULT_METRICS_PREFIX,
@@ -120,29 +119,6 @@ start_common_options = [
         envvar='CLAIM_FEE_SPLITTER',
         help='Claim fee splitter rewards periodically on behalf of the shareholders.'
         ' Default is false.',
-    ),
-    click.option(
-        '--process-meta_vault',
-        is_flag=True,
-        envvar='PROCESS_META_VAULT',
-        help='Process subvault states and deposits, applies only to meta vaults.'
-        ' Default is false.',
-    ),
-    click.option(
-        '--meta-vault-min-deposit-amount-gwei',
-        type=int,
-        envvar='META_VAULT_MIN_DEPOSIT_AMOUNT',
-        help=f'Minimum amount in gwei to deposit into subvaults for meta vault.'
-        f' The default is {DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI}',
-        default=DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
-    ),
-    click.option(
-        '--meta-vault-update-interval',
-        type=int,
-        envvar='META_VAULT_UPDATE_INTERVAL',
-        help=f'Interval in seconds to process subvault states and deposits.'
-        f' The default is {DEFAULT_META_VAULT_UPDATE_INTERVAL}',
-        default=DEFAULT_META_VAULT_UPDATE_INTERVAL,
     ),
     click.option(
         '--disable-withdrawals',
