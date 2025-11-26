@@ -175,11 +175,9 @@ class Settings(metaclass=Singleton):
         vault_first_block: BlockNumber | None = None,
         meta_vault_min_deposit_amount_gwei: Gwei = DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
         meta_vault_update_interval: int = DEFAULT_META_VAULT_UPDATE_INTERVAL,
-        create_vault_dir: bool = True,
     ) -> None:
         self.vault = vault
-        if create_vault_dir:
-            vault_dir.mkdir(parents=True, exist_ok=True)
+        vault_dir.mkdir(parents=True, exist_ok=True)
         self.vault_dir = vault_dir
         self.network = network
 

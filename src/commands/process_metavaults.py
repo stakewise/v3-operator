@@ -138,8 +138,8 @@ logger = logging.getLogger(__name__)
     ),
 )
 @click.command(
-    help='Performs a vault validators consolidation from 0x01 validators to 0x02 validator. '
-    'Switches a validator from 0x01 to 0x02 if the source and target keys are identical.'
+    help='Processes one or more meta vaults by '
+    'performing state updates and handling deposit and exit requests.'
 )
 # pylint: disable-next=too-many-arguments,too-many-locals
 def process_metavaults(
@@ -163,7 +163,6 @@ def process_metavaults(
         # mock vault and vault_dir
         vault=vault_addresses[0],
         vault_dir=Path.home() / '.stakewise',
-
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
         execution_jwt_secret=execution_jwt_secret,
