@@ -26,9 +26,6 @@ DEFAULT_VAULT_MIN_BALANCE_GWEI = Gwei(int(Web3.from_wei(DEFAULT_VAULT_MIN_BALANC
 
 DEFAULT_MIN_DEPOSIT_DELAY = 3600  # 1 hour
 
-DEFAULT_META_VAULT_UPDATE_INTERVAL = 6 * 60 * 60  # 6 hours
-
-
 DEFAULT_MAX_CONSOLIDATION_REQUEST_FEE_GWEI = Gwei(1000)
 DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI = Gwei(1000)
 
@@ -103,7 +100,6 @@ class Settings(metaclass=Singleton):
 
     # meta_vault
     meta_vault_min_deposit_amount_gwei: Gwei
-    meta_vault_update_interval: int
 
     # high priority fee
     priority_fee_num_blocks: int = decouple_config('PRIORITY_FEE_NUM_BLOCKS', default=10, cast=int)
@@ -174,7 +170,6 @@ class Settings(metaclass=Singleton):
         max_withdrawal_request_fee_gwei: Gwei = DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI,
         vault_first_block: BlockNumber | None = None,
         meta_vault_min_deposit_amount_gwei: Gwei = DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
-        meta_vault_update_interval: int = DEFAULT_META_VAULT_UPDATE_INTERVAL,
     ) -> None:
         self.vault = vault
         vault_dir.mkdir(parents=True, exist_ok=True)
@@ -313,7 +308,6 @@ class Settings(metaclass=Singleton):
         self.skip_startup_checks = decouple_config('SKIP_STARTUP_CHECKS', default=False, cast=bool)
         self.vault_first_block = vault_first_block or self.network_config.KEEPER_GENESIS_BLOCK
         self.meta_vault_min_deposit_amount_gwei = meta_vault_min_deposit_amount_gwei
-        self.meta_vault_update_interval = meta_vault_update_interval
 
     @property
     def keystore_cls_str(self) -> str:

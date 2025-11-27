@@ -10,16 +10,13 @@ from sw_utils import InterruptHandler
 from web3.types import Gwei
 
 from src.commands.start.base import log_start, setup_sentry
-from src.common.checks import wait_execution_catch_up_consensus
 from src.common.clients import setup_clients
-from src.common.consensus import get_chain_finalized_head
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.protocol_config import update_oracles_cache
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_addresses
 from src.config.networks import AVAILABLE_NETWORKS, GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
-    DEFAULT_META_VAULT_UPDATE_INTERVAL,
     DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
     LOG_FORMATS,
     LOG_PLAIN,
@@ -67,20 +64,13 @@ logger = logging.getLogger(__name__)
     is_flag=True,
 )
 @click.option(
-    '--meta-vault-min-deposit-amount-gwei',
+    '--min-deposit-amount-gwei',
     type=int,
-    envvar='META_VAULT_MIN_DEPOSIT_AMOUNT',
-    help=f'Minimum amount in gwei to deposit into subvaults for meta vault.'
+    envvar='MIN_DEPOSIT_AMOUNT_GWEI',
+    help=f'Minimum amount in gwei that must accumulate in the vault '
+    f'to trigger deposits to the sub-vaults.'
     f' The default is {DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI}',
     default=DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
-)
-@click.option(
-    '--meta-vault-update-interval',
-    type=int,
-    envvar='META_VAULT_UPDATE_INTERVAL',
-    help=f'Interval in seconds to process subvault states and deposits.'
-    f' The default is {DEFAULT_META_VAULT_UPDATE_INTERVAL}',
-    default=DEFAULT_META_VAULT_UPDATE_INTERVAL,
 )
 @click.option(
     '--execution-endpoints',
@@ -95,13 +85,6 @@ logger = logging.getLogger(__name__)
     envvar='EXECUTION_JWT_SECRET',
     help='JWT secret key used for signing and verifying JSON Web Tokens'
     ' when connecting to execution nodes.',
-)
-@click.option(
-    '--consensus-endpoints',
-    type=str,
-    envvar='CONSENSUS_ENDPOINTS',
-    prompt='Enter the comma separated list of API endpoints for consensus nodes',
-    help='Comma separated list of API endpoints for consensus nodes.',
 )
 @click.option(
     '--graph-endpoint',
@@ -137,14 +120,10 @@ logger = logging.getLogger(__name__)
         case_sensitive=False,
     ),
 )
-@click.command(
-    help='Processes one or more meta vaults by '
-    'performing state updates and handling deposit and exit requests.'
-)
+@click.command(help='Updates states and processes deposits and exits for one or more meta vaults.')
 # pylint: disable-next=too-many-arguments,too-many-locals
 def process_metavaults(
     vaults: str,
-    consensus_endpoints: str,
     execution_endpoints: str,
     execution_jwt_secret: str | None,
     graph_endpoint: str,
@@ -156,14 +135,12 @@ def process_metavaults(
     wallet_password_file: str | None,
     max_fee_per_gas_gwei: int | None,
     meta_vault_min_deposit_amount_gwei: int,
-    meta_vault_update_interval: int,
 ) -> None:
     vault_addresses = [to_checksum_address(address) for address in vaults.split(',')]
     settings.set(
         # mock vault and vault_dir
         vault=vault_addresses[0],
         vault_dir=Path.home() / '.stakewise',
-        consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
         execution_jwt_secret=execution_jwt_secret,
         graph_endpoint=graph_endpoint,
@@ -175,7 +152,6 @@ def process_metavaults(
         log_level=log_level,
         log_format=log_format,
         meta_vault_min_deposit_amount_gwei=Gwei(meta_vault_min_deposit_amount_gwei),
-        meta_vault_update_interval=meta_vault_update_interval,
     )
     try:
         asyncio.run(main(vault_addresses))
@@ -188,11 +164,7 @@ async def main(vaults: list[ChecksumAddress]) -> None:
     setup_logging()
     setup_sentry()
     await setup_clients()
-
     log_start()
-
-    chain_state = await get_chain_finalized_head()
-    await wait_execution_catch_up_consensus(chain_state)
 
     logger.info('Updating oracles cache...')
     await update_oracles_cache()

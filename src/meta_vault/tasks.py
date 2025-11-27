@@ -6,7 +6,6 @@ from sw_utils import GNO_NETWORKS, InterruptHandler, convert_to_mgno
 from web3 import Web3
 from web3.types import BlockNumber
 
-from src.common.app_state import AppState
 from src.common.clients import execution_client
 from src.common.contracts import (
     MetaVaultContract,
@@ -45,12 +44,6 @@ class ProcessMetaVaultTask(BaseTask):
         - Updates the state for the entire meta vault tree.
         - Deposits to sub vaults if there are withdrawable assets.
         """
-        block = await execution_client.eth.get_block('finalized')
-
-        app_state = AppState()
-        if not await _check_meta_vault_block(app_state, block['number']):
-            return
-
         logger.info('Fetching meta vaults')
         meta_vaults_map = await graph_get_vaults(
             is_meta_vault=True,
@@ -60,13 +53,11 @@ class ProcessMetaVaultTask(BaseTask):
 
             root_meta_vault = meta_vaults_map.get(vault)
             if not root_meta_vault:
-                app_state.meta_vault_update_block = block['number']
                 logger.error('Meta vault %s not found in subgraph', vault)
                 return
 
             if not root_meta_vault.sub_vaults:
                 logger.info('Meta vault %s has no sub vaults. Skipping.', vault)
-                app_state.meta_vault_update_block = block['number']
                 return
 
             # check current gas prices
@@ -90,21 +81,6 @@ class ProcessMetaVaultTask(BaseTask):
 
             # Deposit to sub vaults if there are withdrawable assets
             await process_deposit_to_sub_vaults(meta_vault_address=vault)
-
-        app_state.meta_vault_update_block = block['number']
-
-
-async def _check_meta_vault_block(app_state: AppState, block_number: BlockNumber) -> bool:
-    last_processed_block = app_state.meta_vault_update_block
-    meta_vault_update_blocks_interval = (
-        settings.meta_vault_update_interval // settings.network_config.SECONDS_PER_BLOCK
-    )
-    if (
-        last_processed_block
-        and last_processed_block + meta_vault_update_blocks_interval >= block_number
-    ):
-        return False
-    return True
 
 
 async def meta_vault_tree_update_state(
