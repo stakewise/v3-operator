@@ -111,7 +111,7 @@ class TestMetaVaultTreeUpdateStateCalls:
 
 
 class GraphMock:
-    def __init__(self, vaults: list[ChecksumAddress]):
+    def __init__(self, vaults: list[Vault]):
         self._vaults = {vault.address: vault for vault in vaults}
 
     async def graph_get_vaults(self, vaults: list[ChecksumAddress]) -> dict[ChecksumAddress, Vault]:
