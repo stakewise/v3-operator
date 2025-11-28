@@ -12,7 +12,6 @@ from web3.types import Gwei
 from src.commands.start.base import log_start, setup_sentry
 from src.common.clients import setup_clients
 from src.common.logging import LOG_LEVELS, setup_logging
-from src.common.protocol_config import update_oracles_cache
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_addresses
 from src.config.networks import AVAILABLE_NETWORKS, GNOSIS, MAINNET, NETWORKS
@@ -134,7 +133,7 @@ def process_metavaults(
     wallet_file: str | None,
     wallet_password_file: str | None,
     max_fee_per_gas_gwei: int | None,
-    meta_vault_min_deposit_amount_gwei: int,
+    min_deposit_amount_gwei: int,
 ) -> None:
     vault_addresses = [to_checksum_address(address) for address in vaults.split(',')]
     settings.set(
@@ -151,7 +150,7 @@ def process_metavaults(
         max_fee_per_gas_gwei=max_fee_per_gas_gwei,
         log_level=log_level,
         log_format=log_format,
-        meta_vault_min_deposit_amount_gwei=Gwei(meta_vault_min_deposit_amount_gwei),
+        meta_vault_min_deposit_amount_gwei=Gwei(min_deposit_amount_gwei),
     )
     try:
         asyncio.run(main(vault_addresses))
@@ -166,9 +165,6 @@ async def main(vaults: list[ChecksumAddress]) -> None:
     await setup_clients()
     log_start()
 
-    logger.info('Updating oracles cache...')
-    await update_oracles_cache()
-
-    logger.info('Started operator service')
+    logger.info('Started meta vault processing')
     with InterruptHandler() as interrupt_handler:
         await ProcessMetaVaultTask(vaults).run(interrupt_handler)

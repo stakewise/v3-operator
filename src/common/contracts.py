@@ -13,10 +13,10 @@ from web3.contract.async_contract import (
     AsyncContractEvents,
     AsyncContractFunctions,
 )
-from web3.types import BlockNumber, ChecksumAddress, EventData, TxParams, Wei
+from web3.types import BlockNumber, ChecksumAddress, EventData, Wei
 
 from src.common.clients import execution_client as default_execution_client
-from src.common.execution import is_out_of_gas_error, transaction_gas_wrapper
+from src.common.execution import transaction_gas_wrapper
 from src.common.typings import (
     ExitQueueMissingAssetsParams,
     HarvestParams,
@@ -460,23 +460,8 @@ class MulticallContract(ContractWrapper):
         data: list[tuple[ChecksumAddress, HexStr]],
     ) -> HexStr:
         tx_function = self.contract.functions.aggregate(data)
-        try:
-            tx_function = self.contract.functions.aggregate(data)
-            tx_hash = await transaction_gas_wrapper(tx_function)
-            return Web3.to_hex(tx_hash)
-        # Can receive "out of gas" error for some nodes. Handle it with manual gas setup
-        except ValueError as outer_e:
-            if not is_out_of_gas_error(outer_e):
-                raise outer_e
-            for gas in range(100_000, 500_000, 50_000):
-                try:
-                    tx_params: TxParams = {'gas': gas * len(data)}
-                    tx_hash = await transaction_gas_wrapper(tx_function, tx_params=tx_params)
-                    return Web3.to_hex(tx_hash)
-                except ValueError as inner_e:
-                    if not is_out_of_gas_error(inner_e):
-                        raise inner_e
-            raise outer_e
+        tx_hash = await transaction_gas_wrapper(tx_function)
+        return Web3.to_hex(tx_hash)
 
 
 class ValidatorsCheckerContract(ContractWrapper):

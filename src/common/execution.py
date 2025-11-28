@@ -394,19 +394,6 @@ def _is_fee_too_low_error(e: ValueError) -> bool:
     return code == -32010
 
 
-def is_out_of_gas_error(e: ValueError) -> bool:
-    code = None
-    message = None
-    if e.args and isinstance(e.args[0], dict):
-        code = e.args[0].get('code')
-        message = e.args[0].get('message')
-    if code != -32000:
-        return False
-    if message != 'Gas estimation failed due to out of gas':
-        return False
-    return True
-
-
 def _is_alchemy_used() -> bool:
     for endpoint in settings.execution_endpoints:
         domain = urlparse(endpoint).netloc
