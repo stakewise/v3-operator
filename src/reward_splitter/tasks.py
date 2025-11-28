@@ -10,7 +10,7 @@ from src.common.contracts import RewardSplitterContract, RewardSplitterEncoder
 from src.common.execution import check_gas_price, transaction_gas_wrapper
 from src.common.harvest import get_harvest_params
 from src.common.tasks import BaseTask
-from src.common.typings import HarvestParams
+from src.common.typings import ExitRequest, HarvestParams
 from src.common.wallet import wallet
 from src.config.networks import ZERO_CHECKSUM_ADDRESS
 from src.config.settings import FEE_SPLITTER_INTERVAL, FEE_SPLITTER_MIN_ASSETS, settings
@@ -18,7 +18,7 @@ from src.reward_splitter.graph import (
     graph_get_claimable_exit_requests,
     graph_get_reward_splitters,
 )
-from src.reward_splitter.typings import ExitRequest, RewardSplitter
+from src.reward_splitter.typings import RewardSplitter
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ class SplitRewardTask(BaseTask):
                 execution_client=execution_client,
             )
             tx_function = contract.functions.multicall(address_calls)
-            tx = await transaction_gas_wrapper(tx_function=tx_function)
+            tx = await transaction_gas_wrapper(tx_function)
             tx_hash = Web3.to_hex(tx)
             logger.info('Waiting for transaction %s confirmation', tx_hash)
 

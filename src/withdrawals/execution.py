@@ -26,7 +26,7 @@ async def submit_withdraw_validators(
             _encode_withdrawals(withdrawals),
             Web3.to_bytes(hexstr=validators_manager_signature),
         )
-        tx = await transaction_gas_wrapper(tx_function=tx_function, tx_params={'value': tx_fee})
+        tx = await transaction_gas_wrapper(tx_function, tx_params={'value': tx_fee})
     except Exception as e:
         logger.info('Failed to withdraw from validators: %s', format_error(e))
         return None

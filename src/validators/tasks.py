@@ -10,9 +10,10 @@ from web3.types import BlockNumber, Gwei
 
 from src.common.clients import execution_client
 from src.common.contracts import VaultContract, validators_registry_contract
-from src.common.execution import check_gas_price, get_protocol_config
+from src.common.execution import check_gas_price
 from src.common.harvest import get_harvest_params
 from src.common.metrics import metrics
+from src.common.protocol_config import get_protocol_config
 from src.common.typings import HarvestParams, ValidatorsRegistrationMode, ValidatorType
 from src.config.settings import (
     MIN_ACTIVATION_BALANCE_GWEI,

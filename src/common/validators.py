@@ -34,6 +34,21 @@ def validate_eth_address(
     raise click.BadParameter('Invalid Ethereum address')
 
 
+def validate_eth_addresses(
+    ctx: click.Context, param: click.Parameter, value: str | None
+) -> str | None:
+    if not value:
+        return None
+    try:
+        for address in value.split(','):
+            if not is_address(address):
+                raise click.BadParameter('Invalid Ethereum address')
+    except ValueError:
+        pass
+
+    return value
+
+
 def validate_db_uri(ctx: click.Context, param: click.Parameter, value: str) -> str:
     pattern = re.compile(r'.+:\/\/.+:.*@.+\/.+')
     if not pattern.match(value):

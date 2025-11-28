@@ -6,11 +6,8 @@ from web3 import Web3
 from web3.types import Wei
 
 from src.common.clients import graph_client
-from src.reward_splitter.typings import (
-    ExitRequest,
-    RewardSplitter,
-    RewardSplitterShareHolder,
-)
+from src.common.typings import ExitRequest
+from src.reward_splitter.typings import RewardSplitter, RewardSplitterShareHolder
 
 
 async def graph_get_reward_splitters(

@@ -15,8 +15,8 @@ from src.common.app_state import AppState
 from src.common.clients import execution_client
 from src.common.contracts import keeper_contract
 from src.common.exceptions import NotEnoughOracleApprovalsError
-from src.common.execution import get_protocol_config
 from src.common.metrics import metrics
+from src.common.protocol_config import get_protocol_config
 from src.common.tasks import BaseTask
 from src.common.utils import get_current_timestamp, is_block_finalized, warning_verbose
 from src.config.settings import settings

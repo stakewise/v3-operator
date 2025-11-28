@@ -26,7 +26,7 @@ async def submit_exit_signatures(
             approval.ipfs_hash,
             approval.signatures,
         )
-        tx = await transaction_gas_wrapper(tx_function=tx_function)
+        tx = await transaction_gas_wrapper(tx_function)
 
     except Exception as e:
         logger.error('Failed to update exit signatures: %s', format_error(e))

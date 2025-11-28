@@ -19,9 +19,9 @@ from src.common.execution import (
     get_consolidations_count,
     get_pending_consolidations,
     get_pending_partial_withdrawals,
-    get_protocol_config,
 )
 from src.common.logging import LOG_LEVELS, setup_logging
+from src.common.protocol_config import get_protocol_config
 from src.common.utils import log_verbose
 from src.common.validators import (
     validate_eth_address,
