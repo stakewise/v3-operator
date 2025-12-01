@@ -45,6 +45,10 @@ class ProcessMetaVaultTask(BaseTask):
         - Updates the state for the entire meta vault tree.
         - Deposits to sub vaults if there are withdrawable assets.
         """
+        # check current gas prices
+        if not await check_gas_price():
+            return
+
         logger.info('Fetching meta vaults')
         for vault in self.vaults:
             # Refresh the meta vaults map to include updates
@@ -57,15 +61,11 @@ class ProcessMetaVaultTask(BaseTask):
             root_meta_vault = meta_vaults_map.get(vault)
             if not root_meta_vault:
                 logger.error('Meta vault %s not found in subgraph', vault)
-                return
+                continue
 
             if not root_meta_vault.sub_vaults:
                 logger.info('Meta vault %s has no sub vaults. Skipping.', vault)
-                return
-
-            # check current gas prices
-            if not await check_gas_price():
-                return
+                continue
 
             # Update the state for the entire meta vault tree
             try:
@@ -80,7 +80,7 @@ class ProcessMetaVaultTask(BaseTask):
                     root_meta_vault.address,
                     e.exit_request.position_ticket,
                 )
-                return
+                continue
 
             # Deposit to sub vaults if there are withdrawable assets
             await process_deposit_to_sub_vaults(meta_vault_address=vault)
@@ -141,13 +141,11 @@ async def meta_vault_update_state(
 
     calls: list[tuple[ChecksumAddress, HexStr]] = []
     tx_steps: list[str] = []
-    vaults_updated: set[ChecksumAddress] = set()
 
     # Filter out calls for vaults that have already been updated
     for c in calls_with_description:
         calls.append((c.address, c.data))
         tx_steps.append(c.description)
-        vaults_updated.add(c.address)
 
     if not calls:
         logger.info('Meta vault %s state is up-to-date, no updates needed', meta_vault.address)

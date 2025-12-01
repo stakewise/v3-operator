@@ -30,7 +30,7 @@ async def wait_for_graph_node_sync(block_number: BlockNumber) -> None:
         graph_block_number = response['_meta']['block']['number']
         if graph_block_number < block_number:
             logger.info(
-                'Waiting the graph node node located at %s complete synchronization to block %s.',
+                'Waiting for the graph node located at %s to complete synchronization to block %s.',
                 settings.graph_endpoint,
                 block_number,
             )
