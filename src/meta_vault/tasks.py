@@ -47,6 +47,8 @@ class ProcessMetaVaultTask(BaseTask):
         """
         logger.info('Fetching meta vaults')
         for vault in self.vaults:
+            # Refresh the meta vaults map to include updates
+            # made by previous meta vault transactions
             meta_vaults_map = await graph_get_vaults(
                 is_meta_vault=True,
             )
