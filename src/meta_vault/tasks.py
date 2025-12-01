@@ -14,6 +14,7 @@ from src.common.contracts import (
     multicall_contract,
 )
 from src.common.execution import check_gas_price
+from src.common.graph import wait_for_graph_node_sync
 from src.common.tasks import BaseTask
 from src.common.typings import ExitRequest
 from src.config.networks import ZERO_CHECKSUM_ADDRESS
@@ -45,10 +46,10 @@ class ProcessMetaVaultTask(BaseTask):
         - Deposits to sub vaults if there are withdrawable assets.
         """
         logger.info('Fetching meta vaults')
-        meta_vaults_map = await graph_get_vaults(
-            is_meta_vault=True,
-        )
         for vault in self.vaults:
+            meta_vaults_map = await graph_get_vaults(
+                is_meta_vault=True,
+            )
             logger.info('Processing meta vault: %s', vault)
 
             root_meta_vault = meta_vaults_map.get(vault)
@@ -168,6 +169,7 @@ async def meta_vault_update_state(
             f'Failed to confirm tx: {tx_hash}',
         )
     logger.info('Transaction %s confirmed', tx_hash)
+    await wait_for_graph_node_sync(tx_receipt['blockNumber'])
 
 
 async def _get_meta_vault_update_state_calls(
@@ -391,3 +393,4 @@ async def process_deposit_to_sub_vaults(meta_vault_address: ChecksumAddress) -> 
             f'Failed to confirm tx: {tx_hash}',
         )
     logger.info('Transaction %s confirmed', tx_hash)
+    await wait_for_graph_node_sync(tx_receipt['blockNumber'])

@@ -98,6 +98,9 @@ class TestMetaVaultTreeUpdateStateCalls:
             'src.meta_vault.tasks.graph_get_vaults',
             graph_mock.graph_get_vaults,
         ), mock.patch(
+            'src.meta_vault.tasks.wait_for_graph_node_sync',
+            return_value=True,
+        ), mock.patch(
             'src.meta_vault.tasks.get_claimable_sub_vault_exit_requests', return_value=[]
         ), mock.patch(
             'src.meta_vault.tasks.is_meta_vault_rewards_nonce_outdated',
