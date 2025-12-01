@@ -37,5 +37,3 @@ async def wait_for_graph_node_sync(block_number: BlockNumber) -> None:
             await asyncio.sleep(settings.network_config.SECONDS_PER_BLOCK)
             continue
         return
-
-    return
