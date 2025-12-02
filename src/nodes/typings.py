@@ -28,7 +28,7 @@ class Release:
         :param os_name: The name of the operating system as returned by `platform.system()`
         Returns the OS-specific binary name.
         """
-        # On Windows, we need to to include .exe extension
+        # On Windows, we need to include .exe extension
         if os_name == 'Windows':
             return f'{self.app_name}.exe'
 

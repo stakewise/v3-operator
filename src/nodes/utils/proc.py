@@ -31,7 +31,7 @@ async def kill_proc(proc: asyncio.subprocess.Process) -> None:
                 proc.terminate()
                 await wait_for_proc_exit(proc, 10)
         except KeyboardInterrupt:
-            logger.info('Trying to close process. Press Ctrl+C 1 more times to force quit')
+            logger.info('Trying to close process. Press Ctrl+C 1 more time to force quit')
 
         # Send SIGKILL to working processes
         if proc.returncode is None:
