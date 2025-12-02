@@ -9,6 +9,7 @@ from src.common.typings import ValidatorType
 from src.common.validators import (
     validate_eth_address,
     validate_max_validator_balance_gwei,
+    validate_min_deposit_amount_gwei,
 )
 from src.config.networks import GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
@@ -205,6 +206,7 @@ start_common_options = [
         help=f'Minimum amount in gwei to deposit into validator.'
         f' The default is {DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI}',
         default=DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
+        callback=validate_min_deposit_amount_gwei,
     ),
     click.option(
         '--vault-min-balance-gwei',

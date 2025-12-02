@@ -346,6 +346,9 @@ MIN_WITHDRAWAL_AMOUNT_GWEI: Gwei = Gwei(1)
 MIN_ACTIVATION_BALANCE: Wei = Web3.to_wei(32, 'ether')
 MIN_ACTIVATION_BALANCE_GWEI: Gwei = Gwei(int(Web3.from_wei(MIN_ACTIVATION_BALANCE, 'gwei')))
 
+MIN_DEPOSIT_AMOUNT: Wei = Web3.to_wei(1, 'ether')
+MIN_DEPOSIT_AMOUNT_GWEI: Gwei = Gwei(int(Web3.from_wei(MIN_DEPOSIT_AMOUNT, 'gwei')))
+
 MAX_EFFECTIVE_BALANCE: Wei = Web3.to_wei(2048, 'ether')
 MAX_EFFECTIVE_BALANCE_GWEI: Gwei = Gwei(int(Web3.from_wei(MAX_EFFECTIVE_BALANCE, 'gwei')))
 
