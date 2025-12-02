@@ -10,7 +10,7 @@ from web3.types import BlockNumber, Gwei
 
 from src.common.clients import execution_client
 from src.common.contracts import VaultContract, validators_registry_contract
-from src.common.execution import build_gas_manager, get_protocol_config
+from src.common.execution import check_gas_price, get_protocol_config
 from src.common.harvest import get_harvest_params
 from src.common.metrics import metrics
 from src.common.typings import HarvestParams, ValidatorsRegistrationMode, ValidatorType
@@ -23,6 +23,7 @@ from src.validators.consensus import fetch_compounding_validators_balances
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import (
     EmptyRelayerResponseException,
+    FundingException,
     MissingAvailableValidatorsException,
 )
 from src.validators.execution import get_withdrawable_assets
@@ -60,8 +61,7 @@ class ValidatorRegistrationSubtask:
         if vault_assets < settings.min_deposit_amount_gwei:
             return
 
-        gas_manager = build_gas_manager()
-        if not await gas_manager.check_gas_price():
+        if not await check_gas_price():
             return
 
         if settings.validator_type == ValidatorType.V1:
@@ -75,32 +75,14 @@ class ValidatorRegistrationSubtask:
             return
 
         if not settings.disable_validators_funding:
-            compounding_validators_balances = await fetch_compounding_validators_balances()
-            funding_amounts = _get_funding_amounts(
-                compounding_validators_balances=compounding_validators_balances,
-                vault_assets=vault_assets,
-            )
-
-            if funding_amounts:
-                if not await _is_funding_interval_passed():
-                    return
-
-                for validator_fundings_chunk in chunkify(
-                    list(funding_amounts.items()), VALIDATORS_FUNDING_BATCH_SIZE
-                ):
-                    try:
-                        tx_hash = await fund_compounding_validators(
-                            validator_fundings=validator_fundings_chunk,
-                            harvest_params=harvest_params,
-                            relayer=self.relayer,
-                        )
-                        if not tx_hash:
-                            return
-
-                        total_funded = sum(amount for _, amount in validator_fundings_chunk)
-                        vault_assets = Gwei(max(vault_assets - total_funded, 0))
-                    except EmptyRelayerResponseException:
-                        return
+            try:
+                vault_assets = await self.process_funding(
+                    vault_assets=vault_assets,
+                    harvest_params=harvest_params,
+                )
+            except FundingException as e:
+                logger.warning('Funding failed: %s', e)
+                return
 
         if not settings.disable_validators_registration:
             await register_new_validators(
@@ -109,6 +91,48 @@ class ValidatorRegistrationSubtask:
                 keystore=self.keystore,
                 relayer=self.relayer,
             )
+
+    async def process_funding(
+        self,
+        vault_assets: Gwei,
+        harvest_params: HarvestParams | None,
+    ) -> Gwei:
+        """
+        Processes funding compounding validators.
+        Returns the remaining vault assets if funding is successful.
+        Raises FundingException on failure.
+        """
+        compounding_validators_balances = await fetch_compounding_validators_balances()
+        funding_amounts = _get_funding_amounts(
+            compounding_validators_balances=compounding_validators_balances,
+            vault_assets=vault_assets,
+        )
+
+        if not funding_amounts:
+            return vault_assets
+
+        if not await _is_funding_interval_passed():
+            raise FundingException('Funding interval has not passed yet')
+
+        for validator_fundings_chunk in chunkify(
+            list(funding_amounts.items()), VALIDATORS_FUNDING_BATCH_SIZE
+        ):
+            try:
+                tx_hash = await fund_compounding_validators(
+                    validator_fundings=validator_fundings_chunk,
+                    harvest_params=harvest_params,
+                    relayer=self.relayer,
+                )
+            except EmptyRelayerResponseException as e:
+                raise FundingException('Empty response from relayer') from e
+
+            if not tx_hash:
+                raise FundingException('Funding transaction failed')
+
+            total_funded = sum(amount for _, amount in validator_fundings_chunk)
+            vault_assets = Gwei(max(vault_assets - total_funded, 0))
+
+        return vault_assets
 
 
 async def fund_compounding_validators(
@@ -220,8 +244,7 @@ async def register_new_validators(
             )
         validators_manager_signature = relayer_validators_manager_signature
 
-    gas_manager = build_gas_manager()
-    if not await gas_manager.check_gas_price(high_priority=True):
+    if not await check_gas_price(high_priority=True):
         return None
 
     logger.info(

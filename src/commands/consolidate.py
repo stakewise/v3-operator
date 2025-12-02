@@ -14,7 +14,7 @@ from src.common.clients import setup_clients
 from src.common.consensus import get_chain_latest_head
 from src.common.contracts import VaultContract
 from src.common.execution import (
-    build_gas_manager,
+    check_gas_price,
     get_consolidation_request_fee,
     get_consolidations_count,
     get_pending_consolidations,
@@ -326,8 +326,7 @@ async def main(
             abort=True,
         )
 
-    gas_manager = build_gas_manager()
-    if not await gas_manager.check_gas_price():
+    if not await check_gas_price():
         return
 
     protocol_config = await get_protocol_config()
@@ -405,7 +404,9 @@ async def _check_public_keys(
         )
 
     # Fetch source and target validators
-    validators = await fetch_consensus_validators(source_public_keys + [target_public_key])
+    validators = await fetch_consensus_validators(
+        list(set(source_public_keys + [target_public_key]))
+    )
     pubkey_to_validator = {val.public_key: val for val in validators}
 
     source_validators: list[ConsensusValidator] = []
