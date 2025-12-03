@@ -4,7 +4,6 @@ import sys
 from pathlib import Path
 
 import click
-from decouple import config as decouple_config
 from eth_typing import ChecksumAddress
 from eth_utils import to_checksum_address
 from sw_utils import InterruptHandler
