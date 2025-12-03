@@ -7,9 +7,10 @@ import src
 from src.common.checks import wait_execution_catch_up_consensus
 from src.common.clients import setup_clients
 from src.common.consensus import get_chain_finalized_head
-from src.common.execution import WalletTask, update_oracles_cache
+from src.common.execution import WalletTask
 from src.common.logging import setup_logging
 from src.common.metrics import MetricsTask, metrics, metrics_server
+from src.common.protocol_config import update_oracles_cache
 from src.common.startup_check import startup_checks
 from src.common.tasks import BaseTask
 from src.common.typings import ValidatorsRegistrationMode

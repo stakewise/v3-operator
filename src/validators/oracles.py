@@ -14,7 +14,7 @@ from web3 import Web3
 
 from src.common.contracts import validators_registry_contract
 from src.common.exceptions import NotEnoughOracleApprovalsError
-from src.common.execution import get_protocol_config
+from src.common.protocol_config import get_protocol_config
 from src.common.typings import OracleApproval, OraclesApproval, ValidatorType
 from src.common.utils import (
     RateLimiter,

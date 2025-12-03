@@ -2,7 +2,7 @@ import asyncio
 import json
 import os
 from functools import cached_property
-from typing import Callable
+from typing import Callable, cast
 
 from eth_typing import HexStr
 from sw_utils.typings import Bytes32
@@ -16,6 +16,7 @@ from web3.contract.async_contract import (
 from web3.types import BlockNumber, ChecksumAddress, EventData, Wei
 
 from src.common.clients import execution_client as default_execution_client
+from src.common.execution import transaction_gas_wrapper
 from src.common.typings import (
     ExitQueueMissingAssetsParams,
     HarvestParams,
@@ -26,6 +27,7 @@ from src.config.settings import (
     EVENTS_CONCURRENCY_LIMIT,
     settings,
 )
+from src.meta_vault.typings import SubVaultExitRequest
 from src.validators.typings import V2ValidatorEventData
 from src.withdrawals.typings import WithdrawalEvent
 
@@ -120,8 +122,29 @@ class VaultStateMixin:
         return update_state_call
 
 
+class VaultEncoder:
+    def __init__(self, contract: ContractWrapper):
+        self.contract = contract
+
+    def update_state(self, harvest_params: HarvestParams) -> HexStr:
+        return self.contract.encode_abi(
+            fn_name='updateState',
+            args=[
+                (
+                    harvest_params.rewards_root,
+                    harvest_params.reward,
+                    harvest_params.unlocked_mev_reward,
+                    harvest_params.proof,
+                ),
+            ],
+        )
+
+
 class VaultContract(ContractWrapper, VaultStateMixin):
     abi_path = 'abi/IEthVault.json'
+
+    def encoder(self) -> VaultEncoder:
+        return VaultEncoder(self)
 
     async def get_registered_validators_public_keys(
         self, from_block: BlockNumber, to_block: BlockNumber
@@ -193,6 +216,9 @@ class VaultContract(ContractWrapper, VaultStateMixin):
 
     async def validators_manager(self) -> ChecksumAddress:
         return await self.contract.functions.validatorsManager().call()
+
+    async def get_exit_queue_index(self, position_ticket: int) -> int:
+        return await self.contract.functions.getExitQueueIndex(position_ticket).call()
 
     async def get_validator_withdrawal_submitted_events(
         self,
@@ -273,6 +299,15 @@ class KeeperContract(ContractWrapper):
         )
         return voting_info
 
+    async def get_last_rewards_updated_event(
+        self, from_block: BlockNumber, to_block: BlockNumber
+    ) -> EventData | None:
+        return await self._get_last_event(
+            cast(type[AsyncContractEvent], self.contract.events.RewardsUpdated),
+            from_block=from_block,
+            to_block=to_block,
+        )
+
     async def get_exit_signatures_updated_event(
         self,
         vault: ChecksumAddress,
@@ -343,6 +378,72 @@ class RewardSplitterEncoder:
         )
 
 
+class MetaVaultContract(ContractWrapper):
+    abi_path = 'abi/IEthMetaVault.json'
+
+    async def withdrawable_assets(self) -> Wei:
+        return await self.contract.functions.withdrawableAssets().call()
+
+    async def get_exit_queue_index(self, position_ticket: int) -> int:
+        return await self.contract.functions.getExitQueueIndex(position_ticket).call()
+
+    async def deposit_to_sub_vaults(self) -> HexStr:
+        tx_function = self.contract.functions.depositToSubVaults()
+        tx_hash = await transaction_gas_wrapper(tx_function)
+        return Web3.to_hex(tx_hash)
+
+    def encoder(self) -> 'MetaVaultEncoder':
+        return MetaVaultEncoder(self)
+
+    async def get_last_rewards_nonce_updated_event(
+        self, from_block: BlockNumber, to_block: BlockNumber
+    ) -> EventData | None:
+        """
+        Returns the latest RewardsNonceUpdated event data from the contract.
+        """
+        event = await self._get_last_event(
+            event=cast(type[AsyncContractEvent], self.contract.events.RewardsNonceUpdated),
+            from_block=from_block,
+            to_block=to_block,
+        )
+        return event
+
+
+class MetaVaultEncoder:
+    def __init__(self, contract: MetaVaultContract):
+        self.contract = contract
+
+    def claim_sub_vaults_exited_assets(
+        self, sub_vault_exit_requests: list[SubVaultExitRequest]
+    ) -> HexStr:
+        exit_requests_arg: list[tuple] = []
+
+        for request in sub_vault_exit_requests:
+            exit_requests_arg.append(
+                (
+                    request.exit_queue_index,
+                    request.vault,
+                    request.timestamp,
+                )
+            )
+        return self.contract.encode_abi(
+            fn_name='claimSubVaultsExitedAssets', args=[exit_requests_arg]
+        )
+
+    def update_state(self, harvest_params: HarvestParams) -> HexStr:
+        return self.contract.encode_abi(
+            fn_name='updateState',
+            args=[
+                (
+                    harvest_params.rewards_root,
+                    harvest_params.reward,
+                    harvest_params.unlocked_mev_reward,
+                    harvest_params.proof,
+                ),
+            ],
+        )
+
+
 class MulticallContract(ContractWrapper):
     abi_path = 'abi/Multicall.json'
     settings_key = 'MULTICALL_CONTRACT_ADDRESS'
@@ -353,6 +454,14 @@ class MulticallContract(ContractWrapper):
         block_number: BlockNumber | None = None,
     ) -> tuple[BlockNumber, list]:
         return await self.contract.functions.aggregate(data).call(block_identifier=block_number)
+
+    async def tx_aggregate(
+        self,
+        data: list[tuple[ChecksumAddress, HexStr]],
+    ) -> HexStr:
+        tx_function = self.contract.functions.aggregate(data)
+        tx_hash = await transaction_gas_wrapper(tx_function)
+        return Web3.to_hex(tx_hash)
 
 
 class ValidatorsCheckerContract(ContractWrapper):
