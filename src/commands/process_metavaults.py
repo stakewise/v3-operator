@@ -79,6 +79,13 @@ logger = logging.getLogger(__name__)
     help='Comma separated list of API endpoints for execution nodes.',
 )
 @click.option(
+    '--execution-jwt-secret',
+    type=str,
+    envvar='EXECUTION_JWT_SECRET',
+    help='JWT secret key used for signing and verifying JSON Web Tokens'
+    ' when connecting to execution nodes.',
+)
+@click.option(
     '--graph-endpoint',
     type=str,
     envvar='GRAPH_ENDPOINT',
@@ -119,6 +126,7 @@ logger = logging.getLogger(__name__)
 def process_metavaults(
     vaults: str,
     execution_endpoints: str,
+    execution_jwt_secret: str | None,
     graph_endpoint: str,
     network: str,
     verbose: bool,
@@ -151,6 +159,7 @@ def process_metavaults(
         vault=vault_addresses[0],
         vault_dir=Path.home() / '.stakewise',
         execution_endpoints=execution_endpoints,
+        execution_jwt_secret=execution_jwt_secret,
         graph_endpoint=graph_endpoint,
         verbose=verbose,
         network=network,
