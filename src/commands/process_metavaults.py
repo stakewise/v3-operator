@@ -109,6 +109,7 @@ logger = logging.getLogger(__name__)
     '--network',
     help='The network of the meta vaults.',
     prompt='Enter the network name',
+    envvar='NETWORK',
     type=click.Choice(
         AVAILABLE_NETWORKS,
         case_sensitive=False,
