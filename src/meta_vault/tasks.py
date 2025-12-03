@@ -49,10 +49,10 @@ class ProcessMetaVaultTask(BaseTask):
         if not await check_gas_price():
             return
 
-        logger.info('Fetching meta vaults')
         for vault in self.vaults:
             # Refresh the meta vaults map to include updates
             # made by previous meta vault transactions
+            logger.info('Fetching meta vaults')
             meta_vaults_map = await graph_get_vaults(
                 is_meta_vault=True,
             )
