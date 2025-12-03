@@ -46,14 +46,14 @@ logger = logging.getLogger(__name__)
     type=click.Path(exists=True, file_okay=True, dir_okay=False),
     envvar='WALLET_PASSWORD_FILE',
     help='Absolute path to the wallet password file. '
-    'Default is the file generated with "create-wallet" command.',
+    'Must be used if WALLET_PRIVATE_KEY environment variable is not set.',
 )
 @click.option(
     '--wallet-file',
     type=click.Path(exists=True, file_okay=True, dir_okay=False),
     envvar='WALLET_FILE',
     help='Absolute path to the wallet. '
-    'Default is the file generated with "create-wallet" command.',
+    'Must be used if WALLET_PRIVATE_KEY environment variable is not set.',
 )
 @click.option(
     '-v',
@@ -113,7 +113,9 @@ logger = logging.getLogger(__name__)
 )
 @click.option(
     '--network',
-    help='The network of the vault. Default is the network specified at "init" command.',
+    help='The network of the meta vaults.',
+    prompt='Enter the network name',
+    envvar='NETWORK',
     type=click.Choice(
         AVAILABLE_NETWORKS,
         case_sensitive=False,
@@ -135,6 +137,22 @@ def process_metavaults(
     max_fee_per_gas_gwei: int | None,
     min_deposit_amount_gwei: int,
 ) -> None:
+    # Validate wallet configuration
+    has_private_key = settings.wallet_private_key is not None
+    has_wallet_files = wallet_file is not None and wallet_password_file is not None
+
+    if not has_private_key and not has_wallet_files:
+        raise click.ClickException(
+            'Either WALLET_PRIVATE_KEY environment variable must be set, '
+            'or both --wallet-file and --wallet-password-file options must be provided.'
+        )
+
+    if has_private_key and has_wallet_files:
+        logger.warning(
+            'Both WALLET_PRIVATE_KEY and wallet files are provided. '
+            'WALLET_PRIVATE_KEY will take precedence.'
+        )
+
     vault_addresses = [to_checksum_address(address) for address in vaults.split(',')]
     settings.set(
         # mock vault and vault_dir

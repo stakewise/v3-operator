@@ -18,6 +18,10 @@ class Wallet:
 
     @cached_property
     def account(self) -> LocalAccount:
+        if settings.wallet_private_key:
+            # pylint: disable-next=no-value-for-parameter
+            return Account.from_key(settings.wallet_private_key)
+
         keystore_file = settings.wallet_file
         keystore_password_file = settings.wallet_password_file
         if not os.path.isfile(keystore_file):
