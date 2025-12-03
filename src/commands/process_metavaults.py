@@ -131,7 +131,7 @@ def process_metavaults(
     min_deposit_amount_gwei: int,
 ) -> None:
     # Validate wallet configuration
-    has_private_key = decouple_config('WALLET_PRIVATE_KEY', default=None) is not None
+    has_private_key = settings.wallet_private_key is not None
     has_wallet_files = wallet_file is not None and wallet_password_file is not None
 
     if not has_private_key and not has_wallet_files:
