@@ -113,6 +113,7 @@ class Settings(metaclass=Singleton):
     disable_full_withdrawals: bool = decouple_config(
         'DISABLE_FULL_WITHDRAWALS', default=False, cast=bool
     )
+    wallet_private_key: str | None = decouple_config('WALLET_PRIVATE_KEY', default=None)
 
     min_deposit_amount_gwei: Gwei
     vault_min_balance_gwei: Gwei

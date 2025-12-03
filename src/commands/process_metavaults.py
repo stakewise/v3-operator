@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 import click
+from decouple import config as decouple_config
 from eth_typing import ChecksumAddress
 from eth_utils import to_checksum_address
 from sw_utils import InterruptHandler
@@ -46,14 +47,14 @@ logger = logging.getLogger(__name__)
     type=click.Path(exists=True, file_okay=True, dir_okay=False),
     envvar='WALLET_PASSWORD_FILE',
     help='Absolute path to the wallet password file. '
-    'Default is the file generated with "create-wallet" command.',
+    'Must be used if WALLET_PRIVATE_KEY environment variable is not set.',
 )
 @click.option(
     '--wallet-file',
     type=click.Path(exists=True, file_okay=True, dir_okay=False),
     envvar='WALLET_FILE',
     help='Absolute path to the wallet. '
-    'Default is the file generated with "create-wallet" command.',
+    'Must be used if WALLET_PRIVATE_KEY environment variable is not set.',
 )
 @click.option(
     '-v',
@@ -77,13 +78,6 @@ logger = logging.getLogger(__name__)
     envvar='EXECUTION_ENDPOINTS',
     prompt='Enter the comma separated list of API endpoints for execution nodes',
     help='Comma separated list of API endpoints for execution nodes.',
-)
-@click.option(
-    '--execution-jwt-secret',
-    type=str,
-    envvar='EXECUTION_JWT_SECRET',
-    help='JWT secret key used for signing and verifying JSON Web Tokens'
-    ' when connecting to execution nodes.',
 )
 @click.option(
     '--graph-endpoint',
@@ -113,7 +107,8 @@ logger = logging.getLogger(__name__)
 )
 @click.option(
     '--network',
-    help='The network of the vault. Default is the network specified at "init" command.',
+    help='The network of the meta vaults.',
+    prompt='Enter the network name',
     type=click.Choice(
         AVAILABLE_NETWORKS,
         case_sensitive=False,
@@ -124,7 +119,6 @@ logger = logging.getLogger(__name__)
 def process_metavaults(
     vaults: str,
     execution_endpoints: str,
-    execution_jwt_secret: str | None,
     graph_endpoint: str,
     network: str,
     verbose: bool,
@@ -135,13 +129,28 @@ def process_metavaults(
     max_fee_per_gas_gwei: int | None,
     min_deposit_amount_gwei: int,
 ) -> None:
+    # Validate wallet configuration
+    has_private_key = decouple_config('WALLET_PRIVATE_KEY', default=None) is not None
+    has_wallet_files = wallet_file is not None and wallet_password_file is not None
+
+    if not has_private_key and not has_wallet_files:
+        raise click.ClickException(
+            'Either WALLET_PRIVATE_KEY environment variable must be set, '
+            'or both --wallet-file and --wallet-password-file options must be provided.'
+        )
+
+    if has_private_key and has_wallet_files:
+        logger.warning(
+            'Both WALLET_PRIVATE_KEY and wallet files are provided. '
+            'WALLET_PRIVATE_KEY will take precedence.'
+        )
+
     vault_addresses = [to_checksum_address(address) for address in vaults.split(',')]
     settings.set(
         # mock vault and vault_dir
         vault=vault_addresses[0],
         vault_dir=Path.home() / '.stakewise',
         execution_endpoints=execution_endpoints,
-        execution_jwt_secret=execution_jwt_secret,
         graph_endpoint=graph_endpoint,
         verbose=verbose,
         network=network,
