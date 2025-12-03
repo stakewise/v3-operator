@@ -13,7 +13,7 @@ from src.commands.create_keys import create_keys
 from src.commands.create_wallet import create_wallet
 from src.commands.exit_validators import exit_validators
 from src.commands.init import init
-from src.commands.process_metavaults import process_metavaults
+from src.commands.process_meta_vaults import process_meta_vaults
 from src.commands.recover import recover
 from src.commands.setup_remote_signer import setup_remote_signer
 from src.commands.start.hashi_vault import start_hashi_vault
@@ -39,7 +39,7 @@ def cli() -> None:
 cli.add_command(init)
 cli.add_command(create_keys)
 cli.add_command(consolidate)
-cli.add_command(process_metavaults)
+cli.add_command(process_meta_vaults)
 cli.add_command(setup_remote_signer)
 cli.add_command(create_wallet)
 cli.add_command(exit_validators)

@@ -123,7 +123,7 @@ logger = logging.getLogger(__name__)
 )
 @click.command(help='Updates states and processes deposits and exits for one or more meta vaults.')
 # pylint: disable-next=too-many-arguments,too-many-locals
-def process_metavaults(
+def process_meta_vaults(
     vaults: str,
     execution_endpoints: str,
     execution_jwt_secret: str | None,
