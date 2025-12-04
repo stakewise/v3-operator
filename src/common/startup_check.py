@@ -6,7 +6,6 @@ from os import path
 
 import click
 from aiohttp import ClientSession, ClientTimeout
-from gql import gql
 from sw_utils import IpfsFetchClient, get_consensus_client, get_execution_client
 from sw_utils.graph.client import GraphClient as SWGraphClient
 from sw_utils.pectra import get_pectra_vault_version
@@ -58,7 +57,7 @@ async def startup_checks() -> None:
 
     if settings.claim_fee_splitter or settings.process_meta_vault:
         logger.info('Checking graph nodes...')
-        await wait_for_graph_node()
+        await wait_for_graph_node_sync_to_chain_head()
 
     logger.info('Checking execution nodes network...')
     await _check_execution_nodes_network()
@@ -213,41 +212,28 @@ async def wait_for_execution_node() -> None:
         await asyncio.sleep(10)
 
 
-async def wait_for_graph_node() -> None:
+async def wait_for_graph_node_sync_to_chain_head() -> None:
     """
     Waits until graph node is available and synced to the finalized head of the chain.
     """
+    # Create non-retry graph client
     graph_client = SWGraphClient(
         endpoint=settings.graph_endpoint,
         request_timeout=settings.graph_request_timeout,
         retry_timeout=0,
         page_size=settings.graph_page_size,
     )
-    query = gql(
-        '''
-        query Meta {
-          _meta {
-            block {
-              number
-            }
-          }
-        }
-    '''
-    )
-    while True:
-        response = await graph_client.run_query(query)
-        graph_block_number = response['_meta']['block']['number']
-        chain_state = await get_chain_finalized_head()
-        if graph_block_number < chain_state.block_number:
-            logger.warning(
-                'The graph node node located at %s has not completed synchronization yet.',
-                settings.graph_endpoint,
-            )
-            await asyncio.sleep(10)
-            continue
-        return
+    chain_state = await get_chain_finalized_head()
+    graph_block_number = await graph_client.get_last_synced_block()
 
-    return
+    while graph_block_number < chain_state.block_number:
+        logger.warning(
+            'The graph node located at %s has not completed synchronization yet.',
+            settings.graph_endpoint,
+        )
+        await asyncio.sleep(settings.network_config.SECONDS_PER_BLOCK)
+        chain_state = await get_chain_finalized_head()
+        graph_block_number = await graph_client.get_last_synced_block()
 
 
 async def collect_healthy_oracles() -> list:
