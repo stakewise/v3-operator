@@ -228,7 +228,7 @@ async def wait_for_graph_node_sync_to_chain_head() -> None:
 
     while graph_block_number < chain_state.block_number:
         logger.warning(
-            'The graph node node located at %s has not completed synchronization yet.',
+            'The graph node located at %s has not completed synchronization yet.',
             settings.graph_endpoint,
         )
         await asyncio.sleep(settings.network_config.SECONDS_PER_BLOCK)
