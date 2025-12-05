@@ -32,6 +32,8 @@ class TokenJsonFormatter(JsonFormatter):
 
 def setup_logging() -> None:
     formatter: TokenJsonFormatter | TokenPlainFormatter
+    logHandler: logging.Handler
+
     if settings.log_format == LOG_JSON:
         formatter = TokenJsonFormatter('%(timestamp)s %(level)s %(name)s %(message)s')
         logHandler = logging.StreamHandler()
@@ -41,8 +43,12 @@ def setup_logging() -> None:
             handlers=[logHandler],
         )
     else:
+        if settings.enable_file_logging and settings.log_file_path is not None:
+            logHandler = logging.FileHandler(settings.log_file_path)
+        else:
+            logHandler = logging.StreamHandler()
+
         formatter = TokenPlainFormatter('%(asctime)s %(levelname)-8s %(message)s')
-        logHandler = logging.StreamHandler()
         logHandler.setFormatter(formatter)
         logging.basicConfig(
             datefmt=LOG_DATE_FORMAT,
