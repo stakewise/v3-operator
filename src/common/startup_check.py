@@ -9,7 +9,6 @@ import click
 import psutil
 from aiohttp import ClientSession, ClientTimeout
 from click import ClickException
-from gql import gql
 from sw_utils import (
     ChainHead,
     InterruptHandler,
@@ -30,8 +29,9 @@ from src.common.contracts import (
     keeper_contract,
     validators_registry_contract,
 )
-from src.common.execution import check_wallet_balance, get_protocol_config
+from src.common.execution import check_wallet_balance
 from src.common.harvest import get_harvest_params
+from src.common.protocol_config import get_protocol_config
 from src.common.typings import ValidatorsRegistrationMode
 from src.common.utils import format_error, round_down, warning_verbose
 from src.common.wallet import wallet
@@ -42,6 +42,7 @@ from src.config.settings import (
     WITHDRAWALS_INTERVAL,
     settings,
 )
+from src.meta_vault.graph import graph_get_vaults
 from src.validators.execution import get_withdrawable_assets
 from src.validators.keystores.local import LocalKeystore
 from src.validators.relayer import RelayerClient
@@ -79,9 +80,27 @@ async def startup_checks() -> None:
     chain_state = await get_chain_finalized_head()
     await wait_execution_catch_up_consensus(chain_state)
 
-    if settings.claim_fee_splitter:
+    logger.info('Checking execution nodes network...')
+    await _check_execution_nodes_network()
+
+    logger.info('Checking that consensus and execution nodes are in sync...')
+    chain_state = await get_chain_finalized_head()
+    await wait_execution_catch_up_consensus(chain_state)
+
+    if settings.claim_fee_splitter or settings.process_meta_vault:
         logger.info('Checking graph nodes...')
-        await wait_for_graph_node()
+        await wait_for_graph_node_sync_to_chain_head()
+
+    logger.info('Checking execution nodes network...')
+    await _check_execution_nodes_network()
+
+    logger.info('Checking that consensus and execution nodes are in sync...')
+    chain_state = await get_chain_finalized_head()
+    await wait_execution_catch_up_consensus(chain_state)
+
+    if settings.claim_fee_splitter or settings.process_meta_vault:
+        logger.info('Checking graph nodes...')
+        await wait_for_graph_node_sync_to_chain_head()
 
     logger.info('Checking oracles config...')
     await _check_events_logs()
@@ -130,6 +149,8 @@ async def startup_checks() -> None:
             'WITHDRAWALS_INTERVAL setting should be less than '
             f'force withdrawals period({protocol_config.force_withdrawals_period} seconds)'
         )
+    if settings.process_meta_vault:
+        await _check_is_meta_vault()
 
 
 def validate_settings() -> None:
@@ -139,7 +160,7 @@ def validate_settings() -> None:
     if not settings.consensus_endpoints:
         raise ClickException('CONSENSUS_ENDPOINTS is missing')
 
-    if not settings.graph_endpoint and settings.claim_fee_splitter:
+    if not settings.graph_endpoint and (settings.claim_fee_splitter or settings.process_meta_vault):
         raise ClickException('GRAPH_ENDPOINT is missing')
 
     if settings.run_nodes and settings.execution_endpoints != [DEFAULT_EXECUTION_ENDPOINT]:
@@ -275,41 +296,28 @@ async def wait_execution_catch_up_consensus(
             await asyncio.sleep(sleep_time)
 
 
-async def wait_for_graph_node() -> None:
+async def wait_for_graph_node_sync_to_chain_head() -> None:
     """
     Waits until graph node is available and synced to the finalized head of the chain.
     """
+    # Create non-retry graph client
     graph_client = SWGraphClient(
         endpoint=settings.graph_endpoint,
         request_timeout=settings.graph_request_timeout,
         retry_timeout=0,
         page_size=settings.graph_page_size,
     )
-    query = gql(
-        '''
-        query Meta {
-          _meta {
-            block {
-              number
-            }
-          }
-        }
-    '''
-    )
-    while True:
-        response = await graph_client.run_query(query)
-        graph_block_number = response['_meta']['block']['number']
-        chain_state = await get_chain_finalized_head()
-        if graph_block_number < chain_state.block_number:
-            logger.warning(
-                'The graph node node located at %s has not completed synchronization yet.',
-                settings.graph_endpoint,
-            )
-            await asyncio.sleep(10)
-            continue
-        return
+    chain_state = await get_chain_finalized_head()
+    graph_block_number = await graph_client.get_last_synced_block()
 
-    return
+    while graph_block_number < chain_state.block_number:
+        logger.warning(
+            'The graph node located at %s has not completed synchronization yet.',
+            settings.graph_endpoint,
+        )
+        await asyncio.sleep(settings.network_config.SECONDS_PER_BLOCK)
+        chain_state = await get_chain_finalized_head()
+        graph_block_number = await graph_client.get_last_synced_block()
 
 
 async def collect_healthy_oracles() -> list:
@@ -499,6 +507,12 @@ async def _check_vault_address() -> None:
         await VaultContract(address=settings.vault).version()
     except BadFunctionCallOutput as e:
         raise ClickException(f'Invalid vault contract address {settings.vault}') from e
+
+
+async def _check_is_meta_vault() -> None:
+    meta_vaults = await graph_get_vaults(is_meta_vault=True)
+    if settings.vault not in meta_vaults:
+        raise ValueError(f'Vault {settings.vault} is not a meta vault')
 
 
 def check_hardware_requirements(data_dir: Path, network: str, no_confirm: bool) -> None:

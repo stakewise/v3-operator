@@ -21,7 +21,7 @@ async def submit_harvest_transaction(harvest_params: HarvestParams) -> HexStr | 
     ]
     try:
         tx_function = multicall_contract.functions.aggregate(calls)
-        tx = await transaction_gas_wrapper(tx_function=tx_function)
+        tx = await transaction_gas_wrapper(tx_function)
         tx_hash = Web3.to_hex(tx)
     except (ValueError, ContractLogicError) as e:
         logger.error('Failed to harvest: %s', format_error(e))

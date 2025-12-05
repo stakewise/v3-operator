@@ -80,6 +80,7 @@ def hide_tokens(msg: str) -> str:
 def _create_hidden_endpoints() -> dict[str, str]:
     results = {}
     endpoints = settings.execution_endpoints + settings.consensus_endpoints
+    endpoints = [endpoint for endpoint in endpoints if endpoint]
     for endpoint in endpoints:
         if any(e in endpoint for e in LOG_WHITELISTED_DOMAINS):
             continue
