@@ -433,7 +433,6 @@ def parse_stage_progress(log_line: str) -> SyncStageProgress | None:
     target = int(match.group('target'))
 
     # Convert log_time to a datetime object
-    # Note: timezone may not be UTC, but it does not matter for ETA calculation
     log_time = datetime.strptime(log_time_str, '%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=timezone.utc)
 
     return SyncStageProgress(
