@@ -80,7 +80,7 @@ def test_token_formatter(raw_endpoint, hidden_endpoint):
         ),
     ],
 )
-def test_token_formatter_endswith_backslash(raw_endpoint, hidden_endpoint):
+def test_token_formatter_with_trailing_slash(raw_endpoint, hidden_endpoint):
     execution_endpoints = [
         'http://localhost:8545/',
         'https://rpc.public-node.io/',

@@ -80,12 +80,7 @@ def _create_hidden_endpoints() -> dict[str, str]:
             continue
         parsed_endpoint = urlparse(endpoint)
 
-        if (
-            parsed_endpoint.path in ('', '/')
-            and parsed_endpoint.params == ''
-            and parsed_endpoint.query == ''
-            and parsed_endpoint.fragment == ''
-        ):
+        if parsed_endpoint.path in ('', '/'):
             # Nothing to hide
             hidden_path = parsed_endpoint.path
         else:
