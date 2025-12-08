@@ -91,7 +91,7 @@ class ExitRequest:
         """
         Returns True if the assets have exited (fully or partially),
         but the claim delay has not passed yet.
-        Relevant for testnets with short exit queues (e.g., Chiado)
+        Relevant for testnets with short exit queues
         """
         return self.has_exit_queue_index and not self.is_claimable and not self.is_claimed
 
