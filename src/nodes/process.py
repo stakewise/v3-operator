@@ -6,7 +6,6 @@ from pathlib import Path
 from eth_typing import BlockNumber, ChecksumAddress
 
 from src.common.consensus import get_chain_finalized_head
-from src.common.contracts import VaultContract
 from src.common.startup_check import (
     wait_execution_catch_up_consensus,
     wait_for_consensus_node,
@@ -248,7 +247,7 @@ class LighthouseVCProcessBuilder(ProcessBuilder):
         streams: StdStreams,
     ):
         super().__init__(streams=streams)
-        self.fee_recipient: ChecksumAddress | None = None
+        self.fee_recipient = settings.network_config.SHARED_MEV_ESCROW_CONTRACT_ADDRESS
 
     async def get_process(self) -> LighthouseVCProcess:
         # Wait a bit to ensure that the execution and consensus nodes are started
@@ -261,10 +260,6 @@ class LighthouseVCProcessBuilder(ProcessBuilder):
 
         chain_state = await get_chain_finalized_head()
         await wait_execution_catch_up_consensus(chain_state)
-
-        # Fetch mev escrow address and cache it
-        if not self.fee_recipient:
-            self.fee_recipient = await self._get_fee_recipient()
 
         lighthouse_dir = settings.nodes_dir / 'lighthouse'
 
@@ -302,15 +297,6 @@ class LighthouseVCProcessBuilder(ProcessBuilder):
             streams=self.streams,
             init_slashing_protection=init_slashing_protection,
         )
-
-    async def _get_fee_recipient(self) -> ChecksumAddress:
-        """
-        Fetches the fee recipient address from the vault contract.
-        This is used to set the suggested fee recipient for the validator client.
-        """
-        vault_contract = VaultContract(settings.vault)
-        fee_recipient = await vault_contract.mev_escrow()
-        return fee_recipient
 
 
 class ProcessRunner:
