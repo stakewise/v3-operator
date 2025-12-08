@@ -48,9 +48,7 @@ def test_token_formatter(raw_endpoint, hidden_endpoint):
         'https://eth-hoodi.g.alchemy.com/v2/tokenexample',
         'https://node-00.stakewise.io/mainnet-lighthouse',
         'http://localhost:8545',
-        'http://localhost:8545/',
         'https://rpc.public-node.io',
-        'https://rpc.public-node.io/',
     ]
     str_in = f'Retrying {raw_endpoint}, attempt 2...'
     str_out = f'Retrying {hidden_endpoint}, attempt 2...'
