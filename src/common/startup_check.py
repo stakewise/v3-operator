@@ -80,9 +80,6 @@ async def startup_checks() -> None:
     chain_state = await get_chain_finalized_head()
     await wait_execution_catch_up_consensus(chain_state)
 
-    logger.info('Checking execution nodes network...')
-    await _check_execution_nodes_network()
-
     if settings.claim_fee_splitter or settings.process_meta_vault:
         logger.info('Checking graph nodes...')
         await wait_for_graph_node_sync_to_chain_head()

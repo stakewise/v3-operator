@@ -12,11 +12,6 @@ class Timeout(Exception):
     A limited subset of the `gevent.Timeout` context manager.
     """
 
-    seconds = None
-    exception = None
-    begun_at = None
-    is_running = None
-
     def __init__(
         self,
         seconds: int | None = None,
@@ -24,6 +19,8 @@ class Timeout(Exception):
     ):
         self.seconds = seconds
         self.exception = exception
+        self.begun_at: float | None = None
+        self.is_running: bool | None = None
 
     def __str__(self) -> str:
         if self.seconds is None:
