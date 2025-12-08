@@ -78,55 +78,25 @@ def node_install(data_dir: Path, network: str, reth_version: str, lighthouse_ver
     makedirs(reth_dir, exist_ok=True)
     makedirs(lighthouse_dir, exist_ok=True)
 
-    # Installing Reth and Lighthouse binaries
-    install_reth_binary(reth_dir, app_version=reth_version)
-    install_lighthouse_binary(lighthouse_dir, app_version=lighthouse_version)
+    # Install Reth binary
+    install_binary_release(
+        repo_url='https://github.com/paradigmxyz/reth',
+        app_version=reth_version,
+        dir_to_install=reth_dir,
+    )
+    # Install Lighthouse binary
+    install_binary_release(
+        repo_url='https://github.com/sigp/lighthouse',
+        app_version=lighthouse_version,
+        dir_to_install=lighthouse_dir,
+    )
 
 
-def install_reth_binary(dir_to_install: Path, app_version: str) -> None:
-    """
-    Installs the Reth binary.
-    """
-    repo_url = 'https://github.com/paradigmxyz/reth'
-
+def install_binary_release(repo_url: str, app_version: str, dir_to_install: Path) -> None:
     release = Release(
         repo_url=repo_url,
         app_version=app_version,
     )
-    install_binary_release(
-        release=release,
-        dir_to_install=dir_to_install,
-    )
-
-    click.echo(
-        greenify(
-            f'{release.app_name.capitalize()} {app_version} installation completed successfully.'
-        )
-    )
-
-
-def install_lighthouse_binary(dir_to_install: Path, app_version: str) -> None:
-    """
-    Installs the Lighthouse binary.
-    """
-    repo_url = 'https://github.com/sigp/lighthouse'
-
-    release = Release(
-        repo_url=repo_url,
-        app_version=app_version,
-    )
-    install_binary_release(
-        release=release,
-        dir_to_install=dir_to_install,
-    )
-    click.echo(
-        greenify(
-            f'{release.app_name.capitalize()} {app_version} installation completed successfully.'
-        )
-    )
-
-
-def install_binary_release(release: Release, dir_to_install: Path) -> None:
     # Get environment details
     os_name = platform.system()
     arch = platform.machine()
@@ -137,7 +107,7 @@ def install_binary_release(release: Release, dir_to_install: Path) -> None:
     # Download the binary, displaying a progress bar
     content = download_binary_with_progress(binary_url)
     response_len_mb = round(len(content) / 1024 / 1024, 1)
-    click.echo(f'Download complete. {response_len_mb} MB. Extracting to {dir_to_install}...')
+    click.echo(f'Download complete. Size: {response_len_mb} MB. Extracting to {dir_to_install}...')
 
     # Extract the binary from tar.gz
     # Extract only targeted file because of security reasons
@@ -152,6 +122,12 @@ def install_binary_release(release: Release, dir_to_install: Path) -> None:
     # Check permissions of the extracted binary
     binary_path = dir_to_install / binary_name
     ensure_executable_permissions(binary_path)
+
+    click.echo(
+        greenify(
+            f'{release.app_name.capitalize()} {app_version} installation completed successfully.'
+        )
+    )
 
 
 def download_binary_with_progress(url: str) -> bytes:

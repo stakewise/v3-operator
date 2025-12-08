@@ -4,9 +4,8 @@ import logging
 from pathlib import Path
 
 import click
-from eth_typing import HexAddress
+from eth_typing import ChecksumAddress
 from sw_utils import get_consensus_client, get_execution_client
-from web3 import Web3
 
 from src.common.logging import setup_logging
 from src.common.validators import validate_eth_address
@@ -63,7 +62,11 @@ OUTPUT_FORMATS = ['text', 'json']
 )
 @click.command(help='Displays the status of the nodes.', name='node-status')
 def node_status_command(
-    data_dir: Path, vault: HexAddress, output_format: str, verbose: bool, enable_file_logging: bool
+    data_dir: Path,
+    vault: ChecksumAddress,
+    output_format: str,
+    verbose: bool,
+    enable_file_logging: bool,
 ) -> None:
     operator_config = OperatorConfig(vault, Path(data_dir))
     operator_config.load()
@@ -71,7 +74,7 @@ def node_status_command(
 
     # Minimal settings for the nodes
     settings.set(
-        vault=Web3.to_checksum_address(vault),
+        vault=vault,
         network=network,
         vault_dir=operator_config.vault_dir,
         nodes_dir=data_dir / network / 'nodes',
