@@ -85,12 +85,20 @@ def _create_hidden_endpoints() -> dict[str, str]:
         if any(e in endpoint for e in LOG_WHITELISTED_DOMAINS):
             continue
         parsed_endpoint = urlparse(endpoint)
+
+        if parsed_endpoint.path in ('', '/'):
+            # Nothing to hide
+            hidden_path = parsed_endpoint.path
+        else:
+            # Hide path
+            hidden_path = '<hidden>'
+
         # Reconstruct the URL with the token hidden
         hidden_endpoint = urlunparse(
             (
                 parsed_endpoint.scheme,
                 parsed_endpoint.netloc,  # Keep hostname and port
-                '<hidden>',  # Replace the path with '<hidden>'
+                hidden_path,  # Hide the path
                 '',
                 '',
                 '',  # Clear params, query, and fragment
