@@ -12,7 +12,7 @@ from src.common.startup_check import (
     wait_for_consensus_node,
     wait_for_execution_node,
 )
-from src.config.networks import NETWORKS
+from src.config.networks import NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
 from src.nodes.exceptions import NodeException, NodeFailedToStartError
 from src.nodes.lighthouse import update_validator_definitions_file
@@ -305,9 +305,17 @@ class LighthouseVCProcessBuilder(ProcessBuilder):
 
     async def _get_fee_recipient(self) -> ChecksumAddress:
         """
-        Fetches the fee recipient address from the vault contract.
-        This is used to set the suggested fee recipient for the validator client.
+        Returns the suggested fee recipient address for the validator client.
         """
+        # In NodeWise app, the vault address is not available initially.
+        # The vault is created after node synchronization,
+        # so a zero address is used as a placeholder.
+        # In this scenario, use the shared MEV escrow as fee recipient.
+        if settings.vault == ZERO_CHECKSUM_ADDRESS:
+            return settings.network_config.SHARED_MEV_ESCROW_CONTRACT_ADDRESS
+
+        # When running Operator as pure cli tool, without NodeWise,
+        # the vault address is always known.
         vault_contract = VaultContract(settings.vault)
         fee_recipient = await vault_contract.mev_escrow()
         return fee_recipient
