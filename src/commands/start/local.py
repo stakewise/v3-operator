@@ -9,7 +9,7 @@ from web3.types import Gwei
 
 from src.commands.start.base import start_base
 from src.commands.start.common_option import add_common_options, start_common_options
-from src.common.startup_check import check_hardware_requirements, validate_settings
+from src.common.startup_check import check_hardware_requirements
 from src.common.typings import ValidatorType
 from src.common.utils import log_verbose
 from src.config.config import OperatorConfig
@@ -125,7 +125,6 @@ def start_local(
         run_nodes=run_nodes,
         nodes_dir=Path(data_dir) / operator_config.network / 'nodes',
     )
-    validate_settings()
 
     if settings.run_nodes:
         click.echo('Checking hardware requirements...')

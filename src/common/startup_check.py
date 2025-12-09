@@ -54,6 +54,8 @@ IPFS_HASH_EXAMPLE = 'QmawUdo17Fvo7xa6ARCUSMV1eoVwPtVuzx8L8Crj2xozWm'
 
 # pylint: disable-next=too-many-statements
 async def startup_checks() -> None:
+    validate_settings()
+
     logger.info('Checking connection to database...')
     db_client.create_db_dir()
     with db_client.get_db_connection() as conn:
@@ -136,12 +138,6 @@ async def startup_checks() -> None:
 
 
 def validate_settings() -> None:
-    if not settings.execution_endpoints:
-        raise ClickException('EXECUTION_ENDPOINTS is missing')
-
-    if not settings.consensus_endpoints:
-        raise ClickException('CONSENSUS_ENDPOINTS is missing')
-
     if not settings.graph_endpoint and (settings.claim_fee_splitter or settings.process_meta_vault):
         raise ClickException('GRAPH_ENDPOINT is missing')
 
