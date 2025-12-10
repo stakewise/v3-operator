@@ -29,6 +29,9 @@ DEFAULT_MIN_DEPOSIT_DELAY = 3600  # 1 hour
 DEFAULT_MAX_CONSOLIDATION_REQUEST_FEE_GWEI = Gwei(1000)
 DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI = Gwei(1000)
 
+DEFAULT_CONSENSUS_ENDPOINT = 'http://localhost:5052'
+DEFAULT_EXECUTION_ENDPOINT = 'http://localhost:8545'
+
 
 # pylint: disable-next=too-many-public-methods,too-many-instance-attributes
 class Settings(metaclass=Singleton):
@@ -122,6 +125,11 @@ class Settings(metaclass=Singleton):
     max_withdrawal_request_fee_gwei: Gwei
 
     vault_first_block: BlockNumber
+    nodes_dir: Path
+
+    run_nodes: bool
+    enable_file_logging: bool
+    log_file_path: Path | None
 
     # pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements
     def set(
@@ -171,14 +179,26 @@ class Settings(metaclass=Singleton):
         max_withdrawal_request_fee_gwei: Gwei = DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI,
         vault_first_block: BlockNumber | None = None,
         meta_vault_min_deposit_amount_gwei: Gwei = DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
+        nodes_dir: Path = Path(''),
+        run_nodes: bool = False,
+        enable_file_logging: bool = False,
+        log_file_path: Path | None = None,
     ) -> None:
         self.vault = vault
         vault_dir.mkdir(parents=True, exist_ok=True)
         self.vault_dir = vault_dir
         self.network = network
 
-        self.consensus_endpoints = [node.strip() for node in consensus_endpoints.split(',')]
-        self.execution_endpoints = [node.strip() for node in execution_endpoints.split(',')]
+        if consensus_endpoints:
+            self.consensus_endpoints = [node.strip() for node in consensus_endpoints.split(',')]
+        else:
+            self.consensus_endpoints = [DEFAULT_CONSENSUS_ENDPOINT]
+
+        if execution_endpoints:
+            self.execution_endpoints = [node.strip() for node in execution_endpoints.split(',')]
+        else:
+            self.execution_endpoints = [DEFAULT_EXECUTION_ENDPOINT]
+
         self.execution_jwt_secret = execution_jwt_secret
         self.graph_endpoint = graph_endpoint or self.network_config.STAKEWISE_GRAPH_ENDPOINT
         self.harvest_vault = harvest_vault
@@ -309,6 +329,10 @@ class Settings(metaclass=Singleton):
         self.skip_startup_checks = decouple_config('SKIP_STARTUP_CHECKS', default=False, cast=bool)
         self.vault_first_block = vault_first_block or self.network_config.KEEPER_GENESIS_BLOCK
         self.meta_vault_min_deposit_amount_gwei = meta_vault_min_deposit_amount_gwei
+        self.nodes_dir = nodes_dir
+        self.run_nodes = run_nodes
+        self.enable_file_logging = enable_file_logging
+        self.log_file_path = log_file_path
 
     @property
     def keystore_cls_str(self) -> str:

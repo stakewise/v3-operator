@@ -13,6 +13,8 @@ from src.common.validators import (
 )
 from src.config.networks import GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
+    DEFAULT_CONSENSUS_ENDPOINT,
+    DEFAULT_EXECUTION_ENDPOINT,
     DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI,
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
@@ -143,8 +145,10 @@ start_common_options = [
         '--execution-endpoints',
         type=str,
         envvar='EXECUTION_ENDPOINTS',
+        default=DEFAULT_EXECUTION_ENDPOINT,
         prompt='Enter the comma separated list of API endpoints for execution nodes',
         help='Comma separated list of API endpoints for execution nodes.',
+        show_default=True,
     ),
     click.option(
         '--execution-jwt-secret',
@@ -157,8 +161,10 @@ start_common_options = [
         '--consensus-endpoints',
         type=str,
         envvar='CONSENSUS_ENDPOINTS',
+        default=DEFAULT_CONSENSUS_ENDPOINT,
         prompt='Enter the comma separated list of API endpoints for consensus nodes',
         help='Comma separated list of API endpoints for consensus nodes.',
+        show_default=True,
     ),
     click.option(
         '--graph-endpoint',

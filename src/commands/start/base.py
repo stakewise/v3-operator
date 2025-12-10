@@ -4,14 +4,14 @@ import logging
 from sw_utils import InterruptHandler
 
 import src
-from src.common.checks import wait_execution_catch_up_consensus
+from src.commands.nodes.node_start import main as run_nodes
 from src.common.clients import setup_clients
 from src.common.consensus import get_chain_finalized_head
 from src.common.execution import WalletTask
 from src.common.logging import setup_logging
 from src.common.metrics import MetricsTask, metrics, metrics_server
 from src.common.protocol_config import update_oracles_cache
-from src.common.startup_check import startup_checks
+from src.common.startup_check import startup_checks, wait_execution_catch_up_consensus
 from src.common.tasks import BaseTask
 from src.common.typings import ValidatorsRegistrationMode
 from src.common.utils import get_build_version
@@ -42,6 +42,20 @@ async def start_base() -> None:
 
     log_start()
 
+    background_tasks = set()
+
+    if settings.run_nodes:
+        run_nodes_task = asyncio.create_task(
+            run_nodes(
+                print_execution_logs=False,
+                print_consensus_logs=False,
+                print_validator_logs=False,
+            )
+        )
+
+        # Keep track of background tasks to prevent them from being garbage collected
+        background_tasks.add(run_nodes_task)
+
     if not settings.skip_startup_checks:
         await startup_checks()
 
@@ -69,7 +83,6 @@ async def start_base() -> None:
 
     # start operator tasks
     chain_state = await get_chain_finalized_head()
-    await wait_execution_catch_up_consensus(chain_state)
 
     CheckpointCrud().save_checkpoints()
     logger.info('Syncing validator events...')

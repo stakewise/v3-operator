@@ -1,0 +1,440 @@
+import logging
+import re
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+from eth_typing import BlockNumber
+from sw_utils import ExtendedAsyncBeacon
+from sw_utils.consensus import ACTIVE_STATUSES, ValidatorStatus
+from web3 import AsyncWeb3
+from web3.types import BlockData, Timestamp
+
+from src.common.utils import (
+    calc_slot_by_block_number,
+    calc_slot_by_block_timestamp,
+    format_error,
+    info_verbose,
+    warning_verbose,
+)
+from src.config.settings import settings
+from src.nodes.execution_sync_history import ExecutionSyncHistory
+from src.nodes.status_history import SYNC_STATUS_INTERVAL, SyncStatusHistory
+from src.nodes.typings import (
+    ExecutionSyncRecord,
+    StatusHistoryRecord,
+    SyncStageProgress,
+)
+from src.validators.keystores.local import LocalKeystore
+
+logger = logging.getLogger(__name__)
+
+
+async def get_consensus_node_status(consensus_client: ExtendedAsyncBeacon) -> dict:
+    try:
+        syncing = (await consensus_client.get_syncing())['data']
+    except Exception as e:
+        warning_verbose('Error fetching consensus node status: %s', format_error(e))
+        return {}
+
+    eta = await _calc_consensus_eta(
+        consensus_syncing=syncing,
+        sync_status_history=SyncStatusHistory().load_history(),
+    )
+    info_verbose('consensus_eta seconds: %s', int(eta) if eta is not None else 'unavailable')
+
+    return {
+        'is_syncing': syncing['is_syncing'],
+        'head_slot': int(syncing['head_slot']),
+        'sync_distance': int(syncing['sync_distance']),
+        'eta': int(eta) if eta is not None else None,
+    }
+
+
+async def get_execution_node_status(execution_client: AsyncWeb3) -> dict:
+    try:
+        latest_block = await execution_client.eth.get_block('latest')
+    except Exception:
+        return {}
+
+    sync_distance = (
+        int(time.time()) - latest_block['timestamp']
+    ) // settings.network_config.SECONDS_PER_BLOCK
+    allowed_delay = 5
+    is_syncing = sync_distance > allowed_delay
+    execution_sync_history = ExecutionSyncHistory().load_history()
+
+    is_initial_sync = latest_block['number'] == 0
+
+    default_regular_sync_eta = calc_default_regular_sync_eta()
+    eta: float
+
+    if is_initial_sync:
+        initial_eta = await _calc_initial_execution_sync_eta()
+        eta = initial_eta + default_regular_sync_eta
+    elif is_syncing:
+        eta = (
+            await _calc_regular_execution_eta(
+                execution_client=execution_client,
+                execution_sync_history=execution_sync_history,
+                latest_block=latest_block,
+            )
+            or default_regular_sync_eta
+        )
+    else:
+        eta = 0
+
+    return {
+        'is_syncing': is_syncing,
+        'latest_block_number': latest_block['number'],
+        'sync_distance': sync_distance,
+        'eta': int(eta),
+    }
+
+
+def calc_default_regular_sync_eta() -> float:
+    """
+    After initial sync is complete, another sync iteration is needed to fully catch up.
+    Calculate default regular sync ETA based on network config.
+    """
+    # Assume initial sync is 90% of the total sync process
+    initial_sync_ratio = 0.9
+    initial_sync_eta = settings.network_config.NODE_CONFIG.INITIAL_SYNC_ETA
+    regular_sync_eta = (1 - initial_sync_ratio) * initial_sync_eta
+    return regular_sync_eta
+
+
+async def get_validator_activity_stats(consensus_client: ExtendedAsyncBeacon) -> dict:
+    """
+    Returns the activity statistics of validators.
+    Format: `{'active': int, 'total': int}`
+    """
+    keystore_files = LocalKeystore.list_keystore_files()
+    stats: dict[str, int] = {'active': 0, 'total': 0}
+    public_keys: list[str] = []
+
+    # Read public keys from keystore files
+    for keystore_file in keystore_files:
+        _, public_key = LocalKeystore.parse_keystore_file(keystore_file)
+        public_keys.append(public_key)
+
+    stats['total'] = len(public_keys)
+
+    info_verbose('Fetching validator activity stats...')
+
+    stats['active'] = await _get_number_of_active_validators(
+        public_keys=public_keys, consensus_client=consensus_client
+    )
+
+    return stats
+
+
+async def _get_number_of_active_validators(
+    public_keys: list[str], consensus_client: ExtendedAsyncBeacon
+) -> int:
+    if not public_keys:
+        return 0
+
+    try:
+        validators = (await consensus_client.get_validators_by_ids(public_keys))['data']
+    except Exception as e:
+        warning_verbose('Error fetching validators: %s', format_error(e))
+        return 0
+
+    active_count = 0
+
+    for validator in validators:
+        status = ValidatorStatus(validator['status'])
+        if status in ACTIVE_STATUSES:
+            active_count += 1
+
+    return active_count
+
+
+async def _calc_consensus_eta(
+    consensus_syncing: dict, sync_status_history: list[StatusHistoryRecord]
+) -> float | None:
+    if len(sync_status_history) < 2:
+        info_verbose('Not enough consensus sync status history to calculate ETA.')
+        return None
+
+    sync_distance = int(consensus_syncing['sync_distance'])
+    allowed_delay = 1
+
+    if sync_distance <= allowed_delay:
+        info_verbose('Consensus node is nearly synced. No ETA needed.')
+        return 0.0
+
+    consensus_speed = _calc_consensus_speed(sync_status_history)
+    default_consensus_speed = 1.0  # Default consensus sync speed in slots/second.
+    # This value is chosen because, during sync, nodes typically process slots
+    # much faster than the normal slot time (12s/slot).
+    # Using 1.0 slots/second is a conservative estimate for sync speed
+    # when historical data is unavailable or unreliable.
+
+    if consensus_speed is None:
+        info_verbose(
+            'Unable to calculate consensus speed from history. Using default value %s.',
+            default_consensus_speed,
+        )
+        consensus_speed = default_consensus_speed
+
+    # If node is synced then calculated consensus_speed can be very low
+    # which is not realistic, so we set a minimum threshold
+    if consensus_speed < default_consensus_speed:
+        info_verbose(
+            'Calculated consensus speed %.2f is too low. Using default value %s.',
+            consensus_speed,
+            default_consensus_speed,
+        )
+        consensus_speed = default_consensus_speed
+
+    info_verbose('consensus_speed slots/sec: %.2f', consensus_speed)
+
+    return sync_distance / consensus_speed
+
+
+def _calc_consensus_speed(sync_status_history: list[StatusHistoryRecord]) -> float | None:
+    if len(sync_status_history) < 2:
+        return None
+
+    first_record = sync_status_history[0]
+    last_record = sync_status_history[-1]
+    idle_duration = 0
+
+    for i in range(1, len(sync_status_history)):
+        curr = sync_status_history[i]
+        prev = sync_status_history[i - 1]
+        idle_time = max(curr.timestamp - prev.timestamp - SYNC_STATUS_INTERVAL, 0)
+        idle_duration += idle_time
+
+    info_verbose('Total idle duration in consensus sync history: %d seconds', int(idle_duration))
+
+    first_timestamp = first_record.timestamp
+    last_timestamp = last_record.timestamp
+
+    first_slot = first_record.slot
+    last_slot = last_record.slot
+    duration = last_timestamp - first_timestamp - idle_duration
+
+    if duration <= 0:
+        info_verbose('No valid duration to calculate consensus speed.')
+        return None
+
+    consensus_speed = (last_slot - first_slot) / duration
+
+    return consensus_speed
+
+
+async def _calc_regular_execution_eta(
+    execution_client: AsyncWeb3,
+    execution_sync_history: list[ExecutionSyncRecord],
+    latest_block: BlockData,
+) -> float | None:
+    if len(execution_sync_history) < 2:
+        return None
+
+    latest_block_slot = calc_slot_by_block_timestamp(latest_block['timestamp'])
+    cur_ts = int(time.time())
+    head_slot = calc_slot_by_block_timestamp(Timestamp(cur_ts))
+
+    execution_speed = await _calc_execution_speed_slots(
+        execution_sync_history=execution_sync_history,
+        execution_client=execution_client,
+    )
+    if execution_speed is None or execution_speed <= 0:
+        execution_speed = 1.5
+        # Fallback to 1.5 slots/second if speed cannot be determined;
+        # this is a conservative estimate based on typical observed sync rates.
+
+    info_verbose('execution_speed slots/sec: %.2f', execution_speed)
+
+    # Calculate ETA
+    execution_eta = (head_slot - latest_block_slot) / execution_speed
+
+    last_record = execution_sync_history[-1] if execution_sync_history else None
+
+    if last_record and last_record.block_number == latest_block['number']:
+        execution_eta -= last_record.duration
+        execution_eta -= cur_ts - last_record.update_timestamp
+
+    return max(0.0, execution_eta)
+
+
+async def _calc_execution_speed_slots(
+    execution_sync_history: list[ExecutionSyncRecord], execution_client: AsyncWeb3
+) -> float | None:
+    if len(execution_sync_history) <= 2:
+        return None
+
+    # Skip first and last records because they may be incomplete
+    first_record = execution_sync_history[1]
+    last_record = execution_sync_history[-1]
+
+    # total duration from first to last records
+    duration_sum = sum(r.duration for r in execution_sync_history[1:-1])
+
+    first_block_number = BlockNumber(int(first_record.block_number))
+    last_block_number = BlockNumber(int(last_record.block_number))
+
+    # Calculate execution speed in slots per second (not blocks per second)
+    try:
+        first_block_slot = await calc_slot_by_block_number(
+            first_block_number, execution_client=execution_client
+        )
+        last_block_slot = await calc_slot_by_block_number(
+            last_block_number, execution_client=execution_client
+        )
+    except Exception:
+        return None
+
+    return (last_block_slot - first_block_slot) / duration_sum
+
+
+async def _calc_initial_execution_sync_eta() -> float:
+    """
+    Calculate initial sync ETA based on syncing stages.
+    """
+    reth_log_file = settings.nodes_dir / 'reth' / 'logs' / settings.network / 'reth.log'
+    current_stage = _get_current_stage(reth_log_file)
+
+    # Get stage order and eta mapping from config
+    node_config = settings.network_config.NODE_CONFIG
+    initial_stage_to_eta = node_config.INITIAL_SYNC_STAGE_TO_ETA
+    stages = list(initial_stage_to_eta.keys())
+
+    if current_stage is None:
+        # If can't detect stage, fallback to sum of all default ETAs
+        return node_config.INITIAL_SYNC_ETA
+
+    current_index = stages.index(current_stage) if current_stage in stages else None
+    total_eta = 0.0
+
+    for idx, stage in enumerate(stages):
+        if current_index is not None:
+            if idx < current_index:
+                continue  # skip past stages
+            if idx == current_index:
+                eta = calc_stage_eta(reth_log_file)
+                total_eta += eta if eta is not None else initial_stage_to_eta[stage]
+            else:
+                total_eta += initial_stage_to_eta[stage]
+        else:
+            # If current stage not in list, fallback to sum of all default ETAs
+            total_eta = node_config.INITIAL_SYNC_ETA
+            break
+
+    return total_eta
+
+
+def _get_current_stage(log_file: Path) -> str | None:
+    last_lines = read_last_lines(log_file, 100)
+
+    stage_re = re.compile(r'stage=([a-zA-Z0-9_]+)')
+
+    for line in reversed(last_lines):
+        stage_match = stage_re.search(line)
+        if stage_match:
+            return stage_match.group(1)
+
+    return None
+
+
+def calc_stage_eta(log_file: Path) -> float | None:
+    last_lines = read_last_lines(log_file, 1000)
+
+    # Find earliest and latest stage progress entries with the same stage name
+    earliest_stage_progress = None
+    latest_stage_progress = None
+    stage_name = None
+
+    # Find the latest stage_progress (from end)
+    for line in reversed(last_lines):
+        stage_progress = parse_stage_progress(line)
+        if stage_progress is not None:
+            latest_stage_progress = stage_progress
+            stage_name = stage_progress.stage_name
+            break
+
+    # Find the earliest stage_progress with the same stage name (from start)
+    if stage_name is not None:
+        for line in last_lines:
+            stage_progress = parse_stage_progress(line)
+            if stage_progress is not None and stage_progress.stage_name == stage_name:
+                earliest_stage_progress = stage_progress
+                break
+
+    if not earliest_stage_progress or not latest_stage_progress:
+        info_verbose('Not enough stage progress entries to calculate ETA.')
+        return None
+
+    if latest_stage_progress.current_block >= latest_stage_progress.target_block:
+        return 0.0
+
+    time_diff = (
+        latest_stage_progress.created_at - earliest_stage_progress.created_at
+    ).total_seconds()
+    block_diff = latest_stage_progress.current_block - earliest_stage_progress.current_block
+
+    if time_diff <= 0 or block_diff <= 0:
+        return None
+
+    blocks_per_second = block_diff / time_diff
+    remaining_blocks = latest_stage_progress.target_block - latest_stage_progress.current_block
+    eta_seconds = remaining_blocks / blocks_per_second
+
+    return eta_seconds
+
+
+def read_last_lines(file_path: Path, num_lines: int) -> list[str]:
+    """Read the last `num_lines` lines from a file efficiently and safely."""
+    lines: list[bytes] = []
+
+    with file_path.open('rb') as f:
+        f.seek(0, 2)
+        file_size = f.tell()
+        buffer = b''
+        block_size = 4096
+        pointer = file_size
+        while pointer > 0 and len(lines) < num_lines:
+            read_size = min(block_size, pointer)
+            pointer -= read_size
+            f.seek(pointer)
+            data = f.read(read_size)
+            buffer = data + buffer
+            lines = buffer.split(b'\n')
+        # Decode last lines safely
+        result = []
+        for line in lines[-num_lines:]:
+            try:
+                result.append(line.decode('utf-8', errors='replace'))
+            except Exception:
+                result.append('')
+        return result
+
+
+def parse_stage_progress(log_line: str) -> SyncStageProgress | None:
+    # Regular expression to extract log_time, stage_name, checkpoint, and target
+    pattern = (
+        r'^(?P<log_time>[\d\-T:.Z]+).*'
+        r'stage=(?P<stage_name>\w+).*'
+        r'checkpoint=(?P<checkpoint>\d+).*'
+        r'target=(?P<target>\d+)'
+    )
+    match = re.match(pattern, log_line)
+
+    if not match:
+        return None
+
+    # Extract values from the match
+    log_time_str = match.group('log_time')
+    stage_name = match.group('stage_name')
+    checkpoint = int(match.group('checkpoint'))
+    target = int(match.group('target'))
+
+    # Convert log_time to a datetime object
+    log_time = datetime.strptime(log_time_str, '%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=timezone.utc)
+
+    return SyncStageProgress(
+        stage_name=stage_name, created_at=log_time, current_block=checkpoint, target_block=target
+    )
