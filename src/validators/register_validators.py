@@ -117,7 +117,7 @@ async def fund_validators(
     logger.info('Submitting fund validators transaction')
     try:
         tx_function = vault_contract.functions.multicall(calls)
-        tx = await transaction_gas_wrapper(tx_function=tx_function)
+        tx = await transaction_gas_wrapper(tx_function)
     except Exception as e:
         logger.error('Failed to fund validator(s): %s', format_error(e))
         if settings.verbose:
@@ -150,11 +150,12 @@ async def submit_consolidate_validators(
         oracle_signatures = b''
 
     try:
-        tx = await vault_contract.functions.consolidateValidators(
+        tx_function = vault_contract.functions.consolidateValidators(
             validators,
             Web3.to_bytes(hexstr=validators_manager_signature),
             oracle_signatures,
-        ).transact({'value': tx_fee})
+        )
+        tx = await transaction_gas_wrapper(tx_function, tx_params={'value': tx_fee})
     except Exception as e:
         logger.info('Failed to submit consolidate validators transaction: %s', format_error(e))
         return None

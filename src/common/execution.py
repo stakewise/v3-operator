@@ -1,90 +1,26 @@
 import asyncio
 import logging
-from typing import cast
+from urllib.parse import urlparse
 
 from eth_typing import BlockNumber, HexStr
 from hexbytes import HexBytes
-from sw_utils import (
-    ChainHead,
-    GasManager,
-    InterruptHandler,
-    ProtocolConfig,
-    build_protocol_config,
-)
+from sw_utils import ChainHead, GasManager, InterruptHandler
 from web3 import Web3
 from web3.contract.async_contract import AsyncContractFunction
 from web3.types import Gwei, TxParams, Wei
 
-from src.common.app_state import AppState, OraclesCache
-from src.common.clients import consensus_client, execution_client, ipfs_fetch_client
-from src.common.contracts import keeper_contract, multicall_contract
+from src.common.clients import consensus_client, execution_client
 from src.common.metrics import metrics
 from src.common.tasks import BaseTask
 from src.common.typings import PendingConsolidation, PendingPartialWithdrawal
 from src.common.wallet import wallet
+from src.config.networks import HOODI
 from src.config.settings import ATTEMPTS_WITH_DEFAULT_GAS, settings
 from src.validators.typings import ConsensusValidator
 
 logger = logging.getLogger(__name__)
 
-
-async def get_protocol_config() -> ProtocolConfig:
-    await update_oracles_cache()
-    app_state = AppState()
-
-    oracles_cache = cast(OraclesCache, app_state.oracles_cache)
-    pc = build_protocol_config(
-        config_data=oracles_cache.config,
-        rewards_threshold=oracles_cache.rewards_threshold,
-        validators_threshold=oracles_cache.validators_threshold,
-    )
-    return pc
-
-
-async def update_oracles_cache() -> None:
-    """
-    Fetches latest oracle config from IPFS. Uses cache if possible.
-    """
-    app_state = AppState()
-    oracles_cache = app_state.oracles_cache
-
-    # Find the latest block for which oracle config is cached
-    if oracles_cache:
-        from_block = BlockNumber(oracles_cache.checkpoint_block + 1)
-    else:
-        from_block = settings.network_config.KEEPER_GENESIS_BLOCK
-
-    to_block = await execution_client.eth.get_block_number()
-
-    if from_block > to_block:
-        return
-
-    logger.debug('update_oracles_cache: get logs from block %s to block %s', from_block, to_block)
-    event = await keeper_contract.get_config_updated_event(from_block=from_block, to_block=to_block)
-    if event:
-        ipfs_hash = event['args']['configIpfsHash']
-        config = cast(dict, await ipfs_fetch_client.fetch_json(ipfs_hash))
-    else:
-        config = oracles_cache.config  # type: ignore
-
-    rewards_threshold_call = keeper_contract.encode_abi(fn_name='rewardsMinOracles', args=[])
-    validators_threshold_call = keeper_contract.encode_abi(fn_name='validatorsMinOracles', args=[])
-    _, multicall_response = await multicall_contract.aggregate(
-        [
-            (keeper_contract.contract_address, rewards_threshold_call),
-            (keeper_contract.contract_address, validators_threshold_call),
-        ],
-        block_number=to_block,
-    )
-    rewards_threshold = Web3.to_int(multicall_response[0])
-    validators_threshold = Web3.to_int(multicall_response[1])
-
-    app_state.oracles_cache = OraclesCache(
-        config=config,
-        validators_threshold=validators_threshold,
-        rewards_threshold=rewards_threshold,
-        checkpoint_block=to_block,
-    )
+ALCHEMY_DOMAIN = '.alchemy.com'
 
 
 class WalletTask(BaseTask):
@@ -124,23 +60,35 @@ async def transaction_gas_wrapper(
         tx_params = {}
 
     # trying to submit with basic gas
-    for i in range(ATTEMPTS_WITH_DEFAULT_GAS):
+    attempts_with_default_gas = ATTEMPTS_WITH_DEFAULT_GAS
+
+    # Alchemy does not support eth_maxPriorityFeePerGas for Hoodi
+    if settings.network == HOODI and _is_alchemy_used():
+        attempts_with_default_gas = 0
+
+    for i in range(attempts_with_default_gas):
         try:
             return await tx_function.transact(tx_params)
         except ValueError as e:
             # Handle only FeeTooLow error
-            code = None
-            if e.args and isinstance(e.args[0], dict):
-                code = e.args[0].get('code')
-            if not code or code != -32010:
+            if not _is_fee_too_low_error(e):
                 raise e
-            if i < ATTEMPTS_WITH_DEFAULT_GAS - 1:  # skip last sleep
+            if i < attempts_with_default_gas - 1:  # skip last sleep
                 await asyncio.sleep(settings.network_config.SECONDS_PER_BLOCK)
 
     # use high priority fee
     gas_manager = build_gas_manager()
     tx_params = tx_params | await gas_manager.get_high_priority_tx_params()
     return await tx_function.transact(tx_params)
+
+
+async def check_gas_price(high_priority: bool = False) -> bool:
+    gas_manager = build_gas_manager()
+    # Alchemy does not support eth_maxPriorityFeePerGas for Hoodi, skip
+    if settings.network == HOODI and _is_alchemy_used():
+        return True
+
+    return await gas_manager.check_gas_price(high_priority)
 
 
 def build_gas_manager() -> GasManager:
@@ -437,3 +385,18 @@ def _fake_exponential(factor: int, numerator: int, denominator: int) -> int:
         numerator_accum = (numerator_accum * numerator) // (denominator * i)
         i += 1
     return output // denominator
+
+
+def _is_fee_too_low_error(e: ValueError) -> bool:
+    code = None
+    if e.args and isinstance(e.args[0], dict):
+        code = e.args[0].get('code')
+    return code == -32010
+
+
+def _is_alchemy_used() -> bool:
+    for endpoint in settings.execution_endpoints:
+        domain = urlparse(endpoint).netloc
+        if domain.lower().endswith(ALCHEMY_DOMAIN):
+            return True
+    return False

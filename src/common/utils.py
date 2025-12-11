@@ -11,10 +11,11 @@ import click
 import tenacity
 from eth_typing import BlockNumber, ChecksumAddress
 from pythonjsonlogger import jsonlogger
-from web3 import Web3
+from web3 import AsyncWeb3, Web3
 from web3.exceptions import Web3Exception
 from web3.types import Timestamp
 
+from src.common.clients import execution_client as default_execution_client
 from src.common.consensus import get_chain_finalized_head
 from src.common.exceptions import (
     InvalidOraclesRequestError,
@@ -45,6 +46,11 @@ def log_verbose(e: Exception) -> None:
 def warning_verbose(msg: str, *args) -> None:  # type: ignore
     if settings.verbose:
         logger.warning(msg, *args)
+
+
+def info_verbose(msg: str, *args) -> None:  # type: ignore
+    if settings.verbose:
+        logger.info(msg, *args)
 
 
 def format_error(e: BaseException) -> str:
@@ -134,3 +140,17 @@ def round_down(d: int | Decimal, precision: int) -> Decimal:
     with localcontext() as ctx:
         ctx.rounding = ROUND_FLOOR
         return round(d, precision)
+
+
+async def calc_slot_by_block_number(
+    block_number: BlockNumber, execution_client: AsyncWeb3 | None = None
+) -> int:
+    execution_client = execution_client or default_execution_client
+    execution_block = await execution_client.eth.get_block(block_number)
+    return calc_slot_by_block_timestamp(execution_block['timestamp'])
+
+
+def calc_slot_by_block_timestamp(ts: Timestamp) -> int:
+    return int(
+        (ts - settings.network_config.GENESIS_TIMESTAMP) / settings.network_config.SECONDS_PER_SLOT
+    )

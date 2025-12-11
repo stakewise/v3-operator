@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 import click
-from eth_typing import ChecksumAddress, HexStr
+from eth_typing import BlockNumber, ChecksumAddress, HexStr
 from eth_utils import add_0x_prefix
 from sw_utils.consensus import EXITED_STATUSES, ValidatorStatus
 
@@ -94,6 +94,12 @@ from src.config.settings import DEFAULT_NETWORK, settings
     envvar='LOG_LEVEL',
     help='The log level.',
 )
+@click.option(
+    '--vault-first-block',
+    type=int,
+    envvar='VAULT_FIRST_BLOCK',
+    help='The block number where the vault was created. Used to optimize fetching vault events.',
+)
 # pylint: disable-next=too-many-arguments
 def recover(
     data_dir: str,
@@ -105,6 +111,7 @@ def recover(
     per_keystore_password: bool,
     no_confirm: bool,
     log_level: str,
+    vault_first_block: BlockNumber | None,
 ) -> None:
     # pylint: disable=duplicate-code
     operator_config = OperatorConfig(
@@ -121,6 +128,7 @@ def recover(
         network=network,
         vault_dir=operator_config.vault_dir,
         log_level=log_level,
+        vault_first_block=vault_first_block,
     )
 
     try:
@@ -222,7 +230,7 @@ async def _fetch_registered_validators(
     current_block = await execution_client.eth.get_block_number()
     vault_contract = VaultContract(vault)
     public_keys = await vault_contract.get_registered_validators_public_keys(
-        from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
+        from_block=settings.vault_first_block,
         to_block=current_block,
     )
     click.secho(f'Fetched {len(public_keys)} registered validators', bold=True)

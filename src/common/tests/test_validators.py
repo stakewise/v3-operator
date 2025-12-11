@@ -8,6 +8,7 @@ from src.common.validators import (
     _is_public_key,
     validate_db_uri,
     validate_eth_address,
+    validate_eth_addresses,
     validate_public_key,
     validate_public_keys,
     validate_public_keys_file,
@@ -32,6 +33,27 @@ def test_validate_eth_address():
     # raises_error_for_invalid_eth_address
     with pytest.raises(BadParameter, match='Invalid Ethereum address'):
         validate_eth_address(None, None, '0x742d35Cc')
+
+
+def test_validate_eth_addresses():
+    # returns_none_for_empty_eth_addresses
+    result = validate_eth_addresses(None, None, None)
+    assert result is None
+
+    # returns_valid_eth_addresses_as_string
+    address_1 = faker.eth_address()
+    address_2 = faker.eth_address()
+
+    result = validate_eth_addresses(None, None, ','.join([address_1, address_2.lower()]))
+    assert result == ','.join([address_1, address_2.lower()])
+
+    # raises_error_for_invalid_eth_address_in_list
+    with pytest.raises(BadParameter, match='Invalid Ethereum address'):
+        validate_eth_addresses(None, None, ','.join([address_1, 'invalid_address']))
+
+    # raises_error_for_all_invalid_eth_addresses
+    with pytest.raises(BadParameter, match='Invalid Ethereum address'):
+        validate_eth_addresses(None, None, 'invalid_address1,invalid_address2')
 
 
 def test_validate_public_key():

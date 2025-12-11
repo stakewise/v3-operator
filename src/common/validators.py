@@ -12,6 +12,8 @@ from src.config.settings import (
     MAX_EFFECTIVE_BALANCE_GWEI,
     MIN_ACTIVATION_BALANCE,
     MIN_ACTIVATION_BALANCE_GWEI,
+    MIN_DEPOSIT_AMOUNT,
+    MIN_DEPOSIT_AMOUNT_GWEI,
 )
 
 
@@ -32,6 +34,21 @@ def validate_eth_address(
         pass
 
     raise click.BadParameter('Invalid Ethereum address')
+
+
+def validate_eth_addresses(
+    ctx: click.Context, param: click.Parameter, value: str | None
+) -> str | None:
+    if not value:
+        return None
+    try:
+        for address in value.split(','):
+            if not is_address(address):
+                raise click.BadParameter('Invalid Ethereum address')
+    except ValueError:
+        pass
+
+    return value
 
 
 def validate_db_uri(ctx: click.Context, param: click.Parameter, value: str) -> str:
@@ -114,6 +131,16 @@ def validate_max_validator_balance_gwei(
             f'max-validator-balance-gwei must be less than or equal to '
             f'{MAX_EFFECTIVE_BALANCE_GWEI} Gwei '
             f'({Web3.from_wei(MAX_EFFECTIVE_BALANCE, 'ether')} ETH)'
+        )
+    return value
+
+
+def validate_min_deposit_amount_gwei(ctx: click.Context, param: click.Parameter, value: int) -> int:
+    if value < MIN_DEPOSIT_AMOUNT_GWEI:
+        raise click.BadParameter(
+            f'min-deposit-amount-gwei must be greater than or equal to '
+            f'{MIN_DEPOSIT_AMOUNT_GWEI} Gwei '
+            f'({Web3.from_wei(MIN_DEPOSIT_AMOUNT, 'ether')} ETH)'
         )
     return value
 

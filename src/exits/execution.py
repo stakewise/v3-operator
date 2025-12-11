@@ -5,6 +5,7 @@ from web3 import Web3
 
 from src.common.clients import execution_client
 from src.common.contracts import keeper_contract
+from src.common.execution import transaction_gas_wrapper
 from src.common.typings import OraclesApproval
 from src.common.utils import format_error
 from src.config.settings import settings
@@ -19,12 +20,14 @@ async def submit_exit_signatures(
     """Sends updateExitSignatures transaction to keeper contract"""
     logger.info('Submitting UpdateExitSignatures transaction')
     try:
-        tx = await keeper_contract.functions.updateExitSignatures(
+        tx_function = keeper_contract.functions.updateExitSignatures(
             vault_address,
             approval.deadline,
             approval.ipfs_hash,
             approval.signatures,
-        ).transact()
+        )
+        tx = await transaction_gas_wrapper(tx_function)
+
     except Exception as e:
         logger.error('Failed to update exit signatures: %s', format_error(e))
 

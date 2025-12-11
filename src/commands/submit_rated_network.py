@@ -63,7 +63,6 @@ def submit_rated_network(
         return
 
     operator_config = OperatorConfig(vault, Path(data_dir))
-    operator_config.load()
     settings.set(
         vault=vault,
         vault_dir=operator_config.vault_dir,

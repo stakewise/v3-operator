@@ -3,23 +3,25 @@ from typing import Callable
 
 import click
 from click.decorators import FC
-from web3 import Web3
 
 from src.common.logging import LOG_LEVELS
 from src.common.typings import ValidatorType
 from src.common.validators import (
     validate_eth_address,
     validate_max_validator_balance_gwei,
+    validate_min_deposit_amount_gwei,
 )
 from src.config.networks import GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
+    DEFAULT_CONSENSUS_ENDPOINT,
+    DEFAULT_EXECUTION_ENDPOINT,
     DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI,
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
     DEFAULT_METRICS_PREFIX,
-    DEFAULT_MIN_DEPOSIT_AMOUNT,
     DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
     DEFAULT_MIN_DEPOSIT_DELAY,
+    DEFAULT_VAULT_MIN_BALANCE_GWEI,
     LOG_FORMATS,
     LOG_PLAIN,
 )
@@ -143,8 +145,10 @@ start_common_options = [
         '--execution-endpoints',
         type=str,
         envvar='EXECUTION_ENDPOINTS',
+        default=DEFAULT_EXECUTION_ENDPOINT,
         prompt='Enter the comma separated list of API endpoints for execution nodes',
         help='Comma separated list of API endpoints for execution nodes.',
+        show_default=True,
     ),
     click.option(
         '--execution-jwt-secret',
@@ -157,8 +161,10 @@ start_common_options = [
         '--consensus-endpoints',
         type=str,
         envvar='CONSENSUS_ENDPOINTS',
+        default=DEFAULT_CONSENSUS_ENDPOINT,
         prompt='Enter the comma separated list of API endpoints for consensus nodes',
         help='Comma separated list of API endpoints for consensus nodes.',
+        show_default=True,
     ),
     click.option(
         '--graph-endpoint',
@@ -204,9 +210,18 @@ start_common_options = [
         type=int,
         envvar='MIN_DEPOSIT_AMOUNT_GWEI',
         help=f'Minimum amount in gwei to deposit into validator.'
-        f' The default is {DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI} '
-        f'({Web3.from_wei(DEFAULT_MIN_DEPOSIT_AMOUNT, 'ether')} ETH).',
+        f' The default is {DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI}',
         default=DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
+        callback=validate_min_deposit_amount_gwei,
+    ),
+    click.option(
+        '--vault-min-balance-gwei',
+        type=int,
+        envvar='VAULT_MIN_BALANCE_GWEI',
+        help='The amount of assets (ETH/GNO) in Gwei '
+        'that should be kept in the vault and not sent for staking. '
+        f'The default is {DEFAULT_VAULT_MIN_BALANCE_GWEI}.',
+        default=DEFAULT_VAULT_MIN_BALANCE_GWEI,
     ),
     click.option(
         '--max-validator-balance-gwei',

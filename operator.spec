@@ -24,7 +24,7 @@ hiddenimports = [
 # tomli
 hiddenimports += [
     'ddc459050edb75a05942__mypyc',  # MacOS
-    '5bae8a57b5ef85818b48__mypyc',  # Linux (both arm and amd64)
+    '7bce59c0a152c0e01f70__mypyc',  # Linux (both arm and amd64)
     '3c22db458360489351e4＿myрус',  # Windows
     '__future__'
 ]

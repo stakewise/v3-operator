@@ -2,6 +2,7 @@ from pathlib import Path
 
 from decouple import Csv
 from decouple import config as decouple_config
+from eth_typing import BlockNumber
 from web3 import Web3
 from web3.types import ChecksumAddress, Gwei, Wei
 
@@ -20,11 +21,16 @@ DEFAULT_HASHI_VAULT_ENGINE_NAME = 'secret'
 DEFAULT_MIN_DEPOSIT_AMOUNT = Web3.to_wei(10, 'ether')
 DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI = Gwei(int(Web3.from_wei(DEFAULT_MIN_DEPOSIT_AMOUNT, 'gwei')))
 
-DEFAULT_MIN_DEPOSIT_DELAY = 3600  # 1 hour
+DEFAULT_VAULT_MIN_BALANCE = Web3.to_wei(0, 'ether')
+DEFAULT_VAULT_MIN_BALANCE_GWEI = Gwei(int(Web3.from_wei(DEFAULT_VAULT_MIN_BALANCE, 'gwei')))
 
+DEFAULT_MIN_DEPOSIT_DELAY = 3600  # 1 hour
 
 DEFAULT_MAX_CONSOLIDATION_REQUEST_FEE_GWEI = Gwei(1000)
 DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI = Gwei(1000)
+
+DEFAULT_CONSENSUS_ENDPOINT = 'http://localhost:5052'
+DEFAULT_EXECUTION_ENDPOINT = 'http://localhost:8545'
 
 
 # pylint: disable-next=too-many-public-methods,too-many-instance-attributes
@@ -48,6 +54,7 @@ class Settings(metaclass=Singleton):
 
     harvest_vault: bool
     claim_fee_splitter: bool
+    process_meta_vault: bool
     disable_withdrawals: bool
     disable_validators_registration: bool
     disable_validators_funding: bool
@@ -94,6 +101,9 @@ class Settings(metaclass=Singleton):
     validators_registration_mode: ValidatorsRegistrationMode
     skip_startup_checks: bool
 
+    # meta_vault
+    meta_vault_min_deposit_amount_gwei: Gwei
+
     # high priority fee
     priority_fee_num_blocks: int = decouple_config('PRIORITY_FEE_NUM_BLOCKS', default=10, cast=int)
     priority_fee_percentile: float = decouple_config(
@@ -106,11 +116,20 @@ class Settings(metaclass=Singleton):
     disable_full_withdrawals: bool = decouple_config(
         'DISABLE_FULL_WITHDRAWALS', default=False, cast=bool
     )
+    wallet_private_key: str | None = decouple_config('WALLET_PRIVATE_KEY', default=None)
 
     min_deposit_amount_gwei: Gwei
+    vault_min_balance_gwei: Gwei
     max_validator_balance_gwei: Gwei
     min_deposit_delay: int
     max_withdrawal_request_fee_gwei: Gwei
+
+    vault_first_block: BlockNumber
+    nodes_dir: Path
+
+    run_nodes: bool
+    enable_file_logging: bool
+    log_file_path: Path | None
 
     # pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements
     def set(
@@ -124,6 +143,7 @@ class Settings(metaclass=Singleton):
         graph_endpoint: str = '',
         harvest_vault: bool = False,
         claim_fee_splitter: bool = False,
+        process_meta_vault: bool = False,
         disable_withdrawals: bool = False,
         disable_validators_registration: bool = False,
         disable_validators_funding: bool = False,
@@ -153,21 +173,37 @@ class Settings(metaclass=Singleton):
         relayer_endpoint: str | None = None,
         validators_registration_mode: ValidatorsRegistrationMode = ValidatorsRegistrationMode.AUTO,
         min_deposit_amount_gwei: Gwei = DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
+        vault_min_balance_gwei: Gwei = DEFAULT_VAULT_MIN_BALANCE_GWEI,
         max_validator_balance_gwei: Gwei | None = None,
         min_deposit_delay: int = DEFAULT_MIN_DEPOSIT_DELAY,
         max_withdrawal_request_fee_gwei: Gwei = DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI,
+        vault_first_block: BlockNumber | None = None,
+        meta_vault_min_deposit_amount_gwei: Gwei = DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
+        nodes_dir: Path = Path(''),
+        run_nodes: bool = False,
+        enable_file_logging: bool = False,
+        log_file_path: Path | None = None,
     ) -> None:
         self.vault = vault
         vault_dir.mkdir(parents=True, exist_ok=True)
         self.vault_dir = vault_dir
         self.network = network
 
-        self.consensus_endpoints = [node.strip() for node in consensus_endpoints.split(',')]
-        self.execution_endpoints = [node.strip() for node in execution_endpoints.split(',')]
+        if consensus_endpoints:
+            self.consensus_endpoints = [node.strip() for node in consensus_endpoints.split(',')]
+        else:
+            self.consensus_endpoints = [DEFAULT_CONSENSUS_ENDPOINT]
+
+        if execution_endpoints:
+            self.execution_endpoints = [node.strip() for node in execution_endpoints.split(',')]
+        else:
+            self.execution_endpoints = [DEFAULT_EXECUTION_ENDPOINT]
+
         self.execution_jwt_secret = execution_jwt_secret
         self.graph_endpoint = graph_endpoint or self.network_config.STAKEWISE_GRAPH_ENDPOINT
         self.harvest_vault = harvest_vault
         self.claim_fee_splitter = claim_fee_splitter
+        self.process_meta_vault = process_meta_vault
         self.disable_withdrawals = disable_withdrawals
         self.disable_validators_registration = disable_validators_registration
         self.disable_validators_funding = disable_validators_funding
@@ -187,6 +223,7 @@ class Settings(metaclass=Singleton):
         self.max_validator_balance_gwei = Gwei(max_validator_balance_gwei)
 
         self.min_deposit_amount_gwei = min_deposit_amount_gwei
+        self.vault_min_balance_gwei = vault_min_balance_gwei
         self.min_deposit_delay = min_deposit_delay
         self.max_withdrawal_request_fee_gwei = max_withdrawal_request_fee_gwei
 
@@ -290,6 +327,12 @@ class Settings(metaclass=Singleton):
         self.validators_registration_mode = validators_registration_mode
 
         self.skip_startup_checks = decouple_config('SKIP_STARTUP_CHECKS', default=False, cast=bool)
+        self.vault_first_block = vault_first_block or self.network_config.KEEPER_GENESIS_BLOCK
+        self.meta_vault_min_deposit_amount_gwei = meta_vault_min_deposit_amount_gwei
+        self.nodes_dir = nodes_dir
+        self.run_nodes = run_nodes
+        self.enable_file_logging = enable_file_logging
+        self.log_file_path = log_file_path
 
     @property
     def keystore_cls_str(self) -> str:
@@ -328,8 +371,16 @@ MIN_WITHDRAWAL_AMOUNT_GWEI: Gwei = Gwei(1)
 MIN_ACTIVATION_BALANCE: Wei = Web3.to_wei(32, 'ether')
 MIN_ACTIVATION_BALANCE_GWEI: Gwei = Gwei(int(Web3.from_wei(MIN_ACTIVATION_BALANCE, 'gwei')))
 
+MIN_DEPOSIT_AMOUNT: Wei = Web3.to_wei(1, 'ether')
+MIN_DEPOSIT_AMOUNT_GWEI: Gwei = Gwei(int(Web3.from_wei(MIN_DEPOSIT_AMOUNT, 'gwei')))
+
 MAX_EFFECTIVE_BALANCE: Wei = Web3.to_wei(2048, 'ether')
 MAX_EFFECTIVE_BALANCE_GWEI: Gwei = Gwei(int(Web3.from_wei(MAX_EFFECTIVE_BALANCE, 'gwei')))
+
+EVENTS_CONCURRENCY_CHUNK: int = decouple_config(
+    'EVENTS_CONCURRENCY_CHUNK', default=50_000, cast=int
+)
+EVENTS_CONCURRENCY_LIMIT: int = decouple_config('EVENTS_CONCURRENCY_LIMIT', default=10, cast=int)
 
 # Backoff retries
 DEFAULT_RETRY_TIME = 60
@@ -357,8 +408,12 @@ FEE_SPLITTER_MIN_ASSETS: int = decouple_config(
 FEE_SPLITTER_INTERVAL: int = decouple_config(
     'FEE_SPLITTER_INTERVAL', default=86400, cast=int  # every 24 hr
 )
+
 # logging
 LOG_PLAIN = 'plain'
 LOG_JSON = 'json'
 LOG_FORMATS = [LOG_PLAIN, LOG_JSON]
 LOG_DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
+LOG_WHITELISTED_DOMAINS = decouple_config(
+    'LOG_WHITELISTED_DOMAINS', cast=Csv(), default='stakewise.io,localhost'
+)

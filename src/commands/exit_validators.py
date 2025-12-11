@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import click
-from eth_typing import ChecksumAddress, HexStr
+from eth_typing import BlockNumber, ChecksumAddress, HexStr
 from web3 import Web3
 from web3.types import Gwei, Wei
 
@@ -18,6 +18,7 @@ from src.common.startup_check import check_validators_manager, check_vault_versi
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_address, validate_indexes
 from src.config.config import OperatorConfig
+from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI, settings
 from src.validators.consensus import EXITING_STATUSES, fetch_consensus_validators
 from src.validators.relayer import RelayerClient
@@ -33,6 +34,14 @@ logger = logging.getLogger(__name__)
     envvar='DATA_DIR',
     help='Path where the config data is placed. Default is ~/.stakewise.',
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
+)
+@click.option(
+    '--network',
+    help='The network of the vault. Default is the network specified at "init" command.',
+    type=click.Choice(
+        AVAILABLE_NETWORKS,
+        case_sensitive=False,
+    ),
 )
 @click.option(
     '--vault',
@@ -103,8 +112,14 @@ logger = logging.getLogger(__name__)
     default=False,
     help='Skips confirmation messages when provided.',
 )
+@click.option(
+    '--vault-first-block',
+    type=int,
+    envvar='VAULT_FIRST_BLOCK',
+    help='The block number where the vault was created. Used to optimize fetching vault events.',
+)
 @click.command(help='Performs a voluntary exit for active vault validators.')
-# pylint: disable-next=too-many-arguments
+# pylint: disable-next=too-many-arguments,too-many-locals
 def exit_validators(
     vault: ChecksumAddress,
     indexes: list[int],
@@ -113,10 +128,12 @@ def exit_validators(
     execution_endpoints: str,
     max_withdrawal_request_fee_gwei: int,
     data_dir: str,
+    network: str | None,
     verbose: bool,
     no_confirm: bool,
     log_level: str,
-    relayer_endpoint: str | None = None,
+    relayer_endpoint: str | None,
+    vault_first_block: BlockNumber | None,
 ) -> None:
     """
     Trigger vault validator exits via vault contract.
@@ -125,18 +142,21 @@ def exit_validators(
     if all([indexes, count]):
         raise click.ClickException('Please provide either --indexes or --count, not both.')
     operator_config = OperatorConfig(vault, Path(data_dir))
-    operator_config.load()
+    if network is None:
+        operator_config.load()
+        network = operator_config.network
 
     settings.set(
         vault=vault,
         vault_dir=operator_config.vault_dir,
-        network=operator_config.network,
+        network=network,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
         max_withdrawal_request_fee_gwei=Gwei(max_withdrawal_request_fee_gwei),
         relayer_endpoint=relayer_endpoint,
         verbose=verbose,
         log_level=log_level,
+        vault_first_block=vault_first_block,
     )
     try:
         # Try-catch to enable async calls in test - an event loop
@@ -202,7 +222,7 @@ async def process(
     logger.info('Fetching vault validators...')
     vault_contract = VaultContract(vault_address)
     public_keys = await vault_contract.get_registered_validators_public_keys(
-        from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
+        from_block=settings.vault_first_block,
         to_block=chain_head.block_number,
     )
     if indexes:

@@ -13,6 +13,10 @@ from src.commands.create_keys import create_keys
 from src.commands.create_wallet import create_wallet
 from src.commands.exit_validators import exit_validators
 from src.commands.init import init
+from src.commands.nodes.node_install import node_install
+from src.commands.nodes.node_start import node_start
+from src.commands.nodes.node_status import node_status_command as node_status
+from src.commands.process_meta_vaults import process_meta_vaults
 from src.commands.recover import recover
 from src.commands.setup_remote_signer import setup_remote_signer
 from src.commands.start.hashi_vault import start_hashi_vault
@@ -38,6 +42,7 @@ def cli() -> None:
 cli.add_command(init)
 cli.add_command(create_keys)
 cli.add_command(consolidate)
+cli.add_command(process_meta_vaults)
 cli.add_command(setup_remote_signer)
 cli.add_command(create_wallet)
 cli.add_command(exit_validators)
@@ -49,6 +54,10 @@ cli.add_command(start_relayer)
 cli.add_command(recover)
 cli.add_command(remote_db_group)
 cli.add_command(submit_rated_network)
+cli.add_command(node_install)
+cli.add_command(node_start)
+cli.add_command(node_status)
+
 
 if __name__ == '__main__':
     # Pyinstaller hacks
