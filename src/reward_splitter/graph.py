@@ -79,14 +79,18 @@ async def graph_get_claimable_exit_requests(
                 }
             ) {
                 id
-                isClaimable
-                isClaimed
                 positionTicket
                 timestamp
-                exitQueueIndex
+                owner
                 receiver
-                totalAssets
+                exitQueueIndex
+                isClaimed
+                isClaimable
                 exitedAssets
+                totalAssets
+                vault {
+                  id
+                }
             }
         }
     '''
