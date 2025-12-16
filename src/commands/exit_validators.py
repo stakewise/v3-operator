@@ -85,9 +85,9 @@ logger = logging.getLogger(__name__)
     '--max-withdrawal-request-fee-gwei',
     type=int,
     envvar='MAX_WITHDRAWAL_REQUEST_FEE_GWEI',
-    help='The maximum withdrawal request fee in Gwei. '
-    f'The default is {DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI}',
+    help='The maximum withdrawal request fee in Gwei.',
     default=DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI,
+    show_default=True,
 )
 @click.option(
     '-v',
