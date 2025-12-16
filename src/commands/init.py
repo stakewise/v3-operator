@@ -20,7 +20,7 @@ from src.config.settings import DEFAULT_NETWORK
 @click.option(
     '--no-verify',
     is_flag=True,
-    help='Skips mnemonic verification when provided.',
+    help='Skips mnemonic verification when provided. Default is false.',
 )
 @click.option(
     '--language',

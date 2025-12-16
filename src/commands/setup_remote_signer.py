@@ -80,7 +80,8 @@ logger = logging.getLogger(__name__)
 )
 @click.option(
     '--dappnode',
-    help='Add fields required by Dappnode Staking Brain to the keystore import request',
+    help='Add fields required by Dappnode Staking Brain to the keystore import request.'
+    ' Default is false.',
     envvar='DAPPNODE',
     is_flag=True,
 )

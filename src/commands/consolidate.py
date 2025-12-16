@@ -143,19 +143,20 @@ logger = logging.getLogger(__name__)
 @click.option(
     '-v',
     '--verbose',
-    help='Enable debug mode.',
+    help='Enable debug mode. Default is false.',
     envvar='VERBOSE',
     is_flag=True,
 )
 @click.option(
     '--no-switch-consolidation',
     is_flag=True,
-    help='Disables switching a 0x01 validator to 0x02 when no public keys are provided.',
+    help='Disables switching a 0x01 validator to 0x02 when no public keys are provided.'
+    ' Default is false.',
 )
 @click.option(
     '--no-confirm',
     is_flag=True,
-    help='Skips confirmation messages when provided.',
+    help='Skips confirmation messages when provided. Default is false.',
 )
 @click.option(
     '--log-level',

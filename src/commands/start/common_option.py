@@ -67,7 +67,7 @@ start_common_options = [
         '--enable-metrics',
         is_flag=True,
         envvar='ENABLE_METRICS',
-        help='Whether to enable metrics server. Disabled by default.',
+        help='Whether to enable metrics server. Default is false.',
     ),
     click.option(
         '--metrics-host',
@@ -109,7 +109,7 @@ start_common_options = [
     click.option(
         '-v',
         '--verbose',
-        help='Enable debug mode.',
+        help='Enable debug mode. Default is false.',
         envvar='VERBOSE',
         is_flag=True,
     ),
@@ -117,31 +117,33 @@ start_common_options = [
         '--harvest-vault',
         is_flag=True,
         envvar='HARVEST_VAULT',
-        help='Submit the vault state sync transaction periodically.',
+        help='Submit the vault state sync transaction periodically. Default is false.',
     ),
     click.option(
         '--claim-fee-splitter',
         is_flag=True,
         envvar='CLAIM_FEE_SPLITTER',
-        help='Claim fee splitter rewards periodically on behalf of the shareholders.',
+        help='Claim fee splitter rewards periodically on behalf of the shareholders.'
+        ' Default is false.',
     ),
     click.option(
         '--disable-withdrawals',
         is_flag=True,
         envvar='DISABLE_WITHDRAWALS',
-        help='Disable submitting validator withdrawals through the vault contract.',
+        help='Disable submitting validator withdrawals through the vault contract.'
+        ' Default is false.',
     ),
     click.option(
         '--disable-validators-registration',
         is_flag=True,
         envvar='DISABLE_VALIDATORS_REGISTRATION',
-        help='Disable registration of new validators.',
+        help='Disable registration of new validators. Default is false.',
     ),
     click.option(
         '--disable-validators-funding',
         is_flag=True,
         envvar='DISABLE_VALIDATORS_FUNDING',
-        help='Disable funding of existing 0x02 validators.',
+        help='Disable funding of existing 0x02 validators. Default is false.',
     ),
     click.option(
         '--execution-endpoints',

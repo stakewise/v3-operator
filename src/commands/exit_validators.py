@@ -109,8 +109,7 @@ logger = logging.getLogger(__name__)
 @click.option(
     '--no-confirm',
     is_flag=True,
-    default=False,
-    help='Skips confirmation messages when provided.',
+    help='Skips confirmation messages when provided. Default is false.',
 )
 @click.option(
     '--vault-first-block',

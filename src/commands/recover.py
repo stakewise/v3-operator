@@ -31,13 +31,12 @@ from src.config.settings import DEFAULT_NETWORK, settings
     '--per-keystore-password',
     is_flag=True,
     help='Creates separate password file for each keystore.'
-    ' Creates a single password file by default.',
+    ' Creates a single password file by default. Default is false.',
 )
 @click.option(
     '--no-confirm',
     is_flag=True,
-    default=False,
-    help='Skips confirmation messages when provided.',
+    help='Skips confirmation messages when provided. Default is false.',
 )
 @click.option(
     '--mnemonic',
