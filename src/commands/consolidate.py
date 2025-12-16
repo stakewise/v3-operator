@@ -136,9 +136,9 @@ logger = logging.getLogger(__name__)
     '--max-consolidation-request-fee-gwei',
     type=int,
     envvar='MAX_CONSOLIDATION_REQUEST_FEE_GWEI',
-    help='The maximum consolidation request fee in Gwei. '
-    f'Default is {DEFAULT_MAX_CONSOLIDATION_REQUEST_FEE_GWEI} Gwei.',
+    help='The maximum consolidation request fee in Gwei. ',
     default=DEFAULT_MAX_CONSOLIDATION_REQUEST_FEE_GWEI,
+    show_default=True,
 )
 @click.option(
     '-v',
@@ -150,14 +150,13 @@ logger = logging.getLogger(__name__)
 @click.option(
     '--no-switch-consolidation',
     is_flag=True,
-    default=False,
-    help='Disables switching a 0x01 validator to 0x02 when no public keys are provided.',
+    help='Disables switching a 0x01 validator to 0x02 when no public keys are provided.'
+    ' Default is false.',
 )
 @click.option(
     '--no-confirm',
     is_flag=True,
-    default=False,
-    help='Skips confirmation messages when provided.',
+    help='Skips confirmation messages when provided. Default is false.',
 )
 @click.option(
     '--log-level',

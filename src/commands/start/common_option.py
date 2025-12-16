@@ -67,34 +67,36 @@ start_common_options = [
         '--enable-metrics',
         is_flag=True,
         envvar='ENABLE_METRICS',
-        help='Whether to enable metrics server. Disabled by default.',
+        help='Whether to enable metrics server. Default is false.',
     ),
     click.option(
         '--metrics-host',
         type=str,
-        help=f'The prometheus metrics host. Default is {DEFAULT_METRICS_HOST}.',
+        help='The prometheus metrics host.',
         envvar='METRICS_HOST',
         default=DEFAULT_METRICS_HOST,
+        show_default=True,
     ),
     click.option(
         '--metrics-prefix',
         type=str,
-        help=f'The prometheus metrics prefix. Default is {DEFAULT_METRICS_PREFIX}.',
+        help='The prometheus metrics prefix.',
         envvar='METRICS_PREFIX',
         default=DEFAULT_METRICS_PREFIX,
+        show_default=True,
     ),
     click.option(
         '--metrics-port',
         type=int,
-        help=f'The prometheus metrics port. Default is {DEFAULT_METRICS_PORT}.',
+        help='The prometheus metrics port.',
         envvar='METRICS_PORT',
         default=DEFAULT_METRICS_PORT,
+        show_default=True,
     ),
     click.option(
         '--validator-type',
         help='Type of the validators to register:'
-        f' {ValidatorType.V1.value} or {ValidatorType.V2.value}.'
-        f' Default is {ValidatorType.V2.value}.',
+        f' {ValidatorType.V1.value} or {ValidatorType.V2.value}.',
         envvar='VALIDATOR_TYPE',
         default=ValidatorType.V2.value,
         type=click.Choice(
@@ -102,6 +104,7 @@ start_common_options = [
             case_sensitive=False,
         ),
         callback=lambda ctx, param, value: ValidatorType(value),
+        show_default=True,
     ),
     click.option(
         '-v',
@@ -127,19 +130,20 @@ start_common_options = [
         '--disable-withdrawals',
         is_flag=True,
         envvar='DISABLE_WITHDRAWALS',
-        help='Disable submitting validator withdrawals through the vault contract.',
+        help='Disable submitting validator withdrawals through the vault contract.'
+        ' Default is false.',
     ),
     click.option(
         '--disable-validators-registration',
         is_flag=True,
         envvar='DISABLE_VALIDATORS_REGISTRATION',
-        help='Disable registration of new validators. Default is false',
+        help='Disable registration of new validators. Default is false.',
     ),
     click.option(
         '--disable-validators-funding',
         is_flag=True,
         envvar='DISABLE_VALIDATORS_FUNDING',
-        help='Disable funding of existing 0x02 validators. Default is false',
+        help='Disable funding of existing 0x02 validators. Default is false.',
     ),
     click.option(
         '--execution-endpoints',
@@ -209,19 +213,19 @@ start_common_options = [
         '--min-deposit-amount-gwei',
         type=int,
         envvar='MIN_DEPOSIT_AMOUNT_GWEI',
-        help=f'Minimum amount in gwei to deposit into validator.'
-        f' The default is {DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI}',
+        help='Minimum amount in gwei to deposit into validator.',
         default=DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
         callback=validate_min_deposit_amount_gwei,
+        show_default=True,
     ),
     click.option(
         '--vault-min-balance-gwei',
         type=int,
         envvar='VAULT_MIN_BALANCE_GWEI',
         help='The amount of assets (ETH/GNO) in Gwei '
-        'that should be kept in the vault and not sent for staking. '
-        f'The default is {DEFAULT_VAULT_MIN_BALANCE_GWEI}.',
+        'that should be kept in the vault and not sent for staking.',
         default=DEFAULT_VAULT_MIN_BALANCE_GWEI,
+        show_default=True,
     ),
     click.option(
         '--max-validator-balance-gwei',
@@ -236,17 +240,17 @@ start_common_options = [
         '--min-deposit-delay',
         type=int,
         envvar='MIN_DEPOSIT_DELAY',
-        help=f'Minimum delay for validator funding in seconds.'
-        f' The default is {DEFAULT_MIN_DEPOSIT_DELAY}',
+        help='Minimum delay for validator funding in seconds.',
         default=DEFAULT_MIN_DEPOSIT_DELAY,
+        show_default=True,
     ),
     click.option(
         '--max-withdrawal-request-fee-gwei',
         type=int,
         envvar='MAX_WITHDRAWAL_REQUEST_FEE_GWEI',
-        help='The maximum withdrawal request fee in Gwei. '
-        f'The default is {DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI}',
+        help='The maximum withdrawal request fee in Gwei.',
         default=DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI,
+        show_default=True,
     ),
 ]
 

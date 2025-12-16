@@ -36,8 +36,7 @@ logger = logging.getLogger(__name__)
 @click.option(
     '--no-confirm',
     is_flag=True,
-    default=False,
-    help='Skips confirmation messages when provided.',
+    help='Skips confirmation messages when provided. Default is false.',
 )
 @click.option(
     '--vault',
@@ -49,20 +48,17 @@ logger = logging.getLogger(__name__)
 @click.option(
     '--print-execution-logs',
     is_flag=True,
-    default=False,
-    help='Whether to print execution node logs',
+    help='Whether to print execution node logs. Default is false.',
 )
 @click.option(
     '--print-consensus-logs',
     is_flag=True,
-    default=False,
-    help='Whether to print consensus node logs',
+    help='Whether to print consensus node logs. Default is false.',
 )
 @click.option(
     '--print-validator-logs',
     is_flag=True,
-    default=False,
-    help='Whether to print validator node logs',
+    help='Whether to print validator node logs. Default is false.',
 )
 @click.command(help='Starts execution, consensus, and validator nodes.')
 # pylint: disable=too-many-arguments

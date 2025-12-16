@@ -28,9 +28,8 @@ from src.config.config import OperatorConfig
 @click.option(
     '--per-keystore-password',
     is_flag=True,
-    default=False,
     help='Creates separate password file for each keystore.'
-    ' Creates a single password file by default.',
+    ' Creates a single password file by default. Default is false.',
 )
 @click.option(
     '--mnemonic',
