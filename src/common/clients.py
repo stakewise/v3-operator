@@ -131,9 +131,11 @@ ipfs_fetch_client = IpfsLazyFetchClient()
 async def setup_clients() -> None:
     await execution_client.setup()  # type: ignore
     await execution_non_retry_client.setup()  # type: ignore
+    await graph_client.setup()
 
 
 async def close_clients() -> None:
     await execution_client.provider.disconnect()
     await execution_non_retry_client.provider.disconnect()
     await consensus_client.disconnect()
+    await graph_client.disconnect()

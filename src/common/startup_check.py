@@ -288,17 +288,21 @@ async def wait_for_graph_node_sync_to_chain_head() -> None:
         retry_timeout=0,
         page_size=settings.graph_page_size,
     )
-    chain_state = await get_chain_finalized_head()
-    graph_block_number = await graph_client.get_last_synced_block()
-
-    while graph_block_number < chain_state.block_number:
-        logger.warning(
-            'The graph node located at %s has not completed synchronization yet.',
-            settings.graph_endpoint,
-        )
-        await asyncio.sleep(settings.network_config.SECONDS_PER_BLOCK)
+    await graph_client.setup()
+    try:
         chain_state = await get_chain_finalized_head()
         graph_block_number = await graph_client.get_last_synced_block()
+
+        while graph_block_number < chain_state.block_number:
+            logger.warning(
+                'The graph node located at %s has not completed synchronization yet.',
+                settings.graph_endpoint,
+            )
+            await asyncio.sleep(settings.network_config.SECONDS_PER_BLOCK)
+            chain_state = await get_chain_finalized_head()
+            graph_block_number = await graph_client.get_last_synced_block()
+    finally:
+        await graph_client.disconnect()
 
 
 async def collect_healthy_oracles() -> list:
