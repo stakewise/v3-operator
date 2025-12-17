@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 import shutil
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -223,7 +222,7 @@ async def main(vault: ChecksumAddress | None) -> None:
                 shutil.rmtree(settings.keystores_password_dir)
 
             if settings.keystores_password_file.exists():
-                os.remove(settings.keystores_password_file)
+                settings.keystores_password_file.unlink()
 
             click.echo('Removed keystores from local filesystem.')
 
