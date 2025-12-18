@@ -2,7 +2,6 @@ import logging
 from dataclasses import dataclass
 from multiprocessing import Pool
 from os import walk
-from os.path import isfile
 from pathlib import Path
 from typing import NewType
 
@@ -125,16 +124,16 @@ class LocalKeystore(BaseKeystore):
         for current_path, _, files in walk(keystores_dir):
             for f in files:
                 file_path = Path(current_path) / f
-                if not (isfile(file_path) and f.startswith('keystore') and f.endswith('.json')):
+                if not (file_path.is_file() and f.startswith('keystore') and f.endswith('.json')):
                     continue
 
                 # check for password file in the keystores_password_dir
                 password_file = keystores_password_dir / f.replace('.json', '.txt')
-                if not isfile(password_file):
+                if not password_file.is_file():
                     # check for password file in the same directory as the keystore file
                     password_file = Path(current_path) / f.replace('.json', '.txt')
 
-                if not isfile(password_file):
+                if not password_file.is_file():
                     # use password file from the keystores_password_file setting
                     password_file = keystores_password_file
 
