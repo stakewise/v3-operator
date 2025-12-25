@@ -5,7 +5,7 @@ from sw_utils import InterruptHandler
 
 import src
 from src.commands.nodes.node_start import main as run_nodes
-from src.common.clients import setup_clients
+from src.common.clients import close_clients, setup_clients
 from src.common.consensus import get_chain_finalized_head
 from src.common.execution import WalletTask
 from src.common.logging import setup_logging
@@ -38,10 +38,15 @@ async def start_base() -> None:
     """Bootstrap operator service and start periodic tasks."""
     setup_logging()
     setup_sentry()
-    await setup_clients()
-
     log_start()
+    await setup_clients()
+    try:
+        await process()
+    finally:
+        await close_clients()
 
+
+async def process() -> None:
     background_tasks = set()
 
     if settings.run_nodes:
@@ -55,7 +60,6 @@ async def start_base() -> None:
 
         # Keep track of background tasks to prevent them from being garbage collected
         background_tasks.add(run_nodes_task)
-
     if not settings.skip_startup_checks:
         await startup_checks()
 

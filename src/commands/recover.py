@@ -7,7 +7,12 @@ from eth_typing import BlockNumber, ChecksumAddress, HexStr
 from eth_utils import add_0x_prefix
 from sw_utils.consensus import EXITED_STATUSES, ValidatorStatus
 
-from src.common.clients import consensus_client, execution_client, setup_clients
+from src.common.clients import (
+    close_clients,
+    consensus_client,
+    execution_client,
+    setup_clients,
+)
 from src.common.contracts import VaultContract
 from src.common.credentials import CredentialManager
 from src.common.logging import LOG_LEVELS, setup_logging
@@ -146,6 +151,23 @@ async def main(
 ) -> None:
     setup_logging()
     await setup_clients()
+    try:
+        await process(
+            mnemonic=mnemonic,
+            per_keystore_password=per_keystore_password,
+            no_confirm=no_confirm,
+            operator_config=operator_config,
+        )
+    finally:
+        await close_clients()
+
+
+async def process(
+    mnemonic: str,
+    per_keystore_password: bool,
+    no_confirm: bool,
+    operator_config: OperatorConfig,
+) -> None:
 
     validators: dict[HexStr, ValidatorStatus | None] = await _fetch_registered_validators(
         settings.vault
