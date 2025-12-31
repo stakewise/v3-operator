@@ -9,7 +9,7 @@ from typing import Sequence
 from aiohttp import ClientError, ClientSession, ClientTimeout
 from eth_typing import ChecksumAddress, HexStr
 from sw_utils.common import urljoin
-from sw_utils.typings import Bytes32, ProtocolConfig
+from sw_utils.typings import ProtocolConfig
 from web3 import Web3
 
 from src.common.contracts import validators_registry_contract
@@ -29,15 +29,7 @@ from src.config.settings import (
     ORACLES_VALIDATORS_TIMEOUT,
     settings,
 )
-from src.validators.database import NetworkValidatorCrud
-from src.validators.exceptions import (
-    RegistryRootChangedError,
-    ValidatorIndexChangedError,
-)
-from src.validators.execution import (
-    get_latest_network_validator_public_keys,
-    get_validators_start_index,
-)
+from src.validators.execution import get_validators_start_index
 from src.validators.keystores.base import BaseKeystore
 from src.validators.signing.common import get_encrypted_exit_signature_shards
 from src.validators.typings import ApprovalRequest, ConsolidationRequest, Validator
@@ -53,7 +45,7 @@ async def poll_validation_approval(
     """
     Polls oracles for approval of validator registration
     """
-    previous_registry_root: Bytes32 | None = None
+    previous_registry_root: HexStr | None = None
     oracles_request: ApprovalRequest | None = None
     protocol_config = await get_protocol_config()
     deadline: int | None = None
@@ -67,7 +59,7 @@ async def poll_validation_approval(
 
         # Create new approvals request or reuse the previous one
         current_registry_root = await validators_registry_contract.get_registry_root()
-        logger.debug('Fetched validators registry root: %s', Web3.to_hex(current_registry_root))
+        logger.debug('Fetched validators registry root: %s', current_registry_root)
 
         current_timestamp = get_current_timestamp()
         if (
@@ -196,7 +188,7 @@ async def create_approval_request(
     protocol_config: ProtocolConfig,
     keystore: BaseKeystore | None,
     validators: Sequence[Validator],
-    registry_root: Bytes32,
+    registry_root: HexStr,
     deadline: int,
     validators_manager_signature: HexStr,
 ) -> ApprovalRequest:
@@ -210,7 +202,7 @@ async def create_approval_request(
     request = ApprovalRequest(
         validator_index=validators_start_index,
         vault_address=settings.vault,
-        validators_root=Web3.to_hex(registry_root),
+        validators_root=registry_root,
         public_keys=[],
         deposit_signatures=[],
         public_key_shards=[],
@@ -274,23 +266,13 @@ async def _send_approval_request(
 ) -> OracleApproval:
     """Requests approval from single oracle."""
     logger.debug('send_approval_request to %s', endpoint)
-    try:
-        async with session.post(url=endpoint, json=payload) as response:
-            if response.status == 400:
-                logger.warning('%s response: %s', endpoint, await response.json())
-            response.raise_for_status()
-            data = await response.json()
-    except (ClientError, asyncio.TimeoutError) as e:
-        registry_root = await validators_registry_contract.get_registry_root()
-        if Web3.to_hex(registry_root) != payload['validators_root']:
-            raise RegistryRootChangedError from e
 
-        latest_public_keys = await get_latest_network_validator_public_keys()
-        validator_index = NetworkValidatorCrud().get_next_validator_index(list(latest_public_keys))
-        if validator_index != payload['validator_index']:
-            raise ValidatorIndexChangedError from e
+    async with session.post(url=endpoint, json=payload) as response:
+        if response.status == 400:
+            logger.warning('%s response: %s', endpoint, await response.json())
+        response.raise_for_status()
+        data = await response.json()
 
-        raise e
     logger.debug('Received response from oracle %s: %s', endpoint, data)
     return OracleApproval(
         ipfs_hash=data['ipfs_hash'],

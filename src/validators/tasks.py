@@ -4,7 +4,6 @@ from typing import Sequence, cast
 from eth_typing import HexStr
 from sw_utils import IpfsFetchClient, chunkify, convert_to_mgno
 from sw_utils.networks import GNO_NETWORKS
-from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.types import BlockNumber, Gwei
 
@@ -257,12 +256,11 @@ async def register_new_validators(
         validators=validators,
         validators_manager_signature=validators_manager_signature,
     )
-    validators_registry_root = Bytes32(Web3.to_bytes(hexstr=oracles_request.validators_root))
     tx_hash = await register_validators(
         approval=oracles_approval,
         validators=validators,
         harvest_params=harvest_params,
-        validators_registry_root=validators_registry_root,
+        validators_registry_root=oracles_request.validators_root,
         validators_manager_signature=validators_manager_signature,
     )
     if tx_hash:
