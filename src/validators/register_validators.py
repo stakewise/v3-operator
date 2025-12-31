@@ -8,7 +8,7 @@ from web3.exceptions import ContractLogicError
 from web3.types import Wei
 
 from src.common.clients import execution_client
-from src.common.contracts import VaultContract
+from src.common.contracts import VaultContract, validators_registry_contract
 from src.common.execution import build_gas_manager, transaction_gas_wrapper
 from src.common.typings import HarvestParams, OraclesApproval
 from src.common.utils import format_error
@@ -24,25 +24,31 @@ async def register_validators(
     approval: OraclesApproval,
     validators: Sequence[Validator],
     harvest_params: HarvestParams | None,
-    validators_registry_root: Bytes32,
+    validators_registry_root: HexStr,
     validators_manager_signature: HexStr,
 ) -> HexStr | None:
+    # Check that validators registry root has not changed
+    registry_root = await validators_registry_contract.get_registry_root()
+
+    if registry_root != validators_registry_root:
+        return None
+
+    # Get update state call if harvest params are provided
+    vault_contract = VaultContract(settings.vault)
+    if harvest_params is not None:
+        calls = [vault_contract.get_update_state_call(harvest_params)]
+    else:
+        calls = []
+
+    # Build keeper approval params
     tx_validators = [
         Web3.to_bytes(tx_validator)
         for tx_validator in encode_tx_validator_list(
             validators=validators,
         )
     ]
-    vault_contract = VaultContract(settings.vault)
-    if harvest_params is not None:
-        # add update state calls before validator registration
-        calls = [vault_contract.get_update_state_call(harvest_params)]
-    else:
-        # aggregate all the calls into one multicall
-        calls = []
-
     keeper_approval_params = (
-        validators_registry_root,
+        Bytes32(Web3.to_bytes(hexstr=validators_registry_root)),
         approval.deadline,
         b''.join(tx_validators),
         approval.signatures,
@@ -57,6 +63,7 @@ async def register_validators(
         )
     )
 
+    # Simulate transaction
     logger.info('Submitting registration transaction')
     try:
         await vault_contract.functions.multicall(calls).estimate_gas()
@@ -70,6 +77,7 @@ async def register_validators(
             logger.exception(e)
         return None
 
+    # Send transaction
     try:
         gas_manager = build_gas_manager()
         tx_params = await gas_manager.get_high_priority_tx_params()
