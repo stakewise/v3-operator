@@ -31,6 +31,7 @@ async def register_validators(
     registry_root = await validators_registry_contract.get_registry_root()
 
     if registry_root != validators_registry_root:
+        logger.info('Validators registry root has changed. Retrying...')
         return None
 
     # Get update state call if harvest params are provided
