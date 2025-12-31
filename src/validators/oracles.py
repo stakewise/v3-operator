@@ -29,7 +29,15 @@ from src.config.settings import (
     ORACLES_VALIDATORS_TIMEOUT,
     settings,
 )
-from src.validators.execution import get_validators_start_index
+from src.validators.database import NetworkValidatorCrud
+from src.validators.exceptions import (
+    RegistryRootChangedError,
+    ValidatorIndexChangedError,
+)
+from src.validators.execution import (
+    get_latest_network_validator_public_keys,
+    get_validators_start_index,
+)
 from src.validators.keystores.base import BaseKeystore
 from src.validators.signing.common import get_encrypted_exit_signature_shards
 from src.validators.typings import ApprovalRequest, ConsolidationRequest, Validator
@@ -266,15 +274,24 @@ async def _send_approval_request(
 ) -> OracleApproval:
     """Requests approval from single oracle."""
     logger.debug('send_approval_request to %s', endpoint)
+    try:
+        async with session.post(url=endpoint, json=payload) as response:
+            if response.status == 400:
+                logger.warning('%s response: %s', endpoint, await response.json())
+            response.raise_for_status()
+            data = await response.json()
+    except (ClientError, asyncio.TimeoutError) as e:
+        registry_root = await validators_registry_contract.get_registry_root()
+        if Web3.to_hex(registry_root) != payload['validators_root']:
+            raise RegistryRootChangedError from e
 
-    async with session.post(url=endpoint, json=payload) as response:
-        if response.status == 400:
-            logger.warning('%s response: %s', endpoint, await response.json())
-        response.raise_for_status()
-        data = await response.json()
+        latest_public_keys = await get_latest_network_validator_public_keys()
+        validator_index = NetworkValidatorCrud().get_next_validator_index(list(latest_public_keys))
+        if validator_index != payload['validator_index']:
+            raise ValidatorIndexChangedError from e
 
+        raise e
     logger.debug('Received response from oracle %s: %s', endpoint, data)
-
     return OracleApproval(
         ipfs_hash=data['ipfs_hash'],
         signature=Web3.to_bytes(hexstr=data['signature']),
