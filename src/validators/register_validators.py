@@ -13,8 +13,7 @@ from src.common.execution import build_gas_manager, transaction_gas_wrapper
 from src.common.typings import HarvestParams, OraclesApproval
 from src.common.utils import format_error
 from src.config.settings import settings
-from src.validators.database import NetworkValidatorCrud
-from src.validators.execution import get_latest_network_validator_public_keys
+from src.validators.execution import get_validators_start_index
 from src.validators.signing.common import encode_tx_validator_list
 from src.validators.typings import Validator
 
@@ -38,10 +37,8 @@ async def register_validators(
         return None
 
     # Check that validator index has not changed
-    latest_public_keys = await get_latest_network_validator_public_keys()
-    current_validator_index = NetworkValidatorCrud().get_next_validator_index(
-        list(latest_public_keys)
-    )
+    current_validator_index = await get_validators_start_index()
+
     if current_validator_index != validator_index:
         logger.info('Validator index has changed. Retrying...')
         return None
