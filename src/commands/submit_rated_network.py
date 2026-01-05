@@ -10,7 +10,7 @@ from src.common.clients import graph_client
 from src.common.validators import validate_eth_address
 from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS, NETWORKS, RATED_NETWORKS
-from src.config.settings import DEFAULT_NETWORK, settings
+from src.config.settings import settings
 
 
 @click.option(
@@ -29,9 +29,7 @@ from src.config.settings import DEFAULT_NETWORK, settings
 )
 @click.option(
     '--network',
-    default=DEFAULT_NETWORK,
-    help='The network of your vault.',
-    prompt='Enter the network name',
+    help='The network of the vault. Default is the network specified at "init" command.',
     type=click.Choice(
         AVAILABLE_NETWORKS,
         case_sensitive=False,
@@ -53,16 +51,22 @@ from src.config.settings import DEFAULT_NETWORK, settings
 @click.command(help='Submit your validators to the Rated Network.')
 def submit_rated_network(
     vault: ChecksumAddress,
-    network: str,
+    network: str | None,
     pool_tag: str,
     token: str,
     data_dir: str,
 ) -> None:
+    operator_config = OperatorConfig(vault, Path(data_dir))
+
+    if network is None and not operator_config.exists:
+        raise click.ClickException(
+            'Either provide the network using --network option or run "init" command first.'
+        )
+
     if network not in RATED_NETWORKS:
         click.secho(f'{network} network is not yet rated supported')
         return
 
-    operator_config = OperatorConfig(vault, Path(data_dir))
     settings.set(
         vault=vault,
         vault_dir=operator_config.vault_dir,
