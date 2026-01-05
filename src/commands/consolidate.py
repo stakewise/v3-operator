@@ -224,6 +224,12 @@ def consolidate(
         )
 
     operator_config = OperatorConfig(vault, Path(data_dir))
+
+    if network is None and not operator_config.exists:
+        raise click.ClickException(
+            'Either provide the network using --network option or run "init" command first.'
+        )
+
     if network is None:
         operator_config.load()
         network = operator_config.network
