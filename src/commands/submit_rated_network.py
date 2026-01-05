@@ -63,6 +63,10 @@ def submit_rated_network(
             'Either provide the network using --network option or run "init" command first.'
         )
 
+    if network is None:
+        operator_config.load()
+        network = operator_config.network
+
     if network not in RATED_NETWORKS:
         click.secho(f'{network} network is not yet rated supported')
         return
