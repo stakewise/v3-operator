@@ -13,6 +13,8 @@ from src.common.execution import build_gas_manager, transaction_gas_wrapper
 from src.common.typings import HarvestParams, OraclesApproval
 from src.common.utils import format_error
 from src.config.settings import settings
+from src.validators.database import NetworkValidatorCrud
+from src.validators.execution import get_latest_network_validator_public_keys
 from src.validators.signing.common import encode_tx_validator_list
 from src.validators.typings import Validator
 
@@ -25,6 +27,7 @@ async def register_validators(
     validators: Sequence[Validator],
     harvest_params: HarvestParams | None,
     validators_registry_root: HexStr,
+    validator_index: int,
     validators_manager_signature: HexStr,
 ) -> HexStr | None:
     # Check that validators registry root has not changed
@@ -32,6 +35,15 @@ async def register_validators(
 
     if registry_root != validators_registry_root:
         logger.info('Validators registry root has changed. Retrying...')
+        return None
+
+    # Check that validator index has not changed
+    latest_public_keys = await get_latest_network_validator_public_keys()
+    current_validator_index = NetworkValidatorCrud().get_next_validator_index(
+        list(latest_public_keys)
+    )
+    if current_validator_index != validator_index:
+        logger.info('Validator index has changed. Retrying...')
         return None
 
     # Get update state call if harvest params are provided
@@ -89,6 +101,7 @@ async def register_validators(
             logger.exception(e)
         return None
 
+    # Wait for transaction confirmation
     tx_hash = Web3.to_hex(tx)
     logger.info('Waiting for transaction %s confirmation', tx_hash)
     tx_receipt = await execution_client.eth.wait_for_transaction_receipt(

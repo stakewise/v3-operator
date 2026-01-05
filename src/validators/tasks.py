@@ -261,6 +261,7 @@ async def register_new_validators(
         validators=validators,
         harvest_params=harvest_params,
         validators_registry_root=oracles_request.validators_root,
+        validator_index=oracles_request.validator_index,
         validators_manager_signature=validators_manager_signature,
     )
     if tx_hash:
