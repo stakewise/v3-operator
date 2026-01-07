@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Callable, cast
 
 from eth_typing import HexStr
-from sw_utils.typings import Bytes32
 from web3 import AsyncWeb3, Web3
 from web3.contract import AsyncContract
 from web3.contract.async_contract import (
@@ -261,9 +260,10 @@ class ValidatorsRegistryContract(ContractWrapper):
     abi_path = 'abi/IValidatorsRegistry.json'
     settings_key = 'VALIDATORS_REGISTRY_CONTRACT_ADDRESS'
 
-    async def get_registry_root(self) -> Bytes32:
+    async def get_registry_root(self) -> HexStr:
         """Fetches the latest validators registry root."""
-        return await self.contract.functions.get_deposit_root().call()
+        deposit_root = await self.contract.functions.get_deposit_root().call()
+        return Web3.to_hex(deposit_root)
 
 
 class KeeperContract(ContractWrapper):

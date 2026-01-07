@@ -11,7 +11,7 @@ from src.validators.typings import Validator
 
 
 def get_validators_manager_signature(
-    vault: ChecksumAddress, validators_registry_root: bytes, validators: Sequence[Validator]
+    vault: ChecksumAddress, validators_registry_root: HexStr, validators: Sequence[Validator]
 ) -> HexStr:
     encoded_validators = [_encode_validator(v) for v in validators]
 
@@ -30,7 +30,7 @@ def get_validators_manager_signature(
             'verifyingContract': vault,
         },
         'message': {
-            'validatorsRegistryRoot': validators_registry_root,
+            'validatorsRegistryRoot': Web3.to_bytes(hexstr=validators_registry_root),
             'validators': b''.join(encoded_validators),
         },
     }
