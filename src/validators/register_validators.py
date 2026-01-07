@@ -69,7 +69,7 @@ async def register_validators(
     calls.append(
         vault_contract.encode_abi(
             fn_name='registerValidators',
-            args=[keeper_approval_params, validators_manager_signature],
+            args=[keeper_approval_params, Web3.to_bytes(hexstr=validators_manager_signature)],
         )
     )
 
@@ -129,7 +129,7 @@ async def fund_validators(
         calls.append(vault_contract.get_update_state_call(harvest_params))
     fund_validators_call = vault_contract.encode_abi(
         fn_name='fundValidators',
-        args=[b''.join(tx_validators), validators_manager_signature],
+        args=[b''.join(tx_validators), Web3.to_bytes(hexstr=validators_manager_signature)],
     )
     calls.append(fund_validators_call)
 
