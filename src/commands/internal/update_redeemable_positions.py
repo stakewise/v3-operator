@@ -6,7 +6,6 @@ from pathlib import Path
 
 import click
 from eth_typing import BlockNumber, ChecksumAddress
-from web3 import Web3
 from web3.types import Wei
 
 from src.common.clients import (
@@ -21,7 +20,7 @@ from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
 from src.redeem.api_client import APIClient
 from src.redeem.graph import graph_get_allocators, graph_get_leverage_positions_proxies
-from src.redeem.typings import Allocator, RedeemablePosition
+from src.redeem.typings import RedeemablePosition
 
 logger = logging.getLogger(__name__)
 
@@ -87,10 +86,7 @@ logger = logging.getLogger(__name__)
         case_sensitive=False,
     ),
 )
-@click.command(
-    help='Performs a vault validators consolidation from 0x01 validators to 0x02 validator. '
-    'Switches a validator from 0x01 to 0x02 if the source and target keys are identical.',
-)
+@click.command(help='Updates redeemable positions for leverage positions')
 # pylint: disable-next=too-many-arguments
 def update_redeemable_positions(
     execution_endpoints: str,
@@ -153,10 +149,10 @@ async def main() -> None:
                 )
             )
             kept_tokens[allocator.address] = Wei(kept_tokens[allocator.address] - amount)
-    logger.info('Fetched kept tokens for %s addresses...', {len(user_addresses)})
+    logger.info('Fetched kept tokens for %s addresses...', len(user_addresses))
 
     click.confirm(
-        'Proceed consolidation?',
+        'Proceed with uploading redeemable positions to IPFS?',
         default=True,
         abort=True,
     )
@@ -176,7 +172,7 @@ async def get_kept_tokens(
     api_client = APIClient()
     locked_oseth_per_user: dict[ChecksumAddress, Wei] = {}
     for address in user_addresses:
-        locked_os_token = await api_client.get_protocols_locked_locked_os_token(address=address)
+        locked_os_token = await api_client.get_protocols_locked_os_token(address=address)
         locked_oseth_per_user[address] = locked_os_token
 
     kept_token = defaultdict(lambda: Wei(0))

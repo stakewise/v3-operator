@@ -17,7 +17,7 @@ class APIClient:
 
     base_url = API_ENDPOINT
 
-    async def get_protocols_locked_locked_os_token(self, address: ChecksumAddress) -> Wei:
+    async def get_protocols_locked_os_token(self, address: ChecksumAddress) -> Wei:
         url = urljoin(self.base_url, 'v1/user/complex_protocol_list')
         params = {
             'id': address,
@@ -28,7 +28,7 @@ class APIClient:
             async with session.get(
                 url=url,
                 params=params,
-                headers={'user-agent:': DEFAULT_USER_AGENT},
+                headers={'user-agent': DEFAULT_USER_AGENT},
             ) as response:
                 response.raise_for_status()
                 protocol_data = await response.json()
