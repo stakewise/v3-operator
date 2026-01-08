@@ -47,6 +47,7 @@ class NetworkConfig(BaseNetworkConfig):
     TARGET_WITHDRAWAL_REQUESTS_PER_BLOCK: int
     TARGET_CONSOLIDATION_REQUESTS_PER_BLOCK: int
     NODE_CONFIG: NodeConfig
+    OS_TOKEN_REDEEMER_CONTRACT_ADDRESS: ChecksumAddress
 
 
 @dataclass
@@ -125,6 +126,7 @@ NETWORKS: dict[str, NetworkConfig] = {
                 'MerkleExecute': timedelta(hours=1),
             },
         ),
+        OS_TOKEN_REDEEMER_CONTRACT_ADDRESS=ZERO_CHECKSUM_ADDRESS,
     ),
     HOODI: NetworkConfig(
         **asdict(BASE_NETWORKS[HOODI]),
@@ -172,6 +174,9 @@ NETWORKS: dict[str, NetworkConfig] = {
                 'StorageHashing': timedelta(minutes=30),
                 'MerkleExecute': timedelta(minutes=30),
             },
+        ),
+        OS_TOKEN_REDEEMER_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0xdF3123dD182b8d3e0266a2dC37eEb8366d149B5A'
         ),
     ),
     GNOSIS: NetworkConfig(
@@ -223,5 +228,6 @@ NETWORKS: dict[str, NetworkConfig] = {
                 'MerkleExecute': timedelta(hours=1),
             },
         ),
+        OS_TOKEN_REDEEMER_CONTRACT_ADDRESS=ZERO_CHECKSUM_ADDRESS,
     ),
 }

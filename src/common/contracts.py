@@ -19,6 +19,7 @@ from src.common.execution import transaction_gas_wrapper
 from src.common.typings import (
     ExitQueueMissingAssetsParams,
     HarvestParams,
+    RedeemablePositions,
     RewardVoteInfo,
 )
 from src.config.settings import (
@@ -545,7 +546,23 @@ class ValidatorsCheckerContract(ContractWrapper):
         )
 
 
+class OsTokenRedeemerContract(ContractWrapper):
+    abi_path = 'abi/IOSTokenRedeemer.json'
+    settings_key = 'OS_TOKEN_REDEEMER_CONTRACT_ADDRESS'
+
+    async def redeemable_positions(self) -> RedeemablePositions:
+        merkle_root, ipfs_hash = await self.contract.functions.redeemablePositions().call()
+        return RedeemablePositions(
+            merkle_root=Web3.to_hex(merkle_root),
+            ipfs_hash=ipfs_hash,
+        )
+
+    async def nonce(self) -> int:
+        return await self.contract.functions.nonce().call()
+
+
 validators_registry_contract = ValidatorsRegistryContract()
 keeper_contract = KeeperContract()
 multicall_contract = MulticallContract()
 validators_checker_contract = ValidatorsCheckerContract()
+os_token_redeemer_contract = OsTokenRedeemerContract()
