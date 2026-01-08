@@ -26,6 +26,7 @@ class NetworkConfig(BaseNetworkConfig):
     VALIDATORS_CHECKER_CONTRACT_ADDRESS: ChecksumAddress
     CONSOLIDATION_CONTRACT_ADDRESS: ChecksumAddress
     WITHDRAWAL_CONTRACT_ADDRESS: ChecksumAddress
+    OS_TOKEN_CONTRACT_ADDRESS: ChecksumAddress
     WALLET_MIN_BALANCE: Wei
     STAKEWISE_API_URL: str
     STAKEWISE_GRAPH_ENDPOINT: str
@@ -92,6 +93,9 @@ NETWORKS: dict[str, NetworkConfig] = {
         WITHDRAWAL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x00000961Ef480Eb55e80D19ad83579A64c007002'
         ),
+        OS_TOKEN_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38'
+        ),
         WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
         STAKEWISE_API_URL='https://mainnet-api.stakewise.io/graphql',
         STAKEWISE_GRAPH_ENDPOINT=(
@@ -142,6 +146,9 @@ NETWORKS: dict[str, NetworkConfig] = {
         WITHDRAWAL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x00000961Ef480Eb55e80D19ad83579A64c007002'
         ),
+        OS_TOKEN_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x7345fC8268459413beE9e9dd327f31283C65Ee7e'
+        ),
         WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
         STAKEWISE_API_URL='https://hoodi-api.stakewise.io/graphql',
         STAKEWISE_GRAPH_ENDPOINT='https://graphs.stakewise.io/hoodi/subgraphs/name/stakewise/prod',
@@ -189,6 +196,9 @@ NETWORKS: dict[str, NetworkConfig] = {
         ),
         WITHDRAWAL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x00000961Ef480Eb55e80D19ad83579A64c007002'
+        ),
+        OS_TOKEN_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0xF490c80aAE5f2616d3e3BDa2483E30C4CB21d1A0'
         ),
         WALLET_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
         STAKEWISE_API_URL='https://gnosis-api.stakewise.io/graphql',

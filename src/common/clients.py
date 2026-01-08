@@ -5,8 +5,12 @@ from sqlite3 import Connection
 from typing import cast
 
 from sw_utils import (
+    BaseUploadClient,
     ExtendedAsyncBeacon,
     IpfsFetchClient,
+    IpfsMultiUploadClient,
+    IpfsUploadClient,
+    PinataUploadClient,
     get_consensus_client,
     get_execution_client,
 )
@@ -116,6 +120,44 @@ class IpfsLazyFetchClient:
 
     async def fetch_json(self, ipfs_hash: str) -> dict | list:
         return await self.client.fetch_json(ipfs_hash)
+
+
+def build_ipfs_upload_clients() -> IpfsMultiUploadClient:
+    clients: list[BaseUploadClient] = []
+
+    if settings.ipfs_local_client_endpoint:
+        clients.append(
+            IpfsUploadClient(
+                settings.ipfs_local_client_endpoint,
+                username=settings.ipfs_local_username,
+                password=settings.ipfs_local_password,
+                timeout=settings.ipfs_upload_client_timeout,
+            )
+        )
+
+    if settings.ipfs_infura_client_username and settings.ipfs_infura_client_password:
+        ipfs_client = IpfsUploadClient(
+            settings.ipfs_infura_client_endpoint,
+            settings.ipfs_infura_client_username,
+            settings.ipfs_infura_client_password,
+            timeout=settings.ipfs_upload_client_timeout,
+        )
+        clients.append(ipfs_client)
+
+    if settings.ipfs_pinata_api_key and settings.ipfs_pinata_secret_key:
+        pinata_client = PinataUploadClient(
+            settings.ipfs_pinata_api_key,
+            settings.ipfs_pinata_secret_key,
+            timeout=settings.ipfs_upload_client_timeout,
+        )
+        clients.append(pinata_client)
+
+    if not clients:
+        raise ValueError(
+            'No IPFS clients settings. '
+            'Please provide IPFS_LOCAL_CLIENT_ENDPOINT or third party IPFS services settings.'
+        )
+    return IpfsMultiUploadClient(clients)
 
 
 db_client = Database()
