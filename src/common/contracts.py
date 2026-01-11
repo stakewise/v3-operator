@@ -1,7 +1,7 @@
 import asyncio
 import json
-import os
 from functools import cached_property
+from pathlib import Path
 from typing import Callable, cast
 
 from eth_typing import HexStr
@@ -50,8 +50,8 @@ class ContractWrapper:
 
     @cached_property
     def contract(self) -> AsyncContract:
-        current_dir = os.path.dirname(__file__)
-        with open(os.path.join(current_dir, self.abi_path), encoding='utf-8') as f:
+        current_dir = Path(__file__).parent
+        with open(current_dir / self.abi_path, encoding='utf-8') as f:
             abi = json.load(f)
         return self.execution_client.eth.contract(abi=abi, address=self.contract_address)
 

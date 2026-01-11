@@ -28,9 +28,8 @@ from src.config.config import OperatorConfig
 @click.option(
     '--per-keystore-password',
     is_flag=True,
-    default=False,
     help='Creates separate password file for each keystore.'
-    ' Creates a single password file by default.',
+    ' Creates a single password file by default. Default is false.',
 )
 @click.option(
     '--mnemonic',
@@ -88,8 +87,8 @@ def create_keys(
 
         # move files from tmp dir
         operator_config.keystores_dir.mkdir(exist_ok=True)
-        for src_file in tmp_keystores_dir.glob('*'):
-            src_file.rename(operator_config.keystores_dir.joinpath(src_file.name))
+        for src_file in tmp_keystores_dir.iterdir():
+            src_file.rename(operator_config.keystores_dir / src_file.name)
 
     finally:
         operator_config.remove_tmp_dir()

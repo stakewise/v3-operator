@@ -35,16 +35,14 @@ logger = logging.getLogger(__name__)
 @click.option(
     '--run-nodes',
     is_flag=True,
-    default=False,
     envvar='RUN_NODES',
     help='If set, the operator will also start and manage local consensus, execution '
-    'and validator nodes.',
+    'and validator nodes. Default is false.',
 )
 @click.option(
     '--no-confirm',
     is_flag=True,
-    default=False,
-    help='Skips confirmation messages when provided.',
+    help='Skips confirmation messages when provided. Default is false.',
 )
 @add_common_options(start_common_options)
 @click.command(help='Start operator service')

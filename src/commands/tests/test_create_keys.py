@@ -1,4 +1,3 @@
-import glob
 import os
 from pathlib import Path
 
@@ -82,7 +81,7 @@ class TestCreateKeys:
             f'Keystores saved to {vault_dir}/keystores file\n'
         )
         assert output.strip() == result.output.strip()
-        password_files = glob.glob(os.path.join(keystores_dir / '*.txt'))
+        password_files = list(keystores_dir.glob('*.txt'))
         assert len(password_files) == count
         for password_file in password_files:
             with open(password_file, 'r', encoding='utf-8') as f:

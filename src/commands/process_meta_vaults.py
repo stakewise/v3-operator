@@ -66,10 +66,10 @@ logger = logging.getLogger(__name__)
     '--min-deposit-amount-gwei',
     type=int,
     envvar='MIN_DEPOSIT_AMOUNT_GWEI',
-    help=f'Minimum amount in gwei that must accumulate in the vault '
-    f'to trigger deposits to the sub-vaults.'
-    f' The default is {DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI}',
+    help='Minimum amount in gwei that must accumulate in the vault '
+    'to trigger deposits to the sub-vaults.',
     default=DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
+    show_default=True,
 )
 @click.option(
     '--execution-endpoints',

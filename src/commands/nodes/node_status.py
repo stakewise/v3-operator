@@ -58,7 +58,6 @@ OUTPUT_FORMATS = ['text', 'json']
     help='Enable logging command output to a file in the nodes directory. Default is false.',
     envvar='ENABLE_FILE_LOGGING',
     is_flag=True,
-    default=False,
 )
 @click.command(help='Displays the status of the nodes.', name='node-status')
 def node_status_command(
