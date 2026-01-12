@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import sqlite3
 from functools import cached_property
@@ -135,7 +136,10 @@ async def setup_clients() -> None:
 
 
 async def close_clients() -> None:
+    logger.info('Closing active sessions...')
     await execution_client.provider.disconnect()
     await execution_non_retry_client.provider.disconnect()
     await consensus_client.disconnect()
     await graph_client.disconnect()
+    # waiting to ensure all web3 evicted sessions are closed
+    await asyncio.sleep(max(settings.consensus_timeout, settings.execution_timeout))
