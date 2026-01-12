@@ -3,20 +3,23 @@ import logging
 import sys
 from collections import defaultdict
 from pathlib import Path
+from typing import cast
 
 import click
 from eth_typing import BlockNumber, ChecksumAddress
-from web3.types import Wei
+from web3 import Web3
+from web3.types import Gwei, Wei
 
 from src.common.clients import (
     build_ipfs_upload_clients,
     execution_client,
+    get_execution_client,
     setup_clients,
 )
 from src.common.contracts import Erc20Contract
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import log_verbose
-from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
+from src.config.networks import AVAILABLE_NETWORKS, MAINNET, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
 from src.redeem.api_client import APIClient
 from src.redeem.graph import graph_get_allocators, graph_get_leverage_positions_proxies
@@ -40,6 +43,14 @@ logger = logging.getLogger(__name__)
     'Default is the file generated with "create-wallet" command.',
 )
 @click.option(
+    '--min-os-token-position-amount-gwei',
+    type=int,
+    default=0,
+    envvar='MIN_OS_TOKEN_POSITION_AMOUNT_GWEI',
+    help='Process positions only if the amount of minted osETH'
+    ' is greater than the specified value.',
+)
+@click.option(
     '--execution-endpoints',
     type=str,
     envvar='EXECUTION_ENDPOINTS',
@@ -58,6 +69,12 @@ logger = logging.getLogger(__name__)
     type=str,
     envvar='GRAPH_ENDPOINT',
     help='API endpoint for graph node.',
+)
+@click.option(
+    '--arbitrum-endpoint',
+    type=str,
+    envvar='ARBITRUM_ENDPOINT',
+    help='API endpoint for the execution node on Arbitrum.',
 )
 @click.option(
     '--log-level',
@@ -92,12 +109,16 @@ def update_redeemable_positions(
     execution_endpoints: str,
     execution_jwt_secret: str | None,
     graph_endpoint: str,
+    arbitrum_endpoint: str | None,
     network: str,
     verbose: bool,
     log_level: str,
     wallet_file: str | None,
     wallet_password_file: str | None,
+    min_os_token_position_amount_gwei: int,
 ) -> None:
+    if network == MAINNET and not arbitrum_endpoint:
+        raise click.BadParameter('arbitrum-endpoint is required for mainnet network')
     settings.set(
         vault=ZERO_CHECKSUM_ADDRESS,
         vault_dir=Path.home() / '.stakewise',
@@ -111,13 +132,19 @@ def update_redeemable_positions(
         log_level=log_level,
     )
     try:
-        asyncio.run(main())
+        asyncio.run(
+            main(
+                arbitrum_endpoint=arbitrum_endpoint,
+                min_os_token_position_amount_gwei=Gwei(min_os_token_position_amount_gwei),
+            )
+        )
     except Exception as e:
         log_verbose(e)
         sys.exit(1)
 
 
-async def main() -> None:
+# pylint: disable-next=too-many-locals
+async def main(arbitrum_endpoint: str | None, min_os_token_position_amount_gwei: Gwei) -> None:
     """
     Fetch redeemable positions, calculate kept os token amounts and upload to IPFS.
     """
@@ -129,13 +156,24 @@ async def main() -> None:
     # filter
     boost_proxies = await graph_get_leverage_positions_proxies(block_number)
     logger.info('Found %s boost positions to exclude', len(boost_proxies))
-    allocators = [a for a in allocators if a.minted_shares > 0 and a.address not in boost_proxies]
+    min_minted_shares = Web3.to_wei(min_os_token_position_amount_gwei, 'gwei')
+    allocators = [
+        a
+        for a in allocators
+        if a.minted_shares > min_minted_shares and a.address not in boost_proxies
+    ]
+    allocators = sorted(allocators, key=lambda x: x.minted_shares, reverse=True)
     logger.info('Filtered allocators count: %s', len(allocators))
 
+    address_to_minted_shares = {a.address: a.minted_shares for a in allocators}
     user_addresses = set(allocator.address for allocator in allocators)
-    logger.info('Fetching kept tokens for %s addresses...', len(user_addresses))
-
-    kept_tokens = await get_kept_tokens(list(user_addresses), block_number)
+    logger.info('Fetching kept tokens for %s addresses...', len(address_to_minted_shares))
+    kept_tokens = await get_kept_tokens(address_to_minted_shares, block_number, arbitrum_endpoint)
+    filled = 0
+    for allocator in allocators:
+        if allocator.minted_shares == kept_tokens.get(allocator.address, Wei(0)):
+            filled += 1
+    logger.info('Found %s fully filled positions', filled)
     redeemable_positions: list[RedeemablePosition] = []
     for allocator in allocators:
         kept_token = kept_tokens.get(allocator.address, Wei(0))  # 0?
@@ -162,22 +200,38 @@ async def main() -> None:
 
 
 async def get_kept_tokens(
-    user_addresses: list[ChecksumAddress], block_number: BlockNumber
+    address_to_minted_shares: dict[ChecksumAddress, Wei],
+    block_number: BlockNumber,
+    arbitrum_endpoint: str | None,
 ) -> dict[ChecksumAddress, Wei]:
-    wallet_balances = {}
-
+    kept_token = defaultdict(lambda: Wei(0))
     contract = Erc20Contract(settings.network_config.OS_TOKEN_CONTRACT_ADDRESS)
-    for address in user_addresses:
-        wallet_balances[address] = await contract.balance(address, block_number)
+    for address in address_to_minted_shares.keys():
+        kept_token[address] = await contract.balance(address, block_number)
+
+    # arb wallet balance
+    if settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS != ZERO_CHECKSUM_ADDRESS:
+        arbitrum_endpoint = cast(str, arbitrum_endpoint)
+        arb_execution_client = get_execution_client([arbitrum_endpoint])
+
+        arb_contract = Erc20Contract(
+            settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS,
+            execution_client=arb_execution_client,
+        )
+        for address in address_to_minted_shares.keys():
+            arb_balance = await arb_contract.balance(address)
+            kept_token[address] = Wei(kept_token[address] + arb_balance)
+
+    # do not fetch data from api if all os token are on the wallet
+    api_addresses = []
+    for address in address_to_minted_shares.keys():
+        if address_to_minted_shares[address] > kept_token[address]:
+            api_addresses.append(address)
+
     api_client = APIClient()
     locked_oseth_per_user: dict[ChecksumAddress, Wei] = {}
-    for address in user_addresses:
+    for address in api_addresses:
         locked_os_token = await api_client.get_protocols_locked_os_token(address=address)
         locked_oseth_per_user[address] = locked_os_token
-
-    kept_token = defaultdict(lambda: Wei(0))
-    for address, amount in locked_oseth_per_user.items():
-        kept_token[address] = amount
-    for address, amount in wallet_balances.items():
-        kept_token[address] = Wei(kept_token[address] + amount)
+        kept_token[address] = Wei(kept_token[address] + locked_os_token)
     return kept_token

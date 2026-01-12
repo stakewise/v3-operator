@@ -17,14 +17,11 @@ async def graph_get_allocators(block_number: BlockNumber) -> list[Allocator]:
     """
     query = gql(
         """
-        query getAllocators($block: Int, $first: Int, $lastID: String){
+        query getAllocators($block: Int, $first: Int, $skip: Int){
           allocators(
            block: {number: $block},
-            where: {
-                id_gt: $lastID
-            },
-            orderBy: id
             first: $first
+            skip: $skip
           ){
           vault {
             id
@@ -39,7 +36,7 @@ async def graph_get_allocators(block_number: BlockNumber) -> list[Allocator]:
     params = {
         'block': block_number,
     }
-    response = await graph_client.fetch_pages(query, params=params, cursor_pagination=True)
+    response = await graph_client.fetch_pages(query, params=params)
     return [Allocator.from_graph(item) for item in response]
 
 
