@@ -220,6 +220,11 @@ class VaultContract(ContractWrapper, VaultStateMixin):
     async def get_exit_queue_index(self, position_ticket: int) -> int:
         return await self.contract.functions.getExitQueueIndex(position_ticket).call()
 
+    async def convert_to_shares(self, assets: Wei, block_number: BlockNumber | None = None) -> Wei:
+        return await self.contract.functions.convertToShares(assets).call(
+            block_identifier=block_number
+        )
+
     async def get_validator_withdrawal_submitted_events(
         self,
         from_block: BlockNumber,

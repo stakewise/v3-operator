@@ -16,14 +16,14 @@ from src.common.clients import (
     get_execution_client,
     setup_clients,
 )
-from src.common.contracts import Erc20Contract
+from src.common.contracts import Erc20Contract, VaultContract
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import log_verbose
 from src.config.networks import AVAILABLE_NETWORKS, MAINNET, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
 from src.redeem.api_client import APIClient
-from src.redeem.graph import graph_get_allocators, graph_get_leverage_positions_proxies
-from src.redeem.typings import RedeemablePosition
+from src.redeem.graph import graph_get_allocators, graph_get_leverage_positions
+from src.redeem.typings import LeverageStrategyPosition, RedeemablePosition
 
 logger = logging.getLogger(__name__)
 
@@ -153,21 +153,30 @@ async def main(arbitrum_endpoint: str | None, min_os_token_position_amount_gwei:
     block_number = await execution_client.eth.block_number
     allocators = await graph_get_allocators(block_number)
 
-    # filter
-    boost_proxies = await graph_get_leverage_positions_proxies(block_number)
+    # # filter
+    leverage_positions = await graph_get_leverage_positions(block_number)
+    boost_proxies = {pos.proxy for pos in leverage_positions}
     logger.info('Found %s boost positions to exclude', len(boost_proxies))
     min_minted_shares = Web3.to_wei(min_os_token_position_amount_gwei, 'gwei')
-    allocators = [
-        a
-        for a in allocators
-        if a.minted_shares > min_minted_shares and a.address not in boost_proxies
-    ]
+    allocators = [a for a in allocators if a.address not in boost_proxies]
+
     allocators = sorted(allocators, key=lambda x: x.minted_shares, reverse=True)
     logger.info('Filtered allocators count: %s', len(allocators))
 
     address_to_minted_shares = {a.address: a.minted_shares for a in allocators}
     user_addresses = set(allocator.address for allocator in allocators)
     logger.info('Fetching kept tokens for %s addresses...', len(address_to_minted_shares))
+
+    # filter boosted positions
+    boosted_amounts = await get_boosted_amounts(
+        address_to_minted_shares, leverage_positions=leverage_positions, block_number=block_number
+    )
+    for allocator in allocators:
+        allocator.minted_shares = Wei(
+            allocator.minted_shares - boosted_amounts.get(allocator.address, Wei(0))
+        )
+    allocators = [a for a in allocators if a.minted_shares >= min_minted_shares]
+
     kept_tokens = await get_kept_tokens(address_to_minted_shares, block_number, arbitrum_endpoint)
     filled = 0
     for allocator in allocators:
@@ -235,3 +244,23 @@ async def get_kept_tokens(
         locked_oseth_per_user[address] = locked_os_token
         kept_token[address] = Wei(kept_token[address] + locked_os_token)
     return kept_token
+
+
+async def get_boosted_amounts(
+    address_to_minted_shares: dict[ChecksumAddress, Wei],
+    leverage_positions: list[LeverageStrategyPosition],
+    block_number: BlockNumber,
+) -> dict[ChecksumAddress, Wei]:
+    boosted_os_token_shares: defaultdict[ChecksumAddress, Wei] = defaultdict(lambda: Wei(0))
+    for position in leverage_positions:
+        if position.user not in address_to_minted_shares:
+            continue
+        vault_contract = VaultContract(position.vault)
+        position_os_token_shares = (
+            position.os_token_shares
+            + await vault_contract.convert_to_shares(position.assets, block_number)
+        )
+        boosted_os_token_shares[position.user] = Wei(
+            boosted_os_token_shares[position.user] + position_os_token_shares
+        )
+    return boosted_os_token_shares

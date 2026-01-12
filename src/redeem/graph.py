@@ -1,11 +1,10 @@
 import logging
 
-from eth_typing import BlockNumber, ChecksumAddress
+from eth_typing import BlockNumber
 from gql import gql
-from web3 import Web3
 
 from src.common.clients import graph_client
-from src.redeem.typings import Allocator
+from src.redeem.typings import Allocator, LeverageStrategyPosition
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +39,7 @@ async def graph_get_allocators(block_number: BlockNumber) -> list[Allocator]:
     return [Allocator.from_graph(item) for item in response]
 
 
-async def graph_get_leverage_positions_proxies(block_number: BlockNumber) -> list[ChecksumAddress]:
+async def graph_get_leverage_positions(block_number: BlockNumber) -> list[LeverageStrategyPosition]:
     query = gql(
         """
         query PositionsQuery($block: Int,  $first: Int, $skip: Int) {
@@ -51,11 +50,17 @@ async def graph_get_leverage_positions_proxies(block_number: BlockNumber) -> lis
             first: $first
             skip: $skip
           ) {
+            user
             proxy
+            vault {
+              id
+            }
+            osTokenShares
+            assets
           }
         }
         """
     )
     params = {'block': block_number}
     response = await graph_client.fetch_pages(query, params=params)
-    return [Web3.to_checksum_address(item['proxy']) for item in response]
+    return [LeverageStrategyPosition.from_graph(item) for item in response]

@@ -28,6 +28,7 @@ class APIClient:
         protocol_data = await self._fetch_json(url, params=params)
         total_locked_oseth = Wei(0)
         for protocol in protocol_data:
+            # boosted OsEth handled via graph separately
             if protocol['id'] in ['stakewise', 'xdai_stakewise']:
                 continue
             for portfolio_item in protocol.get('portfolio_item_list', []):
