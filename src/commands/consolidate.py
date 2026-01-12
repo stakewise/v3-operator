@@ -11,7 +11,7 @@ from web3 import Web3
 from web3.types import Gwei, Wei
 
 from src.common.clients import close_clients, setup_clients
-from src.common.consensus import get_chain_justified_head
+from src.common.consensus import get_chain_latest_head
 from src.common.contracts import VaultContract
 from src.common.execution import (
     check_gas_price,
@@ -304,7 +304,7 @@ async def process(
     Check validation details: https://github.com/ethereum/consensus-specs/blob/dev/specs/electra/beacon-chain.md#new-process_consolidation_request
     Then send the request to the contract.
     """
-    chain_head = await get_chain_justified_head()
+    chain_head = await get_chain_latest_head()
 
     await _check_validators_manager(vault_address)
     await _check_consolidations_queue(chain_head)
