@@ -9,7 +9,7 @@ from eth_typing import BlockNumber, ChecksumAddress, HexStr
 from web3 import Web3
 from web3.types import Gwei, Wei
 
-from src.common.clients import setup_clients
+from src.common.clients import close_clients, setup_clients
 from src.common.consensus import get_chain_justified_head
 from src.common.contracts import VaultContract
 from src.common.execution import get_withdrawal_request_fee
@@ -203,6 +203,20 @@ async def main(
 ) -> None:
     setup_logging()
     await setup_clients()
+    try:
+        await process(
+            vault_address=vault_address,
+            indexes=indexes,
+            count=count,
+            no_confirm=no_confirm,
+        )
+    finally:
+        await close_clients()
+
+
+async def process(
+    vault_address: ChecksumAddress, count: int | None, indexes: list[int], no_confirm: bool
+) -> None:
 
     await check_vault_version()
     await check_validators_manager()
