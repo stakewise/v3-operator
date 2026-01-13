@@ -10,7 +10,7 @@ from sw_utils import ChainHead
 from web3 import Web3
 from web3.types import Gwei, Wei
 
-from src.common.clients import setup_clients
+from src.common.clients import close_clients, setup_clients
 from src.common.consensus import get_chain_latest_head
 from src.common.contracts import VaultContract
 from src.common.execution import (
@@ -224,6 +224,12 @@ def consolidate(
         )
 
     operator_config = OperatorConfig(vault, Path(data_dir))
+
+    if network is None and not operator_config.exists:
+        raise click.ClickException(
+            'Either provide the network using --network option or run "init" command first.'
+        )
+
     if network is None:
         operator_config.load()
         network = operator_config.network
@@ -261,8 +267,34 @@ def consolidate(
         sys.exit(1)
 
 
-# pylint: disable-next=too-many-locals,too-many-arguments
+# pylint: disable-next=too-many-arguments
 async def main(
+    vault_address: ChecksumAddress,
+    source_public_keys: list[HexStr] | None,
+    target_public_key: HexStr | None,
+    exclude_public_keys: set[HexStr],
+    no_switch_consolidation: bool,
+    max_consolidation_request_fee_gwei: Gwei,
+    no_confirm: bool,
+) -> None:
+    setup_logging()
+    await setup_clients()
+    try:
+        await process(
+            vault_address=vault_address,
+            source_public_keys=source_public_keys,
+            target_public_key=target_public_key,
+            exclude_public_keys=exclude_public_keys,
+            no_switch_consolidation=no_switch_consolidation,
+            max_consolidation_request_fee_gwei=Gwei(max_consolidation_request_fee_gwei),
+            no_confirm=no_confirm,
+        )
+    finally:
+        await close_clients()
+
+
+# pylint: disable-next=too-many-locals,too-many-arguments
+async def process(
     vault_address: ChecksumAddress,
     source_public_keys: list[HexStr] | None,
     target_public_key: HexStr | None,
@@ -278,8 +310,6 @@ async def main(
     Check validation details: https://github.com/ethereum/consensus-specs/blob/dev/specs/electra/beacon-chain.md#new-process_consolidation_request
     Then send the request to the contract.
     """
-    setup_logging()
-    await setup_clients()
     chain_head = await get_chain_latest_head()
 
     await _check_validators_manager(vault_address)

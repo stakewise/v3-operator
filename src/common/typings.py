@@ -71,7 +71,6 @@ class ValidatorsRegistrationMode(Enum):
 @dataclass
 # pylint: disable-next=too-many-instance-attributes
 class ExitRequest:
-    id: str
     vault: ChecksumAddress
     position_ticket: int
     timestamp: int
@@ -106,7 +105,6 @@ class ExitRequest:
             int(data['exitQueueIndex']) if data.get('exitQueueIndex') is not None else None
         )
         return ExitRequest(
-            id=data['id'],
             vault=Web3.to_checksum_address(data['vault']['id']),
             position_ticket=int(data['positionTicket']),
             timestamp=int(data['timestamp']),

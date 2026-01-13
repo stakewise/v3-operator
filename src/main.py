@@ -75,7 +75,5 @@ if __name__ == '__main__':
     if ssl.get_default_verify_paths().cafile is None and hasattr(sys, '_MEIPASS'):
         # pylint: disable-next=protected-access,no-member
         os.environ['SSL_CERT_FILE'] = os.path.join(sys._MEIPASS, 'certifi', 'cacert.pem')
-    # Applies a monkey patch required before instantiating web3 clients.
-    import src.common.web3
 
     cli()

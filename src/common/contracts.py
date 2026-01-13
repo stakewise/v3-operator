@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Callable, cast
 
 from eth_typing import HexStr
-from sw_utils.typings import Bytes32
 from web3 import AsyncWeb3, Web3
 from web3.contract import AsyncContract
 from web3.contract.async_contract import (
@@ -64,7 +63,7 @@ class ContractWrapper:
         return self.contract.events
 
     def encode_abi(self, fn_name: str, args: list | None = None) -> HexStr:
-        return self.contract.encodeABI(fn_name=fn_name, args=args)
+        return self.contract.encode_abi(fn_name, args=args)
 
     async def _get_last_event(
         self,
@@ -76,8 +75,8 @@ class ContractWrapper:
         blocks_range = settings.events_blocks_range_interval
         while to_block >= from_block:
             events = await event.get_logs(
-                fromBlock=BlockNumber(max(to_block - blocks_range, from_block)),
-                toBlock=to_block,
+                from_block=BlockNumber(max(to_block - blocks_range, from_block)),
+                to_block=to_block,
                 argument_filters=argument_filters,
             )
             if events:
@@ -95,8 +94,8 @@ class ContractWrapper:
         blocks_range = settings.events_blocks_range_interval
         while to_block >= from_block:
             range_events = await event.get_logs(
-                fromBlock=from_block,
-                toBlock=BlockNumber(min(from_block + blocks_range, to_block)),
+                from_block=from_block,
+                to_block=BlockNumber(min(from_block + blocks_range, to_block)),
             )
             if range_events:
                 events.extend(range_events)
@@ -275,9 +274,10 @@ class ValidatorsRegistryContract(ContractWrapper):
     abi_path = 'abi/IValidatorsRegistry.json'
     settings_key = 'VALIDATORS_REGISTRY_CONTRACT_ADDRESS'
 
-    async def get_registry_root(self) -> Bytes32:
+    async def get_registry_root(self) -> HexStr:
         """Fetches the latest validators registry root."""
-        return await self.contract.functions.get_deposit_root().call()
+        deposit_root = await self.contract.functions.get_deposit_root().call()
+        return Web3.to_hex(deposit_root)
 
 
 class KeeperContract(ContractWrapper):
