@@ -19,17 +19,22 @@ async def graph_get_allocators(block_number: BlockNumber) -> list[Allocator]:
     """
     query = gql(
         """
-        query getAllocators($block: Int, $first: Int, $skip: Int){
+        query getAllocators($block: Int, $first: Int, $lastID: String){
           allocators(
            block: {number: $block},
+            where: {
+                id_gt: $lastID
+            },
+            orderBy: id
             first: $first
-            skip: $skip
           ){
           vault {
             id
           }
           id
           address
+          shares
+          assets
           mintedOsTokenShares
           }
         }
@@ -38,11 +43,14 @@ async def graph_get_allocators(block_number: BlockNumber) -> list[Allocator]:
     params = {
         'block': block_number,
     }
-    response = await graph_client.fetch_pages(query, params=params)
+    response = await graph_client.fetch_pages(query, params=params, cursor_pagination=True)
     tmp_allocators: defaultdict[str, dict[str, Wei]] = defaultdict(dict)
     allocators = []
     for item in response:
-        tmp_allocators[item['address']][item['vault']['id']] = Wei(int(item['mintedOsTokenShares']))
+        if int(item['mintedOsTokenShares']) > 0:
+            tmp_allocators[item['address']][item['vault']['id']] = Wei(
+                int(item['mintedOsTokenShares'])
+            )
     for allocator_address, vaults in tmp_allocators.items():
         vault_shares = [
             VaultShares(address=Web3.to_checksum_address(vault_address), minted_shares=shares)

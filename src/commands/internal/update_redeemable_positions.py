@@ -151,19 +151,20 @@ async def main(arbitrum_endpoint: str | None, min_os_token_position_amount_gwei:
     setup_logging()
     await setup_clients()
     block_number = await execution_client.eth.block_number
+    logger.info('Fetching allocators from the subgraph...')
     allocators = await graph_get_allocators(block_number)
+    logger.info('Fetched %s allocators from the subgraph', len(allocators))
 
     # filter boost proxy positions
     leverage_positions = await graph_get_leverage_positions(block_number)
     boost_proxies = {pos.proxy for pos in leverage_positions}
-    logger.info('Found %s boost positions to exclude', len(boost_proxies))
-    min_minted_shares = Web3.to_wei(min_os_token_position_amount_gwei, 'gwei')
+    logger.info('Found %s proxy positions to exclude', len(boost_proxies))
     allocators = [a for a in allocators if a.address not in boost_proxies]
-    address_to_minted_shares = {a.address: a.total_shares for a in allocators}
 
     # filter boosted positions
+    logger.info('Fetching boosted positions from the subgraph...')
     boosted_positions = await get_boosted_positions(
-        users=list(address_to_minted_shares.keys()),
+        users=[a.address for a in allocators],
         leverage_positions=leverage_positions,
         block_number=block_number,
     )
@@ -176,9 +177,11 @@ async def main(arbitrum_endpoint: str | None, min_os_token_position_amount_gwei:
                     vault_share.minted_shares = Wei(vault_share.minted_shares - boosted_amount)
 
     # filter zero positions
+    min_minted_shares = Web3.to_wei(min_os_token_position_amount_gwei, 'gwei')
     allocators = [a for a in allocators if a.total_shares >= min_minted_shares]
 
     logger.info('Fetching kept tokens for %s addresses', len(allocators))
+    address_to_minted_shares = {a.address: a.total_shares for a in allocators}
     kept_tokens = await get_kept_tokens(address_to_minted_shares, block_number, arbitrum_endpoint)
     logger.info('Fetched kept tokens for %s addresses...', len(address_to_minted_shares))
 
@@ -201,12 +204,20 @@ async def get_kept_tokens(
     arbitrum_endpoint: str | None,
 ) -> dict[ChecksumAddress, Wei]:
     kept_token = defaultdict(lambda: Wei(0))
+    logger.info('Fetching OsETH from wallet balances...')
+
+    index = 0
     contract = Erc20Contract(settings.network_config.OS_TOKEN_CONTRACT_ADDRESS)
     for address in address_to_minted_shares.keys():
+        if index % 50 == 0:
+            logger.info(
+                'Fetched wallet balances for %d/%d addresses', index, len(address_to_minted_shares)
+            )
         kept_token[address] = await contract.balance(address, block_number)
-
+        index += 1
     # arb wallet balance
     if settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS != ZERO_CHECKSUM_ADDRESS:
+        logger.info('Fetching OsETH from Arbitrum wallet balances...')
         arbitrum_endpoint = cast(str, arbitrum_endpoint)
         arb_execution_client = get_execution_client([arbitrum_endpoint])
 
@@ -214,16 +225,24 @@ async def get_kept_tokens(
             settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS,
             execution_client=arb_execution_client,
         )
+        index = 0
         for address in address_to_minted_shares.keys():
+            if index % 50 == 0:
+                logger.info(
+                    'Fetched wallet balances for %d/%d addresses',
+                    index,
+                    len(address_to_minted_shares),
+                )
             arb_balance = await arb_contract.balance(address)
             kept_token[address] = Wei(kept_token[address] + arb_balance)
-
+            index += 1
     # do not fetch data from api if all os token are on the wallet
     api_addresses = []
     for address in address_to_minted_shares.keys():
         if address_to_minted_shares[address] > kept_token[address]:
             api_addresses.append(address)
 
+    logger.info('Fetching locked OsETH from DeBank API...')
     api_client = APIClient()
     locked_oseth_per_user: dict[ChecksumAddress, Wei] = {}
     for address in api_addresses:
