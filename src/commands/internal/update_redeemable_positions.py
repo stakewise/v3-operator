@@ -214,7 +214,7 @@ async def get_kept_tokens(
     block_number: BlockNumber,
     arbitrum_endpoint: str | None,
 ) -> dict[ChecksumAddress, Wei]:
-    kept_token = defaultdict(lambda: Wei(0))
+    kept_tokens = defaultdict(lambda: Wei(0))
     logger.info('Fetching OsETH from wallet balances...')
 
     contract = Erc20Contract(settings.network_config.OS_TOKEN_CONTRACT_ADDRESS)
@@ -223,7 +223,7 @@ async def get_kept_tokens(
             logger.info(
                 'Fetched wallet balances for %d/%d addresses', index, len(address_to_minted_shares)
             )
-        kept_token[address] = await contract.balance(address, block_number)
+        kept_tokens[address] = await contract.balance(address, block_number)
     # arb wallet balance
     if settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS != ZERO_CHECKSUM_ADDRESS:
         logger.info('Fetching OsETH from Arbitrum wallet balances...')
@@ -242,16 +242,16 @@ async def get_kept_tokens(
                     len(address_to_minted_shares),
                 )
             arb_balance = await arb_contract.balance(address)
-            kept_token[address] = Wei(kept_token[address] + arb_balance)
+            kept_tokens[address] = Wei(kept_tokens[address] + arb_balance)
 
     # do not fetch data from api if all os token are on the wallet
     api_addresses = []
     for address in address_to_minted_shares.keys():
-        if address_to_minted_shares[address] > kept_token[address]:
+        if address_to_minted_shares[address] > kept_tokens[address]:
             api_addresses.append(address)
 
     if not api_addresses:
-        return kept_token
+        return kept_tokens
 
     logger.info('Fetching locked OsETH from DeBank API for %s addresses...', len(api_addresses))
     api_client = APIClient()
@@ -259,9 +259,9 @@ async def get_kept_tokens(
     for address in api_addresses:
         locked_os_token = await api_client.get_protocols_locked_os_token(address=address)
         locked_oseth_per_user[address] = locked_os_token
-        kept_token[address] = Wei(kept_token[address] + locked_os_token)
+        kept_tokens[address] = Wei(kept_tokens[address] + locked_os_token)
         await asyncio.sleep(API_SLEEP_TIMEOUT)  # to avoid rate limiting
-    return kept_token
+    return kept_tokens
 
 
 async def get_boosted_positions(
