@@ -29,6 +29,7 @@ from src.config.settings import (
     ORACLES_VALIDATORS_TIMEOUT,
     settings,
 )
+from src.validators.exceptions import RegistryRootChangedError
 from src.validators.execution import get_validators_start_index
 from src.validators.keystores.base import BaseKeystore
 from src.validators.signing.common import get_encrypted_exit_signature_shards
@@ -40,12 +41,12 @@ logger = logging.getLogger(__name__)
 async def poll_validation_approval(
     keystore: BaseKeystore | None,
     validators: Sequence[Validator],
+    validators_registry_root: HexStr,
     validators_manager_signature: HexStr,
 ) -> tuple[ApprovalRequest, OraclesApproval]:
     """
     Polls oracles for approval of validator registration
     """
-    previous_registry_root: HexStr | None = None
     oracles_request: ApprovalRequest | None = None
     protocol_config = await get_protocol_config()
     deadline: int | None = None
@@ -61,14 +62,13 @@ async def poll_validation_approval(
         current_registry_root = await validators_registry_contract.get_registry_root()
         logger.debug('Fetched validators registry root: %s', current_registry_root)
 
+        if current_registry_root != validators_registry_root:
+            # The validators manager signature must be regenerated.
+            # If using a relayer, this requires an additional query to the relayer.
+            raise RegistryRootChangedError()
+
         current_timestamp = get_current_timestamp()
-        if (
-            oracles_request is None
-            or previous_registry_root is None
-            or previous_registry_root != current_registry_root
-            or deadline is None
-            or deadline <= current_timestamp
-        ):
+        if oracles_request is None or deadline is None or deadline <= current_timestamp:
             deadline = current_timestamp + protocol_config.signature_validity_period
 
             oracles_request = await create_approval_request(
@@ -79,7 +79,6 @@ async def poll_validation_approval(
                 deadline=deadline,
                 validators_manager_signature=validators_manager_signature,
             )
-        previous_registry_root = current_registry_root
 
         # Send approval requests
         try:
