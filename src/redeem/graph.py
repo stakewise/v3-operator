@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 async def graph_get_allocators(block_number: BlockNumber) -> list[Allocator]:
     """
     Fetch allocators at the given block and return them as a list of Allocator objects.
-    Filter record to include only those with mintedOsTokenShares > 0.
+    Filter records to include only those with mintedOsTokenShares > 0.
     """
     query = gql(
         """
