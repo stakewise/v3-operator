@@ -180,13 +180,24 @@ async def main(arbitrum_endpoint: str | None, min_os_token_position_amount_gwei:
     min_minted_shares = Web3.to_wei(min_os_token_position_amount_gwei, 'gwei')
     allocators = [a for a in allocators if a.total_shares >= min_minted_shares]
 
+    if not allocators:
+        logger.info('No allocators with minted shares above the threshold found, exiting...')
+        return
+
     logger.info('Fetching kept tokens for %s addresses', len(allocators))
     address_to_minted_shares = {a.address: a.total_shares for a in allocators}
     kept_tokens = await get_kept_tokens(address_to_minted_shares, block_number, arbitrum_endpoint)
     logger.info('Fetched kept tokens for %s addresses...', len(address_to_minted_shares))
 
     redeemable_positions = create_redeemable_positions(allocators, kept_tokens)
-    logger.info('Created %s redeemable positions', len(redeemable_positions))
+    if not redeemable_positions:
+        logger.info('No redeemable positions to upload, exiting...')
+        return
+    logger.info(
+        'Created %s redeemable positions. Total redeemed OsEth amount: %s',
+        len(redeemable_positions),
+        sum(p.amount for p in redeemable_positions),
+    )
 
     click.confirm(
         'Proceed with uploading redeemable positions to IPFS?',
@@ -206,15 +217,13 @@ async def get_kept_tokens(
     kept_token = defaultdict(lambda: Wei(0))
     logger.info('Fetching OsETH from wallet balances...')
 
-    index = 0
     contract = Erc20Contract(settings.network_config.OS_TOKEN_CONTRACT_ADDRESS)
-    for address in address_to_minted_shares.keys():
-        if index % 50 == 0:
+    for index, address in enumerate(address_to_minted_shares.keys()):
+        if index and index % 50 == 0:
             logger.info(
                 'Fetched wallet balances for %d/%d addresses', index, len(address_to_minted_shares)
             )
         kept_token[address] = await contract.balance(address, block_number)
-        index += 1
     # arb wallet balance
     if settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS != ZERO_CHECKSUM_ADDRESS:
         logger.info('Fetching OsETH from Arbitrum wallet balances...')
@@ -225,9 +234,8 @@ async def get_kept_tokens(
             settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS,
             execution_client=arb_execution_client,
         )
-        index = 0
-        for address in address_to_minted_shares.keys():
-            if index % 50 == 0:
+        for index, address in enumerate(address_to_minted_shares.keys()):
+            if index and index % 50 == 0:
                 logger.info(
                     'Fetched wallet balances for %d/%d addresses',
                     index,
@@ -235,14 +243,17 @@ async def get_kept_tokens(
                 )
             arb_balance = await arb_contract.balance(address)
             kept_token[address] = Wei(kept_token[address] + arb_balance)
-            index += 1
+
     # do not fetch data from api if all os token are on the wallet
     api_addresses = []
     for address in address_to_minted_shares.keys():
         if address_to_minted_shares[address] > kept_token[address]:
             api_addresses.append(address)
 
-    logger.info('Fetching locked OsETH from DeBank API...')
+    if not api_addresses:
+        return kept_token
+
+    logger.info('Fetching locked OsETH from DeBank API for %s addresses...', len(api_addresses))
     api_client = APIClient()
     locked_oseth_per_user: dict[ChecksumAddress, Wei] = {}
     for address in api_addresses:
@@ -274,8 +285,7 @@ async def get_boosted_positions(
 def create_redeemable_positions(
     allocators: list[Allocator], kept_tokens: dict[ChecksumAddress, Wei]
 ) -> list[RedeemablePosition]:
-    # calculate vault proportions # create redeemable positions
-    filled = 0
+    """Calculate vault proportions and create redeemable positions"""
     redeemable_positions: list[RedeemablePosition] = []
     for allocator in allocators:
         kept_token = kept_tokens.get(allocator.address, Wei(0))
