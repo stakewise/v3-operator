@@ -13,6 +13,7 @@ DEFAULT_USER_AGENT = (
     'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36'
 )
 SUPPORTED_CHAINS = {'eth', 'arb'}
+API_SLEEP_TIMEOUT = 1
 
 
 class APIClient:

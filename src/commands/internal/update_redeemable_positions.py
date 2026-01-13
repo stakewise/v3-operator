@@ -21,7 +21,7 @@ from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import log_verbose
 from src.config.networks import AVAILABLE_NETWORKS, MAINNET, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
-from src.redeem.api_client import APIClient
+from src.redeem.api_client import API_SLEEP_TIMEOUT, APIClient
 from src.redeem.graph import graph_get_allocators, graph_get_leverage_positions
 from src.redeem.typings import Allocator, LeverageStrategyPosition, RedeemablePosition
 
@@ -260,6 +260,7 @@ async def get_kept_tokens(
         locked_os_token = await api_client.get_protocols_locked_os_token(address=address)
         locked_oseth_per_user[address] = locked_os_token
         kept_token[address] = Wei(kept_token[address] + locked_os_token)
+        await asyncio.sleep(API_SLEEP_TIMEOUT)  # to avoid rate limiting
     return kept_token
 
 
