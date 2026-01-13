@@ -108,8 +108,12 @@ class TestMetaVaultTreeUpdateStateCalls:
         ), mock.patch.object(
             multicall_contract, 'tx_aggregate', return_value='0x123'
         ) as tx_aggregate_mock, mock.patch(
-            'src.meta_vault.tasks.execution_client.eth.wait_for_transaction_receipt',
-        ):
+            'src.meta_vault.tasks.execution_client', new=mock.AsyncMock()
+        ) as execution_client_mock:
+            execution_client_mock.eth.wait_for_transaction_receipt.return_value = {
+                'status': 1,
+                'blockNumber': 123,
+            }
             yield tx_aggregate_mock
 
 
