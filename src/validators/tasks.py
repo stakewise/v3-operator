@@ -21,11 +21,7 @@ from src.config.settings import (
 )
 from src.validators.consensus import fetch_compounding_validators_balances
 from src.validators.database import NetworkValidatorCrud
-from src.validators.exceptions import (
-    EmptyRelayerResponseException,
-    FundingException,
-    MissingAvailableValidatorsException,
-)
+from src.validators.exceptions import EmptyRelayerResponseException, FundingException
 from src.validators.execution import get_withdrawable_assets
 from src.validators.keystores.base import BaseKeystore
 from src.validators.metrics import update_unused_validator_keys_metric
@@ -198,16 +194,13 @@ async def register_new_validators(
 
     validators_batch_size = min(protocol_config.validators_approval_batch_limit, validators_count)
     validators: Sequence[Validator]
+    validators_registry_root = await validators_registry_contract.get_registry_root()
+    validators_manager_signature: HexStr | None = None
 
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
         validators = await get_validators_for_registration(
             keystore=cast(BaseKeystore, keystore),
             amounts=validators_amounts[:validators_batch_size],
-        )
-        validators_manager_signature = get_validators_manager_signature(
-            vault=settings.vault,
-            validators_registry_root=await validators_registry_contract.get_registry_root(),
-            validators=validators,
         )
         if not validators:
             if not settings.disable_available_validators_warnings:
@@ -218,31 +211,21 @@ async def register_new_validators(
                 )
             return None
     else:
-        try:
-            validators_response = await cast(RelayerClient, relayer).register_validators(
-                amounts=validators_amounts[:validators_batch_size],
-            )
-        except MissingAvailableValidatorsException:
-            if not settings.disable_available_validators_warnings:
-                logger.warning(
-                    'There are no available public keys '
-                    'in current keystores files '
-                    'to proceed with registration. '
-                )
-            return None
-
+        validators_response = await cast(RelayerClient, relayer).register_validators(
+            amounts=validators_amounts[:validators_batch_size],
+        )
         validators = validators_response.validators
         if not validators:
             logger.debug('Waiting for relayer validators')
             return None
-        relayer_validators_manager_signature = validators_response.validators_manager_signature
-        if not relayer_validators_manager_signature:
-            relayer_validators_manager_signature = get_validators_manager_signature(
-                vault=settings.vault,
-                validators_registry_root=await validators_registry_contract.get_registry_root(),
-                validators=validators,
-            )
-        validators_manager_signature = relayer_validators_manager_signature
+        validators_manager_signature = validators_response.validators_manager_signature
+
+    if not validators_manager_signature:
+        validators_manager_signature = get_validators_manager_signature(
+            vault=settings.vault,
+            validators_registry_root=validators_registry_root,
+            validators=validators,
+        )
 
     if not await check_gas_price(high_priority=True):
         return None
@@ -254,6 +237,7 @@ async def register_new_validators(
     oracles_request, oracles_approval = await poll_validation_approval(
         keystore=keystore,
         validators=validators,
+        validators_registry_root=validators_registry_root,
         validators_manager_signature=validators_manager_signature,
     )
     tx_hash = await register_validators(
