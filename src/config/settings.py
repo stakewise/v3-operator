@@ -353,8 +353,8 @@ class Settings(metaclass=Singleton):
         self.consensus_retry_timeout = decouple_config(
             'CONSENSUS_RETRY_TIMEOUT', default=120, cast=int
         )
-        self.graph_request_timeout = decouple_config('GRAPH_REQUEST_TIMEOUT', default=30, cast=int)
-        self.graph_retry_timeout = decouple_config('GRAPH_RETRY_TIMEOUT', default=120, cast=int)
+        self.graph_request_timeout = decouple_config('GRAPH_REQUEST_TIMEOUT', default=10, cast=int)
+        self.graph_retry_timeout = decouple_config('GRAPH_RETRY_TIMEOUT', default=60, cast=int)
         self.graph_page_size = decouple_config('GRAPH_PAGE_SIZE', default=500, cast=int)
         self.relayer_endpoint = relayer_endpoint or ''
         self.relayer_timeout = decouple_config('RELAYER_TIMEOUT', default=10, cast=int)
