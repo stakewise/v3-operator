@@ -22,7 +22,6 @@ prometheus-client = "==0.17.1"
 psycopg2 = "==2.9.9"
 pyyaml = "==6.0.1"
 python-json-logger = "==2.0.7"
-aiohttp = "==3.12.14"
 psutil = "==7.0.0"
 
 [tool.poetry.group.dev.dependencies]
