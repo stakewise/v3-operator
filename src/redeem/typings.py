@@ -7,18 +7,26 @@ from web3.types import Wei
 
 
 @dataclass
-class Allocator:
+class VaultShares:
     address: ChecksumAddress
-    vault: ChecksumAddress
     minted_shares: Wei
 
-    @classmethod
-    def from_graph(cls, data: dict) -> 'Allocator':
-        return Allocator(
-            vault=Web3.to_checksum_address(data['vault']['id']),
-            address=Web3.to_checksum_address(data['address']),
-            minted_shares=Wei(int(data['mintedOsTokenShares'])),
-        )
+
+@dataclass
+class Allocator:
+    address: ChecksumAddress
+    vault_shares: list[VaultShares]
+
+    @property
+    def total_shares(self) -> Wei:
+        return Wei(sum(s.minted_shares for s in self.vault_shares))
+
+    @property
+    def vaults_proportions(self) -> dict[ChecksumAddress, float]:
+        total = self.total_shares
+        if total == 0:
+            return {}
+        return {s.address: s.minted_shares / total for s in self.vault_shares}
 
 
 @dataclass
@@ -42,7 +50,7 @@ class LeverageStrategyPosition:
 
 @dataclass
 class RedeemablePosition:
-    owner: ChecksumAddress
+    owner: ChecksumAddress  # noqa
     vault: ChecksumAddress
     amount: Wei
 

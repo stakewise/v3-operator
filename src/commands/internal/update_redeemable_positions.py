@@ -23,7 +23,7 @@ from src.config.networks import AVAILABLE_NETWORKS, MAINNET, ZERO_CHECKSUM_ADDRE
 from src.config.settings import settings
 from src.redeem.api_client import APIClient
 from src.redeem.graph import graph_get_allocators, graph_get_leverage_positions
-from src.redeem.typings import LeverageStrategyPosition, RedeemablePosition
+from src.redeem.typings import Allocator, LeverageStrategyPosition, RedeemablePosition
 
 logger = logging.getLogger(__name__)
 
@@ -153,50 +153,37 @@ async def main(arbitrum_endpoint: str | None, min_os_token_position_amount_gwei:
     block_number = await execution_client.eth.block_number
     allocators = await graph_get_allocators(block_number)
 
-    # # filter
+    # filter boost proxy positions
     leverage_positions = await graph_get_leverage_positions(block_number)
     boost_proxies = {pos.proxy for pos in leverage_positions}
     logger.info('Found %s boost positions to exclude', len(boost_proxies))
     min_minted_shares = Web3.to_wei(min_os_token_position_amount_gwei, 'gwei')
     allocators = [a for a in allocators if a.address not in boost_proxies]
-
-    allocators = sorted(allocators, key=lambda x: x.minted_shares, reverse=True)
-    logger.info('Filtered allocators count: %s', len(allocators))
-
-    address_to_minted_shares = {a.address: a.minted_shares for a in allocators}
-    user_addresses = set(allocator.address for allocator in allocators)
-    logger.info('Fetching kept tokens for %s addresses...', len(address_to_minted_shares))
+    address_to_minted_shares = {a.address: a.total_shares for a in allocators}
 
     # filter boosted positions
-    boosted_amounts = await get_boosted_amounts(
-        address_to_minted_shares, leverage_positions=leverage_positions, block_number=block_number
+    boosted_positions = await get_boosted_positions(
+        users=list(address_to_minted_shares.keys()),
+        leverage_positions=leverage_positions,
+        block_number=block_number,
     )
     for allocator in allocators:
-        allocator.minted_shares = Wei(
-            allocator.minted_shares - boosted_amounts.get(allocator.address, Wei(0))
-        )
-    allocators = [a for a in allocators if a.minted_shares >= min_minted_shares]
+        if allocator.address not in boosted_positions:
+            continue
+        for vault_address, boosted_amount in boosted_positions[allocator.address].items():
+            for vault_share in allocator.vault_shares:
+                if vault_share.address == vault_address:
+                    vault_share.minted_shares = Wei(vault_share.minted_shares - boosted_amount)
 
+    # filter zero positions
+    allocators = [a for a in allocators if a.total_shares >= min_minted_shares]
+
+    logger.info('Fetching kept tokens for %s addresses', len(allocators))
     kept_tokens = await get_kept_tokens(address_to_minted_shares, block_number, arbitrum_endpoint)
-    filled = 0
-    for allocator in allocators:
-        if allocator.minted_shares == kept_tokens.get(allocator.address, Wei(0)):
-            filled += 1
-    logger.info('Found %s fully filled positions', filled)
-    redeemable_positions: list[RedeemablePosition] = []
-    for allocator in allocators:
-        kept_token = kept_tokens.get(allocator.address, Wei(0))  # 0?
-        amount = min(allocator.minted_shares, kept_token)
-        if amount > 0:
-            redeemable_positions.append(
-                RedeemablePosition(
-                    owner=allocator.address,
-                    vault=allocator.vault,
-                    amount=Wei(allocator.minted_shares - amount),
-                )
-            )
-            kept_tokens[allocator.address] = Wei(kept_tokens[allocator.address] - amount)
-    logger.info('Fetched kept tokens for %s addresses...', len(user_addresses))
+    logger.info('Fetched kept tokens for %s addresses...', len(address_to_minted_shares))
+
+    redeemable_positions = create_redeemable_positions(allocators, kept_tokens)
+    logger.info('Created %s redeemable positions', len(redeemable_positions))
 
     click.confirm(
         'Proceed with uploading redeemable positions to IPFS?',
@@ -246,21 +233,52 @@ async def get_kept_tokens(
     return kept_token
 
 
-async def get_boosted_amounts(
-    address_to_minted_shares: dict[ChecksumAddress, Wei],
+async def get_boosted_positions(
+    users: list[ChecksumAddress],
     leverage_positions: list[LeverageStrategyPosition],
     block_number: BlockNumber,
-) -> dict[ChecksumAddress, Wei]:
-    boosted_os_token_shares: defaultdict[ChecksumAddress, Wei] = defaultdict(lambda: Wei(0))
+) -> dict[ChecksumAddress, dict[ChecksumAddress, Wei]]:
+    boosted_positions: defaultdict[ChecksumAddress, dict[ChecksumAddress, Wei]] = defaultdict(dict)
     for position in leverage_positions:
-        if position.user not in address_to_minted_shares:
+        if position.user not in users:
             continue
         vault_contract = VaultContract(position.vault)
-        position_os_token_shares = (
+        position_os_token_shares = Wei(
             position.os_token_shares
             + await vault_contract.convert_to_shares(position.assets, block_number)
         )
-        boosted_os_token_shares[position.user] = Wei(
-            boosted_os_token_shares[position.user] + position_os_token_shares
-        )
-    return boosted_os_token_shares
+        boosted_positions[position.user][position.vault] = position_os_token_shares
+
+    return boosted_positions
+
+
+def create_redeemable_positions(
+    allocators: list[Allocator], kept_tokens: dict[ChecksumAddress, Wei]
+) -> list[RedeemablePosition]:
+    # calculate vault proportions # create redeemable positions
+    filled = 0
+    redeemable_positions: list[RedeemablePosition] = []
+    for allocator in allocators:
+        kept_token = kept_tokens.get(allocator.address, Wei(0))
+        amount = min(allocator.total_shares, kept_token)
+        if amount <= 0:
+            continue
+
+        filled = 0
+        for index, (vault_address, proportion) in enumerate(allocator.vaults_proportions.items()):
+            # dust handling
+            if index == len(allocator.vaults_proportions) - 1:
+                vault_amount = int(amount - filled)
+            else:
+                vault_amount = int(amount * proportion)
+
+            redeemable_positions.append(
+                RedeemablePosition(
+                    owner=allocator.address,
+                    vault=vault_address,
+                    amount=Wei(vault_amount),
+                )
+            )
+            filled = filled + vault_amount
+
+    return redeemable_positions
