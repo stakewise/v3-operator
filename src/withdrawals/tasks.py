@@ -192,6 +192,13 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
             ', '.join(withdrawals.keys()),
             tx_hash,
         )
+        full_withdrawal_pubkeys = _filter_full_withdrawals(withdrawals)
+        if full_withdrawal_pubkeys:
+            logger.info(
+                'Validators with following public key(s) were requested for full withdrawal '
+                'which requires validator exit: %s',
+                ', '.join(full_withdrawal_pubkeys),
+            )
         tx_data = await execution_client.eth.get_transaction(tx_hash)
         metrics.last_withdrawal_block.labels(network=settings.network).set(tx_data['blockNumber'])
 
@@ -345,3 +352,8 @@ async def _fetch_oracle_exiting_validators(
 async def _is_pending_partial_withdrawals_queue_full(chain_head: ChainHead) -> bool:
     queue_length = await get_withdrawals_count(chain_head)
     return queue_length >= settings.network_config.PENDING_PARTIAL_WITHDRAWALS_LIMIT
+
+
+def _filter_full_withdrawals(withdrawals: dict[HexStr, Gwei]) -> list[HexStr]:
+    """Return public keys of validators requesting full withdrawals."""
+    return [pk for pk, amount in withdrawals.items() if amount == 0]
