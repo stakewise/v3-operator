@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules, copy_metadata
 from sys import platform
 
 datas = [
@@ -13,6 +13,7 @@ datas += collect_data_files('certifi')
 datas += collect_data_files('coincurve')
 datas += collect_data_files('eth_account')
 datas += collect_data_files('eth_utils')
+datas += copy_metadata('py_ecc')
 
 block_cipher = None
 
