@@ -2,9 +2,9 @@ from eth_typing import BlockNumber, HexStr
 from sw_utils import ChainHead
 from web3 import Web3
 from web3.types import Wei
-from common.execution import fake_exponential
 
 from src.common.clients import consensus_client, execution_client
+from src.common.execution import fake_exponential
 from src.common.typings import PendingConsolidation
 from src.config.settings import settings
 from src.validators.typings import ConsensusValidator
