@@ -360,12 +360,20 @@ async def _check_consensus_nodes_network() -> None:
     Checks that consensus node network is the same as settings.network
     """
     chain_id_to_network = _get_chain_id_to_network_dict()
+
     for consensus_endpoint in settings.consensus_endpoints:
         consensus_client = get_consensus_client(
             [consensus_endpoint], user_agent=OPERATOR_USER_AGENT
         )
         try:
             deposit_contract_data = (await consensus_client.get_deposit_contract())['data']
+        except Exception as e:
+            logger.warning(
+                'Failed to check network for consensus node at %s: %s',
+                consensus_endpoint,
+                format_error(e),
+            )
+            continue
         finally:
             await consensus_client.disconnect()
         consensus_chain_id = int(deposit_contract_data['chain_id'])
@@ -390,6 +398,13 @@ async def _check_execution_nodes_network() -> None:
         )
         try:
             execution_chain_id = await execution_client.eth.chain_id
+        except Exception as e:
+            logger.warning(
+                'Failed to check network for execution node at %s: %s',
+                execution_endpoint,
+                format_error(e),
+            )
+            continue
         finally:
             await execution_client.provider.disconnect()
         execution_network = chain_id_to_network.get(execution_chain_id)
