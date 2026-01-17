@@ -129,7 +129,9 @@ jobs:
               copy $ZIP_FILE_NAME \tmp\artifacts\
               $CHECKSUM_FILE_NAME_PASH = "\tmp\artifacts\"  + $BUILD_FILE_NAME + ".sha256"
               certUtil -hashfile $ZIP_FILE_NAME SHA256 | findstr /i /v "SHA256" | findstr /i /v "CertUtil" > $CHECKSUM_FILE_NAME_PASH
-
+    outputs:
+      VERSION: ${{ steps.get_version.outputs.VERSION }}
+      
     steps:
       - uses: actions/checkout@v4
 
@@ -187,43 +189,39 @@ jobs:
         include:
           - OS: ubuntu-24.04
             TEST_CMD: |
-              tar -xvzf /tmp/artifacts/operator-${{ steps.get_version.outputs.VERSION }}-ubuntu-24.04-amd64.tar.gz -C /tmp/test
-              /tmp/test/operator-${{ steps.get_version.outputs.VERSION }}-ubuntu-24.04-amd64/operator --help
+              tar -xvzf /tmp/artifacts/operator-${{ needs.build.get_version.outputs.VERSION }}-ubuntu-24.04-amd64.tar.gz -C /tmp/test
+              /tmp/test/operator-${{ needs.build.get_version.outputs.VERSION }}-ubuntu-24.04-amd64/operator --help
 
           - OS: ubuntu-22.04
             TEST_CMD: |
-              tar -xvzf /tmp/artifacts/operator-${{ steps.get_version.outputs.VERSION }}-ubuntu-22.04-amd64.tar.gz -C /tmp/test
-              /tmp/test/operator-${{ steps.get_version.outputs.VERSION }}-ubuntu-22.04-amd64/operator --help
+              tar -xvzf /tmp/artifacts/operator-${{ needs.build.get_version.outputs.VERSION }}-ubuntu-22.04-amd64.tar.gz -C /tmp/test
+              /tmp/test/operator-${{ needs.build.get_version.outputs.VERSION }}-ubuntu-22.04-amd64/operator --help
 
           - OS: ubuntu-24.04-arm
             TEST_CMD: |
-              tar -xvzf /tmp/artifacts/operator-${{ steps.get_version.outputs.VERSION }}-ubuntu-24.04-arm64.tar.gz -C /tmp/test
-              /tmp/test/operator-${{ steps.get_version.outputs.VERSION }}-ubuntu-24.04-arm64/operator --help
+              tar -xvzf /tmp/artifacts/operator-${{ needs.build.get_version.outputs.VERSION }}-ubuntu-24.04-arm64.tar.gz -C /tmp/test
+              /tmp/test/operator-${{ needs.build.get_version.outputs.VERSION }}-ubuntu-24.04-arm64/operator --help
 
           - OS: ubuntu-22.04-arm
             TEST_CMD: |
-              tar -xvzf /tmp/artifacts/operator-${{ steps.get_version.outputs.VERSION }}-ubuntu-22.04-arm64.tar.gz -C /tmp/test
-              /tmp/test/operator-${{ steps.get_version.outputs.VERSION }}-ubuntu-22.04-arm64/operator --help
+              tar -xvzf /tmp/artifacts/operator-${{ needs.build.get_version.outputs.VERSION }}-ubuntu-22.04-arm64.tar.gz -C /tmp/test
+              /tmp/test/operator-${{ needs.build.get_version.outputs.VERSION }}-ubuntu-22.04-arm64/operator --help
 
           - OS: macos-14
             TEST_CMD: |
-              tar -xvzf /tmp/artifacts/operator-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.tar.gz -C /tmp/test
-              /tmp/test/operator-${{ steps.get_version.outputs.VERSION }}-darwin-arm64/operator --help
+              tar -xvzf /tmp/artifacts/operator-${{ needs.build.get_version.outputs.VERSION }}-darwin-arm64.tar.gz -C /tmp/test
+              /tmp/test/operator-${{ needs.build.get_version.outputs.VERSION }}-darwin-arm64/operator --help
 
           - OS: windows-latest
             TEST_CMD: |
-              Expand-Archive -Path /tmp/artifacts/operator-${{ steps.get_version.outputs.VERSION }}-windows-amd64.zip -DestinationPath C:\test
-              C:\test\operator-${{ steps.get_version.outputs.VERSION }}-windows-amd64\operator.exe --help
+              Expand-Archive -Path /tmp/artifacts/operator-${{ needs.build.get_version.outputs.VERSION }}-windows-amd64.zip -DestinationPath C:\test
+              C:\test\operator-${{ needs.build.get_version.outputs.VERSION }}-windows-amd64\operator.exe --help
 
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           path: /tmp/artifacts
-
-      - name: Get the version
-        id: get_version
-        run: echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3)
 
       - name: Extract and test binary for ${{ matrix.OS }}
         run: ${{ matrix.TEST_CMD }}
