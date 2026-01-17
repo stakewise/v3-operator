@@ -7,6 +7,7 @@ on:
   push:
     tags:
       - "v*.*.*"
+      - "v*.*.*.*"
 
 jobs:
   checks:
@@ -177,6 +178,51 @@ jobs:
           name: ${{ matrix.OS }}
           path: /tmp/artifacts/*
           if-no-files-found: error
+
+  test-binaries:
+    needs: build
+    runs-on: ${{ matrix.OS }}
+    strategy:
+      matrix:
+        include:
+          - OS: ubuntu-24.04
+            TEST_CMD: |
+              tar -xvzf /tmp/artifacts/operator-${{ needs.build.outputs.VERSION }}-ubuntu-24.04-amd64.tar.gz -C /tmp/test
+              /tmp/test/operator-${{ needs.build.outputs.VERSION }}-ubuntu-24.04-amd64/operator --help
+
+          - OS: ubuntu-22.04
+            TEST_CMD: |
+              tar -xvzf /tmp/artifacts/operator-${{ needs.build.outputs.VERSION }}-ubuntu-22.04-amd64.tar.gz -C /tmp/test
+              /tmp/test/operator-${{ needs.build.outputs.VERSION }}-ubuntu-22.04-amd64/operator --help
+
+          - OS: ubuntu-24.04-arm
+            TEST_CMD: |
+              tar -xvzf /tmp/artifacts/operator-${{ needs.build.outputs.VERSION }}-ubuntu-24.04-arm64.tar.gz -C /tmp/test
+              /tmp/test/operator-${{ needs.build.outputs.VERSION }}-ubuntu-24.04-arm64/operator --help
+
+          - OS: ubuntu-22.04-arm
+            TEST_CMD: |
+              tar -xvzf /tmp/artifacts/operator-${{ needs.build.outputs.VERSION }}-ubuntu-22.04-arm64.tar.gz -C /tmp/test
+              /tmp/test/operator-${{ needs.build.outputs.VERSION }}-ubuntu-22.04-arm64/operator --help
+
+          - OS: macos-14
+            TEST_CMD: |
+              tar -xvzf /tmp/artifacts/operator-${{ needs.build.outputs.VERSION }}-darwin-arm64.tar.gz -C /tmp/test
+              /tmp/test/operator-${{ needs.build.outputs.VERSION }}-darwin-arm64/operator --help
+
+          - OS: windows-latest
+            TEST_CMD: |
+              Expand-Archive -Path /tmp/artifacts/operator-${{ needs.build.outputs.VERSION }}-windows-amd64.zip -DestinationPath C:\test
+              C:\test\operator-${{ needs.build.outputs.VERSION }}-windows-amd64\operator.exe --help
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/artifacts
+
+      - name: Extract and test binary for ${{ matrix.OS }}
+        run: ${{ matrix.TEST_CMD }}
 
   release:
     needs: build
