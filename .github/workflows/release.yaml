@@ -131,7 +131,7 @@ jobs:
               certUtil -hashfile $ZIP_FILE_NAME SHA256 | findstr /i /v "SHA256" | findstr /i /v "CertUtil" > $CHECKSUM_FILE_NAME_PASH
     outputs:
       VERSION: ${{ steps.get_version.outputs.VERSION }}
-      
+
     steps:
       - uses: actions/checkout@v4
 
@@ -167,7 +167,7 @@ jobs:
 
       - name: Get the version
         id: get_version
-        run: echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3)
+        run: echo "VERSION=$(echo $GITHUB_REF | cut -d / -f 3)" >> "$GITHUB_OUTPUT"
 
       - name: Build executable for ${{ matrix.OS }}
         env:
@@ -189,33 +189,33 @@ jobs:
         include:
           - OS: ubuntu-24.04
             TEST_CMD: |
-              tar -xvzf /tmp/artifacts/operator-${{ needs.build.get_version.outputs.VERSION }}-ubuntu-24.04-amd64.tar.gz -C /tmp/test
-              /tmp/test/operator-${{ needs.build.get_version.outputs.VERSION }}-ubuntu-24.04-amd64/operator --help
+              tar -xvzf /tmp/artifacts/operator-${{ needs.build.outputs.VERSION }}-ubuntu-24.04-amd64.tar.gz -C /tmp/test
+              /tmp/test/operator-${{ needs.build.outputs.VERSION }}-ubuntu-24.04-amd64/operator --help
 
           - OS: ubuntu-22.04
             TEST_CMD: |
-              tar -xvzf /tmp/artifacts/operator-${{ needs.build.get_version.outputs.VERSION }}-ubuntu-22.04-amd64.tar.gz -C /tmp/test
-              /tmp/test/operator-${{ needs.build.get_version.outputs.VERSION }}-ubuntu-22.04-amd64/operator --help
+              tar -xvzf /tmp/artifacts/operator-${{ needs.build.outputs.VERSION }}-ubuntu-22.04-amd64.tar.gz -C /tmp/test
+              /tmp/test/operator-${{ needs.build.outputs.VERSION }}-ubuntu-22.04-amd64/operator --help
 
           - OS: ubuntu-24.04-arm
             TEST_CMD: |
-              tar -xvzf /tmp/artifacts/operator-${{ needs.build.get_version.outputs.VERSION }}-ubuntu-24.04-arm64.tar.gz -C /tmp/test
-              /tmp/test/operator-${{ needs.build.get_version.outputs.VERSION }}-ubuntu-24.04-arm64/operator --help
+              tar -xvzf /tmp/artifacts/operator-${{ needs.build.outputs.VERSION }}-ubuntu-24.04-arm64.tar.gz -C /tmp/test
+              /tmp/test/operator-${{ needs.build.outputs.VERSION }}-ubuntu-24.04-arm64/operator --help
 
           - OS: ubuntu-22.04-arm
             TEST_CMD: |
-              tar -xvzf /tmp/artifacts/operator-${{ needs.build.get_version.outputs.VERSION }}-ubuntu-22.04-arm64.tar.gz -C /tmp/test
-              /tmp/test/operator-${{ needs.build.get_version.outputs.VERSION }}-ubuntu-22.04-arm64/operator --help
+              tar -xvzf /tmp/artifacts/operator-${{ needs.build.outputs.VERSION }}-ubuntu-22.04-arm64.tar.gz -C /tmp/test
+              /tmp/test/operator-${{ needs.build.outputs.VERSION }}-ubuntu-22.04-arm64/operator --help
 
           - OS: macos-14
             TEST_CMD: |
-              tar -xvzf /tmp/artifacts/operator-${{ needs.build.get_version.outputs.VERSION }}-darwin-arm64.tar.gz -C /tmp/test
-              /tmp/test/operator-${{ needs.build.get_version.outputs.VERSION }}-darwin-arm64/operator --help
+              tar -xvzf /tmp/artifacts/operator-${{ needs.build.outputs.VERSION }}-darwin-arm64.tar.gz -C /tmp/test
+              /tmp/test/operator-${{ needs.build.outputs.VERSION }}-darwin-arm64/operator --help
 
           - OS: windows-latest
             TEST_CMD: |
-              Expand-Archive -Path /tmp/artifacts/operator-${{ needs.build.get_version.outputs.VERSION }}-windows-amd64.zip -DestinationPath C:\test
-              C:\test\operator-${{ needs.build.get_version.outputs.VERSION }}-windows-amd64\operator.exe --help
+              Expand-Archive -Path /tmp/artifacts/operator-${{ needs.build.outputs.VERSION }}-windows-amd64.zip -DestinationPath C:\test
+              C:\test\operator-${{ needs.build.outputs.VERSION }}-windows-amd64\operator.exe --help
 
     steps:
       - name: Download artifacts
@@ -226,37 +226,33 @@ jobs:
       - name: Extract and test binary for ${{ matrix.OS }}
         run: ${{ matrix.TEST_CMD }}
 
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: /tmp/artifacts
+  # release:
+  #   needs: build,test-binaries
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Download all artifacts
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         path: /tmp/artifacts
 
-      - name: Display structure of downloaded files
-        run: ls -R
-        working-directory: /tmp/artifacts
+  #     - name: Display structure of downloaded files
+  #       run: ls -R
+  #       working-directory: /tmp/artifacts
 
-      - name: Get the version
-        id: get_version
-        run: echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3)
-
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        with:
-          fail_on_unmatched_files: true
-          files: |
-            /tmp/artifacts/ubuntu-22.04/operator-${{ steps.get_version.outputs.VERSION }}-ubuntu-22.04-amd64.tar.gz
-            /tmp/artifacts/ubuntu-22.04/operator-${{ steps.get_version.outputs.VERSION }}-ubuntu-22.04-amd64.sha256
-            /tmp/artifacts/ubuntu-22.04-arm/operator-${{ steps.get_version.outputs.VERSION }}-ubuntu-22.04-arm64.tar.gz
-            /tmp/artifacts/ubuntu-22.04-arm/operator-${{ steps.get_version.outputs.VERSION }}-ubuntu-22.04-arm64.sha256
-            /tmp/artifacts/ubuntu-24.04/operator-${{ steps.get_version.outputs.VERSION }}-ubuntu-24.04-amd64.tar.gz
-            /tmp/artifacts/ubuntu-24.04/operator-${{ steps.get_version.outputs.VERSION }}-ubuntu-24.04-amd64.sha256
-            /tmp/artifacts/ubuntu-24.04-arm/operator-${{ steps.get_version.outputs.VERSION }}-ubuntu-24.04-arm64.tar.gz
-            /tmp/artifacts/ubuntu-24.04-arm/operator-${{ steps.get_version.outputs.VERSION }}-ubuntu-24.04-arm64.sha256
-            /tmp/artifacts/macos-14/operator-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.tar.gz
-            /tmp/artifacts/macos-14/operator-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.sha256
-            /tmp/artifacts/windows-latest/operator-${{ steps.get_version.outputs.VERSION }}-windows-amd64.zip
-            /tmp/artifacts/windows-latest/operator-${{ steps.get_version.outputs.VERSION }}-windows-amd64.sha256
+  #     - name: Release
+  #       uses: softprops/action-gh-release@v1
+  #       with:
+  #         fail_on_unmatched_files: true
+  #         files: |
+  #           /tmp/artifacts/ubuntu-22.04/operator-${{ steps.get_version.outputs.VERSION }}-ubuntu-22.04-amd64.tar.gz
+  #           /tmp/artifacts/ubuntu-22.04/operator-${{ steps.get_version.outputs.VERSION }}-ubuntu-22.04-amd64.sha256
+  #           /tmp/artifacts/ubuntu-22.04-arm/operator-${{ steps.get_version.outputs.VERSION }}-ubuntu-22.04-arm64.tar.gz
+  #           /tmp/artifacts/ubuntu-22.04-arm/operator-${{ steps.get_version.outputs.VERSION }}-ubuntu-22.04-arm64.sha256
+  #           /tmp/artifacts/ubuntu-24.04/operator-${{ steps.get_version.outputs.VERSION }}-ubuntu-24.04-amd64.tar.gz
+  #           /tmp/artifacts/ubuntu-24.04/operator-${{ steps.get_version.outputs.VERSION }}-ubuntu-24.04-amd64.sha256
+  #           /tmp/artifacts/ubuntu-24.04-arm/operator-${{ steps.get_version.outputs.VERSION }}-ubuntu-24.04-arm64.tar.gz
+  #           /tmp/artifacts/ubuntu-24.04-arm/operator-${{ steps.get_version.outputs.VERSION }}-ubuntu-24.04-arm64.sha256
+  #           /tmp/artifacts/macos-14/operator-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.tar.gz
+  #           /tmp/artifacts/macos-14/operator-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.sha256
+  #           /tmp/artifacts/windows-latest/operator-${{ steps.get_version.outputs.VERSION }}-windows-amd64.zip
+  #           /tmp/artifacts/windows-latest/operator-${{ steps.get_version.outputs.VERSION }}-windows-amd64.sha256
