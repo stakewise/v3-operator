@@ -47,7 +47,7 @@ jobs:
               poetry run pyinstaller \
                 --distpath ./${BUILD_FILE_NAME} \
                 ./operator.spec;
-              ./${BUILD_FILE_NAME} --help;
+              ./${BUILD_FILE_NAME}/operator --help;
               tar -zcvf ${BUILD_FILE_NAME}.tar.gz ${BUILD_FILE_NAME};
               mkdir /tmp/artifacts;
               cp ${BUILD_FILE_NAME}.tar.gz /tmp/artifacts;
@@ -64,7 +64,7 @@ jobs:
               poetry run pyinstaller \
                 --distpath ./${BUILD_FILE_NAME} \
                 ./operator.spec;
-              ./${BUILD_FILE_NAME} --help;
+              ./${BUILD_FILE_NAME}/operator --help;
               tar -zcvf ${BUILD_FILE_NAME}.tar.gz ${BUILD_FILE_NAME};
               mkdir /tmp/artifacts;
               cp ${BUILD_FILE_NAME}.tar.gz /tmp/artifacts;
@@ -99,7 +99,7 @@ jobs:
               poetry run pyinstaller \
                 --distpath ./${BUILD_FILE_NAME} \
                 ./operator.spec;
-              ./${BUILD_FILE_NAME} --help;
+              ./${BUILD_FILE_NAME}/operator --help;
               tar -zcvf ${BUILD_FILE_NAME}.tar.gz ${BUILD_FILE_NAME};
               rm -rf /tmp/artifacts;
               mkdir /tmp/artifacts;
@@ -117,7 +117,7 @@ jobs:
               poetry run pyinstaller \
                 --distpath ./${BUILD_FILE_NAME} \
                 ./operator.spec;
-              ./${BUILD_FILE_NAME} --help;
+              ./${BUILD_FILE_NAME}/operator --help;
               tar -zcvf ${BUILD_FILE_NAME}.tar.gz ${BUILD_FILE_NAME};
               mkdir /tmp/artifacts || true;
               cp -f ${BUILD_FILE_NAME}.tar.gz /tmp/artifacts;
@@ -134,7 +134,7 @@ jobs:
               poetry run pyinstaller `
                 --distpath ./${BUILD_FILE_NAME} `
                 ./operator.spec;
-              ./${BUILD_FILE_NAME} --help;
+              ./${BUILD_FILE_NAME}/operator --help;
               $ZIP_FILE_NAME = $BUILD_FILE_NAME + ".zip"
               Compress-Archive -Path $BUILD_FILE_NAME_PATH -DestinationPath $ZIP_FILE_NAME
               mkdir \tmp\artifacts
