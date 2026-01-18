@@ -133,7 +133,7 @@ jobs:
               poetry run pyinstaller `
                 --distpath ./${BUILD_FILE_NAME} `
                 ./operator.spec;
-              .\$BUILD_FILE_NAME\operator.exe --help;
+              & ".\$BUILD_FILE_NAME\operator.exe" --help
               $ZIP_FILE_NAME = $BUILD_FILE_NAME + ".zip"
               Compress-Archive -Path $BUILD_FILE_NAME_PATH -DestinationPath $ZIP_FILE_NAME
               mkdir \tmp\artifacts
