@@ -177,7 +177,7 @@ jobs:
 
       - name: Get the version
         id: get_version
-        run: echo "RELEASE_VERSION=$(echo $GITHUB_REF | cut -d / -f 3)" >> $GITHUB_ENV
+        run: echo "RELEASE_VERSION=$(echo $GITHUB_REF | cut -d / -f 3)" >> "$GITHUB_ENV"
 
       - name: Build executable for ${{ matrix.OS }}
         run: ${{ matrix.BUILD_CMD }}
@@ -204,22 +204,22 @@ jobs:
 
       - name: Get the version
         id: get_version
-        run: echo "RELEASE_VERSION=$(echo $GITHUB_REF | cut -d / -f 3)" >> $GITHUB_ENV
+        run: echo "RELEASE_VERSION=$(echo $GITHUB_REF | cut -d / -f 3)" >> "$GITHUB_ENV"
 
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
           fail_on_unmatched_files: true
           files: |
-            /tmp/artifacts/ubuntu-22.04/operator-${{ RELEASE_VERSION }}-ubuntu-22.04-amd64.tar.gz
-            /tmp/artifacts/ubuntu-22.04/operator-${{ RELEASE_VERSION }}-ubuntu-22.04-amd64.sha256
-            /tmp/artifacts/ubuntu-22.04-arm/operator-${{ RELEASE_VERSION }}-ubuntu-22.04-arm64.tar.gz
-            /tmp/artifacts/ubuntu-22.04-arm/operator-${{ RELEASE_VERSION }}-ubuntu-22.04-arm64.sha256
-            /tmp/artifacts/ubuntu-24.04/operator-${{ RELEASE_VERSION }}-ubuntu-24.04-amd64.tar.gz
-            /tmp/artifacts/ubuntu-24.04/operator-${{ RELEASE_VERSION }}-ubuntu-24.04-amd64.sha256
-            /tmp/artifacts/ubuntu-24.04-arm/operator-${{ RELEASE_VERSION }}-ubuntu-24.04-arm64.tar.gz
-            /tmp/artifacts/ubuntu-24.04-arm/operator-${{ RELEASE_VERSION }}-ubuntu-24.04-arm64.sha256
-            /tmp/artifacts/macos-14/operator-${{ RELEASE_VERSION }}-darwin-arm64.tar.gz
-            /tmp/artifacts/macos-14/operator-${{ RELEASE_VERSION }}-darwin-arm64.sha256
-            /tmp/artifacts/windows-latest/operator-${{ RELEASE_VERSION }}-windows-amd64.zip
-            /tmp/artifacts/windows-latest/operator-${{ RELEASE_VERSION }}-windows-amd64.sha256
+            /tmp/artifacts/ubuntu-22.04/operator-${{ env.RELEASE_VERSION }}-ubuntu-22.04-amd64.tar.gz
+            /tmp/artifacts/ubuntu-22.04/operator-${{ env.RELEASE_VERSION }}-ubuntu-22.04-amd64.sha256
+            /tmp/artifacts/ubuntu-22.04-arm/operator-${{ env.RELEASE_VERSION }}-ubuntu-22.04-arm64.tar.gz
+            /tmp/artifacts/ubuntu-22.04-arm/operator-${{ env.RELEASE_VERSION }}-ubuntu-22.04-arm64.sha256
+            /tmp/artifacts/ubuntu-24.04/operator-${{ env.RELEASE_VERSION }}-ubuntu-24.04-amd64.tar.gz
+            /tmp/artifacts/ubuntu-24.04/operator-${{ env.RELEASE_VERSION }}-ubuntu-24.04-amd64.sha256
+            /tmp/artifacts/ubuntu-24.04-arm/operator-${{ env.RELEASE_VERSION }}-ubuntu-24.04-arm64.tar.gz
+            /tmp/artifacts/ubuntu-24.04-arm/operator-${{ env.RELEASE_VERSION }}-ubuntu-24.04-arm64.sha256
+            /tmp/artifacts/macos-14/operator-${{ env.RELEASE_VERSION }}-darwin-arm64.tar.gz
+            /tmp/artifacts/macos-14/operator-${{ env.RELEASE_VERSION }}-darwin-arm64.sha256
+            /tmp/artifacts/windows-latest/operator-${{ env.RELEASE_VERSION }}-windows-amd64.zip
+            /tmp/artifacts/windows-latest/operator-${{ env.RELEASE_VERSION }}-windows-amd64.sha256
