@@ -80,7 +80,7 @@ jobs:
               poetry run pyinstaller \
                 --distpath ./${BUILD_FILE_NAME} \
                 ./operator.spec;
-              ./${BUILD_FILE_NAME} --help;
+              ./${BUILD_FILE_NAME}/operator --help;
               tar -zcvf ${BUILD_FILE_NAME}.tar.gz ${BUILD_FILE_NAME};
               rm -rf /tmp/artifacts;
               mkdir /tmp/artifacts;
