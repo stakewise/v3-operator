@@ -25,8 +25,9 @@ hiddenimports = [
 # tomli
 hiddenimports += [
     'ddc459050edb75a05942__mypyc',  # MacOS
-    '7bce59c0a152c0e01f70__mypyc',  # Linux (both arm and amd64)
-    '3c22db458360489351e4＿myрус',  # Windows
+    '7bce59c0a152c0e01f70__mypyc',  # Ubuntu-22 (both arm and amd64)
+    '9deb819a160db3cef497__mypyc',  # Ubuntu-24 arm
+    '3c22db458360489351e4__mypyc',  # Windows
     '__future__'
 ]
 hiddenimports += collect_submodules('tomli')
