@@ -81,7 +81,9 @@ async def graph_get_leverage_positions(block_number: BlockNumber) -> list[Levera
               id
             }
             osTokenShares
+            exitingOsTokenShares
             assets
+            exitingAssets
           }
         }
         """

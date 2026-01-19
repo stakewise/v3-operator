@@ -219,11 +219,6 @@ class VaultContract(ContractWrapper, VaultStateMixin):
     async def get_exit_queue_index(self, position_ticket: int) -> int:
         return await self.contract.functions.getExitQueueIndex(position_ticket).call()
 
-    async def convert_to_shares(self, assets: Wei, block_number: BlockNumber | None = None) -> Wei:
-        return await self.contract.functions.convertToShares(assets).call(
-            block_identifier=block_number
-        )
-
     async def get_validator_withdrawal_submitted_events(
         self,
         from_block: BlockNumber,
@@ -346,6 +341,17 @@ class KeeperContract(ContractWrapper):
         return await self.contract.functions.canHarvest(vault_address).call(
             block_identifier=block_number
         )
+
+
+class OsTokenVaultControllerContract(ContractWrapper):
+    abi_path = 'abi/IOsTokenVaultController.json'
+    settings_key = 'OS_TOKEN_VAULT_CONTROLLER_CONTRACT_ADDRESS'
+
+    async def total_assets(self, block_number: BlockNumber | None = None) -> Wei:
+        return await self.contract.functions.totalAssets().call(block_identifier=block_number)
+
+    async def total_shares(self, block_number: BlockNumber | None = None) -> Wei:
+        return await self.contract.functions.totalShares().call(block_identifier=block_number)
 
 
 class RewardSplitterContract(ContractWrapper):
@@ -563,3 +569,4 @@ validators_registry_contract = ValidatorsRegistryContract()
 keeper_contract = KeeperContract()
 multicall_contract = MulticallContract()
 validators_checker_contract = ValidatorsCheckerContract()
+os_token_vault_controller_contract = OsTokenVaultControllerContract()

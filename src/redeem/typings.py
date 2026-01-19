@@ -35,7 +35,9 @@ class LeverageStrategyPosition:
     vault: ChecksumAddress
     proxy: ChecksumAddress
     os_token_shares: Wei
+    exiting_os_token_shares: Wei
     assets: Wei
+    exiting_assets: Wei
 
     @classmethod
     def from_graph(cls, data: dict) -> 'LeverageStrategyPosition':
@@ -44,7 +46,9 @@ class LeverageStrategyPosition:
             vault=Web3.to_checksum_address(data['vault']['id']),
             proxy=Web3.to_checksum_address(data['proxy']),
             os_token_shares=Wei(int(data['osTokenShares'])),
+            exiting_os_token_shares=Wei(int(data['exitingOsTokenShares'])),
             assets=Wei(int(data['assets'])),
+            exiting_assets=Wei(int(data['exitingAssets'])),
         )
 
 
