@@ -16,17 +16,17 @@ from web3.types import BlockNumber, Gwei, Wei
 from src.common.app_state import AppState
 from src.common.clients import execution_client
 from src.common.consensus import get_chain_latest_head
+from src.common.consolidations import get_pending_consolidations
 from src.common.contracts import VaultContract
-from src.common.execution import (
-    get_pending_consolidations,
-    get_pending_partial_withdrawals,
-    get_withdrawal_request_fee,
-    get_withdrawals_count,
-)
 from src.common.metrics import metrics
 from src.common.protocol_config import get_protocol_config
 from src.common.typings import PendingPartialWithdrawal, ValidatorsRegistrationMode
 from src.common.utils import round_down
+from src.common.withdrawals import (
+    get_pending_partial_withdrawals,
+    get_withdrawal_request_fee,
+    get_withdrawals_count,
+)
 from src.config.settings import (
     MIN_WITHDRAWAL_AMOUNT_GWEI,
     WITHDRAWALS_INTERVAL,

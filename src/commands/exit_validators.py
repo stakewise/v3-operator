@@ -12,11 +12,11 @@ from web3.types import Gwei, Wei
 from src.common.clients import close_clients, setup_clients
 from src.common.consensus import get_chain_justified_head
 from src.common.contracts import VaultContract
-from src.common.execution import get_withdrawal_request_fee
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.startup_check import check_validators_manager, check_vault_version
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_address, validate_indexes
+from src.common.withdrawals import get_withdrawal_request_fee
 from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI, settings
