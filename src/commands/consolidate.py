@@ -12,14 +12,13 @@ from web3.types import Gwei, Wei
 
 from src.common.clients import close_clients, setup_clients
 from src.common.consensus import get_chain_latest_head
-from src.common.contracts import VaultContract
-from src.common.execution import (
-    check_gas_price,
+from src.common.consolidations import (
     get_consolidation_request_fee,
     get_consolidations_count,
     get_pending_consolidations,
-    get_pending_partial_withdrawals,
 )
+from src.common.contracts import VaultContract
+from src.common.execution import check_gas_price
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.protocol_config import get_protocol_config
 from src.common.utils import log_verbose
@@ -31,6 +30,7 @@ from src.common.validators import (
     validate_public_keys_file,
 )
 from src.common.wallet import wallet
+from src.common.withdrawals import get_pending_partial_withdrawals
 from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS, GNOSIS, MAINNET, NETWORKS
 from src.config.settings import DEFAULT_MAX_CONSOLIDATION_REQUEST_FEE_GWEI, settings
