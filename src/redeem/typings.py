@@ -54,9 +54,13 @@ class LeverageStrategyPosition:
 
 @dataclass
 class RedeemablePosition:
-    owner: ChecksumAddress  # noqa
+    owner: ChecksumAddress
     vault: ChecksumAddress
     amount: Wei
 
     def as_dict(self) -> dict:
         return dataclasses.asdict(self)
+
+    @property
+    def merkle_leaf(self) -> tuple[ChecksumAddress, ChecksumAddress, Wei]:
+        return self.owner, self.vault, self.amount

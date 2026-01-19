@@ -7,6 +7,7 @@ from typing import cast
 
 import click
 from eth_typing import BlockNumber, ChecksumAddress
+from multiproof import StandardMerkleTree
 from web3 import Web3
 from web3.types import Gwei, Wei
 
@@ -146,7 +147,7 @@ def update_redeemable_positions(
 # pylint: disable-next=too-many-locals
 async def main(arbitrum_endpoint: str | None, min_os_token_position_amount_gwei: Gwei) -> None:
     """
-    Fetch redeemable positions, calculate kept osToken amounts and upload to IPFS.
+    Fetch redeemable positions, calculate kept os token amounts and upload to IPFS.
     """
     setup_logging()
     await setup_clients()
@@ -195,11 +196,15 @@ async def main(arbitrum_endpoint: str | None, min_os_token_position_amount_gwei:
     if not redeemable_positions:
         logger.info('No redeemable positions to upload, exiting...')
         return
+
+    total_redeemable = sum(p.amount for p in redeemable_positions)
     logger.info(
-        'Created %s redeemable positions. Total redeemed %s amount: %s',
+        'Created %s redeemable positions. Total redeemed %s amount: %s (%s %s)',
         len(redeemable_positions),
         settings.network_config.OS_TOKEN_BALANCE_SYMBOL,
-        sum(p.amount for p in redeemable_positions),
+        total_redeemable,
+        round(Web3.from_wei(total_redeemable, 'ether'), 5),
+        settings.network_config.WALLET_BALANCE_SYMBOL,
     )
 
     click.confirm(
@@ -210,6 +215,11 @@ async def main(arbitrum_endpoint: str | None, min_os_token_position_amount_gwei:
     ipfs_upload_client = build_ipfs_upload_clients()
     ipfs_hash = await ipfs_upload_client.upload_json([p.as_dict() for p in redeemable_positions])
     click.echo(f'Redeemable position uploaded to IPFS: hash={ipfs_hash}')
+
+    # calculate merkle root
+    leaves = [r.merkle_leaf for r in redeemable_positions]
+    tree = StandardMerkleTree.of(leaves, ['address', 'address', 'uint160'])
+    logger.info('Generated Merkle Tree root: %s', tree.root)
 
 
 async def get_kept_shares(
