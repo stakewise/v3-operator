@@ -22,6 +22,7 @@ ZERO_CHECKSUM_ADDRESS = Web3.to_checksum_address(EMPTY_ADDR_HEX)  # noqa: E501
 class NetworkConfig(BaseNetworkConfig):
     WALLET_BALANCE_SYMBOL: str
     VAULT_BALANCE_SYMBOL: str
+    OS_TOKEN_BALANCE_SYMBOL: str
     DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS: ChecksumAddress
     VALIDATORS_CHECKER_CONTRACT_ADDRESS: ChecksumAddress
     CONSOLIDATION_CONTRACT_ADDRESS: ChecksumAddress
@@ -82,6 +83,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         **asdict(BASE_NETWORKS[MAINNET]),
         WALLET_BALANCE_SYMBOL='ETH',
         VAULT_BALANCE_SYMBOL='ETH',
+        OS_TOKEN_BALANCE_SYMBOL='osETH',
         DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x75AB6DdCe07556639333d3Df1eaa684F5735223e'
         ),
@@ -138,6 +140,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         **asdict(BASE_NETWORKS[HOODI]),
         WALLET_BALANCE_SYMBOL='HoodiETH',
         VAULT_BALANCE_SYMBOL='HoodiETH',
+        OS_TOKEN_BALANCE_SYMBOL='osETH',
         DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x93a3f880E07B27dacA6Ef2d3C23E77DBd6294487'
         ),
@@ -190,6 +193,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         **asdict(BASE_NETWORKS[GNOSIS]),
         WALLET_BALANCE_SYMBOL='xDAI',
         VAULT_BALANCE_SYMBOL='GNO',
+        OS_TOKEN_BALANCE_SYMBOL='osGNO',
         DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x58e16621B5c0786D6667D2d54E28A20940269E16'
         ),
