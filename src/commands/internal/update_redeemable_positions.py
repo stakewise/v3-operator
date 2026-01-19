@@ -103,7 +103,7 @@ logger = logging.getLogger(__name__)
         case_sensitive=False,
     ),
 )
-@click.command(help='Updates redeemable positions for leverage positions')
+@click.command(help='Updates redeemable positions')
 # pylint: disable-next=too-many-arguments
 def update_redeemable_positions(
     execution_endpoints: str,
@@ -146,7 +146,7 @@ def update_redeemable_positions(
 # pylint: disable-next=too-many-locals
 async def main(arbitrum_endpoint: str | None, min_os_token_position_amount_gwei: Gwei) -> None:
     """
-    Fetch redeemable positions, calculate kept os token amounts and upload to IPFS.
+    Fetch redeemable positions, calculate kept osToken amounts and upload to IPFS.
     """
     setup_logging()
     await setup_clients()
@@ -223,7 +223,7 @@ async def get_kept_tokens(
             logger.info(
                 'Fetched wallet balances for %d/%d addresses', index, len(address_to_minted_shares)
             )
-        kept_tokens[address] = await contract.balance(address, block_number)
+        kept_tokens[address] = await contract.get_balance(address, block_number)
     # arb wallet balance
     if settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS != ZERO_CHECKSUM_ADDRESS:
         logger.info('Fetching OsETH from Arbitrum wallet balances...')
@@ -241,7 +241,7 @@ async def get_kept_tokens(
                     index,
                     len(address_to_minted_shares),
                 )
-            arb_balance = await arb_contract.balance(address)
+            arb_balance = await arb_contract.get_balance(address)
             kept_tokens[address] = Wei(kept_tokens[address] + arb_balance)
 
     # do not fetch data from api if all os token are on the wallet
@@ -255,10 +255,10 @@ async def get_kept_tokens(
 
     logger.info('Fetching locked OsETH from DeBank API for %s addresses...', len(api_addresses))
     api_client = APIClient()
-    locked_oseth_per_user: dict[ChecksumAddress, Wei] = {}
+    locked_os_token_per_user: dict[ChecksumAddress, Wei] = {}
     for address in api_addresses:
         locked_os_token = await api_client.get_protocols_locked_os_token(address=address)
-        locked_oseth_per_user[address] = locked_os_token
+        locked_os_token_per_user[address] = locked_os_token
         kept_tokens[address] = Wei(kept_tokens[address] + locked_os_token)
         await asyncio.sleep(API_SLEEP_TIMEOUT)  # to avoid rate limiting
     return kept_tokens
@@ -290,18 +290,17 @@ def create_redeemable_positions(
     redeemable_positions: list[RedeemablePosition] = []
     for allocator in allocators:
         kept_token = kept_tokens.get(allocator.address, Wei(0))
-        kept_amount = min(allocator.total_shares, kept_token)
-        amount = int(allocator.total_shares - kept_amount)
-        if amount <= 0:
+        redeemable_amount = max(0, allocator.total_shares - kept_token)
+        if redeemable_amount <= 0:
             continue
 
         filled = 0
         for index, (vault_address, proportion) in enumerate(allocator.vaults_proportions.items()):
             # dust handling
             if index == len(allocator.vaults_proportions) - 1:
-                vault_amount = int(amount - filled)
+                vault_amount = int(redeemable_amount - filled)
             else:
-                vault_amount = int(amount * proportion)
+                vault_amount = int(redeemable_amount * proportion)
 
             redeemable_positions.append(
                 RedeemablePosition(

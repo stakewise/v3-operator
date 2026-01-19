@@ -45,7 +45,7 @@ async def graph_get_allocators(block_number: BlockNumber) -> list[Allocator]:
     }
     response = await graph_client.fetch_pages(query, params=params, cursor_pagination=True)
     tmp_allocators: defaultdict[str, dict[str, Wei]] = defaultdict(dict)
-    allocators = []
+    allocators: list[Allocator] = []
     for item in response:
         if int(item['mintedOsTokenShares']) > 0:
             tmp_allocators[item['address']][item['vault']['id']] = Wei(

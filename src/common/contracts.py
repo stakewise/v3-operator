@@ -264,7 +264,7 @@ class VaultContract(ContractWrapper, VaultStateMixin):
 class Erc20Contract(ContractWrapper):
     abi_path = 'abi/Erc20Token.json'
 
-    async def balance(
+    async def get_balance(
         self, address: ChecksumAddress, block_number: BlockNumber | None = None
     ) -> Wei:
         return await self.contract.functions.balanceOf(address).call(block_identifier=block_number)

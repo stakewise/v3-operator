@@ -27,7 +27,7 @@ class APIClient:
         }
 
         protocol_data = await self._fetch_json(url, params=params)
-        total_locked_oseth = Wei(0)
+        total_locked_os_token = Wei(0)
         for protocol in protocol_data:
             # boosted OsEth handled via graph separately
             if protocol['id'] in ['stakewise', 'xdai_stakewise']:
@@ -40,11 +40,11 @@ class APIClient:
                     if not Web3.is_address(supply_token['id']):
                         continue
                     if self._is_os_token(Web3.to_checksum_address(supply_token['id'])):
-                        total_locked_oseth = Wei(
-                            total_locked_oseth + Web3.to_wei(float(supply_token['amount']), 'ether')
+                        total_locked_os_token = Wei(
+                            total_locked_os_token + Web3.to_wei(supply_token['amount'], 'ether')
                         )
 
-        return total_locked_oseth
+        return total_locked_os_token
 
     async def _fetch_json(self, url: str, params: dict | None = None) -> dict | list:
         async with aiohttp.ClientSession() as session:
