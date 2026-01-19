@@ -278,11 +278,18 @@ async def get_kept_shares(
     )
     api_client = APIClient()
     locked_os_token_per_address: dict[ChecksumAddress, Wei] = {}
-    for address in api_addresses:
-        locked_os_token = await api_client.get_protocols_locked_os_token(address=address)
-        locked_os_token_per_address[address] = locked_os_token
-        kept_shares[address] = Wei(kept_shares[address] + locked_os_token)
-        await asyncio.sleep(API_SLEEP_TIMEOUT)  # to avoid rate limiting
+    # fetch locked os token from the api
+    with click.progressbar(
+        api_addresses,
+        label='Fetching os token amount locked in protocols from the api:\t\t',
+        show_percent=False,
+        show_pos=True,
+    ) as progress_bar:
+        for address in progress_bar:
+            locked_os_token = await api_client.get_protocols_locked_os_token(address=address)
+            locked_os_token_per_address[address] = locked_os_token
+            kept_shares[address] = Wei(kept_shares[address] + locked_os_token)
+            await asyncio.sleep(API_SLEEP_TIMEOUT)  # to avoid rate limiting
     return kept_shares
 
 
