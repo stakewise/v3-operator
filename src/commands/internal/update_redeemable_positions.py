@@ -290,7 +290,8 @@ def create_redeemable_positions(
     redeemable_positions: list[RedeemablePosition] = []
     for allocator in allocators:
         kept_token = kept_tokens.get(allocator.address, Wei(0))
-        amount = min(allocator.total_shares, kept_token)
+        kept_amount = min(allocator.total_shares, kept_token)
+        amount = int(allocator.total_shares - kept_amount)
         if amount <= 0:
             continue
 
