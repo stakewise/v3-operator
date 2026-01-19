@@ -2,12 +2,14 @@ from pathlib import Path
 from random import randint
 from tempfile import TemporaryDirectory
 from typing import Callable, Generator
+from unittest import mock
 
 import ecies
 import pytest
 from _pytest.fixtures import SubRequest
 from click.testing import CliRunner
 from eth_typing import HexAddress, HexStr
+from sw_utils.graph.client import GraphClient as SWGraphClient
 from sw_utils.tests import faker
 from sw_utils.tests.factories import get_mocked_protocol_config
 from sw_utils.typings import Oracle, ProtocolConfig
@@ -15,7 +17,12 @@ from sw_utils.typings import Oracle, ProtocolConfig
 from src.commands.create_keys import create_keys
 from src.commands.create_wallet import create_wallet
 from src.commands.setup_remote_signer import setup_remote_signer
-from src.common.clients import setup_clients
+from src.common.clients import (
+    ExecutionClient,
+    execution_client,
+    execution_non_retry_client,
+    setup_clients,
+)
 from src.common.credentials import CredentialManager
 from src.config.config import OperatorConfig
 from src.config.networks import HOODI, NETWORKS
@@ -150,6 +157,7 @@ def _setup_remote_signer(
     mocked_protocol_config: ProtocolConfig,
     mocked_remote_signer,
     _create_keys,
+    setup_test_clients,
 ) -> None:
     result = runner.invoke(
         setup_remote_signer,
@@ -209,7 +217,11 @@ def fake_settings(
 
 @pytest.fixture
 async def setup_test_clients():
-    await setup_clients()
+    with mock.patch.object(SWGraphClient, 'setup'), mock.patch.object(
+        SWGraphClient, 'disconnect'
+    ), mock.patch('asyncio.sleep'):
+        await setup_clients()
+        yield
 
 
 @pytest.fixture

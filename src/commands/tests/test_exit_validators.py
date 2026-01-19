@@ -67,7 +67,7 @@ def _patch_get_chain_justified_head() -> Generator:
 )
 @pytest.mark.usefixtures('_init_config')
 class TestValidatorsExit:
-    @pytest.mark.usefixtures('fake_settings')
+    @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
     async def test_auto_exit(
         self,
         vault_address: str,
@@ -115,7 +115,7 @@ class TestValidatorsExit:
         assert result.exit_code == 0
         assert 'Exits for validators with index(es) 1 are successfully initiated\n' in result.output
 
-    @pytest.mark.usefixtures('fake_settings')
+    @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
     async def test_with_indexes(
         self,
         vault_address: str,
@@ -166,7 +166,7 @@ class TestValidatorsExit:
         assert result.exit_code == 0
         assert 'Exits for validators with index(es) 1 are successfully initiated\n' in result.output
 
-    @pytest.mark.usefixtures('fake_settings')
+    @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
     async def test_non_active_indexes(
         self,
         vault_address: str,
