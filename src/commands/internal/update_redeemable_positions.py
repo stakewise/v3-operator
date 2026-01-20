@@ -23,7 +23,11 @@ from src.common.utils import log_verbose
 from src.config.networks import AVAILABLE_NETWORKS, MAINNET, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
 from src.redeem.api_client import API_SLEEP_TIMEOUT, APIClient
-from src.redeem.graph import graph_get_allocators, graph_get_leverage_positions
+from src.redeem.graph import (
+    graph_get_allocators,
+    graph_get_leverage_positions,
+    graph_get_os_token_holders,
+)
 from src.redeem.typings import Allocator, LeverageStrategyPosition, RedeemablePosition
 
 logger = logging.getLogger(__name__)
@@ -226,16 +230,12 @@ async def get_kept_shares(
 ) -> dict[ChecksumAddress, Wei]:
     kept_shares = defaultdict(lambda: Wei(0))
     logger.info(
-        'Fetching %s from wallet balances...', settings.network_config.OS_TOKEN_BALANCE_SYMBOL
+        'Fetching %s balances from the subgraph...', settings.network_config.OS_TOKEN_BALANCE_SYMBOL
     )
+    os_token_holders = await graph_get_os_token_holders(block_number)
+    for address in address_to_minted_shares.keys():
+        kept_shares[address] = os_token_holders.get(address, Wei(0))
 
-    contract = Erc20Contract(settings.network_config.OS_TOKEN_CONTRACT_ADDRESS)
-    for index, address in enumerate(address_to_minted_shares.keys()):
-        if index and index % 50 == 0:
-            logger.info(
-                'Fetched wallet balances for %d/%d addresses', index, len(address_to_minted_shares)
-            )
-        kept_shares[address] = await contract.get_balance(address, block_number)
     # arb wallet balance
     if settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS != ZERO_CHECKSUM_ADDRESS:
         logger.info(

@@ -4,7 +4,7 @@ from collections import defaultdict
 from eth_typing import BlockNumber
 from gql import gql
 from web3 import Web3
-from web3.types import Wei
+from web3.types import ChecksumAddress, Wei
 
 from src.common.clients import graph_client
 from src.redeem.typings import Allocator, LeverageStrategyPosition, VaultShares
@@ -91,3 +91,29 @@ async def graph_get_leverage_positions(block_number: BlockNumber) -> list[Levera
     params = {'block': block_number}
     response = await graph_client.fetch_pages(query, params=params)
     return [LeverageStrategyPosition.from_graph(item) for item in response]
+
+
+async def graph_get_os_token_holders(block_number: BlockNumber) -> dict[ChecksumAddress, Wei]:
+    query = gql(
+        """
+        query osTokenHoldersQuery($block: Int,  $first: Int, $skip: Int) {
+          osTokenHolders(
+            block: { number: $block },
+            where:{
+              balance_gt: 0
+            }
+            orderBy: balance,
+            first: $first
+            skip: $skip
+          ) {
+            id
+            balance
+          }
+        }
+        """
+    )
+    params = {'block': block_number}
+    response = await graph_client.fetch_pages(query, params=params)
+    return {
+        Web3.to_checksum_address(item['id']): Wei(int(item['balance'])) for item in response
+    }
