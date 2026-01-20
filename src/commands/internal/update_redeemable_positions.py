@@ -28,7 +28,7 @@ from src.redeem.graph import (
     graph_get_leverage_positions,
     graph_get_os_token_holders,
 )
-from src.redeem.os_token_converter import create_os_token_converter
+from src.redeem.os_token_converter import OsTokenConverter, create_os_token_converter
 from src.redeem.typings import Allocator, LeverageStrategyPosition, RedeemablePosition
 
 logger = logging.getLogger(__name__)
@@ -169,10 +169,11 @@ async def main(arbitrum_endpoint: str | None, min_os_token_position_amount_gwei:
 
     # reduce boosted positions
     logger.info('Fetching boosted positions from the subgraph...')
-    boost_ostoken_shares = await get_boost_ostoken_shares(
+    os_token_converter = await create_os_token_converter(block_number)
+    boost_ostoken_shares = await calculate_boost_ostoken_shares(
         users={a.address for a in allocators},
         leverage_positions=leverage_positions,
-        block_number=block_number,
+        os_token_converter=os_token_converter,
     )
     allocators = _reduce_boosted_amount(allocators, boost_ostoken_shares)
 
@@ -291,16 +292,15 @@ async def get_kept_shares(
     return kept_shares
 
 
-async def get_boost_ostoken_shares(
+async def calculate_boost_ostoken_shares(
     users: set[ChecksumAddress],
     leverage_positions: list[LeverageStrategyPosition],
-    block_number: BlockNumber,
+    os_token_converter: OsTokenConverter,
 ) -> dict[ChecksumAddress, dict[ChecksumAddress, Wei]]:
     boosted_positions: defaultdict[ChecksumAddress, dict[ChecksumAddress, Wei]] = defaultdict(dict)
     if not leverage_positions:
         return boosted_positions
 
-    os_token_converter = await create_os_token_converter(block_number)
     for position in leverage_positions:
         if position.user not in users:
             continue
@@ -310,7 +310,11 @@ async def get_boost_ostoken_shares(
             + os_token_converter.to_shares(position.assets)
             + os_token_converter.to_shares(position.exiting_assets)
         )
-        boosted_positions[position.user][position.vault] = position_os_token_shares
+        if position.vault not in boosted_positions[position.user]:
+            boosted_positions[position.user][position.vault] = Wei(0)
+        boosted_positions[position.user][position.vault] = Wei(
+            boosted_positions[position.user][position.vault] + position_os_token_shares
+        )
 
     return boosted_positions
 
