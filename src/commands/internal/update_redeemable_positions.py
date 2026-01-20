@@ -162,26 +162,23 @@ async def main(arbitrum_endpoint: str | None, min_os_token_position_amount_gwei:
     logger.info('Found %s proxy positions to exclude', len(boost_proxies))
     allocators = [a for a in allocators if a.address not in boost_proxies]
 
-    # filter boosted positions
+    # reduce boosted positions
     logger.info('Fetching boosted positions from the subgraph...')
     boost_ostoken_shares = await get_boost_ostoken_shares(
         users={a.address for a in allocators},
         leverage_positions=leverage_positions,
         block_number=block_number,
     )
-    for allocator in allocators:
-        if allocator.address not in boost_ostoken_shares:
-            continue
-        for vault_address, boosted_amount in boost_ostoken_shares[allocator.address].items():
-            for vault_share in allocator.vault_shares:
-                if vault_share.address == vault_address:
-                    vault_share.minted_shares = Wei(
-                        max(0, vault_share.minted_shares - boosted_amount)
-                    )
+    allocators = _reduce_boosted_amount(allocators, boost_ostoken_shares)
 
     # filter zero positions
     min_minted_shares = Web3.to_wei(min_os_token_position_amount_gwei, 'gwei')
-    allocators = [a for a in allocators if a.total_shares >= min_minted_shares]
+    for allocator in allocators:
+        allocator.vault_shares = [
+            vault_share
+            for vault_share in allocator.vault_shares
+            if vault_share.minted_shares >= min_minted_shares
+        ]
 
     if not allocators:
         logger.info('No allocators with minted shares above the threshold found, exiting...')
@@ -322,10 +319,6 @@ async def get_boost_ostoken_shares(
     return boosted_positions
 
 
-def _assets_to_shares(assets: Wei, total_shares: Wei, total_assets: Wei) -> Wei:
-    return Wei(assets * total_shares // total_assets)
-
-
 def create_redeemable_positions(
     allocators: list[Allocator], kept_shares: dict[ChecksumAddress, Wei]
 ) -> list[RedeemablePosition]:
@@ -338,9 +331,10 @@ def create_redeemable_positions(
             continue
 
         allocated_amount = 0
-        for index, (vault_address, proportion) in enumerate(allocator.vaults_proportions.items()):
+        vaults_proportions = allocator.vaults_proportions.items()
+        for index, (vault_address, proportion) in enumerate(vaults_proportions):
             # dust handling
-            if index == len(allocator.vaults_proportions) - 1:
+            if index == len(vaults_proportions) - 1:
                 vault_amount = int(redeemable_amount - allocated_amount)
             else:
                 vault_amount = int(redeemable_amount * proportion)
@@ -355,3 +349,22 @@ def create_redeemable_positions(
             allocated_amount += vault_amount
 
     return redeemable_positions
+
+
+def _reduce_boosted_amount(
+    allocators: list[Allocator],
+    boost_ostoken_shares: dict[ChecksumAddress, dict[ChecksumAddress, Wei]],
+) -> list[Allocator]:
+    for allocator in allocators:
+        if allocator.address not in boost_ostoken_shares:
+            continue
+        for vault_share in allocator.vault_shares:
+            boosted_amount = boost_ostoken_shares[allocator.address].get(
+                vault_share.address, Wei(0)
+            )
+            vault_share.minted_shares = Wei(max(0, vault_share.minted_shares - boosted_amount))
+    return allocators
+
+
+def _assets_to_shares(assets: Wei, total_shares: Wei, total_assets: Wei) -> Wei:
+    return Wei(assets * total_shares // total_assets)
