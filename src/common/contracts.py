@@ -1,5 +1,6 @@
 import asyncio
 import json
+import sys
 from functools import cached_property
 from pathlib import Path
 from typing import Callable, cast
@@ -19,7 +20,6 @@ from src.common.execution import transaction_gas_wrapper
 from src.common.typings import (
     ExitQueueMissingAssetsParams,
     HarvestParams,
-    RedeemablePositions,
     RewardVoteInfo,
 )
 from src.config.settings import (
@@ -50,9 +50,7 @@ class ContractWrapper:
 
     @cached_property
     def contract(self) -> AsyncContract:
-        current_dir = Path(__file__).parent
-        with open(current_dir / self.abi_path, encoding='utf-8') as f:
-            abi = json.load(f)
+        abi = self._load_abi(self.abi_path)
         return self.execution_client.eth.contract(abi=abi, address=self.contract_address)
 
     @property
@@ -65,6 +63,16 @@ class ContractWrapper:
 
     def encode_abi(self, fn_name: str, args: list | None = None) -> HexStr:
         return self.contract.encode_abi(fn_name, args=args)
+
+    def _load_abi(self, abi_path: str) -> dict:
+        # get subclass file path
+        file = sys.modules[self.__class__.__module__].__file__
+        if not file:
+            raise RuntimeError("Can't get abi file path")
+        # load abi
+        current_dir = Path(file).parent
+        with (current_dir / abi_path).open(encoding='utf-8') as f:
+            return json.load(f)
 
     async def _get_last_event(
         self,
@@ -546,23 +554,13 @@ class ValidatorsCheckerContract(ContractWrapper):
         )
 
 
-class OsTokenRedeemerContract(ContractWrapper):
-    abi_path = 'abi/IOSTokenRedeemer.json'
-    settings_key = 'OS_TOKEN_REDEEMER_CONTRACT_ADDRESS'
-
-    async def redeemable_positions(self) -> RedeemablePositions:
-        merkle_root, ipfs_hash = await self.contract.functions.redeemablePositions().call()
-        return RedeemablePositions(
-            merkle_root=Web3.to_hex(merkle_root),
-            ipfs_hash=ipfs_hash,
-        )
-
-    async def nonce(self) -> int:
-        return await self.contract.functions.nonce().call()
+class OsTokenVaultControllerContract(ContractWrapper):
+    abi_path = 'abi/IOsTokenVaultController.json'
+    settings_key = 'OS_TOKEN_VAULT_CONTROLLER_CONTRACT_ADDRESS'
 
 
 validators_registry_contract = ValidatorsRegistryContract()
 keeper_contract = KeeperContract()
 multicall_contract = MulticallContract()
 validators_checker_contract = ValidatorsCheckerContract()
-os_token_redeemer_contract = OsTokenRedeemerContract()
+os_token_vault_controller_contract = OsTokenVaultControllerContract()

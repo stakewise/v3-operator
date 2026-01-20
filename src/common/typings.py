@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
 
-from eth_typing import HexStr
 from hexbytes import HexBytes
 from web3 import Web3
 from web3.types import ChecksumAddress, Gwei, Wei
@@ -116,12 +115,6 @@ class ExitRequest:
             exited_assets=Wei(int(data['exitedAssets'])),
             total_assets=Wei(int(data['totalAssets'])),
         )
-
-
-@dataclass
-class RedeemablePositions:
-    merkle_root: HexStr
-    ipfs_hash: str
 
 
 class Singleton(type):
