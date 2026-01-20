@@ -17,7 +17,7 @@ from src.common.clients import (
     get_execution_client,
     setup_clients,
 )
-from src.common.contracts import Erc20Contract, os_token_vault_controller_contract
+from src.common.contracts import Erc20Contract
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import log_verbose
 from src.config.networks import AVAILABLE_NETWORKS, MAINNET, ZERO_CHECKSUM_ADDRESS
@@ -28,6 +28,7 @@ from src.redeem.graph import (
     graph_get_leverage_positions,
     graph_get_os_token_holders,
 )
+from src.redeem.os_token_converter import create_os_token_converter
 from src.redeem.typings import Allocator, LeverageStrategyPosition, RedeemablePosition
 
 logger = logging.getLogger(__name__)
@@ -299,20 +300,15 @@ async def get_boost_ostoken_shares(
     if not leverage_positions:
         return boosted_positions
 
-    total_shares = await os_token_vault_controller_contract.total_shares(block_number)
-    total_assets = await os_token_vault_controller_contract.total_assets(block_number)
+    os_token_converter = await create_os_token_converter(block_number)
     for position in leverage_positions:
         if position.user not in users:
             continue
         position_os_token_shares = Wei(
             position.os_token_shares
             + position.exiting_os_token_shares
-            + _assets_to_shares(
-                assets=position.assets, total_shares=total_shares, total_assets=total_assets
-            )
-            + _assets_to_shares(
-                assets=position.exiting_assets, total_shares=total_shares, total_assets=total_assets
-            )
+            + os_token_converter.to_shares(position.assets)
+            + os_token_converter.to_shares(position.exiting_assets)
         )
         boosted_positions[position.user][position.vault] = position_os_token_shares
 
@@ -364,7 +360,3 @@ def _reduce_boosted_amount(
             )
             vault_share.minted_shares = Wei(max(0, vault_share.minted_shares - boosted_amount))
     return allocators
-
-
-def _assets_to_shares(assets: Wei, total_shares: Wei, total_assets: Wei) -> Wei:
-    return Wei(assets * total_shares // total_assets)

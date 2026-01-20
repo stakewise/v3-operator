@@ -114,6 +114,4 @@ async def graph_get_os_token_holders(block_number: BlockNumber) -> dict[Checksum
     )
     params = {'block': block_number}
     response = await graph_client.fetch_pages(query, params=params)
-    return {
-        Web3.to_checksum_address(item['id']): Wei(int(item['balance'])) for item in response
-    }
+    return {Web3.to_checksum_address(item['id']): Wei(int(item['balance'])) for item in response}
