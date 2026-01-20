@@ -3,6 +3,11 @@
         "inputs": [
             {
                 "internalType": "address",
+                "name": "vaultsRegistry_",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
                 "name": "osToken_",
                 "type": "address"
             },
@@ -99,6 +104,11 @@
     },
     {
         "inputs": [],
+        "name": "InvalidVault",
+        "type": "error"
+    },
+    {
+        "inputs": [],
         "name": "MerkleProofInvalidMultiproof",
         "type": "error"
     },
@@ -122,11 +132,6 @@
             }
         ],
         "name": "OwnableUnauthorizedAccount",
-        "type": "error"
-    },
-    {
-        "inputs": [],
-        "name": "RedeemablePositionsProposed",
         "type": "error"
     },
     {
@@ -374,76 +379,12 @@
                 "type": "string"
             }
         ],
-        "name": "RedeemablePositionsAccepted",
-        "type": "event"
-    },
-    {
-        "anonymous": false,
-        "inputs": [
-            {
-                "indexed": true,
-                "internalType": "bytes32",
-                "name": "merkleRoot",
-                "type": "bytes32"
-            },
-            {
-                "indexed": false,
-                "internalType": "string",
-                "name": "ipfsHash",
-                "type": "string"
-            }
-        ],
-        "name": "RedeemablePositionsDenied",
-        "type": "event"
-    },
-    {
-        "anonymous": false,
-        "inputs": [
-            {
-                "indexed": true,
-                "internalType": "bytes32",
-                "name": "merkleRoot",
-                "type": "bytes32"
-            },
-            {
-                "indexed": false,
-                "internalType": "string",
-                "name": "ipfsHash",
-                "type": "string"
-            }
-        ],
-        "name": "RedeemablePositionsProposed",
-        "type": "event"
-    },
-    {
-        "anonymous": false,
-        "inputs": [
-            {
-                "indexed": true,
-                "internalType": "bytes32",
-                "name": "merkleRoot",
-                "type": "bytes32"
-            },
-            {
-                "indexed": false,
-                "internalType": "string",
-                "name": "ipfsHash",
-                "type": "string"
-            }
-        ],
-        "name": "RedeemablePositionsRemoved",
+        "name": "RedeemablePositionsUpdated",
         "type": "event"
     },
     {
         "inputs": [],
         "name": "acceptOwnership",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-    },
-    {
-        "inputs": [],
-        "name": "acceptRedeemablePositions",
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function"
@@ -519,13 +460,6 @@
         "type": "function"
     },
     {
-        "inputs": [],
-        "name": "denyRedeemablePositions",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-    },
-    {
         "inputs": [
             {
                 "internalType": "uint256",
@@ -596,6 +530,19 @@
     },
     {
         "inputs": [],
+        "name": "getExitQueueCumulativeTickets",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
         "name": "getExitQueueData",
         "outputs": [
             {
@@ -631,6 +578,25 @@
                 "internalType": "int256",
                 "name": "",
                 "type": "int256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "targetCumulativeTickets",
+                "type": "uint256"
+            }
+        ],
+        "name": "getExitQueueMissingAssets",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "missingAssets",
+                "type": "uint256"
             }
         ],
         "stateMutability": "view",
@@ -714,24 +680,6 @@
         "type": "function"
     },
     {
-        "inputs": [],
-        "name": "pendingRedeemablePositions",
-        "outputs": [
-            {
-                "internalType": "bytes32",
-                "name": "merkleRoot",
-                "type": "bytes32"
-            },
-            {
-                "internalType": "string",
-                "name": "ipfsHash",
-                "type": "string"
-            }
-        ],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
         "inputs": [
             {
                 "internalType": "uint256",
@@ -780,31 +728,6 @@
     {
         "inputs": [],
         "name": "processExitQueue",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-    },
-    {
-        "inputs": [
-            {
-                "components": [
-                    {
-                        "internalType": "bytes32",
-                        "name": "merkleRoot",
-                        "type": "bytes32"
-                    },
-                    {
-                        "internalType": "string",
-                        "name": "ipfsHash",
-                        "type": "string"
-                    }
-                ],
-                "internalType": "struct IOsTokenRedeemer.RedeemablePositions",
-                "name": "newPositions",
-                "type": "tuple"
-            }
-        ],
-        "name": "proposeRedeemablePositions",
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function"
@@ -868,6 +791,54 @@
         "type": "function"
     },
     {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "subVault",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
+                "name": "osTokenShares",
+                "type": "uint256"
+            }
+        ],
+        "name": "redeemSubVaultOsToken",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "metaVault",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
+                "name": "assetsToRedeem",
+                "type": "uint256"
+            }
+        ],
+        "name": "redeemSubVaultsAssets",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "totalRedeemedAssets",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
         "inputs": [],
         "name": "redeemablePositions",
         "outputs": [
@@ -913,13 +884,6 @@
     },
     {
         "inputs": [],
-        "name": "removeRedeemablePositions",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-    },
-    {
-        "inputs": [],
         "name": "renounceOwnership",
         "outputs": [],
         "stateMutability": "nonpayable",
@@ -934,6 +898,31 @@
             }
         ],
         "name": "setPositionsManager",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "bytes32",
+                        "name": "merkleRoot",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "ipfsHash",
+                        "type": "string"
+                    }
+                ],
+                "internalType": "struct IOsTokenRedeemer.RedeemablePositions",
+                "name": "newPositions",
+                "type": "tuple"
+            }
+        ],
+        "name": "setRedeemablePositions",
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function"

@@ -136,7 +136,7 @@ NETWORKS: dict[str, NetworkConfig] = {
             '0x93a3f880E07B27dacA6Ef2d3C23E77DBd6294487'
         ),
         VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xA89629B41477560d49dd56ef1a59BD214362aCDC'
+            '0x32172Eb14ABC47470530C50aa23fDF1417A52C07'
         ),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
@@ -176,7 +176,7 @@ NETWORKS: dict[str, NetworkConfig] = {
             },
         ),
         OS_TOKEN_REDEEMER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xdF3123dD182b8d3e0266a2dC37eEb8366d149B5A'
+            '0x103A59fD85FB7aC085Cb4D59c805F11A1b5C1bFc'
         ),
     ),
     GNOSIS: NetworkConfig(
