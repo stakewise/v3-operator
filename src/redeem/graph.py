@@ -33,8 +33,6 @@ async def graph_get_allocators(block_number: BlockNumber) -> list[Allocator]:
           }
           id
           address
-          shares
-          assets
           mintedOsTokenShares
           }
         }
