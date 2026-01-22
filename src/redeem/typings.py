@@ -1,7 +1,7 @@
 import dataclasses
 from dataclasses import dataclass
 
-from eth_typing import ChecksumAddress
+from eth_typing import ChecksumAddress, HexStr
 from web3 import Web3
 from web3.types import Wei
 
@@ -57,6 +57,7 @@ class RedeemablePosition:
     owner: ChecksumAddress
     vault: ChecksumAddress
     amount: Wei
+    redeemable_shares: Wei = Wei(0)
 
     def as_dict(self) -> dict:
         return dataclasses.asdict(self)
@@ -64,3 +65,17 @@ class RedeemablePosition:
     @property
     def merkle_leaf(self) -> tuple[ChecksumAddress, ChecksumAddress, Wei]:
         return self.owner, self.vault, self.amount
+
+
+@dataclass
+class RedeemablePositionsMeta:
+    merkle_root: HexStr
+    ipfs_hash: str
+
+
+@dataclass
+class OsTokenPosition:
+    owner: ChecksumAddress
+    vault: ChecksumAddress
+    leaf_shares: Wei
+    shares_to_redeem: Wei

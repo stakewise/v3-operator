@@ -49,7 +49,7 @@ class ValidatorRegistrationSubtask:
             await update_unused_validator_keys_metric(
                 keystore=self.keystore,
             )
-        harvest_params = await get_harvest_params()
+        harvest_params = await get_harvest_params(settings.vault)
 
         vault_assets = await get_vault_assets(harvest_params=harvest_params)
         vault_assets = Gwei(max(0, vault_assets - settings.vault_min_balance_gwei))
@@ -258,7 +258,7 @@ async def register_new_validators(
 
 
 async def get_vault_assets(harvest_params: HarvestParams | None) -> Gwei:
-    vault_assets = await get_withdrawable_assets(harvest_params=harvest_params)
+    vault_assets = await get_withdrawable_assets(settings.vault, harvest_params=harvest_params)
     if settings.network in GNO_NETWORKS:
         # apply GNO -> mGNO exchange rate
         vault_assets = convert_to_mgno(vault_assets)

@@ -25,6 +25,7 @@ class NetworkConfig(BaseNetworkConfig):
     OS_TOKEN_BALANCE_SYMBOL: str
     DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS: ChecksumAddress
     VALIDATORS_CHECKER_CONTRACT_ADDRESS: ChecksumAddress
+    OS_TOKEN_REDEEMER_CONTRACT_ADDRESS: ChecksumAddress
     CONSOLIDATION_CONTRACT_ADDRESS: ChecksumAddress
     WITHDRAWAL_CONTRACT_ADDRESS: ChecksumAddress
     OS_TOKEN_CONTRACT_ADDRESS: ChecksumAddress
@@ -90,6 +91,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xA89629B41477560d49dd56ef1a59BD214362aCDC'
         ),
+        OS_TOKEN_REDEEMER_CONTRACT_ADDRESS=ZERO_CHECKSUM_ADDRESS,
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
         ),
@@ -147,6 +149,9 @@ NETWORKS: dict[str, NetworkConfig] = {
         VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xA89629B41477560d49dd56ef1a59BD214362aCDC'
         ),
+        OS_TOKEN_REDEEMER_CONTRACT_ADDRESS=Web3.to_checksum_address(
+            '0x103A59fD85FB7aC085Cb4D59c805F11A1b5C1bFc'
+        ),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
         ),
@@ -200,6 +205,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xA89629B41477560d49dd56ef1a59BD214362aCDC'
         ),
+        OS_TOKEN_REDEEMER_CONTRACT_ADDRESS=ZERO_CHECKSUM_ADDRESS,
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
         ),

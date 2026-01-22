@@ -206,9 +206,11 @@ def process_network_validator_event(
     return None
 
 
-async def get_withdrawable_assets(harvest_params: HarvestParams | None) -> Wei:
+async def get_withdrawable_assets(
+    vault: ChecksumAddress, harvest_params: HarvestParams | None
+) -> Wei:
     """Fetches vault's available assets for staking."""
-    vault_contract = VaultContract(settings.vault)
+    vault_contract = VaultContract(vault)
     if harvest_params is None:
         return await vault_contract.functions.withdrawableAssets().call()
 

@@ -484,8 +484,10 @@ async def _check_events_logs() -> None:
 
 
 async def _check_vault_withdrawable_assets() -> None:
-    harvest_params = await get_harvest_params()
-    withdrawable_assets = await get_withdrawable_assets(harvest_params=harvest_params)
+    harvest_params = await get_harvest_params(settings.vault)
+    withdrawable_assets = await get_withdrawable_assets(
+        settings.vault, harvest_params=harvest_params
+    )
 
     # Note. We round down assets in the log message because of the case when assets
     # is slightly less than required amount to register validator.

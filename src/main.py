@@ -13,6 +13,7 @@ from src.commands.create_keys import create_keys
 from src.commands.create_wallet import create_wallet
 from src.commands.exit_validators import exit_validators
 from src.commands.init import init
+from src.commands.internal.process_redeemer import process_redeemer
 from src.commands.internal.update_redeemable_positions import (
     update_redeemable_positions,
 )
@@ -61,6 +62,7 @@ cli.add_command(node_install)
 cli.add_command(node_start)
 cli.add_command(node_status)
 cli.add_command(update_redeemable_positions)
+cli.add_command(process_redeemer)
 
 
 if __name__ == '__main__':

@@ -27,6 +27,7 @@ from src.config.settings import (
     settings,
 )
 from src.meta_vault.typings import SubVaultExitRequest
+from src.redeem.typings import RedeemablePositionsMeta
 from src.validators.typings import V2ValidatorEventData
 from src.withdrawals.typings import WithdrawalEvent
 
@@ -484,6 +485,53 @@ class MulticallContract(ContractWrapper):
         return Web3.to_hex(tx_hash)
 
 
+class OsTokenRedeemerContract(ContractWrapper):
+    abi_path = 'abi/IOsTokenRedeemer.json'
+    settings_key = 'OS_TOKEN_REDEEMER_CONTRACT_ADDRESS'
+
+    async def redeemable_positions(self) -> RedeemablePositionsMeta:
+        merkle_root, ipfs_hash = await self.contract.functions.redeemablePositions().call()
+        return RedeemablePositionsMeta(
+            merkle_root=Web3.to_hex(merkle_root),
+            ipfs_hash=ipfs_hash,
+        )
+
+    async def get_exit_queue_cumulative_tickets(self, block_number: BlockNumber) -> int:
+        return await self.contract.functions.getExitQueueCumulativeTickets().call(
+            block_identifier=block_number
+        )
+
+    async def get_exit_queue_missing_assets(self, target_ticket: int) -> Wei:
+        return await self.contract.functions.getExitQueueMissingAssets(target_ticket).call()
+
+    async def nonce(self) -> int:
+        return await self.contract.functions.nonce().call()
+
+    ###
+    async def positions_manager(self) -> ChecksumAddress:
+        return await self.contract.functions.positionsManager().call()
+
+    async def queued_shares(self) -> Wei:
+        return await self.contract.functions.queuedShares().call()
+
+    async def can_process_exit_queue(self, block_number: BlockNumber | None = None) -> bool:
+        return await self.contract.functions.canProcessExitQueue().call(
+            block_identifier=block_number
+        )
+
+    async def leaf_to_processed_shares(
+        self, leaf: bytes, block_number: BlockNumber | None = None
+    ) -> Wei:
+        return await self.contract.functions.leafToProcessedShares(leaf).call(
+            block_identifier=block_number
+        )
+
+    async def process_exit_queue(self) -> HexStr:
+        tx_function = self.contract.functions.processExitQueue()
+        tx_hash = await transaction_gas_wrapper(tx_function)
+        return Web3.to_hex(tx_hash)
+
+
 class ValidatorsCheckerContract(ContractWrapper):
     abi_path = 'abi/IValidatorsChecker.json'
     settings_key = 'VALIDATORS_CHECKER_CONTRACT_ADDRESS'
@@ -570,3 +618,4 @@ keeper_contract = KeeperContract()
 multicall_contract = MulticallContract()
 validators_checker_contract = ValidatorsCheckerContract()
 os_token_vault_controller_contract = OsTokenVaultControllerContract()
+os_token_redeemer_contract = OsTokenRedeemerContract()
