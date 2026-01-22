@@ -13,11 +13,12 @@ from web3.types import Gwei, Wei
 
 from src.common.clients import (
     build_ipfs_upload_clients,
+    close_clients,
     execution_client,
     get_execution_client,
     setup_clients,
 )
-from src.common.contracts import Erc20Contract
+from src.common.contracts import Erc20Contract, os_token_redeemer_contract
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import log_verbose
 from src.config.networks import AVAILABLE_NETWORKS, MAINNET, ZERO_CHECKSUM_ADDRESS
@@ -149,13 +150,23 @@ def update_redeemable_positions(
         sys.exit(1)
 
 
-# pylint: disable-next=too-many-locals
 async def main(arbitrum_endpoint: str | None, min_os_token_position_amount_gwei: Gwei) -> None:
+    setup_logging()
+    await setup_clients()
+    try:
+        await process(
+            arbitrum_endpoint=arbitrum_endpoint,
+            min_os_token_position_amount_gwei=min_os_token_position_amount_gwei,
+        )
+    finally:
+        await close_clients()
+
+
+# pylint: disable-next=too-many-locals
+async def process(arbitrum_endpoint: str | None, min_os_token_position_amount_gwei: Gwei) -> None:
     """
     Fetch redeemable positions, calculate kept os token amounts and upload to IPFS.
     """
-    setup_logging()
-    await setup_clients()
     block_number = await execution_client.eth.block_number
     logger.info('Fetching allocators from the subgraph...')
     allocators = await graph_get_allocators(block_number)
@@ -220,8 +231,17 @@ async def main(arbitrum_endpoint: str | None, min_os_token_position_amount_gwei:
     click.echo(f'Redeemable position uploaded to IPFS: hash={ipfs_hash}')
 
     # calculate merkle root
-    leaves = [r.merkle_leaf for r in redeemable_positions]
-    tree = StandardMerkleTree.of(leaves, ['address', 'address', 'uint160'])
+    nonce = await os_token_redeemer_contract.nonce()
+    leaves = [r.merkle_leaf(nonce) for r in redeemable_positions]
+    tree = StandardMerkleTree.of(
+        leaves,
+        [
+            'uint256',
+            'address',
+            'uint256',
+            'address',
+        ],
+    )
     logger.info('Generated Merkle Tree root: %s', tree.root)
 
 

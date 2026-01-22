@@ -484,6 +484,14 @@ class MulticallContract(ContractWrapper):
         return Web3.to_hex(tx_hash)
 
 
+class OsTokenRedeemerContract(ContractWrapper):
+    abi_path = 'abi/IOsTokenRedeemer.json'
+    settings_key = 'OS_TOKEN_REDEEMER_CONTRACT_ADDRESS'
+
+    async def nonce(self) -> int:
+        return await self.contract.functions.nonce().call()
+
+
 class ValidatorsCheckerContract(ContractWrapper):
     abi_path = 'abi/IValidatorsChecker.json'
     settings_key = 'VALIDATORS_CHECKER_CONTRACT_ADDRESS'
@@ -570,3 +578,4 @@ keeper_contract = KeeperContract()
 multicall_contract = MulticallContract()
 validators_checker_contract = ValidatorsCheckerContract()
 os_token_vault_controller_contract = OsTokenVaultControllerContract()
+os_token_redeemer_contract = OsTokenRedeemerContract()
