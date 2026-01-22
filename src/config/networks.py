@@ -28,7 +28,6 @@ class NetworkConfig(BaseNetworkConfig):
     OS_TOKEN_REDEEMER_CONTRACT_ADDRESS: ChecksumAddress
     CONSOLIDATION_CONTRACT_ADDRESS: ChecksumAddress
     WITHDRAWAL_CONTRACT_ADDRESS: ChecksumAddress
-    OS_TOKEN_VAULT_CONTROLLER_CONTRACT_ADDRESS: ChecksumAddress
     OS_TOKEN_CONTRACT_ADDRESS: ChecksumAddress
     OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS: ChecksumAddress
     WALLET_MIN_BALANCE: Wei
@@ -99,9 +98,6 @@ NETWORKS: dict[str, NetworkConfig] = {
         WITHDRAWAL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x00000961Ef480Eb55e80D19ad83579A64c007002'
         ),
-        OS_TOKEN_VAULT_CONTROLLER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x2A261e60FB14586B474C208b1B7AC6D0f5000306'
-        ),
         OS_TOKEN_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38'
         ),
@@ -162,9 +158,6 @@ NETWORKS: dict[str, NetworkConfig] = {
         WITHDRAWAL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x00000961Ef480Eb55e80D19ad83579A64c007002'
         ),
-        OS_TOKEN_VAULT_CONTROLLER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x140Fc69Eabd77fFF91d9852B612B2323256f7Ac1'
-        ),
         OS_TOKEN_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x7345fC8268459413beE9e9dd327f31283C65Ee7e'
         ),
@@ -218,9 +211,6 @@ NETWORKS: dict[str, NetworkConfig] = {
         ),
         WITHDRAWAL_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x00000961Ef480Eb55e80D19ad83579A64c007002'
-        ),
-        OS_TOKEN_VAULT_CONTROLLER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x60B2053d7f2a0bBa70fe6CDd88FB47b579B9179a'
         ),
         OS_TOKEN_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xF490c80aAE5f2616d3e3BDa2483E30C4CB21d1A0'
