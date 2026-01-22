@@ -33,8 +33,6 @@ async def graph_get_allocators(block_number: BlockNumber) -> list[Allocator]:
           }
           id
           address
-          shares
-          assets
           mintedOsTokenShares
           }
         }
@@ -102,7 +100,7 @@ async def graph_get_os_token_holders(block_number: BlockNumber) -> dict[Checksum
             where:{
               balance_gt: 0
             }
-            orderBy: balance,
+            orderBy: id,
             first: $first
             skip: $skip
           ) {

@@ -1,4 +1,3 @@
-import dataclasses
 from dataclasses import dataclass
 
 from eth_typing import ChecksumAddress, HexStr
@@ -60,11 +59,14 @@ class RedeemablePosition:
     redeemable_shares: Wei = Wei(0)
 
     def as_dict(self) -> dict:
-        return dataclasses.asdict(self)
+        return {
+            'owner': self.owner,
+            'vault': self.vault,
+            'amount': str(self.amount),
+        }
 
-    @property
-    def merkle_leaf(self) -> tuple[ChecksumAddress, ChecksumAddress, Wei]:
-        return self.owner, self.vault, self.amount
+    def merkle_leaf(self, nonce: int) -> tuple[int, ChecksumAddress, Wei, ChecksumAddress]:
+        return nonce, self.vault, self.amount, self.owner
 
 
 @dataclass
