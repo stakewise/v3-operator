@@ -233,7 +233,7 @@ async def _get_withdrawals(
             partial_capacity += validator.withdrawal_capacity - partial_withdrawals
 
     # If enough partials, use only them
-    if partial_capacity >= queued_assets or settings.disable_full_withdrawals:
+    if partial_capacity >= queued_assets or settings.features.disable_full_withdrawals:
         return _get_partial_withdrawals(
             partial_validators=partial_validators,
             validator_partial_withdrawals=validator_partial_withdrawals,

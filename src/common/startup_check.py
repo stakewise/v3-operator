@@ -55,6 +55,7 @@ IPFS_HASH_EXAMPLE = 'QmawUdo17Fvo7xa6ARCUSMV1eoVwPtVuzx8L8Crj2xozWm'
 # pylint: disable-next=too-many-statements
 async def startup_checks() -> None:
     validate_settings()
+    features = settings.features
 
     logger.info('Checking connection to database...')
     db_client.create_db_dir()
@@ -63,7 +64,7 @@ async def startup_checks() -> None:
     logger.info('Connected to database %s.', settings.database)
 
     if settings.run_nodes:
-        # Wait a bit for nodes to start
+        logger.info('Give nodes some time to start...')
         await asyncio.sleep(10)
 
     logger.info('Checking connection to consensus nodes...')
@@ -82,7 +83,7 @@ async def startup_checks() -> None:
     chain_state = await get_chain_finalized_head()
     await wait_execution_catch_up_consensus(chain_state)
 
-    if settings.claim_fee_splitter or settings.process_meta_vault:
+    if features.claim_fee_splitter or features.process_meta_vault:
         logger.info('Checking graph nodes...')
         await wait_for_graph_node_sync_to_chain_head()
 
@@ -108,14 +109,14 @@ async def startup_checks() -> None:
 
     await check_vault_version()
 
-    if settings.enable_metrics:
+    if features.enable_metrics:
         logger.info('Checking metrics server...')
         check_metrics_port()
 
     if (
         settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO
         and settings.keystore_cls_str == LocalKeystore.__name__
-        and not settings.disable_validators_registration
+        and not features.disable_validators_registration
     ):
         logger.info('Checking keystores dir...')
         wait_for_keystores_dir()
@@ -133,12 +134,14 @@ async def startup_checks() -> None:
             'WITHDRAWALS_INTERVAL setting should be less than '
             f'force withdrawals period({protocol_config.force_withdrawals_period} seconds)'
         )
-    if settings.process_meta_vault:
+    if features.process_meta_vault:
         await _check_is_meta_vault()
 
 
 def validate_settings() -> None:
-    if not settings.graph_endpoint and (settings.claim_fee_splitter or settings.process_meta_vault):
+    features = settings.features
+
+    if not settings.graph_endpoint and (features.claim_fee_splitter or features.process_meta_vault):
         raise ClickException('GRAPH_ENDPOINT is missing')
 
     if settings.run_nodes and settings.execution_endpoints != [DEFAULT_EXECUTION_ENDPOINT]:

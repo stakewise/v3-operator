@@ -33,6 +33,35 @@ DEFAULT_CONSENSUS_ENDPOINT = 'http://localhost:5052'
 DEFAULT_EXECUTION_ENDPOINT = 'http://localhost:8545'
 
 
+# pylint: disable-next=too-many-instance-attributes
+class Features:
+    # pylint: disable-next=too-many-arguments
+    def __init__(
+        self,
+        harvest_vault: bool = False,
+        claim_fee_splitter: bool = False,
+        process_meta_vault: bool = False,
+        disable_withdrawals: bool = False,
+        disable_validators_registration: bool = False,
+        disable_validators_funding: bool = False,
+        enable_metrics: bool = False,
+    ):
+        self.harvest_vault = harvest_vault
+        self.claim_fee_splitter = claim_fee_splitter
+        self.process_meta_vault = process_meta_vault
+        self.disable_withdrawals = disable_withdrawals
+        self.disable_validators_registration = disable_validators_registration
+        self.disable_validators_funding = disable_validators_funding
+        self.enable_metrics = enable_metrics
+
+        self.disable_available_validators_warnings: bool = decouple_config(
+            'DISABLE_AVAILABLE_VALIDATORS_WARNINGS', default=False, cast=bool
+        )
+        self.disable_full_withdrawals: bool = decouple_config(
+            'DISABLE_FULL_WITHDRAWALS', default=False, cast=bool
+        )
+
+
 # pylint: disable-next=too-many-public-methods,too-many-instance-attributes
 class Settings(metaclass=Singleton):
     vault: ChecksumAddress
@@ -52,14 +81,8 @@ class Settings(metaclass=Singleton):
     graph_retry_timeout: int
     graph_page_size: int
 
-    harvest_vault: bool
-    claim_fee_splitter: bool
-    process_meta_vault: bool
-    disable_withdrawals: bool
-    disable_validators_registration: bool
-    disable_validators_funding: bool
+    features: Features
     verbose: bool
-    enable_metrics: bool
     metrics_host: str
     metrics_port: int
     metrics_prefix: str
@@ -110,12 +133,6 @@ class Settings(metaclass=Singleton):
         'PRIORITY_FEE_PERCENTILE', default=80.0, cast=float
     )
 
-    disable_available_validators_warnings: bool = decouple_config(
-        'DISABLE_AVAILABLE_VALIDATORS_WARNINGS', default=False, cast=bool
-    )
-    disable_full_withdrawals: bool = decouple_config(
-        'DISABLE_FULL_WITHDRAWALS', default=False, cast=bool
-    )
     wallet_private_key: str | None = decouple_config('WALLET_PRIVATE_KEY', default=None)
 
     min_deposit_amount_gwei: Gwei
@@ -141,14 +158,8 @@ class Settings(metaclass=Singleton):
         execution_endpoints: str = '',
         execution_jwt_secret: str | None = None,
         graph_endpoint: str = '',
-        harvest_vault: bool = False,
-        claim_fee_splitter: bool = False,
-        process_meta_vault: bool = False,
-        disable_withdrawals: bool = False,
-        disable_validators_registration: bool = False,
-        disable_validators_funding: bool = False,
+        features: Features | None = None,
         verbose: bool = False,
-        enable_metrics: bool = False,
         metrics_port: int = DEFAULT_METRICS_PORT,
         metrics_host: str = DEFAULT_METRICS_HOST,
         metrics_prefix: str = DEFAULT_METRICS_PREFIX,
@@ -201,14 +212,8 @@ class Settings(metaclass=Singleton):
 
         self.execution_jwt_secret = execution_jwt_secret
         self.graph_endpoint = graph_endpoint or self.network_config.STAKEWISE_GRAPH_ENDPOINT
-        self.harvest_vault = harvest_vault
-        self.claim_fee_splitter = claim_fee_splitter
-        self.process_meta_vault = process_meta_vault
-        self.disable_withdrawals = disable_withdrawals
-        self.disable_validators_registration = disable_validators_registration
-        self.disable_validators_funding = disable_validators_funding
+        self.features = features or Features()
         self.verbose = verbose
-        self.enable_metrics = enable_metrics
         self.metrics_host = metrics_host
         self.metrics_port = metrics_port
         self.metrics_prefix = metrics_prefix

@@ -19,6 +19,7 @@ from src.config.settings import (
     DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
     LOG_FORMATS,
     LOG_PLAIN,
+    Features,
     settings,
 )
 from src.meta_vault.tasks import ProcessMetaVaultTask
@@ -154,6 +155,9 @@ def process_meta_vaults(
         )
 
     vault_addresses = [to_checksum_address(address) for address in vaults.split(',')]
+    features = Features(
+        process_meta_vault=True,
+    )
     settings.set(
         # mock vault and vault_dir
         vault=vault_addresses[0],
@@ -161,6 +165,7 @@ def process_meta_vaults(
         execution_endpoints=execution_endpoints,
         execution_jwt_secret=execution_jwt_secret,
         graph_endpoint=graph_endpoint,
+        features=features,
         verbose=verbose,
         network=network,
         wallet_file=wallet_file,

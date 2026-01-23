@@ -13,7 +13,7 @@ from src.common.startup_check import check_hardware_requirements
 from src.common.typings import ValidatorType
 from src.common.utils import log_verbose
 from src.config.config import OperatorConfig
-from src.config.settings import settings
+from src.config.settings import Features, settings
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +85,14 @@ def start_local(
     operator_config = OperatorConfig(vault, Path(data_dir))
     operator_config.load()
 
+    features = Features(
+        harvest_vault=harvest_vault,
+        claim_fee_splitter=claim_fee_splitter,
+        disable_withdrawals=disable_withdrawals,
+        disable_validators_registration=disable_validators_registration,
+        disable_validators_funding=disable_validators_funding,
+        enable_metrics=enable_metrics,
+    )
     settings.set(
         vault=vault,
         vault_dir=operator_config.vault_dir,
@@ -92,13 +100,8 @@ def start_local(
         execution_endpoints=execution_endpoints,
         execution_jwt_secret=execution_jwt_secret,
         graph_endpoint=graph_endpoint,
-        harvest_vault=harvest_vault,
-        claim_fee_splitter=claim_fee_splitter,
-        disable_withdrawals=disable_withdrawals,
-        disable_validators_registration=disable_validators_registration,
-        disable_validators_funding=disable_validators_funding,
+        features=features,
         verbose=verbose,
-        enable_metrics=enable_metrics,
         metrics_host=metrics_host,
         metrics_port=metrics_port,
         metrics_prefix=metrics_prefix,

@@ -63,7 +63,7 @@ async def process() -> None:
     if not settings.skip_startup_checks:
         await startup_checks()
 
-    if settings.enable_metrics:
+    if settings.features.enable_metrics:
         await metrics_server()
 
     NetworkValidatorCrud().setup()
@@ -77,7 +77,7 @@ async def process() -> None:
     relayer: RelayerClient | None = None
 
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
-        if settings.disable_validators_registration:
+        if settings.features.disable_validators_registration:
             keystore = None
         else:
             keystore = await load_keystore()
@@ -112,9 +112,9 @@ async def process() -> None:
             MetricsTask().run(interrupt_handler),
             WalletTask().run(interrupt_handler),
         ]
-        if settings.harvest_vault:
+        if settings.features.harvest_vault:
             tasks.append(HarvestTask().run(interrupt_handler))
-        if settings.claim_fee_splitter:
+        if settings.features.claim_fee_splitter:
             tasks.append(SplitRewardTask().run(interrupt_handler))
 
         await asyncio.gather(*tasks)
@@ -139,8 +139,10 @@ class ValidatorTask(BaseTask):
         )
         await scan_validators_events(block_number=chain_head.block_number, is_startup=False)
         subtasks = [self.validator_registration_subtask.process()]
-        if not settings.disable_withdrawals:
+
+        if not settings.features.disable_withdrawals:
             subtasks.append(self.validator_withdrawal_subtask.process())
+
         await asyncio.gather(*subtasks)
 
 

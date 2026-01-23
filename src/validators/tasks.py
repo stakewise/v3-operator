@@ -61,7 +61,7 @@ class ValidatorRegistrationSubtask:
             return
 
         if settings.validator_type == ValidatorType.V1:
-            if not settings.disable_validators_registration:
+            if not settings.features.disable_validators_registration:
                 await register_new_validators(
                     vault_assets=vault_assets,
                     harvest_params=harvest_params,
@@ -70,7 +70,7 @@ class ValidatorRegistrationSubtask:
                 )
             return
 
-        if not settings.disable_validators_funding:
+        if not settings.features.disable_validators_funding:
             try:
                 vault_assets = await self.process_funding(
                     vault_assets=vault_assets,
@@ -80,7 +80,7 @@ class ValidatorRegistrationSubtask:
                 logger.warning('Funding failed: %s', e)
                 return
 
-        if not settings.disable_validators_registration:
+        if not settings.features.disable_validators_registration:
             await register_new_validators(
                 vault_assets=vault_assets,
                 harvest_params=harvest_params,
@@ -203,7 +203,7 @@ async def register_new_validators(
             amounts=validators_amounts[:validators_batch_size],
         )
         if not validators:
-            if not settings.disable_available_validators_warnings:
+            if not settings.features.disable_available_validators_warnings:
                 logger.warning(
                     'There are no available public keys '
                     'to proceed with registration. '
