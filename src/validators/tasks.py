@@ -273,6 +273,7 @@ async def load_genesis_validators() -> None:
     Load consensus network validators from the ipfs dump.
     Used to speed up service startup
     """
+    logger.info('Downloading validators data from IPFS...')
     ipfs_hash = settings.network_config.GENESIS_VALIDATORS_IPFS_HASH
     if not (NetworkValidatorCrud().get_last_network_validator() is None and ipfs_hash):
         return
@@ -284,7 +285,7 @@ async def load_genesis_validators() -> None:
     )
     data = await ipfs_fetch_client.fetch_bytes(ipfs_hash)
     genesis_validators: list[NetworkValidator] = []
-    logger.info('Loading genesis validators...')
+    logger.info('Loading genesis validators into the database...')
     for i in range(0, len(data), 52):
         genesis_validators.append(
             NetworkValidator(
