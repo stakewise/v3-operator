@@ -295,7 +295,7 @@ async def test_get_withdrawals(data_dir):
     assert result == expected
 
     # empty when partial withdrawals capacity is insufficient and full withdrawals disabled
-    settings.disable_full_withdrawals = True
+    settings.features.disable_full_withdrawals = True
 
     chain_head = create_chain_head(epoch=500)
     queued_assets = ether_to_gwei(100)
@@ -323,7 +323,7 @@ async def test_get_withdrawals(data_dir):
         consolidation_target_indexes=set(),
     )
     assert result == {'0x1': ether_to_gwei(8), '0x2': ether_to_gwei(18)}
-    settings.disable_full_withdrawals = False
+    settings.features.disable_full_withdrawals = False
 
     # no partial withdrawals after full withdrawals
     chain_head = create_chain_head(epoch=500)
