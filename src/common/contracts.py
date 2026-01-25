@@ -27,6 +27,7 @@ from src.config.settings import (
     settings,
 )
 from src.meta_vault.typings import SubVaultExitRequest
+from src.redeem.typings import RedeemablePositions
 from src.validators.typings import V2ValidatorEventData
 from src.withdrawals.typings import WithdrawalEvent
 
@@ -488,8 +489,27 @@ class OsTokenRedeemerContract(ContractWrapper):
     abi_path = 'abi/IOsTokenRedeemer.json'
     settings_key = 'OS_TOKEN_REDEEMER_CONTRACT_ADDRESS'
 
+    async def redeemable_positions(self) -> RedeemablePositions:
+        merkle_root, ipfs_hash = await self.contract.functions.redeemablePositions().call()
+        return RedeemablePositions(
+            merkle_root=Web3.to_hex(merkle_root),
+            ipfs_hash=ipfs_hash,
+        )
+
     async def nonce(self) -> int:
         return await self.contract.functions.nonce().call()
+
+    async def get_exit_queue_cumulative_tickets(self, block_number: BlockNumber) -> int:
+        return await self.contract.functions.getExitQueueCumulativeTickets().call(
+            block_identifier=block_number
+        )
+
+    async def get_exit_queue_missing_assets(
+        self, target_ticket: int, block_number: BlockNumber
+    ) -> Wei:
+        return await self.contract.functions.getExitQueueMissingAssets(target_ticket).call(
+            block_identifier=block_number
+        )
 
 
 class ValidatorsCheckerContract(ContractWrapper):

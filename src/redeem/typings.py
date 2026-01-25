@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from eth_typing import ChecksumAddress
+from eth_typing import ChecksumAddress, HexStr
 from web3 import Web3
 from web3.types import Wei
 
@@ -66,3 +66,9 @@ class RedeemablePosition:
 
     def merkle_leaf(self, nonce: int) -> tuple[int, ChecksumAddress, Wei, ChecksumAddress]:
         return nonce, self.vault, self.amount, self.owner
+
+
+@dataclass
+class RedeemablePositions:
+    merkle_root: HexStr
+    ipfs_hash: str
