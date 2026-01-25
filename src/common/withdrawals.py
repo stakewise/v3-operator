@@ -13,6 +13,9 @@ from src.validators.typings import ConsensusValidator
 async def get_pending_partial_withdrawals(
     chain_head: ChainHead, consensus_validators: list[ConsensusValidator]
 ) -> list[PendingPartialWithdrawal]:
+    """
+    Get pending partial withdrawals from both consensus and execution layers.
+    """
     consensus_withdrawals = await consensus_client.get_pending_partial_withdrawals(
         str(chain_head.slot)
     )
