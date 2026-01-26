@@ -6,14 +6,14 @@ from web3 import Web3
 from web3.types import Wei
 
 from src.config.settings import settings
-from src.redeem.api_client import APIClient
+from src.redemptions.api_client import APIClient
 
 
 class TestAPIClient:
     @pytest.mark.usefixtures('fake_settings')
     async def test_zero_when_no_protocol_data(self):
         client = APIClient()
-        with patch('src.redeem.api_client.APIClient._fetch_json', return_value=[]):
+        with patch('src.redemptions.api_client.APIClient._fetch_json', return_value=[]):
             result = await client.get_protocols_locked_os_token(
                 Web3.to_checksum_address('0x1234567890abcdef1234567890abcdef12345678')
             )
@@ -55,7 +55,9 @@ class TestAPIClient:
                 ],
             },
         ]
-        with patch('src.redeem.api_client.APIClient._fetch_json', return_value=mock_protocol_data):
+        with patch(
+            'src.redemptions.api_client.APIClient._fetch_json', return_value=mock_protocol_data
+        ):
             client = APIClient()
             result = await client.get_protocols_locked_os_token(
                 Web3.to_checksum_address('0x1234567890abcdef1234567890abcdef12345678')
@@ -64,10 +66,10 @@ class TestAPIClient:
 
     @pytest.mark.usefixtures('fake_settings')
     async def test_real_data(self):
-        with open('src/redeem/tests/api_samples/protocols.json', 'r') as f:
+        with open('src/redemptions/tests/api_samples/protocols.json', 'r') as f:
             mock_protocol_data = json.load(f)
         with patch(
-            'src.redeem.api_client.APIClient._fetch_json', return_value=mock_protocol_data
+            'src.redemptions.api_client.APIClient._fetch_json', return_value=mock_protocol_data
         ), patch.object(
             settings.network_config,
             'OS_TOKEN_CONTRACT_ADDRESS',
@@ -85,10 +87,10 @@ class TestAPIClient:
 
     @pytest.mark.usefixtures('fake_settings')
     async def test_real_data_with_boost(self):
-        with open('src/redeem/tests/api_samples/with_boost.json', 'r') as f:
+        with open('src/redemptions/tests/api_samples/with_boost.json', 'r') as f:
             mock_protocol_data = json.load(f)
         with patch(
-            'src.redeem.api_client.APIClient._fetch_json', return_value=mock_protocol_data
+            'src.redemptions.api_client.APIClient._fetch_json', return_value=mock_protocol_data
         ), patch.object(
             settings.network_config,
             'OS_TOKEN_CONTRACT_ADDRESS',

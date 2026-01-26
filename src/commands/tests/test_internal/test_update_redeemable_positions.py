@@ -16,8 +16,8 @@ from src.commands.internal.update_redeemable_positions import (
 )
 from src.config.networks import MAINNET, NETWORKS
 from src.config.settings import settings
-from src.redeem.os_token_converter import OsTokenConverter
-from src.redeem.typings import (
+from src.redemptions.os_token_converter import OsTokenConverter
+from src.redemptions.typings import (
     Allocator,
     LeverageStrategyPosition,
     RedeemablePosition,
@@ -355,7 +355,7 @@ class TestUpdateRedeemablePositions:
             patch_os_token_arbitrum_contract_address(),
             patch_os_token_contract_address(os_token_contract_address),
             mock.patch(
-                'src.redeem.graph.graph_client.fetch_pages',
+                'src.redemptions.graph.graph_client.fetch_pages',
                 side_effect=[allocators, leverage_positions, os_token_holders],
             ),
             mock.patch(
@@ -363,7 +363,7 @@ class TestUpdateRedeemablePositions:
                 return_value=os_token_converter,
             ),
             mock.patch(
-                'src.redeem.api_client.APIClient._fetch_json', return_value=mock_protocol_data
+                'src.redemptions.api_client.APIClient._fetch_json', return_value=mock_protocol_data
             ),
             mock.patch(
                 'src.common.clients.IpfsMultiUploadClient.upload_json',
