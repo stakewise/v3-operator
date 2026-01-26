@@ -6,8 +6,8 @@ from sw_utils.tests import faker
 from web3 import Web3
 from web3.types import Wei
 
-from src.redeem.graph import graph_get_allocators
-from src.redeem.typings import Allocator, VaultShares
+from src.redemptions.graph import graph_get_allocators
+from src.redemptions.typings import Allocator, VaultShares
 
 
 @pytest.mark.usefixtures('fake_settings')
@@ -17,7 +17,7 @@ async def test_graph_get_allocators():
     vault_1 = faker.eth_address().lower()
     vault_2 = faker.eth_address().lower()
 
-    with patch('src.redeem.graph.graph_client.fetch_pages', return_value=[]):
+    with patch('src.redemptions.graph.graph_client.fetch_pages', return_value=[]):
         result = await graph_get_allocators(random.randint(1, 1000000))
     assert result == []
 
@@ -25,7 +25,7 @@ async def test_graph_get_allocators():
         {'address': address_1, 'vault': {'id': vault_1}, 'mintedOsTokenShares': '0'},
         {'address': address_2, 'vault': {'id': vault_2}, 'mintedOsTokenShares': '1000'},
     ]
-    with patch('src.redeem.graph.graph_client.fetch_pages', return_value=mock_response):
+    with patch('src.redemptions.graph.graph_client.fetch_pages', return_value=mock_response):
         result = await graph_get_allocators(random.randint(1, 1000000))
     assert result == [
         Allocator(
@@ -40,7 +40,7 @@ async def test_graph_get_allocators():
         {'address': address_1, 'vault': {'id': vault_1}, 'mintedOsTokenShares': '150'},
         {'address': address_1, 'vault': {'id': vault_2}, 'mintedOsTokenShares': '1000'},
     ]
-    with patch('src.redeem.graph.graph_client.fetch_pages', return_value=mock_response):
+    with patch('src.redemptions.graph.graph_client.fetch_pages', return_value=mock_response):
         result = await graph_get_allocators(random.randint(1, 1000000))
     assert result == [
         Allocator(

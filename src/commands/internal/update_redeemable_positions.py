@@ -24,14 +24,21 @@ from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import log_verbose
 from src.config.networks import AVAILABLE_NETWORKS, MAINNET, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
-from src.redeem.api_client import API_SLEEP_TIMEOUT, APIClient
-from src.redeem.graph import (
+from src.redemptions.api_client import API_SLEEP_TIMEOUT, APIClient
+from src.redemptions.graph import (
     graph_get_allocators,
     graph_get_leverage_positions,
     graph_get_os_token_holders,
 )
-from src.redeem.os_token_converter import OsTokenConverter, create_os_token_converter
-from src.redeem.typings import Allocator, LeverageStrategyPosition, RedeemablePosition
+from src.redemptions.os_token_converter import (
+    OsTokenConverter,
+    create_os_token_converter,
+)
+from src.redemptions.typings import (
+    Allocator,
+    LeverageStrategyPosition,
+    RedeemablePosition,
+)
 
 logger = logging.getLogger(__name__)
 

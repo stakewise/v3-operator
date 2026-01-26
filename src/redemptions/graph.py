@@ -7,7 +7,7 @@ from web3 import Web3
 from web3.types import ChecksumAddress, Wei
 
 from src.common.clients import graph_client
-from src.redeem.typings import Allocator, LeverageStrategyPosition, VaultShares
+from src.redemptions.typings import Allocator, LeverageStrategyPosition, VaultShares
 
 logger = logging.getLogger(__name__)
 
