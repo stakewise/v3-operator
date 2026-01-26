@@ -6,7 +6,7 @@ import pytest
 from click.testing import CliRunner
 from sw_utils.tests import faker
 from web3 import Web3
-from web3.types import Wei
+from web3.types import ChecksumAddress, Wei
 
 from src.commands.internal.update_redeemable_positions import (
     _reduce_boosted_amount,
@@ -241,11 +241,12 @@ class TestUpdateRedeemablePositions:
         execution_endpoints: str,
         runner: CliRunner,
     ):
-        address_1 = faker.eth_address()
-        address_2 = faker.eth_address()
-        vault_1 = faker.eth_address()
-        vault_2 = faker.eth_address()
-        # mocked data
+        # hardcoded to check merkle root
+        address_1 = '0x2242b8ab71521f6abEE4B4D83195E70AcB08727a'
+        address_2 = '0x24c8DBBC3d1C35C4159787b1f7a62bea1A814242'
+        vault_1 = '0xEd735de172272C03CA6F60c1d90D83D9CFB46D22'
+        vault_2 = '0xe8Ea1025b49D2B51C536cFBc0833F021ba4c6903'
+        os_token_contract_address = NETWORKS[MAINNET].OS_TOKEN_CONTRACT_ADDRESS
         allocators = [
             {
                 'vault': {
@@ -253,8 +254,16 @@ class TestUpdateRedeemablePositions:
                 },
                 'id': address_1.lower(),
                 'address': address_1,
-                'mintedOsTokenShares': 1,
-            }
+                'mintedOsTokenShares': Web3.to_wei(10, 'ether'),
+            },
+            {
+                'vault': {
+                    'id': vault_2.lower(),
+                },
+                'id': address_2.lower(),
+                'address': address_2,
+                'mintedOsTokenShares': Web3.to_wei(12, 'ether'),
+            },
         ]
         leverage_positions = [
             {
@@ -263,31 +272,20 @@ class TestUpdateRedeemablePositions:
                     'id': vault_1.lower(),
                 },
                 'proxy': faker.eth_address(),
-                'osTokenShares': '1000',
-                'exitingOsTokenShares': '500',
-                'assets': '200',
-                'exitingAssets': '100',
-            },
-            {
-                'user': address_2,
-                'vault': {
-                    'id': vault_2.lower(),
-                },
-                'proxy': faker.eth_address(),
-                'osTokenShares': '3000',
-                'exitingOsTokenShares': '0',
-                'assets': '100',
-                'exitingAssets': '0',
+                'osTokenShares': Web3.to_wei(1, 'ether'),
+                'exitingOsTokenShares': Web3.to_wei(0.1, 'ether'),
+                'assets': Web3.to_wei(0.1, 'ether'),
+                'exitingAssets': Web3.to_wei(0.05, 'ether'),
             },
         ]
         os_token_holders = [
             {
                 'id': address_1.lower(),
-                'balance': '1000',
+                'balance': Web3.to_wei(3, 'ether'),
             },
             {
                 'id': address_2.lower(),
-                'balance': '5000',
+                'balance': Web3.to_wei(12, 'ether'),
             },
         ]
         mock_protocol_data = [
@@ -300,7 +298,7 @@ class TestUpdateRedeemablePositions:
                                 {
                                     'id': '0x1234567890abcdef1234567890abcdef12345678',
                                     'chain': 'eth',
-                                    'amount': '57',
+                                    'amount': '0.5',
                                 }
                             ]
                         }
@@ -308,15 +306,31 @@ class TestUpdateRedeemablePositions:
                 ],
             },
             {
-                'id': 'other',
+                'id': 'aave3',
                 'portfolio_item_list': [
                     {
                         'detail': {
                             'supply_token_list': [
                                 {
-                                    'id': settings.network_config.OS_TOKEN_CONTRACT_ADDRESS,
+                                    'id': os_token_contract_address,
                                     'chain': 'eth',
-                                    'amount': '555',
+                                    'amount': '2',
+                                }
+                            ]
+                        }
+                    }
+                ],
+            },
+            {
+                'id': 'balancer',
+                'portfolio_item_list': [
+                    {
+                        'detail': {
+                            'supply_token_list': [
+                                {
+                                    'id': os_token_contract_address,
+                                    'chain': 'eth',
+                                    'amount': '0.2',
                                 }
                             ]
                         }
@@ -324,7 +338,7 @@ class TestUpdateRedeemablePositions:
                 ],
             },
         ]
-        os_token_converter = OsTokenConverter(105, 100)
+        os_token_converter = OsTokenConverter(110, 100)
         args = [
             '--network',
             MAINNET,
@@ -335,11 +349,11 @@ class TestUpdateRedeemablePositions:
             '--verbose',
         ]
         with (
-            patch_ipfs_upload(),
             patch_latest_block(11),
-            patch_get_erc_balance(11),
+            patch_get_erc_balance(Web3.to_wei(1, 'ether')),
             patch_os_token_redeemer_contract_nonce(6),
             patch_os_token_arbitrum_contract_address(),
+            patch_os_token_contract_address(os_token_contract_address),
             mock.patch(
                 'src.redeem.graph.graph_client.fetch_pages',
                 side_effect=[allocators, leverage_positions, os_token_holders],
@@ -351,20 +365,20 @@ class TestUpdateRedeemablePositions:
             mock.patch(
                 'src.redeem.api_client.APIClient._fetch_json', return_value=mock_protocol_data
             ),
+            mock.patch(
+                'src.common.clients.IpfsMultiUploadClient.upload_json',
+                return_value=faker.ipfs_hash(),
+            ) as ipfs_mock,
         ):
-            result = runner.invoke(update_redeemable_positions, args)
+            result = runner.invoke(update_redeemable_positions, args, input='\n')
             assert result.exit_code == 0
-            assert '' == result.output.strip()
-
-
-@contextlib.contextmanager
-def patch_ipfs_upload():
-    with mock.patch(
-        'src.commands.internal.update_redeemable_positions.build_ipfs_upload_clients',
-        new=AsyncMock(),
-    ) as ipfs_mock:
-        ipfs_mock.upload_json = 'bafk...'
-        yield
+            ipfs_mock.assert_called_once_with(
+                [{'owner': address_1, 'vault': vault_1, 'amount': '2563636363636363637'}]
+            )
+            assert (
+                '0x9bb2ee30813b89e23e6bbfa1b78706c008f71489750571c81d3b33289647bec1'
+                in result.output.strip()
+            )
 
 
 @contextlib.contextmanager
@@ -391,6 +405,16 @@ def patch_os_token_arbitrum_contract_address():
         settings.network_config,
         'OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS',
         NETWORKS[MAINNET].OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS,
+    ):
+        yield
+
+
+@contextlib.contextmanager
+def patch_os_token_contract_address(address: ChecksumAddress):
+    with mock.patch.object(
+        settings.network_config,
+        'OS_TOKEN_CONTRACT_ADDRESS',
+        address,
     ):
         yield
 

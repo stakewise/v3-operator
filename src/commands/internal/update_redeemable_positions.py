@@ -262,7 +262,7 @@ async def process(arbitrum_endpoint: str | None, min_os_token_position_amount_gw
             'address',
         ],
     )
-    logger.info('Generated Merkle Tree root: %s', tree.root)
+    click.echo(f'Generated Merkle Tree root: {tree.root}')
 
 
 async def get_kept_shares(
