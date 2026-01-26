@@ -210,7 +210,7 @@ async def startup_checks(meta_vault_addresses: list[ChecksumAddress]) -> None:
     logger.info('Checking graph nodes...')
     await wait_for_graph_node_sync_to_chain_head()
 
-    logger.info('Checking vault address %s...', settings.vault)
+    logger.info('Checking meta vault addresses %s...', ', '.join(meta_vault_addresses))
     await _check_meta_vaults(meta_vault_addresses)
 
     logger.info('Checking wallet balance %s...', wallet.address)
