@@ -210,12 +210,6 @@ def consolidate(
             ' --source-public-keys-file or --source-public-keys.'
         )
 
-    if not any([source_public_keys, source_public_keys_file]) and target_public_key:
-        raise click.ClickException(
-            'One of these parameters must be provided with target-public-key:'
-            ' --source-public-keys-file or --source-public-keys.'
-        )
-
     if source_public_keys_file:
         source_public_keys = _load_public_keys(source_public_keys_file)
 
@@ -659,6 +653,13 @@ async def _find_target_source_public_keys(
             )
         if not target_validator.is_compounding:
             # switch the 0x01 to 0x02
+            max_activation_epoch = chain_head.epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
+            if target_validator.activation_epoch > max_activation_epoch:
+                raise click.ClickException(
+                    f'Validator {target_public_key} is not active enough for consolidation. '
+                    f'It must be active for at least '
+                    f'{settings.network_config.SHARD_COMMITTEE_PERIOD} epochs before consolidation.'
+                )
             return [(target_validator, target_validator)]
     else:
         target_validator_candidates = [val for val in validator_candidates if val.is_compounding]
