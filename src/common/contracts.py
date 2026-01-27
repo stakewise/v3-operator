@@ -27,7 +27,7 @@ from src.config.settings import (
     settings,
 )
 from src.meta_vault.typings import SubVaultExitRequest
-from src.redeem.typings import RedeemablePositionsMeta
+from src.redemptions.typings import RedeemablePositionsMeta
 from src.validators.typings import V2ValidatorEventData
 from src.withdrawals.typings import WithdrawalEvent
 
@@ -408,6 +408,9 @@ class MetaVaultContract(ContractWrapper):
     async def get_exit_queue_index(self, position_ticket: int) -> int:
         return await self.contract.functions.getExitQueueIndex(position_ticket).call()
 
+    async def sub_vaults_rewards_nonce(self) -> HexStr:
+        return await self.contract.functions.subVaultsRewardsNonce().call()
+
     async def deposit_to_sub_vaults(self) -> HexStr:
         tx_function = self.contract.functions.depositToSubVaults()
         tx_hash = await transaction_gas_wrapper(tx_function)
@@ -489,8 +492,10 @@ class OsTokenRedeemerContract(ContractWrapper):
     abi_path = 'abi/IOsTokenRedeemer.json'
     settings_key = 'OS_TOKEN_REDEEMER_CONTRACT_ADDRESS'
 
-    async def redeemable_positions(self) -> RedeemablePositionsMeta:
-        merkle_root, ipfs_hash = await self.contract.functions.redeemablePositions().call()
+    async def redeemable_positions(self, block_number: BlockNumber) -> RedeemablePositionsMeta:
+        merkle_root, ipfs_hash = await self.contract.functions.redeemablePositions().call(
+            block_identifier=block_number
+        )
         return RedeemablePositionsMeta(
             merkle_root=Web3.to_hex(merkle_root),
             ipfs_hash=ipfs_hash,
@@ -504,15 +509,14 @@ class OsTokenRedeemerContract(ContractWrapper):
     async def get_exit_queue_missing_assets(self, target_ticket: int) -> Wei:
         return await self.contract.functions.getExitQueueMissingAssets(target_ticket).call()
 
-    async def nonce(self) -> int:
-        return await self.contract.functions.nonce().call()
+    async def nonce(self, block_number: BlockNumber | None = None) -> int:
+        return await self.contract.functions.nonce().call(block_identifier=block_number)
 
-    ###
     async def positions_manager(self) -> ChecksumAddress:
         return await self.contract.functions.positionsManager().call()
 
-    async def queued_shares(self) -> Wei:
-        return await self.contract.functions.queuedShares().call()
+    async def queued_shares(self, block_number: BlockNumber | None = None) -> Wei:
+        return await self.contract.functions.queuedShares().call(block_identifier=block_number)
 
     async def can_process_exit_queue(self, block_number: BlockNumber | None = None) -> bool:
         return await self.contract.functions.canProcessExitQueue().call(
@@ -530,6 +534,13 @@ class OsTokenRedeemerContract(ContractWrapper):
         tx_function = self.contract.functions.processExitQueue()
         tx_hash = await transaction_gas_wrapper(tx_function)
         return Web3.to_hex(tx_hash)
+
+    async def redeem_sub_vaults_assets(
+        self, vault_address: ChecksumAddress, assets_to_redeem: Wei
+    ) -> Wei:
+        tx_function = self.contract.functions.redeemSubVaultsAssets(vault_address, assets_to_redeem)
+        tx = await transaction_gas_wrapper(tx_function)
+        return Wei(Web3.to_int(tx))
 
 
 class ValidatorsCheckerContract(ContractWrapper):
