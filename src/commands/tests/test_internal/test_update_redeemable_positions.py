@@ -1,6 +1,5 @@
 import contextlib
-from unittest import mock
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from click.testing import CliRunner
@@ -23,6 +22,8 @@ from src.redemptions.typings import (
     RedeemablePosition,
     VaultShares,
 )
+
+os_token_contract_address = NETWORKS[MAINNET].OS_TOKEN_CONTRACT_ADDRESS
 
 
 def test_create_redeemable_positions():
@@ -235,7 +236,7 @@ def test_reduces_boosted_amount():
 @pytest.mark.usefixtures('_init_config')
 class TestUpdateRedeemablePositions:
     @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
-    async def test_update_redeemable_positions(
+    async def test_basic_call(
         self,
         vault_address: str,
         execution_endpoints: str,
@@ -246,7 +247,6 @@ class TestUpdateRedeemablePositions:
         address_2 = '0x24c8DBBC3d1C35C4159787b1f7a62bea1A814242'
         vault_1 = '0xEd735de172272C03CA6F60c1d90D83D9CFB46D22'
         vault_2 = '0xe8Ea1025b49D2B51C536cFBc0833F021ba4c6903'
-        os_token_contract_address = NETWORKS[MAINNET].OS_TOKEN_CONTRACT_ADDRESS
         allocators = [
             {
                 'vault': {
@@ -354,18 +354,13 @@ class TestUpdateRedeemablePositions:
             patch_os_token_redeemer_contract_nonce(6),
             patch_os_token_arbitrum_contract_address(),
             patch_os_token_contract_address(os_token_contract_address),
-            mock.patch(
+            patch_os_token_converter(os_token_converter),
+            patch_api_cliente(mock_protocol_data),
+            patch(
                 'src.redemptions.graph.graph_client.fetch_pages',
                 side_effect=[allocators, leverage_positions, os_token_holders],
             ),
-            mock.patch(
-                'src.commands.internal.update_redeemable_positions.create_os_token_converter',
-                return_value=os_token_converter,
-            ),
-            mock.patch(
-                'src.redemptions.api_client.APIClient._fetch_json', return_value=mock_protocol_data
-            ),
-            mock.patch(
+            patch(
                 'src.common.clients.IpfsMultiUploadClient.upload_json',
                 return_value=faker.ipfs_hash(),
             ) as ipfs_mock,
@@ -380,10 +375,126 @@ class TestUpdateRedeemablePositions:
                 in result.output.strip()
             )
 
+    @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
+    async def test_full_position(
+        self,
+        vault_address: str,
+        execution_endpoints: str,
+        runner: CliRunner,
+    ):
+        # hardcoded to check merkle root
+        address_1 = '0x2242b8ab71521f6abEE4B4D83195E70AcB08727a'
+        vault_1 = '0xEd735de172272C03CA6F60c1d90D83D9CFB46D22'
+        allocators = [
+            {
+                'vault': {
+                    'id': vault_1.lower(),
+                },
+                'id': address_1.lower(),
+                'address': address_1,
+                'mintedOsTokenShares': Web3.to_wei(10, 'ether'),
+            },
+        ]
+        leverage_positions = []
+        os_token_holders = []
+        mock_protocol_data = []
+        os_token_converter = OsTokenConverter(110, 100)
+        args = [
+            '--network',
+            MAINNET,
+            '--execution-endpoints',
+            execution_endpoints,
+            '--arbitrum-endpoint',
+            execution_endpoints,
+            '--verbose',
+        ]
+        with (
+            patch_latest_block(11),
+            patch_get_erc_balance(Web3.to_wei(0, 'ether')),
+            patch_os_token_redeemer_contract_nonce(6),
+            patch_os_token_arbitrum_contract_address(),
+            patch_os_token_contract_address(os_token_contract_address),
+            patch_os_token_converter(os_token_converter),
+            patch_api_cliente(mock_protocol_data),
+            patch(
+                'src.redemptions.graph.graph_client.fetch_pages',
+                side_effect=[allocators, leverage_positions, os_token_holders],
+            ),
+            patch(
+                'src.common.clients.IpfsMultiUploadClient.upload_json',
+                return_value=faker.ipfs_hash(),
+            ) as ipfs_mock,
+        ):
+            result = runner.invoke(update_redeemable_positions, args, input='\n')
+            assert result.exit_code == 0
+            ipfs_mock.assert_called_once_with(
+                [{'owner': address_1, 'vault': vault_1, 'amount': '10000000000000000000'}]
+            )
+            assert (
+                '0x9b4419ebea301ed07e591b477e69499f35e4c3cd69538c2f22a6a014b06e5bbd'
+                in result.output.strip()
+            )
+
+    @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
+    async def test_min_os_token_position_amount(
+        self,
+        vault_address: str,
+        execution_endpoints: str,
+        runner: CliRunner,
+    ):
+        # hardcoded to check merkle root
+        address_1 = '0x2242b8ab71521f6abEE4B4D83195E70AcB08727a'
+        vault_1 = '0xEd735de172272C03CA6F60c1d90D83D9CFB46D22'
+        allocators = [
+            {
+                'vault': {
+                    'id': vault_1.lower(),
+                },
+                'id': address_1.lower(),
+                'address': address_1,
+                'mintedOsTokenShares': Web3.to_wei(5, 'ether'),
+            },
+        ]
+        leverage_positions = []
+        os_token_holders = []
+        mock_protocol_data = []
+        os_token_converter = OsTokenConverter(110, 100)
+        args = [
+            '--network',
+            MAINNET,
+            '--execution-endpoints',
+            execution_endpoints,
+            '--arbitrum-endpoint',
+            execution_endpoints,
+            '--verbose',
+            '--min-os-token-position-amount-gwei',
+            6 * 10**9,  # 6 ETH in Gwei
+        ]
+        with (
+            patch_latest_block(11),
+            patch_get_erc_balance(Web3.to_wei(0, 'ether')),
+            patch_os_token_redeemer_contract_nonce(6),
+            patch_os_token_arbitrum_contract_address(),
+            patch_os_token_contract_address(os_token_contract_address),
+            patch_os_token_converter(os_token_converter),
+            patch_api_cliente(mock_protocol_data),
+            patch(
+                'src.redemptions.graph.graph_client.fetch_pages',
+                side_effect=[allocators, leverage_positions, os_token_holders],
+            ),
+            patch(
+                'src.common.clients.IpfsMultiUploadClient.upload_json',
+                return_value=faker.ipfs_hash(),
+            ) as ipfs_mock,
+        ):
+            result = runner.invoke(update_redeemable_positions, args, input='\n')
+            assert result.exit_code == 0
+            ipfs_mock.assert_not_called()
+
 
 @contextlib.contextmanager
 def patch_latest_block(block_number):
-    with mock.patch(
+    with patch(
         'src.commands.internal.update_redeemable_positions.execution_client', new=AsyncMock()
     ) as execution_client_mock:
         execution_client_mock.eth.get_block_number.return_value = block_number
@@ -391,8 +502,17 @@ def patch_latest_block(block_number):
 
 
 @contextlib.contextmanager
+def patch_os_token_converter(os_token_converter: OsTokenConverter):
+    with patch(
+        'src.commands.internal.update_redeemable_positions.create_os_token_converter',
+        return_value=os_token_converter,
+    ):
+        yield
+
+
+@contextlib.contextmanager
 def patch_get_erc_balance(balance):
-    with mock.patch(
+    with patch(
         'src.commands.internal.update_redeemable_positions.Erc20Contract.get_balance',
         return_value=balance,
     ):
@@ -401,7 +521,7 @@ def patch_get_erc_balance(balance):
 
 @contextlib.contextmanager
 def patch_os_token_arbitrum_contract_address():
-    with mock.patch.object(
+    with patch.object(
         settings.network_config,
         'OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS',
         NETWORKS[MAINNET].OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS,
@@ -411,7 +531,7 @@ def patch_os_token_arbitrum_contract_address():
 
 @contextlib.contextmanager
 def patch_os_token_contract_address(address: ChecksumAddress):
-    with mock.patch.object(
+    with patch.object(
         settings.network_config,
         'OS_TOKEN_CONTRACT_ADDRESS',
         address,
@@ -421,8 +541,14 @@ def patch_os_token_contract_address(address: ChecksumAddress):
 
 @contextlib.contextmanager
 def patch_os_token_redeemer_contract_nonce(nonce):
-    with mock.patch(
+    with patch(
         'src.commands.internal.update_redeemable_positions.os_token_redeemer_contract.nonce',
         return_value=nonce,
     ):
+        yield
+
+
+@contextlib.contextmanager
+def patch_api_cliente(mock_protocol_data):
+    with patch('src.redemptions.api_client.APIClient._fetch_json', return_value=mock_protocol_data):
         yield
