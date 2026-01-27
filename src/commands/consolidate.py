@@ -684,7 +684,7 @@ async def _find_target_source_public_keys(
 
     if target_public_key:
         raise click.ClickException(
-            'Target validator is almost full, cannot consolidate any source validator...'
+            'Target validator has insufficient capacity to consolidate any source validators.'
         )
 
     # Target validator is almost full, switch the oldest 0x01 to 0x02
