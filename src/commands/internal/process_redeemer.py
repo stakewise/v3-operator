@@ -7,6 +7,8 @@ from typing import cast
 
 import click
 from eth_typing import BlockNumber, ChecksumAddress, HexStr
+from multiproof import StandardMerkleTree
+from multiproof.standard import MultiProof
 from sw_utils import InterruptHandler
 from web3 import Web3
 from web3.exceptions import ContractLogicError, Web3RPCError
@@ -33,7 +35,7 @@ from src.common.wallet import wallet
 from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
 from src.redemptions.os_token_converter import create_os_token_converter
-from src.redemptions.typings import OsTokenPosition, RedeemablePosition
+from src.redemptions.typings import RedeemablePosition
 from src.validators.execution import get_withdrawable_assets
 
 logger = logging.getLogger(__name__)
@@ -244,11 +246,11 @@ async def process(block_number: BlockNumber) -> None:
                     shares_to_redeem,
                 )
                 positions_to_redeem.append(
-                    OsTokenPosition(
+                    RedeemablePosition(
                         vault=position.vault,
                         owner=position.owner,
-                        leaf_shares=position.amount,
-                        shares_to_redeem=shares_to_redeem,
+                        amount=position.amount,
+                        redeemable_shares=shares_to_redeem,
                     )
                 )
                 withdrawable_assets = Wei(withdrawable_assets - redeemable_assets)
@@ -258,6 +260,7 @@ async def process(block_number: BlockNumber) -> None:
     tx_hash = await execute_redemption(
         positions_to_redeem=positions_to_redeem,
         vault_to_harvest_params=vault_to_harvest_params,
+        nonce=nonce,
     )
     logger.info(
         'Successfully redeemed %s OsToken positions. Transaction hash: %s',
@@ -267,9 +270,15 @@ async def process(block_number: BlockNumber) -> None:
 
 
 async def execute_redemption(
-    positions_to_redeem: list[OsTokenPosition],
+    positions_to_redeem: list[RedeemablePosition],
     vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None],
+    nonce: int,
 ) -> HexStr | None:
+
+    multiproof = _get_multi_proof(
+        positions_to_redeem=positions_to_redeem,
+        nonce=nonce,
+    )
     calls = []
 
     for vault in set(pos.vault for pos in positions_to_redeem):
@@ -277,17 +286,15 @@ async def execute_redemption(
         if harvest_params:
             vault_contract = VaultContract(vault)
             calls.append(
-                [
-                    (
-                        vault_contract.contract_address,
-                        vault_contract.get_update_state_call(harvest_params),
-                    )
-                ]
+                (
+                    vault_contract.contract_address,
+                    vault_contract.get_update_state_call(harvest_params),
+                )
             )
 
     redeem_os_token_positions_call = os_token_redeemer_contract.encode_abi(
         fn_name='redeemOsTokenPositions',
-        args=[positions_to_redeem, proof, proofFlags],
+        args=[positions_to_redeem, multiproof.proof, multiproof.proof_flags],
     )
     calls.append((os_token_redeemer_contract.contract_address, redeem_os_token_positions_call))
     try:
@@ -355,3 +362,21 @@ async def _startup_check() -> None:
         raise RuntimeError(
             f'The Position Manager role must be assigned to the address {wallet.account.address}.'
         )
+
+
+def _get_multi_proof(
+    nonce: int,
+    positions_to_redeem: list[RedeemablePosition],
+) -> MultiProof[tuple[bytes, int]]:
+    leaves = [r.merkle_leaf(nonce) for r in positions_to_redeem]
+    tree = StandardMerkleTree.of(
+        leaves,
+        [
+            'uint256',
+            'address',
+            'uint256',
+            'address',
+        ],
+    )
+    multi_proof = tree.get_multi_proof(leaves)
+    return multi_proof

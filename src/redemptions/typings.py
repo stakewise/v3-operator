@@ -80,11 +80,3 @@ class RedeemablePosition:
 class RedeemablePositionsMeta:
     merkle_root: HexStr
     ipfs_hash: str
-
-
-@dataclass
-class OsTokenPosition:
-    owner: ChecksumAddress
-    vault: ChecksumAddress
-    leaf_shares: Wei
-    shares_to_redeem: Wei
