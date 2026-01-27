@@ -210,6 +210,12 @@ def consolidate(
             ' --source-public-keys-file or --source-public-keys.'
         )
 
+    if not any([source_public_keys, source_public_keys_file]) and target_public_key:
+        raise click.ClickException(
+            'One of these parameters must be provided with target-public-key:'
+            ' --source-public-keys-file or --source-public-keys.'
+        )
+
     if source_public_keys_file:
         source_public_keys = _load_public_keys(source_public_keys_file)
 
@@ -327,6 +333,7 @@ async def process(
         target_source = await _find_target_source_public_keys(
             vault_address=vault_address,
             chain_head=chain_head,
+            target_public_key=target_public_key,
             exclude_public_keys=exclude_public_keys,
         )
         if not target_source:
@@ -578,10 +585,11 @@ def _load_public_keys(public_keys_file: Path) -> list[HexStr]:
     return public_keys
 
 
-# pylint: disable-next=too-many-locals
+# pylint: disable-next=too-many-locals,too-many-branches
 async def _find_target_source_public_keys(
     vault_address: ChecksumAddress,
     chain_head: ChainHead,
+    target_public_key: HexStr | None,
     exclude_public_keys: set[HexStr],
 ) -> list[tuple[ConsensusValidator, ConsensusValidator]]:
     """
@@ -629,14 +637,37 @@ async def _find_target_source_public_keys(
         return []
 
     source_validators.sort(key=lambda val: val.activation_epoch)
-    target_validator_candidates = [val for val in validator_candidates if val.is_compounding]
+    if target_public_key:
+        target_validators = [val for val in all_validators if val.public_key == target_public_key]
+        if not target_validators:
+            raise click.ClickException(
+                f'Validator {target_public_key} not found in the consensus layer.'
+            )
+        target_validator = target_validators[0]
+        if target_validator.status in EXITING_STATUSES:
+            raise click.ClickException(
+                f'Target validator {target_public_key} is in exiting '
+                f'status {target_validator.status.value}.'
+            )
+        if target_validator.index in consolidating_indexes:
+            raise click.ClickException(
+                f'Target validator {target_public_key} is consolidating to another validator.'
+            )
+        if target_validator.public_key in exclude_public_keys:
+            raise click.ClickException(
+                f'Target validator {target_public_key} is excluded from consolidation.'
+            )
+        if not target_validator.is_compounding:
+            # switch the 0x01 to 0x02
+            return [(target_validator, target_validator)]
+    else:
+        target_validator_candidates = [val for val in validator_candidates if val.is_compounding]
+        if not target_validator_candidates:
+            # there are no 0x02 validators, switch the oldest 0x01 to 0x02
+            return [(source_validators[0], source_validators[0])]
 
-    if not target_validator_candidates:
-        # there are no 0x02 validators, switch the oldest 0x01 to 0x02
-        return [(source_validators[0], source_validators[0])]
-
-    # there is at least one 0x02 validator, top up the one with smallest balance
-    target_validator = min(target_validator_candidates, key=lambda val: val.balance)
+        # there is at least one 0x02 validator, top up the one with smallest balance
+        target_validator = min(target_validator_candidates, key=lambda val: val.balance)
 
     selected_source_validators: list[ConsensusValidator] = []
     target_balance = target_validator.balance
@@ -649,6 +680,11 @@ async def _find_target_source_public_keys(
 
     if selected_source_validators:
         return [(target_validator, val) for val in selected_source_validators]
+
+    if target_public_key:
+        raise click.ClickException(
+            'Target validator is almost full, cannot consolidate any source validator...'
+        )
 
     # Target validator is almost full, switch the oldest 0x01 to 0x02
     return [(source_validators[0], source_validators[0])]
