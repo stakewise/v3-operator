@@ -54,7 +54,6 @@ class Settings(metaclass=Singleton):
 
     harvest_vault: bool
     claim_fee_splitter: bool
-    process_meta_vault: bool
     disable_withdrawals: bool
     disable_validators_registration: bool
     disable_validators_funding: bool
@@ -143,7 +142,6 @@ class Settings(metaclass=Singleton):
         graph_endpoint: str = '',
         harvest_vault: bool = False,
         claim_fee_splitter: bool = False,
-        process_meta_vault: bool = False,
         disable_withdrawals: bool = False,
         disable_validators_registration: bool = False,
         disable_validators_funding: bool = False,
@@ -203,7 +201,6 @@ class Settings(metaclass=Singleton):
         self.graph_endpoint = graph_endpoint or self.network_config.STAKEWISE_GRAPH_ENDPOINT
         self.harvest_vault = harvest_vault
         self.claim_fee_splitter = claim_fee_splitter
-        self.process_meta_vault = process_meta_vault
         self.disable_withdrawals = disable_withdrawals
         self.disable_validators_registration = disable_validators_registration
         self.disable_validators_funding = disable_validators_funding
