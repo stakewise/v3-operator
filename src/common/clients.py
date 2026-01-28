@@ -132,7 +132,9 @@ ipfs_fetch_client = IpfsLazyFetchClient()
 async def setup_clients() -> None:
     await execution_client.setup()  # type: ignore
     await execution_non_retry_client.setup()  # type: ignore
-    await graph_client.setup()
+
+    if settings.graph_endpoint:
+        await graph_client.setup()
 
 
 async def close_clients() -> None:
@@ -140,6 +142,9 @@ async def close_clients() -> None:
     await execution_client.provider.disconnect()
     await execution_non_retry_client.provider.disconnect()
     await consensus_client.disconnect()
-    await graph_client.disconnect()
+
+    if settings.graph_endpoint:
+        await graph_client.disconnect()
+
     # waiting to ensure all web3 evicted sessions are closed
     await asyncio.sleep(max(settings.consensus_timeout, settings.execution_timeout))
