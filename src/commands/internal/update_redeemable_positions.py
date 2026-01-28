@@ -374,7 +374,7 @@ def create_redeemable_positions(
     for allocator in allocators:
         allocator_kept_shares = kept_shares.get(allocator.address, Wei(0))
         redeemable_amount = max(0, allocator.total_shares - allocator_kept_shares)
-        if redeemable_amount <= 0:
+        if redeemable_amount == 0:
             continue
 
         allocated_amount = 0
@@ -382,7 +382,7 @@ def create_redeemable_positions(
         for index, (vault_address, proportion) in enumerate(vaults_proportions):
             # dust handling
             if index == len(vaults_proportions) - 1:
-                vault_amount = int(redeemable_amount - allocated_amount)
+                vault_amount = max(0, int(redeemable_amount - allocated_amount))
             else:
                 vault_amount = int(redeemable_amount * proportion)
 

@@ -86,7 +86,7 @@ def test_create_redeemable_positions():
     result = create_redeemable_positions(allocators, kept_tokens)
     assert result == [RedeemablePosition(owner=address_1, vault=vault_1, amount=Wei(150))]
 
-    # test multiple vaults
+    # test multiple vaults #1
     allocators = [
         Allocator(
             address=Web3.to_checksum_address(address_1),
@@ -96,13 +96,47 @@ def test_create_redeemable_positions():
             ],
         )
     ]
-    kept_tokens = {
-        address_1: Wei(0),
-    }
-    result = create_redeemable_positions(allocators, kept_tokens)
+    result = create_redeemable_positions(allocators, {})
     assert result == [
         RedeemablePosition(owner=address_1, vault=vault_1, amount=Wei(150)),
         RedeemablePosition(owner=address_1, vault=vault_2, amount=Wei(150)),
+    ]
+
+    allocators = [
+        Allocator(
+            address=Web3.to_checksum_address(address_1),
+            vault_shares=[
+                VaultShares(address=Web3.to_checksum_address(vault_1), minted_shares=Wei(333)),
+                VaultShares(address=Web3.to_checksum_address(vault_2), minted_shares=Wei(666)),
+            ],
+        )
+    ]
+    kept_tokens = {
+        address_1: Wei(100),
+    }
+    result = create_redeemable_positions(allocators, kept_tokens)
+    assert result == [
+        RedeemablePosition(owner=address_1, vault=vault_1, amount=Wei(299)),
+        RedeemablePosition(owner=address_1, vault=vault_2, amount=Wei(600)),
+    ]
+
+    # test multiple vaults #3
+    allocators = [
+        Allocator(
+            address=Web3.to_checksum_address(address_1),
+            vault_shares=[
+                VaultShares(address=Web3.to_checksum_address(vault_1), minted_shares=Wei(333)),
+                VaultShares(address=Web3.to_checksum_address(vault_2), minted_shares=Wei(666)),
+            ],
+        )
+    ]
+    kept_tokens = {
+        address_1: Wei(100),
+    }
+    result = create_redeemable_positions(allocators, kept_tokens)
+    assert result == [
+        RedeemablePosition(owner=address_1, vault=vault_1, amount=Wei(299)),
+        RedeemablePosition(owner=address_1, vault=vault_2, amount=Wei(600)),
     ]
 
 
