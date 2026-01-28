@@ -1,5 +1,5 @@
 import contextlib
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
@@ -355,19 +355,16 @@ class TestUpdateRedeemablePositions:
             patch_os_token_arbitrum_contract_address(),
             patch_os_token_contract_address(os_token_contract_address),
             patch_os_token_converter(os_token_converter),
-            patch_api_cliente(mock_protocol_data),
+            patch_api_client(mock_protocol_data),
             patch(
                 'src.redemptions.graph.graph_client.fetch_pages',
                 side_effect=[allocators, leverage_positions, os_token_holders],
             ),
-            patch(
-                'src.common.clients.IpfsMultiUploadClient.upload_json',
-                return_value=faker.ipfs_hash(),
-            ) as ipfs_mock,
+            patch_ipfs_client() as mock_upload_json,
         ):
             result = runner.invoke(update_redeemable_positions, args, input='\n')
             assert result.exit_code == 0
-            ipfs_mock.assert_called_once_with(
+            mock_upload_json.assert_called_once_with(
                 [{'owner': address_1, 'vault': vault_1, 'amount': '2563636363636363637'}]
             )
             assert (
@@ -415,19 +412,16 @@ class TestUpdateRedeemablePositions:
             patch_os_token_arbitrum_contract_address(),
             patch_os_token_contract_address(os_token_contract_address),
             patch_os_token_converter(os_token_converter),
-            patch_api_cliente(mock_protocol_data),
+            patch_api_client(mock_protocol_data),
             patch(
                 'src.redemptions.graph.graph_client.fetch_pages',
                 side_effect=[allocators, leverage_positions, os_token_holders],
             ),
-            patch(
-                'src.common.clients.IpfsMultiUploadClient.upload_json',
-                return_value=faker.ipfs_hash(),
-            ) as ipfs_mock,
+            patch_ipfs_client() as mock_upload_json,
         ):
             result = runner.invoke(update_redeemable_positions, args, input='\n')
             assert result.exit_code == 0
-            ipfs_mock.assert_called_once_with(
+            mock_upload_json.assert_called_once_with(
                 [{'owner': address_1, 'vault': vault_1, 'amount': '10000000000000000000'}]
             )
             assert (
@@ -477,19 +471,16 @@ class TestUpdateRedeemablePositions:
             patch_os_token_arbitrum_contract_address(),
             patch_os_token_contract_address(os_token_contract_address),
             patch_os_token_converter(os_token_converter),
-            patch_api_cliente(mock_protocol_data),
+            patch_api_client(mock_protocol_data),
             patch(
                 'src.redemptions.graph.graph_client.fetch_pages',
                 side_effect=[allocators, leverage_positions, os_token_holders],
             ),
-            patch(
-                'src.common.clients.IpfsMultiUploadClient.upload_json',
-                return_value=faker.ipfs_hash(),
-            ) as ipfs_mock,
+            patch_ipfs_client() as mock_upload_json,
         ):
             result = runner.invoke(update_redeemable_positions, args, input='\n')
             assert result.exit_code == 0
-            ipfs_mock.assert_not_called()
+            mock_upload_json.assert_not_called()
 
 
 @contextlib.contextmanager
@@ -549,6 +540,20 @@ def patch_os_token_redeemer_contract_nonce(nonce):
 
 
 @contextlib.contextmanager
-def patch_api_cliente(mock_protocol_data):
+def patch_api_client(mock_protocol_data):
     with patch('src.redemptions.api_client.APIClient._fetch_json', return_value=mock_protocol_data):
         yield
+
+
+@contextlib.contextmanager
+def patch_ipfs_client():
+    mock_upload_json = AsyncMock(return_value=faker.ipfs_hash())
+    mock_ipfs_client = MagicMock()
+    mock_ipfs_client.upload_json = mock_upload_json
+    mock_build = MagicMock(return_value=mock_ipfs_client)
+    with patch(
+        'src.commands.internal.update_redeemable_positions.build_ipfs_upload_clients', mock_build
+    ):
+        yield mock_upload_json
+    # with patch('src.redemptions.api_client.APIClient._fetch_json', return_value=mock_protocol_data):
+    #     yield
