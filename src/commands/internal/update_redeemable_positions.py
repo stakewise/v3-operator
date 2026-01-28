@@ -202,12 +202,12 @@ async def process(arbitrum_endpoint: str | None, min_os_token_position_amount_gw
     logger.info('Fetched %s allocators from the subgraph', len(allocators))
 
     # filter boost proxy positions
+    logger.info('Fetching boosted positions from the subgraph...')
     leverage_positions = await graph_get_leverage_positions(block_number)
     boost_proxies = {pos.proxy for pos in leverage_positions}
     logger.info('Found %s proxy positions to exclude', len(boost_proxies))
     allocators = [a for a in allocators if a.address not in boost_proxies]
     # reduce boosted positions
-    logger.info('Fetching boosted positions from the subgraph...')
     os_token_converter = await create_os_token_converter(block_number)
     boost_ostoken_shares = await calculate_boost_ostoken_shares(
         users={a.address for a in allocators},
