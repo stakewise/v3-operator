@@ -26,7 +26,7 @@ from src.config.settings import (
     EVENTS_CONCURRENCY_LIMIT,
     settings,
 )
-from src.meta_vault.typings import SubVaultExitRequest
+from src.meta_vault.typings import SubVaultExitRequest, SubVaultRedemption
 from src.redeem.typings import RedeemablePositions
 from src.validators.typings import V2ValidatorEventData
 from src.withdrawals.typings import WithdrawalEvent
@@ -142,6 +142,9 @@ class VaultEncoder:
 
 class VaultContract(ContractWrapper, VaultStateMixin):
     abi_path = 'abi/IEthVault.json'
+
+    async def vault_id(self) -> str:
+        return await self.contract.functions.vaultId().call()
 
     def encoder(self) -> VaultEncoder:
         return VaultEncoder(self)
@@ -408,6 +411,18 @@ class MetaVaultContract(ContractWrapper):
     async def get_exit_queue_index(self, position_ticket: int) -> int:
         return await self.contract.functions.getExitQueueIndex(position_ticket).call()
 
+    async def calculate_sub_vaults_redemptions(
+        self, assets_to_redeem: Wei
+    ) -> list[SubVaultRedemption]:
+        res = await self.contract.functions.calculateSubVaultsRedemptions(assets_to_redeem).call()
+        return [
+            SubVaultRedemption(
+                vault=Web3.to_checksum_address(entry[0]),
+                assets=Wei(entry[1]),
+            )
+            for entry in res
+        ]
+
     async def deposit_to_sub_vaults(self) -> HexStr:
         tx_function = self.contract.functions.depositToSubVaults()
         tx_hash = await transaction_gas_wrapper(tx_function)
@@ -496,16 +511,18 @@ class OsTokenRedeemerContract(ContractWrapper):
             ipfs_hash=ipfs_hash,
         )
 
-    async def nonce(self) -> int:
-        return await self.contract.functions.nonce().call()
+    async def nonce(self, block_number: BlockNumber | None = None) -> int:
+        return await self.contract.functions.nonce().call(block_identifier=block_number)
 
-    async def get_exit_queue_cumulative_tickets(self, block_number: BlockNumber) -> int:
+    async def get_exit_queue_cumulative_tickets(
+        self, block_number: BlockNumber | None = None
+    ) -> int:
         return await self.contract.functions.getExitQueueCumulativeTickets().call(
             block_identifier=block_number
         )
 
     async def get_exit_queue_missing_assets(
-        self, target_ticket: int, block_number: BlockNumber
+        self, target_ticket: int, block_number: BlockNumber | None = None
     ) -> Wei:
         return await self.contract.functions.getExitQueueMissingAssets(target_ticket).call(
             block_identifier=block_number

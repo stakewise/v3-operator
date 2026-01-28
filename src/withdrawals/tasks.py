@@ -32,6 +32,7 @@ from src.config.settings import (
     WITHDRAWALS_INTERVAL,
     settings,
 )
+from src.redeem.tasks import get_redemption_assets
 from src.validators.consensus import fetch_consensus_validators
 from src.validators.database import VaultValidatorCrud
 from src.validators.exceptions import EmptyRelayerResponseException
@@ -120,6 +121,9 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
             consolidations=consolidations,
             chain_head=chain_head,
         )
+        redemption_assets = await get_redemption_assets()
+        queued_assets = Gwei(queued_assets + redemption_assets)
+
         metrics.queued_assets.labels(network=settings.network).set(int(queued_assets))
 
         if queued_assets < MIN_WITHDRAWAL_AMOUNT_GWEI:

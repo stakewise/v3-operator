@@ -2,15 +2,21 @@ import logging
 from collections import defaultdict
 from typing import AsyncGenerator, cast
 
-from eth_typing import BlockNumber, ChecksumAddress
+from eth_typing import BlockNumber, ChecksumAddress, HexStr
 from multiproof.standard import standard_leaf_hash
+from sw_utils import convert_to_mgno
+from sw_utils.networks import GNO_NETWORKS
 from sw_utils.typings import ChainHead, ProtocolConfig
 from web3 import Web3
-from web3.types import Wei
+from web3.types import Gwei, Wei
 
-from src.common.clients import execution_client, ipfs_fetch_client
-from src.common.contracts import os_token_redeemer_contract
+from src.common.clients import ipfs_fetch_client
+from src.common.consensus import get_chain_latest_head
+from src.common.contracts import multicall_contract, os_token_redeemer_contract
+from src.common.protocol_config import get_protocol_config
 from src.common.utils import async_batched
+from src.config.settings import settings
+from src.meta_vault.service import distribute_meta_vault_redemption_assets
 from src.redeem.os_token_converter import create_os_token_converter
 from src.redeem.typings import RedeemablePosition
 
@@ -18,6 +24,32 @@ logger = logging.getLogger(__name__)
 
 
 batch_size = 20
+
+
+async def get_redemption_assets() -> Gwei:
+    """
+    Get redemption assets for operator's vault.
+    For Gno networks return value in mGNO-GWei.
+    """
+    protocol_config = await get_protocol_config()
+    chain_head = await get_chain_latest_head()
+
+    # Aggregate redemption assets per vault
+    vault_to_redemption_assets = await get_vault_to_redemption_assets(
+        chain_head=chain_head, protocol_config=protocol_config
+    )
+    # Distribute redemption assets from meta vaults to their underlying vaults
+    vault_to_redemption_assets = await distribute_meta_vault_redemption_assets(
+        vault_to_redemption_assets=vault_to_redemption_assets
+    )
+    # Filter by operator's vault
+    redemption_assets = vault_to_redemption_assets[settings.vault]
+
+    if settings.network in GNO_NETWORKS:
+        # Convert GNO -> mGNO
+        redemption_assets = convert_to_mgno(redemption_assets)
+
+    return Gwei(int(Web3.from_wei(redemption_assets, 'gwei')))
 
 
 async def get_vault_to_redemption_assets(
@@ -131,19 +163,22 @@ async def iter_redeemable_positions() -> AsyncGenerator[RedeemablePosition, None
 
 
 async def get_processed_shares_batch(
-    redeemable_positions_batch: list[RedeemablePosition], nonce: int
+    redeemable_positions_batch: list[RedeemablePosition],
+    nonce: int,
+    block_number: BlockNumber | None = None,
 ) -> list[Wei]:
-    """
-    Get processed shares for a batch of redeemable positions.
-    Make single batch request to the contract.
-    """
-    batch = execution_client.batch_requests()
+    calls: list[tuple[ChecksumAddress, HexStr]] = []
 
     for redeemable_position in redeemable_positions_batch:
         leaf_hash = get_redeemable_position_leaf_hash(redeemable_position, nonce)
-        batch.add(os_token_redeemer_contract.functions.leafToProcessedShares(leaf_hash))
+        call_data = os_token_redeemer_contract.encode_abi(
+            fn_name='leafToProcessedShares',
+            args=[leaf_hash],
+        )
+        calls.append((os_token_redeemer_contract.contract_address, call_data))
 
-    return await batch.async_execute()  # type: ignore
+    _, results = await multicall_contract.aggregate(calls, block_number=block_number)
+    return [Wei(Web3.to_int(res)) for res in results]
 
 
 def get_redeemable_position_leaf_hash(redeemable_position: RedeemablePosition, nonce: int) -> bytes:
