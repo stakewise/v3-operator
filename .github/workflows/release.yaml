@@ -14,12 +14,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: 3.12.8
+          python-version: 3.12.12
 
       - name: Install Poetry
         uses: Gr1N/setup-poetry@v8
@@ -36,7 +36,7 @@ jobs:
       matrix:
         include:
           - OS: ubuntu-24.04
-            PYTHON_VERSION: 3.12.8
+            PYTHON_VERSION: 3.12.12
             BUILD_CMD: |
               set -e
               export PYTHONHASHSEED=42
@@ -53,7 +53,7 @@ jobs:
               sha256sum ${BUILD_FILE_NAME}.tar.gz | head -c 64 > /tmp/artifacts/${BUILD_FILE_NAME}.sha256;
 
           - OS: ubuntu-22.04
-            PYTHON_VERSION: 3.12.8
+            PYTHON_VERSION: 3.12.12
             BUILD_CMD: |
               set -e
               export PYTHONHASHSEED=42
@@ -70,7 +70,7 @@ jobs:
               sha256sum ${BUILD_FILE_NAME}.tar.gz | head -c 64 > /tmp/artifacts/${BUILD_FILE_NAME}.sha256;
 
           - OS: ubuntu-24.04-arm
-            PYTHON_VERSION: 3.12.8
+            PYTHON_VERSION: 3.12.12
             BUILD_CMD: |
               set -e
               export PYTHONHASHSEED=42
@@ -88,7 +88,7 @@ jobs:
               sha256sum ${BUILD_FILE_NAME}.tar.gz | head -c 64 > /tmp/artifacts/${BUILD_FILE_NAME}.sha256;
 
           - OS: ubuntu-22.04-arm
-            PYTHON_VERSION: 3.12.8
+            PYTHON_VERSION: 3.12.12
             BUILD_CMD: |
               set -e
               export PYTHONHASHSEED=42
@@ -106,7 +106,7 @@ jobs:
               sha256sum ${BUILD_FILE_NAME}.tar.gz | head -c 64 > /tmp/artifacts/${BUILD_FILE_NAME}.sha256;
 
           - OS: macos-14
-            PYTHON_VERSION: 3.12.8
+            PYTHON_VERSION: 3.12.12
             BUILD_CMD: |
               set -e
               export PYTHONHASHSEED=42
@@ -123,7 +123,7 @@ jobs:
               shasum -a 256 ${BUILD_FILE_NAME}.tar.gz | head -c 64 > /tmp/artifacts/${BUILD_FILE_NAME}.sha256
 
           - OS: windows-latest
-            PYTHON_VERSION: 3.12.8
+            PYTHON_VERSION: 3.12.12
             BUILD_CMD: |
               $ErrorActionPreference = "Stop"
               $RELEASE_VERSION = $env:GITHUB_REF.replace('refs/tags/', '')
@@ -142,7 +142,8 @@ jobs:
               certUtil -hashfile $ZIP_FILE_NAME SHA256 | findstr /i /v "SHA256" | findstr /i /v "CertUtil" > $CHECKSUM_FILE_NAME_PASH
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v5
 
       - name: Install build dependencies for Linux
         run: |
@@ -157,7 +158,8 @@ jobs:
           brew install openssl@3.0
         if: matrix.os == 'macos-14'
 
-      - uses: actions/setup-python@v5
+      - name: Set up python
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.PYTHON_VERSION }}
 
