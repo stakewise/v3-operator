@@ -152,7 +152,7 @@ class HashiVaultBundledKeysLoader(HashiVaultKeysLoader):
             raise RuntimeError('Can not retrieve validator signing keys from hashi vault')
 
         for pk, sk in key_data['data']['data'].items():
-            if sk == '':
+            if not sk:
                 continue
             sk_bytes = Web3.to_bytes(hexstr=sk)
             keys.append((add_0x_prefix(HexStr(pk)), BLSPrivkey(sk_bytes)))
