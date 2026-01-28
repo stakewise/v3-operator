@@ -106,7 +106,7 @@ jobs:
               sha256sum ${BUILD_FILE_NAME}.tar.gz | head -c 64 > /tmp/artifacts/${BUILD_FILE_NAME}.sha256;
 
           - OS: macos-14
-            PYTHON_VERSION: 3.12.12
+            PYTHON_VERSION: 3.12.8
             BUILD_CMD: |
               set -e
               export PYTHONHASHSEED=42
@@ -123,7 +123,7 @@ jobs:
               shasum -a 256 ${BUILD_FILE_NAME}.tar.gz | head -c 64 > /tmp/artifacts/${BUILD_FILE_NAME}.sha256
 
           - OS: windows-latest
-            PYTHON_VERSION: 3.12.12
+            PYTHON_VERSION: 3.12.8
             BUILD_CMD: |
               $ErrorActionPreference = "Stop"
               $RELEASE_VERSION = $env:GITHUB_REF.replace('refs/tags/', '')
