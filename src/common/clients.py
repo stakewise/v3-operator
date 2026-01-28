@@ -142,8 +142,9 @@ async def close_clients() -> None:
     await execution_client.provider.disconnect()
     await execution_non_retry_client.provider.disconnect()
     await consensus_client.disconnect()
-    # waiting to ensure all web3 evicted sessions are closed
-    await asyncio.sleep(max(settings.consensus_timeout, settings.execution_timeout))
 
     if settings.graph_endpoint:
         await graph_client.disconnect()
+
+    # waiting to ensure all web3 evicted sessions are closed
+    await asyncio.sleep(max(settings.consensus_timeout, settings.execution_timeout))
