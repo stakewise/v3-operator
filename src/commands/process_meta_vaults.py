@@ -98,7 +98,7 @@ logger = logging.getLogger(__name__)
     '--graph-endpoint',
     type=str,
     envvar='GRAPH_ENDPOINT',
-    prompt='Enter the API endpoint for graph node',
+    # default is endpoint from network config
     help='API endpoint for graph node.',
 )
 @click.option(
@@ -137,7 +137,7 @@ def process_meta_vaults(
     vaults: str,
     execution_endpoints: str,
     execution_jwt_secret: str | None,
-    graph_endpoint: str,
+    graph_endpoint: str | None,
     network: str,
     verbose: bool,
     log_level: str,
