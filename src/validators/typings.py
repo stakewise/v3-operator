@@ -112,3 +112,13 @@ class ApprovalRequest:
 class ConsolidationRequest:
     public_keys: list[HexStr]
     vault_address: ChecksumAddress
+
+
+@dataclass
+class ConsolidationKeys:
+    source_public_keys: list[HexStr]
+    target_public_key: HexStr
+
+    @property
+    def all_public_keys(self) -> list[HexStr]:
+        return list(set(self.source_public_keys + [self.target_public_key]))

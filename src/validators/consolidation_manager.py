@@ -9,12 +9,13 @@ from src.common.contracts import VaultContract
 from src.common.withdrawals import get_pending_partial_withdrawals
 from src.config.settings import settings
 from src.validators.consensus import EXITING_STATUSES, fetch_consensus_validators
-from src.validators.typings import ConsensusValidator
+from src.validators.typings import ConsensusValidator, ConsolidationKeys
 
 logger = logging.getLogger(__name__)
 
 
-class ConsolidationSelector:
+class ConsolidationManager:
+    chain_head: ChainHead
     vault_validators: list[HexStr]
     consensus_validators: list[ConsensusValidator]
     consolidating_indexes: set[int]
@@ -24,22 +25,21 @@ class ConsolidationSelector:
     @classmethod
     async def create(
         cls,
-        source_public_keys: list[HexStr] | None,
-        target_public_key: HexStr | None,
+        consolidation_keys: ConsolidationKeys | None,
         chain_head: ChainHead,
         exclude_public_keys: set[HexStr],
-    ) -> 'ConsolidationSelector':
-        klass: type[ConsolidationSelectorSelector] | type[ConsolidationSelectorChecker]
-        if source_public_keys is not None:
-            klass = ConsolidationSelectorChecker
+    ) -> 'ConsolidationManager':
+        self: ConsolidationManager
+        if consolidation_keys is not None:
+            self = ConsolidationChecker(
+                consolidation_keys=consolidation_keys,
+                chain_head=chain_head,
+            )
         else:
-            klass = ConsolidationSelectorSelector
-        self = klass(
-            source_public_keys=source_public_keys,
-            target_public_key=target_public_key,
-            chain_head=chain_head,
-            exclude_public_keys=exclude_public_keys,
-        )
+            self = ConsolidationSelector(
+                chain_head=chain_head,
+                exclude_public_keys=exclude_public_keys,
+            )
         logger.info('Fetching vault validators...')
         self.vault_validators = await VaultContract(
             settings.vault
@@ -47,9 +47,9 @@ class ConsolidationSelector:
             from_block=settings.vault_first_block,
             to_block=self.chain_head.block_number,
         )
-        if source_public_keys is not None and target_public_key is not None:
+        if consolidation_keys is not None:
             self.consensus_validators = await fetch_consensus_validators(
-                list(set(source_public_keys + [target_public_key]))
+                consolidation_keys.all_public_keys
             )
         else:
             self.consensus_validators = await fetch_consensus_validators(self.vault_validators)
@@ -69,18 +69,6 @@ class ConsolidationSelector:
         for withdrawal in pending_partial_withdrawals:
             self.pending_partial_withdrawals_indexes.add(withdrawal.validator_index)
         return self
-
-    def __init__(
-        self,
-        source_public_keys: list[HexStr] | None,
-        target_public_key: HexStr | None,
-        chain_head: ChainHead,
-        exclude_public_keys: set[HexStr],
-    ):
-        self.source_public_keys = source_public_keys
-        self.target_public_key = target_public_key
-        self.chain_head = chain_head
-        self.exclude_public_keys = exclude_public_keys
 
     async def get_target_source(self) -> list[tuple[ConsensusValidator, ConsensusValidator]]:
         '''
@@ -107,56 +95,20 @@ class ConsolidationSelector:
         '''
         raise NotImplementedError()
 
-    def _validate_target_validator(
-        self,
-        is_switch: bool | None = None,
-    ) -> ConsensusValidator:
-        target_validators = [
-            val for val in self.consensus_validators if val.public_key == self.target_public_key
-        ]
-        if not target_validators:
-            raise click.ClickException(
-                f'Validator {self.target_public_key} not found in the consensus layer.'
-            )
-        target_validator = target_validators[0]
-        if target_validator.status in EXITING_STATUSES:
-            raise click.ClickException(
-                f'Target validator {self.target_public_key} is in exiting '
-                f'status {target_validator.status.value}.'
-            )
-        if target_validator.index in self.consolidating_indexes:
-            raise click.ClickException(
-                f'Target validator {self.target_public_key} is consolidating to another validator.'
-            )
-        if target_validator.public_key in self.exclude_public_keys:
-            raise click.ClickException(
-                f'Target validator {self.target_public_key} is excluded from consolidation.'
-            )
-
-        if is_switch is None:
-            is_switch = not target_validator.is_compounding
-
-        if is_switch:
-            if target_validator.is_compounding:
-                raise click.ClickException(
-                    f'Target validator {self.target_public_key} is already a compounding validator.'
-                )
-            # switch the 0x01 to 0x02
-            if target_validator.activation_epoch > self.max_activation_epoch:
-                raise click.ClickException(
-                    f'Validator {self.target_public_key} is not active enough for consolidation. '
-                    f'It must be active for at least '
-                    f'{settings.network_config.SHARD_COMMITTEE_PERIOD} epochs before consolidation.'
-                )
-        return target_validator
-
     @property
     def max_activation_epoch(self) -> int:
         return self.chain_head.epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
 
 
-# 2 subclasses
-class ConsolidationSelectorSelector(ConsolidationSelector):
+class ConsolidationSelector(ConsolidationManager):
+    def __init__(
+        self,
+        chain_head: ChainHead,
+        exclude_public_keys: set[HexStr],
+    ):
+        self.chain_head = chain_head
+        self.exclude_public_keys = exclude_public_keys
+
     async def get_target_source(self) -> list[tuple[ConsensusValidator, ConsensusValidator]]:
         """
         If there are no 0x02 validators,
@@ -173,21 +125,15 @@ class ConsolidationSelectorSelector(ConsolidationSelector):
             return []
 
         source_validators_candidates.sort(key=lambda val: val.activation_epoch)
-        if self.target_public_key:
-            target_validator = self._validate_target_validator()
-            if not target_validator.is_compounding:
-                return [(target_validator, target_validator)]
+        target_validator_candidates = [
+            val for val in target_validator_candidates if val.is_compounding
+        ]
+        if not target_validator_candidates:
+            # there are no 0x02 validators, switch the oldest 0x01 to 0x02
+            return [(source_validators_candidates[0], source_validators_candidates[0])]
 
-        else:
-            target_validator_candidates = [
-                val for val in target_validator_candidates if val.is_compounding
-            ]
-            if not target_validator_candidates:
-                # there are no 0x02 validators, switch the oldest 0x01 to 0x02
-                return [(source_validators_candidates[0], source_validators_candidates[0])]
-
-            # there is at least one 0x02 validator, top up the one with smallest balance
-            target_validator = min(target_validator_candidates, key=lambda val: val.balance)
+        # there is at least one 0x02 validator, top up the one with smallest balance
+        target_validator = min(target_validator_candidates, key=lambda val: val.balance)
 
         selected_source_validators: list[ConsensusValidator] = []
         target_balance = target_validator.balance
@@ -200,11 +146,6 @@ class ConsolidationSelectorSelector(ConsolidationSelector):
 
         if selected_source_validators:
             return [(target_validator, val) for val in selected_source_validators]
-
-        if self.target_public_key:
-            raise click.ClickException(
-                'Target validator has insufficient capacity to consolidate any source validators.'
-            )
 
         # Target validator is almost full, switch the oldest 0x01 to 0x02
         return [(selected_source_validators[0], selected_source_validators[0])]
@@ -223,7 +164,7 @@ class ConsolidationSelectorSelector(ConsolidationSelector):
                 continue
             target_validators.append(val)
 
-            # source
+            # additional filters for source validators
             if val.is_compounding:
                 continue
             if val.activation_epoch >= self.max_activation_epoch:
@@ -234,30 +175,22 @@ class ConsolidationSelectorSelector(ConsolidationSelector):
         return source_validators, target_validators
 
 
-class ConsolidationSelectorChecker(ConsolidationSelector):
+class ConsolidationChecker(ConsolidationManager):
+    def __init__(
+        self,
+        consolidation_keys: ConsolidationKeys,
+        chain_head: ChainHead,
+    ):
+        self.consolidation_keys = consolidation_keys
+        self.chain_head = chain_head
+
     async def get_target_source(self) -> list[tuple[ConsensusValidator, ConsensusValidator]]:
         """
         Validate that provided public keys can be consolidated
         and returns the target and source validators info.
-
         """
-        if self.source_public_keys is None or self.target_public_key is None:
-            raise click.ClickException(
-                'Both source_public_keys and target_public_key must be provided for checking.'
-            )
-
         logger.info('Checking selected validators for consolidation...')
-
-        # Validate that source public keys are unique
-        if len(self.source_public_keys) != len(set(self.source_public_keys)):
-            raise click.ClickException('Source public keys must be unique.')
-
-        # Validate the switch from 0x01 to 0x02 and consolidation to another validator
-        if len(self.source_public_keys) > 1 and self.target_public_key in self.source_public_keys:
-            raise click.ClickException(
-                'Cannot switch from 0x01 to 0x02 and consolidate '
-                'to another validator in the same request.'
-            )
+        self._validate_public_keys()
 
         # Validate the source and target validators are in the vault
         for public_keys in self.source_public_keys + [self.target_public_key]:
@@ -267,9 +200,8 @@ class ConsolidationSelectorChecker(ConsolidationSelector):
                 )
 
         # Validate target public key
-        is_switch = is_switch_to_compounding(self.source_public_keys, self.target_public_key)
-        target_validator = self._validate_target_validator(is_switch=is_switch)
-        if is_switch:
+        target_validator = self._validate_target_validator()
+        if self.is_switch_to_compounding():
             return [(target_validator, target_validator)]
 
         # Validate source public keys
@@ -326,6 +258,71 @@ class ConsolidationSelectorChecker(ConsolidationSelector):
 
         return [(target_validator, source_validator) for source_validator in source_validators]
 
+    def _validate_public_keys(self) -> None:
+        if self.source_public_keys is None or self.target_public_key is None:
+            raise click.ClickException(
+                'Both source_public_keys and target_public_key must be provided for checking.'
+            )
+        # Validate that source public keys are unique
+        if len(self.source_public_keys) != len(set(self.source_public_keys)):
+            raise click.ClickException('Source public keys must be unique.')
 
-def is_switch_to_compounding(source_public_keys: list[HexStr], target_public_key: HexStr) -> bool:
-    return len(source_public_keys) == 1 and source_public_keys[0] == target_public_key
+        # Validate the switch from 0x01 to 0x02 and consolidation to another validator
+        if len(self.source_public_keys) > 1 and self.target_public_key in self.source_public_keys:
+            raise click.ClickException(
+                'Cannot switch from 0x01 to 0x02 and consolidate '
+                'to another validator in the same request.'
+            )
+
+    def _validate_target_validator(
+        self,
+    ) -> ConsensusValidator:
+        target_validators = [
+            val for val in self.consensus_validators if val.public_key == self.target_public_key
+        ]
+        if not target_validators:
+            raise click.ClickException(
+                f'Validator {self.target_public_key} not found in the consensus layer.'
+            )
+        target_validator = target_validators[0]
+        if target_validator.status in EXITING_STATUSES:
+            raise click.ClickException(
+                f'Target validator {self.target_public_key} is in exiting '
+                f'status {target_validator.status.value}.'
+            )
+        if target_validator.index in self.consolidating_indexes:
+            raise click.ClickException(
+                f'Target validator {self.target_public_key} is consolidating to another validator.'
+            )
+        if target_validator.public_key in self.exclude_public_keys:
+            raise click.ClickException(
+                f'Target validator {self.target_public_key} is excluded from consolidation.'
+            )
+
+        if self.is_switch_to_compounding():
+            if target_validator.is_compounding:
+                raise click.ClickException(
+                    f'Target validator {self.target_public_key} is already a compounding validator.'
+                )
+            # switch the 0x01 to 0x02
+            if target_validator.activation_epoch > self.max_activation_epoch:
+                raise click.ClickException(
+                    f'Validator {self.target_public_key} is not active enough for consolidation. '
+                    f'It must be active for at least '
+                    f'{settings.network_config.SHARD_COMMITTEE_PERIOD} epochs before consolidation.'
+                )
+        return target_validator
+
+    def is_switch_to_compounding(self) -> bool:
+        return (
+            len(self.source_public_keys) == 1
+            and self.source_public_keys[0] == self.target_public_key
+        )
+
+    @property
+    def source_public_keys(self) -> list[HexStr]:
+        return self.consolidation_keys.source_public_keys
+
+    @property
+    def target_public_key(self) -> HexStr:
+        return self.consolidation_keys.target_public_key

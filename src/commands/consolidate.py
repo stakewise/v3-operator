@@ -32,10 +32,11 @@ from src.common.wallet import wallet
 from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS, GNOSIS, MAINNET, NETWORKS
 from src.config.settings import DEFAULT_MAX_CONSOLIDATION_REQUEST_FEE_GWEI, settings
-from src.validators.consolidation_selector import ConsolidationSelector
+from src.validators.consolidation_manager import ConsolidationManager
 from src.validators.oracles import poll_consolidation_signature
 from src.validators.register_validators import submit_consolidate_validators
 from src.validators.relayer import RelayerClient
+from src.validators.typings import ConsolidationKeys
 
 logger = logging.getLogger(__name__)
 
@@ -317,9 +318,14 @@ async def process(
     await _check_validators_manager(vault_address)
     await _check_consolidations_queue(chain_head)
 
-    consolidation_selector = await ConsolidationSelector.create(
-        source_public_keys=source_public_keys,
-        target_public_key=target_public_key,
+    consolidation_keys = None
+    if source_public_keys and target_public_key:
+        consolidation_keys = ConsolidationKeys(
+            source_public_keys=source_public_keys,
+            target_public_key=target_public_key,
+        )
+    consolidation_selector = await ConsolidationManager.create(
+        consolidation_keys=consolidation_keys,
         chain_head=chain_head,
         exclude_public_keys=exclude_public_keys,
     )
