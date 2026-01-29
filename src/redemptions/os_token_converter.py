@@ -18,6 +18,11 @@ class OsTokenConverter:
             return Wei(0)
         return Wei((assets * self.total_shares) // self.total_assets)
 
+    def to_assets(self, shares: Wei) -> Wei:
+        if self.total_shares == 0:
+            return Wei(0)
+        return Wei((shares * self.total_assets) // self.total_shares)
+
 
 async def create_os_token_converter(block_number: BlockNumber) -> OsTokenConverter:
     total_assets = await os_token_vault_controller_contract.total_assets(block_number)
