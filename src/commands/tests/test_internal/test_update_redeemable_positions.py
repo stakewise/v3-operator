@@ -26,17 +26,14 @@ from src.redemptions.typings import (
 os_token_contract_address = NETWORKS[MAINNET].OS_TOKEN_CONTRACT_ADDRESS
 
 
-def test_create_redeemable_positions():
-    address_1 = faker.eth_address()
-    address_2 = faker.eth_address()
-    vault_1 = faker.eth_address()
-    vault_2 = faker.eth_address()
-
-    # test zero allocators
+def test_create_redeemable_positions_zero_allocators():
     result = create_redeemable_positions([], {})
     assert result == []
 
-    # test single vault
+
+def test_create_redeemable_positions_single_vault():
+    address_1 = faker.eth_address()
+    vault_1 = faker.eth_address()
     allocators = [
         Allocator(
             address=Web3.to_checksum_address(address_1),
@@ -51,6 +48,11 @@ def test_create_redeemable_positions():
     result = create_redeemable_positions(allocators, kept_tokens)
     assert result == [RedeemablePosition(owner=address_1, vault=vault_1, amount=Wei(150))]
 
+
+def test_create_redeemable_positions_kept_tokens():
+    address_1 = faker.eth_address()
+    vault_1 = faker.eth_address()
+
     allocators = [
         Allocator(
             address=Web3.to_checksum_address(address_1),
@@ -64,6 +66,12 @@ def test_create_redeemable_positions():
     }
     result = create_redeemable_positions(allocators, kept_tokens)
     assert result == [RedeemablePosition(owner=address_1, vault=vault_1, amount=Wei(50))]
+
+
+def test_create_redeemable_positions_multiple_allocators():
+    address_1 = faker.eth_address()
+    address_2 = faker.eth_address()
+    vault_1 = faker.eth_address()
 
     allocators = [
         Allocator(
@@ -86,7 +94,12 @@ def test_create_redeemable_positions():
     result = create_redeemable_positions(allocators, kept_tokens)
     assert result == [RedeemablePosition(owner=address_1, vault=vault_1, amount=Wei(150))]
 
-    # test multiple vaults #1
+
+def test_create_redeemable_positions_multiple_vaults_1():
+    address_1 = faker.eth_address()
+    vault_1 = faker.eth_address()
+    vault_2 = faker.eth_address()
+
     allocators = [
         Allocator(
             address=Web3.to_checksum_address(address_1),
@@ -102,6 +115,11 @@ def test_create_redeemable_positions():
         RedeemablePosition(owner=address_1, vault=vault_2, amount=Wei(150)),
     ]
 
+
+def test_create_redeemable_positions_multiple_vaults_2():
+    address_1 = faker.eth_address()
+    vault_1 = faker.eth_address()
+    vault_2 = faker.eth_address()
     allocators = [
         Allocator(
             address=Web3.to_checksum_address(address_1),
@@ -120,7 +138,11 @@ def test_create_redeemable_positions():
         RedeemablePosition(owner=address_1, vault=vault_2, amount=Wei(600)),
     ]
 
-    # test multiple vaults #3
+
+def test_create_redeemable_positions_multiple_vaults_3():
+    address_1 = faker.eth_address()
+    vault_1 = faker.eth_address()
+    vault_2 = faker.eth_address()
     allocators = [
         Allocator(
             address=Web3.to_checksum_address(address_1),
@@ -195,7 +217,11 @@ async def test_calculate_boost_ostoken_shares():
     result = await calculate_boost_ostoken_shares(
         {address_1, address_2}, leverage_positions, os_token_converter
     )
-    assert result == {address_1: {vault_1: 3570}, address_2: {vault_1: 100, vault_2: 3095}}
+    assert result == {
+        (address_1, vault_1): 3570,
+        (address_2, vault_1): 100,
+        (address_2, vault_2): 3095,
+    }
 
 
 def test_reduces_boosted_amount():
@@ -241,14 +267,11 @@ def test_reduces_boosted_amount():
         ),
     ]
     boost_ostoken_shares = {
-        address_1: {
-            vault_1: Wei(300),
-        },
-        address_2: {
-            vault_1: Wei(500),
-            vault_2: Wei(1500),
-        },
+        (address_1, vault_1): Wei(300),
+        (address_2, vault_1): Wei(500),
+        (address_2, vault_2): Wei(1500),
     }
+
     result = _reduce_boosted_amount(allocators, boost_ostoken_shares)
     assert result == [
         Allocator(
