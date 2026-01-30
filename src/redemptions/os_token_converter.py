@@ -1,0 +1,25 @@
+from web3.types import BlockNumber, Wei
+
+from src.common.contracts import os_token_vault_controller_contract
+
+
+class OsTokenConverter:
+    """
+    Convert between shares and assets based on total assets and total shares.
+    Helps to avoid repeating calls to the contract.
+    """
+
+    def __init__(self, total_assets: Wei, total_shares: Wei):
+        self.total_assets = total_assets
+        self.total_shares = total_shares
+
+    def to_shares(self, assets: Wei) -> Wei:
+        if self.total_assets == 0:
+            return Wei(0)
+        return Wei((assets * self.total_shares) // self.total_assets)
+
+
+async def create_os_token_converter(block_number: BlockNumber) -> OsTokenConverter:
+    total_assets = await os_token_vault_controller_contract.total_assets(block_number)
+    total_shares = await os_token_vault_controller_contract.total_shares(block_number)
+    return OsTokenConverter(total_assets=total_assets, total_shares=total_shares)
