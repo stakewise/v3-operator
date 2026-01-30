@@ -4,7 +4,6 @@ import sys
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import cast
 
 import click
 from eth_typing import BlockNumber, ChecksumAddress
@@ -36,6 +35,7 @@ from src.redemptions.os_token_converter import (
 )
 from src.redemptions.typings import (
     Allocator,
+    ArbitrumConfig,
     LeverageStrategyPosition,
     RedeemablePosition,
 )
@@ -132,8 +132,14 @@ def update_redeemable_positions(
     wallet_password_file: str | None,
     min_os_token_position_amount_gwei: int,
 ) -> None:
-    if network == MAINNET and not arbitrum_endpoint:
-        raise click.BadParameter('arbitrum-endpoint is required for mainnet network')
+    arbitrum_config: ArbitrumConfig | None = None
+    if network == MAINNET:
+        if not arbitrum_endpoint:
+            raise click.BadParameter('arbitrum-endpoint is required for mainnet network')
+        arbitrum_config = ArbitrumConfig(
+            OS_TOKEN_CONTRACT_ADDRESS=settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS,
+            EXECUTION_ENDPOINT=arbitrum_endpoint,
+        )
     settings.set(
         vault=ZERO_CHECKSUM_ADDRESS,
         vault_dir=Path.home() / '.stakewise',
@@ -156,7 +162,7 @@ def update_redeemable_positions(
                 pool.submit(
                     lambda: asyncio.run(
                         main(
-                            arbitrum_endpoint=arbitrum_endpoint,
+                            arbitrum_config=arbitrum_config,
                             min_os_token_position_amount_gwei=Gwei(
                                 min_os_token_position_amount_gwei
                             ),
@@ -168,7 +174,7 @@ def update_redeemable_positions(
                 # no event loop running
                 asyncio.run(
                     main(
-                        arbitrum_endpoint=arbitrum_endpoint,
+                        arbitrum_config=arbitrum_config,
                         min_os_token_position_amount_gwei=Gwei(min_os_token_position_amount_gwei),
                     )
                 )
@@ -179,12 +185,14 @@ def update_redeemable_positions(
         sys.exit(1)
 
 
-async def main(arbitrum_endpoint: str | None, min_os_token_position_amount_gwei: Gwei) -> None:
+async def main(
+    arbitrum_config: ArbitrumConfig | None, min_os_token_position_amount_gwei: Gwei
+) -> None:
     setup_logging()
     await setup_clients()
     try:
         await process(
-            arbitrum_endpoint=arbitrum_endpoint,
+            arbitrum_config=arbitrum_config,
             min_os_token_position_amount_gwei=min_os_token_position_amount_gwei,
         )
     finally:
@@ -192,7 +200,9 @@ async def main(arbitrum_endpoint: str | None, min_os_token_position_amount_gwei:
 
 
 # pylint: disable-next=too-many-locals
-async def process(arbitrum_endpoint: str | None, min_os_token_position_amount_gwei: Gwei) -> None:
+async def process(
+    arbitrum_config: ArbitrumConfig | None, min_os_token_position_amount_gwei: Gwei
+) -> None:
     """
     Fetch redeemable positions, calculate kept os token amounts and upload to IPFS.
     """
@@ -231,7 +241,7 @@ async def process(arbitrum_endpoint: str | None, min_os_token_position_amount_gw
 
     logger.info('Fetching kept tokens for %s addresses', len(allocators))
     address_to_minted_shares = {a.address: a.total_shares for a in allocators}
-    kept_shares = await get_kept_shares(address_to_minted_shares, block_number, arbitrum_endpoint)
+    kept_shares = await get_kept_shares(address_to_minted_shares, block_number, arbitrum_config)
     logger.info('Fetched kept tokens for %s addresses...', len(address_to_minted_shares))
 
     redeemable_positions = create_redeemable_positions(allocators, kept_shares)
@@ -277,7 +287,7 @@ async def process(arbitrum_endpoint: str | None, min_os_token_position_amount_gw
 async def get_kept_shares(
     address_to_minted_shares: dict[ChecksumAddress, Wei],
     block_number: BlockNumber,
-    arbitrum_endpoint: str | None,
+    arbitrum_config: ArbitrumConfig | None,
 ) -> dict[ChecksumAddress, Wei]:
     kept_shares = defaultdict(lambda: Wei(0))
     logger.info(
@@ -288,12 +298,12 @@ async def get_kept_shares(
         kept_shares[address] = os_token_holders.get(address, Wei(0))
 
     # arb wallet balance
-    if settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS != ZERO_CHECKSUM_ADDRESS:
+    if arbitrum_config:
         logger.info(
             'Fetching %s from Arbitrum wallet balances...',
             settings.network_config.OS_TOKEN_BALANCE_SYMBOL,
         )
-        arbitrum_endpoint = cast(str, arbitrum_endpoint)
+        arbitrum_endpoint = arbitrum_config.EXECUTION_ENDPOINT
         arb_execution_client = get_execution_client([arbitrum_endpoint])
 
         arb_contract = Erc20Contract(

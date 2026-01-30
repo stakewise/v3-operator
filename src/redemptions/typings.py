@@ -66,3 +66,9 @@ class RedeemablePosition:
 
     def merkle_leaf(self, nonce: int) -> tuple[int, ChecksumAddress, Wei, ChecksumAddress]:
         return nonce, self.vault, self.amount, self.owner
+
+
+@dataclass
+class ArbitrumConfig:
+    OS_TOKEN_CONTRACT_ADDRESS: ChecksumAddress
+    EXECUTION_ENDPOINT: str
