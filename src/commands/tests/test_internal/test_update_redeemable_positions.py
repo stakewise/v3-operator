@@ -27,7 +27,7 @@ os_token_contract_address = NETWORKS[MAINNET].OS_TOKEN_CONTRACT_ADDRESS
 
 
 def test_create_redeemable_positions_zero_allocators():
-    result = create_redeemable_positions([], {})
+    result = create_redeemable_positions([], {}, 0)
     assert result == []
 
 
@@ -45,7 +45,7 @@ def test_create_redeemable_positions_single_vault():
     kept_tokens = {
         address_1: Wei(0),
     }
-    result = create_redeemable_positions(allocators, kept_tokens)
+    result = create_redeemable_positions(allocators, kept_tokens, 0)
     assert result == [RedeemablePosition(owner=address_1, vault=vault_1, amount=Wei(150))]
 
 
@@ -64,7 +64,7 @@ def test_create_redeemable_positions_kept_tokens():
     kept_tokens = {
         address_1: Wei(100),
     }
-    result = create_redeemable_positions(allocators, kept_tokens)
+    result = create_redeemable_positions(allocators, kept_tokens, 0)
     assert result == [RedeemablePosition(owner=address_1, vault=vault_1, amount=Wei(50))]
 
 
@@ -91,7 +91,7 @@ def test_create_redeemable_positions_multiple_allocators():
         address_1: Wei(0),
         address_2: Wei(75),
     }
-    result = create_redeemable_positions(allocators, kept_tokens)
+    result = create_redeemable_positions(allocators, kept_tokens, 0)
     assert result == [RedeemablePosition(owner=address_1, vault=vault_1, amount=Wei(150))]
 
 
@@ -109,7 +109,7 @@ def test_create_redeemable_positions_multiple_vaults_1():
             ],
         )
     ]
-    result = create_redeemable_positions(allocators, {})
+    result = create_redeemable_positions(allocators, {}, 0)
     assert result == [
         RedeemablePosition(owner=address_1, vault=vault_1, amount=Wei(150)),
         RedeemablePosition(owner=address_1, vault=vault_2, amount=Wei(150)),
@@ -132,7 +132,7 @@ def test_create_redeemable_positions_multiple_vaults_2():
     kept_tokens = {
         address_1: Wei(100),
     }
-    result = create_redeemable_positions(allocators, kept_tokens)
+    result = create_redeemable_positions(allocators, kept_tokens, 0)
     assert result == [
         RedeemablePosition(owner=address_1, vault=vault_1, amount=Wei(299)),
         RedeemablePosition(owner=address_1, vault=vault_2, amount=Wei(600)),
@@ -155,9 +155,31 @@ def test_create_redeemable_positions_multiple_vaults_3():
     kept_tokens = {
         address_1: Wei(100),
     }
-    result = create_redeemable_positions(allocators, kept_tokens)
+    result = create_redeemable_positions(allocators, kept_tokens, 0)
     assert result == [
         RedeemablePosition(owner=address_1, vault=vault_1, amount=Wei(299)),
+        RedeemablePosition(owner=address_1, vault=vault_2, amount=Wei(600)),
+    ]
+
+
+def test_create_redeemable_positions_min_minted_shares():
+    address_1 = faker.eth_address()
+    vault_1 = faker.eth_address()
+    vault_2 = faker.eth_address()
+    allocators = [
+        Allocator(
+            address=Web3.to_checksum_address(address_1),
+            vault_shares=[
+                VaultShares(address=Web3.to_checksum_address(vault_1), minted_shares=Wei(333)),
+                VaultShares(address=Web3.to_checksum_address(vault_2), minted_shares=Wei(666)),
+            ],
+        )
+    ]
+    kept_tokens = {
+        address_1: Wei(100),
+    }
+    result = create_redeemable_positions(allocators, kept_tokens, 300)
+    assert result == [
         RedeemablePosition(owner=address_1, vault=vault_2, amount=Wei(600)),
     ]
 
@@ -539,6 +561,64 @@ class TestUpdateRedeemablePositions:
             assert result.exit_code == 0
             mock_upload_json.assert_not_called()
 
+    @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
+    async def test_min_os_token_position_amount_after_kept_shares(
+        self,
+        vault_address: str,
+        execution_endpoints: str,
+        runner: CliRunner,
+    ):
+        # hardcoded to check merkle root
+        address_1 = '0x2242b8ab71521f6abEE4B4D83195E70AcB08727a'
+        vault_1 = '0xEd735de172272C03CA6F60c1d90D83D9CFB46D22'
+        allocators = [
+            {
+                'vault': {
+                    'id': vault_1.lower(),
+                },
+                'id': address_1.lower(),
+                'address': address_1,
+                'mintedOsTokenShares': Web3.to_wei(10, 'ether'),
+            },
+        ]
+        leverage_positions = []
+        os_token_holders = [
+            {
+                'id': address_1.lower(),
+                'balance': Web3.to_wei(7, 'ether'),
+            },
+        ]
+        mock_protocol_data = []
+        os_token_converter = OsTokenConverter(110, 100)
+        args = [
+            '--network',
+            MAINNET,
+            '--execution-endpoints',
+            execution_endpoints,
+            '--arbitrum-endpoint',
+            execution_endpoints,
+            '--verbose',
+            '--min-os-token-position-amount-gwei',
+            6 * 10**9,  # 6 ETH in Gwei
+        ]
+        with (
+            patch_latest_block(11),
+            patch_get_erc_balance(Web3.to_wei(0, 'ether')),
+            patch_os_token_redeemer_contract_nonce(6),
+            patch_os_token_arbitrum_contract_address(),
+            patch_os_token_contract_address(os_token_contract_address),
+            patch_os_token_converter(os_token_converter),
+            patch_api_client(mock_protocol_data),
+            patch(
+                'src.redemptions.graph.graph_client.fetch_pages',
+                side_effect=[allocators, leverage_positions, os_token_holders],
+            ),
+            patch_ipfs_client() as mock_upload_json,
+        ):
+            result = runner.invoke(update_redeemable_positions, args, input='\n')
+            assert result.exit_code == 0
+            mock_upload_json.assert_not_called()
+
 
 @contextlib.contextmanager
 def patch_latest_block(block_number):
@@ -612,5 +692,3 @@ def patch_ipfs_client():
         'src.commands.internal.update_redeemable_positions.build_ipfs_upload_clients', mock_build
     ):
         yield mock_upload_json
-    # with patch('src.redemptions.api_client.APIClient._fetch_json', return_value=mock_protocol_data):
-    #     yield

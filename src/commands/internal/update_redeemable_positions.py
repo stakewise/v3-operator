@@ -226,7 +226,7 @@ async def process(
     )
     allocators = _reduce_boosted_amount(allocators, boost_ostoken_shares)
 
-    # filter zero positions
+    # filter zero positions. Filter before kept shares calculation to reduce api calls
     min_minted_shares = Web3.to_wei(min_os_token_position_amount_gwei, 'gwei')
     for allocator in allocators:
         allocator.vault_shares = [
@@ -244,7 +244,7 @@ async def process(
     kept_shares = await get_kept_shares(address_to_minted_shares, block_number, arbitrum_config)
     logger.info('Fetched kept tokens for %s addresses...', len(address_to_minted_shares))
 
-    redeemable_positions = create_redeemable_positions(allocators, kept_shares)
+    redeemable_positions = create_redeemable_positions(allocators, kept_shares, min_minted_shares)
     if not redeemable_positions:
         logger.info('No redeemable positions to upload, exiting...')
         return
@@ -377,7 +377,9 @@ async def calculate_boost_ostoken_shares(
 
 
 def create_redeemable_positions(
-    allocators: list[Allocator], kept_shares: dict[ChecksumAddress, Wei]
+    allocators: list[Allocator],
+    kept_shares: dict[ChecksumAddress, Wei],
+    min_minted_shares: Wei,
 ) -> list[RedeemablePosition]:
     """Calculate vault proportions and create redeemable positions"""
     redeemable_positions: list[RedeemablePosition] = []
@@ -395,7 +397,9 @@ def create_redeemable_positions(
                 vault_amount = max(0, int(redeemable_amount - allocated_amount))
             else:
                 vault_amount = int(redeemable_amount * proportion)
-
+            allocated_amount += vault_amount
+            if vault_amount <= min_minted_shares:
+                continue
             redeemable_positions.append(
                 RedeemablePosition(
                     owner=allocator.address,
@@ -403,7 +407,6 @@ def create_redeemable_positions(
                     amount=Wei(vault_amount),
                 )
             )
-            allocated_amount += vault_amount
 
     return redeemable_positions
 
