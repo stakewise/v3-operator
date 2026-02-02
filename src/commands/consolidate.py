@@ -329,7 +329,7 @@ async def process(
         chain_head=chain_head,
         exclude_public_keys=exclude_public_keys,
     )
-    target_source = await consolidation_selector.get_target_source()
+    target_source = consolidation_selector.get_target_source()
     if not target_source:
         raise click.ClickException(f'Validators in vault {vault_address} can\'t be consolidated')
 

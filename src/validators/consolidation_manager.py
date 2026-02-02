@@ -70,7 +70,7 @@ class ConsolidationManager:
             self.pending_partial_withdrawals_indexes.add(withdrawal.validator_index)
         return self
 
-    async def get_target_source(self) -> list[tuple[ConsensusValidator, ConsensusValidator]]:
+    def get_target_source(self) -> list[tuple[ConsensusValidator, ConsensusValidator]]:
         '''
          # Source validators must be:
         - unique
@@ -109,7 +109,7 @@ class ConsolidationSelector(ConsolidationManager):
         self.chain_head = chain_head
         self.exclude_public_keys = exclude_public_keys
 
-    async def get_target_source(self) -> list[tuple[ConsensusValidator, ConsensusValidator]]:
+    def get_target_source(self) -> list[tuple[ConsensusValidator, ConsensusValidator]]:
         """
         If there are no 0x02 validators,
         take the oldest 0x01 validator and convert it to 0x02 with confirmation prompt.
@@ -121,7 +121,7 @@ class ConsolidationSelector(ConsolidationManager):
         source_validators_candidates, target_validator_candidates = (
             self._find_validators_candidates()
         )
-        if not target_validator_candidates:
+        if not source_validators_candidates or not target_validator_candidates:
             return []
 
         source_validators_candidates.sort(key=lambda val: val.activation_epoch)
@@ -165,7 +165,7 @@ class ConsolidationSelector(ConsolidationManager):
             target_validators.append(val)
 
             # additional filters for source validators
-            if val.is_compounding:
+            if val.is_compounding:  # todo
                 continue
             if val.activation_epoch >= self.max_activation_epoch:
                 continue
@@ -184,7 +184,7 @@ class ConsolidationChecker(ConsolidationManager):
         self.consolidation_keys = consolidation_keys
         self.chain_head = chain_head
 
-    async def get_target_source(self) -> list[tuple[ConsensusValidator, ConsensusValidator]]:
+    def get_target_source(self) -> list[tuple[ConsensusValidator, ConsensusValidator]]:
         """
         Validate that provided public keys can be consolidated
         and returns the target and source validators info.
@@ -293,10 +293,6 @@ class ConsolidationChecker(ConsolidationManager):
         if target_validator.index in self.consolidating_indexes:
             raise click.ClickException(
                 f'Target validator {self.target_public_key} is consolidating to another validator.'
-            )
-        if target_validator.public_key in self.exclude_public_keys:
-            raise click.ClickException(
-                f'Target validator {self.target_public_key} is excluded from consolidation.'
             )
 
         if self.is_switch_to_compounding():
