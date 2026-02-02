@@ -264,7 +264,7 @@ class TestConsolidationSelector:
         # since it's in consolidating_target_indexes
         assert result == []
 
-    async def test_non_excludes_validator_in_target_indexes_as_target(self):
+    async def test_allows_validator_in_target_indexes_as_target(self):
         """Test that target validator is not excluded if it's in consolidating_target_indexes"""
         consensus_validators = [
             create_consensus_validator(

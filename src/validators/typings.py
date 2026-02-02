@@ -121,4 +121,4 @@ class ConsolidationKeys:
 
     @property
     def all_public_keys(self) -> list[HexStr]:
-        return list(set(self.source_public_keys + [self.target_public_key]))
+        return list(dict.fromkeys(self.source_public_keys + [self.target_public_key]))

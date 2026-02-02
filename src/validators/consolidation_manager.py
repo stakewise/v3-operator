@@ -203,10 +203,10 @@ class ConsolidationChecker(ConsolidationManager):
         self._validate_public_keys()
 
         # Validate the source and target validators are in the vault
-        for public_keys in self.source_public_keys + [self.target_public_key]:
-            if public_keys not in self.vault_validators:
+        for public_key in self.source_public_keys + [self.target_public_key]:
+            if public_key not in self.vault_validators:
                 raise click.ClickException(
-                    f'Validator {public_keys} is not registered in the vault {settings.vault}.'
+                    f'Validator {public_key} is not registered in the vault {settings.vault}.'
                 )
 
         # Validate target public key

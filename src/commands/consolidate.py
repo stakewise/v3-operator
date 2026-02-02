@@ -202,12 +202,12 @@ def consolidate(
         raise click.ClickException(
             'Provide only one parameter: either --source-public-keys-file or --source-public-keys.'
         )
-    if not any([source_public_keys, source_public_keys_file]) and target_public_key:
+    if not (source_public_keys or source_public_keys_file) and target_public_key:
         raise click.ClickException(
             'One of these parameters must be provided with target-public-key:'
             ' --source-public-keys-file or --source-public-keys.'
         )
-    if any([source_public_keys, source_public_keys_file]) and not target_public_key:
+    if (source_public_keys or source_public_keys_file) and not target_public_key:
         raise click.ClickException(
             'target-public-key must be provided with one of these parameters:'
             ' --source-public-keys-file or --source-public-keys.'
