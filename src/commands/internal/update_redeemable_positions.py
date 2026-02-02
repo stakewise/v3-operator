@@ -272,6 +272,8 @@ async def process(
     # calculate merkle root
     nonce = await os_token_redeemer_contract.nonce()
     leaves = [r.merkle_leaf(nonce) for r in redeemable_positions]
+    # sort leaves by (vault, amount, owner)
+    leaves = sorted(leaves, key=lambda x: (x[1], x[2], x[3]))
     tree = StandardMerkleTree.of(
         leaves,
         [
@@ -305,21 +307,22 @@ async def get_kept_shares(
         )
         arbitrum_endpoint = arbitrum_config.EXECUTION_ENDPOINT
         arb_execution_client = get_execution_client([arbitrum_endpoint])
-
-        arb_contract = Erc20Contract(
-            settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS,
-            execution_client=arb_execution_client,
-        )
-        for index, address in enumerate(address_to_minted_shares.keys()):
-            if index and index % 50 == 0:
-                logger.info(
-                    'Fetched wallet balances for %d/%d addresses',
-                    index,
-                    len(address_to_minted_shares),
-                )
-            arb_balance = await arb_contract.get_balance(address)
-            kept_shares[address] = Wei(kept_shares[address] + arb_balance)
-
+        try:
+            arb_contract = Erc20Contract(
+                settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS,
+                execution_client=arb_execution_client,
+            )
+            for index, address in enumerate(address_to_minted_shares.keys()):
+                if index and index % 50 == 0:
+                    logger.info(
+                        'Fetched wallet balances for %d/%d addresses',
+                        index,
+                        len(address_to_minted_shares),
+                    )
+                arb_balance = await arb_contract.get_balance(address)
+                kept_shares[address] = Wei(kept_shares[address] + arb_balance)
+        finally:
+            await arb_execution_client.provider.disconnect()
     # do not fetch data from api if all os token are in the wallet
     api_addresses = []
     for address in address_to_minted_shares.keys():
@@ -381,7 +384,10 @@ def create_redeemable_positions(
     kept_shares: dict[ChecksumAddress, Wei],
     min_minted_shares: Wei,
 ) -> list[RedeemablePosition]:
-    """Calculate vault proportions and create redeemable positions"""
+    """
+    Calculate vault proportions and create redeemable positions.
+    Sort by amount descending.
+    """
     redeemable_positions: list[RedeemablePosition] = []
     for allocator in allocators:
         allocator_kept_shares = kept_shares.get(allocator.address, Wei(0))
@@ -407,7 +413,7 @@ def create_redeemable_positions(
                     amount=Wei(vault_amount),
                 )
             )
-
+    redeemable_positions.sort(key=lambda p: p.amount, reverse=True)
     return redeemable_positions
 
 

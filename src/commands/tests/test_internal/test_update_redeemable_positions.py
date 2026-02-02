@@ -134,8 +134,8 @@ def test_create_redeemable_positions_multiple_vaults_2():
     }
     result = create_redeemable_positions(allocators, kept_tokens, 0)
     assert result == [
-        RedeemablePosition(owner=address_1, vault=vault_1, amount=Wei(299)),
         RedeemablePosition(owner=address_1, vault=vault_2, amount=Wei(600)),
+        RedeemablePosition(owner=address_1, vault=vault_1, amount=Wei(299)),
     ]
 
 
@@ -157,8 +157,8 @@ def test_create_redeemable_positions_multiple_vaults_3():
     }
     result = create_redeemable_positions(allocators, kept_tokens, 0)
     assert result == [
-        RedeemablePosition(owner=address_1, vault=vault_1, amount=Wei(299)),
         RedeemablePosition(owner=address_1, vault=vault_2, amount=Wei(600)),
+        RedeemablePosition(owner=address_1, vault=vault_1, amount=Wei(299)),
     ]
 
 
