@@ -171,7 +171,8 @@ class ConsolidationSelector(ConsolidationManager):
             target_validators.append(val)
 
             # additional filters for source validators
-            if val.is_compounding:  # todo
+            # Source validator must be non-compounding
+            if val.is_compounding:
                 continue
             if val.activation_epoch >= self.max_activation_epoch:
                 continue

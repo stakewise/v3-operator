@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import click
 import pytest
 from eth_typing import HexStr
@@ -78,6 +80,7 @@ class TestConsolidationSelector:
         result = selector.get_target_source()
         assert result == [(consensus_validators[1], consensus_validators[0])]
 
+    @pytest.mark.asyncio
     async def test_consolidation_max_balance(self):
         consensus_validators = [
             create_consensus_validator(
@@ -93,16 +96,17 @@ class TestConsolidationSelector:
                 activation_epoch=3, is_compounding=False, balance=ether_to_gwei(32.3)
             ),
         ]
-        settings.max_validator_balance_gwei = ether_to_gwei(100)  # todo
-        selector = create_manager(
-            vault_validators=[v.public_key for v in consensus_validators],
-            consensus_validators=consensus_validators,
-        )
-        result = selector.get_target_source()
-        assert result == [
-            (consensus_validators[0], consensus_validators[1]),
-            (consensus_validators[0], consensus_validators[2]),
-        ]
+
+        with patch.object(settings, 'max_validator_balance_gwei', ether_to_gwei(100)):
+            selector = create_manager(
+                vault_validators=[v.public_key for v in consensus_validators],
+                consensus_validators=consensus_validators,
+            )
+            result = selector.get_target_source()
+            assert result == [
+                (consensus_validators[0], consensus_validators[1]),
+                (consensus_validators[0], consensus_validators[2]),
+            ]
 
     async def test_excludes_consolidating_validators(self):
         consensus_validators = [
@@ -202,12 +206,12 @@ class TestConsolidationSelector:
             create_consensus_validator(
                 index=10,
                 activation_epoch=1,
-                is_compounding=True,  # compounding validator that could be a target
+                is_compounding=True,
             ),
             create_consensus_validator(
                 index=11,
                 activation_epoch=1,
-                is_compounding=False,  # non-compounding validator that could be a source
+                is_compounding=False,
             ),
         ]
         selector = create_manager(
@@ -229,12 +233,12 @@ class TestConsolidationSelector:
             create_consensus_validator(
                 index=10,
                 activation_epoch=1,
-                is_compounding=False,  # non-compounding validator that could be a source
+                is_compounding=False,
             ),
             create_consensus_validator(
                 index=11,
                 activation_epoch=1,
-                is_compounding=True,  # compounding validator that could be a target
+                is_compounding=True,
             ),
         ]
         selector = create_manager(
@@ -266,12 +270,12 @@ class TestConsolidationSelector:
             create_consensus_validator(
                 index=10,
                 activation_epoch=1,
-                is_compounding=True,  # compounding validator that could be a target
+                is_compounding=True,
             ),
             create_consensus_validator(
                 index=11,
                 activation_epoch=1,
-                is_compounding=False,  # non-compounding validator that could be a source
+                is_compounding=False,
             ),
         ]
         selector = create_manager(
@@ -293,12 +297,12 @@ class TestConsolidationSelector:
             create_consensus_validator(
                 index=10,
                 activation_epoch=1,
-                is_compounding=False,  # non-compounding validator that could be a source
+                is_compounding=False,
             ),
             create_consensus_validator(
                 index=11,
                 activation_epoch=1,
-                is_compounding=True,  # compounding validator that could be a target
+                is_compounding=True,
             ),
         ]
         selector = create_manager(
@@ -461,6 +465,7 @@ class TestConsolidationChecker:
             (consensus_validators[2], consensus_validators[1]),
         ]
 
+    @pytest.mark.asyncio
     async def test_consolidation_max_balance(self):
         source_pk_1 = faker.validator_public_key()
         source_pk_2 = faker.validator_public_key()
@@ -497,19 +502,18 @@ class TestConsolidationChecker:
                 balance=ether_to_gwei(32.0),
             ),
         ]
-        settings.max_validator_balance_gwei = ether_to_gwei(
-            96.0
-        )  # Max balance to allow 2 consolidations
-        selector = create_manager(
-            consolidation_keys=consolidation_keys,
-            vault_validators=[v.public_key for v in consensus_validators],
-            consensus_validators=consensus_validators,
-        )
 
-        with pytest.raises(
-            click.ClickException, match='Cannot consolidate validators, total balance exceed'
-        ):
-            selector.get_target_source()
+        with patch.object(settings, 'max_validator_balance_gwei', ether_to_gwei(96.0)):
+            selector = create_manager(
+                consolidation_keys=consolidation_keys,
+                vault_validators=[v.public_key for v in consensus_validators],
+                consensus_validators=consensus_validators,
+            )
+
+            with pytest.raises(
+                click.ClickException, match='Cannot consolidate validators, total balance exceed'
+            ):
+                selector.get_target_source()
 
     async def test_excludes_consolidating_validators(self):
         source_pk = faker.validator_public_key()
