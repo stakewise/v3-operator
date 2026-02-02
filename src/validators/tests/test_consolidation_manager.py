@@ -120,7 +120,8 @@ class TestConsolidationSelector:
         selector = create_manager(
             vault_validators=[v.public_key for v in consensus_validators],
             consensus_validators=consensus_validators,
-            consolidating_indexes={10, 11},
+            consolidating_source_indexes={10, 11},
+            consolidating_target_indexes={10, 11},
         )
         result = selector.get_target_source()
         assert result == []
@@ -193,6 +194,124 @@ class TestConsolidationSelector:
             consensus_validators=consensus_validators,
         )
         result = selector.get_target_source()
+        assert result == []
+
+    async def test_excludes_source_as_target_validator(self):
+        """Test that target validator is excluded if it's in consolidating_source_indexes"""
+        consensus_validators = [
+            create_consensus_validator(
+                index=10,
+                activation_epoch=1,
+                is_compounding=True,  # compounding validator that could be a target
+            ),
+            create_consensus_validator(
+                index=11,
+                activation_epoch=1,
+                is_compounding=False,  # non-compounding validator that could be a source
+            ),
+        ]
+        selector = create_manager(
+            vault_validators=[v.public_key for v in consensus_validators],
+            consensus_validators=consensus_validators,
+            consolidating_source_indexes={
+                10
+            },  # index 10 is in source consolidation, so can't be target
+            consolidating_target_indexes=set(),
+        )
+        result = selector.get_target_source()
+        # Should switch validator 11 from 0x01 to 0x02 since there are no valid targets
+        # but validator 11 is available as source
+        assert result == [(consensus_validators[1], consensus_validators[1])]
+
+    async def test_excludes_source_validator_in_both_indexes(self):
+        """Test that source validator is excluded if it's in either source or target consolidating indexes"""
+        consensus_validators = [
+            create_consensus_validator(
+                index=10,
+                activation_epoch=1,
+                is_compounding=False,  # non-compounding validator that could be a source
+            ),
+            create_consensus_validator(
+                index=11,
+                activation_epoch=1,
+                is_compounding=True,  # compounding validator that could be a target
+            ),
+        ]
+        selector = create_manager(
+            vault_validators=[v.public_key for v in consensus_validators],
+            consensus_validators=consensus_validators,
+            consolidating_source_indexes={10},  # index 10 is in source consolidation
+            consolidating_target_indexes=set(),
+        )
+        result = selector.get_target_source()
+        # Should be empty because the only potential source (index 10) is excluded
+        # since it's in consolidating_source_indexes
+        assert result == []
+
+        # Test with target indexes too
+        selector = create_manager(
+            vault_validators=[v.public_key for v in consensus_validators],
+            consensus_validators=consensus_validators,
+            consolidating_source_indexes=set(),
+            consolidating_target_indexes={10},  # index 10 is in target consolidation
+        )
+        result = selector.get_target_source()
+        # Should still be empty because the only potential source (index 10) is excluded
+        # since it's in consolidating_target_indexes
+        assert result == []
+
+    async def test_non_excludes_validator_in_target_indexes_as_target(self):
+        """Test that target validator is not excluded if it's in consolidating_target_indexes"""
+        consensus_validators = [
+            create_consensus_validator(
+                index=10,
+                activation_epoch=1,
+                is_compounding=True,  # compounding validator that could be a target
+            ),
+            create_consensus_validator(
+                index=11,
+                activation_epoch=1,
+                is_compounding=False,  # non-compounding validator that could be a source
+            ),
+        ]
+        selector = create_manager(
+            vault_validators=[v.public_key for v in consensus_validators],
+            consensus_validators=consensus_validators,
+            consolidating_source_indexes=set(),
+            consolidating_target_indexes={
+                10
+            },  # index 10 is in target consolidation, so can't be target again
+        )
+        result = selector.get_target_source()
+        # Should switch validator 11 from 0x01 to 0x02 since there are no valid targets
+        # but validator 11 is available as source
+        assert result == [(consensus_validators[0], consensus_validators[1])]
+
+    async def test_excludes_validator_in_target_indexes_as_source(self):
+        """Test that source validator is excluded if it's in consolidating_target_indexes"""
+        consensus_validators = [
+            create_consensus_validator(
+                index=10,
+                activation_epoch=1,
+                is_compounding=False,  # non-compounding validator that could be a source
+            ),
+            create_consensus_validator(
+                index=11,
+                activation_epoch=1,
+                is_compounding=True,  # compounding validator that could be a target
+            ),
+        ]
+        selector = create_manager(
+            vault_validators=[v.public_key for v in consensus_validators],
+            consensus_validators=consensus_validators,
+            consolidating_source_indexes=set(),
+            consolidating_target_indexes={
+                10
+            },  # index 10 is in target consolidation, so can't be source
+        )
+        result = selector.get_target_source()
+        # Should be empty because the only potential source (index 10) is excluded
+        # since it's in consolidating_target_indexes
         assert result == []
 
 
@@ -418,7 +537,8 @@ class TestConsolidationChecker:
             consolidation_keys=consolidation_keys,
             vault_validators=[v.public_key for v in consensus_validators],
             consensus_validators=consensus_validators,
-            consolidating_indexes={10},  # Source validator is consolidating
+            consolidating_source_indexes={10},  # Source validator is consolidating
+            consolidating_target_indexes=set(),
         )
 
         with pytest.raises(
@@ -432,12 +552,13 @@ class TestConsolidationChecker:
             consolidation_keys=consolidation_keys,
             vault_validators=[v.public_key for v in consensus_validators],
             consensus_validators=consensus_validators,
-            consolidating_indexes={11},  # Target validator is consolidating
+            consolidating_source_indexes={11},  # Target validator is consolidating (as source)
+            consolidating_target_indexes=set(),
         )
 
         with pytest.raises(
             click.ClickException,
-            match=f'Target validator {target_pk} is consolidating to another validator.',
+            match=f'Target validator {target_pk} is involved in another consolidation.',
         ):
             selector.get_target_source()
 
@@ -579,7 +700,8 @@ def create_manager(
     exclude_public_keys: set[HexStr] = None,
     vault_validators: list[HexStr] = None,
     consensus_validators: list[ConsensusValidator] = None,
-    consolidating_indexes: set[int] = None,
+    consolidating_source_indexes: set[int] = None,
+    consolidating_target_indexes: set[int] = None,
     pending_partial_withdrawals_indexes: set[int] = None,
 ) -> ConsolidationSelector | ConsolidationChecker:
     self: ConsolidationChecker | ConsolidationSelector
@@ -592,7 +714,7 @@ def create_manager(
         )
     else:
         if exclude_public_keys is None:
-            exclude_public_keys = []
+            exclude_public_keys = set()
         self = ConsolidationSelector(
             chain_head=chain_head,
             exclude_public_keys=exclude_public_keys,
@@ -600,10 +722,15 @@ def create_manager(
     self.vault_validators = vault_validators
     self.consensus_validators = consensus_validators
 
-    if consolidating_indexes:
-        self.consolidating_indexes = consolidating_indexes
+    if consolidating_source_indexes:
+        self.consolidating_source_indexes = consolidating_source_indexes
     else:
-        self.consolidating_indexes = set()
+        self.consolidating_source_indexes = set()
+
+    if consolidating_target_indexes:
+        self.consolidating_target_indexes = consolidating_target_indexes
+    else:
+        self.consolidating_target_indexes = set()
 
     if pending_partial_withdrawals_indexes:
         self.pending_partial_withdrawals_indexes = pending_partial_withdrawals_indexes

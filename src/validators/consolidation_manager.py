@@ -18,7 +18,8 @@ class ConsolidationManager:
     chain_head: ChainHead
     vault_validators: list[HexStr]
     consensus_validators: list[ConsensusValidator]
-    consolidating_indexes: set[int]
+    consolidating_source_indexes: set[int]
+    consolidating_target_indexes: set[int]
     pending_partial_withdrawals_indexes: set[int]
     exclude_public_keys: set[HexStr]
 
@@ -60,10 +61,11 @@ class ConsolidationManager:
         pending_consolidations = await get_pending_consolidations(
             chain_head, self.consensus_validators
         )
-        self.consolidating_indexes = set()
+        self.consolidating_source_indexes = set()
+        self.consolidating_target_indexes = set()
         for cons in pending_consolidations:
-            self.consolidating_indexes.add(cons.source_index)
-            self.consolidating_indexes.add(cons.target_index)  # todo
+            self.consolidating_source_indexes.add(cons.source_index)
+            self.consolidating_target_indexes.add(cons.target_index)
 
         self.pending_partial_withdrawals_indexes = set()
         for withdrawal in pending_partial_withdrawals:
@@ -148,7 +150,10 @@ class ConsolidationSelector(ConsolidationManager):
             return [(target_validator, val) for val in selected_source_validators]
 
         # Target validator is almost full, switch the oldest 0x01 to 0x02
-        return [(selected_source_validators[0], selected_source_validators[0])]
+        # Only do this if there are source validators available
+        if source_validators_candidates:
+            return [(source_validators_candidates[0], source_validators_candidates[0])]
+        return []
 
     def _find_validators_candidates(
         self,
@@ -158,7 +163,8 @@ class ConsolidationSelector(ConsolidationManager):
         for val in self.consensus_validators:
             if val.status in EXITING_STATUSES:
                 continue
-            if val.index in self.consolidating_indexes:
+            # Target validator cannot be used as source in ongoing consolidations
+            if val.index in self.consolidating_source_indexes:
                 continue
             if val.public_key in self.exclude_public_keys:
                 continue
@@ -168,6 +174,9 @@ class ConsolidationSelector(ConsolidationManager):
             if val.is_compounding:  # todo
                 continue
             if val.activation_epoch >= self.max_activation_epoch:
+                continue
+            # Source validator cannot be in any ongoing consolidations (either as source or target)
+            if val.index in self.consolidating_target_indexes:
                 continue
             if val.index in self.pending_partial_withdrawals_indexes:
                 continue
@@ -232,7 +241,10 @@ class ConsolidationChecker(ConsolidationManager):
                 )
 
             # Validate the source validator is not consolidating
-            if source_validator.index in self.consolidating_indexes:
+            if (
+                source_validator.index in self.consolidating_source_indexes
+                or source_validator.index in self.consolidating_target_indexes
+            ):
                 raise click.ClickException(
                     f'Validator {source_validator.public_key} '
                     f'is consolidating to another validator.'
@@ -290,9 +302,10 @@ class ConsolidationChecker(ConsolidationManager):
                 f'Target validator {self.target_public_key} is in exiting '
                 f'status {target_validator.status.value}.'
             )
-        if target_validator.index in self.consolidating_indexes:
+        # Target validator cannot be used as source in ongoing consolidations
+        if target_validator.index in self.consolidating_source_indexes:
             raise click.ClickException(
-                f'Target validator {self.target_public_key} is consolidating to another validator.'
+                f'Target validator {self.target_public_key} is involved in another consolidation.'
             )
 
         if self.is_switch_to_compounding():
