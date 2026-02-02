@@ -132,14 +132,6 @@ def update_redeemable_positions(
     wallet_password_file: str | None,
     min_os_token_position_amount_gwei: int,
 ) -> None:
-    arbitrum_config: ArbitrumConfig | None = None
-    if network == MAINNET:
-        if not arbitrum_endpoint:
-            raise click.BadParameter('arbitrum-endpoint is required for mainnet network')
-        arbitrum_config = ArbitrumConfig(
-            OS_TOKEN_CONTRACT_ADDRESS=settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS,
-            EXECUTION_ENDPOINT=arbitrum_endpoint,
-        )
     settings.set(
         vault=ZERO_CHECKSUM_ADDRESS,
         vault_dir=Path.home() / '.stakewise',
@@ -152,6 +144,14 @@ def update_redeemable_positions(
         wallet_password_file=wallet_password_file,
         log_level=log_level,
     )
+    arbitrum_config: ArbitrumConfig | None = None
+    if network == MAINNET:
+        if not arbitrum_endpoint:
+            raise click.BadParameter('arbitrum-endpoint is required for mainnet network')
+        arbitrum_config = ArbitrumConfig(
+            OS_TOKEN_CONTRACT_ADDRESS=settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS,
+            EXECUTION_ENDPOINT=arbitrum_endpoint,
+        )
     try:
         # Try-catch to enable async calls in test - an event loop
         #  will already be running in that case
@@ -345,10 +345,11 @@ async def get_kept_shares(
         show_percent=False,
         show_pos=True,
     ) as progress_bar:
-        for address in progress_bar:
+        for index, address in enumerate(progress_bar):
+            if index:
+                await asyncio.sleep(API_SLEEP_TIMEOUT)  # to avoid rate limiting
             locked_os_token = await api_client.get_protocols_locked_os_token(address=address)
             kept_shares[address] = Wei(kept_shares[address] + locked_os_token)
-            await asyncio.sleep(API_SLEEP_TIMEOUT)  # to avoid rate limiting
     return kept_shares
 
 
@@ -404,7 +405,7 @@ def create_redeemable_positions(
             else:
                 vault_amount = int(redeemable_amount * proportion)
             allocated_amount += vault_amount
-            if vault_amount <= min_minted_shares:
+            if vault_amount < min_minted_shares:
                 continue
             redeemable_positions.append(
                 RedeemablePosition(
