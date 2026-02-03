@@ -272,8 +272,6 @@ async def process(
     # calculate merkle root
     nonce = await os_token_redeemer_contract.nonce()
     leaves = [r.merkle_leaf(nonce) for r in redeemable_positions]
-    # sort leaves by (vault, amount, owner)
-    leaves = sorted(leaves, key=lambda x: (x[1], x[2], x[3]))
     tree = StandardMerkleTree.of(
         leaves,
         [
