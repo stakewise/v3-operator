@@ -84,7 +84,7 @@ async def get_vault_to_redemption_assets(
 
 
 async def aggregate_redemption_assets_by_vaults(
-    total_redemption_assets: Wei, block_number: BlockNumber
+    total_redemption_assets: Wei, block_number: BlockNumber | None = None
 ) -> defaultdict[ChecksumAddress, Wei]:
     """
     Iterate through redeemable positions until the total redemption assets are exhausted.
