@@ -11,7 +11,7 @@ Repository settings require all commits to be signed. You have to setup GPG sign
 1. Install [poetry](https://python-poetry.org/). See the [Dockerfile](https://github.com/stakewise/v3-operator/blob/master/Dockerfile) in the project sources for the exact poetry version.
 2. Check out github repo.
 3. Run `poetry install --no-root`. This command will install all dependencies including dev dependencies.
-4. Add project directory to `PYTHONPATH`. For example: `export PYTHONPATH=`.
+4. Add project directory to `PYTHONPATH`. For example: `export PYTHONPATH=.`.
 
 ## Linting and testing
 
