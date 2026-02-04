@@ -370,6 +370,7 @@ class TestUpdateRedeemablePositions:
         mock_protocol_data = [
             {
                 'id': 'stakewise',
+                'chain': 'eth',
                 'portfolio_item_list': [
                     {
                         'detail': {
@@ -386,6 +387,7 @@ class TestUpdateRedeemablePositions:
             },
             {
                 'id': 'aave3',
+                'chain': 'eth',
                 'portfolio_item_list': [
                     {
                         'detail': {
@@ -402,6 +404,7 @@ class TestUpdateRedeemablePositions:
             },
             {
                 'id': 'balancer',
+                'chain': 'eth',
                 'portfolio_item_list': [
                     {
                         'detail': {
