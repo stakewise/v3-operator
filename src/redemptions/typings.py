@@ -69,6 +69,12 @@ class RedeemablePosition:
 
 
 @dataclass
+class ArbitrumConfig:
+    OS_TOKEN_CONTRACT_ADDRESS: ChecksumAddress
+    EXECUTION_ENDPOINT: str
+
+
+@dataclass
 class RedeemablePositions:
     merkle_root: HexStr
     ipfs_hash: str

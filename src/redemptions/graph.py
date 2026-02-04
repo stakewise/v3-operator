@@ -68,8 +68,7 @@ async def graph_get_leverage_positions(block_number: BlockNumber) -> list[Levera
         query PositionsQuery($block: Int,  $first: Int, $skip: Int) {
           leverageStrategyPositions(
             block: { number: $block },
-            orderBy: borrowLtv,
-            orderDirection: desc,
+            orderBy: id,
             first: $first
             skip: $skip
           ) {

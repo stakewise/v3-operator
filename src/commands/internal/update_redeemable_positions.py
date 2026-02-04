@@ -4,7 +4,6 @@ import sys
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import cast
 
 import click
 from eth_typing import BlockNumber, ChecksumAddress
@@ -36,6 +35,7 @@ from src.redemptions.os_token_converter import (
 )
 from src.redemptions.typings import (
     Allocator,
+    ArbitrumConfig,
     LeverageStrategyPosition,
     RedeemablePosition,
 )
@@ -132,8 +132,6 @@ def update_redeemable_positions(
     wallet_password_file: str | None,
     min_os_token_position_amount_gwei: int,
 ) -> None:
-    if network == MAINNET and not arbitrum_endpoint:
-        raise click.BadParameter('arbitrum-endpoint is required for mainnet network')
     settings.set(
         vault=ZERO_CHECKSUM_ADDRESS,
         vault_dir=Path.home() / '.stakewise',
@@ -146,6 +144,14 @@ def update_redeemable_positions(
         wallet_password_file=wallet_password_file,
         log_level=log_level,
     )
+    arbitrum_config: ArbitrumConfig | None = None
+    if network == MAINNET:
+        if not arbitrum_endpoint:
+            raise click.BadParameter('arbitrum-endpoint is required for mainnet network')
+        arbitrum_config = ArbitrumConfig(
+            OS_TOKEN_CONTRACT_ADDRESS=settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS,
+            EXECUTION_ENDPOINT=arbitrum_endpoint,
+        )
     try:
         # Try-catch to enable async calls in test - an event loop
         #  will already be running in that case
@@ -156,7 +162,7 @@ def update_redeemable_positions(
                 pool.submit(
                     lambda: asyncio.run(
                         main(
-                            arbitrum_endpoint=arbitrum_endpoint,
+                            arbitrum_config=arbitrum_config,
                             min_os_token_position_amount_gwei=Gwei(
                                 min_os_token_position_amount_gwei
                             ),
@@ -168,7 +174,7 @@ def update_redeemable_positions(
                 # no event loop running
                 asyncio.run(
                     main(
-                        arbitrum_endpoint=arbitrum_endpoint,
+                        arbitrum_config=arbitrum_config,
                         min_os_token_position_amount_gwei=Gwei(min_os_token_position_amount_gwei),
                     )
                 )
@@ -179,12 +185,14 @@ def update_redeemable_positions(
         sys.exit(1)
 
 
-async def main(arbitrum_endpoint: str | None, min_os_token_position_amount_gwei: Gwei) -> None:
+async def main(
+    arbitrum_config: ArbitrumConfig | None, min_os_token_position_amount_gwei: Gwei
+) -> None:
     setup_logging()
     await setup_clients()
     try:
         await process(
-            arbitrum_endpoint=arbitrum_endpoint,
+            arbitrum_config=arbitrum_config,
             min_os_token_position_amount_gwei=min_os_token_position_amount_gwei,
         )
     finally:
@@ -192,7 +200,9 @@ async def main(arbitrum_endpoint: str | None, min_os_token_position_amount_gwei:
 
 
 # pylint: disable-next=too-many-locals
-async def process(arbitrum_endpoint: str | None, min_os_token_position_amount_gwei: Gwei) -> None:
+async def process(
+    arbitrum_config: ArbitrumConfig | None, min_os_token_position_amount_gwei: Gwei
+) -> None:
     """
     Fetch redeemable positions, calculate kept os token amounts and upload to IPFS.
     """
@@ -216,7 +226,7 @@ async def process(arbitrum_endpoint: str | None, min_os_token_position_amount_gw
     )
     allocators = _reduce_boosted_amount(allocators, boost_ostoken_shares)
 
-    # filter zero positions
+    # filter zero positions. Filter before kept shares calculation to reduce api calls
     min_minted_shares = Web3.to_wei(min_os_token_position_amount_gwei, 'gwei')
     for allocator in allocators:
         allocator.vault_shares = [
@@ -231,21 +241,23 @@ async def process(arbitrum_endpoint: str | None, min_os_token_position_amount_gw
 
     logger.info('Fetching kept tokens for %s addresses', len(allocators))
     address_to_minted_shares = {a.address: a.total_shares for a in allocators}
-    kept_shares = await get_kept_shares(address_to_minted_shares, block_number, arbitrum_endpoint)
+    kept_shares = await get_kept_shares(address_to_minted_shares, block_number, arbitrum_config)
     logger.info('Fetched kept tokens for %s addresses...', len(address_to_minted_shares))
 
-    redeemable_positions = create_redeemable_positions(allocators, kept_shares)
+    redeemable_positions = create_redeemable_positions(allocators, kept_shares, min_minted_shares)
     if not redeemable_positions:
         logger.info('No redeemable positions to upload, exiting...')
         return
     total_redeemable = sum(p.amount for p in redeemable_positions)
     logger.info(
-        'Created %s redeemable positions. Total redeemed %s amount: %s (%s %s)',
-        len(redeemable_positions),
-        settings.network_config.OS_TOKEN_BALANCE_SYMBOL,
-        total_redeemable,
-        round(Web3.from_wei(total_redeemable, 'ether'), 5),
-        settings.network_config.WALLET_BALANCE_SYMBOL,
+        'Created %(count)s redeemable positions. Total redeemed %(os_token_symbol)s amount: '
+        '%(total_redeemable)s (%(total_redeemable_eth).5f %(os_token_symbol)s)',
+        {
+            'count': len(redeemable_positions),
+            'os_token_symbol': settings.network_config.OS_TOKEN_BALANCE_SYMBOL,
+            'total_redeemable': total_redeemable,
+            'total_redeemable_eth': Web3.from_wei(total_redeemable, 'ether'),
+        },
     )
 
     click.confirm(
@@ -275,7 +287,7 @@ async def process(arbitrum_endpoint: str | None, min_os_token_position_amount_gw
 async def get_kept_shares(
     address_to_minted_shares: dict[ChecksumAddress, Wei],
     block_number: BlockNumber,
-    arbitrum_endpoint: str | None,
+    arbitrum_config: ArbitrumConfig | None,
 ) -> dict[ChecksumAddress, Wei]:
     kept_shares = defaultdict(lambda: Wei(0))
     logger.info(
@@ -286,28 +298,29 @@ async def get_kept_shares(
         kept_shares[address] = os_token_holders.get(address, Wei(0))
 
     # arb wallet balance
-    if settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS != ZERO_CHECKSUM_ADDRESS:
+    if arbitrum_config:
         logger.info(
             'Fetching %s from Arbitrum wallet balances...',
             settings.network_config.OS_TOKEN_BALANCE_SYMBOL,
         )
-        arbitrum_endpoint = cast(str, arbitrum_endpoint)
+        arbitrum_endpoint = arbitrum_config.EXECUTION_ENDPOINT
         arb_execution_client = get_execution_client([arbitrum_endpoint])
-
-        arb_contract = Erc20Contract(
-            settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS,
-            execution_client=arb_execution_client,
-        )
-        for index, address in enumerate(address_to_minted_shares.keys()):
-            if index and index % 50 == 0:
-                logger.info(
-                    'Fetched wallet balances for %d/%d addresses',
-                    index,
-                    len(address_to_minted_shares),
-                )
-            arb_balance = await arb_contract.get_balance(address)
-            kept_shares[address] = Wei(kept_shares[address] + arb_balance)
-
+        try:
+            arb_contract = Erc20Contract(
+                settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS,
+                execution_client=arb_execution_client,
+            )
+            for index, address in enumerate(address_to_minted_shares.keys()):
+                if index and index % 50 == 0:
+                    logger.info(
+                        'Fetched wallet balances for %d/%d addresses',
+                        index,
+                        len(address_to_minted_shares),
+                    )
+                arb_balance = await arb_contract.get_balance(address)
+                kept_shares[address] = Wei(kept_shares[address] + arb_balance)
+        finally:
+            await arb_execution_client.provider.disconnect()
     # do not fetch data from api if all os token are in the wallet
     api_addresses = []
     for address in address_to_minted_shares.keys():
@@ -323,7 +336,6 @@ async def get_kept_shares(
         len(api_addresses),
     )
     api_client = APIClient()
-    locked_os_token_per_address: dict[ChecksumAddress, Wei] = {}
     # fetch locked os token from the api
     with click.progressbar(
         api_addresses,
@@ -331,11 +343,11 @@ async def get_kept_shares(
         show_percent=False,
         show_pos=True,
     ) as progress_bar:
-        for address in progress_bar:
+        for index, address in enumerate(progress_bar):
+            if index:
+                await asyncio.sleep(API_SLEEP_TIMEOUT)  # to avoid rate limiting
             locked_os_token = await api_client.get_protocols_locked_os_token(address=address)
-            locked_os_token_per_address[address] = locked_os_token
             kept_shares[address] = Wei(kept_shares[address] + locked_os_token)
-            await asyncio.sleep(API_SLEEP_TIMEOUT)  # to avoid rate limiting
     return kept_shares
 
 
@@ -343,8 +355,10 @@ async def calculate_boost_ostoken_shares(
     users: set[ChecksumAddress],
     leverage_positions: list[LeverageStrategyPosition],
     os_token_converter: OsTokenConverter,
-) -> dict[ChecksumAddress, dict[ChecksumAddress, Wei]]:
-    boosted_positions: defaultdict[ChecksumAddress, dict[ChecksumAddress, Wei]] = defaultdict(dict)
+) -> dict[tuple[ChecksumAddress, ChecksumAddress], Wei]:
+    boosted_positions: defaultdict[tuple[ChecksumAddress, ChecksumAddress], Wei] = defaultdict(
+        lambda: Wei(0)
+    )
     if not leverage_positions:
         return boosted_positions
 
@@ -357,19 +371,22 @@ async def calculate_boost_ostoken_shares(
             + os_token_converter.to_shares(position.assets)
             + os_token_converter.to_shares(position.exiting_assets)
         )
-        if position.vault not in boosted_positions[position.user]:
-            boosted_positions[position.user][position.vault] = Wei(0)
-        boosted_positions[position.user][position.vault] = Wei(
-            boosted_positions[position.user][position.vault] + position_os_token_shares
+        boosted_positions[position.user, position.vault] = Wei(
+            boosted_positions[position.user, position.vault] + position_os_token_shares
         )
 
     return boosted_positions
 
 
 def create_redeemable_positions(
-    allocators: list[Allocator], kept_shares: dict[ChecksumAddress, Wei]
+    allocators: list[Allocator],
+    kept_shares: dict[ChecksumAddress, Wei],
+    min_minted_shares: Wei,
 ) -> list[RedeemablePosition]:
-    """Calculate vault proportions and create redeemable positions"""
+    """
+    Calculate vault proportions and create redeemable positions.
+    Sort by amount descending.
+    """
     redeemable_positions: list[RedeemablePosition] = []
     for allocator in allocators:
         allocator_kept_shares = kept_shares.get(allocator.address, Wei(0))
@@ -385,7 +402,9 @@ def create_redeemable_positions(
                 vault_amount = max(0, int(redeemable_amount - allocated_amount))
             else:
                 vault_amount = int(redeemable_amount * proportion)
-
+            allocated_amount += vault_amount
+            if vault_amount < min_minted_shares:
+                continue
             redeemable_positions.append(
                 RedeemablePosition(
                     owner=allocator.address,
@@ -393,21 +412,17 @@ def create_redeemable_positions(
                     amount=Wei(vault_amount),
                 )
             )
-            allocated_amount += vault_amount
-
+    redeemable_positions.sort(key=lambda p: p.amount, reverse=True)
     return redeemable_positions
 
 
 def _reduce_boosted_amount(
     allocators: list[Allocator],
-    boost_ostoken_shares: dict[ChecksumAddress, dict[ChecksumAddress, Wei]],
+    boost_ostoken_shares: dict[tuple[ChecksumAddress, ChecksumAddress], Wei],
 ) -> list[Allocator]:
     for allocator in allocators:
-        if allocator.address not in boost_ostoken_shares:
-            continue
         for vault_share in allocator.vault_shares:
-            boosted_amount = boost_ostoken_shares[allocator.address].get(
-                vault_share.address, Wei(0)
-            )
+            key = allocator.address, vault_share.address
+            boosted_amount = boost_ostoken_shares.get(key, Wei(0))
             vault_share.minted_shares = Wei(max(0, vault_share.minted_shares - boosted_amount))
     return allocators
