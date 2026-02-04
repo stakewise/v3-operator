@@ -423,9 +423,6 @@ class MetaVaultContract(ContractWrapper):
             for entry in res
         ]
 
-    async def sub_vaults_rewards_nonce(self) -> HexStr:
-        return await self.contract.functions.subVaultsRewardsNonce().call()
-
     async def deposit_to_sub_vaults(self) -> HexStr:
         tx_function = self.contract.functions.depositToSubVaults()
         tx_hash = await transaction_gas_wrapper(tx_function)

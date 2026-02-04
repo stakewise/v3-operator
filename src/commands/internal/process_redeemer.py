@@ -11,7 +11,6 @@ from multiproof import StandardMerkleTree
 from multiproof.standard import MultiProof
 from sw_utils import InterruptHandler
 from web3 import Web3
-from web3.exceptions import ContractLogicError, Web3RPCError
 from web3.types import Wei
 
 from src.common.clients import (
@@ -21,7 +20,6 @@ from src.common.clients import (
     setup_clients,
 )
 from src.common.contracts import (
-    MetaVaultContract,
     VaultContract,
     multicall_contract,
     os_token_redeemer_contract,
@@ -34,6 +32,7 @@ from src.common.utils import log_verbose
 from src.common.wallet import wallet
 from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
+from src.meta_vault.service import is_meta_vault
 from src.redemptions.os_token_converter import create_os_token_converter
 from src.redemptions.typings import RedeemablePosition
 from src.validators.execution import get_withdrawable_assets
@@ -221,7 +220,7 @@ async def process(block_number: BlockNumber) -> None:
         #  Handle Meta-Vaults with Insufficient Withdrawable Assets
         vault_positions_shares = Wei(sum(position.redeemable_shares for position in positions))
         vault_positions_assets = os_token_converter.to_assets(vault_positions_shares)
-        if vault_positions_assets > withdrawable_assets and await _is_meta_vault(vault_address):
+        if vault_positions_assets > withdrawable_assets and await is_meta_vault(vault_address):
             # Check if vault is a meta-vault
             logger.info(
                 'Vault %s is a meta-vault with insufficient withdrawable assets.', vault_address
@@ -345,15 +344,6 @@ async def _process_exit_queue(block_number: BlockNumber) -> None:
         logger.info('Exit queue can be processed. Calling processExitQueue...')
         tx_hash = await os_token_redeemer_contract.process_exit_queue()
         logger.info('ProcessExitQueue transaction sent. Tx Hash: %s', tx_hash)
-
-
-async def _is_meta_vault(vault_address: ChecksumAddress) -> bool:
-    meta_vault_contract = MetaVaultContract(vault_address)
-    try:
-        await meta_vault_contract.sub_vaults_rewards_nonce()
-        return True
-    except (Web3RPCError, ValueError, ContractLogicError):
-        return False
 
 
 async def _startup_check() -> None:
