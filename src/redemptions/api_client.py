@@ -14,6 +14,7 @@ DEFAULT_USER_AGENT = (
 )
 SUPPORTED_CHAINS = {'eth', 'arb'}
 API_SLEEP_TIMEOUT = 1
+STAKEWISE_DEBANK_PROTOCOL_IDS = ['stakewise', 'xdai_stakewise']
 
 
 class APIClient:
@@ -30,7 +31,7 @@ class APIClient:
         total_locked_os_token = Wei(0)
         for protocol in protocol_data:
             # boosted OsEth handled via graph separately
-            if protocol['id'] in ['stakewise', 'xdai_stakewise']:
+            if protocol['id'] in STAKEWISE_DEBANK_PROTOCOL_IDS:
                 continue
             for portfolio_item in protocol.get('portfolio_item_list', []):
                 supply_token_list = portfolio_item.get('detail', {}).get('supply_token_list', [])

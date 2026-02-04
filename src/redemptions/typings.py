@@ -77,6 +77,6 @@ class RedeemablePosition:
 
 
 @dataclass
-class RedeemablePositionsMeta:
+class RedeemablePositions:
     merkle_root: HexStr
     ipfs_hash: str

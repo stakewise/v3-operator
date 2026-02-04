@@ -157,7 +157,7 @@ def build_ipfs_upload_clients() -> IpfsMultiUploadClient:
 
     if not clients:
         raise ValueError(
-            'No IPFS clients settings. '
+            'No IPFS client settings configured. '
             'Please provide IPFS_LOCAL_CLIENT_ENDPOINT or third party IPFS services settings.'
         )
     return IpfsMultiUploadClient(clients)

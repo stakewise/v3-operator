@@ -44,6 +44,10 @@ async def get_queued_assets(
     pending_partial_withdrawals: list[PendingPartialWithdrawal],
     chain_head: ChainHead,
 ) -> Gwei:
+    """
+    Get exit queue missing assets.
+    For Gno networks return value in mGNO-Gwei.
+    """
     harvest_params = await get_harvest_params(settings.vault, chain_head.block_number)
 
     # Get exit queue cumulative tickets
