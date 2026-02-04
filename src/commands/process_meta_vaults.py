@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 import click
+from click import ClickException
 from eth_typing import ChecksumAddress
 from eth_utils import to_checksum_address
 from sw_utils import InterruptHandler
@@ -11,9 +12,16 @@ from web3.types import Gwei
 
 from src.commands.start.base import log_start, setup_sentry
 from src.common.clients import setup_clients
+from src.common.execution import check_wallet_balance
 from src.common.logging import LOG_LEVELS, setup_logging
+from src.common.startup_check import (
+    check_execution_nodes_network,
+    wait_for_execution_node,
+    wait_for_graph_node_sync_to_chain_head,
+)
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_addresses
+from src.common.wallet import wallet
 from src.config.networks import AVAILABLE_NETWORKS, GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
     DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
@@ -21,6 +29,7 @@ from src.config.settings import (
     LOG_PLAIN,
     settings,
 )
+from src.meta_vault.graph import graph_get_vaults
 from src.meta_vault.tasks import ProcessMetaVaultTask
 
 logger = logging.getLogger(__name__)
@@ -89,6 +98,7 @@ logger = logging.getLogger(__name__)
     '--graph-endpoint',
     type=str,
     envvar='GRAPH_ENDPOINT',
+    # default is endpoint from network config
     help='API endpoint for graph node.',
 )
 @click.option(
@@ -127,7 +137,7 @@ def process_meta_vaults(
     vaults: str,
     execution_endpoints: str,
     execution_jwt_secret: str | None,
-    graph_endpoint: str,
+    graph_endpoint: str | None,
     network: str,
     verbose: bool,
     log_level: str,
@@ -183,6 +193,33 @@ async def main(vaults: list[ChecksumAddress]) -> None:
     await setup_clients()
     log_start()
 
+    await startup_checks(vaults)
+
     logger.info('Started meta vault processing')
     with InterruptHandler() as interrupt_handler:
         await ProcessMetaVaultTask(vaults).run(interrupt_handler)
+
+
+async def startup_checks(meta_vault_addresses: list[ChecksumAddress]) -> None:
+    logger.info('Checking connection to execution nodes...')
+    await wait_for_execution_node()
+
+    logger.info('Checking execution nodes network...')
+    await check_execution_nodes_network()
+
+    logger.info('Checking graph nodes...')
+    await wait_for_graph_node_sync_to_chain_head()
+
+    logger.info('Checking meta vault addresses %s...', ', '.join(meta_vault_addresses))
+    await _check_meta_vaults(meta_vault_addresses)
+
+    logger.info('Checking wallet balance %s...', wallet.address)
+    await check_wallet_balance()
+
+
+async def _check_meta_vaults(meta_vault_addresses: list[ChecksumAddress]) -> None:
+    meta_vaults = await graph_get_vaults(is_meta_vault=True)
+
+    for vault in meta_vault_addresses:
+        if vault not in meta_vaults:
+            raise ClickException(f'Vault {vault} is not a meta vault')

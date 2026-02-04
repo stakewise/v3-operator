@@ -9,6 +9,7 @@ import click
 import psutil
 from aiohttp import ClientSession, ClientTimeout
 from click import ClickException
+from eth_typing import BlockNumber
 from sw_utils import (
     ChainHead,
     InterruptHandler,
@@ -42,7 +43,6 @@ from src.config.settings import (
     WITHDRAWALS_INTERVAL,
     settings,
 )
-from src.meta_vault.graph import graph_get_vaults
 from src.validators.execution import get_withdrawable_assets
 from src.validators.keystores.local import LocalKeystore
 from src.validators.relayer import RelayerClient
@@ -76,13 +76,13 @@ async def startup_checks() -> None:
     await _check_consensus_nodes_network()
 
     logger.info('Checking execution nodes network...')
-    await _check_execution_nodes_network()
+    await check_execution_nodes_network()
 
     logger.info('Checking that consensus and execution nodes are in sync...')
     chain_state = await get_chain_finalized_head()
     await wait_execution_catch_up_consensus(chain_state)
 
-    if settings.claim_fee_splitter or settings.process_meta_vault:
+    if settings.claim_fee_splitter:
         logger.info('Checking graph nodes...')
         await wait_for_graph_node_sync_to_chain_head()
 
@@ -133,12 +133,10 @@ async def startup_checks() -> None:
             'WITHDRAWALS_INTERVAL setting should be less than '
             f'force withdrawals period({protocol_config.force_withdrawals_period} seconds)'
         )
-    if settings.process_meta_vault:
-        await _check_is_meta_vault()
 
 
 def validate_settings() -> None:
-    if not settings.graph_endpoint and (settings.claim_fee_splitter or settings.process_meta_vault):
+    if not settings.graph_endpoint and settings.claim_fee_splitter:
         raise ClickException('GRAPH_ENDPOINT is missing')
 
     if settings.run_nodes and settings.execution_endpoints != [DEFAULT_EXECUTION_ENDPOINT]:
@@ -290,16 +288,16 @@ async def wait_for_graph_node_sync_to_chain_head() -> None:
     )
     await graph_client.setup()
     try:
-        chain_state = await get_chain_finalized_head()
+        finalized_block_number = await _get_finalized_block_number()
         graph_block_number = await graph_client.get_last_synced_block()
 
-        while graph_block_number < chain_state.block_number:
+        while graph_block_number < finalized_block_number:
             logger.warning(
                 'The graph node located at %s has not completed synchronization yet.',
                 settings.graph_endpoint,
             )
             await asyncio.sleep(settings.network_config.SECONDS_PER_BLOCK)
-            chain_state = await get_chain_finalized_head()
+            finalized_block_number = await _get_finalized_block_number()
             graph_block_number = await graph_client.get_last_synced_block()
     finally:
         await graph_client.disconnect()
@@ -385,7 +383,7 @@ async def _check_consensus_nodes_network() -> None:
             )
 
 
-async def _check_execution_nodes_network() -> None:
+async def check_execution_nodes_network() -> None:
     """
     Checks that execution node network is the same as settings.network
     """
@@ -515,12 +513,6 @@ async def _check_vault_address() -> None:
         raise ClickException(f'Invalid vault contract address {settings.vault}') from e
 
 
-async def _check_is_meta_vault() -> None:
-    meta_vaults = await graph_get_vaults(is_meta_vault=True)
-    if settings.vault not in meta_vaults:
-        raise ValueError(f'Vault {settings.vault} is not a meta vault')
-
-
 def check_hardware_requirements(data_dir: Path, network: str, no_confirm: bool) -> None:
     # Check memory requirements
     mem = psutil.virtual_memory()
@@ -558,3 +550,13 @@ def check_hardware_requirements(data_dir: Path, network: str, no_confirm: bool) 
             default=False,
         ):
             raise click.Abort()
+
+
+async def _get_finalized_block_number() -> BlockNumber:
+    """
+    Do not call get_chain_finalized_head() here because it requires consensus client.
+    In process-meta-vaults command it should work without consensus client.
+    """
+    execution_client = default_execution_client
+    finalized_block = await execution_client.eth.get_block('finalized')
+    return finalized_block['number']
