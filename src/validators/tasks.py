@@ -277,6 +277,7 @@ async def load_genesis_validators() -> None:
     if not (NetworkValidatorCrud().get_last_network_validator() is None and ipfs_hash):
         return
 
+    logger.info('Downloading validators data from IPFS...')
     ipfs_fetch_client = IpfsFetchClient(
         ipfs_endpoints=settings.ipfs_fetch_endpoints,
         timeout=settings.genesis_validators_ipfs_timeout,
@@ -284,7 +285,7 @@ async def load_genesis_validators() -> None:
     )
     data = await ipfs_fetch_client.fetch_bytes(ipfs_hash)
     genesis_validators: list[NetworkValidator] = []
-    logger.info('Loading genesis validators...')
+    logger.info('Loading genesis validators into the database...')
     for i in range(0, len(data), 52):
         genesis_validators.append(
             NetworkValidator(

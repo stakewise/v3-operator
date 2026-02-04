@@ -42,7 +42,6 @@ logger = logging.getLogger(__name__)
     '--hashi-vault-key-path',
     envvar='HASHI_VAULT_KEY_PATH',
     multiple=True,
-    required=True,
     help='Key path(s) in the K/V secret engine where validator signing keys are stored.',
 )
 @click.option(

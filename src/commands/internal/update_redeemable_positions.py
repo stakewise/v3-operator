@@ -23,7 +23,11 @@ from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import log_verbose
 from src.config.networks import AVAILABLE_NETWORKS, MAINNET, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
-from src.redemptions.api_client import API_SLEEP_TIMEOUT, APIClient
+from src.redemptions.api_client import (
+    API_SLEEP_TIMEOUT,
+    API_SUPPORTED_CHAINS,
+    APIClient,
+)
 from src.redemptions.graph import (
     graph_get_allocators,
     graph_get_leverage_positions,
@@ -321,6 +325,11 @@ async def get_kept_shares(
                 kept_shares[address] = Wei(kept_shares[address] + arb_balance)
         finally:
             await arb_execution_client.provider.disconnect()
+
+    # rabby doesnt support hoodi so skip api call
+    if settings.network not in API_SUPPORTED_CHAINS:
+        return kept_shares
+
     # do not fetch data from api if all os token are in the wallet
     api_addresses = []
     for address in address_to_minted_shares.keys():
