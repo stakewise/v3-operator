@@ -9,6 +9,9 @@ from web3.types import BlockNumber
 from src.common.clients import execution_client
 from src.common.contracts import (
     MetaVaultContract,
+    MetaVaultEncoder,
+    SubVaultsRegistryContract,
+    SubVaultsRegistryEncoder,
     VaultContract,
     keeper_contract,
     multicall_contract,
@@ -221,12 +224,14 @@ async def _get_meta_vault_update_state_calls(
     meta_vault_contract = MetaVaultContract(
         address=meta_vault.address,
     )
+    sub_vaults_registry_address = await meta_vault_contract.sub_vaults_registry()
 
     # Collect claimable exit requests for the sub vaults
     sub_vault_exit_requests = await get_claimable_sub_vault_exit_requests(
         meta_vault_contract=meta_vault_contract
     )
-    meta_vault_encoder = meta_vault_contract.encoder()
+    meta_vault_encoder = MetaVaultEncoder()
+    sub_vaults_registry_encoder = SubVaultsRegistryEncoder()
 
     # Claim sub vaults exited assets
     if sub_vault_exit_requests:
@@ -237,8 +242,10 @@ async def _get_meta_vault_update_state_calls(
         )
         calls.append(
             ContractCall(
-                address=meta_vault.address,
-                data=meta_vault_encoder.claim_sub_vaults_exited_assets(sub_vault_exit_requests),
+                address=sub_vaults_registry_address,
+                data=sub_vaults_registry_encoder.claim_sub_vaults_exited_assets(
+                    sub_vault_exit_requests
+                ),
                 description=f'Claim {len(sub_vault_exit_requests)} sub vault exit requests '
                 f'for meta vault {meta_vault.address}',
             )
@@ -382,7 +389,10 @@ async def process_deposit_to_sub_vaults(meta_vault_address: ChecksumAddress) -> 
         return
 
     logger.info('Depositing to sub vaults for meta vault %s', meta_vault_address)
-    tx_hash = await meta_vault_contract.deposit_to_sub_vaults()
+    sub_vaults_registry_address = await meta_vault_contract.sub_vaults_registry()
+    sub_vaults_registry = SubVaultsRegistryContract(sub_vaults_registry_address)
+
+    tx_hash = await sub_vaults_registry.deposit_to_sub_vaults()
 
     logger.info('Waiting for transaction %s confirmation', tx_hash)
     tx_receipt = await execution_client.eth.wait_for_transaction_receipt(

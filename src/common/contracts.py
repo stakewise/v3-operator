@@ -21,6 +21,7 @@ from src.common.typings import (
     HarvestParams,
     RewardVoteInfo,
 )
+from src.config.networks import ZERO_CHECKSUM_ADDRESS
 from src.config.settings import (
     EVENTS_CONCURRENCY_CHUNK,
     EVENTS_CONCURRENCY_LIMIT,
@@ -381,19 +382,14 @@ class RewardSplitterEncoder:
 class MetaVaultContract(ContractWrapper):
     abi_path = 'abi/IEthMetaVault.json'
 
+    async def sub_vaults_registry(self) -> ChecksumAddress:
+        return await self.contract.functions.subVaultsRegistry().call()
+
     async def withdrawable_assets(self) -> Wei:
         return await self.contract.functions.withdrawableAssets().call()
 
     async def get_exit_queue_index(self, position_ticket: int) -> int:
         return await self.contract.functions.getExitQueueIndex(position_ticket).call()
-
-    async def deposit_to_sub_vaults(self) -> HexStr:
-        tx_function = self.contract.functions.depositToSubVaults()
-        tx_hash = await transaction_gas_wrapper(tx_function)
-        return Web3.to_hex(tx_hash)
-
-    def encoder(self) -> 'MetaVaultEncoder':
-        return MetaVaultEncoder(self)
 
     async def get_last_rewards_nonce_updated_event(
         self, from_block: BlockNumber, to_block: BlockNumber
@@ -410,8 +406,37 @@ class MetaVaultContract(ContractWrapper):
 
 
 class MetaVaultEncoder:
-    def __init__(self, contract: MetaVaultContract):
-        self.contract = contract
+    def __init__(self) -> None:
+        # Use dummy address since we only need to encode ABI calls, no actual contract interaction
+        self.contract = MetaVaultContract(ZERO_CHECKSUM_ADDRESS)
+
+    def update_state(self, harvest_params: HarvestParams) -> HexStr:
+        return self.contract.encode_abi(
+            fn_name='updateState',
+            args=[
+                (
+                    harvest_params.rewards_root,
+                    harvest_params.reward,
+                    harvest_params.unlocked_mev_reward,
+                    harvest_params.proof,
+                ),
+            ],
+        )
+
+
+class SubVaultsRegistryContract(ContractWrapper):
+    abi_path = 'abi/ISubVaultsRegistry.json'
+
+    async def deposit_to_sub_vaults(self) -> HexStr:
+        tx_function = self.contract.functions.depositToSubVaults()
+        tx_hash = await transaction_gas_wrapper(tx_function)
+        return Web3.to_hex(tx_hash)
+
+
+class SubVaultsRegistryEncoder:
+    def __init__(self) -> None:
+        # Use dummy address since we only need to encode ABI calls, no actual contract interaction
+        self.contract = SubVaultsRegistryContract(ZERO_CHECKSUM_ADDRESS)
 
     def claim_sub_vaults_exited_assets(
         self, sub_vault_exit_requests: list[SubVaultExitRequest]
@@ -428,19 +453,6 @@ class MetaVaultEncoder:
             )
         return self.contract.encode_abi(
             fn_name='claimSubVaultsExitedAssets', args=[exit_requests_arg]
-        )
-
-    def update_state(self, harvest_params: HarvestParams) -> HexStr:
-        return self.contract.encode_abi(
-            fn_name='updateState',
-            args=[
-                (
-                    harvest_params.rewards_root,
-                    harvest_params.reward,
-                    harvest_params.unlocked_mev_reward,
-                    harvest_params.proof,
-                ),
-            ],
         )
 
 
