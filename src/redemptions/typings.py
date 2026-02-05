@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from eth_typing import ChecksumAddress
+from eth_typing import ChecksumAddress, HexStr
 from web3 import Web3
 from web3.types import Wei
 
@@ -72,3 +72,9 @@ class RedeemablePosition:
 class ArbitrumConfig:
     OS_TOKEN_CONTRACT_ADDRESS: ChecksumAddress
     EXECUTION_ENDPOINT: str
+
+
+@dataclass
+class RedeemablePositions:
+    merkle_root: HexStr
+    ipfs_hash: str
