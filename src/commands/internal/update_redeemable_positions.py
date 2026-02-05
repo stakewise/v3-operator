@@ -4,6 +4,7 @@ import sys
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import cast
 
 import click
 from eth_typing import BlockNumber, ChecksumAddress
@@ -48,23 +49,10 @@ logger = logging.getLogger(__name__)
 
 
 @click.option(
-    '--wallet-password-file',
-    type=click.Path(exists=True, file_okay=True, dir_okay=False),
-    envvar='WALLET_PASSWORD_FILE',
-    help='Absolute path to the wallet password file. '
-    'Default is the file generated with "create-wallet" command.',
-)
-@click.option(
-    '--wallet-file',
-    type=click.Path(exists=True, file_okay=True, dir_okay=False),
-    envvar='WALLET_FILE',
-    help='Absolute path to the wallet. '
-    'Default is the file generated with "create-wallet" command.',
-)
-@click.option(
     '--min-os-token-position-amount-gwei',
     type=int,
     default=0,
+    show_default=True,
     envvar='MIN_OS_TOKEN_POSITION_AMOUNT_GWEI',
     help='Process positions only if the amount of minted os token in Gwei'
     ' is greater than the specified value.',
@@ -93,7 +81,12 @@ logger = logging.getLogger(__name__)
     '--arbitrum-endpoint',
     type=str,
     envvar='ARBITRUM_ENDPOINT',
-    help='API endpoint for the execution node on Arbitrum.',
+    help='API endpoint for the Arbitrum execution node. Should only be specified for mainnet.',
+)
+@click.option(
+    '--no-confirm',
+    is_flag=True,
+    help='Skips confirmation messages when provided. Default is false.',
 )
 @click.option(
     '--log-level',
@@ -114,7 +107,7 @@ logger = logging.getLogger(__name__)
 )
 @click.option(
     '--network',
-    help='The network of the meta vaults.',
+    help='The network for redeemable positions.',
     prompt='Enter the network name',
     envvar='NETWORK',
     type=click.Choice(
@@ -130,10 +123,9 @@ def update_redeemable_positions(
     graph_endpoint: str,
     arbitrum_endpoint: str | None,
     network: str,
+    no_confirm: bool,
     verbose: bool,
     log_level: str,
-    wallet_file: str | None,
-    wallet_password_file: str | None,
     min_os_token_position_amount_gwei: int,
 ) -> None:
     settings.set(
@@ -144,17 +136,17 @@ def update_redeemable_positions(
         graph_endpoint=graph_endpoint,
         verbose=verbose,
         network=network,
-        wallet_file=wallet_file,
-        wallet_password_file=wallet_password_file,
         log_level=log_level,
     )
     arbitrum_config: ArbitrumConfig | None = None
     if network == MAINNET:
         if not arbitrum_endpoint:
-            raise click.BadParameter('arbitrum-endpoint is required for mainnet network')
+            arbitrum_endpoint = click.prompt(
+                'Enter the API endpoint for the Arbitrum execution node'
+            )
         arbitrum_config = ArbitrumConfig(
             OS_TOKEN_CONTRACT_ADDRESS=settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS,
-            EXECUTION_ENDPOINT=arbitrum_endpoint,
+            EXECUTION_ENDPOINT=cast(str, arbitrum_endpoint),
         )
     try:
         # Try-catch to enable async calls in test - an event loop
@@ -170,6 +162,7 @@ def update_redeemable_positions(
                             min_os_token_position_amount_gwei=Gwei(
                                 min_os_token_position_amount_gwei
                             ),
+                            no_confirm=no_confirm,
                         )
                     )
                 ).result()
@@ -180,6 +173,7 @@ def update_redeemable_positions(
                     main(
                         arbitrum_config=arbitrum_config,
                         min_os_token_position_amount_gwei=Gwei(min_os_token_position_amount_gwei),
+                        no_confirm=no_confirm,
                     )
                 )
             else:
@@ -190,7 +184,9 @@ def update_redeemable_positions(
 
 
 async def main(
-    arbitrum_config: ArbitrumConfig | None, min_os_token_position_amount_gwei: Gwei
+    arbitrum_config: ArbitrumConfig | None,
+    min_os_token_position_amount_gwei: Gwei,
+    no_confirm: bool,
 ) -> None:
     setup_logging()
     await setup_clients()
@@ -198,6 +194,7 @@ async def main(
         await process(
             arbitrum_config=arbitrum_config,
             min_os_token_position_amount_gwei=min_os_token_position_amount_gwei,
+            no_confirm=no_confirm,
         )
     finally:
         await close_clients()
@@ -205,7 +202,9 @@ async def main(
 
 # pylint: disable-next=too-many-locals
 async def process(
-    arbitrum_config: ArbitrumConfig | None, min_os_token_position_amount_gwei: Gwei
+    arbitrum_config: ArbitrumConfig | None,
+    min_os_token_position_amount_gwei: Gwei,
+    no_confirm: bool,
 ) -> None:
     """
     Fetch redeemable positions, calculate kept os token amounts and upload to IPFS.
@@ -263,12 +262,12 @@ async def process(
             'total_redeemable_eth': Web3.from_wei(total_redeemable, 'ether'),
         },
     )
-
-    click.confirm(
-        'Proceed with uploading redeemable positions to IPFS?',
-        default=True,
-        abort=True,
-    )
+    if not no_confirm:
+        click.confirm(
+            'Proceed with uploading redeemable positions to IPFS?',
+            default=True,
+            abort=True,
+        )
     ipfs_upload_client = build_ipfs_upload_clients()
     ipfs_hash = await ipfs_upload_client.upload_json([p.as_dict() for p in redeemable_positions])
     click.echo(f'Redeemable position uploaded to IPFS: hash={ipfs_hash}')
