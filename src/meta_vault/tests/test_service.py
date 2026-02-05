@@ -31,7 +31,7 @@ class TestDistributeMetaVaultRedemptionAssets:
             },
         )
 
-        with patch('src.meta_vault.service.is_meta_vault', return_value=False):
+        with patch('src.meta_vault.service.is_meta_vault', new=AsyncMock(return_value=False)):
             result = await distribute_meta_vault_redemption_assets(assets)
             assert dict(result) == {
                 vaults['vault1']: 100,
@@ -92,7 +92,7 @@ class TestDistributeMetaVaultRedemptionAssets:
             SubVaultRedemption(vault=vaults['sub_vault2'], assets=200),
         ]
 
-        async def calculate_sub_vaults_redemptions_side_effect(self, assets):
+        async def calculate_sub_vaults_redemptions_side_effect(self, assets, block_number=None):
             if self.address == vaults['meta_vault']:
                 return meta_vault_redemptions
             elif self.address == vaults['nested_meta_vault']:

@@ -9,8 +9,8 @@ from eth_typing import HexStr
 from sw_utils.tests import faker
 from web3 import Web3
 
-from src.redemptions.os_token_converter import os_token_vault_controller_contract
 from src.common.tests.utils import parse_wei
+from src.redemptions.os_token_converter import os_token_vault_controller_contract
 from src.redemptions.tasks import (
     aggregate_redemption_assets_by_vaults,
     batch_size,

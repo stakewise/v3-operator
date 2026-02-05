@@ -412,9 +412,11 @@ class MetaVaultContract(ContractWrapper):
         return await self.contract.functions.getExitQueueIndex(position_ticket).call()
 
     async def calculate_sub_vaults_redemptions(
-        self, assets_to_redeem: Wei
+        self, assets_to_redeem: Wei, block_number: BlockNumber | None = None
     ) -> list[SubVaultRedemption]:
-        res = await self.contract.functions.calculateSubVaultsRedemptions(assets_to_redeem).call()
+        res = await self.contract.functions.calculateSubVaultsRedemptions(assets_to_redeem).call(
+            block_identifier=block_number
+        )
         return [
             SubVaultRedemption(
                 vault=Web3.to_checksum_address(entry[0]),
@@ -504,8 +506,12 @@ class OsTokenRedeemerContract(ContractWrapper):
     abi_path = 'abi/IOsTokenRedeemer.json'
     settings_key = 'OS_TOKEN_REDEEMER_CONTRACT_ADDRESS'
 
-    async def redeemable_positions(self) -> RedeemablePositions:
-        merkle_root, ipfs_hash = await self.contract.functions.redeemablePositions().call()
+    async def redeemable_positions(
+        self, block_number: BlockNumber | None = None
+    ) -> RedeemablePositions:
+        merkle_root, ipfs_hash = await self.contract.functions.redeemablePositions().call(
+            block_identifier=block_number
+        )
         return RedeemablePositions(
             merkle_root=Web3.to_hex(merkle_root),
             ipfs_hash=ipfs_hash,

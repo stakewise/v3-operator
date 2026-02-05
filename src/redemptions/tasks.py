@@ -11,7 +11,6 @@ from web3 import Web3
 from web3.types import Gwei, Wei
 
 from src.common.clients import ipfs_fetch_client
-from src.common.consensus import get_chain_latest_head
 from src.common.contracts import multicall_contract, os_token_redeemer_contract
 from src.common.protocol_config import get_protocol_config
 from src.common.utils import async_batched
@@ -26,13 +25,12 @@ logger = logging.getLogger(__name__)
 batch_size = 20
 
 
-async def get_redemption_assets() -> Gwei:
+async def get_redemption_assets(chain_head: ChainHead) -> Gwei:
     """
     Get redemption assets for operator's vault.
     For Gno networks return value in mGNO-GWei.
     """
     protocol_config = await get_protocol_config()
-    chain_head = await get_chain_latest_head()
 
     # Aggregate redemption assets per vault
     vault_to_redemption_assets = await get_vault_to_redemption_assets(
@@ -40,7 +38,8 @@ async def get_redemption_assets() -> Gwei:
     )
     # Distribute redemption assets from meta vaults to their underlying vaults
     vault_to_redemption_assets = await distribute_meta_vault_redemption_assets(
-        vault_to_redemption_assets=vault_to_redemption_assets
+        vault_to_redemption_assets=vault_to_redemption_assets,
+        block_number=chain_head.block_number,
     )
     # Filter by operator's vault
     redemption_assets = vault_to_redemption_assets[settings.vault]
@@ -59,8 +58,6 @@ async def get_vault_to_redemption_assets(
     Get redemption assets per vault.
     For Gno networks return value in GNO-Wei.
     """
-    # todo: finalized head or latest head?
-    # or skip block argument?
     ticket = await os_token_redeemer_contract.get_exit_queue_cumulative_tickets(
         block_number=chain_head.block_number
     )
@@ -99,13 +96,17 @@ async def aggregate_redemption_assets_by_vaults(
     os_token_converter = await create_os_token_converter(block_number)
     total_redemption_shares = os_token_converter.to_shares(total_redemption_assets)
 
-    nonce = await os_token_redeemer_contract.nonce()
+    nonce = await os_token_redeemer_contract.nonce(block_number=block_number)
     vault_to_unprocessed_shares: defaultdict[ChecksumAddress, Wei] = defaultdict(lambda: Wei(0))
 
     # Iterate through redeemable positions until total redemption shares are exhausted
-    async for redeemable_position_batch in async_batched(iter_redeemable_positions(), batch_size):
+    async for redeemable_position_batch in async_batched(
+        iter_redeemable_positions(block_number=block_number), batch_size
+    ):
         processed_shares_batch = await get_processed_shares_batch(
-            redeemable_positions_batch=redeemable_position_batch, nonce=nonce
+            redeemable_positions_batch=redeemable_position_batch,
+            nonce=nonce,
+            block_number=block_number,
         )
         for redeemable_position, processed_shares in zip(
             redeemable_position_batch, processed_shares_batch
@@ -141,8 +142,12 @@ async def aggregate_redemption_assets_by_vaults(
     return vault_to_unprocessed_assets
 
 
-async def iter_redeemable_positions() -> AsyncGenerator[RedeemablePosition, None]:
-    redeemable_positions = await os_token_redeemer_contract.redeemable_positions()
+async def iter_redeemable_positions(
+    block_number: BlockNumber | None = None,
+) -> AsyncGenerator[RedeemablePosition, None]:
+    redeemable_positions = await os_token_redeemer_contract.redeemable_positions(
+        block_number=block_number
+    )
 
     # Check whether redeemable positions are available
     if not redeemable_positions.ipfs_hash:
