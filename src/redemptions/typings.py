@@ -9,6 +9,7 @@ from web3.types import Wei
 class VaultOsTokenPosition:
     address: ChecksumAddress
     minted_shares: Wei
+    ltv: float
 
 
 @dataclass

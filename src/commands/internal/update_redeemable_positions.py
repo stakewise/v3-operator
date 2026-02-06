@@ -456,15 +456,17 @@ def create_os_token_positions(
 ) -> list[OsTokenPosition]:
     """
     Calculate vault proportions and create redeemable positions.
-    Sort by amount descending.
+    Sort by ltv descending, then amount descending.
     """
     os_token_positions: list[OsTokenPosition] = []
+    position_ltv: dict[tuple[ChecksumAddress, ChecksumAddress], float] = {}
     for allocator in allocators:
         allocator_kept_shares = kept_shares.get(allocator.address, Wei(0))
         redeemable_amount = max(0, allocator.total_shares - allocator_kept_shares)
         if redeemable_amount == 0:
             continue
 
+        vault_ltv = {vs.address: vs.ltv for vs in allocator.vault_shares}
         allocated_amount = 0
         vaults_proportions = allocator.vaults_proportions.items()
         for index, (vault_address, proportion) in enumerate(vaults_proportions):
@@ -483,7 +485,8 @@ def create_os_token_positions(
                     amount=Wei(vault_amount),
                 )
             )
-    os_token_positions.sort(key=lambda p: p.amount, reverse=True)
+            position_ltv[allocator.address, vault_address] = vault_ltv[vault_address]
+    os_token_positions.sort(key=lambda p: (position_ltv[p.owner, p.vault], p.amount), reverse=True)
     return os_token_positions
 
 

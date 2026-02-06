@@ -38,6 +38,7 @@ async def graph_get_allocators(block_number: BlockNumber) -> list[Allocator]:
           id
           address
           mintedOsTokenShares
+          ltv
           }
         }
         """
@@ -46,19 +47,22 @@ async def graph_get_allocators(block_number: BlockNumber) -> list[Allocator]:
         'block': block_number,
     }
     response = await graph_client.fetch_pages(query, params=params, cursor_pagination=True)
-    tmp_allocators: defaultdict[str, dict[str, Wei]] = defaultdict(dict)
+    tmp_allocators: defaultdict[str, dict[str, tuple[Wei, float]]] = defaultdict(dict)
     allocators: list[Allocator] = []
     for item in response:
         if int(item['mintedOsTokenShares']) > 0:
-            tmp_allocators[item['address']][item['vault']['id']] = Wei(
-                int(item['mintedOsTokenShares'])
+            tmp_allocators[item['address']][item['vault']['id']] = (
+                Wei(int(item['mintedOsTokenShares'])),
+                float(item['ltv']),
             )
     for allocator_address, vaults in tmp_allocators.items():
         vault_shares = [
             VaultOsTokenPosition(
-                address=Web3.to_checksum_address(vault_address), minted_shares=shares
+                address=Web3.to_checksum_address(vault_address),
+                minted_shares=minted_shares,
+                ltv=ltv,
             )
-            for vault_address, shares in vaults.items()
+            for vault_address, (minted_shares, ltv) in vaults.items()
         ]
         allocators.append(
             Allocator(
