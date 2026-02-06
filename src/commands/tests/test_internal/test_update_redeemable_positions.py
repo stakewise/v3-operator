@@ -456,7 +456,7 @@ class TestUpdateOsTokenPositions:
         ]
         with (
             patch_latest_block(11),
-            patch_get_erc_balance(Web3.to_wei(1, 'ether')),
+            patch_get_arb_balance(Web3.to_wei(1, 'ether')),
             patch_os_token_redeemer_contract_nonce(6),
             patch_os_token_arbitrum_contract_address(),
             patch_os_token_contract_address(os_token_contract_address),
@@ -513,7 +513,7 @@ class TestUpdateOsTokenPositions:
         ]
         with (
             patch_latest_block(11),
-            patch_get_erc_balance(Web3.to_wei(0, 'ether')),
+            patch_get_arb_balance(Web3.to_wei(0, 'ether')),
             patch_os_token_redeemer_contract_nonce(6),
             patch_os_token_arbitrum_contract_address(),
             patch_os_token_contract_address(os_token_contract_address),
@@ -572,7 +572,7 @@ class TestUpdateOsTokenPositions:
         ]
         with (
             patch_latest_block(11),
-            patch_get_erc_balance(Web3.to_wei(0, 'ether')),
+            patch_get_arb_balance(Web3.to_wei(0, 'ether')),
             patch_os_token_redeemer_contract_nonce(6),
             patch_os_token_arbitrum_contract_address(),
             patch_os_token_contract_address(os_token_contract_address),
@@ -630,7 +630,7 @@ class TestUpdateOsTokenPositions:
         ]
         with (
             patch_latest_block(11),
-            patch_get_erc_balance(Web3.to_wei(0, 'ether')),
+            patch_get_arb_balance(Web3.to_wei(0, 'ether')),
             patch_os_token_redeemer_contract_nonce(6),
             patch_os_token_arbitrum_contract_address(),
             patch_os_token_contract_address(os_token_contract_address),
@@ -666,10 +666,15 @@ def patch_os_token_converter(os_token_converter: OsTokenConverter):
 
 
 @contextlib.contextmanager
-def patch_get_erc_balance(balance):
+def patch_get_arb_balance(balance):
+    encoded = balance.to_bytes(32, 'big')
+
+    async def mock_aggregate(data, block_number=None):
+        return (0, [encoded] * len(data))
+
     with patch(
-        'src.commands.internal.update_redeemable_positions.Erc20Contract.get_balance',
-        return_value=balance,
+        'src.commands.internal.update_redeemable_positions.MulticallContract.aggregate',
+        side_effect=mock_aggregate,
     ):
         yield
 

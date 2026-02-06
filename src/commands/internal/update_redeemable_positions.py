@@ -19,7 +19,11 @@ from src.common.clients import (
     get_execution_client,
     setup_clients,
 )
-from src.common.contracts import Erc20Contract, os_token_redeemer_contract
+from src.common.contracts import (
+    Erc20Contract,
+    MulticallContract,
+    os_token_redeemer_contract,
+)
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import log_verbose
 from src.config.networks import AVAILABLE_NETWORKS, MAINNET, ZERO_CHECKSUM_ADDRESS
@@ -350,28 +354,11 @@ async def get_kept_shares(
 
     # arb wallet balance
     if arbitrum_config:
-        logger.info(
-            'Fetching %s from Arbitrum wallet balances...',
-            settings.network_config.OS_TOKEN_BALANCE_SYMBOL,
+        arb_balances = await _get_arb_balances(
+            arbitrum_config, list(address_to_minted_shares.keys())
         )
-        arbitrum_endpoint = arbitrum_config.EXECUTION_ENDPOINT
-        arb_execution_client = get_execution_client([arbitrum_endpoint])
-        try:
-            arb_contract = Erc20Contract(
-                settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS,
-                execution_client=arb_execution_client,
-            )
-            for index, address in enumerate(address_to_minted_shares.keys()):
-                if index and index % 50 == 0:
-                    logger.info(
-                        'Fetched wallet balances for %d/%d addresses',
-                        index,
-                        len(address_to_minted_shares),
-                    )
-                arb_balance = await arb_contract.get_balance(address)
-                kept_shares[address] = Wei(kept_shares[address] + arb_balance)
-        finally:
-            await arb_execution_client.provider.disconnect()
+        for address, arb_balance in arb_balances.items():
+            kept_shares[address] = Wei(kept_shares[address] + arb_balance)
 
     # rabby doesnt support hoodi so skip api call
     if settings.network not in API_SUPPORTED_CHAINS:
@@ -405,6 +392,34 @@ async def get_kept_shares(
             locked_os_token = await api_client.get_protocols_locked_os_token(address=address)
             kept_shares[address] = Wei(kept_shares[address] + locked_os_token)
     return kept_shares
+
+
+async def _get_arb_balances(
+    arbitrum_config: ArbitrumConfig,
+    addresses: list[ChecksumAddress],
+) -> dict[ChecksumAddress, Wei]:
+    logger.info(
+        'Fetching %s from Arbitrum wallet balances...',
+        settings.network_config.OS_TOKEN_BALANCE_SYMBOL,
+    )
+    arb_execution_client = get_execution_client([arbitrum_config.EXECUTION_ENDPOINT])
+    try:
+        arb_contract = Erc20Contract(
+            settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS,
+            execution_client=arb_execution_client,
+        )
+        arb_multicall = MulticallContract(
+            address=settings.network_config.MULTICALL_CONTRACT_ADDRESS,
+            execution_client=arb_execution_client,
+        )
+        calls = [
+            (arb_contract.contract_address, arb_contract.encode_abi('balanceOf', [addr]))
+            for addr in addresses
+        ]
+        _, results = await arb_multicall.aggregate(calls)
+        return {address: Wei(Web3.to_int(result)) for address, result in zip(addresses, results)}
+    finally:
+        await arb_execution_client.provider.disconnect()
 
 
 async def calculate_boost_ostoken_shares(
