@@ -10,7 +10,7 @@ from web3.types import ChecksumAddress, Wei
 from src.commands.internal.update_redeemable_positions import (
     _reduce_boosted_amount,
     calculate_boost_ostoken_shares,
-    create_redeemable_positions,
+    create_os_token_positions,
     update_redeemable_positions,
 )
 from src.config.networks import MAINNET, NETWORKS
@@ -19,19 +19,19 @@ from src.redemptions.os_token_converter import OsTokenConverter
 from src.redemptions.typings import (
     Allocator,
     LeverageStrategyPosition,
-    RedeemablePosition,
+    OsTokenPosition,
     VaultOsTokenPosition,
 )
 
 os_token_contract_address = NETWORKS[MAINNET].OS_TOKEN_CONTRACT_ADDRESS
 
 
-def test_create_redeemable_positions_zero_allocators():
-    result = create_redeemable_positions([], {}, 0)
+def test_create_os_token_positions_zero_allocators():
+    result = create_os_token_positions([], {}, 0)
     assert result == []
 
 
-def test_create_redeemable_positions_single_vault():
+def test_create_os_token_positions_single_vault():
     address_1 = faker.eth_address()
     vault_1 = faker.eth_address()
     allocators = [
@@ -47,11 +47,11 @@ def test_create_redeemable_positions_single_vault():
     kept_tokens = {
         address_1: Wei(0),
     }
-    result = create_redeemable_positions(allocators, kept_tokens, 0)
-    assert result == [RedeemablePosition(owner=address_1, vault=vault_1, amount=Wei(150))]
+    result = create_os_token_positions(allocators, kept_tokens, 0)
+    assert result == [OsTokenPosition(owner=address_1, vault=vault_1, amount=Wei(150))]
 
 
-def test_create_redeemable_positions_kept_tokens():
+def test_create_os_token_positions_kept_tokens():
     address_1 = faker.eth_address()
     vault_1 = faker.eth_address()
 
@@ -68,11 +68,11 @@ def test_create_redeemable_positions_kept_tokens():
     kept_tokens = {
         address_1: Wei(100),
     }
-    result = create_redeemable_positions(allocators, kept_tokens, 0)
-    assert result == [RedeemablePosition(owner=address_1, vault=vault_1, amount=Wei(50))]
+    result = create_os_token_positions(allocators, kept_tokens, 0)
+    assert result == [OsTokenPosition(owner=address_1, vault=vault_1, amount=Wei(50))]
 
 
-def test_create_redeemable_positions_multiple_allocators():
+def test_create_os_token_positions_multiple_allocators():
     address_1 = faker.eth_address()
     address_2 = faker.eth_address()
     vault_1 = faker.eth_address()
@@ -99,11 +99,11 @@ def test_create_redeemable_positions_multiple_allocators():
         address_1: Wei(0),
         address_2: Wei(75),
     }
-    result = create_redeemable_positions(allocators, kept_tokens, 0)
-    assert result == [RedeemablePosition(owner=address_1, vault=vault_1, amount=Wei(150))]
+    result = create_os_token_positions(allocators, kept_tokens, 0)
+    assert result == [OsTokenPosition(owner=address_1, vault=vault_1, amount=Wei(150))]
 
 
-def test_create_redeemable_positions_multiple_vaults_1():
+def test_create_os_token_positions_multiple_vaults_1():
     address_1 = faker.eth_address()
     vault_1 = faker.eth_address()
     vault_2 = faker.eth_address()
@@ -121,14 +121,14 @@ def test_create_redeemable_positions_multiple_vaults_1():
             ],
         )
     ]
-    result = create_redeemable_positions(allocators, {}, 0)
+    result = create_os_token_positions(allocators, {}, 0)
     assert result == [
-        RedeemablePosition(owner=address_1, vault=vault_1, amount=Wei(150)),
-        RedeemablePosition(owner=address_1, vault=vault_2, amount=Wei(150)),
+        OsTokenPosition(owner=address_1, vault=vault_1, amount=Wei(150)),
+        OsTokenPosition(owner=address_1, vault=vault_2, amount=Wei(150)),
     ]
 
 
-def test_create_redeemable_positions_multiple_vaults_2():
+def test_create_os_token_positions_multiple_vaults_2():
     address_1 = faker.eth_address()
     vault_1 = faker.eth_address()
     vault_2 = faker.eth_address()
@@ -148,14 +148,14 @@ def test_create_redeemable_positions_multiple_vaults_2():
     kept_tokens = {
         address_1: Wei(100),
     }
-    result = create_redeemable_positions(allocators, kept_tokens, 0)
+    result = create_os_token_positions(allocators, kept_tokens, 0)
     assert result == [
-        RedeemablePosition(owner=address_1, vault=vault_2, amount=Wei(600)),
-        RedeemablePosition(owner=address_1, vault=vault_1, amount=Wei(299)),
+        OsTokenPosition(owner=address_1, vault=vault_2, amount=Wei(600)),
+        OsTokenPosition(owner=address_1, vault=vault_1, amount=Wei(299)),
     ]
 
 
-def test_create_redeemable_positions_multiple_vaults_3():
+def test_create_os_token_positions_multiple_vaults_3():
     address_1 = faker.eth_address()
     vault_1 = faker.eth_address()
     vault_2 = faker.eth_address()
@@ -175,14 +175,14 @@ def test_create_redeemable_positions_multiple_vaults_3():
     kept_tokens = {
         address_1: Wei(100),
     }
-    result = create_redeemable_positions(allocators, kept_tokens, 0)
+    result = create_os_token_positions(allocators, kept_tokens, 0)
     assert result == [
-        RedeemablePosition(owner=address_1, vault=vault_2, amount=Wei(600)),
-        RedeemablePosition(owner=address_1, vault=vault_1, amount=Wei(299)),
+        OsTokenPosition(owner=address_1, vault=vault_2, amount=Wei(600)),
+        OsTokenPosition(owner=address_1, vault=vault_1, amount=Wei(299)),
     ]
 
 
-def test_create_redeemable_positions_min_minted_shares():
+def test_create_os_token_positions_min_minted_shares():
     address_1 = faker.eth_address()
     vault_1 = faker.eth_address()
     vault_2 = faker.eth_address()
@@ -202,9 +202,9 @@ def test_create_redeemable_positions_min_minted_shares():
     kept_tokens = {
         address_1: Wei(100),
     }
-    result = create_redeemable_positions(allocators, kept_tokens, 300)
+    result = create_os_token_positions(allocators, kept_tokens, 300)
     assert result == [
-        RedeemablePosition(owner=address_1, vault=vault_2, amount=Wei(600)),
+        OsTokenPosition(owner=address_1, vault=vault_2, amount=Wei(600)),
     ]
 
 
@@ -337,7 +337,7 @@ def test_reduces_boosted_amount():
 
 
 @pytest.mark.usefixtures('_init_config')
-class TestUpdateRedeemablePositions:
+class TestUpdateOsTokenPositions:
     @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
     async def test_basic_call(
         self,

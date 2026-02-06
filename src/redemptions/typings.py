@@ -52,7 +52,7 @@ class LeverageStrategyPosition:
 
 
 @dataclass
-class RedeemablePosition:
+class OsTokenPosition:
     owner: ChecksumAddress
     vault: ChecksumAddress
     amount: Wei
