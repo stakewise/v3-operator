@@ -7,7 +7,14 @@ from web3.types import Wei
 from src.config.networks import GNOSIS, MAINNET, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
 
-API_ENDPOINT = 'https://api.rabby.io/'
+RABBY_API_ENDPOINT = 'https://api.rabby.io/'
+DEBANK_API_ENDPOINT = 'https://pro-openapi.debank.com/'
+RABBY_API_SOURCE = 'rabby'
+DEBANK_API_SOURCE = 'debank'
+API_SOURCES = {
+    RABBY_API_SOURCE: RABBY_API_ENDPOINT,
+    DEBANK_API_SOURCE: DEBANK_API_ENDPOINT,
+}
 DEFAULT_USER_AGENT = (
     'Mozilla/5.0 (X11; Linux x86_64) '
     'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36'
@@ -22,7 +29,11 @@ STAKEWISE_DEBANK_PROTOCOL_IDS = ['stakewise', 'xdai_stakewise']
 
 class APIClient:
 
-    base_url = API_ENDPOINT
+    def __init__(
+        self, api_source: str = RABBY_API_SOURCE, api_access_key: str | None = None
+    ) -> None:
+        self.base_url = API_SOURCES[api_source]
+        self.api_access_key = api_access_key
 
     async def get_protocols_locked_os_token(self, address: ChecksumAddress) -> Wei:
         if settings.network not in API_SUPPORTED_CHAINS:
@@ -56,11 +67,14 @@ class APIClient:
         return total_locked_os_token
 
     async def _fetch_json(self, url: str, params: dict | None = None) -> dict | list:
+        headers: dict[str, str] = {'user-agent': DEFAULT_USER_AGENT}
+        if self.api_access_key:
+            headers['AccessKey'] = self.api_access_key
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 url=url,
                 params=params,
-                headers={'user-agent': DEFAULT_USER_AGENT},
+                headers=headers,
             ) as response:
                 response.raise_for_status()
                 return await response.json()

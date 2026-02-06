@@ -26,7 +26,10 @@ from src.config.networks import AVAILABLE_NETWORKS, MAINNET, ZERO_CHECKSUM_ADDRE
 from src.config.settings import settings
 from src.redemptions.api_client import (
     API_SLEEP_TIMEOUT,
+    API_SOURCES,
     API_SUPPORTED_CHAINS,
+    DEBANK_API_SOURCE,
+    RABBY_API_SOURCE,
     APIClient,
 )
 from src.redemptions.graph import (
@@ -40,6 +43,7 @@ from src.redemptions.os_token_converter import (
 )
 from src.redemptions.typings import (
     Allocator,
+    ApiConfig,
     ArbitrumConfig,
     LeverageStrategyPosition,
     RedeemablePosition,
@@ -48,6 +52,28 @@ from src.redemptions.typings import (
 logger = logging.getLogger(__name__)
 
 
+@click.option(
+    '--api-access-key',
+    type=str,
+    envvar='API_ACCESS_KEY',
+    help='Access key for the DeBank API. Required when api-source is debank.',
+)
+@click.option(
+    '--api-source',
+    type=click.Choice(list(API_SOURCES.keys()), case_sensitive=False),
+    default=RABBY_API_SOURCE,
+    show_default=True,
+    envvar='API_SOURCE',
+    help='API source to use for fetching locked os token positions.',
+)
+@click.option(
+    '--api-sleep-timeout',
+    type=float,
+    default=API_SLEEP_TIMEOUT,
+    show_default=True,
+    envvar='API_SLEEP_TIMEOUT',
+    help='Sleep timeout in seconds between API calls to avoid rate limiting.',
+)
 @click.option(
     '--min-os-token-position-amount-gwei',
     type=int,
@@ -116,7 +142,7 @@ logger = logging.getLogger(__name__)
     ),
 )
 @click.command(help='Updates redeemable positions')
-# pylint: disable-next=too-many-arguments
+# pylint: disable-next=too-many-arguments,too-many-locals
 def update_redeemable_positions(
     execution_endpoints: str,
     execution_jwt_secret: str | None,
@@ -127,7 +153,17 @@ def update_redeemable_positions(
     verbose: bool,
     log_level: str,
     min_os_token_position_amount_gwei: int,
+    api_sleep_timeout: float,
+    api_source: str,
+    api_access_key: str | None,
 ) -> None:
+    if api_source == DEBANK_API_SOURCE and not api_access_key:
+        api_access_key = click.prompt('Enter the DeBank API access key')
+    api_config = ApiConfig(
+        source=api_source,
+        sleep_timeout=api_sleep_timeout,
+        access_key=api_access_key,
+    )
     settings.set(
         vault=ZERO_CHECKSUM_ADDRESS,
         vault_dir=Path.home() / '.stakewise',
@@ -163,6 +199,7 @@ def update_redeemable_positions(
                                 min_os_token_position_amount_gwei
                             ),
                             no_confirm=no_confirm,
+                            api_config=api_config,
                         )
                     )
                 ).result()
@@ -174,6 +211,7 @@ def update_redeemable_positions(
                         arbitrum_config=arbitrum_config,
                         min_os_token_position_amount_gwei=Gwei(min_os_token_position_amount_gwei),
                         no_confirm=no_confirm,
+                        api_config=api_config,
                     )
                 )
             else:
@@ -187,6 +225,7 @@ async def main(
     arbitrum_config: ArbitrumConfig | None,
     min_os_token_position_amount_gwei: Gwei,
     no_confirm: bool,
+    api_config: ApiConfig,
 ) -> None:
     setup_logging()
     await setup_clients()
@@ -195,6 +234,7 @@ async def main(
             arbitrum_config=arbitrum_config,
             min_os_token_position_amount_gwei=min_os_token_position_amount_gwei,
             no_confirm=no_confirm,
+            api_config=api_config,
         )
     finally:
         await close_clients()
@@ -205,6 +245,7 @@ async def process(
     arbitrum_config: ArbitrumConfig | None,
     min_os_token_position_amount_gwei: Gwei,
     no_confirm: bool,
+    api_config: ApiConfig,
 ) -> None:
     """
     Fetch redeemable positions, calculate kept os token amounts and upload to IPFS.
@@ -244,7 +285,12 @@ async def process(
 
     logger.info('Fetching kept tokens for %s addresses', len(allocators))
     address_to_minted_shares = {a.address: a.total_shares for a in allocators}
-    kept_shares = await get_kept_shares(address_to_minted_shares, block_number, arbitrum_config)
+    kept_shares = await get_kept_shares(
+        address_to_minted_shares,
+        block_number,
+        arbitrum_config,
+        api_config,
+    )
     logger.info('Fetched kept tokens for %s addresses...', len(address_to_minted_shares))
 
     redeemable_positions = create_redeemable_positions(allocators, kept_shares, min_minted_shares)
@@ -287,10 +333,12 @@ async def process(
     click.echo(f'Generated Merkle Tree root: {tree.root}')
 
 
+# pylint: disable-next=too-many-locals
 async def get_kept_shares(
     address_to_minted_shares: dict[ChecksumAddress, Wei],
     block_number: BlockNumber,
     arbitrum_config: ArbitrumConfig | None,
+    api_config: ApiConfig,
 ) -> dict[ChecksumAddress, Wei]:
     kept_shares = defaultdict(lambda: Wei(0))
     logger.info(
@@ -343,7 +391,7 @@ async def get_kept_shares(
         settings.network_config.OS_TOKEN_BALANCE_SYMBOL,
         len(api_addresses),
     )
-    api_client = APIClient()
+    api_client = APIClient(api_source=api_config.source, api_access_key=api_config.access_key)
     # fetch locked os token from the api
     with click.progressbar(
         api_addresses,
@@ -353,7 +401,7 @@ async def get_kept_shares(
     ) as progress_bar:
         for index, address in enumerate(progress_bar):
             if index:
-                await asyncio.sleep(API_SLEEP_TIMEOUT)  # to avoid rate limiting
+                await asyncio.sleep(api_config.sleep_timeout)  # to avoid rate limiting
             locked_os_token = await api_client.get_protocols_locked_os_token(address=address)
             kept_shares[address] = Wei(kept_shares[address] + locked_os_token)
     return kept_shares

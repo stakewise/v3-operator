@@ -69,6 +69,13 @@ class RedeemablePosition:
 
 
 @dataclass
+class ApiConfig:
+    source: str
+    sleep_timeout: float
+    access_key: str | None = None
+
+
+@dataclass
 class ArbitrumConfig:
     OS_TOKEN_CONTRACT_ADDRESS: ChecksumAddress
     EXECUTION_ENDPOINT: str
