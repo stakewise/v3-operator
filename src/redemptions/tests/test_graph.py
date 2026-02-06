@@ -7,7 +7,7 @@ from web3 import Web3
 from web3.types import Wei
 
 from src.redemptions.graph import graph_get_allocators
-from src.redemptions.typings import Allocator, VaultShares
+from src.redemptions.typings import Allocator, VaultOsTokenPosition
 
 
 @pytest.mark.usefixtures('fake_settings')
@@ -31,7 +31,9 @@ async def test_graph_get_allocators():
         Allocator(
             address=Web3.to_checksum_address(address_2),
             vault_shares=[
-                VaultShares(address=Web3.to_checksum_address(vault_2), minted_shares=Wei(1000))
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_2), minted_shares=Wei(1000)
+                )
             ],
         )
     ]
@@ -46,8 +48,12 @@ async def test_graph_get_allocators():
         Allocator(
             address=Web3.to_checksum_address(address_1),
             vault_shares=[
-                VaultShares(address=Web3.to_checksum_address(vault_1), minted_shares=Wei(150)),
-                VaultShares(address=Web3.to_checksum_address(vault_2), minted_shares=Wei(1000)),
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_1), minted_shares=Wei(150)
+                ),
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_2), minted_shares=Wei(1000)
+                ),
             ],
         )
     ]

@@ -6,7 +6,7 @@ from web3.types import Wei
 
 
 @dataclass
-class VaultShares:
+class VaultOsTokenPosition:
     address: ChecksumAddress
     minted_shares: Wei
 
@@ -14,7 +14,7 @@ class VaultShares:
 @dataclass
 class Allocator:
     address: ChecksumAddress
-    vault_shares: list[VaultShares]
+    vault_shares: list[VaultOsTokenPosition]
 
     @property
     def total_shares(self) -> Wei:

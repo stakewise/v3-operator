@@ -7,7 +7,11 @@ from web3 import Web3
 from web3.types import ChecksumAddress, Wei
 
 from src.common.clients import graph_client
-from src.redemptions.typings import Allocator, LeverageStrategyPosition, VaultShares
+from src.redemptions.typings import (
+    Allocator,
+    LeverageStrategyPosition,
+    VaultOsTokenPosition,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +55,9 @@ async def graph_get_allocators(block_number: BlockNumber) -> list[Allocator]:
             )
     for allocator_address, vaults in tmp_allocators.items():
         vault_shares = [
-            VaultShares(address=Web3.to_checksum_address(vault_address), minted_shares=shares)
+            VaultOsTokenPosition(
+                address=Web3.to_checksum_address(vault_address), minted_shares=shares
+            )
             for vault_address, shares in vaults.items()
         ]
         allocators.append(

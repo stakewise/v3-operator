@@ -20,7 +20,7 @@ from src.redemptions.typings import (
     Allocator,
     LeverageStrategyPosition,
     RedeemablePosition,
-    VaultShares,
+    VaultOsTokenPosition,
 )
 
 os_token_contract_address = NETWORKS[MAINNET].OS_TOKEN_CONTRACT_ADDRESS
@@ -38,7 +38,9 @@ def test_create_redeemable_positions_single_vault():
         Allocator(
             address=Web3.to_checksum_address(address_1),
             vault_shares=[
-                VaultShares(address=Web3.to_checksum_address(vault_1), minted_shares=Wei(150)),
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_1), minted_shares=Wei(150)
+                ),
             ],
         )
     ]
@@ -57,7 +59,9 @@ def test_create_redeemable_positions_kept_tokens():
         Allocator(
             address=Web3.to_checksum_address(address_1),
             vault_shares=[
-                VaultShares(address=Web3.to_checksum_address(vault_1), minted_shares=Wei(150)),
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_1), minted_shares=Wei(150)
+                ),
             ],
         )
     ]
@@ -77,13 +81,17 @@ def test_create_redeemable_positions_multiple_allocators():
         Allocator(
             address=Web3.to_checksum_address(address_1),
             vault_shares=[
-                VaultShares(address=Web3.to_checksum_address(vault_1), minted_shares=Wei(150)),
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_1), minted_shares=Wei(150)
+                ),
             ],
         ),
         Allocator(
             address=Web3.to_checksum_address(address_2),
             vault_shares=[
-                VaultShares(address=Web3.to_checksum_address(vault_1), minted_shares=Wei(75)),
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_1), minted_shares=Wei(75)
+                ),
             ],
         ),
     ]
@@ -104,8 +112,12 @@ def test_create_redeemable_positions_multiple_vaults_1():
         Allocator(
             address=Web3.to_checksum_address(address_1),
             vault_shares=[
-                VaultShares(address=Web3.to_checksum_address(vault_1), minted_shares=Wei(150)),
-                VaultShares(address=Web3.to_checksum_address(vault_2), minted_shares=Wei(150)),
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_1), minted_shares=Wei(150)
+                ),
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_2), minted_shares=Wei(150)
+                ),
             ],
         )
     ]
@@ -124,8 +136,12 @@ def test_create_redeemable_positions_multiple_vaults_2():
         Allocator(
             address=Web3.to_checksum_address(address_1),
             vault_shares=[
-                VaultShares(address=Web3.to_checksum_address(vault_1), minted_shares=Wei(333)),
-                VaultShares(address=Web3.to_checksum_address(vault_2), minted_shares=Wei(666)),
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_1), minted_shares=Wei(333)
+                ),
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_2), minted_shares=Wei(666)
+                ),
             ],
         )
     ]
@@ -147,8 +163,12 @@ def test_create_redeemable_positions_multiple_vaults_3():
         Allocator(
             address=Web3.to_checksum_address(address_1),
             vault_shares=[
-                VaultShares(address=Web3.to_checksum_address(vault_1), minted_shares=Wei(333)),
-                VaultShares(address=Web3.to_checksum_address(vault_2), minted_shares=Wei(666)),
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_1), minted_shares=Wei(333)
+                ),
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_2), minted_shares=Wei(666)
+                ),
             ],
         )
     ]
@@ -170,8 +190,12 @@ def test_create_redeemable_positions_min_minted_shares():
         Allocator(
             address=Web3.to_checksum_address(address_1),
             vault_shares=[
-                VaultShares(address=Web3.to_checksum_address(vault_1), minted_shares=Wei(333)),
-                VaultShares(address=Web3.to_checksum_address(vault_2), minted_shares=Wei(666)),
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_1), minted_shares=Wei(333)
+                ),
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_2), minted_shares=Wei(666)
+                ),
             ],
         )
     ]
@@ -256,8 +280,8 @@ def test_reduces_boosted_amount():
         Allocator(
             address=address_1,
             vault_shares=[
-                VaultShares(address=vault_1, minted_shares=Wei(1000)),
-                VaultShares(address=vault_2, minted_shares=Wei(2000)),
+                VaultOsTokenPosition(address=vault_1, minted_shares=Wei(1000)),
+                VaultOsTokenPosition(address=vault_2, minted_shares=Wei(2000)),
             ],
         )
     ]
@@ -267,8 +291,8 @@ def test_reduces_boosted_amount():
         Allocator(
             address=address_1,
             vault_shares=[
-                VaultShares(address=vault_1, minted_shares=Wei(1000)),
-                VaultShares(address=vault_2, minted_shares=Wei(2000)),
+                VaultOsTokenPosition(address=vault_1, minted_shares=Wei(1000)),
+                VaultOsTokenPosition(address=vault_2, minted_shares=Wei(2000)),
             ],
         )
     ]
@@ -277,14 +301,14 @@ def test_reduces_boosted_amount():
         Allocator(
             address=address_1,
             vault_shares=[
-                VaultShares(address=vault_1, minted_shares=Wei(500)),
+                VaultOsTokenPosition(address=vault_1, minted_shares=Wei(500)),
             ],
         ),
         Allocator(
             address=address_2,
             vault_shares=[
-                VaultShares(address=vault_1, minted_shares=Wei(1000)),
-                VaultShares(address=vault_2, minted_shares=Wei(2000)),
+                VaultOsTokenPosition(address=vault_1, minted_shares=Wei(1000)),
+                VaultOsTokenPosition(address=vault_2, minted_shares=Wei(2000)),
             ],
         ),
     ]
@@ -299,14 +323,14 @@ def test_reduces_boosted_amount():
         Allocator(
             address=address_1,
             vault_shares=[
-                VaultShares(address=vault_1, minted_shares=Wei(200)),
+                VaultOsTokenPosition(address=vault_1, minted_shares=Wei(200)),
             ],
         ),
         Allocator(
             address=address_2,
             vault_shares=[
-                VaultShares(address=vault_1, minted_shares=Wei(500)),
-                VaultShares(address=vault_2, minted_shares=Wei(500)),
+                VaultOsTokenPosition(address=vault_1, minted_shares=Wei(500)),
+                VaultOsTokenPosition(address=vault_2, minted_shares=Wei(500)),
             ],
         ),
     ]
