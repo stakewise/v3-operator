@@ -1,4 +1,5 @@
 import logging
+from typing import Sequence
 
 import aiohttp
 from aiohttp import ClientTimeout
@@ -49,7 +50,7 @@ class RelayerClient:
         )
 
     async def fund_validators(
-        self, validator_fundings: list[tuple[HexStr, Gwei]]
+        self, validator_fundings: Sequence[tuple[HexStr, Gwei]]
     ) -> RelayerSignatureResponse:
         public_keys, funding_amounts = zip(*validator_fundings)
         relayer_response = await self._fund_validators(

@@ -1,6 +1,7 @@
 import time
 from dataclasses import dataclass
 from functools import cached_property
+from itertools import batched
 from multiprocessing import Pool
 from os import path
 from secrets import randbits
@@ -17,7 +18,6 @@ from staking_deposit.key_handling.key_derivation.tree import (
 )
 from staking_deposit.key_handling.keystore import Keystore, ScryptKeystore
 from staking_deposit.settings import DEPOSIT_CLI_VERSION
-from sw_utils import chunkify
 from sw_utils.signing import (
     DepositData,
     DepositMessage,
@@ -144,7 +144,7 @@ class CredentialManager:
 
             results = []
             indexes = range(start_index, start_index + count)
-            for chunk_indexes in chunkify(indexes, 50):
+            for chunk_indexes in batched(indexes, 50):
                 results.append(
                     pool.apply_async(
                         CredentialManager._generate_credentials_chunk,

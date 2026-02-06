@@ -1,7 +1,8 @@
 import logging
+from itertools import batched
 
 from eth_typing import HexStr
-from sw_utils import ValidatorStatus, chunkify
+from sw_utils import ValidatorStatus
 from sw_utils.consensus import EXITED_STATUSES
 from web3.types import Gwei
 
@@ -52,7 +53,7 @@ async def fetch_consensus_validators(
     validator_ids: list[HexStr] | list[str], slot: str = 'head'
 ) -> list[ConsensusValidator]:
     validators = []
-    for chunk_keys in chunkify(validator_ids, settings.validators_fetch_chunk_size):
+    for chunk_keys in batched(validator_ids, settings.validators_fetch_chunk_size):
         beacon_validators = await consensus_client.get_validators_by_ids(
             validator_ids=chunk_keys, state_id=slot
         )

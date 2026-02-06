@@ -3,12 +3,12 @@ import asyncio
 import logging
 import urllib.parse
 from dataclasses import dataclass
+from itertools import batched
 from typing import Iterable
 
 from aiohttp import ClientSession, ClientTimeout
 from eth_typing import HexStr
 from eth_utils import add_0x_prefix
-from sw_utils import chunkify
 from web3 import Web3
 
 from src.config.settings import HASHI_VAULT_TIMEOUT, settings
@@ -118,7 +118,7 @@ class HashiVaultBundledKeysLoader(HashiVaultKeysLoader):
         """Load all the key bundles from key paths."""
         merged_keys = HashiKeys()
 
-        for key_chunk in chunkify(self.config.key_paths, self.config.parallelism):
+        for key_chunk in batched(self.config.key_paths, self.config.parallelism):
             keys_responses = await asyncio.gather(
                 *[
                     self._load_bundled_keys(session=session, key_path=key_path)
@@ -172,7 +172,7 @@ class HashiVaultPrefixedKeysLoader(HashiVaultKeysLoader):
         merged_keys = HashiKeys()
         prefix_pubkey_pairs = await self._get_prefix_pubkey_pairs(session=session)
 
-        for prefix_pubkey_chunk in chunkify(prefix_pubkey_pairs, self.config.parallelism):
+        for prefix_pubkey_chunk in batched(prefix_pubkey_pairs, self.config.parallelism):
             keys_responses = await asyncio.gather(
                 *[
                     self._load_prefixed_key(session=session, prefix=prefix, pubkey=pubkey)
@@ -187,7 +187,7 @@ class HashiVaultPrefixedKeysLoader(HashiVaultKeysLoader):
     async def _get_prefix_pubkey_pairs(self, session: ClientSession) -> list[tuple[str, str]]:
         prefix_pubkey_pairs: list[tuple[str, str]] = []
 
-        for prefix_chunk in chunkify(self.config.key_prefixes, self.config.parallelism):
+        for prefix_chunk in batched(self.config.key_prefixes, self.config.parallelism):
             keys_results = await asyncio.gather(
                 *[
                     self._find_keys_by_prefix(
