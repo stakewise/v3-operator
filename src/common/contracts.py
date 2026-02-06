@@ -123,8 +123,9 @@ class VaultStateMixin:
 
 
 class VaultEncoder:
-    def __init__(self, contract: ContractWrapper):
-        self.contract = contract
+    def __init__(self) -> None:
+        # Use dummy address since we only need to encode ABI calls, no actual contract interaction
+        self.contract = VaultContract(address=ZERO_CHECKSUM_ADDRESS)
 
     def update_state(self, harvest_params: HarvestParams) -> HexStr:
         return self.contract.encode_abi(
@@ -142,9 +143,6 @@ class VaultEncoder:
 
 class VaultContract(ContractWrapper, VaultStateMixin):
     abi_path = 'abi/IEthVault.json'
-
-    def encoder(self) -> VaultEncoder:
-        return VaultEncoder(self)
 
     async def get_registered_validators_public_keys(
         self, from_block: BlockNumber, to_block: BlockNumber

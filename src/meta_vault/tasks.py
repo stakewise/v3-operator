@@ -13,6 +13,7 @@ from src.common.contracts import (
     SubVaultsRegistryContract,
     SubVaultsRegistryEncoder,
     VaultContract,
+    VaultEncoder,
     keeper_contract,
     multicall_contract,
 )
@@ -20,7 +21,6 @@ from src.common.execution import check_gas_price
 from src.common.graph import wait_for_graph_node_sync
 from src.common.tasks import BaseTask
 from src.common.typings import ExitRequest
-from src.config.networks import ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
 from src.meta_vault.exceptions import ClaimDelayNotPassedException
 from src.meta_vault.graph import (
@@ -193,9 +193,7 @@ async def _get_meta_vault_update_state_calls(
     calls: list[ContractCall] = []
 
     # Vault contract
-    vault_encoder = VaultContract(
-        address=ZERO_CHECKSUM_ADDRESS,
-    ).encoder()
+    vault_encoder = VaultEncoder()
 
     # Filter harvestable sub vaults and prepare calls for updating their state
     for sub_vault in sub_vaults.values():
