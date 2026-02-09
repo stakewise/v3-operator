@@ -122,23 +122,14 @@ class VaultStateMixin:
         return update_state_call
 
 
-class VaultEncoder:
+class BaseEncoder:
+    """Base class for contract ABI encoders."""
+
+    contract_class: type[ContractWrapper]
+
     def __init__(self) -> None:
         # Use dummy address since we only need to encode ABI calls, no actual contract interaction
-        self.contract = VaultContract(address=ZERO_CHECKSUM_ADDRESS)
-
-    def update_state(self, harvest_params: HarvestParams) -> HexStr:
-        return self.contract.encode_abi(
-            fn_name='updateState',
-            args=[
-                (
-                    harvest_params.rewards_root,
-                    harvest_params.reward,
-                    harvest_params.unlocked_mev_reward,
-                    harvest_params.proof,
-                ),
-            ],
-        )
+        self.contract = self.contract_class(address=ZERO_CHECKSUM_ADDRESS)
 
 
 class VaultContract(ContractWrapper, VaultStateMixin):
@@ -255,6 +246,25 @@ class VaultContract(ContractWrapper, VaultStateMixin):
             return [Web3.to_hex(event['args']['publicKey']) for event in events]
 
 
+class VaultEncoder(BaseEncoder):
+    """Helper class to encode Vault contract ABI calls."""
+
+    contract_class = VaultContract
+
+    def update_state(self, harvest_params: HarvestParams) -> HexStr:
+        return self.contract.encode_abi(
+            fn_name='updateState',
+            args=[
+                (
+                    harvest_params.rewards_root,
+                    harvest_params.reward,
+                    harvest_params.unlocked_mev_reward,
+                    harvest_params.proof,
+                ),
+            ],
+        )
+
+
 class ValidatorsRegistryContract(ContractWrapper):
     abi_path = 'abi/IValidatorsRegistry.json'
     settings_key = 'VALIDATORS_REGISTRY_CONTRACT_ADDRESS'
@@ -336,17 +346,13 @@ class KeeperContract(ContractWrapper):
 class RewardSplitterContract(ContractWrapper):
     abi_path = 'abi/IRewardSplitter.json'
 
-    def encoder(self) -> 'RewardSplitterEncoder':
-        return RewardSplitterEncoder(self)
 
-
-class RewardSplitterEncoder:
+class RewardSplitterEncoder(BaseEncoder):
     """
     Helper class to encode RewardSplitter contract ABI calls
     """
 
-    def __init__(self, contract: RewardSplitterContract):
-        self.contract = contract
+    contract_class = RewardSplitterContract
 
     def update_vault_state(self, harvest_params: HarvestParams) -> HexStr:
         return self.contract.encode_abi(
@@ -403,10 +409,10 @@ class MetaVaultContract(ContractWrapper):
         return event
 
 
-class MetaVaultEncoder:
-    def __init__(self) -> None:
-        # Use dummy address since we only need to encode ABI calls, no actual contract interaction
-        self.contract = MetaVaultContract(ZERO_CHECKSUM_ADDRESS)
+class MetaVaultEncoder(BaseEncoder):
+    """Helper class to encode MetaVault contract ABI calls."""
+
+    contract_class = MetaVaultContract
 
     def update_state(self, harvest_params: HarvestParams) -> HexStr:
         return self.contract.encode_abi(
@@ -431,10 +437,10 @@ class SubVaultsRegistryContract(ContractWrapper):
         return Web3.to_hex(tx_hash)
 
 
-class SubVaultsRegistryEncoder:
-    def __init__(self) -> None:
-        # Use dummy address since we only need to encode ABI calls, no actual contract interaction
-        self.contract = SubVaultsRegistryContract(ZERO_CHECKSUM_ADDRESS)
+class SubVaultsRegistryEncoder(BaseEncoder):
+    """Helper class to encode SubVaultsRegistry contract ABI calls."""
+
+    contract_class = SubVaultsRegistryContract
 
     def claim_sub_vaults_exited_assets(
         self, sub_vault_exit_requests: list[SubVaultExitRequest]
