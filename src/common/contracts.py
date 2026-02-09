@@ -386,8 +386,16 @@ class RewardSplitterEncoder(BaseEncoder):
 class MetaVaultContract(ContractWrapper):
     abi_path = 'abi/IEthMetaVault.json'
 
+    def __init__(
+        self, address: ChecksumAddress | None = None, execution_client: AsyncWeb3 | None = None
+    ):
+        super().__init__(address, execution_client)
+        self._sub_vaults_registry: ChecksumAddress | None = None
+
     async def sub_vaults_registry(self) -> ChecksumAddress:
-        return await self.contract.functions.subVaultsRegistry().call()
+        if self._sub_vaults_registry is None:
+            self._sub_vaults_registry = await self.contract.functions.subVaultsRegistry().call()
+        return self._sub_vaults_registry
 
     async def withdrawable_assets(self) -> Wei:
         return await self.contract.functions.withdrawableAssets().call()
