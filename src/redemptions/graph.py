@@ -56,7 +56,7 @@ async def graph_get_allocators(block_number: BlockNumber) -> list[Allocator]:
                 float(item['ltv']),
             )
     for allocator_address, vaults in tmp_allocators.items():
-        vault_shares = [
+        vault_os_token_positions = [
             VaultOsTokenPosition(
                 address=Web3.to_checksum_address(vault_address),
                 minted_shares=minted_shares,
@@ -66,7 +66,8 @@ async def graph_get_allocators(block_number: BlockNumber) -> list[Allocator]:
         ]
         allocators.append(
             Allocator(
-                address=Web3.to_checksum_address(allocator_address), vault_shares=vault_shares
+                address=Web3.to_checksum_address(allocator_address),
+                vault_os_token_positions=vault_os_token_positions,
             )
         )
     return allocators

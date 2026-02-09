@@ -15,18 +15,18 @@ class VaultOsTokenPosition:
 @dataclass
 class Allocator:
     address: ChecksumAddress
-    vault_shares: list[VaultOsTokenPosition]
+    vault_os_token_positions: list[VaultOsTokenPosition]
 
     @property
     def total_shares(self) -> Wei:
-        return Wei(sum(s.minted_shares for s in self.vault_shares))
+        return Wei(sum(s.minted_shares for s in self.vault_os_token_positions))
 
     @property
     def vaults_proportions(self) -> dict[ChecksumAddress, float]:
         total = self.total_shares
         if total == 0:
             return {}
-        return {s.address: s.minted_shares / total for s in self.vault_shares}
+        return {s.address: s.minted_shares / total for s in self.vault_os_token_positions}
 
 
 @dataclass

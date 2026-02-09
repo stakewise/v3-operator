@@ -22,37 +22,52 @@ async def test_graph_get_allocators():
     assert result == []
 
     mock_response = [
-        {'address': address_1, 'vault': {'id': vault_1}, 'mintedOsTokenShares': '0'},
-        {'address': address_2, 'vault': {'id': vault_2}, 'mintedOsTokenShares': '1000'},
+        {'address': address_1, 'vault': {'id': vault_1}, 'mintedOsTokenShares': '0', 'ltv': '0'},
+        {
+            'address': address_2,
+            'vault': {'id': vault_2},
+            'mintedOsTokenShares': '1000',
+            'ltv': '0.7',
+        },
     ]
     with patch('src.redemptions.graph.graph_client.fetch_pages', return_value=mock_response):
         result = await graph_get_allocators(random.randint(1, 1000000))
     assert result == [
         Allocator(
             address=Web3.to_checksum_address(address_2),
-            vault_shares=[
+            vault_os_token_positions=[
                 VaultOsTokenPosition(
-                    address=Web3.to_checksum_address(vault_2), minted_shares=Wei(1000)
+                    address=Web3.to_checksum_address(vault_2), minted_shares=Wei(1000), ltv=0.7
                 )
             ],
         )
     ]
 
     mock_response = [
-        {'address': address_1, 'vault': {'id': vault_1}, 'mintedOsTokenShares': '150'},
-        {'address': address_1, 'vault': {'id': vault_2}, 'mintedOsTokenShares': '1000'},
+        {
+            'address': address_1,
+            'vault': {'id': vault_1},
+            'mintedOsTokenShares': '150',
+            'ltv': '0.5',
+        },
+        {
+            'address': address_1,
+            'vault': {'id': vault_2},
+            'mintedOsTokenShares': '1000',
+            'ltv': '0.7',
+        },
     ]
     with patch('src.redemptions.graph.graph_client.fetch_pages', return_value=mock_response):
         result = await graph_get_allocators(random.randint(1, 1000000))
     assert result == [
         Allocator(
             address=Web3.to_checksum_address(address_1),
-            vault_shares=[
+            vault_os_token_positions=[
                 VaultOsTokenPosition(
-                    address=Web3.to_checksum_address(vault_1), minted_shares=Wei(150)
+                    address=Web3.to_checksum_address(vault_1), minted_shares=Wei(150), ltv=0.5
                 ),
                 VaultOsTokenPosition(
-                    address=Web3.to_checksum_address(vault_2), minted_shares=Wei(1000)
+                    address=Web3.to_checksum_address(vault_2), minted_shares=Wei(1000), ltv=0.7
                 ),
             ],
         )

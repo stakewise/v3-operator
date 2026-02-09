@@ -37,7 +37,7 @@ def test_create_os_token_positions_single_vault():
     allocators = [
         Allocator(
             address=Web3.to_checksum_address(address_1),
-            vault_shares=[
+            vault_os_token_positions=[
                 VaultOsTokenPosition(
                     address=Web3.to_checksum_address(vault_1), minted_shares=Wei(150), ltv=0.5
                 ),
@@ -58,7 +58,7 @@ def test_create_os_token_positions_kept_tokens():
     allocators = [
         Allocator(
             address=Web3.to_checksum_address(address_1),
-            vault_shares=[
+            vault_os_token_positions=[
                 VaultOsTokenPosition(
                     address=Web3.to_checksum_address(vault_1), minted_shares=Wei(150), ltv=0.5
                 ),
@@ -80,7 +80,7 @@ def test_create_os_token_positions_multiple_allocators():
     allocators = [
         Allocator(
             address=Web3.to_checksum_address(address_1),
-            vault_shares=[
+            vault_os_token_positions=[
                 VaultOsTokenPosition(
                     address=Web3.to_checksum_address(vault_1), minted_shares=Wei(150), ltv=0.5
                 ),
@@ -88,7 +88,7 @@ def test_create_os_token_positions_multiple_allocators():
         ),
         Allocator(
             address=Web3.to_checksum_address(address_2),
-            vault_shares=[
+            vault_os_token_positions=[
                 VaultOsTokenPosition(
                     address=Web3.to_checksum_address(vault_1), minted_shares=Wei(75), ltv=0.5
                 ),
@@ -111,7 +111,7 @@ def test_create_os_token_positions_multiple_vaults_1():
     allocators = [
         Allocator(
             address=Web3.to_checksum_address(address_1),
-            vault_shares=[
+            vault_os_token_positions=[
                 VaultOsTokenPosition(
                     address=Web3.to_checksum_address(vault_1), minted_shares=Wei(150), ltv=0.5
                 ),
@@ -135,7 +135,7 @@ def test_create_os_token_positions_multiple_vaults_2():
     allocators = [
         Allocator(
             address=Web3.to_checksum_address(address_1),
-            vault_shares=[
+            vault_os_token_positions=[
                 VaultOsTokenPosition(
                     address=Web3.to_checksum_address(vault_1), minted_shares=Wei(333), ltv=0.5
                 ),
@@ -162,7 +162,7 @@ def test_create_os_token_positions_multiple_vaults_3():
     allocators = [
         Allocator(
             address=Web3.to_checksum_address(address_1),
-            vault_shares=[
+            vault_os_token_positions=[
                 VaultOsTokenPosition(
                     address=Web3.to_checksum_address(vault_1), minted_shares=Wei(333), ltv=0.5
                 ),
@@ -189,7 +189,7 @@ def test_create_os_token_positions_min_minted_shares():
     allocators = [
         Allocator(
             address=Web3.to_checksum_address(address_1),
-            vault_shares=[
+            vault_os_token_positions=[
                 VaultOsTokenPosition(
                     address=Web3.to_checksum_address(vault_1), minted_shares=Wei(333), ltv=0.5
                 ),
@@ -218,7 +218,7 @@ def test_create_os_token_positions_ordering_by_ltv_and_amount():
     allocators = [
         Allocator(
             address=Web3.to_checksum_address(address_1),
-            vault_shares=[
+            vault_os_token_positions=[
                 VaultOsTokenPosition(
                     address=Web3.to_checksum_address(vault_1), minted_shares=Wei(1000), ltv=0.3
                 ),
@@ -226,7 +226,7 @@ def test_create_os_token_positions_ordering_by_ltv_and_amount():
         ),
         Allocator(
             address=Web3.to_checksum_address(address_2),
-            vault_shares=[
+            vault_os_token_positions=[
                 VaultOsTokenPosition(
                     address=Web3.to_checksum_address(vault_1), minted_shares=Wei(500), ltv=0.9
                 ),
@@ -234,7 +234,7 @@ def test_create_os_token_positions_ordering_by_ltv_and_amount():
         ),
         Allocator(
             address=Web3.to_checksum_address(address_3),
-            vault_shares=[
+            vault_os_token_positions=[
                 VaultOsTokenPosition(
                     address=Web3.to_checksum_address(vault_2), minted_shares=Wei(200), ltv=0.9
                 ),
@@ -321,7 +321,7 @@ def test_reduces_boosted_amount():
     allocators = [
         Allocator(
             address=address_1,
-            vault_shares=[
+            vault_os_token_positions=[
                 VaultOsTokenPosition(address=vault_1, minted_shares=Wei(1000), ltv=0.5),
                 VaultOsTokenPosition(address=vault_2, minted_shares=Wei(2000), ltv=0.5),
             ],
@@ -332,7 +332,7 @@ def test_reduces_boosted_amount():
     assert result == [
         Allocator(
             address=address_1,
-            vault_shares=[
+            vault_os_token_positions=[
                 VaultOsTokenPosition(address=vault_1, minted_shares=Wei(1000), ltv=0.5),
                 VaultOsTokenPosition(address=vault_2, minted_shares=Wei(2000), ltv=0.5),
             ],
@@ -342,13 +342,13 @@ def test_reduces_boosted_amount():
     allocators = [
         Allocator(
             address=address_1,
-            vault_shares=[
+            vault_os_token_positions=[
                 VaultOsTokenPosition(address=vault_1, minted_shares=Wei(500), ltv=0.5),
             ],
         ),
         Allocator(
             address=address_2,
-            vault_shares=[
+            vault_os_token_positions=[
                 VaultOsTokenPosition(address=vault_1, minted_shares=Wei(1000), ltv=0.5),
                 VaultOsTokenPosition(address=vault_2, minted_shares=Wei(2000), ltv=0.5),
             ],
@@ -364,13 +364,13 @@ def test_reduces_boosted_amount():
     assert result == [
         Allocator(
             address=address_1,
-            vault_shares=[
+            vault_os_token_positions=[
                 VaultOsTokenPosition(address=vault_1, minted_shares=Wei(200), ltv=0.5),
             ],
         ),
         Allocator(
             address=address_2,
-            vault_shares=[
+            vault_os_token_positions=[
                 VaultOsTokenPosition(address=vault_1, minted_shares=Wei(500), ltv=0.5),
                 VaultOsTokenPosition(address=vault_2, minted_shares=Wei(500), ltv=0.5),
             ],

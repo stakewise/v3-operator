@@ -277,9 +277,9 @@ async def process(
     # filter zero positions. Filter before kept shares calculation to reduce api calls
     min_minted_shares = Web3.to_wei(min_os_token_position_amount_gwei, 'gwei')
     for allocator in allocators:
-        allocator.vault_shares = [
+        allocator.vault_os_token_positions = [
             vault_share
-            for vault_share in allocator.vault_shares
+            for vault_share in allocator.vault_os_token_positions
             if vault_share.minted_shares >= min_minted_shares
         ]
 
@@ -466,7 +466,7 @@ def create_os_token_positions(
         if redeemable_amount == 0:
             continue
 
-        vault_ltv = {vs.address: vs.ltv for vs in allocator.vault_shares}
+        vault_ltv = {vs.address: vs.ltv for vs in allocator.vault_os_token_positions}
         allocated_amount = 0
         vaults_proportions = allocator.vaults_proportions.items()
         for index, (vault_address, proportion) in enumerate(vaults_proportions):
@@ -495,7 +495,7 @@ def _reduce_boosted_amount(
     boost_ostoken_shares: dict[tuple[ChecksumAddress, ChecksumAddress], Wei],
 ) -> list[Allocator]:
     for allocator in allocators:
-        for vault_share in allocator.vault_shares:
+        for vault_share in allocator.vault_os_token_positions:
             key = allocator.address, vault_share.address
             boosted_amount = boost_ostoken_shares.get(key, Wei(0))
             vault_share.minted_shares = Wei(max(0, vault_share.minted_shares - boosted_amount))
