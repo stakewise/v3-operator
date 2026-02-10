@@ -139,9 +139,6 @@ class VaultContract(ContractWrapper, VaultStateMixin):
     async def vault_id(self) -> str:
         return await self.contract.functions.vaultId().call()
 
-    def encoder(self) -> VaultEncoder:
-        return VaultEncoder(self)
-
     async def get_registered_validators_public_keys(
         self, from_block: BlockNumber, to_block: BlockNumber
     ) -> list[HexStr]:
@@ -448,9 +445,6 @@ class MetaVaultContract(ContractWrapper):
         tx_function = self.contract.functions.depositToSubVaults()
         tx_hash = await transaction_gas_wrapper(tx_function)
         return Web3.to_hex(tx_hash)
-
-    def encoder(self) -> 'MetaVaultEncoder':
-        return MetaVaultEncoder(self)
 
     async def get_last_rewards_nonce_updated_event(
         self, from_block: BlockNumber, to_block: BlockNumber

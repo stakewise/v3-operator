@@ -17,7 +17,7 @@ from src.common.utils import async_batched
 from src.config.settings import settings
 from src.meta_vault.service import distribute_meta_vault_redemption_assets
 from src.redemptions.os_token_converter import create_os_token_converter
-from src.redemptions.typings import RedeemablePosition
+from src.redemptions.typings import OsTokenPosition
 
 logger = logging.getLogger(__name__)
 
@@ -100,19 +100,19 @@ async def aggregate_redemption_assets_by_vaults(
     vault_to_unprocessed_shares: defaultdict[ChecksumAddress, Wei] = defaultdict(lambda: Wei(0))
 
     # Iterate through redeemable positions until total redemption shares are exhausted
-    async for redeemable_position_batch in async_batched(
-        iter_redeemable_positions(block_number=block_number), batch_size
+    async for os_token_position_batch in async_batched(
+        iter_os_token_positions(block_number=block_number), batch_size
     ):
         processed_shares_batch = await get_processed_shares_batch(
-            redeemable_positions_batch=redeemable_position_batch,
+            os_token_positions_batch=os_token_position_batch,
             nonce=nonce,
             block_number=block_number,
         )
-        for redeemable_position, processed_shares in zip(
-            redeemable_position_batch, processed_shares_batch
+        for os_token_position, processed_shares in zip(
+            os_token_position_batch, processed_shares_batch
         ):
-            vault = redeemable_position.vault
-            leaf_shares = redeemable_position.amount
+            vault = os_token_position.vault
+            leaf_shares = os_token_position.amount
             unprocessed_shares = leaf_shares - processed_shares
 
             # Skip if no unprocessed shares, handle rounding errors
@@ -142,9 +142,9 @@ async def aggregate_redemption_assets_by_vaults(
     return vault_to_unprocessed_assets
 
 
-async def iter_redeemable_positions(
+async def iter_os_token_positions(
     block_number: BlockNumber | None = None,
-) -> AsyncGenerator[RedeemablePosition, None]:
+) -> AsyncGenerator[OsTokenPosition, None]:
     redeemable_positions = await os_token_redeemer_contract.redeemable_positions(
         block_number=block_number
     )
@@ -160,7 +160,7 @@ async def iter_redeemable_positions(
     # [{"owner:" 0x01, "amount": 100000, "vault": 0x02}, ...]
 
     for item in data:
-        yield RedeemablePosition(
+        yield OsTokenPosition(
             owner=Web3.to_checksum_address(item['owner']),
             vault=Web3.to_checksum_address(item['vault']),
             amount=Wei(int(item['amount'])),
@@ -168,14 +168,14 @@ async def iter_redeemable_positions(
 
 
 async def get_processed_shares_batch(
-    redeemable_positions_batch: list[RedeemablePosition],
+    os_token_positions_batch: list[OsTokenPosition],
     nonce: int,
     block_number: BlockNumber | None = None,
 ) -> list[Wei]:
     calls: list[tuple[ChecksumAddress, HexStr]] = []
 
-    for redeemable_position in redeemable_positions_batch:
-        leaf_hash = get_redeemable_position_leaf_hash(redeemable_position, nonce)
+    for os_token_position in os_token_positions_batch:
+        leaf_hash = get_os_token_position_leaf_hash(os_token_position, nonce)
         call_data = os_token_redeemer_contract.encode_abi(
             fn_name='leafToProcessedShares',
             args=[leaf_hash],
@@ -186,11 +186,11 @@ async def get_processed_shares_batch(
     return [Wei(Web3.to_int(res)) for res in results]
 
 
-def get_redeemable_position_leaf_hash(redeemable_position: RedeemablePosition, nonce: int) -> bytes:
-    """Get the leaf hash for a redeemable position."""
-    vault = redeemable_position.vault
-    owner = redeemable_position.owner
-    amount = redeemable_position.amount
+def get_os_token_position_leaf_hash(os_token_position: OsTokenPosition, nonce: int) -> bytes:
+    """Get the leaf hash for osToken position."""
+    vault = os_token_position.vault
+    owner = os_token_position.owner
+    amount = os_token_position.amount
 
     leaf = standard_leaf_hash(
         values=(nonce, vault, amount, owner),
