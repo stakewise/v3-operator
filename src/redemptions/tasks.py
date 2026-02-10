@@ -3,7 +3,6 @@ from collections import defaultdict
 from typing import AsyncGenerator, cast
 
 from eth_typing import BlockNumber, ChecksumAddress, HexStr
-from multiproof.standard import standard_leaf_hash
 from sw_utils import convert_to_mgno
 from sw_utils.networks import GNO_NETWORKS
 from sw_utils.typings import ChainHead, ProtocolConfig
@@ -175,7 +174,7 @@ async def get_processed_shares_batch(
     calls: list[tuple[ChecksumAddress, HexStr]] = []
 
     for os_token_position in os_token_positions_batch:
-        leaf_hash = get_os_token_position_leaf_hash(os_token_position, nonce)
+        leaf_hash = os_token_position.leaf_hash(nonce)
         call_data = os_token_redeemer_contract.encode_abi(
             fn_name='leafToProcessedShares',
             args=[leaf_hash],
@@ -184,16 +183,3 @@ async def get_processed_shares_batch(
 
     _, results = await multicall_contract.aggregate(calls, block_number=block_number)
     return [Wei(Web3.to_int(res)) for res in results]
-
-
-def get_os_token_position_leaf_hash(os_token_position: OsTokenPosition, nonce: int) -> bytes:
-    """Get the leaf hash for osToken position."""
-    vault = os_token_position.vault
-    owner = os_token_position.owner
-    amount = os_token_position.amount
-
-    leaf = standard_leaf_hash(
-        values=(nonce, vault, amount, owner),
-        types=['uint256', 'address', 'uint256', 'address'],
-    )
-    return leaf
