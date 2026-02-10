@@ -137,7 +137,7 @@ async def setup_clients() -> None:
         await graph_client.setup()
 
 
-async def close_clients() -> None:
+async def close_clients(wait_sessions_close: bool = False) -> None:
     logger.info('Closing active sessions...')
     await execution_client.provider.disconnect()
     await execution_non_retry_client.provider.disconnect()
@@ -146,5 +146,8 @@ async def close_clients() -> None:
     if settings.graph_endpoint:
         await graph_client.disconnect()
 
-    # waiting to ensure all web3 evicted sessions are closed
-    await asyncio.sleep(max(settings.consensus_timeout, settings.execution_timeout))
+    # Waiting to ensure all web3 evicted sessions are closed
+    # Apply only if needed to avoid unnecessary delays during shutdown
+    # Check https://github.com/ethereum/web3.py/pull/3805
+    if wait_sessions_close:
+        await asyncio.sleep(max(settings.consensus_timeout, settings.execution_timeout))
