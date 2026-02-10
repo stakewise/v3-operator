@@ -3,13 +3,13 @@ import logging
 import shutil
 import sys
 from concurrent.futures import ThreadPoolExecutor
+from itertools import batched
 from pathlib import Path
 
 import aiohttp
 import click
 from aiohttp import ClientTimeout
 from eth_typing import ChecksumAddress
-from sw_utils import chunkify
 
 from src.common.clients import close_clients, setup_clients
 from src.common.contracts import VaultContract
@@ -181,7 +181,7 @@ async def process(vault: ChecksumAddress | None) -> None:
 
     async with aiohttp.ClientSession(timeout=ClientTimeout(REMOTE_SIGNER_TIMEOUT)) as session:
         for keystores_json_chunk, keystore_files_chunk in zip(
-            chunkify(keystores_json, chunk_size), chunkify(keystore_files, chunk_size)
+            batched(keystores_json, chunk_size), batched(keystore_files, chunk_size)
         ):
             data = {
                 'keystores': keystores_json_chunk,
@@ -199,7 +199,7 @@ async def process(vault: ChecksumAddress | None) -> None:
                 data.update(
                     {
                         'tags': tags_array,
-                        'feeRecipients': fee_recipient_array,  # type: ignore
+                        'feeRecipients': fee_recipient_array,
                     }
                 )
 

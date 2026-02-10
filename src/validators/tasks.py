@@ -1,8 +1,9 @@
 import logging
+from itertools import batched
 from typing import Sequence, cast
 
 from eth_typing import HexStr
-from sw_utils import IpfsFetchClient, chunkify, convert_to_mgno
+from sw_utils import IpfsFetchClient, convert_to_mgno
 from sw_utils.networks import GNO_NETWORKS
 from web3 import Web3
 from web3.types import BlockNumber, Gwei
@@ -110,7 +111,7 @@ class ValidatorRegistrationSubtask:
         if not await _is_funding_interval_passed():
             raise FundingException('Funding interval has not passed yet')
 
-        for validator_fundings_chunk in chunkify(
+        for validator_fundings_chunk in batched(
             list(funding_amounts.items()), VALIDATORS_FUNDING_BATCH_SIZE
         ):
             try:
@@ -132,7 +133,7 @@ class ValidatorRegistrationSubtask:
 
 
 async def fund_compounding_validators(
-    validator_fundings: list[tuple[HexStr, Gwei]],
+    validator_fundings: Sequence[tuple[HexStr, Gwei]],
     harvest_params: HarvestParams | None,
     relayer: RelayerClient | None = None,
 ) -> HexStr | None:
