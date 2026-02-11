@@ -210,7 +210,7 @@ def consolidate(
         )
     if (source_public_keys or source_public_keys_file) and not target_public_key:
         raise click.ClickException(
-            'target-public-key must be provided with one of these parameters:'
+            '--target-public-key must be provided when using'
             ' --source-public-keys-file or --source-public-keys.'
         )
 

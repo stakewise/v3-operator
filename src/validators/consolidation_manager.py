@@ -73,7 +73,7 @@ class ConsolidationManager:
         return self
 
     def get_target_source(self) -> list[tuple[ConsensusValidator, ConsensusValidator]]:
-        '''
+        """
         # Source validators must be:
         - unique
         - in the vault
@@ -81,8 +81,8 @@ class ConsolidationManager:
         - active for at least SHARD_COMMITTEE_PERIOD epochs
         - not consolidating to another validator
         - not consolidating from another validator
-        - have no pending partial withdrawals in the queue
-        - total balance that won't exceed the max effective balance when consolidated
+        - no pending partial withdrawals in the queue
+        - total balance not exceeding the max effective balance when consolidated
         # Target validator must be:
         - in the vault
         - not exiting
@@ -94,7 +94,7 @@ class ConsolidationManager:
         - in the vault
         - not exiting
         - active for at least SHARD_COMMITTEE_PERIOD epochs
-        '''
+        """
         raise NotImplementedError()
 
     @property
@@ -114,15 +114,16 @@ class ConsolidationSelector(ConsolidationManager):
     def get_target_source(self) -> list[tuple[ConsensusValidator, ConsensusValidator]]:
         """
         If there are no 0x02 validators,
-        take the oldest 0x01 validator and convert it to 0x02 with confirmation prompt.
-        If there is 0x02 validator,
-        take the oldest 0x01 validators to top up its balance to 2048 ETH / 64 GNO.
+        take the oldest 0x01 validator and convert it to 0x02 with a confirmation prompt.
+        If there is a 0x02 validator,
+        take the oldest 0x01 validators to top up the target's balance to MAX BALANCE.
         """
         # Candidates on the role of either source or target validator
 
-        source_validators_candidates, target_validator_candidates = (
-            self._find_validators_candidates()
-        )
+        (
+            source_validators_candidates,
+            target_validator_candidates,
+        ) = self._find_validators_candidates()
         if not source_validators_candidates or not target_validator_candidates:
             return []
 
@@ -195,7 +196,7 @@ class ConsolidationChecker(ConsolidationManager):
     def get_target_source(self) -> list[tuple[ConsensusValidator, ConsensusValidator]]:
         """
         Validate that provided public keys can be consolidated
-        and returns the target and source validators info.
+        and return the target and source validators info.
         """
         logger.info('Checking selected validators for consolidation...')
         self._validate_public_keys()
@@ -229,7 +230,7 @@ class ConsolidationChecker(ConsolidationManager):
                     f'status {source_validator.status.value}.'
                 )
 
-            # Validate the source has been active long enough
+            # Validate the source validator has been active long enough
             if source_validator.activation_epoch >= self.max_activation_epoch:
                 raise ConsolidationError(
                     f'Validator {source_validator.public_key}'
@@ -275,7 +276,7 @@ class ConsolidationChecker(ConsolidationManager):
         if len(self.source_public_keys) != len(set(self.source_public_keys)):
             raise ConsolidationError('Source public keys must be unique.')
 
-        # Validate the switch from 0x01 to 0x02 and consolidation to another validator
+        # Reject combining switch from 0x01 to 0x02 with consolidation to another validator
         if len(self.source_public_keys) > 1 and self.target_public_key in self.source_public_keys:
             raise ConsolidationError(
                 'Cannot switch from 0x01 to 0x02 and consolidate '

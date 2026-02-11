@@ -281,13 +281,11 @@ class TestConsolidationSelector:
             vault_validators=[v.public_key for v in consensus_validators],
             consensus_validators=consensus_validators,
             consolidating_source_indexes=set(),
-            consolidating_target_indexes={
-                10
-            },  # index 10 is in target consolidation, so can't be target again
+            consolidating_target_indexes={10},
         )
         result = selector.get_target_source()
-        # Should switch validator 11 from 0x01 to 0x02 since there are no valid targets
-        # but validator 11 is available as source
+        # Validator 10 can still be target even if already in consolidating_target_indexes,
+        # so validator 11 consolidates into validator 10
         assert result == [(consensus_validators[0], consensus_validators[1])]
 
     async def test_excludes_validator_in_target_indexes_as_source(self):
