@@ -1,6 +1,5 @@
 from unittest.mock import patch
 
-import click
 import pytest
 from eth_typing import HexStr
 from sw_utils import ChainHead
@@ -14,6 +13,7 @@ from src.validators.consolidation_manager import (
     ConsolidationChecker,
     ConsolidationSelector,
 )
+from src.validators.exceptions import ConsolidationError
 from src.validators.tests.factories import create_consensus_validator
 from src.validators.typings import ConsensusValidator, ConsolidationKeys
 
@@ -183,11 +183,11 @@ class TestConsolidationSelector:
         assert result == []
 
     async def test_min_activation_epoch(self):
-        epoch = 10
+        epoch = 1000
         consensus_validators = [
             create_consensus_validator(
                 index=10,
-                activation_epoch=epoch + settings.network_config.SHARD_COMMITTEE_PERIOD - 1,
+                activation_epoch=epoch - settings.network_config.SHARD_COMMITTEE_PERIOD + 1,
                 is_compounding=False,
             ),
         ]
@@ -332,7 +332,7 @@ class TestConsolidationChecker:
             consensus_validators=[],
         )
         with pytest.raises(
-            click.ClickException,
+            ConsolidationError,
             match=f'Validator {pk} is not registered in the vault {settings.vault}.',
         ):
             selector.get_target_source()
@@ -380,7 +380,7 @@ class TestConsolidationChecker:
             consensus_validators=consensus_validators,
         )
         with pytest.raises(
-            click.ClickException, match=f'Target validator {pk} is already a compounding validator.'
+            ConsolidationError, match=f'Target validator {pk} is already a compounding validator.'
         ):
             selector.get_target_source()
 
@@ -509,7 +509,7 @@ class TestConsolidationChecker:
             )
 
             with pytest.raises(
-                click.ClickException, match='Cannot consolidate validators, total balance exceed'
+                ConsolidationError, match='Cannot consolidate validators, total balance exceed'
             ):
                 selector.get_target_source()
 
@@ -544,7 +544,7 @@ class TestConsolidationChecker:
         )
 
         with pytest.raises(
-            click.ClickException,
+            ConsolidationError,
             match=f'Validator {source_pk} is consolidating to another validator.',
         ):
             selector.get_target_source()
@@ -559,7 +559,7 @@ class TestConsolidationChecker:
         )
 
         with pytest.raises(
-            click.ClickException,
+            ConsolidationError,
             match=f'Target validator {target_pk} is involved in another consolidation.',
         ):
             selector.get_target_source()
@@ -594,7 +594,7 @@ class TestConsolidationChecker:
         )
 
         with pytest.raises(
-            click.ClickException,
+            ConsolidationError,
             match=f'Validator {source_pk} has pending partial withdrawals in the queue.',
         ):
             selector.get_target_source()
@@ -628,7 +628,7 @@ class TestConsolidationChecker:
         )
 
         with pytest.raises(
-            click.ClickException,
+            ConsolidationError,
             match=f'Validator {source_pk} is in exiting status {EXITING_STATUSES[0].value}.',
         ):
             selector.get_target_source()
@@ -654,7 +654,7 @@ class TestConsolidationChecker:
         )
 
         with pytest.raises(
-            click.ClickException,
+            ConsolidationError,
             match=f'Target validator {target_pk} is in exiting status {EXITING_STATUSES[0].value}.',
         ):
             selector.get_target_source()
@@ -688,7 +688,7 @@ class TestConsolidationChecker:
         )
 
         with pytest.raises(
-            click.ClickException,
+            ConsolidationError,
             match=f'The target validator {target_pk} is not a compounding validator.',
         ):
             selector.get_target_source()
@@ -724,7 +724,7 @@ class TestConsolidationChecker:
         )
 
         with pytest.raises(
-            click.ClickException,
+            ConsolidationError,
             match=f'Validator {consensus_validators[0].public_key} is not active enough for consolidation.',
         ):
             selector.get_target_source()

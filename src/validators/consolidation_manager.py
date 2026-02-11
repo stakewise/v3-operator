@@ -1,6 +1,5 @@
 import logging
 
-import click
 from eth_typing import HexStr
 from sw_utils import ChainHead
 
@@ -9,6 +8,7 @@ from src.common.contracts import VaultContract
 from src.common.withdrawals import get_pending_partial_withdrawals
 from src.config.settings import settings
 from src.validators.consensus import EXITING_STATUSES, fetch_consensus_validators
+from src.validators.exceptions import ConsolidationError
 from src.validators.typings import ConsensusValidator, ConsolidationKeys
 
 logger = logging.getLogger(__name__)
@@ -74,7 +74,7 @@ class ConsolidationManager:
 
     def get_target_source(self) -> list[tuple[ConsensusValidator, ConsensusValidator]]:
         '''
-         # Source validators must be:
+        # Source validators must be:
         - unique
         - in the vault
         - not exiting
@@ -203,7 +203,7 @@ class ConsolidationChecker(ConsolidationManager):
         # Validate the source and target validators are in the vault
         for public_key in self.source_public_keys + [self.target_public_key]:
             if public_key not in self.vault_validators:
-                raise click.ClickException(
+                raise ConsolidationError(
                     f'Validator {public_key} is not registered in the vault {settings.vault}.'
                 )
 
@@ -218,20 +218,20 @@ class ConsolidationChecker(ConsolidationManager):
         for source_public_key in self.source_public_keys:
             source_validator = pubkey_to_validator.get(source_public_key)
             if not source_validator:
-                raise click.ClickException(
+                raise ConsolidationError(
                     f'Validator {source_public_key} not found in the consensus layer.'
                 )
 
             # Validate the source validator status
             if source_validator.status in EXITING_STATUSES:
-                raise click.ClickException(
+                raise ConsolidationError(
                     f'Validator {source_public_key} is in exiting '
                     f'status {source_validator.status.value}.'
                 )
 
             # Validate the source has been active long enough
-            if source_validator.activation_epoch > self.max_activation_epoch:
-                raise click.ClickException(
+            if source_validator.activation_epoch >= self.max_activation_epoch:
+                raise ConsolidationError(
                     f'Validator {source_validator.public_key}'
                     f' is not active enough for consolidation. '
                     f'It must be active for at least '
@@ -244,14 +244,14 @@ class ConsolidationChecker(ConsolidationManager):
                 source_validator.index in self.consolidating_source_indexes
                 or source_validator.index in self.consolidating_target_indexes
             ):
-                raise click.ClickException(
+                raise ConsolidationError(
                     f'Validator {source_validator.public_key} '
                     f'is consolidating to another validator.'
                 )
 
-            # Validate the source validators has no pending withdrawals in the queue
+            # Validate the source validator has no pending withdrawals in the queue
             if source_validator.index in self.pending_partial_withdrawals_indexes:
-                raise click.ClickException(
+                raise ConsolidationError(
                     f'Validator {source_validator.public_key} '
                     f'has pending partial withdrawals in the queue.'
                 )
@@ -263,7 +263,7 @@ class ConsolidationChecker(ConsolidationManager):
             sum(val.balance for val in self.consensus_validators)
             > settings.max_validator_balance_gwei
         ):
-            raise click.ClickException(
+            raise ConsolidationError(
                 'Cannot consolidate validators,'
                 f' total balance exceeds {settings.max_validator_balance_gwei} Gwei'
             )
@@ -273,11 +273,11 @@ class ConsolidationChecker(ConsolidationManager):
     def _validate_public_keys(self) -> None:
         # Validate that source public keys are unique
         if len(self.source_public_keys) != len(set(self.source_public_keys)):
-            raise click.ClickException('Source public keys must be unique.')
+            raise ConsolidationError('Source public keys must be unique.')
 
         # Validate the switch from 0x01 to 0x02 and consolidation to another validator
         if len(self.source_public_keys) > 1 and self.target_public_key in self.source_public_keys:
-            raise click.ClickException(
+            raise ConsolidationError(
                 'Cannot switch from 0x01 to 0x02 and consolidate '
                 'to another validator in the same request.'
             )
@@ -289,36 +289,36 @@ class ConsolidationChecker(ConsolidationManager):
             val for val in self.consensus_validators if val.public_key == self.target_public_key
         ]
         if not target_validators:
-            raise click.ClickException(
+            raise ConsolidationError(
                 f'Validator {self.target_public_key} not found in the consensus layer.'
             )
         target_validator = target_validators[0]
         if target_validator.status in EXITING_STATUSES:
-            raise click.ClickException(
+            raise ConsolidationError(
                 f'Target validator {self.target_public_key} is in exiting '
                 f'status {target_validator.status.value}.'
             )
         # Target validator cannot be used as source in ongoing consolidations
         if target_validator.index in self.consolidating_source_indexes:
-            raise click.ClickException(
+            raise ConsolidationError(
                 f'Target validator {self.target_public_key} is involved in another consolidation.'
             )
 
         if self.is_switch_to_compounding():
             if target_validator.is_compounding:
-                raise click.ClickException(
+                raise ConsolidationError(
                     f'Target validator {self.target_public_key} is already a compounding validator.'
                 )
             # switch the 0x01 to 0x02
-            if target_validator.activation_epoch > self.max_activation_epoch:
-                raise click.ClickException(
+            if target_validator.activation_epoch >= self.max_activation_epoch:
+                raise ConsolidationError(
                     f'Validator {self.target_public_key} is not active enough for consolidation. '
                     f'It must be active for at least '
                     f'{settings.network_config.SHARD_COMMITTEE_PERIOD} epochs before consolidation.'
                 )
         else:
             if not target_validator.is_compounding:
-                raise click.ClickException(
+                raise ConsolidationError(
                     f'The target validator {self.target_public_key}'
                     f' is not a compounding validator.'
                 )
