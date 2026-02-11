@@ -47,30 +47,23 @@ async def graph_get_allocators(block_number: BlockNumber) -> list[Allocator]:
         'block': block_number,
     }
     response = await graph_client.fetch_pages(query, params=params, cursor_pagination=True)
-    tmp_allocators: defaultdict[str, dict[str, tuple[Wei, float]]] = defaultdict(dict)
-    allocators: list[Allocator] = []
+    positions_by_allocator: defaultdict[str, list[VaultOsTokenPosition]] = defaultdict(list)
     for item in response:
         if int(item['mintedOsTokenShares']) > 0:
-            tmp_allocators[item['address']][item['vault']['id']] = (
-                Wei(int(item['mintedOsTokenShares'])),
-                float(item['ltv']),
+            positions_by_allocator[item['address']].append(
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(item['vault']['id']),
+                    minted_shares=Wei(int(item['mintedOsTokenShares'])),
+                    ltv=float(item['ltv']),
+                )
             )
-    for allocator_address, vaults in tmp_allocators.items():
-        vault_os_token_positions = [
-            VaultOsTokenPosition(
-                address=Web3.to_checksum_address(vault_address),
-                minted_shares=minted_shares,
-                ltv=ltv,
-            )
-            for vault_address, (minted_shares, ltv) in vaults.items()
-        ]
-        allocators.append(
-            Allocator(
-                address=Web3.to_checksum_address(allocator_address),
-                vault_os_token_positions=vault_os_token_positions,
-            )
+    return [
+        Allocator(
+            address=Web3.to_checksum_address(allocator_address),
+            vault_os_token_positions=vault_os_token_positions,
         )
-    return allocators
+        for allocator_address, vault_os_token_positions in positions_by_allocator.items()
+    ]
 
 
 async def graph_get_leverage_positions(block_number: BlockNumber) -> list[LeverageStrategyPosition]:
