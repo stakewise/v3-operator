@@ -403,19 +403,6 @@ class MetaVaultContract(ContractWrapper):
     async def get_exit_queue_index(self, position_ticket: int) -> int:
         return await self.contract.functions.getExitQueueIndex(position_ticket).call()
 
-    async def get_last_rewards_nonce_updated_event(
-        self, from_block: BlockNumber, to_block: BlockNumber
-    ) -> EventData | None:
-        """
-        Returns the latest RewardsNonceUpdated event data from the contract.
-        """
-        event = await self._get_last_event(
-            event=cast(type[AsyncContractEvent], self.contract.events.RewardsNonceUpdated),
-            from_block=from_block,
-            to_block=to_block,
-        )
-        return event
-
 
 class MetaVaultEncoder(BaseEncoder):
     """Helper class to encode MetaVault contract ABI calls."""
@@ -438,6 +425,19 @@ class MetaVaultEncoder(BaseEncoder):
 
 class SubVaultsRegistryContract(ContractWrapper):
     abi_path = 'abi/ISubVaultsRegistry.json'
+
+    async def get_last_rewards_nonce_updated_event(
+        self, from_block: BlockNumber, to_block: BlockNumber
+    ) -> EventData | None:
+        """
+        Returns the latest RewardsNonceUpdated event data from the contract.
+        """
+        event = await self._get_last_event(
+            event=cast(type[AsyncContractEvent], self.contract.events.RewardsNonceUpdated),
+            from_block=from_block,
+            to_block=to_block,
+        )
+        return event
 
     async def deposit_to_sub_vaults(self) -> HexStr:
         tx_function = self.contract.functions.depositToSubVaults()
