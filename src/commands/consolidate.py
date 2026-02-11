@@ -256,7 +256,6 @@ def consolidate(
     try:
         asyncio.run(
             main(
-                vault_address=vault,
                 source_public_keys=source_public_keys,
                 target_public_key=target_public_key,
                 exclude_public_keys=exclude_public_keys,
@@ -272,7 +271,6 @@ def consolidate(
 
 # pylint: disable-next=too-many-arguments
 async def main(
-    vault_address: ChecksumAddress,
     source_public_keys: list[HexStr] | None,
     target_public_key: HexStr | None,
     exclude_public_keys: set[HexStr],
@@ -284,7 +282,6 @@ async def main(
     await setup_clients()
     try:
         await process(
-            vault_address=vault_address,
             source_public_keys=source_public_keys,
             target_public_key=target_public_key,
             exclude_public_keys=exclude_public_keys,
@@ -298,7 +295,6 @@ async def main(
 
 # pylint: disable-next=too-many-locals,too-many-arguments
 async def process(
-    vault_address: ChecksumAddress,
     source_public_keys: list[HexStr] | None,
     target_public_key: HexStr | None,
     exclude_public_keys: set[HexStr],
@@ -315,7 +311,7 @@ async def process(
     """
     chain_head = await get_chain_latest_head()
 
-    await _check_validators_manager(vault_address)
+    await _check_validators_manager()
     await _check_consolidations_queue(chain_head)
 
     consolidation_keys = None
@@ -331,7 +327,7 @@ async def process(
     )
     target_source = consolidation_selector.get_target_source()
     if not target_source:
-        raise click.ClickException(f'Validators in vault {vault_address} can\'t be consolidated')
+        raise click.ClickException(f'Validators in vault {settings.vault} can\'t be consolidated')
 
     for target_validator, source_validator in target_source:
         if source_validator.index == target_validator.index:
@@ -383,13 +379,13 @@ async def process(
         # The oracles signatures are only required when switching from 0x01 to 0x02
         oracle_signatures = await poll_consolidation_signature(
             target_public_keys=[target_source_public_keys[0][0]],
-            vault=vault_address,
+            vault=settings.vault,
             protocol_config=protocol_config,
         )
 
     encoded_validators = _encode_validators(target_source_public_keys)
     validators_manager_signature = await _get_validators_manager_signature(
-        vault_address, target_source_public_keys
+        target_source_public_keys
     )
 
     tx_hash = await submit_consolidate_validators(
@@ -407,10 +403,10 @@ async def process(
         )
 
 
-async def _check_validators_manager(vault_address: ChecksumAddress) -> None:
+async def _check_validators_manager() -> None:
     if settings.relayer_endpoint:
         return
-    vault_contract = VaultContract(vault_address)
+    vault_contract = VaultContract(settings.vault)
     validators_manager = await vault_contract.validators_manager()
     if validators_manager != wallet.account.address:
         raise click.ClickException(
@@ -444,14 +440,14 @@ def _load_public_keys(public_keys_file: Path) -> list[HexStr]:
 
 
 async def _get_validators_manager_signature(
-    vault_address: ChecksumAddress, target_source_public_keys: list[tuple[HexStr, HexStr]]
+    target_source_public_keys: list[tuple[HexStr, HexStr]]
 ) -> HexStr:
     if not settings.relayer_endpoint:
         return HexStr('0x')
     relayer = RelayerClient()
     # fetch validator manager signature from relayer
     relayer_response = await relayer.consolidate_validators(
-        vault_address=vault_address,
+        vault_address=settings.vault,
         target_source_public_keys=target_source_public_keys,
     )
     if not relayer_response.validators_manager_signature:

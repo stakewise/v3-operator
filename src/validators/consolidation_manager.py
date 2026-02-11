@@ -248,14 +248,15 @@ class ConsolidationChecker(ConsolidationManager):
                     f'Validator {source_validator.public_key} '
                     f'is consolidating to another validator.'
                 )
-            source_validators.append(source_validator)
 
             # Validate the source validators has no pending withdrawals in the queue
             if source_validator.index in self.pending_partial_withdrawals_indexes:
                 raise click.ClickException(
                     f'Validator {source_validator.public_key} '
-                    f'has pending partial withdrawals in the queue. '
+                    f'has pending partial withdrawals in the queue.'
                 )
+
+            source_validators.append(source_validator)
 
         # Validate the total balance won't exceed the max effective balance
         if (
@@ -264,7 +265,7 @@ class ConsolidationChecker(ConsolidationManager):
         ):
             raise click.ClickException(
                 'Cannot consolidate validators,'
-                f' total balance exceed {settings.max_validator_balance_gwei} Gwei'
+                f' total balance exceeds {settings.max_validator_balance_gwei} Gwei'
             )
 
         return [(target_validator, source_validator) for source_validator in source_validators]

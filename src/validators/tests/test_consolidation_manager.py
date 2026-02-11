@@ -464,7 +464,6 @@ class TestConsolidationChecker:
             (consensus_validators[2], consensus_validators[1]),
         ]
 
-    @pytest.mark.asyncio
     async def test_consolidation_max_balance(self):
         source_pk_1 = faker.validator_public_key()
         source_pk_2 = faker.validator_public_key()
@@ -736,10 +735,10 @@ def create_manager(
     chain_head: ChainHead | None = None,
     exclude_public_keys: set[HexStr] | None = None,
     vault_validators: list[HexStr] | None = None,
-    consensus_validators: list[ConsensusValidator] = None,
-    consolidating_source_indexes: set[int] = None,
-    consolidating_target_indexes: set[int] = None,
-    pending_partial_withdrawals_indexes: set[int] = None,
+    consensus_validators: list[ConsensusValidator] | None = None,
+    consolidating_source_indexes: set[int] | None = None,
+    consolidating_target_indexes: set[int] | None = None,
+    pending_partial_withdrawals_indexes: set[int] | None = None,
 ) -> ConsolidationSelector | ConsolidationChecker:
     self: ConsolidationChecker | ConsolidationSelector
     if chain_head is None:
