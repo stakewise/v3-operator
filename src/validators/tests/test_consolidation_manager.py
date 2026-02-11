@@ -80,7 +80,6 @@ class TestConsolidationSelector:
         result = selector.get_target_source()
         assert result == [(consensus_validators[1], consensus_validators[0])]
 
-    @pytest.mark.asyncio
     async def test_consolidation_max_balance(self):
         consensus_validators = [
             create_consensus_validator(
@@ -597,7 +596,7 @@ class TestConsolidationChecker:
 
         with pytest.raises(
             click.ClickException,
-            match=f'Validator {source_pk} have pending partial withdrawals in the queue.',
+            match=f'Validator {source_pk} has pending partial withdrawals in the queue.',
         ):
             selector.get_target_source()
 
@@ -661,6 +660,40 @@ class TestConsolidationChecker:
         ):
             selector.get_target_source()
 
+    async def test_rejects_non_compounding_target(self):
+        source_pk = faker.validator_public_key()
+        target_pk = faker.validator_public_key()
+        consolidation_keys = ConsolidationKeys(
+            source_public_keys=[source_pk],
+            target_public_key=target_pk,
+        )
+
+        consensus_validators = [
+            create_consensus_validator(
+                public_key=source_pk,
+                index=10,
+                activation_epoch=1,
+                is_compounding=False,
+            ),
+            create_consensus_validator(
+                public_key=target_pk,
+                index=11,
+                activation_epoch=1,
+                is_compounding=False,
+            ),
+        ]
+        selector = create_manager(
+            consolidation_keys=consolidation_keys,
+            vault_validators=[v.public_key for v in consensus_validators],
+            consensus_validators=consensus_validators,
+        )
+
+        with pytest.raises(
+            click.ClickException,
+            match=f'The target validator {target_pk} is not a compounding validator.',
+        ):
+            selector.get_target_source()
+
     async def test_min_activation_epoch(self):
         source_pk = faker.validator_public_key()
         target_pk = faker.validator_public_key()
@@ -701,8 +734,8 @@ class TestConsolidationChecker:
 def create_manager(
     consolidation_keys: ConsolidationKeys | None = None,
     chain_head: ChainHead | None = None,
-    exclude_public_keys: set[HexStr] = None,
-    vault_validators: list[HexStr] = None,
+    exclude_public_keys: set[HexStr] | None = None,
+    vault_validators: list[HexStr] | None = None,
     consensus_validators: list[ConsensusValidator] = None,
     consolidating_source_indexes: set[int] = None,
     consolidating_target_indexes: set[int] = None,

@@ -80,7 +80,7 @@ class ConsolidationManager:
         - not exiting
         - active for at least SHARD_COMMITTEE_PERIOD epochs
         - not consolidating to another validator
-        - not consolidations from another validator
+        - not consolidating from another validator
         - have no pending partial withdrawals in the queue
         - total balance that won't exceed the max effective balance when consolidated
         # Target validator must be:
@@ -151,9 +151,7 @@ class ConsolidationSelector(ConsolidationManager):
 
         # Target validator is almost full, switch the oldest 0x01 to 0x02
         # Only do this if there are source validators available
-        if source_validators_candidates:
-            return [(source_validators_candidates[0], source_validators_candidates[0])]
-        return []
+        return [(source_validators_candidates[0], source_validators_candidates[0])]
 
     def _find_validators_candidates(
         self,
@@ -256,7 +254,7 @@ class ConsolidationChecker(ConsolidationManager):
             if source_validator.index in self.pending_partial_withdrawals_indexes:
                 raise click.ClickException(
                     f'Validator {source_validator.public_key} '
-                    f'have pending partial withdrawals in the queue. '
+                    f'has pending partial withdrawals in the queue. '
                 )
 
         # Validate the total balance won't exceed the max effective balance
@@ -272,10 +270,6 @@ class ConsolidationChecker(ConsolidationManager):
         return [(target_validator, source_validator) for source_validator in source_validators]
 
     def _validate_public_keys(self) -> None:
-        if self.source_public_keys is None or self.target_public_key is None:
-            raise click.ClickException(
-                'Both source_public_keys and target_public_key must be provided for checking.'
-            )
         # Validate that source public keys are unique
         if len(self.source_public_keys) != len(set(self.source_public_keys)):
             raise click.ClickException('Source public keys must be unique.')
@@ -320,6 +314,12 @@ class ConsolidationChecker(ConsolidationManager):
                     f'Validator {self.target_public_key} is not active enough for consolidation. '
                     f'It must be active for at least '
                     f'{settings.network_config.SHARD_COMMITTEE_PERIOD} epochs before consolidation.'
+                )
+        else:
+            if not target_validator.is_compounding:
+                raise click.ClickException(
+                    f'The target validator {self.target_public_key}'
+                    f' is not a compounding validator.'
                 )
         return target_validator
 
