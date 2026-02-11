@@ -358,8 +358,12 @@ async def is_meta_vault_rewards_nonce_outdated(
         return False
 
     # Find the last rewards nonce updated event in the meta vault contract
-    # since the last Keeper vote
-    meta_vault_event = await meta_vault_contract.get_last_rewards_nonce_updated_event(
+    # since the last Keeper vote.
+    # Event is emitted by SubVaultsRegistryContract
+    sub_vaults_registry_address = await meta_vault_contract.sub_vaults_registry()
+    sub_vaults_registry = SubVaultsRegistryContract(sub_vaults_registry_address)
+
+    meta_vault_event = await sub_vaults_registry.get_last_rewards_nonce_updated_event(
         from_block=BlockNumber(keeper_event['blockNumber'] + 1), to_block=current_block
     )
 
