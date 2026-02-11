@@ -137,7 +137,7 @@ logger = logging.getLogger(__name__)
 )
 @click.option(
     '--network',
-    help='The network for redeemable positions.',
+    help='The network for redeemable os token positions.',
     prompt='Enter the network name',
     envvar='NETWORK',
     type=click.Choice(
@@ -145,7 +145,7 @@ logger = logging.getLogger(__name__)
         case_sensitive=False,
     ),
 )
-@click.command(help='Updates redeemable positions')
+@click.command(help='Updates redeemable os token positions')
 # pylint: disable-next=too-many-arguments,too-many-locals
 def update_redeemable_positions(
     execution_endpoints: str,
@@ -252,7 +252,7 @@ async def process(
     api_config: ApiConfig,
 ) -> None:
     """
-    Fetch redeemable positions, calculate kept os token amounts and upload to IPFS.
+    Fetch redeemable os token positions, calculate kept os token amounts and upload to IPFS.
     """
     block_number = await execution_client.eth.get_block_number()
     logger.info('Fetching allocators from the subgraph...')
@@ -267,12 +267,12 @@ async def process(
     allocators = [a for a in allocators if a.address not in boost_proxies]
     # reduce boosted positions
     os_token_converter = await create_os_token_converter(block_number)
-    boost_ostoken_shares = await calculate_boost_ostoken_shares(
+    boost_os_token_shares = await calculate_boost_os_token_shares(
         users={a.address for a in allocators},
         leverage_positions=leverage_positions,
         os_token_converter=os_token_converter,
     )
-    allocators = _reduce_boosted_amount(allocators, boost_ostoken_shares)
+    allocators = _reduce_boosted_amount(allocators, boost_os_token_shares)
 
     # filter zero positions. Filter before kept shares calculation to reduce api calls
     min_minted_shares = Web3.to_wei(min_os_token_position_amount_gwei, 'gwei')
@@ -299,11 +299,12 @@ async def process(
 
     os_token_positions = create_os_token_positions(allocators, kept_shares, min_minted_shares)
     if not os_token_positions:
-        logger.info('No redeemable positions to upload, exiting...')
+        logger.info('No redeemable os token positions to upload, exiting...')
         return
     total_redeemable = sum(p.amount for p in os_token_positions)
     logger.info(
-        'Created %(count)s redeemable positions. Total redeemed %(os_token_symbol)s amount: '
+        'Created %(count)s redeemable os token positions. '
+        'Total redeemed %(os_token_symbol)s amount: '
         '%(total_redeemable)s (%(total_redeemable_eth).5f %(os_token_symbol)s)',
         {
             'count': len(os_token_positions),
@@ -314,13 +315,13 @@ async def process(
     )
     if not no_confirm:
         click.confirm(
-            'Proceed with uploading redeemable positions to IPFS?',
+            'Proceed with uploading redeemable os token positions to IPFS?',
             default=True,
             abort=True,
         )
     ipfs_upload_client = build_ipfs_upload_clients()
     ipfs_hash = await ipfs_upload_client.upload_json([p.as_dict() for p in os_token_positions])
-    click.echo(f'Redeemable position uploaded to IPFS: hash={ipfs_hash}')
+    click.echo(f'Redeemable os token positions uploaded to IPFS: hash={ipfs_hash}')
 
     # calculate merkle root
     nonce = await os_token_redeemer_contract.nonce()
@@ -374,8 +375,9 @@ async def get_kept_shares(
         return kept_shares
 
     logger.info(
-        'Fetching locked %s from DeBank API for %s addresses...',
+        'Fetching locked %s from %s API for %s addresses...',
         settings.network_config.OS_TOKEN_BALANCE_SYMBOL,
+        api_config.source,
         len(api_addresses),
     )
     api_client = APIClient(api_source=api_config.source, api_access_key=api_config.access_key)
@@ -422,7 +424,7 @@ async def _get_arb_balances(
         await arb_execution_client.provider.disconnect()
 
 
-async def calculate_boost_ostoken_shares(
+async def calculate_boost_os_token_shares(
     users: set[ChecksumAddress],
     leverage_positions: list[LeverageStrategyPosition],
     os_token_converter: OsTokenConverter,
@@ -455,7 +457,7 @@ def create_os_token_positions(
     min_minted_shares: Wei,
 ) -> list[OsTokenPosition]:
     """
-    Calculate vault proportions and create redeemable positions.
+    Calculate vault proportions and create redeemable os token positions.
     Sort by ltv descending, then amount descending.
     """
     os_token_positions: list[OsTokenPosition] = []
@@ -492,11 +494,11 @@ def create_os_token_positions(
 
 def _reduce_boosted_amount(
     allocators: list[Allocator],
-    boost_ostoken_shares: dict[tuple[ChecksumAddress, ChecksumAddress], Wei],
+    boost_os_token_shares: dict[tuple[ChecksumAddress, ChecksumAddress], Wei],
 ) -> list[Allocator]:
     for allocator in allocators:
         for vault_share in allocator.vault_os_token_positions:
             key = allocator.address, vault_share.address
-            boosted_amount = boost_ostoken_shares.get(key, Wei(0))
+            boosted_amount = boost_os_token_shares.get(key, Wei(0))
             vault_share.minted_shares = Wei(max(0, vault_share.minted_shares - boosted_amount))
     return allocators

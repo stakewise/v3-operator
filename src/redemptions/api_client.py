@@ -37,7 +37,7 @@ class APIClient:
 
     async def get_protocols_locked_os_token(self, address: ChecksumAddress) -> Wei:
         if settings.network not in API_SUPPORTED_CHAINS:
-            raise ValueError(f'Unsupported network for Rabby API Client: {settings.network}')
+            raise ValueError(f'Unsupported network for API Client: {settings.network}')
 
         url = urljoin(self.base_url, 'v1/user/complex_protocol_list')
         params = {
@@ -82,7 +82,7 @@ class APIClient:
     def _is_os_token(self, token_address: ChecksumAddress) -> bool:
         if token_address == ZERO_CHECKSUM_ADDRESS:
             return False
-        return token_address in [
+        return token_address in (
             settings.network_config.OS_TOKEN_CONTRACT_ADDRESS,
             settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS,
-        ]
+        )
