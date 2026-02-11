@@ -114,7 +114,7 @@ class ConsolidationSelector(ConsolidationManager):
     def get_target_source(self) -> list[tuple[ConsensusValidator, ConsensusValidator]]:
         """
         If there are no 0x02 validators,
-        take the oldest 0x01 validator and convert it to 0x02 with a confirmation prompt.
+        take the oldest 0x01 validator and convert it to 0x02.
         If there is a 0x02 validator,
         take the oldest 0x01 validators to top up the target's balance to MAX BALANCE.
         """
@@ -162,7 +162,7 @@ class ConsolidationSelector(ConsolidationManager):
         for val in self.consensus_validators:
             if val.status in EXITING_STATUSES:
                 continue
-            # Target validator cannot be used as source in ongoing consolidations
+            # Exclude validators that are sources in ongoing consolidations
             if val.index in self.consolidating_source_indexes:
                 continue
             if val.public_key in self.exclude_public_keys:
