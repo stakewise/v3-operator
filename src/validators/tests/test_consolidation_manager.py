@@ -199,21 +199,6 @@ class TestConsolidationSelector:
         result = selector.get_target_source()
         assert result == []
 
-        consensus_validators = [
-            create_consensus_validator(
-                index=10,
-                activation_epoch=epoch - settings.network_config.SHARD_COMMITTEE_PERIOD,
-                is_compounding=False,
-            ),
-        ]
-        selector = create_manager(
-            chain_head=create_chain_head(epoch),
-            vault_validators=[v.public_key for v in consensus_validators],
-            consensus_validators=consensus_validators,
-        )
-        result = selector.get_target_source()
-        assert result == []
-
     async def test_excludes_source_as_target_validator(self):
         """Test that target validator is excluded if it's in consolidating_source_indexes"""
         consensus_validators = [
@@ -522,7 +507,7 @@ class TestConsolidationChecker:
             )
 
             with pytest.raises(
-                ConsolidationError, match='Cannot consolidate validators, total balance exceed'
+                ConsolidationError, match='Cannot consolidate validators, total balance exceeds'
             ):
                 selector.get_target_source()
 

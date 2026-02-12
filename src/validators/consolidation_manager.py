@@ -1,7 +1,9 @@
 import logging
+from abc import ABC, abstractmethod
 
 from eth_typing import HexStr
 from sw_utils import ChainHead
+from web3.types import Gwei
 
 from src.common.consolidations import get_pending_consolidations
 from src.common.contracts import VaultContract
@@ -14,7 +16,7 @@ from src.validators.typings import ConsensusValidator, ConsolidationKeys
 logger = logging.getLogger(__name__)
 
 
-class ConsolidationManager:
+class ConsolidationManager(ABC):
     chain_head: ChainHead
     vault_validators: list[HexStr]
     consensus_validators: list[ConsensusValidator]
@@ -72,6 +74,7 @@ class ConsolidationManager:
             self.pending_partial_withdrawals_indexes.add(withdrawal.validator_index)
         return self
 
+    @abstractmethod
     def get_target_source(self) -> list[tuple[ConsensusValidator, ConsensusValidator]]:
         """
         # Source validators must be:
@@ -145,7 +148,7 @@ class ConsolidationSelector(ConsolidationManager):
             if target_balance + val.balance > settings.max_validator_balance_gwei:
                 break
             selected_source_validators.append(val)
-            target_balance += val.balance  # type: ignore
+            target_balance = Gwei(target_balance + val.balance)
 
         if selected_source_validators:
             return [(target_validator, val) for val in selected_source_validators]
@@ -173,7 +176,7 @@ class ConsolidationSelector(ConsolidationManager):
             # Source validator must be non-compounding
             if val.is_compounding:
                 continue
-            if val.activation_epoch >= self.max_activation_epoch:
+            if val.activation_epoch > self.max_activation_epoch:
                 continue
             # Source validator cannot be in any ongoing consolidations (either as source or target)
             if val.index in self.consolidating_target_indexes:
@@ -231,7 +234,7 @@ class ConsolidationChecker(ConsolidationManager):
                 )
 
             # Validate the source validator has been active long enough
-            if source_validator.activation_epoch >= self.max_activation_epoch:
+            if source_validator.activation_epoch > self.max_activation_epoch:
                 raise ConsolidationError(
                     f'Validator {source_validator.public_key}'
                     f' is not active enough for consolidation. '
@@ -311,7 +314,7 @@ class ConsolidationChecker(ConsolidationManager):
                     f'Target validator {self.target_public_key} is already a compounding validator.'
                 )
             # switch the 0x01 to 0x02
-            if target_validator.activation_epoch >= self.max_activation_epoch:
+            if target_validator.activation_epoch > self.max_activation_epoch:
                 raise ConsolidationError(
                     f'Validator {self.target_public_key} is not active enough for consolidation. '
                     f'It must be active for at least '
