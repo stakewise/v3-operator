@@ -20,7 +20,7 @@ from src.validators.typings import ConsensusValidator, ConsolidationKeys
 
 @pytest.mark.usefixtures('fake_settings')
 class TestConsolidationSelector:
-    async def test_empty_list_when_no_target_validators(self):
+    def test_empty_list_when_no_target_validators(self):
         selector = create_manager(
             vault_validators=[],
             consensus_validators=[],
@@ -28,7 +28,7 @@ class TestConsolidationSelector:
         result = selector.get_target_source()
         assert result == []
 
-    async def test_switches_oldest_0x01_to_0x02(self):
+    def test_switches_oldest_0x01_to_0x02(self):
         consensus_validators = [
             create_consensus_validator(
                 activation_epoch=1,
@@ -42,7 +42,7 @@ class TestConsolidationSelector:
         result = selector.get_target_source()
         assert result == [(consensus_validators[0], consensus_validators[0])]
 
-    async def test_consolidation_with_single_compounding(self):
+    def test_consolidation_with_single_compounding(self):
         consensus_validators = [
             create_consensus_validator(
                 activation_epoch=1,
@@ -60,7 +60,7 @@ class TestConsolidationSelector:
         result = selector.get_target_source()
         assert result == [(consensus_validators[1], consensus_validators[0])]
 
-    async def test_consolidation_to_smallest_balance(self):
+    def test_consolidation_to_smallest_balance(self):
         consensus_validators = [
             create_consensus_validator(
                 activation_epoch=1,
@@ -80,7 +80,7 @@ class TestConsolidationSelector:
         result = selector.get_target_source()
         assert result == [(consensus_validators[1], consensus_validators[0])]
 
-    async def test_consolidation_max_balance(self):
+    def test_consolidation_max_balance(self):
         consensus_validators = [
             create_consensus_validator(
                 activation_epoch=1, is_compounding=True, balance=ether_to_gwei(32.0)
@@ -107,7 +107,7 @@ class TestConsolidationSelector:
                 (consensus_validators[0], consensus_validators[2]),
             ]
 
-    async def test_excludes_consolidating_validators(self):
+    def test_excludes_consolidating_validators(self):
         consensus_validators = [
             create_consensus_validator(
                 index=10,
@@ -129,7 +129,7 @@ class TestConsolidationSelector:
         result = selector.get_target_source()
         assert result == []
 
-    async def test_excludes_pending_partial_withdrawals(self):
+    def test_excludes_pending_partial_withdrawals(self):
         consensus_validators = [
             create_consensus_validator(
                 index=10,
@@ -150,7 +150,7 @@ class TestConsolidationSelector:
         result = selector.get_target_source()
         assert result == []
 
-    async def test_excludes_specified_public_keys(self):
+    def test_excludes_specified_public_keys(self):
         consensus_validators = [
             create_consensus_validator(
                 index=10,
@@ -166,7 +166,7 @@ class TestConsolidationSelector:
         result = selector.get_target_source()
         assert result == []
 
-    async def test_excludes_exiting_validators(self):
+    def test_excludes_exiting_validators(self):
         consensus_validators = [
             create_consensus_validator(
                 activation_epoch=1,
@@ -182,7 +182,7 @@ class TestConsolidationSelector:
         result = selector.get_target_source()
         assert result == []
 
-    async def test_min_activation_epoch(self):
+    def test_min_activation_epoch(self):
         epoch = 1000
         consensus_validators = [
             create_consensus_validator(
@@ -199,7 +199,7 @@ class TestConsolidationSelector:
         result = selector.get_target_source()
         assert result == []
 
-    async def test_excludes_source_as_target_validator(self):
+    def test_excludes_source_as_target_validator(self):
         """Test that target validator is excluded if it's in consolidating_source_indexes"""
         consensus_validators = [
             create_consensus_validator(
@@ -226,7 +226,7 @@ class TestConsolidationSelector:
         # but validator 11 is available as source
         assert result == [(consensus_validators[1], consensus_validators[1])]
 
-    async def test_excludes_source_validator_in_both_indexes(self):
+    def test_excludes_source_validator_in_both_indexes(self):
         """Test that source validator is excluded if it's in either source or target consolidating indexes"""
         consensus_validators = [
             create_consensus_validator(
@@ -263,7 +263,7 @@ class TestConsolidationSelector:
         # since it's in consolidating_target_indexes
         assert result == []
 
-    async def test_allows_validator_in_target_indexes_as_target(self):
+    def test_allows_validator_in_target_indexes_as_target(self):
         """Test that target validator is not excluded if it's in consolidating_target_indexes"""
         consensus_validators = [
             create_consensus_validator(
@@ -288,7 +288,7 @@ class TestConsolidationSelector:
         # so validator 11 consolidates into validator 10
         assert result == [(consensus_validators[0], consensus_validators[1])]
 
-    async def test_excludes_validator_in_target_indexes_as_source(self):
+    def test_excludes_validator_in_target_indexes_as_source(self):
         """Test that source validator is excluded if it's in consolidating_target_indexes"""
         consensus_validators = [
             create_consensus_validator(
@@ -318,7 +318,7 @@ class TestConsolidationSelector:
 
 @pytest.mark.usefixtures('fake_settings')
 class TestConsolidationChecker:
-    async def test_empty_list_when_empty_vault(self):
+    def test_empty_list_when_empty_vault(self):
         pk = faker.validator_public_key()
         consolidation_keys = ConsolidationKeys(
             source_public_keys=[pk],
@@ -335,7 +335,7 @@ class TestConsolidationChecker:
         ):
             selector.get_target_source()
 
-    async def test_switch_from_0x01_to_0x02(self):
+    def test_switch_from_0x01_to_0x02(self):
         pk = faker.validator_public_key()
         consolidation_keys = ConsolidationKeys(
             source_public_keys=[pk],
@@ -357,7 +357,7 @@ class TestConsolidationChecker:
         result = selector.get_target_source()
         assert result == [(consensus_validators[0], consensus_validators[0])]
 
-    async def test_switch_from_0x02_to_0x02(self):
+    def test_switch_from_0x02_to_0x02(self):
         pk = faker.validator_public_key()
         consolidation_keys = ConsolidationKeys(
             source_public_keys=[pk],
@@ -382,7 +382,7 @@ class TestConsolidationChecker:
         ):
             selector.get_target_source()
 
-    async def test_consolidation_with_single_compounding(self):
+    def test_consolidation_with_single_compounding(self):
         source_pk = faker.validator_public_key()
         target_pk = faker.validator_public_key()
         consolidation_keys = ConsolidationKeys(
@@ -410,7 +410,7 @@ class TestConsolidationChecker:
         result = selector.get_target_source()
         assert result == [(consensus_validators[1], consensus_validators[0])]
 
-    async def test_consolidation_to_smallest_balance(self):
+    def test_consolidation_to_smallest_balance(self):
         source_pk_1 = faker.validator_public_key()
         source_pk_2 = faker.validator_public_key()
         target_pk_1 = faker.validator_public_key()
@@ -462,7 +462,7 @@ class TestConsolidationChecker:
             (consensus_validators[2], consensus_validators[1]),
         ]
 
-    async def test_consolidation_max_balance(self):
+    def test_consolidation_max_balance(self):
         source_pk_1 = faker.validator_public_key()
         source_pk_2 = faker.validator_public_key()
         source_pk_3 = faker.validator_public_key()
@@ -511,7 +511,7 @@ class TestConsolidationChecker:
             ):
                 selector.get_target_source()
 
-    async def test_excludes_consolidating_validators(self):
+    def test_excludes_consolidating_validators(self):
         source_pk = faker.validator_public_key()
         target_pk = faker.validator_public_key()
         consolidation_keys = ConsolidationKeys(
@@ -562,7 +562,7 @@ class TestConsolidationChecker:
         ):
             selector.get_target_source()
 
-    async def test_excludes_pending_partial_withdrawals(self):
+    def test_excludes_pending_partial_withdrawals(self):
         source_pk = faker.validator_public_key()
         target_pk = faker.validator_public_key()
         consolidation_keys = ConsolidationKeys(
@@ -597,7 +597,7 @@ class TestConsolidationChecker:
         ):
             selector.get_target_source()
 
-    async def test_excludes_exiting_validators(self):
+    def test_excludes_exiting_validators(self):
         source_pk = faker.validator_public_key()
         target_pk = faker.validator_public_key()
         consolidation_keys = ConsolidationKeys(
@@ -657,7 +657,7 @@ class TestConsolidationChecker:
         ):
             selector.get_target_source()
 
-    async def test_rejects_non_compounding_target(self):
+    def test_rejects_non_compounding_target(self):
         source_pk = faker.validator_public_key()
         target_pk = faker.validator_public_key()
         consolidation_keys = ConsolidationKeys(
@@ -691,7 +691,7 @@ class TestConsolidationChecker:
         ):
             selector.get_target_source()
 
-    async def test_min_activation_epoch(self):
+    def test_min_activation_epoch(self):
         source_pk = faker.validator_public_key()
         target_pk = faker.validator_public_key()
         consolidation_keys = ConsolidationKeys(
