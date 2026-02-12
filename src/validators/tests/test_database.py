@@ -15,21 +15,24 @@ from src.validators.typings import NetworkValidator, VaultValidator
 def network_validator_crud(fake_settings):
     crud = NetworkValidatorCrud()
     crud.setup()
-    return crud
+    yield crud
+    settings.database.unlink(missing_ok=True)
 
 
 @pytest.fixture
 def checkpoint_crud(fake_settings):
     crud = CheckpointCrud()
     crud.setup()
-    return crud
+    yield crud
+    settings.database.unlink(missing_ok=True)
 
 
 @pytest.fixture
 def vault_validator_crud(fake_settings):
     crud = VaultValidatorCrud()
     crud.setup()
-    return crud
+    yield crud
+    settings.database.unlink(missing_ok=True)
 
 
 class TestNetworkValidatorCrud:
@@ -122,6 +125,19 @@ class TestNetworkValidatorCrud:
         idx = network_validator_crud.get_next_validator_index([pk1, pk2])
         assert idx == 2
 
+    def test_next_index_with_unknown_latest_keys(self, network_validator_crud):
+        pk1 = faker.validator_public_key()
+        validators = [
+            NetworkValidator(public_key=pk1, block_number=BlockNumber(1)),
+        ]
+        network_validator_crud.save_network_validators(validators)
+
+        unknown_pk = faker.validator_public_key()
+        # unknown_pk is not in DB, so NOT IN excludes nothing -> count=1
+        # index = count(1) + len(latest_public_keys)(1) = 2
+        idx = network_validator_crud.get_next_validator_index([unknown_pk])
+        assert idx == 2
+
     def test_table_name_uses_network(self, network_validator_crud):
         expected = f'{settings.network}_network_validators'
         assert network_validator_crud.NETWORK_VALIDATORS_TABLE == expected
@@ -172,6 +188,18 @@ class TestCheckpointCrud:
 
         cp = checkpoint_crud.get_vault_validators_checkpoint()
         assert cp == BlockNumber(200)
+
+    def test_save_checkpoints_idempotent(self, checkpoint_crud):
+        checkpoint_crud.save_checkpoints()
+        checkpoint_crud.save_checkpoints()
+
+        from src.common.clients import db_client
+
+        with db_client.get_db_connection() as conn:
+            count = conn.execute(
+                f'SELECT COUNT(*) FROM {checkpoint_crud.CHECKPOINTS_TABLE}'
+            ).fetchone()[0]
+        assert count == 1
 
     def test_table_name_uses_network(self, checkpoint_crud):
         expected = f'{settings.network}_checkpoints'

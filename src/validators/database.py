@@ -20,7 +20,10 @@ class NetworkValidatorCrud:
             conn.executemany(
                 f'INSERT INTO {self.NETWORK_VALIDATORS_TABLE} '
                 ' VALUES(:public_key, :block_number) ON CONFLICT DO NOTHING',
-                [(val.public_key, val.block_number) for val in validators],
+                [
+                    {'public_key': val.public_key, 'block_number': val.block_number}
+                    for val in validators
+                ],
             )
 
     def get_last_network_validator(self) -> NetworkValidator | None:
@@ -75,17 +78,16 @@ class NetworkValidatorCrud:
 
 
 class CheckpointCrud:
-
     @property
     def CHECKPOINTS_TABLE(self) -> str:
         return f'{settings.network}_checkpoints'
 
     def save_checkpoints(self) -> None:
         with db_client.get_db_connection() as conn:
-            conn.executemany(
+            conn.execute(
                 f'INSERT INTO {self.CHECKPOINTS_TABLE} '
                 ' VALUES(:block_number,:block_number) ON CONFLICT DO NOTHING',
-                [(settings.network_config.KEEPER_GENESIS_BLOCK,)],
+                {'block_number': settings.network_config.KEEPER_GENESIS_BLOCK},
             )
 
     def get_vault_validators_checkpoint(self) -> BlockNumber | None:
@@ -115,7 +117,7 @@ class CheckpointCrud:
                 f'''INSERT INTO {self.CHECKPOINTS_TABLE}
                    VALUES (:block_number, :block_number)
                     ''',
-                (block_number,),
+                {'block_number': block_number},
             )
 
     def setup(self) -> None:
@@ -125,7 +127,8 @@ class CheckpointCrud:
                 f"""
                         CREATE TABLE IF NOT EXISTS {self.CHECKPOINTS_TABLE} (
                             checkpoint_validators INTEGER NOT NULL,
-                            checkpoint_v2_validators INTEGER NOT NULL
+                            checkpoint_v2_validators INTEGER NOT NULL,
+                            UNIQUE(checkpoint_validators, checkpoint_v2_validators)
                         )
                         """
             )
@@ -141,7 +144,10 @@ class VaultValidatorCrud:
             conn.executemany(
                 f'INSERT INTO {self.VAULT_VALIDATORS_TABLE} '
                 ' VALUES(:public_key, :block_number) ON CONFLICT DO NOTHING',
-                [(val.public_key, val.block_number) for val in validators],
+                [
+                    {'public_key': val.public_key, 'block_number': val.block_number}
+                    for val in validators
+                ],
             )
 
     def get_vault_validators(self) -> list[VaultValidator]:
