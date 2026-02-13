@@ -1,5 +1,4 @@
 import logging
-from sqlite3 import Connection
 
 from eth_typing import BlockNumber, HexStr
 
@@ -83,15 +82,15 @@ class CheckpointCrud:
     def CHECKPOINTS_TABLE(self) -> str:
         return f'{settings.network}_checkpoints'
 
-    def save_checkpoint(self) -> None:
+    def save_checkpoints(self) -> None:
         with db_client.get_db_connection() as conn:
             conn.execute(
                 f'INSERT INTO {self.CHECKPOINTS_TABLE} '
-                ' VALUES(:block_number) ON CONFLICT DO NOTHING',
+                ' VALUES(:block_number,:block_number) ON CONFLICT DO NOTHING',
                 {'block_number': settings.network_config.KEEPER_GENESIS_BLOCK},
             )
 
-    def get_checkpoint(self) -> BlockNumber | None:
+    def get_vault_validators_checkpoint(self) -> BlockNumber | None:
         with db_client.get_db_connection() as conn:
             results = conn.execute(
                 f'''SELECT checkpoint_validators
@@ -100,14 +99,23 @@ class CheckpointCrud:
             ).fetchone()
             return BlockNumber(results[0]) if results else None
 
-    def update_checkpoint(self, block_number: BlockNumber) -> None:
+    def get_vault_v2_validators_checkpoint(self) -> BlockNumber | None:
+        with db_client.get_db_connection() as conn:
+            results = conn.execute(
+                f'''SELECT checkpoint_v2_validators
+                    FROM {self.CHECKPOINTS_TABLE}
+                    ''',
+            ).fetchone()
+            return BlockNumber(results[0]) if results else None
+
+    def update_vault_checkpoints(self, block_number: BlockNumber) -> None:
         with db_client.get_db_connection() as conn:
             conn.execute(
                 f'DELETE FROM {self.CHECKPOINTS_TABLE}',
             )
             conn.execute(
                 f'''INSERT INTO {self.CHECKPOINTS_TABLE}
-                    VALUES (:block_number)
+                   VALUES (:block_number, :block_number)
                     ''',
                 {'block_number': block_number},
             )
@@ -115,24 +123,15 @@ class CheckpointCrud:
     def setup(self) -> None:
         """Creates tables."""
         with db_client.get_db_connection() as conn:
-            self._migrate_drop_v2_column(conn)
             conn.execute(
                 f"""
-                CREATE TABLE IF NOT EXISTS {self.CHECKPOINTS_TABLE} (
-                    checkpoint_validators INTEGER NOT NULL UNIQUE
-                )
-                """
+                        CREATE TABLE IF NOT EXISTS {self.CHECKPOINTS_TABLE} (
+                            checkpoint_validators INTEGER NOT NULL,
+                            checkpoint_v2_validators INTEGER NOT NULL,
+                            UNIQUE(checkpoint_validators, checkpoint_v2_validators)
+                        )
+                        """
             )
-
-    def _migrate_drop_v2_column(self, conn: Connection) -> None:
-        """Migrate old 2-column checkpoints table to single-column schema."""
-        table = self.CHECKPOINTS_TABLE
-        cur = conn.execute(f'PRAGMA table_info({table})')
-        columns = [row[1] for row in cur.fetchall()]
-        if 'checkpoint_v2_validators' not in columns:
-            return
-
-        conn.execute(f'ALTER TABLE {table} DROP COLUMN checkpoint_v2_validators')
 
 
 class VaultValidatorCrud:
@@ -166,9 +165,9 @@ class VaultValidatorCrud:
         with db_client.get_db_connection() as conn:
             conn.execute(
                 f"""
-                CREATE TABLE IF NOT EXISTS {self.VAULT_VALIDATORS_TABLE} (
-                    public_key VARCHAR(98) UNIQUE NOT NULL,
-                    block_number INTEGER NOT NULL
-                )
-                """
+                        CREATE TABLE IF NOT EXISTS {self.VAULT_VALIDATORS_TABLE} (
+                            public_key VARCHAR(98) UNIQUE NOT NULL,
+                            block_number INTEGER NOT NULL
+                        )
+                        """
             )
