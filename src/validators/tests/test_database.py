@@ -153,10 +153,9 @@ class TestCheckpointCrud:
     def test_setup_creates_table(self, checkpoint_crud):
         checkpoint_crud.setup()
 
-    def test_setup_inserts_genesis_checkpoint(self, checkpoint_crud):
+    def test_setup_no_genesis_checkpoint(self, checkpoint_crud):
         checkpoint = checkpoint_crud.get_validators_checkpoint()
-        genesis = settings.network_config.KEEPER_GENESIS_BLOCK
-        assert checkpoint == genesis
+        assert checkpoint is None
 
     def test_update_validators_checkpoint(self, checkpoint_crud):
         new_block = BlockNumber(99999)
@@ -181,7 +180,7 @@ class TestCheckpointCrud:
             count = conn.execute(
                 f'SELECT COUNT(*) FROM {checkpoint_crud.CHECKPOINTS_TABLE}'
             ).fetchone()[0]
-        assert count == 1
+        assert count == 0
 
     def test_table_name_uses_network(self, checkpoint_crud):
         expected = f'{settings.network}_checkpoints'
@@ -232,7 +231,7 @@ class TestCheckpointCrud:
         crud.setup()
 
         cp = crud.get_validators_checkpoint()
-        assert cp == settings.network_config.KEEPER_GENESIS_BLOCK
+        assert cp is None
 
 
 class TestVaultValidatorCrud:

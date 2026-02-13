@@ -107,14 +107,6 @@ class CheckpointCrud:
         self._migrate()
         with db_client.get_db_connection() as conn:
             self._create_table(conn)
-            conn.execute(
-                f'INSERT INTO {self.CHECKPOINTS_TABLE} '
-                ' VALUES(:name, :block) ON CONFLICT DO NOTHING',
-                {
-                    'name': self.CHECKPOINT_VALIDATORS,
-                    'block': settings.network_config.KEEPER_GENESIS_BLOCK,
-                },
-            )
 
     def _migrate(self) -> None:
         """Migrates from old (checkpoint_validators, checkpoint_v2_validators) schema."""
@@ -139,9 +131,9 @@ class CheckpointCrud:
     def _create_table(self, conn: Connection) -> None:
         conn.execute(
             f"""CREATE TABLE IF NOT EXISTS {self.CHECKPOINTS_TABLE} (
-                    name TEXT NOT NULL UNIQUE,
-                    block INTEGER NOT NULL
-                )"""
+                name TEXT NOT NULL UNIQUE,
+                block INTEGER NOT NULL
+            )"""
         )
 
 
