@@ -28,6 +28,12 @@ def checkpoint_crud(fake_settings):
 
 
 @pytest.fixture
+def checkpoint_crud_no_setup(fake_settings):
+    yield CheckpointCrud()
+    settings.database.unlink(missing_ok=True)
+
+
+@pytest.fixture
 def vault_validator_crud(fake_settings):
     crud = VaultValidatorCrud()
     crud.setup()
@@ -181,11 +187,11 @@ class TestCheckpointCrud:
         expected = f'{settings.network}_checkpoints'
         assert checkpoint_crud.CHECKPOINTS_TABLE == expected
 
-    def test_migrate_old_schema(self, fake_settings):
+    def test_migrate_old_schema(self, checkpoint_crud_no_setup: CheckpointCrud) -> None:
         """Test migration from old (checkpoint_validators, checkpoint_v2_validators) schema."""
         from src.common.clients import db_client
 
-        crud = CheckpointCrud()
+        crud = checkpoint_crud_no_setup
         # Create old schema
         with db_client.get_db_connection() as conn:
             conn.execute(
@@ -199,12 +205,34 @@ class TestCheckpointCrud:
                 f'INSERT INTO {crud.CHECKPOINTS_TABLE} VALUES (42, 42)',
             )
 
-        # Run setup which should migrate
         crud.setup()
 
         cp = crud.get_validators_checkpoint()
         assert cp == BlockNumber(42)
-        settings.database.unlink(missing_ok=True)
+
+        # Verify new schema columns
+        with db_client.get_db_connection() as conn:
+            cursor = conn.execute(f'PRAGMA table_info({crud.CHECKPOINTS_TABLE})')
+            columns = {row[1] for row in cursor.fetchall()}
+        assert columns == {'name', 'block'}
+
+    def test_migrate_old_schema_empty_table(self, checkpoint_crud_no_setup: CheckpointCrud) -> None:
+        """Test migration when old schema exists but has no data."""
+        from src.common.clients import db_client
+
+        crud = checkpoint_crud_no_setup
+        with db_client.get_db_connection() as conn:
+            conn.execute(
+                f"""CREATE TABLE {crud.CHECKPOINTS_TABLE} (
+                        checkpoint_validators INTEGER NOT NULL,
+                        checkpoint_v2_validators INTEGER NOT NULL
+                    )"""
+            )
+
+        crud.setup()
+
+        cp = crud.get_validators_checkpoint()
+        assert cp == settings.network_config.KEEPER_GENESIS_BLOCK
 
 
 class TestVaultValidatorCrud:

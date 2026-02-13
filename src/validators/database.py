@@ -1,7 +1,7 @@
 import logging
+from sqlite3 import Connection
 
 from eth_typing import BlockNumber, HexStr
-from sqlite3 import Connection
 
 from src.common.clients import db_client
 from src.config.settings import settings
