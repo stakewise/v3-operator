@@ -124,8 +124,9 @@ class CheckpointCrud:
             self._create_table(conn)
             if row:
                 conn.execute(
-                    f'INSERT INTO {self.CHECKPOINTS_TABLE} VALUES (?, ?)',
-                    (self.CHECKPOINT_VALIDATORS, row[0]),
+                    f'''INSERT INTO {self.CHECKPOINTS_TABLE} (name, block)
+                        VALUES (:name, :block)''',
+                    {'name': self.CHECKPOINT_VALIDATORS, 'block': row[0]},
                 )
 
     def _create_table(self, conn: Connection) -> None:
