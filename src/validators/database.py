@@ -102,6 +102,20 @@ class CheckpointCrud:
                 {'name': self.CHECKPOINT_VALIDATORS, 'block': block_number},
             )
 
+    def setup(self) -> None:
+        """Creates tables and migrates from old schema if needed."""
+        self._migrate()
+        with db_client.get_db_connection() as conn:
+            self._create_table(conn)
+            conn.execute(
+                f'INSERT INTO {self.CHECKPOINTS_TABLE} '
+                ' VALUES(:name, :block) ON CONFLICT DO NOTHING',
+                {
+                    'name': self.CHECKPOINT_VALIDATORS,
+                    'block': settings.network_config.KEEPER_GENESIS_BLOCK,
+                },
+            )
+
     def _migrate(self) -> None:
         """Migrates from old (checkpoint_validators, checkpoint_v2_validators) schema."""
         with db_client.get_db_connection() as conn:
@@ -129,20 +143,6 @@ class CheckpointCrud:
                     block INTEGER NOT NULL
                 )"""
         )
-
-    def setup(self) -> None:
-        """Creates tables and migrates from old schema if needed."""
-        self._migrate()
-        with db_client.get_db_connection() as conn:
-            self._create_table(conn)
-            conn.execute(
-                f'INSERT INTO {self.CHECKPOINTS_TABLE} '
-                ' VALUES(:name, :block) ON CONFLICT DO NOTHING',
-                {
-                    'name': self.CHECKPOINT_VALIDATORS,
-                    'block': settings.network_config.KEEPER_GENESIS_BLOCK,
-                },
-            )
 
 
 class VaultValidatorCrud:
