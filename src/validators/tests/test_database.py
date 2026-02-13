@@ -147,51 +147,27 @@ class TestCheckpointCrud:
     def test_setup_creates_table(self, checkpoint_crud):
         checkpoint_crud.setup()
 
-    def test_save_and_get_checkpoint(self, checkpoint_crud):
-        checkpoint_crud.save_checkpoints()
-
-        checkpoint = checkpoint_crud.get_vault_validators_checkpoint()
+    def test_setup_inserts_genesis_checkpoint(self, checkpoint_crud):
+        checkpoint = checkpoint_crud.get_validators_checkpoint()
         genesis = settings.network_config.KEEPER_GENESIS_BLOCK
         assert checkpoint == genesis
 
-    def test_save_and_get_v2_checkpoint(self, checkpoint_crud):
-        checkpoint_crud.save_checkpoints()
-
-        cp = checkpoint_crud.get_vault_v2_validators_checkpoint()
-        genesis = settings.network_config.KEEPER_GENESIS_BLOCK
-        assert cp == genesis
-
-    def test_get_checkpoint_empty(self, checkpoint_crud):
-        result = checkpoint_crud.get_vault_validators_checkpoint()
-        assert result is None
-
-    def test_get_v2_checkpoint_empty(self, checkpoint_crud):
-        result = checkpoint_crud.get_vault_v2_validators_checkpoint()
-        assert result is None
-
-    def test_update_vault_checkpoints(self, checkpoint_crud):
-        checkpoint_crud.save_checkpoints()
-
+    def test_update_validators_checkpoint(self, checkpoint_crud):
         new_block = BlockNumber(99999)
-        checkpoint_crud.update_vault_checkpoints(new_block)
+        checkpoint_crud.update_validators_checkpoint(new_block)
 
-        cp = checkpoint_crud.get_vault_validators_checkpoint()
-        cp_v2 = checkpoint_crud.get_vault_v2_validators_checkpoint()
+        cp = checkpoint_crud.get_validators_checkpoint()
         assert cp == new_block
-        assert cp_v2 == new_block
 
     def test_update_replaces_existing(self, checkpoint_crud):
-        checkpoint_crud.save_checkpoints()
+        checkpoint_crud.update_validators_checkpoint(BlockNumber(100))
+        checkpoint_crud.update_validators_checkpoint(BlockNumber(200))
 
-        checkpoint_crud.update_vault_checkpoints(BlockNumber(100))
-        checkpoint_crud.update_vault_checkpoints(BlockNumber(200))
-
-        cp = checkpoint_crud.get_vault_validators_checkpoint()
+        cp = checkpoint_crud.get_validators_checkpoint()
         assert cp == BlockNumber(200)
 
-    def test_save_checkpoints_idempotent(self, checkpoint_crud):
-        checkpoint_crud.save_checkpoints()
-        checkpoint_crud.save_checkpoints()
+    def test_setup_idempotent(self, checkpoint_crud):
+        checkpoint_crud.setup()
 
         from src.common.clients import db_client
 
@@ -204,6 +180,31 @@ class TestCheckpointCrud:
     def test_table_name_uses_network(self, checkpoint_crud):
         expected = f'{settings.network}_checkpoints'
         assert checkpoint_crud.CHECKPOINTS_TABLE == expected
+
+    def test_migrate_old_schema(self, fake_settings):
+        """Test migration from old (checkpoint_validators, checkpoint_v2_validators) schema."""
+        from src.common.clients import db_client
+
+        crud = CheckpointCrud()
+        # Create old schema
+        with db_client.get_db_connection() as conn:
+            conn.execute(
+                f"""CREATE TABLE {crud.CHECKPOINTS_TABLE} (
+                        checkpoint_validators INTEGER NOT NULL,
+                        checkpoint_v2_validators INTEGER NOT NULL,
+                        UNIQUE(checkpoint_validators, checkpoint_v2_validators)
+                    )"""
+            )
+            conn.execute(
+                f'INSERT INTO {crud.CHECKPOINTS_TABLE} VALUES (42, 42)',
+            )
+
+        # Run setup which should migrate
+        crud.setup()
+
+        cp = crud.get_validators_checkpoint()
+        assert cp == BlockNumber(42)
+        settings.database.unlink(missing_ok=True)
 
 
 class TestVaultValidatorCrud:

@@ -1,6 +1,7 @@
 import logging
 
 from eth_typing import BlockNumber, HexStr
+from sqlite3 import Connection
 
 from src.common.clients import db_client
 from src.config.settings import settings
@@ -78,59 +79,69 @@ class NetworkValidatorCrud:
 
 
 class CheckpointCrud:
+    CHECKPOINT_VALIDATORS = 'checkpoint_validators'
+
     @property
     def CHECKPOINTS_TABLE(self) -> str:
         return f'{settings.network}_checkpoints'
 
-    def save_checkpoints(self) -> None:
+    def get_validators_checkpoint(self) -> BlockNumber | None:
         with db_client.get_db_connection() as conn:
-            conn.execute(
-                f'INSERT INTO {self.CHECKPOINTS_TABLE} '
-                ' VALUES(:block_number,:block_number) ON CONFLICT DO NOTHING',
-                {'block_number': settings.network_config.KEEPER_GENESIS_BLOCK},
-            )
-
-    def get_vault_validators_checkpoint(self) -> BlockNumber | None:
-        with db_client.get_db_connection() as conn:
-            results = conn.execute(
-                f'''SELECT checkpoint_validators
-                    FROM {self.CHECKPOINTS_TABLE}
-                    ''',
+            result = conn.execute(
+                f'SELECT block FROM {self.CHECKPOINTS_TABLE}' ' WHERE name = :name',
+                {'name': self.CHECKPOINT_VALIDATORS},
             ).fetchone()
-            return BlockNumber(results[0]) if results else None
+            return BlockNumber(result[0]) if result else None
 
-    def get_vault_v2_validators_checkpoint(self) -> BlockNumber | None:
+    def update_validators_checkpoint(self, block_number: BlockNumber) -> None:
         with db_client.get_db_connection() as conn:
-            results = conn.execute(
-                f'''SELECT checkpoint_v2_validators
-                    FROM {self.CHECKPOINTS_TABLE}
-                    ''',
+            conn.execute(
+                f'''INSERT INTO {self.CHECKPOINTS_TABLE} (name, block)
+                    VALUES (:name, :block)
+                    ON CONFLICT(name) DO UPDATE SET block = :block''',
+                {'name': self.CHECKPOINT_VALIDATORS, 'block': block_number},
+            )
+
+    def _migrate(self) -> None:
+        """Migrates from old (checkpoint_validators, checkpoint_v2_validators) schema."""
+        with db_client.get_db_connection() as conn:
+            cursor = conn.execute(f'PRAGMA table_info({self.CHECKPOINTS_TABLE})')
+            columns = {row[1] for row in cursor.fetchall()}
+
+            if 'checkpoint_validators' not in columns:
+                return
+
+            row = conn.execute(
+                f'SELECT checkpoint_validators FROM {self.CHECKPOINTS_TABLE} LIMIT 1'
             ).fetchone()
-            return BlockNumber(results[0]) if results else None
+            conn.execute(f'DROP TABLE {self.CHECKPOINTS_TABLE}')
+            self._create_table(conn)
+            if row:
+                conn.execute(
+                    f'INSERT INTO {self.CHECKPOINTS_TABLE} VALUES (?, ?)',
+                    (self.CHECKPOINT_VALIDATORS, row[0]),
+                )
 
-    def update_vault_checkpoints(self, block_number: BlockNumber) -> None:
-        with db_client.get_db_connection() as conn:
-            conn.execute(
-                f'DELETE FROM {self.CHECKPOINTS_TABLE}',
-            )
-            conn.execute(
-                f'''INSERT INTO {self.CHECKPOINTS_TABLE}
-                   VALUES (:block_number, :block_number)
-                    ''',
-                {'block_number': block_number},
-            )
+    def _create_table(self, conn: Connection) -> None:
+        conn.execute(
+            f"""CREATE TABLE IF NOT EXISTS {self.CHECKPOINTS_TABLE} (
+                    name TEXT NOT NULL UNIQUE,
+                    block INTEGER NOT NULL
+                )"""
+        )
 
     def setup(self) -> None:
-        """Creates tables."""
+        """Creates tables and migrates from old schema if needed."""
+        self._migrate()
         with db_client.get_db_connection() as conn:
+            self._create_table(conn)
             conn.execute(
-                f"""
-                        CREATE TABLE IF NOT EXISTS {self.CHECKPOINTS_TABLE} (
-                            checkpoint_validators INTEGER NOT NULL,
-                            checkpoint_v2_validators INTEGER NOT NULL,
-                            UNIQUE(checkpoint_validators, checkpoint_v2_validators)
-                        )
-                        """
+                f'INSERT INTO {self.CHECKPOINTS_TABLE} '
+                ' VALUES(:name, :block) ON CONFLICT DO NOTHING',
+                {
+                    'name': self.CHECKPOINT_VALIDATORS,
+                    'block': settings.network_config.KEEPER_GENESIS_BLOCK,
+                },
             )
 
 
