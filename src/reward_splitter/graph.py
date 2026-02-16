@@ -23,6 +23,8 @@ async def graph_get_reward_splitters(
                     vault: $vault,
                     version_gte: 3,
                 }
+                first: $first,
+                skip: $skip
             ) {
                 id
                 vault {
@@ -77,6 +79,8 @@ async def graph_get_claimable_exit_requests(
                     isClaimable: true,
                     isClaimed: false
                 }
+                first: $first,
+                skip: $skip
             ) {
                 id
                 positionTicket

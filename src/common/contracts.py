@@ -246,6 +246,15 @@ class VaultContract(ContractWrapper, VaultStateMixin):
             return [Web3.to_hex(event['args']['publicKey']) for event in events]
 
 
+class Erc20Contract(ContractWrapper):
+    abi_path = 'abi/Erc20Token.json'
+
+    async def get_balance(
+        self, address: ChecksumAddress, block_number: BlockNumber | None = None
+    ) -> Wei:
+        return await self.contract.functions.balanceOf(address).call(block_identifier=block_number)
+
+
 class VaultEncoder(BaseEncoder):
     """Helper class to encode Vault contract ABI calls."""
 
@@ -341,6 +350,17 @@ class KeeperContract(ContractWrapper):
         return await self.contract.functions.canHarvest(vault_address).call(
             block_identifier=block_number
         )
+
+
+class OsTokenVaultControllerContract(ContractWrapper):
+    abi_path = 'abi/IOsTokenVaultController.json'
+    settings_key = 'OS_TOKEN_VAULT_CONTROLLER_CONTRACT_ADDRESS'
+
+    async def total_assets(self, block_number: BlockNumber | None = None) -> Wei:
+        return await self.contract.functions.totalAssets().call(block_identifier=block_number)
+
+    async def total_shares(self, block_number: BlockNumber | None = None) -> Wei:
+        return await self.contract.functions.totalShares().call(block_identifier=block_number)
 
 
 class RewardSplitterContract(ContractWrapper):
@@ -488,6 +508,14 @@ class MulticallContract(ContractWrapper):
         return Web3.to_hex(tx_hash)
 
 
+class OsTokenRedeemerContract(ContractWrapper):
+    abi_path = 'abi/IOsTokenRedeemer.json'
+    settings_key = 'OS_TOKEN_REDEEMER_CONTRACT_ADDRESS'
+
+    async def nonce(self) -> int:
+        return await self.contract.functions.nonce().call()
+
+
 class ValidatorsCheckerContract(ContractWrapper):
     abi_path = 'abi/IValidatorsChecker.json'
     settings_key = 'VALIDATORS_CHECKER_CONTRACT_ADDRESS'
@@ -573,3 +601,5 @@ validators_registry_contract = ValidatorsRegistryContract()
 keeper_contract = KeeperContract()
 multicall_contract = MulticallContract()
 validators_checker_contract = ValidatorsCheckerContract()
+os_token_vault_controller_contract = OsTokenVaultControllerContract()
+os_token_redeemer_contract = OsTokenRedeemerContract()

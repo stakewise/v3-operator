@@ -2445,6 +2445,26 @@ files = [
 ]
 
 [[package]]
+name = "multiproof"
+version = "v0.1.10"
+description = "A Python library to generate merkle trees and merkle proofs."
+optional = false
+python-versions = "^3.10"
+files = []
+develop = false
+
+[package.dependencies]
+eth-abi = "^5.0.1"
+eth-hash = {version = "^0.7.0", extras = ["pycryptodome"]}
+eth-utils = ">=5.1.0"
+
+[package.source]
+type = "git"
+url = "https://github.com/stakewise/multiproof.git"
+reference = "v0.1.10"
+resolved_reference = "c5378e44877c5442a486a8f4006f16961e42662b"
+
+[[package]]
 name = "mypy"
 version = "1.14.1"
 description = "Optional static typing for Python"
@@ -4435,4 +4455,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12,<3.13"
-content-hash = "2086d97346aa91345f06a6ce9d6f9d10de17897bd17b0aa37374d48688ec8b62"
+content-hash = "2b78ffa58e36a9039a5fc710a51d09c4eaeffffd70739f1a5e0d1424a42f71fa"

@@ -1,0 +1,504 @@
+import asyncio
+import logging
+import sys
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from typing import cast
+
+import click
+from eth_typing import BlockNumber, ChecksumAddress
+from multiproof import StandardMerkleTree
+from web3 import Web3
+from web3.types import Gwei, Wei
+
+from src.common.clients import (
+    build_ipfs_upload_clients,
+    close_clients,
+    execution_client,
+    get_execution_client,
+    setup_clients,
+)
+from src.common.contracts import (
+    Erc20Contract,
+    MulticallContract,
+    os_token_redeemer_contract,
+)
+from src.common.logging import LOG_LEVELS, setup_logging
+from src.common.utils import log_verbose
+from src.config.networks import AVAILABLE_NETWORKS, MAINNET, ZERO_CHECKSUM_ADDRESS
+from src.config.settings import settings
+from src.redemptions.api_client import (
+    API_SLEEP_TIMEOUT,
+    API_SOURCES,
+    API_SUPPORTED_CHAINS,
+    DEBANK_API_SOURCE,
+    RABBY_API_SOURCE,
+    APIClient,
+)
+from src.redemptions.graph import (
+    graph_get_allocators,
+    graph_get_leverage_positions,
+    graph_get_os_token_holders,
+)
+from src.redemptions.os_token_converter import (
+    OsTokenConverter,
+    create_os_token_converter,
+)
+from src.redemptions.typings import (
+    Allocator,
+    ApiConfig,
+    ArbitrumConfig,
+    LeverageStrategyPosition,
+    OsTokenPosition,
+)
+
+logger = logging.getLogger(__name__)
+
+
+@click.option(
+    '--api-access-key',
+    type=str,
+    envvar='API_ACCESS_KEY',
+    help='Access key for the DeBank API. Required when api-source is debank.',
+)
+@click.option(
+    '--api-source',
+    type=click.Choice(list(API_SOURCES.keys()), case_sensitive=False),
+    default=RABBY_API_SOURCE,
+    show_default=True,
+    envvar='API_SOURCE',
+    help='API source to use for fetching locked os token positions.',
+)
+@click.option(
+    '--api-sleep-timeout',
+    type=float,
+    default=API_SLEEP_TIMEOUT,
+    show_default=True,
+    envvar='API_SLEEP_TIMEOUT',
+    help='Sleep timeout in seconds between API calls to avoid rate limiting.',
+)
+@click.option(
+    '--min-os-token-position-amount-gwei',
+    type=int,
+    default=0,
+    show_default=True,
+    envvar='MIN_OS_TOKEN_POSITION_AMOUNT_GWEI',
+    help='Process positions only if the amount of minted os token in Gwei'
+    ' is greater than the specified value.',
+)
+@click.option(
+    '--execution-endpoints',
+    type=str,
+    envvar='EXECUTION_ENDPOINTS',
+    prompt='Enter the comma separated list of API endpoints for execution nodes',
+    help='Comma separated list of API endpoints for execution nodes.',
+)
+@click.option(
+    '--execution-jwt-secret',
+    type=str,
+    envvar='EXECUTION_JWT_SECRET',
+    help='JWT secret key used for signing and verifying JSON Web Tokens'
+    ' when connecting to execution nodes.',
+)
+@click.option(
+    '--graph-endpoint',
+    type=str,
+    envvar='GRAPH_ENDPOINT',
+    help='API endpoint for graph node.',
+)
+@click.option(
+    '--arbitrum-endpoint',
+    type=str,
+    envvar='ARBITRUM_ENDPOINT',
+    help='API endpoint for the Arbitrum execution node. Should only be specified for mainnet.',
+)
+@click.option(
+    '--no-confirm',
+    is_flag=True,
+    help='Skips confirmation messages when provided. Default is false.',
+)
+@click.option(
+    '--log-level',
+    type=click.Choice(
+        LOG_LEVELS,
+        case_sensitive=False,
+    ),
+    default='INFO',
+    envvar='LOG_LEVEL',
+    help='The log level.',
+)
+@click.option(
+    '-v',
+    '--verbose',
+    help='Enable debug mode. Default is false.',
+    envvar='VERBOSE',
+    is_flag=True,
+)
+@click.option(
+    '--network',
+    help='The network for redeemable os token positions.',
+    prompt='Enter the network name',
+    envvar='NETWORK',
+    type=click.Choice(
+        AVAILABLE_NETWORKS,
+        case_sensitive=False,
+    ),
+)
+@click.command(help='Updates redeemable os token positions')
+# pylint: disable-next=too-many-arguments,too-many-locals
+def update_redeemable_positions(
+    execution_endpoints: str,
+    execution_jwt_secret: str | None,
+    graph_endpoint: str,
+    arbitrum_endpoint: str | None,
+    network: str,
+    no_confirm: bool,
+    verbose: bool,
+    log_level: str,
+    min_os_token_position_amount_gwei: int,
+    api_sleep_timeout: float,
+    api_source: str,
+    api_access_key: str | None,
+) -> None:
+    if api_source == DEBANK_API_SOURCE and not api_access_key:
+        api_access_key = click.prompt('Enter the DeBank API access key')
+    api_config = ApiConfig(
+        source=api_source,
+        sleep_timeout=api_sleep_timeout,
+        access_key=api_access_key,
+    )
+    settings.set(
+        vault=ZERO_CHECKSUM_ADDRESS,
+        vault_dir=Path.home() / '.stakewise',
+        execution_endpoints=execution_endpoints,
+        execution_jwt_secret=execution_jwt_secret,
+        graph_endpoint=graph_endpoint,
+        verbose=verbose,
+        network=network,
+        log_level=log_level,
+    )
+    arbitrum_config: ArbitrumConfig | None = None
+    if network == MAINNET:
+        if not arbitrum_endpoint:
+            arbitrum_endpoint = click.prompt(
+                'Enter the API endpoint for the Arbitrum execution node'
+            )
+        arbitrum_config = ArbitrumConfig(
+            OS_TOKEN_CONTRACT_ADDRESS=settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS,
+            EXECUTION_ENDPOINT=cast(str, arbitrum_endpoint),
+        )
+    try:
+        # Try-catch to enable async calls in test - an event loop
+        #  will already be running in that case
+        try:
+            asyncio.get_running_loop()
+            # we need to create a separate thread so we can block before returning
+            with ThreadPoolExecutor(1) as pool:
+                pool.submit(
+                    lambda: asyncio.run(
+                        main(
+                            arbitrum_config=arbitrum_config,
+                            min_os_token_position_amount_gwei=Gwei(
+                                min_os_token_position_amount_gwei
+                            ),
+                            no_confirm=no_confirm,
+                            api_config=api_config,
+                        )
+                    )
+                ).result()
+        except RuntimeError as e:
+            if 'no running event loop' == e.args[0]:
+                # no event loop running
+                asyncio.run(
+                    main(
+                        arbitrum_config=arbitrum_config,
+                        min_os_token_position_amount_gwei=Gwei(min_os_token_position_amount_gwei),
+                        no_confirm=no_confirm,
+                        api_config=api_config,
+                    )
+                )
+            else:
+                raise e
+    except Exception as e:
+        log_verbose(e)
+        sys.exit(1)
+
+
+async def main(
+    arbitrum_config: ArbitrumConfig | None,
+    min_os_token_position_amount_gwei: Gwei,
+    no_confirm: bool,
+    api_config: ApiConfig,
+) -> None:
+    setup_logging()
+    await setup_clients()
+    try:
+        await process(
+            arbitrum_config=arbitrum_config,
+            min_os_token_position_amount_gwei=min_os_token_position_amount_gwei,
+            no_confirm=no_confirm,
+            api_config=api_config,
+        )
+    finally:
+        await close_clients()
+
+
+# pylint: disable-next=too-many-locals
+async def process(
+    arbitrum_config: ArbitrumConfig | None,
+    min_os_token_position_amount_gwei: Gwei,
+    no_confirm: bool,
+    api_config: ApiConfig,
+) -> None:
+    """
+    Fetch redeemable os token positions, calculate kept os token amounts and upload to IPFS.
+    """
+    block_number = await execution_client.eth.get_block_number()
+    logger.info('Fetching allocators from the subgraph...')
+    allocators = await graph_get_allocators(block_number)
+    logger.info('Fetched %s allocators from the subgraph', len(allocators))
+
+    # filter boost proxy positions
+    logger.info('Fetching boosted positions from the subgraph...')
+    leverage_positions = await graph_get_leverage_positions(block_number)
+    boost_proxies = {pos.proxy for pos in leverage_positions}
+    logger.info('Found %s proxy positions to exclude', len(boost_proxies))
+    allocators = [a for a in allocators if a.address not in boost_proxies]
+    # reduce boosted positions
+    os_token_converter = await create_os_token_converter(block_number)
+    boost_os_token_shares = await calculate_boost_os_token_shares(
+        users={a.address for a in allocators},
+        leverage_positions=leverage_positions,
+        os_token_converter=os_token_converter,
+    )
+    allocators = _reduce_boosted_amount(allocators, boost_os_token_shares)
+
+    # filter zero positions. Filter before kept shares calculation to reduce api calls
+    min_minted_shares = Web3.to_wei(min_os_token_position_amount_gwei, 'gwei')
+    for allocator in allocators:
+        allocator.vault_os_token_positions = [
+            vault_share
+            for vault_share in allocator.vault_os_token_positions
+            if vault_share.minted_shares >= min_minted_shares
+        ]
+
+    if not allocators:
+        logger.info('No allocators with minted shares above the threshold found, exiting...')
+        return
+
+    logger.info('Fetching kept tokens for %s addresses', len(allocators))
+    address_to_minted_shares = {a.address: a.total_shares for a in allocators}
+    kept_shares = await get_kept_shares(
+        address_to_minted_shares,
+        block_number,
+        arbitrum_config,
+        api_config,
+    )
+    logger.info('Fetched kept tokens for %s addresses...', len(address_to_minted_shares))
+
+    os_token_positions = create_os_token_positions(allocators, kept_shares, min_minted_shares)
+    if not os_token_positions:
+        logger.info('No redeemable os token positions to upload, exiting...')
+        return
+    total_redeemable = sum(p.amount for p in os_token_positions)
+    logger.info(
+        'Created %(count)s redeemable os token positions. '
+        'Total redeemed %(os_token_symbol)s amount: '
+        '%(total_redeemable)s (%(total_redeemable_eth).5f %(os_token_symbol)s)',
+        {
+            'count': len(os_token_positions),
+            'os_token_symbol': settings.network_config.OS_TOKEN_BALANCE_SYMBOL,
+            'total_redeemable': total_redeemable,
+            'total_redeemable_eth': Web3.from_wei(total_redeemable, 'ether'),
+        },
+    )
+    if not no_confirm:
+        click.confirm(
+            'Proceed with uploading redeemable os token positions to IPFS?',
+            default=True,
+            abort=True,
+        )
+    ipfs_upload_client = build_ipfs_upload_clients()
+    ipfs_hash = await ipfs_upload_client.upload_json([p.as_dict() for p in os_token_positions])
+    click.echo(f'Redeemable os token positions uploaded to IPFS: hash={ipfs_hash}')
+
+    # calculate merkle root
+    nonce = await os_token_redeemer_contract.nonce()
+    leaves = [r.merkle_leaf(nonce) for r in os_token_positions]
+    tree = StandardMerkleTree.of(
+        leaves,
+        [
+            'uint256',
+            'address',
+            'uint256',
+            'address',
+        ],
+    )
+    click.echo(f'Generated Merkle Tree root: {tree.root}')
+
+
+# pylint: disable-next=too-many-locals
+async def get_kept_shares(
+    address_to_minted_shares: dict[ChecksumAddress, Wei],
+    block_number: BlockNumber,
+    arbitrum_config: ArbitrumConfig | None,
+    api_config: ApiConfig,
+) -> dict[ChecksumAddress, Wei]:
+    kept_shares = defaultdict(lambda: Wei(0))
+    logger.info(
+        'Fetching %s balances from the subgraph...', settings.network_config.OS_TOKEN_BALANCE_SYMBOL
+    )
+    os_token_holders = await graph_get_os_token_holders(block_number)
+    for address in address_to_minted_shares.keys():
+        kept_shares[address] = os_token_holders.get(address, Wei(0))
+
+    # arb wallet balance
+    if arbitrum_config:
+        arb_balances = await _get_arb_balances(
+            arbitrum_config, list(address_to_minted_shares.keys())
+        )
+        for address, arb_balance in arb_balances.items():
+            kept_shares[address] = Wei(kept_shares[address] + arb_balance)
+
+    # rabby doesnt support hoodi so skip api call
+    if settings.network not in API_SUPPORTED_CHAINS:
+        return kept_shares
+
+    # do not fetch data from api if all os token are in the wallet
+    api_addresses = []
+    for address in address_to_minted_shares.keys():
+        if address_to_minted_shares[address] >= kept_shares[address]:
+            api_addresses.append(address)
+
+    if not api_addresses:
+        return kept_shares
+
+    logger.info(
+        'Fetching locked %s from %s API for %s addresses...',
+        settings.network_config.OS_TOKEN_BALANCE_SYMBOL,
+        api_config.source,
+        len(api_addresses),
+    )
+    api_client = APIClient(api_source=api_config.source, api_access_key=api_config.access_key)
+    # fetch locked os token from the api
+    with click.progressbar(
+        api_addresses,
+        label='Fetching os token amount locked in protocols from the api:\t\t',
+        show_percent=False,
+        show_pos=True,
+    ) as progress_bar:
+        for index, address in enumerate(progress_bar):
+            if index:
+                await asyncio.sleep(api_config.sleep_timeout)  # to avoid rate limiting
+            locked_os_token = await api_client.get_protocols_locked_os_token(address=address)
+            kept_shares[address] = Wei(kept_shares[address] + locked_os_token)
+    return kept_shares
+
+
+async def _get_arb_balances(
+    arbitrum_config: ArbitrumConfig,
+    addresses: list[ChecksumAddress],
+) -> dict[ChecksumAddress, Wei]:
+    logger.info(
+        'Fetching %s from Arbitrum wallet balances...',
+        settings.network_config.OS_TOKEN_BALANCE_SYMBOL,
+    )
+    arb_execution_client = get_execution_client([arbitrum_config.EXECUTION_ENDPOINT])
+    try:
+        arb_contract = Erc20Contract(
+            settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS,
+            execution_client=arb_execution_client,
+        )
+        arb_multicall = MulticallContract(
+            address=settings.network_config.MULTICALL_CONTRACT_ADDRESS,
+            execution_client=arb_execution_client,
+        )
+        calls = [
+            (arb_contract.contract_address, arb_contract.encode_abi('balanceOf', [addr]))
+            for addr in addresses
+        ]
+        _, results = await arb_multicall.aggregate(calls)
+        return {address: Wei(Web3.to_int(result)) for address, result in zip(addresses, results)}
+    finally:
+        await arb_execution_client.provider.disconnect()
+
+
+async def calculate_boost_os_token_shares(
+    users: set[ChecksumAddress],
+    leverage_positions: list[LeverageStrategyPosition],
+    os_token_converter: OsTokenConverter,
+) -> dict[tuple[ChecksumAddress, ChecksumAddress], Wei]:
+    boosted_positions: defaultdict[tuple[ChecksumAddress, ChecksumAddress], Wei] = defaultdict(
+        lambda: Wei(0)
+    )
+    if not leverage_positions:
+        return boosted_positions
+
+    for position in leverage_positions:
+        if position.user not in users:
+            continue
+        position_os_token_shares = Wei(
+            position.os_token_shares
+            + position.exiting_os_token_shares
+            + os_token_converter.to_shares(position.assets)
+            + os_token_converter.to_shares(position.exiting_assets)
+        )
+        boosted_positions[position.user, position.vault] = Wei(
+            boosted_positions[position.user, position.vault] + position_os_token_shares
+        )
+
+    return boosted_positions
+
+
+def create_os_token_positions(
+    allocators: list[Allocator],
+    kept_shares: dict[ChecksumAddress, Wei],
+    min_minted_shares: Wei,
+) -> list[OsTokenPosition]:
+    """
+    Calculate vault proportions and create redeemable os token positions.
+    Sort by ltv descending, then amount descending.
+    """
+    os_token_positions: list[OsTokenPosition] = []
+    position_ltv: dict[tuple[ChecksumAddress, ChecksumAddress], float] = {}
+    for allocator in allocators:
+        allocator_kept_shares = kept_shares.get(allocator.address, Wei(0))
+        redeemable_amount = max(0, allocator.total_shares - allocator_kept_shares)
+        if redeemable_amount == 0:
+            continue
+
+        vault_ltv = {vs.address: vs.ltv for vs in allocator.vault_os_token_positions}
+        allocated_amount = 0
+        vaults_proportions = allocator.vaults_proportions.items()
+        for index, (vault_address, proportion) in enumerate(vaults_proportions):
+            # dust handling
+            if index == len(vaults_proportions) - 1:
+                vault_amount = max(0, int(redeemable_amount - allocated_amount))
+            else:
+                vault_amount = int(redeemable_amount * proportion)
+            allocated_amount += vault_amount
+            if vault_amount < min_minted_shares:
+                continue
+            os_token_positions.append(
+                OsTokenPosition(
+                    owner=allocator.address,
+                    vault=vault_address,
+                    amount=Wei(vault_amount),
+                )
+            )
+            position_ltv[allocator.address, vault_address] = vault_ltv[vault_address]
+    os_token_positions.sort(key=lambda p: (position_ltv[p.owner, p.vault], p.amount), reverse=True)
+    return os_token_positions
+
+
+def _reduce_boosted_amount(
+    allocators: list[Allocator],
+    boost_os_token_shares: dict[tuple[ChecksumAddress, ChecksumAddress], Wei],
+) -> list[Allocator]:
+    for allocator in allocators:
+        for vault_share in allocator.vault_os_token_positions:
+            key = allocator.address, vault_share.address
+            boosted_amount = boost_os_token_shares.get(key, Wei(0))
+            vault_share.minted_shares = Wei(max(0, vault_share.minted_shares - boosted_amount))
+    return allocators

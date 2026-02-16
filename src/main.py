@@ -10,6 +10,9 @@ from src.commands.create_keys import create_keys
 from src.commands.create_wallet import create_wallet
 from src.commands.exit_validators import exit_validators
 from src.commands.init import init
+from src.commands.internal.update_redeemable_positions import (
+    update_redeemable_positions,
+)
 from src.commands.nodes.node_install import node_install
 from src.commands.nodes.node_start import node_start
 from src.commands.nodes.node_status import node_status_command as node_status
@@ -54,6 +57,7 @@ cli.add_command(submit_rated_network)
 cli.add_command(node_install)
 cli.add_command(node_start)
 cli.add_command(node_status)
+cli.add_command(update_redeemable_positions)
 
 
 if __name__ == '__main__':

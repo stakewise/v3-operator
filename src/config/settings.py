@@ -88,6 +88,17 @@ class Settings(metaclass=Singleton):
     ipfs_fetch_endpoints: list[str]
     ipfs_timeout: int
     ipfs_retry_timeout: int
+
+    ipfs_upload_client_timeout: int
+    ipfs_local_client_endpoint: str
+    ipfs_local_username: str | None
+    ipfs_local_password: str | None
+    ipfs_infura_client_endpoint: str
+    ipfs_infura_client_username: str | None
+    ipfs_infura_client_password: str | None
+    ipfs_pinata_api_key: str | None
+    ipfs_pinata_secret_key: str | None
+
     genesis_validators_ipfs_timeout: int
     genesis_validators_ipfs_retry_timeout: int
     validators_fetch_chunk_size: int
@@ -287,6 +298,30 @@ class Settings(metaclass=Singleton):
         self.ipfs_timeout = decouple_config('IPFS_TIMEOUT', default=60, cast=int)
         self.ipfs_retry_timeout = decouple_config('IPFS_RETRY_TIMEOUT', default=120, cast=int)
 
+        self.ipfs_upload_client_timeout = decouple_config(
+            'IPFS_UPLOAD_CLIENT_TIMEOUT', default=30, cast=int
+        )
+
+        # local IPFS
+        self.ipfs_local_client_endpoint: str = decouple_config(
+            'IPFS_LOCAL_CLIENT_ENDPOINT', default=''
+        )
+        self.ipfs_local_username: str | None = decouple_config('IPFS_LOCAL_USERNAME', default=None)
+        self.ipfs_local_password: str | None = decouple_config('IPFS_LOCAL_PASSWORD', default=None)
+
+        # infura
+        self.ipfs_infura_client_endpoint: str = '/dns/ipfs.infura.io/tcp/5001/https'
+        self.ipfs_infura_client_username: str = decouple_config(
+            'IPFS_INFURA_CLIENT_USERNAME', default=''
+        )
+        self.ipfs_infura_client_password: str = decouple_config(
+            'IPFS_INFURA_CLIENT_PASSWORD', default=''
+        )
+
+        # pinata
+        self.ipfs_pinata_api_key: str = decouple_config('IPFS_PINATA_API_KEY', default='')
+        self.ipfs_pinata_secret_key: str = decouple_config('IPFS_PINATA_SECRET_KEY', default='')
+
         # Genesis validators ipfs fetch may have larger timeouts
         self.genesis_validators_ipfs_timeout = decouple_config(
             'GENESIS_VALIDATORS_IPFS_TIMEOUT', default=300, cast=int
@@ -317,7 +352,7 @@ class Settings(metaclass=Singleton):
         )
         self.graph_request_timeout = decouple_config('GRAPH_REQUEST_TIMEOUT', default=10, cast=int)
         self.graph_retry_timeout = decouple_config('GRAPH_RETRY_TIMEOUT', default=60, cast=int)
-        self.graph_page_size = decouple_config('GRAPH_PAGE_SIZE', default=100, cast=int)
+        self.graph_page_size = decouple_config('GRAPH_PAGE_SIZE', default=500, cast=int)
         self.relayer_endpoint = relayer_endpoint or ''
         self.relayer_timeout = decouple_config('RELAYER_TIMEOUT', default=10, cast=int)
 
