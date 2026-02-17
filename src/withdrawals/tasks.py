@@ -121,7 +121,7 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
             consolidations=consolidations,
             chain_head=chain_head,
         )
-        redemption_assets = await get_redemption_assets()
+        redemption_assets = await get_redemption_assets(chain_head=chain_head)
         queued_assets = Gwei(queued_assets + redemption_assets)
 
         metrics.queued_assets.labels(network=settings.network).set(int(queued_assets))

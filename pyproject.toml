@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "v3-operator"
-version = "v4.1.4"
+version = "v4.1.6"
 description = "StakeWise operator service for registering vault validators"
 authors = ["StakeWise Labs <info@stakewise.io>"]
 package-mode = false
@@ -9,8 +9,7 @@ package-mode = false
 python = ">=3.12,<3.13"
 python-decouple = "==3.8"
 sentry-sdk = "==1.45.1"
-py-ecc = "==8.0.0"
-sw-utils = {git = "https://github.com/stakewise/sw-utils.git", rev = "v0.12.4"}
+sw-utils = {git = "https://github.com/stakewise/sw-utils.git", rev = "v0.12.9"}
 staking-deposit = { git = "https://github.com/ethereum/staking-deposit-cli.git", rev = "v2.8.0" }
 multiproof = { git = "https://github.com/stakewise/multiproof.git", rev = "v0.1.10" }
 pycryptodomex = "3.19.1"

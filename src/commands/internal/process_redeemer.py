@@ -34,7 +34,7 @@ from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
 from src.meta_vault.service import is_meta_vault
 from src.redemptions.os_token_converter import create_os_token_converter
-from src.redemptions.typings import RedeemablePosition
+from src.redemptions.typings import OsTokenPosition
 from src.validators.execution import get_withdrawable_assets
 
 logger = logging.getLogger(__name__)
@@ -194,7 +194,7 @@ async def process(block_number: BlockNumber) -> None:
     # Calculate Redeemable Shares Per Position
     for redeemable_position in redeemable_positions:
         # Compute leaf hash
-        leaf_hash = redeemable_position.merkle_leaf_bytes(nonce - 1)
+        leaf_hash = redeemable_position.leaf_hash(nonce - 1)
         # Get already processed shares
         leaf_processed_shares = await os_token_redeemer_contract.leaf_to_processed_shares(
             leaf_hash, block_number
@@ -205,7 +205,7 @@ async def process(block_number: BlockNumber) -> None:
         )
 
     # Group positions by vault
-    vault_to_positions: defaultdict[ChecksumAddress, list[RedeemablePosition]] = defaultdict(list)
+    vault_to_positions: defaultdict[ChecksumAddress, list[OsTokenPosition]] = defaultdict(list)
     for position in redeemable_positions:
         vault_to_positions[position.vault].append(position)
 
@@ -245,7 +245,7 @@ async def process(block_number: BlockNumber) -> None:
                     shares_to_redeem,
                 )
                 positions_to_redeem.append(
-                    RedeemablePosition(
+                    OsTokenPosition(
                         vault=position.vault,
                         owner=position.owner,
                         amount=position.amount,
@@ -269,7 +269,7 @@ async def process(block_number: BlockNumber) -> None:
 
 
 async def execute_redemption(
-    positions_to_redeem: list[RedeemablePosition],
+    positions_to_redeem: list[OsTokenPosition],
     vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None],
     nonce: int,
 ) -> HexStr | None:
@@ -316,7 +316,7 @@ async def execute_redemption(
     return tx_hash
 
 
-async def fetch_redeemable_positions(ipfs_hash: str) -> list[RedeemablePosition]:
+async def fetch_redeemable_positions(ipfs_hash: str) -> list[OsTokenPosition]:
     # Fetch redeemable positions data from IPFS
     data = cast(list[dict], await ipfs_fetch_client.fetch_json(ipfs_hash))
 
@@ -324,7 +324,7 @@ async def fetch_redeemable_positions(ipfs_hash: str) -> list[RedeemablePosition]
     # [{"owner:" 0x01, "amount": 100000, "vault": 0x02}, ...]
 
     return [
-        RedeemablePosition(
+        OsTokenPosition(
             owner=Web3.to_checksum_address(item['owner']),
             vault=Web3.to_checksum_address(item['vault']),
             amount=Wei(int(item['amount'])),
@@ -356,7 +356,7 @@ async def _startup_check() -> None:
 
 def _get_multi_proof(
     nonce: int,
-    positions_to_redeem: list[RedeemablePosition],
+    positions_to_redeem: list[OsTokenPosition],
 ) -> MultiProof[tuple[bytes, int]]:
     leaves = [r.merkle_leaf(nonce) for r in positions_to_redeem]
     tree = StandardMerkleTree.of(

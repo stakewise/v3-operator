@@ -152,7 +152,7 @@ NETWORKS: dict[str, NetworkConfig] = {
             '0xA89629B41477560d49dd56ef1a59BD214362aCDC'
         ),
         OS_TOKEN_REDEEMER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x103A59fD85FB7aC085Cb4D59c805F11A1b5C1bFc'
+            '0x991EFCe45663Bc3E3dd309b61Af56105A3430008'
         ),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'

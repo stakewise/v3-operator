@@ -3,7 +3,9 @@ from unittest import mock
 
 import pytest
 from eth_typing import ChecksumAddress
+from sw_utils.tests import faker
 
+from src.common.contracts import MetaVaultContract
 from src.meta_vault.tasks import meta_vault_tree_update_state, multicall_contract
 from src.meta_vault.tests.factories import create_vault
 from src.meta_vault.typings import Vault
@@ -109,7 +111,9 @@ class TestMetaVaultTreeUpdateStateCalls:
             multicall_contract, 'tx_aggregate', return_value='0x123'
         ) as tx_aggregate_mock, mock.patch(
             'src.meta_vault.tasks.execution_client', new=mock.AsyncMock()
-        ) as execution_client_mock:
+        ) as execution_client_mock, mock.patch.object(
+            MetaVaultContract, 'sub_vaults_registry', return_value=faker.eth_address()
+        ):
             execution_client_mock.eth.wait_for_transaction_receipt.return_value = {
                 'status': 1,
                 'blockNumber': 123,

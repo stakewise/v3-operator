@@ -1,7 +1,4 @@
 import multiprocessing
-import os
-import ssl
-import sys
 import warnings
 from importlib.metadata import metadata
 
@@ -73,9 +70,5 @@ if __name__ == '__main__':
     ssz_metadata = metadata('ssz')
     multiprocessing.set_start_method('spawn')
     multiprocessing.freeze_support()
-    # Use certificate from certifi only if cafile could not find by ssl.
-    if ssl.get_default_verify_paths().cafile is None and hasattr(sys, '_MEIPASS'):
-        # pylint: disable-next=protected-access,no-member
-        os.environ['SSL_CERT_FILE'] = os.path.join(sys._MEIPASS, 'certifi', 'cacert.pem')
 
     cli()

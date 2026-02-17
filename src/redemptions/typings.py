@@ -7,26 +7,27 @@ from web3.types import Wei
 
 
 @dataclass
-class VaultShares:
+class VaultOsTokenPosition:
     address: ChecksumAddress
     minted_shares: Wei
+    ltv: float
 
 
 @dataclass
 class Allocator:
     address: ChecksumAddress
-    vault_shares: list[VaultShares]
+    vault_os_token_positions: list[VaultOsTokenPosition]
 
     @property
     def total_shares(self) -> Wei:
-        return Wei(sum(s.minted_shares for s in self.vault_shares))
+        return Wei(sum(s.minted_shares for s in self.vault_os_token_positions))
 
     @property
     def vaults_proportions(self) -> dict[ChecksumAddress, float]:
         total = self.total_shares
         if total == 0:
             return {}
-        return {s.address: s.minted_shares / total for s in self.vault_shares}
+        return {s.address: s.minted_shares / total for s in self.vault_os_token_positions}
 
 
 @dataclass
@@ -53,7 +54,7 @@ class LeverageStrategyPosition:
 
 
 @dataclass
-class RedeemablePosition:
+class OsTokenPosition:
     owner: ChecksumAddress
     vault: ChecksumAddress
     amount: Wei
@@ -66,14 +67,28 @@ class RedeemablePosition:
             'amount': str(self.amount),
         }
 
-    def merkle_leaf_bytes(self, nonce: int) -> bytes:
+    def merkle_leaf(self, nonce: int) -> tuple[int, ChecksumAddress, Wei, ChecksumAddress]:
+        return nonce, self.vault, self.amount, self.owner
+
+    def leaf_hash(self, nonce: int) -> bytes:
+        """Get the Merkle leaf hash"""
         return standard_leaf_hash(
             values=(nonce, self.vault, self.amount, self.owner),
             types=['uint256', 'address', 'uint256', 'address'],
         )
 
-    def merkle_leaf(self, nonce: int) -> tuple[int, ChecksumAddress, Wei, ChecksumAddress]:
-        return nonce, self.vault, self.amount, self.owner
+
+@dataclass
+class ApiConfig:
+    source: str
+    sleep_timeout: float
+    access_key: str | None = None
+
+
+@dataclass
+class ArbitrumConfig:
+    OS_TOKEN_CONTRACT_ADDRESS: ChecksumAddress
+    EXECUTION_ENDPOINT: str
 
 
 @dataclass

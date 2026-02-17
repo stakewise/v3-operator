@@ -21,6 +21,7 @@ from src.common.typings import (
     HarvestParams,
     RewardVoteInfo,
 )
+from src.config.networks import ZERO_CHECKSUM_ADDRESS
 from src.config.settings import (
     EVENTS_CONCURRENCY_CHUNK,
     EVENTS_CONCURRENCY_LIMIT,
@@ -122,22 +123,14 @@ class VaultStateMixin:
         return update_state_call
 
 
-class VaultEncoder:
-    def __init__(self, contract: ContractWrapper):
-        self.contract = contract
+class BaseEncoder:
+    """Base class for contract ABI encoders."""
 
-    def update_state(self, harvest_params: HarvestParams) -> HexStr:
-        return self.contract.encode_abi(
-            fn_name='updateState',
-            args=[
-                (
-                    harvest_params.rewards_root,
-                    harvest_params.reward,
-                    harvest_params.unlocked_mev_reward,
-                    harvest_params.proof,
-                ),
-            ],
-        )
+    contract_class: type[ContractWrapper]
+
+    def __init__(self) -> None:
+        # Use dummy address since we only need to encode ABI calls, no actual contract interaction
+        self.contract = self.contract_class(address=ZERO_CHECKSUM_ADDRESS)
 
 
 class VaultContract(ContractWrapper, VaultStateMixin):
@@ -145,9 +138,6 @@ class VaultContract(ContractWrapper, VaultStateMixin):
 
     async def vault_id(self) -> str:
         return await self.contract.functions.vaultId().call()
-
-    def encoder(self) -> VaultEncoder:
-        return VaultEncoder(self)
 
     async def get_registered_validators_public_keys(
         self, from_block: BlockNumber, to_block: BlockNumber
@@ -269,6 +259,25 @@ class Erc20Contract(ContractWrapper):
         return await self.contract.functions.balanceOf(address).call(block_identifier=block_number)
 
 
+class VaultEncoder(BaseEncoder):
+    """Helper class to encode Vault contract ABI calls."""
+
+    contract_class = VaultContract
+
+    def update_state(self, harvest_params: HarvestParams) -> HexStr:
+        return self.contract.encode_abi(
+            fn_name='updateState',
+            args=[
+                (
+                    harvest_params.rewards_root,
+                    harvest_params.reward,
+                    harvest_params.unlocked_mev_reward,
+                    harvest_params.proof,
+                ),
+            ],
+        )
+
+
 class ValidatorsRegistryContract(ContractWrapper):
     abi_path = 'abi/IValidatorsRegistry.json'
     settings_key = 'VALIDATORS_REGISTRY_CONTRACT_ADDRESS'
@@ -361,17 +370,13 @@ class OsTokenVaultControllerContract(ContractWrapper):
 class RewardSplitterContract(ContractWrapper):
     abi_path = 'abi/IRewardSplitter.json'
 
-    def encoder(self) -> 'RewardSplitterEncoder':
-        return RewardSplitterEncoder(self)
 
-
-class RewardSplitterEncoder:
+class RewardSplitterEncoder(BaseEncoder):
     """
     Helper class to encode RewardSplitter contract ABI calls
     """
 
-    def __init__(self, contract: RewardSplitterContract):
-        self.contract = contract
+    contract_class = RewardSplitterContract
 
     def update_vault_state(self, harvest_params: HarvestParams) -> HexStr:
         return self.contract.encode_abi(
@@ -405,31 +410,45 @@ class RewardSplitterEncoder:
 class MetaVaultContract(ContractWrapper):
     abi_path = 'abi/IEthMetaVault.json'
 
+    def __init__(
+        self, address: ChecksumAddress | None = None, execution_client: AsyncWeb3 | None = None
+    ):
+        super().__init__(address, execution_client)
+        self._sub_vaults_registry: ChecksumAddress | None = None
+
+    async def sub_vaults_registry(self) -> ChecksumAddress:
+        if self._sub_vaults_registry is None:
+            self._sub_vaults_registry = await self.contract.functions.subVaultsRegistry().call()
+        return self._sub_vaults_registry
+
     async def withdrawable_assets(self) -> Wei:
         return await self.contract.functions.withdrawableAssets().call()
 
     async def get_exit_queue_index(self, position_ticket: int) -> int:
         return await self.contract.functions.getExitQueueIndex(position_ticket).call()
 
-    async def calculate_sub_vaults_redemptions(
-        self, assets_to_redeem: Wei
-    ) -> list[SubVaultRedemption]:
-        res = await self.contract.functions.calculateSubVaultsRedemptions(assets_to_redeem).call()
-        return [
-            SubVaultRedemption(
-                vault=Web3.to_checksum_address(entry[0]),
-                assets=Wei(entry[1]),
-            )
-            for entry in res
-        ]
 
-    async def deposit_to_sub_vaults(self) -> HexStr:
-        tx_function = self.contract.functions.depositToSubVaults()
-        tx_hash = await transaction_gas_wrapper(tx_function)
-        return Web3.to_hex(tx_hash)
+class MetaVaultEncoder(BaseEncoder):
+    """Helper class to encode MetaVault contract ABI calls."""
 
-    def encoder(self) -> 'MetaVaultEncoder':
-        return MetaVaultEncoder(self)
+    contract_class = MetaVaultContract
+
+    def update_state(self, harvest_params: HarvestParams) -> HexStr:
+        return self.contract.encode_abi(
+            fn_name='updateState',
+            args=[
+                (
+                    harvest_params.rewards_root,
+                    harvest_params.reward,
+                    harvest_params.unlocked_mev_reward,
+                    harvest_params.proof,
+                ),
+            ],
+        )
+
+
+class SubVaultsRegistryContract(ContractWrapper):
+    abi_path = 'abi/ISubVaultsRegistry.json'
 
     async def get_last_rewards_nonce_updated_event(
         self, from_block: BlockNumber, to_block: BlockNumber
@@ -444,10 +463,30 @@ class MetaVaultContract(ContractWrapper):
         )
         return event
 
+    async def deposit_to_sub_vaults(self) -> HexStr:
+        tx_function = self.contract.functions.depositToSubVaults()
+        tx_hash = await transaction_gas_wrapper(tx_function)
+        return Web3.to_hex(tx_hash)
 
-class MetaVaultEncoder:
-    def __init__(self, contract: MetaVaultContract):
-        self.contract = contract
+    async def calculate_sub_vaults_redemptions(
+        self, assets_to_redeem: Wei, block_number: BlockNumber | None = None
+    ) -> list[SubVaultRedemption]:
+        res = await self.contract.functions.calculateSubVaultsRedemptions(assets_to_redeem).call(
+            block_identifier=block_number
+        )
+        return [
+            SubVaultRedemption(
+                vault=Web3.to_checksum_address(entry[0]),
+                assets=Wei(entry[1]),
+            )
+            for entry in res
+        ]
+
+
+class SubVaultsRegistryEncoder(BaseEncoder):
+    """Helper class to encode SubVaultsRegistry contract ABI calls."""
+
+    contract_class = SubVaultsRegistryContract
 
     def claim_sub_vaults_exited_assets(
         self, sub_vault_exit_requests: list[SubVaultExitRequest]
@@ -464,19 +503,6 @@ class MetaVaultEncoder:
             )
         return self.contract.encode_abi(
             fn_name='claimSubVaultsExitedAssets', args=[exit_requests_arg]
-        )
-
-    def update_state(self, harvest_params: HarvestParams) -> HexStr:
-        return self.contract.encode_abi(
-            fn_name='updateState',
-            args=[
-                (
-                    harvest_params.rewards_root,
-                    harvest_params.reward,
-                    harvest_params.unlocked_mev_reward,
-                    harvest_params.proof,
-                ),
-            ],
         )
 
 
@@ -503,6 +529,34 @@ class MulticallContract(ContractWrapper):
 class OsTokenRedeemerContract(ContractWrapper):
     abi_path = 'abi/IOsTokenRedeemer.json'
     settings_key = 'OS_TOKEN_REDEEMER_CONTRACT_ADDRESS'
+
+    async def redeemable_positions(
+        self, block_number: BlockNumber | None = None
+    ) -> RedeemablePositions:
+        merkle_root, ipfs_hash = await self.contract.functions.redeemablePositions().call(
+            block_identifier=block_number
+        )
+        return RedeemablePositions(
+            merkle_root=Web3.to_hex(merkle_root),
+            ipfs_hash=ipfs_hash,
+        )
+
+    async def nonce(self, block_number: BlockNumber | None = None) -> int:
+        return await self.contract.functions.nonce().call(block_identifier=block_number)
+
+    async def get_exit_queue_cumulative_tickets(
+        self, block_number: BlockNumber | None = None
+    ) -> int:
+        return await self.contract.functions.getExitQueueCumulativeTickets().call(
+            block_identifier=block_number
+        )
+
+    async def get_exit_queue_missing_assets(
+        self, target_ticket: int, block_number: BlockNumber | None = None
+    ) -> Wei:
+        return await self.contract.functions.getExitQueueMissingAssets(target_ticket).call(
+            block_identifier=block_number
+        )
 
     async def positions_manager(self) -> ChecksumAddress:
         return await self.contract.functions.positionsManager().call()
@@ -533,34 +587,6 @@ class OsTokenRedeemerContract(ContractWrapper):
         tx_function = self.contract.functions.redeemSubVaultsAssets(vault_address, assets_to_redeem)
         tx = await transaction_gas_wrapper(tx_function)
         return Wei(Web3.to_int(tx))
-
-    async def redeemable_positions(
-        self, block_number: BlockNumber | None = None
-    ) -> RedeemablePositions:
-        merkle_root, ipfs_hash = await self.contract.functions.redeemablePositions().call(
-            block_identifier=block_number
-        )
-        return RedeemablePositions(
-            merkle_root=Web3.to_hex(merkle_root),
-            ipfs_hash=ipfs_hash,
-        )
-
-    async def nonce(self, block_number: BlockNumber | None = None) -> int:
-        return await self.contract.functions.nonce().call(block_identifier=block_number)
-
-    async def get_exit_queue_cumulative_tickets(
-        self, block_number: BlockNumber | None = None
-    ) -> int:
-        return await self.contract.functions.getExitQueueCumulativeTickets().call(
-            block_identifier=block_number
-        )
-
-    async def get_exit_queue_missing_assets(
-        self, target_ticket: int, block_number: BlockNumber | None = None
-    ) -> Wei:
-        return await self.contract.functions.getExitQueueMissingAssets(target_ticket).call(
-            block_identifier=block_number
-        )
 
 
 class ValidatorsCheckerContract(ContractWrapper):
