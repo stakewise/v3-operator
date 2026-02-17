@@ -9,7 +9,7 @@ from web3.types import ChecksumAddress, Wei
 
 from src.commands.internal.update_redeemable_positions import (
     _reduce_boosted_amount,
-    calculate_boost_ostoken_shares,
+    calculate_boost_os_token_shares,
     create_os_token_positions,
     update_redeemable_positions,
 )
@@ -164,10 +164,10 @@ def test_create_os_token_positions_multiple_vaults_3():
             address=Web3.to_checksum_address(address_1),
             vault_os_token_positions=[
                 VaultOsTokenPosition(
-                    address=Web3.to_checksum_address(vault_1), minted_shares=Wei(333), ltv=0.5
+                    address=Web3.to_checksum_address(vault_1), minted_shares=Wei(1), ltv=0.5
                 ),
                 VaultOsTokenPosition(
-                    address=Web3.to_checksum_address(vault_2), minted_shares=Wei(666), ltv=0.5
+                    address=Web3.to_checksum_address(vault_2), minted_shares=Wei(999), ltv=0.5
                 ),
             ],
         )
@@ -177,8 +177,8 @@ def test_create_os_token_positions_multiple_vaults_3():
     }
     result = create_os_token_positions(allocators, kept_tokens, 0)
     assert result == [
-        OsTokenPosition(owner=address_1, vault=vault_2, amount=Wei(600)),
-        OsTokenPosition(owner=address_1, vault=vault_1, amount=Wei(299)),
+        OsTokenPosition(owner=address_1, vault=vault_2, amount=Wei(900)),
+        OsTokenPosition(owner=address_1, vault=vault_1, amount=Wei(0)),
     ]
 
 
@@ -250,7 +250,7 @@ def test_create_os_token_positions_ordering_by_ltv_and_amount():
     ]
 
 
-async def test_calculate_boost_ostoken_shares():
+async def test_calculate_boost_os_token_shares():
     address_1 = faker.eth_address()
     address_2 = faker.eth_address()
     vault_1 = faker.eth_address()
@@ -260,7 +260,7 @@ async def test_calculate_boost_ostoken_shares():
     os_token_converter = OsTokenConverter(105, 100)
 
     # empty case
-    result = await calculate_boost_ostoken_shares(set(), [], os_token_converter)
+    result = await calculate_boost_os_token_shares(set(), [], os_token_converter)
     assert result == {}
 
     # filter by users
@@ -302,7 +302,7 @@ async def test_calculate_boost_ostoken_shares():
             exiting_assets=Wei(0),
         ),
     ]
-    result = await calculate_boost_ostoken_shares(
+    result = await calculate_boost_os_token_shares(
         {address_1, address_2}, leverage_positions, os_token_converter
     )
     assert result == {

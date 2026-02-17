@@ -427,25 +427,6 @@ class MetaVaultContract(ContractWrapper):
     async def get_exit_queue_index(self, position_ticket: int) -> int:
         return await self.contract.functions.getExitQueueIndex(position_ticket).call()
 
-    async def calculate_sub_vaults_redemptions(
-        self, assets_to_redeem: Wei, block_number: BlockNumber | None = None
-    ) -> list[SubVaultRedemption]:
-        res = await self.contract.functions.calculateSubVaultsRedemptions(assets_to_redeem).call(
-            block_identifier=block_number
-        )
-        return [
-            SubVaultRedemption(
-                vault=Web3.to_checksum_address(entry[0]),
-                assets=Wei(entry[1]),
-            )
-            for entry in res
-        ]
-
-    async def deposit_to_sub_vaults(self) -> HexStr:
-        tx_function = self.contract.functions.depositToSubVaults()
-        tx_hash = await transaction_gas_wrapper(tx_function)
-        return Web3.to_hex(tx_hash)
-
     async def get_last_rewards_nonce_updated_event(
         self, from_block: BlockNumber, to_block: BlockNumber
     ) -> EventData | None:
@@ -481,6 +462,19 @@ class MetaVaultEncoder(BaseEncoder):
 
 class SubVaultsRegistryContract(ContractWrapper):
     abi_path = 'abi/ISubVaultsRegistry.json'
+
+    async def get_last_rewards_nonce_updated_event(
+        self, from_block: BlockNumber, to_block: BlockNumber
+    ) -> EventData | None:
+        """
+        Returns the latest RewardsNonceUpdated event data from the contract.
+        """
+        event = await self._get_last_event(
+            event=cast(type[AsyncContractEvent], self.contract.events.RewardsNonceUpdated),
+            from_block=from_block,
+            to_block=to_block,
+        )
+        return event
 
     async def deposit_to_sub_vaults(self) -> HexStr:
         tx_function = self.contract.functions.depositToSubVaults()
