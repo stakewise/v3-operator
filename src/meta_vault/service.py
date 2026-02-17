@@ -59,9 +59,9 @@ async def get_meta_vault_redemption_assets(
     meta_vault_contract = MetaVaultContract(meta_vault_address)
 
     sub_vaults_registry_address = await meta_vault_contract.sub_vaults_registry()
-    sub_vaults_registry = SubVaultsRegistryContract(sub_vaults_registry_address)
+    sub_vaults_registry_contract = SubVaultsRegistryContract(sub_vaults_registry_address)
 
-    sub_vaults_redemptions = await sub_vaults_registry.calculate_sub_vaults_redemptions(
+    sub_vaults_redemptions = await sub_vaults_registry_contract.calculate_sub_vaults_redemptions(
         assets_to_redeem, block_number=block_number
     )
 
