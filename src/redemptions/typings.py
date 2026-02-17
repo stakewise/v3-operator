@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
-from eth_typing import ChecksumAddress
+from eth_typing import ChecksumAddress, HexStr
+from multiproof.standard import standard_leaf_hash
 from web3 import Web3
 from web3.types import Wei
 
@@ -68,6 +69,13 @@ class OsTokenPosition:
     def merkle_leaf(self, nonce: int) -> tuple[int, ChecksumAddress, Wei, ChecksumAddress]:
         return nonce, self.vault, self.amount, self.owner
 
+    def leaf_hash(self, nonce: int) -> bytes:
+        """Get the Merkle leaf hash"""
+        return standard_leaf_hash(
+            values=(nonce, self.vault, self.amount, self.owner),
+            types=['uint256', 'address', 'uint256', 'address'],
+        )
+
 
 @dataclass
 class ApiConfig:
@@ -80,3 +88,9 @@ class ApiConfig:
 class ArbitrumConfig:
     OS_TOKEN_CONTRACT_ADDRESS: ChecksumAddress
     EXECUTION_ENDPOINT: str
+
+
+@dataclass
+class RedeemablePositions:
+    merkle_root: HexStr
+    ipfs_hash: str

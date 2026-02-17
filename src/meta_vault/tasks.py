@@ -361,9 +361,9 @@ async def is_meta_vault_rewards_nonce_outdated(
     # since the last Keeper vote.
     # Event is emitted by SubVaultsRegistryContract
     sub_vaults_registry_address = await meta_vault_contract.sub_vaults_registry()
-    sub_vaults_registry = SubVaultsRegistryContract(sub_vaults_registry_address)
+    sub_vaults_registry_contract = SubVaultsRegistryContract(sub_vaults_registry_address)
 
-    meta_vault_event = await sub_vaults_registry.get_last_rewards_nonce_updated_event(
+    meta_vault_event = await sub_vaults_registry_contract.get_last_rewards_nonce_updated_event(
         from_block=BlockNumber(keeper_event['blockNumber'] + 1), to_block=current_block
     )
 
@@ -392,9 +392,9 @@ async def process_deposit_to_sub_vaults(meta_vault_address: ChecksumAddress) -> 
 
     logger.info('Depositing to sub vaults for meta vault %s', meta_vault_address)
     sub_vaults_registry_address = await meta_vault_contract.sub_vaults_registry()
-    sub_vaults_registry = SubVaultsRegistryContract(sub_vaults_registry_address)
+    sub_vaults_registry_contract = SubVaultsRegistryContract(sub_vaults_registry_address)
 
-    tx_hash = await sub_vaults_registry.deposit_to_sub_vaults()
+    tx_hash = await sub_vaults_registry_contract.deposit_to_sub_vaults()
 
     logger.info('Waiting for transaction %s confirmation', tx_hash)
     tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
