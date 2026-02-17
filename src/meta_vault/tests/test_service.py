@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from sw_utils.tests import faker
 
-from src.common.contracts import MetaVaultContract
+from src.common.contracts import MetaVaultContract, SubVaultsRegistryContract
 from src.meta_vault.service import distribute_meta_vault_redemption_assets
 from src.meta_vault.typings import SubVaultRedemption
 
@@ -60,6 +60,10 @@ class TestDistributeMetaVaultRedemptionAssets:
             new=AsyncMock(side_effect=is_meta_vault_side_effect),
         ), patch.object(
             MetaVaultContract,
+            'sub_vaults_registry',
+            return_value=faker.eth_address(),
+        ), patch.object(
+            SubVaultsRegistryContract,
             'calculate_sub_vaults_redemptions',
             return_value=sub_vault_redemptions,
         ):
@@ -100,11 +104,18 @@ class TestDistributeMetaVaultRedemptionAssets:
             else:
                 return defaultdict(int)
 
+        async def sub_vaults_registry_side_effect(self):
+            return self.address
+
         with patch(
             'src.meta_vault.service.is_meta_vault',
             new=AsyncMock(side_effect=is_meta_vault_side_effect),
         ), patch.object(
             MetaVaultContract,
+            'sub_vaults_registry',
+            new=sub_vaults_registry_side_effect,
+        ), patch.object(
+            SubVaultsRegistryContract,
             'calculate_sub_vaults_redemptions',
             new=calculate_sub_vaults_redemptions_side_effect,
         ):
@@ -138,6 +149,10 @@ class TestDistributeMetaVaultRedemptionAssets:
             new=AsyncMock(side_effect=is_meta_vault_side_effect),
         ), patch.object(
             MetaVaultContract,
+            'sub_vaults_registry',
+            return_value=faker.eth_address(),
+        ), patch.object(
+            SubVaultsRegistryContract,
             'calculate_sub_vaults_redemptions',
             return_value=sub_vault_redemptions,
         ):

@@ -4,7 +4,11 @@ from typing import cast
 from eth_typing import BlockNumber, ChecksumAddress
 from web3.types import Wei
 
-from src.common.contracts import MetaVaultContract, VaultContract
+from src.common.contracts import (
+    MetaVaultContract,
+    SubVaultsRegistryContract,
+    VaultContract,
+)
 from src.common.decorators import memoize
 from src.config.settings import settings
 
@@ -54,7 +58,10 @@ async def get_meta_vault_redemption_assets(
     vault_to_redemption_assets: defaultdict[ChecksumAddress, int] = defaultdict(lambda: 0)
     meta_vault_contract = MetaVaultContract(meta_vault_address)
 
-    sub_vaults_redemptions = await meta_vault_contract.calculate_sub_vaults_redemptions(
+    sub_vaults_registry_address = await meta_vault_contract.sub_vaults_registry()
+    sub_vaults_registry = SubVaultsRegistryContract(sub_vaults_registry_address)
+
+    sub_vaults_redemptions = await sub_vaults_registry.calculate_sub_vaults_redemptions(
         assets_to_redeem, block_number=block_number
     )
 
