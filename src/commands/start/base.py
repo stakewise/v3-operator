@@ -88,7 +88,6 @@ async def process() -> None:
     # start operator tasks
     chain_state = await get_chain_finalized_head()
 
-    CheckpointCrud().save_checkpoints()
     logger.info('Syncing validator events...')
     await scan_validators_events(chain_state.block_number, is_startup=True)
 

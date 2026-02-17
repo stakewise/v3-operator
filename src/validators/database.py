@@ -1,4 +1,5 @@
 import logging
+from sqlite3 import Connection
 
 from eth_typing import BlockNumber, HexStr
 
@@ -20,7 +21,10 @@ class NetworkValidatorCrud:
             conn.executemany(
                 f'INSERT INTO {self.NETWORK_VALIDATORS_TABLE} '
                 ' VALUES(:public_key, :block_number) ON CONFLICT DO NOTHING',
-                [(val.public_key, val.block_number) for val in validators],
+                [
+                    {'public_key': val.public_key, 'block_number': val.block_number}
+                    for val in validators
+                ],
             )
 
     def get_last_network_validator(self) -> NetworkValidator | None:
@@ -75,60 +79,63 @@ class NetworkValidatorCrud:
 
 
 class CheckpointCrud:
+    CHECKPOINT_VALIDATORS = 'checkpoint_validators'
 
     @property
     def CHECKPOINTS_TABLE(self) -> str:
         return f'{settings.network}_checkpoints'
 
-    def save_checkpoints(self) -> None:
+    def get_validators_checkpoint(self) -> BlockNumber | None:
         with db_client.get_db_connection() as conn:
-            conn.executemany(
-                f'INSERT INTO {self.CHECKPOINTS_TABLE} '
-                ' VALUES(:block_number,:block_number) ON CONFLICT DO NOTHING',
-                [(settings.network_config.KEEPER_GENESIS_BLOCK,)],
-            )
-
-    def get_vault_validators_checkpoint(self) -> BlockNumber | None:
-        with db_client.get_db_connection() as conn:
-            results = conn.execute(
-                f'''SELECT checkpoint_validators
-                    FROM {self.CHECKPOINTS_TABLE}
-                    ''',
+            result = conn.execute(
+                f'SELECT block FROM {self.CHECKPOINTS_TABLE}' ' WHERE name = :name',
+                {'name': self.CHECKPOINT_VALIDATORS},
             ).fetchone()
-            return BlockNumber(results[0]) if results else None
+            return BlockNumber(result[0]) if result else None
 
-    def get_vault_v2_validators_checkpoint(self) -> BlockNumber | None:
-        with db_client.get_db_connection() as conn:
-            results = conn.execute(
-                f'''SELECT checkpoint_v2_validators
-                    FROM {self.CHECKPOINTS_TABLE}
-                    ''',
-            ).fetchone()
-            return BlockNumber(results[0]) if results else None
-
-    def update_vault_checkpoints(self, block_number: BlockNumber) -> None:
+    def update_validators_checkpoint(self, block_number: BlockNumber) -> None:
         with db_client.get_db_connection() as conn:
             conn.execute(
-                f'DELETE FROM {self.CHECKPOINTS_TABLE}',
-            )
-            conn.execute(
-                f'''INSERT INTO {self.CHECKPOINTS_TABLE}
-                   VALUES (:block_number, :block_number)
-                    ''',
-                (block_number,),
+                f'''INSERT INTO {self.CHECKPOINTS_TABLE} (name, block)
+                    VALUES (:name, :block)
+                    ON CONFLICT(name) DO UPDATE SET block = :block''',
+                {'name': self.CHECKPOINT_VALIDATORS, 'block': block_number},
             )
 
     def setup(self) -> None:
-        """Creates tables."""
+        """Creates tables and migrates from old schema if needed."""
+        self._migrate()
         with db_client.get_db_connection() as conn:
-            conn.execute(
-                f"""
-                        CREATE TABLE IF NOT EXISTS {self.CHECKPOINTS_TABLE} (
-                            checkpoint_validators INTEGER NOT NULL,
-                            checkpoint_v2_validators INTEGER NOT NULL
-                        )
-                        """
-            )
+            self._create_table(conn)
+
+    def _migrate(self) -> None:
+        """Migrates from old (checkpoint_validators, checkpoint_v2_validators) schema."""
+        with db_client.get_db_connection() as conn:
+            cursor = conn.execute(f'PRAGMA table_info({self.CHECKPOINTS_TABLE})')
+            columns = {row[1] for row in cursor.fetchall()}
+
+            if 'checkpoint_validators' not in columns:
+                return
+
+            row = conn.execute(
+                f'SELECT checkpoint_validators FROM {self.CHECKPOINTS_TABLE} LIMIT 1'
+            ).fetchone()
+            conn.execute(f'DROP TABLE {self.CHECKPOINTS_TABLE}')
+            self._create_table(conn)
+            if row:
+                conn.execute(
+                    f'''INSERT INTO {self.CHECKPOINTS_TABLE} (name, block)
+                        VALUES (:name, :block)''',
+                    {'name': self.CHECKPOINT_VALIDATORS, 'block': row[0]},
+                )
+
+    def _create_table(self, conn: Connection) -> None:
+        conn.execute(
+            f"""CREATE TABLE IF NOT EXISTS {self.CHECKPOINTS_TABLE} (
+                name TEXT NOT NULL UNIQUE,
+                block INTEGER NOT NULL
+            )"""
+        )
 
 
 class VaultValidatorCrud:
@@ -141,7 +148,10 @@ class VaultValidatorCrud:
             conn.executemany(
                 f'INSERT INTO {self.VAULT_VALIDATORS_TABLE} '
                 ' VALUES(:public_key, :block_number) ON CONFLICT DO NOTHING',
-                [(val.public_key, val.block_number) for val in validators],
+                [
+                    {'public_key': val.public_key, 'block_number': val.block_number}
+                    for val in validators
+                ],
             )
 
     def get_vault_validators(self) -> list[VaultValidator]:
