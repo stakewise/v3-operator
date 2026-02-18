@@ -43,7 +43,7 @@ from src.validators.execution import get_withdrawable_assets
 
 logger = logging.getLogger(__name__)
 
-SLEEP_INTERVAL = 60  # 1 minute
+DEFAULT_INTERVAL = 60  # 1 minute
 ZERO_MERKLE_ROOT = HexStr('0x' + '0' * 64)
 
 
@@ -88,6 +88,13 @@ class PositionSelectionResult:
     help='API endpoint for graph node.',
 )
 @click.option(
+    '--interval',
+    type=int,
+    default=DEFAULT_INTERVAL,
+    envvar='INTERVAL',
+    help='Sleep interval in seconds between processing rounds.',
+)
+@click.option(
     '--log-level',
     type=click.Choice(
         LOG_LEVELS,
@@ -127,6 +134,7 @@ def process_redeemer(
     network: str,
     verbose: bool,
     log_level: str,
+    interval: int,
     wallet_file: str | None,
     wallet_password_file: str | None,
 ) -> None:
@@ -143,13 +151,13 @@ def process_redeemer(
         log_level=log_level,
     )
     try:
-        asyncio.run(main())
+        asyncio.run(main(interval=interval))
     except Exception as e:
         log_verbose(e)
         sys.exit(1)
 
 
-async def main() -> None:
+async def main(interval: int = DEFAULT_INTERVAL) -> None:
     setup_logging()
     await setup_clients()
     await _startup_check()
@@ -158,7 +166,7 @@ async def main() -> None:
             while not interrupt_handler.exit:
                 block_number = await execution_client.eth.block_number
                 await process(block_number=block_number)
-                await interrupt_handler.sleep(SLEEP_INTERVAL)
+                await interrupt_handler.sleep(interval)
 
     finally:
         await close_clients()
