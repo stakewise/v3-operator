@@ -190,6 +190,12 @@ async def process(block_number: BlockNumber) -> None:
     )
 
     # Fetch Positions from IPFS
+    redeemable_positions_meta = await os_token_redeemer_contract.redeemable_positions(block_number)
+    zero_merkle_root = redeemable_positions_meta.merkle_root == HexStr('0x' + '0' * 64)
+    if zero_merkle_root or not redeemable_positions_meta.ipfs_hash:
+        logger.info('No redeemable positions available. Skipping redemption processing.')
+        return
+
     redeemable_positions = await _fetch_redeemable_positions(
         nonce=tree_nonce, block_number=block_number
     )
@@ -223,6 +229,9 @@ async def process(block_number: BlockNumber) -> None:
 
         # Process each position in the vault
         for position in positions:
+            if queued_shares <= 0:
+                break
+
             # Convert redeemable shares to assets
             redeemable_assets = os_token_converter.to_assets(position.redeemable_shares)
 
@@ -245,6 +254,13 @@ async def process(block_number: BlockNumber) -> None:
                 withdrawable_assets = Wei(withdrawable_assets - redeemable_assets)
                 queued_shares = Wei(queued_shares - shares_to_redeem)
 
+        if queued_shares <= 0:
+            break
+
+    if not positions_to_redeem:
+        logger.info('No positions eligible for redemption.')
+        return
+
     #  Execute Redemption with Multicall
     tx_hash = await execute_redemption(
         all_positions=redeemable_positions,
@@ -252,11 +268,12 @@ async def process(block_number: BlockNumber) -> None:
         vault_to_harvest_params=vault_to_harvest_params,
         nonce=tree_nonce,
     )
-    logger.info(
-        'Successfully redeemed %s OsToken positions. Transaction hash: %s',
-        len(positions_to_redeem),
-        tx_hash,
-    )
+    if tx_hash:
+        logger.info(
+            'Successfully redeemed %s OsToken positions. Transaction hash: %s',
+            len(positions_to_redeem),
+            tx_hash,
+        )
 
 
 async def execute_redemption(
@@ -346,7 +363,14 @@ async def _process_exit_queue(block_number: BlockNumber) -> None:
     if can_process_exit_queue:
         logger.info('Exit queue can be processed. Calling processExitQueue...')
         tx_hash = await os_token_redeemer_contract.process_exit_queue()
-        logger.info('ProcessExitQueue transaction sent. Tx Hash: %s', tx_hash)
+        logger.info('Waiting for processExitQueue transaction %s confirmation', tx_hash)
+        tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
+            tx_hash, timeout=settings.execution_transaction_timeout
+        )
+        if not tx_receipt['status']:
+            logger.error('processExitQueue transaction failed. Tx Hash: %s', tx_hash)
+        else:
+            logger.info('processExitQueue confirmed. Tx Hash: %s', tx_hash)
 
 
 async def _startup_check() -> None:
