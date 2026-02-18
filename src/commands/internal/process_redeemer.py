@@ -346,8 +346,11 @@ async def _fetch_redeemable_positions(
         for os_token_position, processed_shares in zip(
             os_token_position_batch, processed_shares_batch
         ):
-            # Calculate redeemable shares
-            os_token_position.redeemable_shares = Wei(os_token_position.amount - processed_shares)
+            # Calculate redeemable shares, skip fully processed positions
+            redeemable_shares = os_token_position.amount - processed_shares
+            if redeemable_shares <= 0:
+                continue
+            os_token_position.redeemable_shares = Wei(redeemable_shares)
             os_token_positions.append(os_token_position)
 
     return os_token_positions
