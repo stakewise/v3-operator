@@ -178,6 +178,9 @@ async def process(block_number: BlockNumber) -> None:
 
     os_token_converter = await create_os_token_converter(block_number)
     nonce = await os_token_redeemer_contract.nonce(block_number)
+    # The contract increments nonce during setRedeemablePositions,
+    # but uses nonce - 1 for leaf hash computation during redemption.
+    tree_nonce = nonce - 1
 
     queued_assets = os_token_converter.to_assets(queued_shares)
     logger.info(
@@ -187,7 +190,9 @@ async def process(block_number: BlockNumber) -> None:
     )
 
     # Fetch Positions from IPFS
-    redeemable_positions = await _fetch_redeemable_positions(nonce=nonce, block_number=block_number)
+    redeemable_positions = await _fetch_redeemable_positions(
+        nonce=tree_nonce, block_number=block_number
+    )
 
     # Group positions by vault
     vault_to_positions: defaultdict[ChecksumAddress, list[OsTokenPosition]] = defaultdict(list)
@@ -222,7 +227,7 @@ async def process(block_number: BlockNumber) -> None:
             redeemable_assets = os_token_converter.to_assets(position.redeemable_shares)
 
             if redeemable_assets <= withdrawable_assets:
-                shares_to_redeem = min(position.amount, queued_shares)
+                shares_to_redeem = min(position.redeemable_shares, queued_shares)
                 logger.info(
                     'Position Owner: %s, Vault: %s, Shares to Redeem: %s',
                     position.owner,
@@ -238,13 +243,14 @@ async def process(block_number: BlockNumber) -> None:
                     )
                 )
                 withdrawable_assets = Wei(withdrawable_assets - redeemable_assets)
-                queued_shares = Wei(queued_assets - shares_to_redeem)
+                queued_shares = Wei(queued_shares - shares_to_redeem)
 
     #  Execute Redemption with Multicall
     tx_hash = await execute_redemption(
+        all_positions=redeemable_positions,
         positions_to_redeem=positions_to_redeem,
         vault_to_harvest_params=vault_to_harvest_params,
-        nonce=nonce,
+        nonce=tree_nonce,
     )
     logger.info(
         'Successfully redeemed %s OsToken positions. Transaction hash: %s',
@@ -254,12 +260,14 @@ async def process(block_number: BlockNumber) -> None:
 
 
 async def execute_redemption(
+    all_positions: list[OsTokenPosition],
     positions_to_redeem: list[OsTokenPosition],
     vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None],
     nonce: int,
 ) -> HexStr | None:
 
     multiproof = _get_multi_proof(
+        all_positions=all_positions,
         positions_to_redeem=positions_to_redeem,
         nonce=nonce,
     )
@@ -276,9 +284,14 @@ async def execute_redemption(
                 )
             )
 
+    # Convert to tuples matching Solidity struct:
+    # OsTokenPosition(address vault, address owner, uint256 leafShares, uint256 sharesToRedeem)
+    positions_arg = [
+        (pos.vault, pos.owner, pos.amount, pos.redeemable_shares) for pos in positions_to_redeem
+    ]
     redeem_os_token_positions_call = os_token_redeemer_contract.encode_abi(
         fn_name='redeemOsTokenPositions',
-        args=[positions_to_redeem, multiproof.proof, multiproof.proof_flags],
+        args=[positions_arg, multiproof.proof, multiproof.proof_flags],
     )
     calls.append((os_token_redeemer_contract.contract_address, redeem_os_token_positions_call))
     try:
@@ -346,11 +359,12 @@ async def _startup_check() -> None:
 
 def _get_multi_proof(
     nonce: int,
+    all_positions: list[OsTokenPosition],
     positions_to_redeem: list[OsTokenPosition],
 ) -> MultiProof[tuple[bytes, int]]:
-    leaves = [r.merkle_leaf(nonce) for r in positions_to_redeem]
+    all_leaves = [r.merkle_leaf(nonce) for r in all_positions]
     tree = StandardMerkleTree.of(
-        leaves,
+        all_leaves,
         [
             'uint256',
             'address',
@@ -358,5 +372,6 @@ def _get_multi_proof(
             'address',
         ],
     )
-    multi_proof = tree.get_multi_proof(leaves)
+    redeem_leaves = [r.merkle_leaf(nonce) for r in positions_to_redeem]
+    multi_proof = tree.get_multi_proof(redeem_leaves)
     return multi_proof
