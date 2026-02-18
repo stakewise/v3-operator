@@ -32,7 +32,10 @@ class ConsolidationManager(ABC):
         chain_head: ChainHead,
         exclude_public_keys: set[HexStr],
     ) -> 'ConsolidationManager':
+        # Instance to create
         self: ConsolidationManager
+
+        # Switch to "check" logic or "select" logic
         if consolidation_keys is not None:
             self = ConsolidationChecker(
                 consolidation_keys=consolidation_keys,
@@ -43,6 +46,8 @@ class ConsolidationManager(ABC):
                 chain_head=chain_head,
                 exclude_public_keys=exclude_public_keys,
             )
+
+        # Fetch vault validators
         logger.info('Fetching vault validators...')
         self.vault_validators = await VaultContract(
             settings.vault
@@ -50,6 +55,8 @@ class ConsolidationManager(ABC):
             from_block=settings.vault_first_block,
             to_block=self.chain_head.block_number,
         )
+
+        # Fetch consensus validators
         if consolidation_keys is not None:
             self.consensus_validators = await fetch_consensus_validators(
                 consolidation_keys.all_public_keys
@@ -57,9 +64,7 @@ class ConsolidationManager(ABC):
         else:
             self.consensus_validators = await fetch_consensus_validators(self.vault_validators)
 
-        pending_partial_withdrawals = await get_pending_partial_withdrawals(
-            chain_head, self.consensus_validators
-        )
+        # Pending consolidations
         pending_consolidations = await get_pending_consolidations(
             chain_head, self.consensus_validators
         )
@@ -69,9 +74,14 @@ class ConsolidationManager(ABC):
             self.consolidating_source_indexes.add(cons.source_index)
             self.consolidating_target_indexes.add(cons.target_index)
 
+        # Pending withdrawals
+        pending_partial_withdrawals = await get_pending_partial_withdrawals(
+            chain_head, self.consensus_validators
+        )
         self.pending_partial_withdrawals_indexes = set()
         for withdrawal in pending_partial_withdrawals:
             self.pending_partial_withdrawals_indexes.add(withdrawal.validator_index)
+
         return self
 
     @abstractmethod
@@ -106,6 +116,11 @@ class ConsolidationManager(ABC):
 
 
 class ConsolidationSelector(ConsolidationManager):
+    """
+    Suited for the case when the user doesn't specify which validators to consolidate.
+    ConsolidationSelector picks the most appropriate validators for consolidation.
+    """
+
     def __init__(
         self,
         chain_head: ChainHead,
@@ -122,7 +137,6 @@ class ConsolidationSelector(ConsolidationManager):
         take the oldest 0x01 validators to top up the target's balance to MAX BALANCE.
         """
         # Candidates on the role of either source or target validator
-
         (
             source_validators_candidates,
             target_validator_candidates,
@@ -188,6 +202,11 @@ class ConsolidationSelector(ConsolidationManager):
 
 
 class ConsolidationChecker(ConsolidationManager):
+    """
+    Suited for the case when the user specifies which validators to consolidate.
+    We have to check if they are valid for consolidation.
+    """
+
     def __init__(
         self,
         consolidation_keys: ConsolidationKeys,
