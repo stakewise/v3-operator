@@ -576,18 +576,17 @@ class OsTokenRedeemerContract(ContractWrapper):
 
     async def redeem_sub_vaults_assets(
         self, vault_address: ChecksumAddress, assets_to_redeem: Wei
-    ) -> Wei:
+    ) -> HexStr:
         tx_function = self.contract.functions.redeemSubVaultsAssets(vault_address, assets_to_redeem)
-        # Simulate the call first to get the return value (totalRedeemedAssets)
-        redeemed_assets: int = await tx_function.call()
-        # Send the actual transaction
         tx_hash = await transaction_gas_wrapper(tx_function)
         tx_receipt = await self.execution_client.eth.wait_for_transaction_receipt(
             tx_hash, timeout=settings.execution_transaction_timeout
         )
         if not tx_receipt['status']:
-            return Wei(0)
-        return Wei(redeemed_assets)
+            raise RuntimeError(
+                f'redeemSubVaultsAssets transaction failed. Tx Hash: {Web3.to_hex(tx_hash)}'
+            )
+        return Web3.to_hex(tx_hash)
 
 
 class ValidatorsCheckerContract(ContractWrapper):

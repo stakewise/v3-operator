@@ -2,6 +2,7 @@ import asyncio
 import logging
 import sys
 from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
 
 import click
@@ -10,6 +11,7 @@ from multiproof import StandardMerkleTree
 from multiproof.standard import MultiProof
 from sw_utils import InterruptHandler
 from web3 import Web3
+from web3.exceptions import Web3Exception
 from web3.types import Wei
 
 from src.common.clients import close_clients, execution_client, setup_clients
@@ -27,7 +29,10 @@ from src.common.wallet import wallet
 from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
 from src.meta_vault.service import is_meta_vault
-from src.redemptions.os_token_converter import create_os_token_converter
+from src.redemptions.os_token_converter import (
+    OsTokenConverter,
+    create_os_token_converter,
+)
 from src.redemptions.tasks import (
     batch_size,
     get_processed_shares_batch,
@@ -39,6 +44,13 @@ from src.validators.execution import get_withdrawable_assets
 logger = logging.getLogger(__name__)
 
 SLEEP_INTERVAL = 60  # 1 minute
+ZERO_MERKLE_ROOT = HexStr('0x' + '0' * 64)
+
+
+@dataclass
+class PositionSelectionResult:
+    positions_to_redeem: list[OsTokenPosition]
+    vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None]
 
 
 @click.option(
@@ -137,13 +149,7 @@ def process_redeemer(
         sys.exit(1)
 
 
-# pylint: disable-next=too-many-locals
 async def main() -> None:
-    """
-    Monitors the EthOsTokenRedeemer/GnoOsTokenRedeemer contracts
-    and automatically processes OsToken position redemptions
-    and exit queue checkpoints.
-    """
     setup_logging()
     await setup_clients()
     await _startup_check()
@@ -151,144 +157,190 @@ async def main() -> None:
         with InterruptHandler() as interrupt_handler:
             while not interrupt_handler.exit:
                 block_number = await execution_client.eth.block_number
-                await process(
-                    block_number=block_number,
-                )
+                await process(block_number=block_number)
                 await interrupt_handler.sleep(SLEEP_INTERVAL)
 
     finally:
         await close_clients()
 
 
-# pylint: disable-next=too-many-locals
 async def process(block_number: BlockNumber) -> None:
-    """
-    Monitors the EthOsTokenRedeemer/GnoOsTokenRedeemer contracts
-    and automatically processes OsToken position redemptions
-    and exit queue checkpoints.
-    """
-    # Check Exit Queue Processing
     await _process_exit_queue(block_number)
 
-    # Check Queued Shares for Redemption
     queued_shares = await os_token_redeemer_contract.queued_shares(block_number)
     if queued_shares == 0:
         logger.info('No queued shares for redemption. Skipping to next interval.')
         return
 
     os_token_converter = await create_os_token_converter(block_number)
-    nonce = await os_token_redeemer_contract.nonce(block_number)
+
     # The contract increments nonce during setRedeemablePositions,
     # but uses nonce - 1 for leaf hash computation during redemption.
+    nonce = await os_token_redeemer_contract.nonce(block_number)
     tree_nonce = nonce - 1
 
     queued_assets = os_token_converter.to_assets(queued_shares)
     logger.info(
-        'Queued Shares for Redemption: %s(~%s assets)',
+        'Queued Shares for Redemption: %s (~%s assets)',
         queued_shares,
         Web3.from_wei(queued_assets, 'ether'),
     )
 
-    # Fetch Positions from IPFS
     redeemable_positions_meta = await os_token_redeemer_contract.redeemable_positions(block_number)
-    zero_merkle_root = redeemable_positions_meta.merkle_root == HexStr('0x' + '0' * 64)
-    if zero_merkle_root or not redeemable_positions_meta.ipfs_hash:
+    if redeemable_positions_meta.merkle_root == ZERO_MERKLE_ROOT or (
+        not redeemable_positions_meta.ipfs_hash
+    ):
         logger.info('No redeemable positions available. Skipping redemption processing.')
         return
 
     redeemable_positions = await _fetch_redeemable_positions(
-        nonce=tree_nonce, block_number=block_number
+        tree_nonce=tree_nonce, block_number=block_number
     )
 
-    # Group positions by vault
-    vault_to_positions: defaultdict[ChecksumAddress, list[OsTokenPosition]] = defaultdict(list)
-    for position in redeemable_positions:
-        vault_to_positions[position.vault].append(position)
+    result = await _select_positions_to_redeem(
+        redeemable_positions=redeemable_positions,
+        queued_shares=queued_shares,
+        os_token_converter=os_token_converter,
+        block_number=block_number,
+    )
 
-    positions_to_redeem = []
-    vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None] = {}
-    for vault_address, positions in vault_to_positions.items():
-        # Check if state update is required
-        harvest_params = await get_harvest_params(vault_address, block_number)
-        vault_to_harvest_params[vault_address] = harvest_params
-        withdrawable_assets = await get_withdrawable_assets(vault_address, harvest_params)
-
-        #  Handle Meta-Vaults with Insufficient Withdrawable Assets
-        vault_positions_shares = Wei(sum(position.redeemable_shares for position in positions))
-        vault_positions_assets = os_token_converter.to_assets(vault_positions_shares)
-        if vault_positions_assets > withdrawable_assets and await is_meta_vault(vault_address):
-            # Check if vault is a meta-vault
-            logger.info(
-                'Vault %s is a meta-vault with insufficient withdrawable assets.', vault_address
-            )
-            additional_assets_needed = Wei(vault_positions_assets - withdrawable_assets)
-            redeemed_assets = await os_token_redeemer_contract.redeem_sub_vaults_assets(
-                vault_address, additional_assets_needed
-            )
-            withdrawable_assets = Wei(withdrawable_assets + redeemed_assets)
-
-        # Process each position in the vault
-        for position in positions:
-            if queued_shares <= 0:
-                break
-
-            # Convert redeemable shares to assets
-            redeemable_assets = os_token_converter.to_assets(position.redeemable_shares)
-
-            if redeemable_assets <= withdrawable_assets:
-                shares_to_redeem = min(position.redeemable_shares, queued_shares)
-                logger.info(
-                    'Position Owner: %s, Vault: %s, Shares to Redeem: %s',
-                    position.owner,
-                    position.vault,
-                    shares_to_redeem,
-                )
-                positions_to_redeem.append(
-                    OsTokenPosition(
-                        vault=position.vault,
-                        owner=position.owner,
-                        amount=position.amount,
-                        redeemable_shares=shares_to_redeem,
-                    )
-                )
-                withdrawable_assets = Wei(withdrawable_assets - redeemable_assets)
-                queued_shares = Wei(queued_shares - shares_to_redeem)
-
-        if queued_shares <= 0:
-            break
-
-    if not positions_to_redeem:
+    if not result.positions_to_redeem:
         logger.info('No positions eligible for redemption.')
         return
 
-    #  Execute Redemption with Multicall
-    tx_hash = await execute_redemption(
+    tx_hash = await _execute_redemption(
         all_positions=redeemable_positions,
-        positions_to_redeem=positions_to_redeem,
-        vault_to_harvest_params=vault_to_harvest_params,
-        nonce=tree_nonce,
+        positions_to_redeem=result.positions_to_redeem,
+        vault_to_harvest_params=result.vault_to_harvest_params,
+        tree_nonce=tree_nonce,
     )
     if tx_hash:
         logger.info(
             'Successfully redeemed %s OsToken positions. Transaction hash: %s',
-            len(positions_to_redeem),
+            len(result.positions_to_redeem),
             tx_hash,
         )
 
 
-async def execute_redemption(
+async def _select_positions_to_redeem(
+    redeemable_positions: list[OsTokenPosition],
+    queued_shares: int,
+    os_token_converter: OsTokenConverter,
+    block_number: BlockNumber,
+) -> PositionSelectionResult:
+    vault_to_positions: defaultdict[ChecksumAddress, list[OsTokenPosition]] = defaultdict(list)
+    for position in redeemable_positions:
+        vault_to_positions[position.vault].append(position)
+
+    positions_to_redeem: list[OsTokenPosition] = []
+    vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None] = {}
+    remaining_shares = queued_shares
+
+    for vault_address, positions in vault_to_positions.items():
+        harvest_params = await get_harvest_params(vault_address, block_number)
+        vault_to_harvest_params[vault_address] = harvest_params
+        withdrawable_assets = await get_withdrawable_assets(vault_address, harvest_params)
+
+        withdrawable_assets = await _try_redeem_sub_vaults(
+            vault_address=vault_address,
+            positions=positions,
+            withdrawable_assets=withdrawable_assets,
+            harvest_params=harvest_params,
+            os_token_converter=os_token_converter,
+        )
+
+        for position in positions:
+            if remaining_shares <= 0:
+                break
+
+            redeemable_assets = os_token_converter.to_assets(position.redeemable_shares)
+            if redeemable_assets > withdrawable_assets:
+                continue
+
+            shares_to_redeem = Wei(min(position.redeemable_shares, remaining_shares))
+            logger.info(
+                'Position Owner: %s, Vault: %s, Shares to Redeem: %s',
+                position.owner,
+                position.vault,
+                shares_to_redeem,
+            )
+            # redeemable_shares is overloaded here: in the source position it means
+            # "total shares available for redemption", in the redeem batch it means
+            # "shares to actually redeem in this transaction" (maps to sharesToRedeem
+            # in the Solidity struct).
+            positions_to_redeem.append(
+                OsTokenPosition(
+                    vault=position.vault,
+                    owner=position.owner,
+                    amount=position.amount,
+                    redeemable_shares=shares_to_redeem,
+                )
+            )
+            withdrawable_assets = Wei(withdrawable_assets - redeemable_assets)
+            remaining_shares -= shares_to_redeem
+
+        if remaining_shares <= 0:
+            break
+
+    return PositionSelectionResult(
+        positions_to_redeem=positions_to_redeem,
+        vault_to_harvest_params=vault_to_harvest_params,
+    )
+
+
+async def _try_redeem_sub_vaults(
+    vault_address: ChecksumAddress,
+    positions: list[OsTokenPosition],
+    withdrawable_assets: Wei,
+    harvest_params: HarvestParams | None,
+    os_token_converter: OsTokenConverter,
+) -> Wei:
+    """If vault is a meta-vault with insufficient assets, redeem from sub-vaults.
+
+    Returns the (possibly updated) withdrawable assets for the vault.
+    """
+    vault_positions_shares = Wei(sum(p.redeemable_shares for p in positions))
+    vault_positions_assets = os_token_converter.to_assets(vault_positions_shares)
+
+    if vault_positions_assets <= withdrawable_assets or not await is_meta_vault(vault_address):
+        return withdrawable_assets
+
+    logger.info('Vault %s is a meta-vault with insufficient withdrawable assets.', vault_address)
+    additional_assets_needed = Wei(vault_positions_assets - withdrawable_assets)
+    try:
+        tx_hash = await os_token_redeemer_contract.redeem_sub_vaults_assets(
+            vault_address, additional_assets_needed
+        )
+        logger.info(
+            'redeemSubVaultsAssets confirmed for vault %s. Tx Hash: %s',
+            vault_address,
+            tx_hash,
+        )
+    except RuntimeError:
+        logger.warning(
+            'redeemSubVaultsAssets failed for vault %s. '
+            'Proceeding with current withdrawable assets.',
+            vault_address,
+        )
+        return withdrawable_assets
+
+    # Re-query actual withdrawable assets on-chain after sub-vault redemption
+    # to avoid TOCTOU issues with stale values
+    return await get_withdrawable_assets(vault_address, harvest_params)
+
+
+async def _execute_redemption(
     all_positions: list[OsTokenPosition],
     positions_to_redeem: list[OsTokenPosition],
     vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None],
-    nonce: int,
+    tree_nonce: int,
 ) -> HexStr | None:
-
     multiproof = _get_multi_proof(
         all_positions=all_positions,
         positions_to_redeem=positions_to_redeem,
-        nonce=nonce,
+        tree_nonce=tree_nonce,
     )
-    calls = []
+    calls: list[tuple[ChecksumAddress, HexStr]] = []
 
     for vault in set(pos.vault for pos in positions_to_redeem):
         harvest_params = vault_to_harvest_params.get(vault)
@@ -301,22 +353,23 @@ async def execute_redemption(
                 )
             )
 
-    # Convert to tuples matching Solidity struct:
+    # Maps to Solidity struct:
     # OsTokenPosition(address vault, address owner, uint256 leafShares, uint256 sharesToRedeem)
+    # amount -> leafShares, redeemable_shares -> sharesToRedeem
     positions_arg = [
         (pos.vault, pos.owner, pos.amount, pos.redeemable_shares) for pos in positions_to_redeem
     ]
-    redeem_os_token_positions_call = os_token_redeemer_contract.encode_abi(
+    redeem_call = os_token_redeemer_contract.encode_abi(
         fn_name='redeemOsTokenPositions',
         args=[positions_arg, multiproof.proof, multiproof.proof_flags],
     )
-    calls.append((os_token_redeemer_contract.contract_address, redeem_os_token_positions_call))
+    calls.append((os_token_redeemer_contract.contract_address, redeem_call))
+
     try:
         tx_function = multicall_contract.functions.aggregate(calls)
         tx = await transaction_gas_wrapper(tx_function=tx_function)
-    except Exception as e:
-        logger.error('Failed to redeem os token positions: %s', e)
-        logger.exception(e)
+    except Web3Exception:
+        logger.exception('Failed to redeem os token positions')
         return None
 
     tx_hash = Web3.to_hex(tx)
@@ -332,28 +385,31 @@ async def execute_redemption(
 
 
 async def _fetch_redeemable_positions(
-    nonce: int, block_number: BlockNumber
+    tree_nonce: int, block_number: BlockNumber
 ) -> list[OsTokenPosition]:
-    os_token_positions = []
-    async for os_token_position_batch in async_batched(
+    positions: list[OsTokenPosition] = []
+    async for batch in async_batched(
         iter_os_token_positions(block_number=block_number), batch_size
     ):
         processed_shares_batch = await get_processed_shares_batch(
-            os_token_positions_batch=os_token_position_batch,
-            nonce=nonce,
+            os_token_positions_batch=batch,
+            nonce=tree_nonce,
             block_number=block_number,
         )
-        for os_token_position, processed_shares in zip(
-            os_token_position_batch, processed_shares_batch
-        ):
-            # Calculate redeemable shares, skip fully processed positions
-            redeemable_shares = os_token_position.amount - processed_shares
+        for position, processed_shares in zip(batch, processed_shares_batch):
+            redeemable_shares = position.amount - processed_shares
             if redeemable_shares <= 0:
                 continue
-            os_token_position.redeemable_shares = Wei(redeemable_shares)
-            os_token_positions.append(os_token_position)
+            positions.append(
+                OsTokenPosition(
+                    owner=position.owner,
+                    vault=position.vault,
+                    amount=position.amount,
+                    redeemable_shares=Wei(redeemable_shares),
+                )
+            )
 
-    return os_token_positions
+    return positions
 
 
 async def _process_exit_queue(block_number: BlockNumber) -> None:
@@ -385,20 +441,14 @@ async def _startup_check() -> None:
 
 
 def _get_multi_proof(
-    nonce: int,
+    tree_nonce: int,
     all_positions: list[OsTokenPosition],
     positions_to_redeem: list[OsTokenPosition],
 ) -> MultiProof[tuple[bytes, int]]:
-    all_leaves = [r.merkle_leaf(nonce) for r in all_positions]
+    all_leaves = [p.merkle_leaf(tree_nonce) for p in all_positions]
     tree = StandardMerkleTree.of(
         all_leaves,
-        [
-            'uint256',
-            'address',
-            'uint256',
-            'address',
-        ],
+        ['uint256', 'address', 'uint256', 'address'],
     )
-    redeem_leaves = [r.merkle_leaf(nonce) for r in positions_to_redeem]
-    multi_proof = tree.get_multi_proof(redeem_leaves)
-    return multi_proof
+    redeem_leaves = [p.merkle_leaf(tree_nonce) for p in positions_to_redeem]
+    return tree.get_multi_proof(redeem_leaves)
