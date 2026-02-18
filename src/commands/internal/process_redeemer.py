@@ -3,7 +3,6 @@ import logging
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import cast
 
 import click
 from eth_typing import BlockNumber, ChecksumAddress, HexStr
@@ -13,12 +12,7 @@ from sw_utils import InterruptHandler
 from web3 import Web3
 from web3.types import Wei
 
-from src.common.clients import (
-    close_clients,
-    execution_client,
-    ipfs_fetch_client,
-    setup_clients,
-)
+from src.common.clients import close_clients, execution_client, setup_clients
 from src.common.contracts import (
     VaultContract,
     multicall_contract,
@@ -28,12 +22,17 @@ from src.common.execution import transaction_gas_wrapper
 from src.common.harvest import get_harvest_params
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.typings import HarvestParams
-from src.common.utils import log_verbose
+from src.common.utils import async_batched, log_verbose
 from src.common.wallet import wallet
 from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
 from src.meta_vault.service import is_meta_vault
 from src.redemptions.os_token_converter import create_os_token_converter
+from src.redemptions.tasks import (
+    batch_size,
+    get_processed_shares_batch,
+    iter_os_token_positions,
+)
 from src.redemptions.typings import OsTokenPosition
 from src.validators.execution import get_withdrawable_assets
 
@@ -188,21 +187,7 @@ async def process(block_number: BlockNumber) -> None:
     )
 
     # Fetch Positions from IPFS
-    redeemable_positions_meta = await os_token_redeemer_contract.redeemable_positions(block_number)
-    redeemable_positions = await fetch_redeemable_positions(redeemable_positions_meta.ipfs_hash)
-
-    # Calculate Redeemable Shares Per Position
-    for redeemable_position in redeemable_positions:
-        # Compute leaf hash
-        leaf_hash = redeemable_position.leaf_hash(nonce - 1)
-        # Get already processed shares
-        leaf_processed_shares = await os_token_redeemer_contract.leaf_to_processed_shares(
-            leaf_hash, block_number
-        )
-        # Calculate redeemable shares
-        redeemable_position.redeemable_shares = Wei(
-            redeemable_position.amount - leaf_processed_shares
-        )
+    redeemable_positions = await _fetch_redeemable_positions(nonce=nonce, block_number=block_number)
 
     # Group positions by vault
     vault_to_positions: defaultdict[ChecksumAddress, list[OsTokenPosition]] = defaultdict(list)
@@ -316,21 +301,26 @@ async def execute_redemption(
     return tx_hash
 
 
-async def fetch_redeemable_positions(ipfs_hash: str) -> list[OsTokenPosition]:
-    # Fetch redeemable positions data from IPFS
-    data = cast(list[dict], await ipfs_fetch_client.fetch_json(ipfs_hash))
-
-    # data structure example:
-    # [{"owner:" 0x01, "amount": 100000, "vault": 0x02}, ...]
-
-    return [
-        OsTokenPosition(
-            owner=Web3.to_checksum_address(item['owner']),
-            vault=Web3.to_checksum_address(item['vault']),
-            amount=Wei(int(item['amount'])),
+async def _fetch_redeemable_positions(
+    nonce: int, block_number: BlockNumber
+) -> list[OsTokenPosition]:
+    os_token_positions = []
+    async for os_token_position_batch in async_batched(
+        iter_os_token_positions(block_number=block_number), batch_size
+    ):
+        processed_shares_batch = await get_processed_shares_batch(
+            os_token_positions_batch=os_token_position_batch,
+            nonce=nonce,
+            block_number=block_number,
         )
-        for item in data
-    ]
+        for os_token_position, processed_shares in zip(
+            os_token_position_batch, processed_shares_batch
+        ):
+            # Calculate redeemable shares
+            os_token_position.redeemable_shares = Wei(os_token_position.amount - processed_shares)
+            os_token_positions.append(os_token_position)
+
+    return os_token_positions
 
 
 async def _process_exit_queue(block_number: BlockNumber) -> None:

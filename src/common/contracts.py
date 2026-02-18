@@ -569,13 +569,6 @@ class OsTokenRedeemerContract(ContractWrapper):
             block_identifier=block_number
         )
 
-    async def leaf_to_processed_shares(
-        self, leaf: bytes, block_number: BlockNumber | None = None
-    ) -> Wei:
-        return await self.contract.functions.leafToProcessedShares(leaf).call(
-            block_identifier=block_number
-        )
-
     async def process_exit_queue(self) -> HexStr:
         tx_function = self.contract.functions.processExitQueue()
         tx_hash = await transaction_gas_wrapper(tx_function)
