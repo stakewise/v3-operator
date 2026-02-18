@@ -232,9 +232,8 @@ async def _select_positions_to_redeem(
     for position in redeemable_positions:
         vault_to_positions[position.vault].append(position)
 
-    positions_to_redeem: list[OsTokenPosition] = []
     vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None] = {}
-    remaining_shares = queued_shares
+    vault_to_withdrawable_assets: dict[ChecksumAddress, Wei] = {}
 
     for vault_address, positions in vault_to_positions.items():
         harvest_params = await get_harvest_params(vault_address, block_number)
@@ -248,6 +247,29 @@ async def _select_positions_to_redeem(
             harvest_params=harvest_params,
             os_token_converter=os_token_converter,
         )
+        vault_to_withdrawable_assets[vault_address] = withdrawable_assets
+
+    return _filter_positions_to_redeem(
+        vault_to_positions=vault_to_positions,
+        vault_to_withdrawable_assets=vault_to_withdrawable_assets,
+        vault_to_harvest_params=vault_to_harvest_params,
+        queued_shares=queued_shares,
+        os_token_converter=os_token_converter,
+    )
+
+
+def _filter_positions_to_redeem(
+    vault_to_positions: dict[ChecksumAddress, list[OsTokenPosition]],
+    vault_to_withdrawable_assets: dict[ChecksumAddress, Wei],
+    vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None],
+    queued_shares: int,
+    os_token_converter: OsTokenConverter,
+) -> PositionSelectionResult:
+    positions_to_redeem: list[OsTokenPosition] = []
+    remaining_shares = queued_shares
+
+    for vault_address, positions in vault_to_positions.items():
+        withdrawable_assets = vault_to_withdrawable_assets[vault_address]
 
         for position in positions:
             if remaining_shares <= 0:
