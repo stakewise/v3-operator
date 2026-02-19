@@ -44,7 +44,6 @@ from src.validators.execution import get_withdrawable_assets
 logger = logging.getLogger(__name__)
 
 DEFAULT_INTERVAL = 60  # 1 minute
-ZERO_MERKLE_ROOT = HexStr('0x' + '0' * 64)
 
 
 @dataclass
@@ -80,12 +79,6 @@ class PositionSelectionResult:
     envvar='EXECUTION_JWT_SECRET',
     help='JWT secret key used for signing and verifying JSON Web Tokens'
     ' when connecting to execution nodes.',
-)
-@click.option(
-    '--graph-endpoint',
-    type=str,
-    envvar='GRAPH_ENDPOINT',
-    help='API endpoint for graph node.',
 )
 @click.option(
     '--interval',
@@ -130,7 +123,6 @@ class PositionSelectionResult:
 def process_redeemer(
     execution_endpoints: str,
     execution_jwt_secret: str | None,
-    graph_endpoint: str,
     network: str,
     verbose: bool,
     log_level: str,
@@ -143,7 +135,6 @@ def process_redeemer(
         vault_dir=Path.home() / '.stakewise',
         execution_endpoints=execution_endpoints,
         execution_jwt_secret=execution_jwt_secret,
-        graph_endpoint=graph_endpoint,
         verbose=verbose,
         network=network,
         wallet_file=wallet_file,
@@ -194,13 +185,6 @@ async def process(block_number: BlockNumber) -> None:
         Web3.from_wei(queued_assets, 'ether'),
     )
 
-    redeemable_positions_meta = await os_token_redeemer_contract.redeemable_positions(block_number)
-    if redeemable_positions_meta.merkle_root == ZERO_MERKLE_ROOT or (
-        not redeemable_positions_meta.ipfs_hash
-    ):
-        logger.info('No redeemable positions available. Skipping redemption processing.')
-        return
-
     redeemable_positions = await _fetch_redeemable_positions(
         tree_nonce=tree_nonce, block_number=block_number
     )
@@ -236,6 +220,7 @@ async def _select_positions_to_redeem(
     os_token_converter: OsTokenConverter,
     block_number: BlockNumber,
 ) -> PositionSelectionResult:
+    # group positions by vault
     vault_to_positions: defaultdict[ChecksumAddress, list[OsTokenPosition]] = defaultdict(list)
     for position in redeemable_positions:
         vault_to_positions[position.vault].append(position)
@@ -347,7 +332,7 @@ async def _try_redeem_sub_vaults(
             tx_hash,
         )
     except RuntimeError:
-        logger.warning(
+        logger.error(
             'redeemSubVaultsAssets failed for vault %s. '
             'Proceeding with current withdrawable assets.',
             vault_address,

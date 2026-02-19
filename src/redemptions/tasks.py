@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 batch_size = 20
+ZERO_MERKLE_ROOT = HexStr('0x' + '0' * 64)
 
 
 async def get_redemption_assets(chain_head: ChainHead) -> Gwei:
@@ -151,7 +152,8 @@ async def iter_os_token_positions(
     # Check whether redeemable positions are available
     if not redeemable_positions.ipfs_hash:
         return
-
+    if redeemable_positions.merkle_root == ZERO_MERKLE_ROOT:
+        return
     # Fetch redeemable positions data from IPFS
     data = cast(list[dict], await ipfs_fetch_client.fetch_json(redeemable_positions.ipfs_hash))
 
