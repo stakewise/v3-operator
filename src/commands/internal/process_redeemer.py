@@ -268,27 +268,24 @@ def _filter_positions_to_redeem(
             if remaining_shares <= 0:
                 break
 
-            redeemable_assets = os_token_converter.to_assets(position.redeemable_shares)
+            redeemable_assets = os_token_converter.to_assets(position.available_shares)
             if redeemable_assets > withdrawable_assets:
                 continue
 
-            shares_to_redeem = Wei(min(position.redeemable_shares, remaining_shares))
+            shares_to_redeem = Wei(min(position.available_shares, remaining_shares))
             logger.info(
                 'Position Owner: %s, Vault: %s, Shares to Redeem: %s',
                 position.owner,
                 position.vault,
                 shares_to_redeem,
             )
-            # redeemable_shares is overloaded here: in the source position it means
-            # "total shares available for redemption", in the redeem batch it means
-            # "shares to actually redeem in this transaction" (maps to sharesToRedeem
-            # in the Solidity struct).
             positions_to_redeem.append(
                 OsTokenPosition(
                     vault=position.vault,
                     owner=position.owner,
                     amount=position.amount,
-                    redeemable_shares=shares_to_redeem,
+                    available_shares=position.available_shares,
+                    shares_to_redeem=shares_to_redeem,
                 )
             )
             withdrawable_assets = Wei(withdrawable_assets - redeemable_assets)
@@ -314,7 +311,7 @@ async def _try_redeem_sub_vaults(
 
     Returns the (possibly updated) withdrawable assets for the vault.
     """
-    vault_positions_shares = Wei(sum(p.redeemable_shares for p in positions))
+    vault_positions_shares = Wei(sum(p.available_shares for p in positions))
     vault_positions_assets = os_token_converter.to_assets(vault_positions_shares)
 
     if vault_positions_assets <= withdrawable_assets or not await is_meta_vault(vault_address):
@@ -370,9 +367,8 @@ async def _execute_redemption(
 
     # Maps to Solidity struct:
     # OsTokenPosition(address vault, address owner, uint256 leafShares, uint256 sharesToRedeem)
-    # amount -> leafShares, redeemable_shares -> sharesToRedeem
     positions_arg = [
-        (pos.vault, pos.owner, pos.amount, pos.redeemable_shares) for pos in positions_to_redeem
+        (pos.vault, pos.owner, pos.amount, pos.shares_to_redeem) for pos in positions_to_redeem
     ]
     redeem_call = os_token_redeemer_contract.encode_abi(
         fn_name='redeemOsTokenPositions',
@@ -412,15 +408,15 @@ async def _fetch_redeemable_positions(
             block_number=block_number,
         )
         for position, processed_shares in zip(batch, processed_shares_batch):
-            redeemable_shares = position.amount - processed_shares
-            if redeemable_shares <= 0:
+            available_shares = position.amount - processed_shares
+            if available_shares <= 0:
                 continue
             positions.append(
                 OsTokenPosition(
                     owner=position.owner,
                     vault=position.vault,
                     amount=position.amount,
-                    redeemable_shares=Wei(redeemable_shares),
+                    available_shares=Wei(available_shares),
                 )
             )
 

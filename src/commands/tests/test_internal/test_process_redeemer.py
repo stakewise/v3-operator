@@ -9,7 +9,6 @@ from web3.exceptions import Web3Exception
 from web3.types import Wei
 
 from src.commands.internal.process_redeemer import (
-    ZERO_MERKLE_ROOT,
     PositionSelectionResult,
     _execute_redemption,
     _fetch_redeemable_positions,
@@ -23,6 +22,7 @@ from src.commands.internal.process_redeemer import (
 )
 from src.common.typings import HarvestParams
 from src.redemptions.os_token_converter import OsTokenConverter
+from src.redemptions.tasks import ZERO_MERKLE_ROOT
 from src.redemptions.typings import OsTokenPosition, RedeemablePositions
 
 MODULE = 'src.commands.internal.process_redeemer'
@@ -38,7 +38,7 @@ OWNER_2 = Web3.to_checksum_address('0x' + '44' * 20)
 
 class TestGetMultiProof:
     def test_single_position(self) -> None:
-        position = make_position(amount=1000, redeemable_shares=500)
+        position = make_position(amount=1000, available_shares=500)
         result = _get_multi_proof(
             tree_nonce=5,
             all_positions=[position],
@@ -47,8 +47,8 @@ class TestGetMultiProof:
         assert len(result.leaves) == 1
 
     def test_partial_redeem(self) -> None:
-        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, amount=1000, redeemable_shares=500)
-        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, amount=2000, redeemable_shares=1000)
+        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, amount=1000, available_shares=500)
+        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, amount=2000, available_shares=1000)
 
         result = _get_multi_proof(
             tree_nonce=5,
@@ -59,8 +59,8 @@ class TestGetMultiProof:
         assert len(result.proof) > 0
 
     def test_all_positions_redeemed(self) -> None:
-        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, amount=1000, redeemable_shares=500)
-        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, amount=2000, redeemable_shares=1000)
+        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, amount=1000, available_shares=500)
+        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, amount=2000, available_shares=1000)
 
         result = _get_multi_proof(
             tree_nonce=5,
@@ -83,7 +83,7 @@ class TestFilterPositionsToRedeem:
         assert result.vault_to_harvest_params == {}
 
     def test_single_position_sufficient_assets(self) -> None:
-        position = make_position(redeemable_shares=500)
+        position = make_position(available_shares=500)
         # to_assets(500) = 500 * 110 / 100 = 550; withdrawable=1000 → selected
         result = _filter_positions_to_redeem(
             vault_to_positions={VAULT_1: [position]},
@@ -93,10 +93,10 @@ class TestFilterPositionsToRedeem:
             os_token_converter=make_converter(),
         )
         assert len(result.positions_to_redeem) == 1
-        assert result.positions_to_redeem[0].redeemable_shares == Wei(500)
+        assert result.positions_to_redeem[0].shares_to_redeem == Wei(500)
 
     def test_single_position_insufficient_assets(self) -> None:
-        position = make_position(redeemable_shares=500)
+        position = make_position(available_shares=500)
         # to_assets(500) = 550; withdrawable=100 → skipped
         result = _filter_positions_to_redeem(
             vault_to_positions={VAULT_1: [position]},
@@ -108,7 +108,7 @@ class TestFilterPositionsToRedeem:
         assert result.positions_to_redeem == []
 
     def test_queued_shares_limits_redemption(self) -> None:
-        position = make_position(redeemable_shares=500)
+        position = make_position(available_shares=500)
         result = _filter_positions_to_redeem(
             vault_to_positions={VAULT_1: [position]},
             vault_to_withdrawable_assets={VAULT_1: Wei(10000)},
@@ -117,11 +117,11 @@ class TestFilterPositionsToRedeem:
             os_token_converter=make_converter(),
         )
         assert len(result.positions_to_redeem) == 1
-        assert result.positions_to_redeem[0].redeemable_shares == Wei(200)
+        assert result.positions_to_redeem[0].shares_to_redeem == Wei(200)
 
     def test_multiple_positions_limited_by_withdrawable_assets(self) -> None:
-        pos1 = make_position(owner=OWNER_1, redeemable_shares=500)
-        pos2 = make_position(owner=OWNER_2, redeemable_shares=1000)
+        pos1 = make_position(owner=OWNER_1, available_shares=500)
+        pos2 = make_position(owner=OWNER_2, available_shares=1000)
         # 1:1 converter; pos1=500 assets, pos2=1000 assets; withdrawable=700
         # pos1 fits (700-500=200 remaining), pos2 doesn't (1000>200)
         result = _filter_positions_to_redeem(
@@ -135,8 +135,8 @@ class TestFilterPositionsToRedeem:
         assert result.positions_to_redeem[0].owner == OWNER_1
 
     def test_multiple_vaults_both_selected(self) -> None:
-        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, redeemable_shares=500)
-        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, redeemable_shares=800)
+        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, available_shares=500)
+        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, available_shares=800)
 
         vault_to_positions: dict[ChecksumAddress, list[OsTokenPosition]] = {}
         vault_to_positions[VAULT_1] = [pos1]
@@ -152,8 +152,8 @@ class TestFilterPositionsToRedeem:
         assert len(result.positions_to_redeem) == 2
 
     def test_stops_across_vaults_when_queued_shares_exhausted(self) -> None:
-        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, redeemable_shares=500)
-        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, redeemable_shares=800)
+        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, available_shares=500)
+        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, available_shares=800)
 
         vault_to_positions: dict[ChecksumAddress, list[OsTokenPosition]] = {}
         vault_to_positions[VAULT_1] = [pos1]
@@ -170,7 +170,7 @@ class TestFilterPositionsToRedeem:
         assert result.positions_to_redeem[0].vault == VAULT_1
 
     def test_preserves_harvest_params(self) -> None:
-        pos = make_position(redeemable_shares=500)
+        pos = make_position(available_shares=500)
         harvest_params = make_harvest_params()
 
         result = _filter_positions_to_redeem(
@@ -183,7 +183,7 @@ class TestFilterPositionsToRedeem:
         assert result.vault_to_harvest_params[VAULT_1] is harvest_params
 
     def test_preserves_original_amount(self) -> None:
-        pos = make_position(amount=1000, redeemable_shares=500)
+        pos = make_position(amount=1000, available_shares=500)
         result = _filter_positions_to_redeem(
             vault_to_positions={VAULT_1: [pos]},
             vault_to_withdrawable_assets={VAULT_1: Wei(10000)},
@@ -192,12 +192,12 @@ class TestFilterPositionsToRedeem:
             os_token_converter=make_converter(),
         )
         assert result.positions_to_redeem[0].amount == Wei(1000)
-        assert result.positions_to_redeem[0].redeemable_shares == Wei(200)
+        assert result.positions_to_redeem[0].shares_to_redeem == Wei(200)
 
     def test_stops_within_vault_when_queued_shares_exhausted(self) -> None:
         # Multiple positions in same vault, queued_shares runs out mid-vault
-        pos1 = make_position(owner=OWNER_1, redeemable_shares=400)
-        pos2 = make_position(owner=OWNER_2, redeemable_shares=300)
+        pos1 = make_position(owner=OWNER_1, available_shares=400)
+        pos2 = make_position(owner=OWNER_2, available_shares=300)
         # 1:1 converter; pos1 consumes all 400 queued_shares, pos2 is skipped
         result = _filter_positions_to_redeem(
             vault_to_positions={VAULT_1: [pos1, pos2]},
@@ -211,8 +211,8 @@ class TestFilterPositionsToRedeem:
 
     def test_skips_position_then_selects_next(self) -> None:
         # First position too expensive, second fits
-        pos1 = make_position(owner=OWNER_1, redeemable_shares=1000)
-        pos2 = make_position(owner=OWNER_2, redeemable_shares=100)
+        pos1 = make_position(owner=OWNER_1, available_shares=1000)
+        pos2 = make_position(owner=OWNER_2, available_shares=100)
         # 1:1 converter; pos1=1000 assets > 500 withdrawable; pos2=100 <= 500
         result = _filter_positions_to_redeem(
             vault_to_positions={VAULT_1: [pos1, pos2]},
@@ -272,7 +272,7 @@ class TestFetchRedeemablePositions:
         ):
             result = await _fetch_redeemable_positions(tree_nonce=5, block_number=BlockNumber(100))
         assert len(result) == 1
-        assert result[0].redeemable_shares == Wei(700)
+        assert result[0].available_shares == Wei(700)
         assert result[0].amount == Wei(1000)
 
     async def test_multiple_positions_mixed(self) -> None:
@@ -294,12 +294,12 @@ class TestFetchRedeemablePositions:
             result = await _fetch_redeemable_positions(tree_nonce=5, block_number=BlockNumber(100))
         assert len(result) == 1
         assert result[0].owner == OWNER_2
-        assert result[0].redeemable_shares == Wei(1500)
+        assert result[0].available_shares == Wei(1500)
 
 
 class TestTryRedeemSubVaults:
     async def test_sufficient_withdrawable_assets(self) -> None:
-        positions = [make_position(redeemable_shares=500)]
+        positions = [make_position(available_shares=500)]
         # 1:1 converter; vault_positions_assets=500 <= withdrawable=1000 → return
         result = await _try_redeem_sub_vaults(
             vault_address=VAULT_1,
@@ -311,7 +311,7 @@ class TestTryRedeemSubVaults:
         assert result == Wei(1000)
 
     async def test_insufficient_non_meta_vault(self) -> None:
-        positions = [make_position(redeemable_shares=500)]
+        positions = [make_position(available_shares=500)]
         # vault_positions_assets=500 > withdrawable=100, but not meta-vault
         with patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=False)):
             result = await _try_redeem_sub_vaults(
@@ -324,7 +324,7 @@ class TestTryRedeemSubVaults:
         assert result == Wei(100)
 
     async def test_meta_vault_successful_redeem(self) -> None:
-        positions = [make_position(redeemable_shares=500)]
+        positions = [make_position(available_shares=500)]
         # vault_positions_assets=500 > withdrawable=100, meta-vault
         with (
             patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
@@ -346,7 +346,7 @@ class TestTryRedeemSubVaults:
         mock_redeemer.redeem_sub_vaults_assets.assert_called_once_with(VAULT_1, Wei(400))
 
     async def test_meta_vault_failed_redeem(self) -> None:
-        positions = [make_position(redeemable_shares=500)]
+        positions = [make_position(available_shares=500)]
         with (
             patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
             patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
@@ -433,8 +433,8 @@ class TestSelectPositionsToRedeem:
         assert result.positions_to_redeem == []
 
     async def test_calls_io_per_vault(self) -> None:
-        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, amount=1000, redeemable_shares=500)
-        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, amount=2000, redeemable_shares=800)
+        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, amount=1000, available_shares=500)
+        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, amount=2000, available_shares=800)
 
         mock_harvest = AsyncMock(return_value=None)
         mock_withdrawable = AsyncMock(return_value=Wei(10000))
@@ -458,7 +458,7 @@ class TestSelectPositionsToRedeem:
         assert len(result.positions_to_redeem) == 2
 
     async def test_passes_harvest_params_to_get_withdrawable_assets(self) -> None:
-        pos = make_position(vault=VAULT_1, redeemable_shares=500)
+        pos = make_position(vault=VAULT_1, available_shares=500)
         harvest_params = make_harvest_params()
 
         mock_harvest = AsyncMock(return_value=harvest_params)
@@ -483,7 +483,7 @@ class TestSelectPositionsToRedeem:
 
 class TestExecuteRedemption:
     async def test_successful_with_harvest_params(self) -> None:
-        pos = make_position(vault=VAULT_1, amount=1000, redeemable_shares=500)
+        pos = make_position(vault=VAULT_1, amount=1000, available_shares=500, shares_to_redeem=500)
         harvest_params = make_harvest_params()
         mock_client = AsyncMock()
         mock_client.eth.wait_for_transaction_receipt = AsyncMock(return_value={'status': 1})
@@ -517,7 +517,7 @@ class TestExecuteRedemption:
         mock_vault.get_update_state_call.assert_called_once_with(harvest_params)
 
     async def test_successful_without_harvest_params(self) -> None:
-        pos = make_position(vault=VAULT_1, amount=1000, redeemable_shares=500)
+        pos = make_position(vault=VAULT_1, amount=1000, available_shares=500, shares_to_redeem=500)
         mock_client = AsyncMock()
         mock_client.eth.wait_for_transaction_receipt = AsyncMock(return_value={'status': 1})
 
@@ -545,7 +545,7 @@ class TestExecuteRedemption:
         assert result is not None
 
     async def test_web3_exception(self) -> None:
-        pos = make_position(amount=1000, redeemable_shares=500)
+        pos = make_position(amount=1000, available_shares=500, shares_to_redeem=500)
 
         with (
             patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
@@ -568,7 +568,7 @@ class TestExecuteRedemption:
         assert result is None
 
     async def test_tx_receipt_fails(self) -> None:
-        pos = make_position(amount=1000, redeemable_shares=500)
+        pos = make_position(amount=1000, available_shares=500, shares_to_redeem=500)
         mock_client = AsyncMock()
         mock_client.eth.wait_for_transaction_receipt = AsyncMock(return_value={'status': 0})
 
@@ -669,7 +669,7 @@ class TestProcess:
             mock_execute.assert_not_called()
 
     async def test_successful_redemption(self) -> None:
-        positions = [make_position(amount=1000, redeemable_shares=500)]
+        positions = [make_position(amount=1000, available_shares=500, shares_to_redeem=500)]
         selection = PositionSelectionResult(
             positions_to_redeem=positions,
             vault_to_harvest_params={VAULT_1: None},
@@ -715,13 +715,15 @@ def make_position(
     vault: ChecksumAddress = VAULT_1,
     owner: ChecksumAddress = OWNER_1,
     amount: int = 1000,
-    redeemable_shares: int = 0,
+    available_shares: int = 0,
+    shares_to_redeem: int = 0,
 ) -> OsTokenPosition:
     return OsTokenPosition(
         vault=vault,
         owner=owner,
         amount=Wei(amount),
-        redeemable_shares=Wei(redeemable_shares),
+        available_shares=Wei(available_shares),
+        shares_to_redeem=Wei(shares_to_redeem),
     )
 
 
