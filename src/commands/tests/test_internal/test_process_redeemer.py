@@ -26,6 +26,7 @@ from src.redemptions.tasks import ZERO_MERKLE_ROOT
 from src.redemptions.typings import OsTokenPosition, RedeemablePositions
 
 MODULE = 'src.commands.internal.process_redeemer'
+TASKS_MODULE = 'src.redemptions.tasks'
 
 VAULT_1 = Web3.to_checksum_address('0x' + '11' * 20)
 VAULT_2 = Web3.to_checksum_address('0x' + '22' * 20)
@@ -613,16 +614,19 @@ class TestProcess:
                 f'{MODULE}.create_os_token_converter',
                 new=AsyncMock(return_value=make_converter()),
             ),
+            patch(f'{TASKS_MODULE}.os_token_redeemer_contract') as mock_tasks_redeemer,
+            patch(f'{MODULE}._execute_redemption') as mock_execute,
         ):
             mock_redeemer.queued_shares = AsyncMock(return_value=Wei(1000))
             mock_redeemer.nonce = AsyncMock(return_value=5)
-            mock_redeemer.redeemable_positions = AsyncMock(
+            mock_tasks_redeemer.redeemable_positions = AsyncMock(
                 return_value=RedeemablePositions(
                     merkle_root=ZERO_MERKLE_ROOT,
                     ipfs_hash='QmTest',
                 )
             )
             await process(block_number=BlockNumber(100))
+            mock_execute.assert_not_called()
 
     async def test_empty_ipfs_hash(self) -> None:
         with (
@@ -632,16 +636,19 @@ class TestProcess:
                 f'{MODULE}.create_os_token_converter',
                 new=AsyncMock(return_value=make_converter()),
             ),
+            patch(f'{TASKS_MODULE}.os_token_redeemer_contract') as mock_tasks_redeemer,
+            patch(f'{MODULE}._execute_redemption') as mock_execute,
         ):
             mock_redeemer.queued_shares = AsyncMock(return_value=Wei(1000))
             mock_redeemer.nonce = AsyncMock(return_value=5)
-            mock_redeemer.redeemable_positions = AsyncMock(
+            mock_tasks_redeemer.redeemable_positions = AsyncMock(
                 return_value=RedeemablePositions(
                     merkle_root=HexStr('0x' + 'ab' * 32),
                     ipfs_hash='',
                 )
             )
             await process(block_number=BlockNumber(100))
+            mock_execute.assert_not_called()
 
     async def test_no_eligible_positions(self) -> None:
         with (
