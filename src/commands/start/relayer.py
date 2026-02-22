@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
         AVAILABLE_NETWORKS,
         case_sensitive=False,
     ),
+    envvar='NETWORK',
 )
 @add_common_options(start_common_options)
 @click.command(help='Start operator service in API mode')

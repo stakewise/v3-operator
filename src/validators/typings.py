@@ -32,7 +32,7 @@ class ExitSignatureShards:
 @dataclass
 class Validator:
     public_key: HexStr
-    signature: HexStr
+    deposit_signature: HexStr
     amount: Gwei
     exit_signature: BLSSignature | None = None
     exit_signature_shards: ExitSignatureShards | None = None

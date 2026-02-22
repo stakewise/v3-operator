@@ -230,7 +230,7 @@ async def create_approval_request(
             break
 
         request.public_keys.append(validator.public_key)
-        request.deposit_signatures.append(validator.signature)
+        request.deposit_signatures.append(validator.deposit_signature)
         request.public_key_shards.append(shards.public_keys)
         request.exit_signature_shards.append(shards.exit_signatures)
         if request.amounts is not None:
