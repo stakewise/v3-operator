@@ -36,12 +36,10 @@ class ProcessMetaVaultTask(BaseTask):
     ):
         self.vaults = vaults
 
-    # pylint: disable-next=too-many-locals
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         """
-        Processes the meta vault.
-        This function performs the following steps:
-        - Fetches meta vaults from the subgraph.
+        Processes each meta vault in the configured list.
+        For each vault:
         - Updates the state for the entire meta vault tree.
         - Deposits to sub vaults if there are withdrawable assets.
         """
@@ -56,40 +54,53 @@ class ProcessMetaVaultTask(BaseTask):
             meta_vaults_map = await graph_get_vaults(
                 is_meta_vault=True,
             )
-            logger.info('Processing meta vault: %s', vault)
-
-            root_meta_vault = meta_vaults_map.get(vault)
-            if not root_meta_vault:
-                logger.error('Meta vault %s not found in subgraph', vault)
-                continue
-
-            if not root_meta_vault.sub_vaults:
-                logger.info('Meta vault %s has no sub vaults. Skipping.', vault)
-                continue
-
-            # Update the state for the entire meta vault tree
             try:
-                await meta_vault_tree_update_state(
-                    root_meta_vault=root_meta_vault,
-                    meta_vaults_map=meta_vaults_map,
-                )
-            except ClaimDelayNotPassedException as e:
-                logger.error(
-                    'Can not process meta vault %s because claim delay for exit request with '
-                    'position ticket %s has not passed yet',
-                    root_meta_vault.address,
-                    e.exit_request.position_ticket,
-                )
-                continue
+                await process_meta_vault_tree(vault=vault, meta_vaults_map=meta_vaults_map)
+            except Exception:
+                logger.exception('Failed to process meta vault tree for vault %s', vault)
 
-            # Deposit to sub vaults for the entire meta vault tree (top-down order)
-            meta_vault_addresses = get_meta_vault_addresses_bottom_up(
-                root_meta_vault=root_meta_vault,
-                meta_vaults_map=meta_vaults_map,
-            )
-            # Reverse to get top-down order: root deposits first, then nested meta vaults
-            for meta_vault_address in reversed(meta_vault_addresses):
-                await process_deposit_to_sub_vaults(meta_vault_address=meta_vault_address)
+
+async def process_meta_vault_tree(
+    vault: ChecksumAddress,
+    meta_vaults_map: dict[ChecksumAddress, Vault],
+) -> None:
+    """
+    Process a single meta vault tree: update state and deposit to sub vaults.
+    """
+    logger.info('Processing meta vault: %s', vault)
+
+    root_meta_vault = meta_vaults_map.get(vault)
+    if not root_meta_vault:
+        logger.error('Meta vault %s not found in subgraph', vault)
+        return
+
+    if not root_meta_vault.sub_vaults:
+        logger.info('Meta vault %s has no sub vaults. Skipping.', vault)
+        return
+
+    # Update the state for the entire meta vault tree
+    try:
+        await meta_vault_tree_update_state(
+            root_meta_vault=root_meta_vault,
+            meta_vaults_map=meta_vaults_map,
+        )
+    except ClaimDelayNotPassedException as e:
+        logger.error(
+            'Can not process meta vault %s because claim delay for exit request with '
+            'position ticket %s has not passed yet',
+            root_meta_vault.address,
+            e.exit_request.position_ticket,
+        )
+        return
+
+    # Deposit to sub vaults for the entire meta vault tree (top-down order)
+    meta_vault_addresses = get_meta_vault_addresses_bottom_up(
+        root_meta_vault=root_meta_vault,
+        meta_vaults_map=meta_vaults_map,
+    )
+    # Reverse to get top-down order: root deposits first, then nested meta vaults
+    for meta_vault_address in reversed(meta_vault_addresses):
+        await process_deposit_to_sub_vaults(meta_vault_address=meta_vault_address)
 
 
 async def meta_vault_tree_update_state(
