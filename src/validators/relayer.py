@@ -30,33 +30,7 @@ class RelayerClient:
             settings.vault, validators_start_index, amounts
         )
 
-        validators: list[Validator] = []
-        for v in relayer_response.get('validators') or []:
-            public_key = add_0x_prefix(v['public_key'])
-            deposit_signature = _to_hex_or_none(v.get('deposit_signature'))
-            exit_signature = _to_bls_signature_or_none(v.get('exit_signature'))
-
-            # Handle exit signature shards if present
-            shards = v.get('oracles_exit_signature_shares')
-            exit_signature_shards = (
-                ExitSignatureShards(
-                    public_keys=[add_0x_prefix(pk) for pk in shards['public_keys']],
-                    exit_signatures=[
-                        add_0x_prefix(sig) for sig in shards['encrypted_exit_signatures']
-                    ],
-                )
-                if shards
-                else None
-            )
-
-            validator = Validator(
-                public_key=public_key,
-                amount=v['amount'],
-                deposit_signature=deposit_signature,
-                exit_signature=exit_signature,
-                exit_signature_shards=exit_signature_shards,
-            )
-            validators.append(validator)
+        validators = [_parse_validator(v) for v in relayer_response.get('validators') or []]
 
         validators_manager_signature = _to_hex_or_none(
             relayer_response.get('validators_manager_signature')
@@ -193,6 +167,25 @@ class RelayerClient:
                 logger.debug('Relayer response: %s', await resp.read())
             resp.raise_for_status()
             return await resp.json()
+
+
+def _parse_validator(v: dict) -> Validator:
+    shards = v.get('oracles_exit_signature_shares')
+    exit_signature_shards = (
+        ExitSignatureShards(
+            public_keys=[add_0x_prefix(pk) for pk in shards['public_keys']],
+            exit_signatures=[add_0x_prefix(sig) for sig in shards['encrypted_exit_signatures']],
+        )
+        if shards
+        else None
+    )
+    return Validator(
+        public_key=add_0x_prefix(v['public_key']),
+        amount=v['amount'],
+        deposit_signature=_to_hex_or_none(v.get('deposit_signature')),
+        exit_signature=_to_bls_signature_or_none(v.get('exit_signature')),
+        exit_signature_shards=exit_signature_shards,
+    )
 
 
 def _to_hex_or_none(value: str | None) -> HexStr | None:
