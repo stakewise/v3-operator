@@ -39,7 +39,7 @@ class RelayerClient:
         validators: list[Validator] = []
         for v in relayer_response.get('validators') or []:
             public_key = _to_hex(v['public_key'])
-            deposit_signature = _to_hex(v.get('deposit_signature') or '')
+            deposit_signature = _to_hex(v.get('deposit_signature'))
             exit_signature = _to_hex_or_none(v.get('exit_signature'))
 
             # Handle exit signature shards if present
@@ -81,9 +81,7 @@ class RelayerClient:
             amounts=list(funding_amounts),
         )
 
-        validators_manager_signature = _to_hex(
-            relayer_response.get('validators_manager_signature') or HexStr('0x')
-        )
+        validators_manager_signature = _to_hex(relayer_response.get('validators_manager_signature'))
         return RelayerSignatureResponse(
             validators_manager_signature=validators_manager_signature,
         )
@@ -96,9 +94,7 @@ class RelayerClient:
             public_keys=list(withdrawals.keys()),
             amounts=list(withdrawals.values()),
         )
-        validators_manager_signature = _to_hex(
-            relayer_response.get('validators_manager_signature') or HexStr('0x')
-        )
+        validators_manager_signature = _to_hex(relayer_response.get('validators_manager_signature'))
         return RelayerSignatureResponse(
             validators_manager_signature=validators_manager_signature,
         )
@@ -117,9 +113,7 @@ class RelayerClient:
             source_public_keys=source_public_keys,
             target_public_keys=target_public_keys,
         )
-        validators_manager_signature = _to_hex(
-            relayer_response.get('validators_manager_signature') or HexStr('0x')
-        )
+        validators_manager_signature = _to_hex(relayer_response.get('validators_manager_signature'))
         return RelayerSignatureResponse(
             validators_manager_signature=validators_manager_signature,
         )
@@ -199,8 +193,8 @@ class RelayerClient:
             return await resp.json()
 
 
-def _to_hex(value: str) -> HexStr:
-    return add_0x_prefix(HexStr(value))
+def _to_hex(value: str | None) -> HexStr:
+    return add_0x_prefix(HexStr(value or ''))
 
 
 def _to_hex_or_none(value: str | None) -> HexStr | None:
