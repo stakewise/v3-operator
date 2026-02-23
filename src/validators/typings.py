@@ -32,9 +32,16 @@ class ExitSignatureShards:
 @dataclass
 class Validator:
     public_key: HexStr
-    deposit_signature: HexStr
     amount: Gwei
+
+    # Deposit signature may be None when Relayer is not ready to provide it
+    deposit_signature: HexStr | None = None
+
+    # Exit signature may be None when Relayer is not ready to provide it
     exit_signature: BLSSignature | None = None
+
+    # DVT Relayer should provide encrypted exit signature shards because we don't want
+    # to expose the full exit signature on public endpoints.
     exit_signature_shards: ExitSignatureShards | None = None
 
     deposit_data_root: HexStr | None = None

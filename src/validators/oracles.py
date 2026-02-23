@@ -229,6 +229,10 @@ async def create_approval_request(
             )
             break
 
+        # Deposit signature should not be None since validators manager signature is ready
+        if validator.deposit_signature is None:
+            raise ValueError('Deposit signature is required for validator')
+
         request.public_keys.append(validator.public_key)
         request.deposit_signatures.append(validator.deposit_signature)
         request.public_key_shards.append(shards.public_keys)

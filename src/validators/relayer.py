@@ -1,4 +1,3 @@
-import json
 import logging
 from typing import Sequence
 
@@ -26,28 +25,25 @@ logger = logging.getLogger(__name__)
 class RelayerClient:
     async def register_validators(self, amounts: list[Gwei]) -> RelayerValidatorsResponse:
         validators_start_index = await get_validators_start_index()
-        logger.debug(
-            'Requesting relayer to register validators with start index %d and amounts %s',
-            validators_start_index,
-            amounts,
-        )
+
         relayer_response = await self._register_validators(
             settings.vault, validators_start_index, amounts
         )
-        logger.debug('Relayer response: %s', json.dumps(relayer_response, indent=2))
 
         validators: list[Validator] = []
         for v in relayer_response.get('validators') or []:
-            public_key = _to_hex(v['public_key'])
-            deposit_signature = _to_hex(v.get('deposit_signature'))
-            exit_signature = _to_hex_or_none(v.get('exit_signature'))
+            public_key = add_0x_prefix(v['public_key'])
+            deposit_signature = _to_hex_or_none(v.get('deposit_signature'))
+            exit_signature = _to_bls_signature_or_none(v.get('exit_signature'))
 
             # Handle exit signature shards if present
             shards = v.get('oracles_exit_signature_shares')
             exit_signature_shards = (
                 ExitSignatureShards(
-                    public_keys=[_to_hex(pk) for pk in shards['public_keys']],
-                    exit_signatures=[_to_hex(sig) for sig in shards['encrypted_exit_signatures']],
+                    public_keys=[add_0x_prefix(pk) for pk in shards['public_keys']],
+                    exit_signatures=[
+                        add_0x_prefix(sig) for sig in shards['encrypted_exit_signatures']
+                    ],
                 )
                 if shards
                 else None
@@ -57,7 +53,7 @@ class RelayerClient:
                 public_key=public_key,
                 amount=v['amount'],
                 deposit_signature=deposit_signature,
-                exit_signature=_to_bls_signature_or_none(exit_signature),
+                exit_signature=exit_signature,
                 exit_signature_shards=exit_signature_shards,
             )
             validators.append(validator)
@@ -81,7 +77,9 @@ class RelayerClient:
             amounts=list(funding_amounts),
         )
 
-        validators_manager_signature = _to_hex(relayer_response.get('validators_manager_signature'))
+        validators_manager_signature = add_0x_prefix(
+            relayer_response.get('validators_manager_signature') or HexStr('0x')
+        )
         return RelayerSignatureResponse(
             validators_manager_signature=validators_manager_signature,
         )
@@ -94,7 +92,9 @@ class RelayerClient:
             public_keys=list(withdrawals.keys()),
             amounts=list(withdrawals.values()),
         )
-        validators_manager_signature = _to_hex(relayer_response.get('validators_manager_signature'))
+        validators_manager_signature = add_0x_prefix(
+            relayer_response.get('validators_manager_signature') or HexStr('0x')
+        )
         return RelayerSignatureResponse(
             validators_manager_signature=validators_manager_signature,
         )
@@ -113,7 +113,9 @@ class RelayerClient:
             source_public_keys=source_public_keys,
             target_public_keys=target_public_keys,
         )
-        validators_manager_signature = _to_hex(relayer_response.get('validators_manager_signature'))
+        validators_manager_signature = add_0x_prefix(
+            relayer_response.get('validators_manager_signature') or HexStr('0x')
+        )
         return RelayerSignatureResponse(
             validators_manager_signature=validators_manager_signature,
         )
@@ -193,13 +195,9 @@ class RelayerClient:
             return await resp.json()
 
 
-def _to_hex(value: str | None) -> HexStr:
-    return add_0x_prefix(HexStr(value or ''))
-
-
 def _to_hex_or_none(value: str | None) -> HexStr | None:
     return add_0x_prefix(HexStr(value)) if value else None
 
 
 def _to_bls_signature_or_none(value: str | None) -> BLSSignature | None:
-    return BLSSignature(Web3.to_bytes(hexstr=add_0x_prefix(HexStr(value)))) if value else None
+    return BLSSignature(Web3.to_bytes(hexstr=HexStr(value))) if value else None
