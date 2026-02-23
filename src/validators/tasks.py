@@ -159,7 +159,7 @@ async def fund_compounding_validators(
         validators.append(
             Validator(
                 public_key=public_key,
-                signature=empty_signature,
+                deposit_signature=empty_signature,
                 amount=amount,
             )
         )
@@ -216,10 +216,13 @@ async def register_new_validators(
             amounts=validators_amounts[:validators_batch_size],
         )
         validators = validators_response.validators
-        if not validators:
-            logger.debug('Waiting for relayer validators')
-            return None
         validators_manager_signature = validators_response.validators_manager_signature
+
+        if not validators or not validators_manager_signature:
+            # Missing signature indicates that relayer is not ready with the validators,
+            # wait for the next cycle
+            logger.info('Waiting for relayer validators')
+            return None
 
     if not validators_manager_signature:
         validators_manager_signature = get_validators_manager_signature(
