@@ -115,7 +115,7 @@ class VaultValidatorsProcessor(EventProcessor):
         ).contract
 
     async def get_from_block(self) -> BlockNumber:
-        checkpoint = CheckpointCrud().get_vault_validators_checkpoint()
+        checkpoint = CheckpointCrud().get_validators_checkpoint()
         if not checkpoint:
             return settings.network_config.KEEPER_GENESIS_BLOCK
 
@@ -137,7 +137,7 @@ class VaultV2ValidatorsProcessor(VaultValidatorsProcessor):
     contract_event = 'V2ValidatorRegistered'
 
     async def get_from_block(self) -> BlockNumber:
-        checkpoint = CheckpointCrud().get_vault_v2_validators_checkpoint()
+        checkpoint = CheckpointCrud().get_validators_checkpoint()
         if not checkpoint:
             return settings.network_config.KEEPER_GENESIS_BLOCK
 
@@ -176,7 +176,7 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
 
 async def get_latest_vault_v2_validator_public_keys(vault_address: ChecksumAddress) -> Set[HexStr]:
     """Fetches the latest vault v2 validator public keys registered after finalized block"""
-    block_number = CheckpointCrud().get_vault_v2_validators_checkpoint()
+    block_number = CheckpointCrud().get_validators_checkpoint()
     if block_number:
         from_block = BlockNumber(block_number + 1)
     else:
@@ -240,4 +240,4 @@ async def scan_validators_events(block_number: BlockNumber, is_startup: bool) ->
     vault_v2_validators_scanner = EventScanner(vault_v2_validators_processor)
     await vault_v2_validators_scanner.process_new_events(block_number)
 
-    CheckpointCrud().update_vault_checkpoints(block_number=block_number)
+    CheckpointCrud().update_validators_checkpoint(block_number=block_number)

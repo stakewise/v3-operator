@@ -32,7 +32,7 @@ async def get_validators_for_registration(
         validators.append(
             Validator(
                 public_key=Web3.to_hex(deposit_data['pubkey']),
-                signature=Web3.to_hex(deposit_data['signature']),
+                deposit_signature=Web3.to_hex(deposit_data['signature']),
                 amount=Gwei(int(deposit_data['amount'])),
                 deposit_data_root=Web3.to_hex(deposit_data['deposit_data_root']),
             )
