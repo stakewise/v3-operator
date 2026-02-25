@@ -149,10 +149,10 @@ NETWORKS: dict[str, NetworkConfig] = {
             '0x93a3f880E07B27dacA6Ef2d3C23E77DBd6294487'
         ),
         VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xA89629B41477560d49dd56ef1a59BD214362aCDC'
+            '0x4464460A201f735f111C445282914fC3314c709e'
         ),
         OS_TOKEN_REDEEMER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x991EFCe45663Bc3E3dd309b61Af56105A3430008'
+            '0xb99f388b081724aaDB73e6Fc06B5de2F76E08bf2'
         ),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
