@@ -255,11 +255,11 @@ class ConsolidationChecker(ConsolidationManager):
             # Validate the source validator has been active long enough
             if source_validator.activation_epoch > self.max_activation_epoch:
                 raise ConsolidationError(
-                    f'Validator {source_validator.public_key}'
-                    f' is not active enough for consolidation. '
+                    f'Validator {source_validator.public_key} '
+                    f'is not active enough for consolidation. '
                     f'It must be active for at least '
-                    f'{settings.network_config.SHARD_COMMITTEE_PERIOD}'
-                    f' epochs before consolidation.'
+                    f'{settings.network_config.SHARD_COMMITTEE_PERIOD} '
+                    f'epochs before consolidation.'
                 )
 
             # Validate the source validator is not consolidating
@@ -342,8 +342,8 @@ class ConsolidationChecker(ConsolidationManager):
         else:
             if not target_validator.is_compounding:
                 raise ConsolidationError(
-                    f'The target validator {self.target_public_key}'
-                    f' is not a compounding validator.'
+                    f'The target validator {self.target_public_key} '
+                    f'is not a compounding validator.'
                 )
         return target_validator
 
