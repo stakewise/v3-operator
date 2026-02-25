@@ -1,4 +1,5 @@
 import asyncio
+import itertools
 import json
 from functools import cached_property
 from pathlib import Path
@@ -73,15 +74,28 @@ class ContractWrapper:
         argument_filters: dict | None = None,
     ) -> EventData | None:
         blocks_range = settings.events_blocks_range_interval
-        while to_block >= from_block:
-            events = await event.get_logs(
-                from_block=BlockNumber(max(to_block - blocks_range, from_block)),
-                to_block=to_block,
+
+        # Build all chunk ranges from newest to oldest
+        ranges: list[tuple[BlockNumber, BlockNumber]] = []
+        chunk_to = to_block
+        while chunk_to >= from_block:
+            chunk_from = BlockNumber(max(chunk_to - blocks_range, from_block))
+            ranges.append((chunk_from, chunk_to))
+            chunk_to = BlockNumber(chunk_to - blocks_range - 1)
+
+        async def fetch_chunk(chunk_from: BlockNumber, chunk_to: BlockNumber) -> list[EventData]:
+            return await event.get_logs(
+                from_block=chunk_from,
+                to_block=chunk_to,
                 argument_filters=argument_filters,
             )
-            if events:
-                return events[-1]
-            to_block = BlockNumber(to_block - blocks_range - 1)
+
+        # Process chunks in batches (newest-first), abort on first hit
+        for batch in itertools.batched(ranges, EVENTS_CONCURRENCY_LIMIT):
+            batch_results = await asyncio.gather(*[fetch_chunk(f, t) for f, t in batch])
+            for chunk_events in batch_results:
+                if chunk_events:
+                    return chunk_events[-1]
         return None
 
     async def _get_events(
