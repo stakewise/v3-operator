@@ -13,6 +13,7 @@ from src.common.clients import OPERATOR_USER_AGENT
 from src.config.settings import settings
 from src.validators.execution import get_validators_start_index
 from src.validators.typings import (
+    ExitSignatureShards,
     RelayerSignatureResponse,
     RelayerValidatorsResponse,
     Validator,
@@ -24,26 +25,17 @@ logger = logging.getLogger(__name__)
 class RelayerClient:
     async def register_validators(self, amounts: list[Gwei]) -> RelayerValidatorsResponse:
         validators_start_index = await get_validators_start_index()
+
         relayer_response = await self._register_validators(
             settings.vault, validators_start_index, amounts
         )
-        validators: list[Validator] = []
-        for v in relayer_response.get('validators') or []:
-            public_key = add_0x_prefix(v['public_key'])
-            deposit_signature = add_0x_prefix(v['deposit_signature'])
-            exit_signature = add_0x_prefix(v['exit_signature'])
 
-            validator = Validator(
-                public_key=public_key,
-                amount=v['amount'],
-                signature=deposit_signature,
-                exit_signature=BLSSignature(Web3.to_bytes(hexstr=exit_signature)),
-            )
-            validators.append(validator)
+        validators = [_parse_validator(v) for v in relayer_response.get('validators') or []]
 
-        validators_manager_signature = add_0x_prefix(
-            relayer_response.get('validators_manager_signature') or HexStr('0x')
+        validators_manager_signature = _to_hex_or_none(
+            relayer_response.get('validators_manager_signature')
         )
+
         return RelayerValidatorsResponse(
             validators=validators,
             validators_manager_signature=validators_manager_signature,
@@ -161,7 +153,7 @@ class RelayerClient:
             resp.raise_for_status()
             return await resp.json()
 
-    async def _send_post_request(self, endpoint: str, json: dict) -> dict:
+    async def _send_post_request(self, endpoint: str, jsn: dict) -> dict:
         url = urljoin(settings.relayer_endpoint, endpoint)
         async with aiohttp.ClientSession(
             timeout=ClientTimeout(settings.relayer_timeout),
@@ -169,9 +161,36 @@ class RelayerClient:
         ) as session:
             resp = await session.post(
                 url,
-                json=json,
+                json=jsn,
             )
             if 400 <= resp.status < 500:
                 logger.debug('Relayer response: %s', await resp.read())
             resp.raise_for_status()
             return await resp.json()
+
+
+def _parse_validator(v: dict) -> Validator:
+    shards = v.get('oracles_exit_signature_shares')
+    exit_signature_shards = (
+        ExitSignatureShards(
+            public_keys=[add_0x_prefix(pk) for pk in shards['public_keys']],
+            exit_signatures=[add_0x_prefix(sig) for sig in shards['encrypted_exit_signatures']],
+        )
+        if shards
+        else None
+    )
+    return Validator(
+        public_key=add_0x_prefix(v['public_key']),
+        amount=v['amount'],
+        deposit_signature=_to_hex_or_none(v.get('deposit_signature')),
+        exit_signature=_to_bls_signature_or_none(v.get('exit_signature')),
+        exit_signature_shards=exit_signature_shards,
+    )
+
+
+def _to_hex_or_none(value: str | None) -> HexStr | None:
+    return add_0x_prefix(HexStr(value)) if value else None
+
+
+def _to_bls_signature_or_none(value: str | None) -> BLSSignature | None:
+    return BLSSignature(Web3.to_bytes(hexstr=HexStr(value))) if value else None
