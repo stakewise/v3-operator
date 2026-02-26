@@ -20,6 +20,11 @@
         "internalType": "address",
         "name": "depositDataRegistry",
         "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "genesisVaultPoolEscrow",
+        "type": "address"
       }
     ],
     "stateMutability": "nonpayable",
@@ -170,6 +175,11 @@
       {
         "internalType": "uint256",
         "name": "withdrawingAssets",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "redemptionAssets",
         "type": "uint256"
       },
       {

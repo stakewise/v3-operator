@@ -635,6 +635,7 @@ class ValidatorsCheckerContract(ContractWrapper):
             [
                 params.vault,
                 params.withdrawing_assets,
+                params.redemption_assets,
                 params.exit_queue_cumulative_ticket,
             ],
         )
