@@ -3,11 +3,9 @@ from collections import defaultdict
 from typing import AsyncGenerator, cast
 
 from eth_typing import BlockNumber, ChecksumAddress, HexStr
-from sw_utils import convert_to_mgno
-from sw_utils.networks import GNO_NETWORKS
 from sw_utils.typings import ChainHead, ProtocolConfig
 from web3 import Web3
-from web3.types import Gwei, Wei
+from web3.types import Wei
 
 from src.common.clients import ipfs_fetch_client
 from src.common.contracts import multicall_contract, os_token_redeemer_contract
@@ -24,10 +22,10 @@ logger = logging.getLogger(__name__)
 batch_size = 20
 
 
-async def get_redemption_assets(chain_head: ChainHead) -> Gwei:
+async def get_redemption_assets(chain_head: ChainHead) -> Wei:
     """
     Get redemption assets for operator's vault.
-    For Gno networks return value in mGNO-GWei.
+    For Gno networks return value in GNO-Wei.
     """
     protocol_config = await get_protocol_config()
 
@@ -41,13 +39,7 @@ async def get_redemption_assets(chain_head: ChainHead) -> Gwei:
         block_number=chain_head.block_number,
     )
     # Filter by operator's vault
-    redemption_assets = vault_to_redemption_assets[settings.vault]
-
-    if settings.network in GNO_NETWORKS:
-        # Convert GNO -> mGNO
-        redemption_assets = convert_to_mgno(redemption_assets)
-
-    return Gwei(int(Web3.from_wei(redemption_assets, 'gwei')))
+    return vault_to_redemption_assets[settings.vault]
 
 
 async def get_vault_to_redemption_assets(
