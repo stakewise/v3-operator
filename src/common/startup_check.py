@@ -442,10 +442,21 @@ async def _check_ipfs_endpoints() -> list[str]:
 
 
 async def check_validators_manager() -> None:
-    if settings.validators_registration_mode != ValidatorsRegistrationMode.AUTO:
-        return
     vault_contract = VaultContract(settings.vault)
     validators_manager = await vault_contract.validators_manager()
+
+    if settings.relayer_endpoint:
+        info = await RelayerClient().get_info()
+        relayer_validators_manager = info.get('validators_manager_address')
+        if not relayer_validators_manager:
+            return
+        if Web3.to_checksum_address(relayer_validators_manager) != validators_manager:
+            raise RuntimeError(
+                f'Relayer validators manager address {relayer_validators_manager} '
+                f'does not match vault validators manager {validators_manager}.'
+            )
+        return
+
     if validators_manager != wallet.account.address:
         raise RuntimeError(
             f'The Validators Manager role must be assigned to the address {wallet.account.address}'
