@@ -90,6 +90,12 @@ class V2ValidatorEventData:
 
 
 @dataclass
+class RelayerInfoResponse:
+    network: str
+    validators_manager_address: ChecksumAddress | None = None
+
+
+@dataclass
 class RelayerValidatorsResponse:
     validators: list[Validator]
     validators_manager_signature: HexStr | None = None

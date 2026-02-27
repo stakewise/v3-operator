@@ -445,14 +445,17 @@ async def check_validators_manager() -> None:
     vault_contract = VaultContract(settings.vault)
     validators_manager = await vault_contract.validators_manager()
 
-    if settings.relayer_endpoint:
+    if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
         info = await RelayerClient().get_info()
-        relayer_validators_manager = info.get('validators_manager_address')
-        if not relayer_validators_manager:
+        if not info.validators_manager_address:
+            logger.warning(
+                'Relayer did not return validators manager address. '
+                'Make sure validators manager is correctly configured in the relayer.'
+            )
             return
-        if Web3.to_checksum_address(relayer_validators_manager) != validators_manager:
+        if info.validators_manager_address != validators_manager:
             raise RuntimeError(
-                f'Relayer validators manager address {relayer_validators_manager} '
+                f'Relayer validators manager address {info.validators_manager_address} '
                 f'does not match vault validators manager {validators_manager}.'
             )
         return
@@ -509,10 +512,9 @@ async def _check_vault_withdrawable_assets() -> None:
 async def _check_relayer_endpoint() -> None:
     info = await RelayerClient().get_info()
 
-    relayer_network = info['network']
-    if relayer_network != settings.network:
+    if info.network != settings.network:
         raise ValueError(
-            f'Relayer network "{relayer_network}" does not match '
+            f'Relayer network "{info.network}" does not match '
             f'Operator network "{settings.network}"'
         )
 
