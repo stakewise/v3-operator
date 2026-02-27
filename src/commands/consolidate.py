@@ -55,6 +55,7 @@ logger = logging.getLogger(__name__)
         AVAILABLE_NETWORKS,
         case_sensitive=False,
     ),
+    envvar='NETWORK',
 )
 @click.option(
     '--vault',

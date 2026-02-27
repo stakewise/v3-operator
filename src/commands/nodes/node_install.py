@@ -32,6 +32,7 @@ DEFAULT_LIGHTHOUSE_VERSION = 'v8.0.1'
     default=DEFAULT_NETWORK,
     help='The network of your vault.',
     prompt='Enter the network name',
+    envvar='NETWORK',
     type=click.Choice(
         AVAILABLE_NETWORKS,
         case_sensitive=False,

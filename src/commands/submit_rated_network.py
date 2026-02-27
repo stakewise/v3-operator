@@ -34,6 +34,7 @@ from src.config.settings import settings
         AVAILABLE_NETWORKS,
         case_sensitive=False,
     ),
+    envvar='NETWORK',
 )
 @click.option(
     '--pool-tag',
