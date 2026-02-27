@@ -3,6 +3,7 @@ from collections import defaultdict
 from typing import AsyncGenerator, cast
 
 from eth_typing import BlockNumber, ChecksumAddress, HexStr
+from sw_utils import async_batched
 from sw_utils.typings import ChainHead, ProtocolConfig
 from web3 import Web3
 from web3.types import Wei
@@ -10,7 +11,6 @@ from web3.types import Wei
 from src.common.clients import ipfs_fetch_client
 from src.common.contracts import multicall_contract, os_token_redeemer_contract
 from src.common.protocol_config import get_protocol_config
-from src.common.utils import async_batched
 from src.config.settings import settings
 from src.meta_vault.service import distribute_meta_vault_redemption_assets
 from src.redemptions.os_token_converter import create_os_token_converter

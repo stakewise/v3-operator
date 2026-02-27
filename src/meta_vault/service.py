@@ -2,6 +2,7 @@ from collections import defaultdict
 from typing import cast
 
 from eth_typing import BlockNumber, ChecksumAddress
+from sw_utils import memoize
 from web3.types import Wei
 
 from src.common.contracts import (
@@ -9,7 +10,6 @@ from src.common.contracts import (
     SubVaultsRegistryContract,
     VaultContract,
 )
-from src.common.decorators import memoize
 from src.config.settings import settings
 
 
