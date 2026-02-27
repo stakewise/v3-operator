@@ -13,7 +13,6 @@ from src.common.metrics import MetricsTask, metrics, metrics_server
 from src.common.protocol_config import update_oracles_cache
 from src.common.startup_check import startup_checks, wait_execution_catch_up_consensus
 from src.common.tasks import BaseTask
-from src.common.typings import ValidatorsRegistrationMode
 from src.common.utils import get_build_version
 from src.config.settings import settings
 from src.exits.tasks import ExitSignatureTask
@@ -76,14 +75,10 @@ async def process() -> None:
     keystore: BaseKeystore | None = None
     relayer: RelayerClient | None = None
 
-    if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
-        if settings.disable_validators_registration:
-            keystore = None
-        else:
-            keystore = await load_keystore()
-
-    else:
+    if settings.relayer_endpoint:
         relayer = RelayerClient()
+    elif not settings.disable_validators_registration:
+        keystore = await load_keystore()
 
     # start operator tasks
     chain_state = await get_chain_finalized_head()
@@ -93,9 +88,6 @@ async def process() -> None:
 
     logger.info('Updating oracles cache...')
     await update_oracles_cache()
-
-    if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
-        logger.info('Starting api mode')
 
     logger.info('Started operator service')
     metrics.service_started.labels(network=settings.network).set(1)
