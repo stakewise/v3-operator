@@ -445,7 +445,7 @@ async def check_validators_manager() -> None:
     vault_contract = VaultContract(settings.vault)
     validators_manager = await vault_contract.validators_manager()
 
-    if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
+    if settings.relayer_endpoint:
         info = await RelayerClient().get_info()
         if not info.validators_manager_address:
             logger.warning(
