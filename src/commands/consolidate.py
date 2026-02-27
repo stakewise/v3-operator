@@ -16,10 +16,10 @@ from src.common.consolidations import (
     get_consolidation_request_fee,
     get_consolidations_count,
 )
-from src.common.contracts import VaultContract
 from src.common.execution import check_gas_price
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.protocol_config import get_protocol_config
+from src.common.startup_check import check_validators_manager
 from src.common.utils import log_verbose
 from src.common.validators import (
     validate_eth_address,
@@ -28,7 +28,6 @@ from src.common.validators import (
     validate_public_keys,
     validate_public_keys_file,
 )
-from src.common.wallet import wallet
 from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS, GNOSIS, MAINNET, NETWORKS
 from src.config.settings import DEFAULT_MAX_CONSOLIDATION_REQUEST_FEE_GWEI, settings
@@ -312,7 +311,7 @@ async def process(
     """
     chain_head = await get_chain_latest_head()
 
-    await _check_validators_manager()
+    await check_validators_manager()
     await _check_consolidations_queue(chain_head)
 
     consolidation_keys = None
@@ -404,18 +403,6 @@ async def process(
             'Validators have been successfully consolidated',
             bold=True,
             fg='green',
-        )
-
-
-async def _check_validators_manager() -> None:
-    if settings.relayer_endpoint:
-        return
-    vault_contract = VaultContract(settings.vault)
-    validators_manager = await vault_contract.validators_manager()
-    if validators_manager != wallet.account.address:
-        raise click.ClickException(
-            f'The Validators Manager role must be assigned to the address {wallet.account.address}.'
-            f' Please update it in the vault settings.'
         )
 
 

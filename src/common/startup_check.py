@@ -442,10 +442,24 @@ async def _check_ipfs_endpoints() -> list[str]:
 
 
 async def check_validators_manager() -> None:
-    if settings.validators_registration_mode != ValidatorsRegistrationMode.AUTO:
-        return
     vault_contract = VaultContract(settings.vault)
     validators_manager = await vault_contract.validators_manager()
+
+    if settings.relayer_endpoint:
+        info = await RelayerClient().get_info()
+        if not info.validators_manager_address:
+            logger.warning(
+                'Relayer did not return validators manager address. '
+                'Make sure validators manager is correctly configured in the relayer.'
+            )
+            return
+        if info.validators_manager_address != validators_manager:
+            raise RuntimeError(
+                f'Relayer validators manager address {info.validators_manager_address} '
+                f'does not match vault validators manager {validators_manager}.'
+            )
+        return
+
     if validators_manager != wallet.account.address:
         raise RuntimeError(
             f'The Validators Manager role must be assigned to the address {wallet.account.address}'
@@ -498,10 +512,9 @@ async def _check_vault_withdrawable_assets() -> None:
 async def _check_relayer_endpoint() -> None:
     info = await RelayerClient().get_info()
 
-    relayer_network = info['network']
-    if relayer_network != settings.network:
+    if info.network != settings.network:
         raise ValueError(
-            f'Relayer network "{relayer_network}" does not match '
+            f'Relayer network "{info.network}" does not match '
             f'Operator network "{settings.network}"'
         )
 
