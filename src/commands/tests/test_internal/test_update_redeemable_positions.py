@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
+from sw_utils import OsTokenConverter
 from sw_utils.tests import faker
 from web3 import Web3
 from web3.types import ChecksumAddress, Wei
@@ -15,7 +16,6 @@ from src.commands.internal.update_redeemable_positions import (
 )
 from src.config.networks import MAINNET, NETWORKS
 from src.config.settings import settings
-from src.redemptions.os_token_converter import OsTokenConverter
 from src.redemptions.typings import (
     Allocator,
     LeverageStrategyPosition,

@@ -5,7 +5,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from decimal import ROUND_FLOOR, Decimal, localcontext
 from pathlib import Path
-from typing import Any, AsyncGenerator, TypeVar
+from typing import Any
 
 import click
 import tenacity
@@ -25,9 +25,6 @@ from src.common.typings import OracleApproval, OraclesApproval
 from src.config.settings import LOG_DATE_FORMAT, settings
 
 logger = logging.getLogger(__name__)
-
-
-T = TypeVar('T')
 
 
 def get_build_version() -> str | None:
@@ -157,17 +154,3 @@ def calc_slot_by_block_timestamp(ts: Timestamp) -> int:
     return int(
         (ts - settings.network_config.GENESIS_TIMESTAMP) / settings.network_config.SECONDS_PER_SLOT
     )
-
-
-async def async_batched(
-    async_gen: AsyncGenerator[T, None], batch_size: int
-) -> AsyncGenerator[list[T], None]:
-    """Batch items from an async iterator. Replacement for itertools.batched."""
-    batch = []
-    async for item in async_gen:
-        batch.append(item)
-        if len(batch) == batch_size:
-            yield batch
-            batch = []
-    if batch:
-        yield batch
