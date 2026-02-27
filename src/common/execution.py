@@ -36,13 +36,13 @@ async def check_wallet_balance() -> None:
 
     metrics.wallet_balance.labels(network=settings.network).set(wallet_balance)
 
-    if wallet_balance < wallet_min_balance:
-        logger.warning(
-            'Wallet %s balance is too low. At least %s %s is recommended.',
-            wallet.address,
-            Web3.from_wei(wallet_min_balance, 'ether'),
-            symbol,
-        )
+    # if wallet_balance < wallet_min_balance:
+    #     logger.warning(
+    #         'Wallet %s balance is too low. At least %s %s is recommended.',
+    #         wallet.address,
+    #         Web3.from_wei(wallet_min_balance, 'ether'),
+    #         symbol,
+    #     )
 
 
 async def get_wallet_balance() -> Wei:
