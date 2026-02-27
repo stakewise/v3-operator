@@ -25,6 +25,7 @@ from src.config.settings import settings
     prompt='Enter your vault address',
     help='The vault address.',
     type=str,
+    envvar='VAULT',
     callback=validate_eth_address,
 )
 @click.option(
