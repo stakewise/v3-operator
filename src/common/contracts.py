@@ -558,6 +558,36 @@ class OsTokenRedeemerContract(ContractWrapper):
             block_identifier=block_number
         )
 
+    async def positions_manager(self) -> ChecksumAddress:
+        return await self.contract.functions.positionsManager().call()
+
+    async def queued_shares(self, block_number: BlockNumber | None = None) -> Wei:
+        return await self.contract.functions.queuedShares().call(block_identifier=block_number)
+
+    async def can_process_exit_queue(self, block_number: BlockNumber | None = None) -> bool:
+        return await self.contract.functions.canProcessExitQueue().call(
+            block_identifier=block_number
+        )
+
+    async def process_exit_queue(self) -> HexStr:
+        tx_function = self.contract.functions.processExitQueue()
+        tx_hash = await transaction_gas_wrapper(tx_function)
+        return Web3.to_hex(tx_hash)
+
+    async def redeem_sub_vaults_assets(
+        self, vault_address: ChecksumAddress, assets_to_redeem: Wei
+    ) -> HexStr:
+        tx_function = self.contract.functions.redeemSubVaultsAssets(vault_address, assets_to_redeem)
+        tx_hash = await transaction_gas_wrapper(tx_function)
+        tx_receipt = await self.execution_client.eth.wait_for_transaction_receipt(
+            tx_hash, timeout=settings.execution_transaction_timeout
+        )
+        if not tx_receipt['status']:
+            raise RuntimeError(
+                f'redeemSubVaultsAssets transaction failed. Tx Hash: {Web3.to_hex(tx_hash)}'
+            )
+        return Web3.to_hex(tx_hash)
+
 
 class ValidatorsCheckerContract(ContractWrapper):
     abi_path = 'abi/IValidatorsChecker.json'
