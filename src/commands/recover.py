@@ -10,10 +10,10 @@ from sw_utils.consensus import EXITED_STATUSES, ValidatorStatus
 from src.common.clients import (
     close_clients,
     consensus_client,
-    execution_client,
     setup_clients,
 )
 from src.common.contracts import VaultContract
+from src.common.execution import get_latest_block_number
 from src.common.credentials import CredentialManager
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.password import generate_password, get_or_create_password_file
@@ -227,7 +227,7 @@ async def _fetch_registered_validators(
 ) -> dict[HexStr, ValidatorStatus | None]:
     """Fetch registered validators."""
     click.secho(f'Fetching registered validators for vault {vault}...', bold=True)
-    current_block = await execution_client.eth.get_block_number()
+    current_block = await get_latest_block_number()
     vault_contract = VaultContract(vault)
     public_keys = await vault_contract.get_registered_validators_public_keys(
         from_block=settings.vault_first_block,

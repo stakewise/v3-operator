@@ -16,7 +16,7 @@ from web3.contract.async_contract import (
 from web3.types import BlockNumber, ChecksumAddress, EventData, Wei
 
 from src.common.clients import execution_client as default_execution_client
-from src.common.execution import transaction_gas_wrapper
+from src.common.execution import get_latest_block_number, transaction_gas_wrapper
 from src.common.typings import (
     ExitQueueMissingAssetsParams,
     HarvestParams,
@@ -243,7 +243,7 @@ class VaultContract(ContractWrapper, VaultStateMixin):
         events = await self._get_events(
             self.events.ValidatorWithdrawalSubmitted,  # type: ignore
             from_block=from_block,
-            to_block=await self.execution_client.eth.get_block_number(),
+            to_block=await get_latest_block_number(),
         )
         return [
             WithdrawalEvent(
@@ -291,14 +291,14 @@ class KeeperContract(ContractWrapper):
         return await self._get_last_event(
             self.events.ConfigUpdated,  # type: ignore
             from_block=from_block or settings.network_config.KEEPER_GENESIS_BLOCK,
-            to_block=to_block or await self.execution_client.eth.get_block_number(),
+            to_block=to_block or await get_latest_block_number(),
         )
 
     async def get_last_rewards_update(
         self, block_number: BlockNumber | None = None
     ) -> RewardVoteInfo | None:
         """Fetches the last rewards update."""
-        to_block = block_number or await self.execution_client.eth.get_block_number()
+        to_block = block_number or await get_latest_block_number()
         last_event = await self._get_last_event(
             self.events.RewardsUpdated,  # type: ignore
             from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
@@ -329,7 +329,7 @@ class KeeperContract(ContractWrapper):
         to_block: BlockNumber | None = None,
     ) -> EventData | None:
         from_block = from_block or settings.network_config.KEEPER_GENESIS_BLOCK
-        to_block = to_block or await self.execution_client.eth.get_block_number()
+        to_block = to_block or await get_latest_block_number()
 
         last_event = await self._get_last_event(
             self.events.ExitSignaturesUpdated,  # type: ignore

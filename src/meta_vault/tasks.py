@@ -13,7 +13,7 @@ from src.common.contracts import (
     keeper_contract,
     multicall_contract,
 )
-from src.common.execution import check_gas_price
+from src.common.execution import check_gas_price, get_latest_block_number
 from src.common.graph import wait_for_graph_node_sync
 from src.common.tasks import BaseTask
 from src.common.typings import ExitRequest
@@ -359,7 +359,7 @@ async def is_meta_vault_rewards_nonce_outdated(
     because it is stored in private attribute.
     Solution: compare events.
     """
-    current_block = await execution_client.eth.get_block_number()
+    current_block = await get_latest_block_number()
 
     # Find the last rewards updated event in the Keeper contract
     keeper_event = await keeper_contract.get_last_rewards_updated_event(

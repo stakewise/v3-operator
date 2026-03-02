@@ -30,7 +30,7 @@ from src.common.contracts import (
     keeper_contract,
     validators_registry_contract,
 )
-from src.common.execution import check_wallet_balance
+from src.common.execution import check_wallet_balance, get_latest_block_number
 from src.common.harvest import get_harvest_params
 from src.common.protocol_config import get_protocol_config
 from src.common.utils import format_error, round_down, warning_verbose
@@ -249,13 +249,11 @@ async def wait_execution_catch_up_consensus(
     Consider execution and consensus nodes are working independently of each other.
     Check execution node is synced to the consensus finalized block.
     """
-    execution_client = default_execution_client
-
     while True:
         if interrupt_handler and interrupt_handler.exit:
             return
 
-        execution_block_number = await execution_client.eth.get_block_number()
+        execution_block_number = await get_latest_block_number()
         if execution_block_number >= chain_head.block_number:
             return
 

@@ -7,6 +7,7 @@ from web3 import Web3
 
 from src.common.app_state import AppState, OraclesCache
 from src.common.clients import execution_client, ipfs_fetch_client
+from src.common.execution import get_latest_block_number
 from src.common.contracts import keeper_contract, multicall_contract
 from src.config.settings import settings
 
@@ -39,7 +40,7 @@ async def update_oracles_cache() -> None:
     else:
         from_block = settings.network_config.KEEPER_GENESIS_BLOCK
 
-    to_block = await execution_client.eth.get_block_number()
+    to_block = await get_latest_block_number()
 
     if from_block > to_block:
         return

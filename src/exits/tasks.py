@@ -12,7 +12,7 @@ from tenacity import RetryError
 from web3.types import HexStr
 
 from src.common.app_state import AppState
-from src.common.clients import execution_client
+from src.common.execution import get_latest_block_number
 from src.common.contracts import keeper_contract
 from src.common.exceptions import NotEnoughOracleApprovalsError
 from src.common.metrics import metrics
@@ -118,7 +118,7 @@ async def _fetch_last_update_block() -> BlockNumber | None:
     if (checkpoint_block := update_cache.checkpoint_block) is not None:
         from_block = BlockNumber(checkpoint_block + 1)
 
-    to_block = await execution_client.eth.get_block_number()
+    to_block = await get_latest_block_number()
 
     if from_block is not None and from_block > to_block:
         return update_cache.last_event_block

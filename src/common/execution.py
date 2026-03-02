@@ -20,6 +20,16 @@ logger = logging.getLogger(__name__)
 ALCHEMY_DOMAIN = '.alchemy.com'
 
 
+async def get_latest_block_number() -> int:
+    """Returns the latest block number.
+
+    Workaround for Nethermind bug where eth_blockNumber returns the pending block number.
+    Uses pending block number minus 1 to get the actual latest block.
+    """
+    pending_block = await execution_client.eth.get_block('pending')
+    return pending_block['number'] - 1
+
+
 class WalletTask(BaseTask):
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         await check_wallet_balance()

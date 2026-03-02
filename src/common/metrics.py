@@ -5,7 +5,7 @@ from prometheus_client import Gauge, Info, start_http_server
 from sw_utils import InterruptHandler
 
 import src
-from src.common.clients import execution_client
+from src.common.execution import get_latest_block_number
 from src.common.consensus import get_chain_finalized_head
 from src.common.tasks import BaseTask
 from src.config.settings import settings
@@ -117,7 +117,7 @@ class MetricsTask(BaseTask):
         metrics.set_app_version()
 
         chain_state = await get_chain_finalized_head()
-        latest_block_number = await execution_client.eth.get_block_number()
+        latest_block_number = await get_latest_block_number()
 
         metrics.block_number.labels(network=settings.network).set(latest_block_number)
         metrics.slot_number.labels(network=settings.network).set(chain_state.slot)
