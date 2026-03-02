@@ -56,6 +56,7 @@ from src.config.settings import DEFAULT_NETWORK, settings
     prompt='Enter your vault address',
     help='Vault address',
     type=str,
+    envvar='VAULT',
     callback=validate_eth_address,
 )
 @click.option(
@@ -77,6 +78,7 @@ from src.config.settings import DEFAULT_NETWORK, settings
     default=DEFAULT_NETWORK,
     help='The network of your vault.',
     prompt='Enter the network name',
+    envvar='NETWORK',
     type=click.Choice(
         AVAILABLE_NETWORKS,
         case_sensitive=False,
