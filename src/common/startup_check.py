@@ -33,7 +33,6 @@ from src.common.contracts import (
 from src.common.execution import check_wallet_balance
 from src.common.harvest import get_harvest_params
 from src.common.protocol_config import get_protocol_config
-from src.common.typings import ValidatorsRegistrationMode
 from src.common.utils import format_error, round_down, warning_verbose
 from src.common.wallet import wallet
 from src.config.networks import NETWORKS
@@ -113,7 +112,7 @@ async def startup_checks() -> None:
         check_metrics_port()
 
     if (
-        settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO
+        not settings.relayer_endpoint
         and settings.keystore_cls_str == LocalKeystore.__name__
         and not settings.disable_validators_registration
     ):
@@ -123,7 +122,7 @@ async def startup_checks() -> None:
 
     await check_validators_manager()
 
-    if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
+    if settings.relayer_endpoint:
         logger.info('Checking Relayer endpoint %s...', settings.relayer_endpoint)
         await _check_relayer_endpoint()
 
@@ -442,10 +441,24 @@ async def _check_ipfs_endpoints() -> list[str]:
 
 
 async def check_validators_manager() -> None:
-    if settings.validators_registration_mode != ValidatorsRegistrationMode.AUTO:
-        return
     vault_contract = VaultContract(settings.vault)
     validators_manager = await vault_contract.validators_manager()
+
+    if settings.relayer_endpoint:
+        info = await RelayerClient().get_info()
+        if not info.validators_manager_address:
+            logger.warning(
+                'Relayer did not return validators manager address. '
+                'Make sure validators manager is correctly configured in the relayer.'
+            )
+            return
+        if info.validators_manager_address != validators_manager:
+            raise RuntimeError(
+                f'Relayer validators manager address {info.validators_manager_address} '
+                f'does not match vault validators manager {validators_manager}.'
+            )
+        return
+
     if validators_manager != wallet.account.address:
         raise RuntimeError(
             f'The Validators Manager role must be assigned to the address {wallet.account.address}'
@@ -498,10 +511,9 @@ async def _check_vault_withdrawable_assets() -> None:
 async def _check_relayer_endpoint() -> None:
     info = await RelayerClient().get_info()
 
-    relayer_network = info['network']
-    if relayer_network != settings.network:
+    if info.network != settings.network:
         raise ValueError(
-            f'Relayer network "{relayer_network}" does not match '
+            f'Relayer network "{info.network}" does not match '
             f'Operator network "{settings.network}"'
         )
 

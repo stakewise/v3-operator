@@ -106,7 +106,7 @@ class TestGetEncryptedExitSignatureShards:
         ],
         indirect=True,
     )
-    async def test_api(
+    async def test_relayer(
         self,
         create_validator_keypair: Callable,
         fork: ConsensusFork,
@@ -114,7 +114,7 @@ class TestGetEncryptedExitSignatureShards:
         _mocked_oracle_committee: OracleCommittee,
     ):
         """
-        The case when settings.validators_registration_mode == ValidatorsRegistrationMode.API.
+        The case when settings.relayer_endpoint is set.
         Exit signature is created by third party.
         """
         validator_privkey, validator_pubkey = create_validator_keypair()

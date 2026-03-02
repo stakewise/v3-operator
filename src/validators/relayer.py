@@ -14,6 +14,7 @@ from src.config.settings import settings
 from src.validators.execution import get_validators_start_index
 from src.validators.typings import (
     ExitSignatureShards,
+    RelayerInfoResponse,
     RelayerSignatureResponse,
     RelayerValidatorsResponse,
     Validator,
@@ -141,8 +142,9 @@ class RelayerClient:
         }
         return await self._send_post_request('withdraw', jsn)
 
-    async def get_info(self) -> dict:
+    async def get_info(self) -> RelayerInfoResponse:
         url = urljoin(settings.relayer_endpoint, 'info')
+
         async with aiohttp.ClientSession(
             timeout=ClientTimeout(settings.relayer_timeout),
             headers={'User-Agent': OPERATOR_USER_AGENT},
@@ -151,7 +153,15 @@ class RelayerClient:
             if 400 <= resp.status < 500:
                 logger.debug('Relayer response: %s', await resp.read())
             resp.raise_for_status()
-            return await resp.json()
+            data = await resp.json()
+        validators_manager = data.get('validators_manager_address')
+
+        return RelayerInfoResponse(
+            network=data['network'],
+            validators_manager_address=(
+                Web3.to_checksum_address(validators_manager) if validators_manager else None
+            ),
+        )
 
     async def _send_post_request(self, endpoint: str, jsn: dict) -> dict:
         url = urljoin(settings.relayer_endpoint, endpoint)

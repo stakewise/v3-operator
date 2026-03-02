@@ -25,6 +25,7 @@ from src.config.settings import settings
     prompt='Enter your vault address',
     help='The vault address.',
     type=str,
+    envvar='VAULT',
     callback=validate_eth_address,
 )
 @click.option(
@@ -34,6 +35,7 @@ from src.config.settings import settings
         AVAILABLE_NETWORKS,
         case_sensitive=False,
     ),
+    envvar='NETWORK',
 )
 @click.option(
     '--pool-tag',
