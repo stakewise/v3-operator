@@ -7,14 +7,10 @@ from eth_typing import BlockNumber, ChecksumAddress, HexStr
 from eth_utils import add_0x_prefix
 from sw_utils.consensus import EXITED_STATUSES, ValidatorStatus
 
-from src.common.clients import (
-    close_clients,
-    consensus_client,
-    setup_clients,
-)
+from src.common.clients import close_clients, consensus_client, setup_clients
 from src.common.contracts import VaultContract
-from src.common.execution import get_latest_block_number
 from src.common.credentials import CredentialManager
+from src.common.execution import get_latest_block_number
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.password import generate_password, get_or_create_password_file
 from src.common.utils import greenify, log_verbose
@@ -231,7 +227,7 @@ async def _fetch_registered_validators(
     vault_contract = VaultContract(vault)
     public_keys = await vault_contract.get_registered_validators_public_keys(
         from_block=settings.vault_first_block,
-        to_block=current_block,
+        to_block=BlockNumber(current_block),
     )
     click.secho(f'Fetched {len(public_keys)} registered validators', bold=True)
 

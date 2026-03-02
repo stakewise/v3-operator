@@ -12,7 +12,6 @@ from web3.types import Gwei
 
 from src.commands.start.base import log_start, setup_sentry
 from src.common.clients import setup_clients
-from src.common.execution import check_wallet_balance
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.startup_check import (
     check_execution_nodes_network,
@@ -31,6 +30,7 @@ from src.config.settings import (
 )
 from src.meta_vault.graph import graph_get_vaults
 from src.meta_vault.tasks import ProcessMetaVaultTask
+from src.wallet.tasks import check_wallet_balance
 
 logger = logging.getLogger(__name__)
 

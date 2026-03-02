@@ -7,7 +7,6 @@ import src
 from src.commands.nodes.node_start import main as run_nodes
 from src.common.clients import close_clients, setup_clients
 from src.common.consensus import get_chain_finalized_head
-from src.common.execution import WalletTask
 from src.common.logging import setup_logging
 from src.common.metrics import MetricsTask, metrics, metrics_server
 from src.common.protocol_config import update_oracles_cache
@@ -28,6 +27,7 @@ from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
 from src.validators.relayer import RelayerClient
 from src.validators.tasks import ValidatorRegistrationSubtask, load_genesis_validators
+from src.wallet.tasks import WalletTask
 from src.withdrawals.tasks import ValidatorWithdrawalSubtask
 
 logger = logging.getLogger(__name__)

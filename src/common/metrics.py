@@ -5,8 +5,8 @@ from prometheus_client import Gauge, Info, start_http_server
 from sw_utils import InterruptHandler
 
 import src
-from src.common.execution import get_latest_block_number
 from src.common.consensus import get_chain_finalized_head
+from src.common.execution import get_latest_block_number
 from src.common.tasks import BaseTask
 from src.config.settings import settings
 

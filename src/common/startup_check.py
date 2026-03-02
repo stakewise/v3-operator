@@ -30,7 +30,7 @@ from src.common.contracts import (
     keeper_contract,
     validators_registry_contract,
 )
-from src.common.execution import check_wallet_balance, get_latest_block_number
+from src.common.execution import get_latest_block_number
 from src.common.harvest import get_harvest_params
 from src.common.protocol_config import get_protocol_config
 from src.common.utils import format_error, round_down, warning_verbose
@@ -45,6 +45,7 @@ from src.config.settings import (
 from src.validators.execution import get_withdrawable_assets
 from src.validators.keystores.local import LocalKeystore
 from src.validators.relayer import RelayerClient
+from src.wallet.tasks import check_wallet_balance
 
 logger = logging.getLogger(__name__)
 
