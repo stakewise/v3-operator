@@ -4,7 +4,7 @@ from dataclasses import asdict, dataclass
 from datetime import timedelta
 
 from ens.constants import EMPTY_ADDR_HEX
-from eth_typing import BlockNumber, ChecksumAddress, HexStr
+from eth_typing import BlockNumber, ChecksumAddress
 from sw_utils.networks import GNOSIS, HOODI, MAINNET
 from sw_utils.networks import NETWORKS as BASE_NETWORKS
 from sw_utils.networks import BaseNetworkConfig
@@ -51,7 +51,6 @@ class NetworkConfig(BaseNetworkConfig):
     TARGET_WITHDRAWAL_REQUESTS_PER_BLOCK: int
     TARGET_CONSOLIDATION_REQUESTS_PER_BLOCK: int
     NODE_CONFIG: NodeConfig
-    META_VAULT_ID: HexStr
 
 
 @dataclass
@@ -138,7 +137,6 @@ NETWORKS: dict[str, NetworkConfig] = {
                 'MerkleExecute': timedelta(hours=1),
             },
         ),
-        META_VAULT_ID=HexStr('0xcfece609e9557b5f0b085dadb8b7c99d43a9052d28ab3d68c9e3c1a9c3ab85c0'),
     ),
     HOODI: NetworkConfig(
         **asdict(BASE_NETWORKS[HOODI]),
@@ -195,7 +193,6 @@ NETWORKS: dict[str, NetworkConfig] = {
                 'MerkleExecute': timedelta(minutes=30),
             },
         ),
-        META_VAULT_ID=HexStr('0xcfece609e9557b5f0b085dadb8b7c99d43a9052d28ab3d68c9e3c1a9c3ab85c0'),
     ),
     GNOSIS: NetworkConfig(
         **asdict(BASE_NETWORKS[GNOSIS]),
@@ -252,6 +249,5 @@ NETWORKS: dict[str, NetworkConfig] = {
                 'MerkleExecute': timedelta(hours=1),
             },
         ),
-        META_VAULT_ID=HexStr('0xfb5cee5ecc2ff8d1a7a5ad55f89156551c040a926bec689720ab06063922454d'),
     ),
 }
