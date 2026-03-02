@@ -33,7 +33,6 @@ from src.common.contracts import (
 from src.common.execution import check_wallet_balance
 from src.common.harvest import get_harvest_params
 from src.common.protocol_config import get_protocol_config
-from src.common.typings import ValidatorsRegistrationMode
 from src.common.utils import format_error, round_down, warning_verbose
 from src.common.wallet import wallet
 from src.config.networks import NETWORKS
@@ -113,7 +112,7 @@ async def startup_checks() -> None:
         check_metrics_port()
 
     if (
-        settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO
+        not settings.relayer_endpoint
         and settings.keystore_cls_str == LocalKeystore.__name__
         and not settings.disable_validators_registration
     ):
@@ -123,7 +122,7 @@ async def startup_checks() -> None:
 
     await check_validators_manager()
 
-    if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
+    if settings.relayer_endpoint:
         logger.info('Checking Relayer endpoint %s...', settings.relayer_endpoint)
         await _check_relayer_endpoint()
 

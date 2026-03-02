@@ -20,7 +20,7 @@ from src.common.consolidations import get_pending_consolidations
 from src.common.contracts import VaultContract
 from src.common.metrics import metrics
 from src.common.protocol_config import get_protocol_config
-from src.common.typings import PendingPartialWithdrawal, ValidatorsRegistrationMode
+from src.common.typings import PendingPartialWithdrawal
 from src.common.utils import round_down
 from src.common.withdrawals import (
     get_pending_partial_withdrawals,
@@ -148,7 +148,7 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
             return
 
         validators_manager_signature = HexStr('0x')
-        if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
+        if settings.relayer_endpoint:
             # fetch validator manager signature from relayer
             relayer_response = await cast(RelayerClient, self.relayer).withdraw_validators(
                 withdrawals=withdrawals,

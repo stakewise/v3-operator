@@ -58,16 +58,6 @@ class ValidatorType(Enum):
     V2 = '0x02'
 
 
-class ValidatorsRegistrationMode(Enum):
-    """
-    AUTO mode: validators are registered automatically when vault assets are enough.
-    API mode: validators registration is triggered by API request.
-    """
-
-    AUTO = 'AUTO'
-    API = 'API'
-
-
 @dataclass
 # pylint: disable-next=too-many-instance-attributes
 class ExitRequest:

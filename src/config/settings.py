@@ -6,7 +6,7 @@ from eth_typing import BlockNumber
 from web3 import Web3
 from web3.types import ChecksumAddress, Gwei, Wei
 
-from src.common.typings import Singleton, ValidatorsRegistrationMode, ValidatorType
+from src.common.typings import Singleton, ValidatorType
 from src.config.networks import MAINNET, NETWORKS, NetworkConfig
 
 DATA_DIR = Path.home() / '.stakewise'
@@ -97,7 +97,6 @@ class Settings(metaclass=Singleton):
 
     relayer_endpoint: str
     relayer_timeout: int
-    validators_registration_mode: ValidatorsRegistrationMode
     skip_startup_checks: bool
 
     # meta_vault
@@ -169,7 +168,6 @@ class Settings(metaclass=Singleton):
         log_format: str | None = None,
         concurrency: int | None = None,
         relayer_endpoint: str | None = None,
-        validators_registration_mode: ValidatorsRegistrationMode = ValidatorsRegistrationMode.AUTO,
         min_deposit_amount_gwei: Gwei = DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
         vault_min_balance_gwei: Gwei = DEFAULT_VAULT_MIN_BALANCE_GWEI,
         max_validator_balance_gwei: Gwei | None = None,
@@ -320,8 +318,6 @@ class Settings(metaclass=Singleton):
         self.graph_page_size = decouple_config('GRAPH_PAGE_SIZE', default=100, cast=int)
         self.relayer_endpoint = relayer_endpoint or ''
         self.relayer_timeout = decouple_config('RELAYER_TIMEOUT', default=10, cast=int)
-
-        self.validators_registration_mode = validators_registration_mode
 
         self.skip_startup_checks = decouple_config('SKIP_STARTUP_CHECKS', default=False, cast=bool)
         self.vault_first_block = vault_first_block or self.network_config.KEEPER_GENESIS_BLOCK
