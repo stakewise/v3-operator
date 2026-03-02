@@ -363,7 +363,7 @@ async def is_meta_vault_rewards_nonce_outdated(
 
     # Find the last rewards updated event in the Keeper contract
     keeper_event = await keeper_contract.get_last_rewards_updated_event(
-        from_block=settings.network_config.KEEPER_GENESIS_BLOCK, to_block=BlockNumber(current_block)
+        from_block=settings.network_config.KEEPER_GENESIS_BLOCK, to_block=current_block
     )
     if keeper_event is None:
         logger.info('No RewardsUpdated event found in the Keeper contract')
@@ -372,7 +372,7 @@ async def is_meta_vault_rewards_nonce_outdated(
     # Find the last rewards nonce updated event in the meta vault contract
     # since the last Keeper vote
     meta_vault_event = await meta_vault_contract.get_last_rewards_nonce_updated_event(
-        from_block=BlockNumber(keeper_event['blockNumber'] + 1), to_block=BlockNumber(current_block)
+        from_block=BlockNumber(keeper_event['blockNumber'] + 1), to_block=current_block
     )
 
     # If no meta vault event is found, the rewards nonce is outdated

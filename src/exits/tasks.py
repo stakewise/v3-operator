@@ -118,7 +118,7 @@ async def _fetch_last_update_block() -> BlockNumber | None:
     if (checkpoint_block := update_cache.checkpoint_block) is not None:
         from_block = BlockNumber(checkpoint_block + 1)
 
-    to_block = BlockNumber(await get_latest_block_number())
+    to_block = await get_latest_block_number()
 
     if from_block is not None and from_block > to_block:
         return update_cache.last_event_block

@@ -340,7 +340,7 @@ async def _is_funding_interval_passed() -> bool:
     Mitigate gas griefing attack
     """
     blocks_delay = settings.min_deposit_delay // settings.network_config.SECONDS_PER_BLOCK
-    to_block = BlockNumber(await get_latest_block_number())
+    to_block = await get_latest_block_number()
     from_block = BlockNumber(to_block - blocks_delay)
     funding_events = await VaultContract(settings.vault).get_funding_events(from_block, to_block)
     return len(funding_events) == 0

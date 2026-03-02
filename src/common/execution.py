@@ -6,7 +6,7 @@ from hexbytes import HexBytes
 from sw_utils import GasManager
 from web3 import Web3
 from web3.contract.async_contract import AsyncContractFunction
-from web3.types import TxParams
+from web3.types import BlockNumber, TxParams
 
 from src.common.clients import execution_client
 from src.config.networks import HOODI
@@ -17,14 +17,14 @@ logger = logging.getLogger(__name__)
 ALCHEMY_DOMAIN = '.alchemy.com'
 
 
-async def get_latest_block_number() -> int:
+async def get_latest_block_number() -> BlockNumber:
     """Returns the latest block number.
 
     Workaround for Nethermind bug where eth_blockNumber returns the pending block number.
     Uses pending block number minus 1 to get the actual latest block.
     """
     pending_block = await execution_client.eth.get_block('pending')
-    return pending_block['number'] - 1
+    return BlockNumber(pending_block['number'] - 1)
 
 
 async def transaction_gas_wrapper(

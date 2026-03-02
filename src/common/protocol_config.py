@@ -40,7 +40,7 @@ async def update_oracles_cache() -> None:
     else:
         from_block = settings.network_config.KEEPER_GENESIS_BLOCK
 
-    to_block = BlockNumber(await get_latest_block_number())
+    to_block = await get_latest_block_number()
 
     if from_block > to_block:
         return

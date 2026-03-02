@@ -227,7 +227,7 @@ async def _fetch_registered_validators(
     vault_contract = VaultContract(vault)
     public_keys = await vault_contract.get_registered_validators_public_keys(
         from_block=settings.vault_first_block,
-        to_block=BlockNumber(current_block),
+        to_block=current_block,
     )
     click.secho(f'Fetched {len(public_keys)} registered validators', bold=True)
 
