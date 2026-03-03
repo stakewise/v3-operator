@@ -34,7 +34,8 @@ HTTPSessionManager._async_close_evicted_sessions = (  # type: ignore[method-assi
 
 async def close_evicted_sessions() -> None:
     """Force-close any evicted sessions still waiting in background tasks."""
-    for session in list(_pending_evicted_sessions):
+    while _pending_evicted_sessions:
+        session = next(iter(_pending_evicted_sessions))
         if not session.closed:
             await session.close()
         _pending_evicted_sessions.remove(session)
