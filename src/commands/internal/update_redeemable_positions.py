@@ -8,7 +8,6 @@ from typing import cast
 
 import click
 from eth_typing import BlockNumber, ChecksumAddress
-from hexbytes import HexBytes
 from multiproof import StandardMerkleTree
 from sw_utils import OsTokenConverter
 from web3 import Web3
@@ -363,7 +362,7 @@ async def process(
                 abort=True,
             )
         await _submit_redeemable_positions(
-            merkle_root=bytes.fromhex(tree.root[2:]),
+            merkle_root=Web3.to_bytes(hexstr=tree.root),
             ipfs_hash=ipfs_hash,
         )
 
@@ -541,7 +540,7 @@ async def _submit_redeemable_positions(merkle_root: bytes, ipfs_hash: str) -> No
     )
     logger.info('Waiting for transaction %s confirmation', tx_hash)
     tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
-        HexBytes(Web3.to_bytes(hexstr=tx_hash)), timeout=settings.execution_transaction_timeout
+        tx_hash, timeout=settings.execution_transaction_timeout
     )
     if not tx_receipt['status']:
         raise RuntimeError(
