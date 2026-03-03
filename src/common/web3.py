@@ -37,4 +37,4 @@ async def close_evicted_sessions() -> None:
     for session in list(_pending_evicted_sessions):
         if not session.closed:
             await session.close()
-    _pending_evicted_sessions.clear()
+        _pending_evicted_sessions.remove(session)

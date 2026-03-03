@@ -138,12 +138,10 @@ async def setup_clients() -> None:
 
 
 async def close_clients() -> None:
-    logger.info('Closing active sessions...')
+    logger.debug('Closing active sessions...')
     await execution_client.provider.disconnect()
     await execution_non_retry_client.provider.disconnect()
     await consensus_client.disconnect()
-
     if settings.graph_endpoint:
         await graph_client.disconnect()
-
     await close_evicted_sessions()
