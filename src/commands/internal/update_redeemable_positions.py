@@ -8,6 +8,7 @@ from typing import cast
 
 import click
 from eth_typing import BlockNumber, ChecksumAddress
+from hexbytes import HexBytes
 from multiproof import StandardMerkleTree
 from sw_utils import OsTokenConverter
 from web3 import Web3
@@ -27,6 +28,7 @@ from src.common.contracts import (
 )
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import log_verbose
+from src.common.wallet import wallet
 from src.config.networks import AVAILABLE_NETWORKS, MAINNET, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
 from src.redemptions.api_client import (
@@ -112,6 +114,20 @@ logger = logging.getLogger(__name__)
     help='API endpoint for the Arbitrum execution node. Should only be specified for mainnet.',
 )
 @click.option(
+    '--wallet-password-file',
+    type=click.Path(exists=True, file_okay=True, dir_okay=False),
+    envvar='WALLET_PASSWORD_FILE',
+    help='Absolute path to the wallet password file. '
+    'Default is the file generated with "create-wallet" command.',
+)
+@click.option(
+    '--wallet-file',
+    type=click.Path(exists=True, file_okay=True, dir_okay=False),
+    envvar='WALLET_FILE',
+    help='Absolute path to the wallet. '
+    'Default is the file generated with "create-wallet" command.',
+)
+@click.option(
     '--no-confirm',
     is_flag=True,
     help='Skips confirmation messages when provided. Default is false.',
@@ -152,6 +168,8 @@ def update_redeemable_positions(
     arbitrum_endpoint: str | None,
     network: str,
     no_confirm: bool,
+    wallet_file: str | None,
+    wallet_password_file: str | None,
     verbose: bool,
     log_level: str,
     min_os_token_position_amount_gwei: int,
@@ -175,6 +193,8 @@ def update_redeemable_positions(
         verbose=verbose,
         network=network,
         log_level=log_level,
+        wallet_file=wallet_file,
+        wallet_password_file=wallet_password_file,
     )
     arbitrum_config: ArbitrumConfig | None = None
     if network == MAINNET:
@@ -334,6 +354,18 @@ async def process(
         ],
     )
     click.echo(f'Generated Merkle Tree root: {tree.root}')
+
+    if wallet.can_load():
+        if not no_confirm:
+            click.confirm(
+                'Proceed with calling setRedeemablePositions on-chain?',
+                default=True,
+                abort=True,
+            )
+        await _submit_redeemable_positions(
+            merkle_root=bytes.fromhex(tree.root[2:]),
+            ipfs_hash=ipfs_hash,
+        )
 
 
 # pylint: disable-next=too-many-locals
@@ -500,3 +532,19 @@ def _reduce_boosted_amount(
             boosted_amount = boost_os_token_shares.get(key, Wei(0))
             vault_share.minted_shares = Wei(max(0, vault_share.minted_shares - boosted_amount))
     return allocators
+
+
+async def _submit_redeemable_positions(merkle_root: bytes, ipfs_hash: str) -> None:
+    tx_hash = await os_token_redeemer_contract.set_redeemable_positions(
+        merkle_root=merkle_root,
+        ipfs_hash=ipfs_hash,
+    )
+    logger.info('Waiting for transaction %s confirmation', tx_hash)
+    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
+        HexBytes(Web3.to_bytes(hexstr=tx_hash)), timeout=settings.execution_transaction_timeout
+    )
+    if not tx_receipt['status']:
+        raise RuntimeError(
+            f'Failed to confirm tx: {tx_hash}',
+        )
+    logger.info('Transaction %s confirmed', tx_hash)

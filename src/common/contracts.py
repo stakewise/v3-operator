@@ -572,6 +572,11 @@ class OsTokenRedeemerContract(ContractWrapper):
             block_identifier=block_number
         )
 
+    async def set_redeemable_positions(self, merkle_root: bytes, ipfs_hash: str) -> HexStr:
+        tx_function = self.contract.functions.setRedeemablePositions((merkle_root, ipfs_hash))
+        tx_hash = await transaction_gas_wrapper(tx_function)
+        return Web3.to_hex(tx_hash)
+
 
 class ValidatorsCheckerContract(ContractWrapper):
     abi_path = 'abi/IValidatorsChecker.json'
