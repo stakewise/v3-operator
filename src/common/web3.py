@@ -9,6 +9,8 @@ from aiohttp import ClientSession
 from web3._utils.http_session_manager import HTTPSessionManager
 
 _pending_evicted_sessions: set[ClientSession] = set()
+
+# pylint: disable-next=protected-access
 _original_async_close_evicted = HTTPSessionManager._async_close_evicted_sessions
 
 
@@ -24,7 +26,10 @@ async def _patched_async_close_evicted_sessions(
         _pending_evicted_sessions.difference_update(evicted_sessions)
 
 
-HTTPSessionManager._async_close_evicted_sessions = _patched_async_close_evicted_sessions  # type: ignore[method-assign]
+# pylint: disable-next=protected-access
+HTTPSessionManager._async_close_evicted_sessions = (  # type: ignore[method-assign]
+    _patched_async_close_evicted_sessions
+)
 
 
 async def close_evicted_sessions() -> None:
