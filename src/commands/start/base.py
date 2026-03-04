@@ -42,7 +42,7 @@ async def start_base() -> None:
     try:
         await process()
     finally:
-        await close_clients(wait_sessions_close=True)
+        await close_clients()
 
 
 async def process() -> None:
