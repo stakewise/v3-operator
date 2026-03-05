@@ -81,12 +81,10 @@ class ConsolidationManager(ABC):
             self.consolidating_target_indexes.add(cons.target_index)
             source_balance = index_to_balance.get(cons.source_index)
             if source_balance is None:
-                logger.error(
-                    'Source validator %d in pending consolidation not found'
-                    ' in consensus validators',
-                    cons.source_index,
+                raise ConsolidationError(
+                    f'Cannot determine balance for source validator index {cons.source_index} '
+                    'in pending consolidation'
                 )
-                source_balance = Gwei(0)
             self.pending_incoming_balances[cons.target_index] = Gwei(
                 self.pending_incoming_balances[cons.target_index] + source_balance
             )
