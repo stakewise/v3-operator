@@ -1,3 +1,4 @@
+from collections import defaultdict
 from unittest.mock import patch
 
 import pytest
@@ -894,7 +895,8 @@ def create_manager(
     else:
         self.pending_partial_withdrawals_indexes = set()
 
-    self.pending_incoming_balances = (
-        pending_incoming_balances if pending_incoming_balances is not None else {}
-    )
+    if pending_incoming_balances is not None:
+        self.pending_incoming_balances = defaultdict(lambda: Gwei(0), pending_incoming_balances)
+    else:
+        self.pending_incoming_balances = defaultdict(lambda: Gwei(0))
     return self

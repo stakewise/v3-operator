@@ -1,5 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
+from collections import defaultdict
 
 from eth_typing import HexStr
 from sw_utils import ChainHead
@@ -22,7 +23,7 @@ class ConsolidationManager(ABC):
     consensus_validators: list[ConsensusValidator]
     consolidating_source_indexes: set[int]
     consolidating_target_indexes: set[int]
-    pending_incoming_balances: dict[int, Gwei]
+    pending_incoming_balances: defaultdict[int, Gwei]
     pending_partial_withdrawals_indexes: set[int]
     exclude_public_keys: set[HexStr]
 
@@ -71,7 +72,7 @@ class ConsolidationManager(ABC):
         )
         self.consolidating_source_indexes = set()
         self.consolidating_target_indexes = set()
-        self.pending_incoming_balances = {}
+        self.pending_incoming_balances = defaultdict(lambda: Gwei(0))
         index_to_balance: dict[int, Gwei] = {
             val.index: val.balance for val in self.consensus_validators
         }
@@ -87,7 +88,7 @@ class ConsolidationManager(ABC):
                 )
                 source_balance = Gwei(0)
             self.pending_incoming_balances[cons.target_index] = Gwei(
-                self.pending_incoming_balances.get(cons.target_index, Gwei(0)) + source_balance
+                self.pending_incoming_balances[cons.target_index] + source_balance
             )
 
         # Pending withdrawals
@@ -172,12 +173,12 @@ class ConsolidationSelector(ConsolidationManager):
         # there is at least one 0x02 validator, top up the one with smallest balance
         target_validator = min(
             target_validator_candidates,
-            key=lambda val: val.balance + self.pending_incoming_balances.get(val.index, 0),
+            key=lambda val: val.balance + self.pending_incoming_balances[val.index],
         )
 
         selected_source_validators: list[ConsensusValidator] = []
         target_balance = Gwei(
-            target_validator.balance + self.pending_incoming_balances.get(target_validator.index, 0)
+            target_validator.balance + self.pending_incoming_balances[target_validator.index]
         )
 
         for val in source_validators_candidates:
@@ -307,7 +308,7 @@ class ConsolidationChecker(ConsolidationManager):
         # Validate the total balance won't exceed the max effective balance
         total_balance = Gwei(
             target_validator.balance
-            + self.pending_incoming_balances.get(target_validator.index, 0)
+            + self.pending_incoming_balances[target_validator.index]
             + sum(val.balance for val in source_validators)
         )
         if total_balance > settings.max_validator_balance_gwei:
