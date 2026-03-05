@@ -9,7 +9,7 @@ import click
 from eth_typing import BlockNumber, ChecksumAddress, HexStr
 from multiproof import StandardMerkleTree
 from multiproof.standard import MultiProof
-from sw_utils import InterruptHandler
+from sw_utils import InterruptHandler, async_batched
 from web3 import Web3
 from web3.exceptions import Web3Exception
 from web3.types import Wei
@@ -24,7 +24,7 @@ from src.common.execution import transaction_gas_wrapper
 from src.common.harvest import get_harvest_params
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.typings import HarvestParams
-from src.common.utils import async_batched, log_verbose
+from src.common.utils import log_verbose
 from src.common.wallet import wallet
 from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
@@ -180,9 +180,10 @@ async def process(block_number: BlockNumber) -> None:
 
     queued_assets = os_token_converter.to_assets(queued_shares)
     logger.info(
-        'Queued Shares for Redemption: %s (~%s assets)',
+        'Queued Shares for Redemption: %s (~%s %s)',
         queued_shares,
         Web3.from_wei(queued_assets, 'ether'),
+        settings.network_config.VAULT_BALANCE_SYMBOL,
     )
 
     redeemable_positions = await _fetch_redeemable_positions(
@@ -430,17 +431,18 @@ async def _process_exit_queue(block_number: BlockNumber) -> None:
     shares into claimable assets for users in the exit queue.
     """
     can_process_exit_queue = await os_token_redeemer_contract.can_process_exit_queue(block_number)
-    if can_process_exit_queue:
-        logger.info('Exit queue can be processed. Calling processExitQueue...')
-        tx_hash = await os_token_redeemer_contract.process_exit_queue()
-        logger.info('Waiting for processExitQueue transaction %s confirmation', tx_hash)
-        tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
-            tx_hash, timeout=settings.execution_transaction_timeout
-        )
-        if not tx_receipt['status']:
-            logger.error('processExitQueue transaction failed. Tx Hash: %s', tx_hash)
-        else:
-            logger.info('processExitQueue confirmed. Tx Hash: %s', tx_hash)
+    if not can_process_exit_queue:
+        return
+    logger.info('Exit queue can be processed. Calling processExitQueue...')
+    tx_hash = await os_token_redeemer_contract.process_exit_queue()
+    logger.info('Waiting for processExitQueue transaction %s confirmation', tx_hash)
+    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
+        tx_hash, timeout=settings.execution_transaction_timeout
+    )
+    if not tx_receipt['status']:
+        logger.error('processExitQueue transaction failed. Tx Hash: %s', tx_hash)
+    else:
+        logger.info('processExitQueue confirmed. Tx Hash: %s', tx_hash)
 
 
 async def _startup_check() -> None:
