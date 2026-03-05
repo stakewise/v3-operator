@@ -833,7 +833,7 @@ class TestConsolidationChecker:
         ]
 
         # Target (32 ETH) + pending incoming (32 ETH) + source (32 ETH) = 96 ETH > 90 ETH
-        # Should raise, but current code doesn't account for pending incoming balances
+        # Should raise because total exceeds max_validator_balance_gwei
         with patch.object(settings, 'max_validator_balance_gwei', ether_to_gwei(90)):
             checker = create_manager(
                 consolidation_keys=consolidation_keys,
@@ -894,8 +894,7 @@ def create_manager(
     else:
         self.pending_partial_withdrawals_indexes = set()
 
-    if pending_incoming_balances:
-        self.pending_incoming_balances = pending_incoming_balances
-    else:
-        self.pending_incoming_balances = {}
+    self.pending_incoming_balances = (
+        pending_incoming_balances if pending_incoming_balances is not None else {}
+    )
     return self
