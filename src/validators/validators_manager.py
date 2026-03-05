@@ -44,7 +44,7 @@ def get_validators_manager_signature(
 def _encode_validator(v: Validator) -> bytes:
     encoded_validator = [
         Web3.to_bytes(hexstr=v.public_key),
-        Web3.to_bytes(hexstr=v.signature),
+        Web3.to_bytes(hexstr=v.deposit_signature),
         Web3.to_bytes(hexstr=v.deposit_data_root),
     ]
     if settings.validator_type == ValidatorType.V2:

@@ -42,12 +42,14 @@ logger = logging.getLogger(__name__)
         AVAILABLE_NETWORKS,
         case_sensitive=False,
     ),
+    envvar='NETWORK',
 )
 @click.option(
     '--vault',
     prompt='Enter your vault address',
     help='Vault address',
     type=str,
+    envvar='VAULT',
     callback=validate_eth_address,
 )
 @click.option(

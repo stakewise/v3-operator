@@ -32,9 +32,16 @@ class ExitSignatureShards:
 @dataclass
 class Validator:
     public_key: HexStr
-    signature: HexStr
     amount: Gwei
+
+    # Deposit signature may be None when Relayer is not ready to provide it
+    deposit_signature: HexStr | None = None
+
+    # Exit signature may be None when Relayer is not ready to provide it
     exit_signature: BLSSignature | None = None
+
+    # DVT Relayer should provide encrypted exit signature shards because we don't want
+    # to expose the full exit signature on public endpoints.
     exit_signature_shards: ExitSignatureShards | None = None
 
     deposit_data_root: HexStr | None = None
@@ -83,6 +90,12 @@ class V2ValidatorEventData:
 
 
 @dataclass
+class RelayerInfoResponse:
+    network: str
+    validators_manager_address: ChecksumAddress | None = None
+
+
+@dataclass
 class RelayerValidatorsResponse:
     validators: list[Validator]
     validators_manager_signature: HexStr | None = None
@@ -112,3 +125,13 @@ class ApprovalRequest:
 class ConsolidationRequest:
     public_keys: list[HexStr]
     vault_address: ChecksumAddress
+
+
+@dataclass
+class ConsolidationKeys:
+    source_public_keys: list[HexStr]
+    target_public_key: HexStr
+
+    @property
+    def all_public_keys(self) -> list[HexStr]:
+        return list(dict.fromkeys(self.source_public_keys + [self.target_public_key]))

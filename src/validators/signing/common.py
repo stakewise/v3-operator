@@ -25,7 +25,7 @@ def encode_tx_validator_list(validators: Sequence[Validator]) -> list[bytes]:
 
 def encode_tx_validator(withdrawal_credentials: bytes, validator: Validator) -> bytes:
     public_key = Web3.to_bytes(hexstr=validator.public_key)
-    signature = Web3.to_bytes(hexstr=validator.signature)
+    signature = Web3.to_bytes(hexstr=validator.deposit_signature)
     deposit_root = compute_deposit_data(
         public_key=public_key,
         withdrawal_credentials=withdrawal_credentials,

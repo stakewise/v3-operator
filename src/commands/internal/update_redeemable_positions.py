@@ -9,6 +9,7 @@ from typing import cast
 import click
 from eth_typing import BlockNumber, ChecksumAddress
 from multiproof import StandardMerkleTree
+from sw_utils import OsTokenConverter
 from web3 import Web3
 from web3.types import Gwei, Wei
 
@@ -41,10 +42,7 @@ from src.redemptions.graph import (
     graph_get_leverage_positions,
     graph_get_os_token_holders,
 )
-from src.redemptions.os_token_converter import (
-    OsTokenConverter,
-    create_os_token_converter,
-)
+from src.redemptions.os_token_converter import create_os_token_converter
 from src.redemptions.typings import (
     Allocator,
     ApiConfig,

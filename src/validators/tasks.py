@@ -14,7 +14,7 @@ from src.common.execution import check_gas_price
 from src.common.harvest import get_harvest_params
 from src.common.metrics import metrics
 from src.common.protocol_config import get_protocol_config
-from src.common.typings import HarvestParams, ValidatorsRegistrationMode, ValidatorType
+from src.common.typings import HarvestParams, ValidatorType
 from src.config.settings import (
     MIN_ACTIVATION_BALANCE_GWEI,
     VALIDATORS_FUNDING_BATCH_SIZE,
@@ -142,7 +142,7 @@ async def fund_compounding_validators(
     """
     logger.info('Started funding of %d validator(s)', len(validator_fundings))
     validators_manager_signature = HexStr('0x')
-    if settings.validators_registration_mode != ValidatorsRegistrationMode.AUTO:
+    if settings.relayer_endpoint:
         # fetch validators and signature from relayer
         validators_response = await cast(RelayerClient, relayer).fund_validators(
             validator_fundings=validator_fundings,
@@ -159,7 +159,7 @@ async def fund_compounding_validators(
         validators.append(
             Validator(
                 public_key=public_key,
-                signature=empty_signature,
+                deposit_signature=empty_signature,
                 amount=amount,
             )
         )
@@ -198,7 +198,7 @@ async def register_new_validators(
     validators_registry_root = await validators_registry_contract.get_registry_root()
     validators_manager_signature: HexStr | None = None
 
-    if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
+    if not settings.relayer_endpoint:
         validators = await get_validators_for_registration(
             keystore=cast(BaseKeystore, keystore),
             amounts=validators_amounts[:validators_batch_size],
@@ -216,10 +216,13 @@ async def register_new_validators(
             amounts=validators_amounts[:validators_batch_size],
         )
         validators = validators_response.validators
-        if not validators:
-            logger.debug('Waiting for relayer validators')
-            return None
         validators_manager_signature = validators_response.validators_manager_signature
+
+        if not validators or not validators_manager_signature:
+            # Missing signature indicates that relayer is not ready with the validators,
+            # wait for the next cycle
+            logger.info('Waiting for relayer validators')
+            return None
 
     if not validators_manager_signature:
         validators_manager_signature = get_validators_manager_signature(

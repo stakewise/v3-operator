@@ -21,3 +21,7 @@ database
 .python-version
 .history
 local
+
+# claude
+.claude
+CLAUDE.md

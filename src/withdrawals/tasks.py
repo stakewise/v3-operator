@@ -3,13 +3,8 @@ from collections import defaultdict
 from typing import cast
 
 from eth_typing import HexStr
-from sw_utils import (
-    GNO_NETWORKS,
-    ChainHead,
-    ProtocolConfig,
-    ValidatorStatus,
-    convert_to_gno,
-)
+from sw_utils import GNO_NETWORKS, ChainHead, ProtocolConfig, ValidatorStatus
+from sw_utils.gnosis import convert_to_gno
 from web3 import Web3
 from web3.types import BlockNumber, Gwei, Wei
 
@@ -20,7 +15,7 @@ from src.common.consolidations import get_pending_consolidations
 from src.common.contracts import VaultContract
 from src.common.metrics import metrics
 from src.common.protocol_config import get_protocol_config
-from src.common.typings import PendingPartialWithdrawal, ValidatorsRegistrationMode
+from src.common.typings import PendingPartialWithdrawal
 from src.common.utils import round_down
 from src.common.withdrawals import (
     get_pending_partial_withdrawals,
@@ -114,15 +109,16 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
             chain_head=chain_head,
             consensus_validators=active_validators,
         )
+        redemption_assets = await get_redemption_assets(chain_head=chain_head)
+
         queued_assets = await get_queued_assets(
             consensus_validators=consensus_validators,
             oracle_exiting_validators=oracle_exiting_validators,
             pending_partial_withdrawals=pending_partial_withdrawals,
             consolidations=consolidations,
             chain_head=chain_head,
+            redemption_assets=redemption_assets,
         )
-        redemption_assets = await get_redemption_assets(chain_head=chain_head)
-        queued_assets = Gwei(queued_assets + redemption_assets)
 
         metrics.queued_assets.labels(network=settings.network).set(int(queued_assets))
 
@@ -152,7 +148,7 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
             return
 
         validators_manager_signature = HexStr('0x')
-        if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
+        if settings.relayer_endpoint:
             # fetch validator manager signature from relayer
             relayer_response = await cast(RelayerClient, self.relayer).withdraw_validators(
                 withdrawals=withdrawals,

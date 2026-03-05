@@ -38,6 +38,7 @@ class OraclesApproval:
 class ExitQueueMissingAssetsParams:
     vault: ChecksumAddress
     withdrawing_assets: Wei
+    redemption_assets: Wei
     exit_queue_cumulative_ticket: int
 
 
@@ -56,16 +57,6 @@ class PendingPartialWithdrawal:
 class ValidatorType(Enum):
     V1 = '0x01'
     V2 = '0x02'
-
-
-class ValidatorsRegistrationMode(Enum):
-    """
-    AUTO mode: validators are registered automatically when vault assets are enough.
-    API mode: validators registration is triggered by API request.
-    """
-
-    AUTO = 'AUTO'
-    API = 'API'
 
 
 @dataclass
