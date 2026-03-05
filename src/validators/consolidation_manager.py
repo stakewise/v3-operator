@@ -22,6 +22,7 @@ class ConsolidationManager(ABC):
     consensus_validators: list[ConsensusValidator]
     consolidating_source_indexes: set[int]
     consolidating_target_indexes: set[int]
+    pending_incoming_balances: dict[int, Gwei]
     pending_partial_withdrawals_indexes: set[int]
     exclude_public_keys: set[HexStr]
 
@@ -70,9 +71,17 @@ class ConsolidationManager(ABC):
         )
         self.consolidating_source_indexes = set()
         self.consolidating_target_indexes = set()
+        self.pending_incoming_balances = {}
+        index_to_balance: dict[int, Gwei] = {
+            val.index: val.balance for val in self.consensus_validators
+        }
         for cons in pending_consolidations:
             self.consolidating_source_indexes.add(cons.source_index)
             self.consolidating_target_indexes.add(cons.target_index)
+            source_balance = index_to_balance.get(cons.source_index, Gwei(0))
+            self.pending_incoming_balances[cons.target_index] = Gwei(
+                self.pending_incoming_balances.get(cons.target_index, Gwei(0)) + source_balance
+            )
 
         # Pending withdrawals
         pending_partial_withdrawals = await get_pending_partial_withdrawals(
@@ -115,6 +124,7 @@ class ConsolidationManager(ABC):
         return self.chain_head.epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
 
 
+# pylint: disable-next=too-many-instance-attributes
 class ConsolidationSelector(ConsolidationManager):
     """
     Suited for the case when the user doesn't specify which validators to consolidate.
@@ -153,10 +163,15 @@ class ConsolidationSelector(ConsolidationManager):
             return [(source_validators_candidates[0], source_validators_candidates[0])]
 
         # there is at least one 0x02 validator, top up the one with smallest balance
-        target_validator = min(target_validator_candidates, key=lambda val: val.balance)
+        target_validator = min(
+            target_validator_candidates,
+            key=lambda val: val.balance + self.pending_incoming_balances.get(val.index, 0),
+        )
 
         selected_source_validators: list[ConsensusValidator] = []
-        target_balance = target_validator.balance
+        target_balance = Gwei(
+            target_validator.balance + self.pending_incoming_balances.get(target_validator.index, 0)
+        )
 
         for val in source_validators_candidates:
             if target_balance + val.balance > settings.max_validator_balance_gwei:
@@ -201,6 +216,7 @@ class ConsolidationSelector(ConsolidationManager):
         return source_validators, target_validators
 
 
+# pylint: disable-next=too-many-instance-attributes
 class ConsolidationChecker(ConsolidationManager):
     """
     Suited for the case when the user specifies which validators to consolidate.
@@ -282,10 +298,12 @@ class ConsolidationChecker(ConsolidationManager):
             source_validators.append(source_validator)
 
         # Validate the total balance won't exceed the max effective balance
-        if (
-            sum(val.balance for val in self.consensus_validators)
-            > settings.max_validator_balance_gwei
-        ):
+        total_balance = Gwei(
+            target_validator.balance
+            + self.pending_incoming_balances.get(target_validator.index, 0)
+            + sum(val.balance for val in source_validators)
+        )
+        if total_balance > settings.max_validator_balance_gwei:
             raise ConsolidationError(
                 'Cannot consolidate validators,'
                 f' total balance exceeds {settings.max_validator_balance_gwei} Gwei'
