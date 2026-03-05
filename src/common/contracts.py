@@ -543,6 +543,8 @@ class MulticallContract(ContractWrapper):
 class OsTokenRedeemerContract(ContractWrapper):
     abi_path = 'abi/IOsTokenRedeemer.json'
     settings_key = 'OS_TOKEN_REDEEMER_CONTRACT_ADDRESS'
+    _cached_nonce_block: BlockNumber | None = None
+    _cached_nonce_value: int = 0
 
     async def redeemable_positions(
         self, block_number: BlockNumber | None = None
@@ -556,7 +558,13 @@ class OsTokenRedeemerContract(ContractWrapper):
         )
 
     async def nonce(self, block_number: BlockNumber | None = None) -> int:
-        return await self.contract.functions.nonce().call(block_identifier=block_number)
+        """Get the current nonce of the redeemer contract. Cached by block number."""
+        if block_number == self._cached_nonce_block:
+            return self._cached_nonce_value
+        value = await self.contract.functions.nonce().call(block_identifier=block_number)
+        self._cached_nonce_block = block_number
+        self._cached_nonce_value = value
+        return value
 
     async def get_exit_queue_cumulative_tickets(
         self, block_number: BlockNumber | None = None

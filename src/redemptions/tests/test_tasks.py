@@ -236,8 +236,6 @@ class TestAggregateRedemptionAssetsByVaults:
         with mock.patch.object(
             os_token_redeemer_contract, 'redeemable_positions', return_value=redeemable_positions
         ), mock.patch.object(
-            os_token_redeemer_contract, 'nonce', return_value=0
-        ), mock.patch.object(
             os_token_vault_controller_contract, 'total_assets', return_value=total_assets
         ), mock.patch.object(
             os_token_vault_controller_contract, 'total_shares', return_value=total_shares
@@ -248,6 +246,6 @@ class TestAggregateRedemptionAssetsByVaults:
         ):
             yield
 
-    def get_processed_shares_batch(self, redeemable_positions_batch, nonce) -> list[int]:
+    def get_processed_shares_batch(self, redeemable_positions_batch) -> list[int]:
         """A placeholder for the patched method."""
         return [0] * len(redeemable_positions_batch)

@@ -87,7 +87,6 @@ async def aggregate_redemption_assets_by_vaults(
     os_token_converter = await create_os_token_converter(block_number)
     total_redemption_shares = os_token_converter.to_shares(total_redemption_assets)
 
-    nonce = await os_token_redeemer_contract.nonce(block_number=block_number)
     vault_to_unprocessed_shares: defaultdict[ChecksumAddress, Wei] = defaultdict(lambda: Wei(0))
 
     # Iterate through redeemable positions until total redemption shares are exhausted
@@ -96,7 +95,6 @@ async def aggregate_redemption_assets_by_vaults(
     ):
         processed_shares_batch = await get_processed_shares_batch(
             os_token_positions_batch=os_token_position_batch,
-            nonce=nonce,
             block_number=block_number,
         )
         for os_token_position, processed_shares in zip(
@@ -160,13 +158,17 @@ async def iter_os_token_positions(
 
 async def get_processed_shares_batch(
     os_token_positions_batch: list[OsTokenPosition],
-    nonce: int,
     block_number: BlockNumber | None = None,
 ) -> list[Wei]:
+    nonce = await os_token_redeemer_contract.nonce(block_number=block_number)
+    # Use the previous nonce since the current nonce was incremented
+    # after submitting redeemable positions
+    prev_nonce = nonce - 1
+
     calls: list[tuple[ChecksumAddress, HexStr]] = []
 
     for os_token_position in os_token_positions_batch:
-        leaf_hash = os_token_position.leaf_hash(nonce)
+        leaf_hash = os_token_position.leaf_hash(prev_nonce)
         call_data = os_token_redeemer_contract.encode_abi(
             fn_name='leafToProcessedShares',
             args=[leaf_hash],
