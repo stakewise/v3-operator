@@ -269,11 +269,11 @@ def _filter_positions_to_redeem(
             if remaining_shares <= 0:
                 break
 
-            redeemable_assets = os_token_converter.to_assets(position.available_shares)
+            shares_to_redeem = Wei(min(position.available_shares, remaining_shares))
+            redeemable_assets = os_token_converter.to_assets(shares_to_redeem)
             if redeemable_assets > withdrawable_assets:
                 continue
 
-            shares_to_redeem = Wei(min(position.available_shares, remaining_shares))
             logger.info(
                 'Position Owner: %s, Vault: %s, Shares to Redeem: %s',
                 position.owner,
