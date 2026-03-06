@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 batch_size = 20
+ZERO_MERKLE_ROOT = HexStr('0x' + '0' * 64)
 
 
 async def get_redemption_assets(chain_head: ChainHead) -> Wei:
@@ -87,7 +88,9 @@ async def aggregate_redemption_assets_by_vaults(
     os_token_converter = await create_os_token_converter(block_number)
     total_redemption_shares = os_token_converter.to_shares(total_redemption_assets)
 
-    nonce = await os_token_redeemer_contract.nonce(block_number=block_number)
+    # The contract increments nonce during setRedeemablePositions,
+    # but uses nonce - 1 for leaf hash computation during redemption.
+    tree_nonce = await os_token_redeemer_contract.nonce(block_number) - 1
     vault_to_unprocessed_shares: defaultdict[ChecksumAddress, Wei] = defaultdict(lambda: Wei(0))
 
     # Iterate through redeemable positions until total redemption shares are exhausted
@@ -96,7 +99,7 @@ async def aggregate_redemption_assets_by_vaults(
     ):
         processed_shares_batch = await get_processed_shares_batch(
             os_token_positions_batch=os_token_position_batch,
-            nonce=nonce,
+            nonce=tree_nonce,
             block_number=block_number,
         )
         for os_token_position, processed_shares in zip(
@@ -143,7 +146,8 @@ async def iter_os_token_positions(
     # Check whether redeemable positions are available
     if not redeemable_positions.ipfs_hash:
         return
-
+    if redeemable_positions.merkle_root == ZERO_MERKLE_ROOT:
+        return
     # Fetch redeemable positions data from IPFS
     data = cast(list[dict], await ipfs_fetch_client.fetch_json(redeemable_positions.ipfs_hash))
 
