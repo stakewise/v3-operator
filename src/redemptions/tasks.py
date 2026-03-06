@@ -88,7 +88,9 @@ async def aggregate_redemption_assets_by_vaults(
     os_token_converter = await create_os_token_converter(block_number)
     total_redemption_shares = os_token_converter.to_shares(total_redemption_assets)
 
-    nonce = await os_token_redeemer_contract.nonce(block_number=block_number)
+    # The contract increments nonce during setRedeemablePositions,
+    # but uses nonce - 1 for leaf hash computation during redemption.
+    tree_nonce = await os_token_redeemer_contract.nonce(block_number) - 1
     vault_to_unprocessed_shares: defaultdict[ChecksumAddress, Wei] = defaultdict(lambda: Wei(0))
 
     # Iterate through redeemable positions until total redemption shares are exhausted
@@ -97,7 +99,7 @@ async def aggregate_redemption_assets_by_vaults(
     ):
         processed_shares_batch = await get_processed_shares_batch(
             os_token_positions_batch=os_token_position_batch,
-            nonce=nonce,
+            nonce=tree_nonce,
             block_number=block_number,
         )
         for os_token_position, processed_shares in zip(
