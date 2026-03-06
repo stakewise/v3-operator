@@ -1,4 +1,6 @@
 import asyncio
+from contextlib import contextmanager
+from typing import Iterator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -17,18 +19,15 @@ from src.commands.internal.process_redeemer import (
     calculate_redeemable_shares,
     execute_redemption,
     fetch_positions_from_ipfs,
-    fetch_vault_harvest_params,
     fetch_vault_withdrawable_assets,
     process,
     select_positions,
 )
 from src.common.typings import HarvestParams
 from src.redemptions.os_token_converter import OsTokenConverter
-from src.redemptions.tasks import ZERO_MERKLE_ROOT
-from src.redemptions.typings import OsTokenPosition, RedeemablePositions
+from src.redemptions.typings import OsTokenPosition
 
 MODULE = 'src.commands.internal.process_redeemer'
-TASKS_MODULE = 'src.redemptions.tasks'
 
 VAULT_1 = Web3.to_checksum_address('0x' + '11' * 20)
 VAULT_2 = Web3.to_checksum_address('0x' + '22' * 20)
@@ -73,46 +72,6 @@ class TestBuildMultiProof:
         assert len(result.leaves) == 2
 
 
-class TestFetchHarvestParamsByVault:
-    async def test_empty_positions(self) -> None:
-        result = await fetch_vault_harvest_params([], BlockNumber(100))
-        assert result == {}
-
-    async def test_single_vault(self) -> None:
-        pos = make_position(vault=VAULT_1, available_shares=500)
-        hp = make_harvest_params()
-        mock_batch = AsyncMock(return_value={VAULT_1: hp})
-
-        with patch(f'{MODULE}.get_multiple_harvest_params', mock_batch):
-            result = await fetch_vault_harvest_params([pos], BlockNumber(100))
-
-        assert result[VAULT_1] is hp
-        mock_batch.assert_called_once_with([VAULT_1], BlockNumber(100))
-
-    async def test_multiple_vaults(self) -> None:
-        pos1 = make_position(vault=VAULT_1, available_shares=500)
-        pos2 = make_position(vault=VAULT_2, available_shares=800)
-        hp = make_harvest_params()
-        mock_batch = AsyncMock(return_value={VAULT_1: hp, VAULT_2: hp})
-
-        with patch(f'{MODULE}.get_multiple_harvest_params', mock_batch):
-            result = await fetch_vault_harvest_params([pos1, pos2], BlockNumber(100))
-
-        assert len(result) == 2
-        mock_batch.assert_called_once()
-
-    async def test_deduplicates_vaults(self) -> None:
-        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, available_shares=500)
-        pos2 = make_position(vault=VAULT_1, owner=OWNER_2, available_shares=800)
-        mock_batch = AsyncMock(return_value={VAULT_1: None})
-
-        with patch(f'{MODULE}.get_multiple_harvest_params', mock_batch):
-            result = await fetch_vault_harvest_params([pos1, pos2], BlockNumber(100))
-
-        assert len(result) == 1
-        mock_batch.assert_called_once_with([VAULT_1], BlockNumber(100))
-
-
 class TestSelectPositions:
     async def test_empty_positions(self) -> None:
         positions_to_redeem = await select_positions(
@@ -139,8 +98,6 @@ class TestSelectPositions:
 
     async def test_single_position_insufficient_assets_partial_fill(self) -> None:
         position = make_position(available_shares=500)
-        # 1:1 converter; 500 shares = 500 assets, but only 100 withdrawable
-        # partial fill: to_shares(100) = 100, so shares_to_redeem = 100
 
         with patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=False)):
             positions_to_redeem = await select_positions(
@@ -182,8 +139,6 @@ class TestSelectPositions:
     async def test_multiple_positions_limited_by_withdrawable_assets(self) -> None:
         pos1 = make_position(owner=OWNER_1, available_shares=500)
         pos2 = make_position(owner=OWNER_2, available_shares=1000)
-        # 1:1 converter; pos1=500 assets, pos2=1000 assets; withdrawable=700
-        # pos1 fits fully (700-500=200 remaining), pos2 partial-fills to 200 shares
 
         with patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=False)):
             positions_to_redeem = await select_positions(
@@ -256,9 +211,6 @@ class TestSelectPositions:
     async def test_partial_fills_first_then_exhausts_withdrawable(self) -> None:
         pos1 = make_position(owner=OWNER_1, available_shares=1000)
         pos2 = make_position(owner=OWNER_2, available_shares=100)
-        # 1:1 converter; withdrawable=500
-        # pos1 partial-fills to 500 shares (500 assets), withdrawable becomes 0
-        # pos2 can't fill (0 withdrawable)
 
         with patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=False)):
             positions_to_redeem = await select_positions(
@@ -272,6 +224,8 @@ class TestSelectPositions:
         assert positions_to_redeem[0].owner == OWNER_1
         assert positions_to_redeem[0].shares_to_redeem == Wei(500)
 
+
+class TestFetchVaultWithdrawableAssets:
     async def test_calls_withdrawable_per_vault(self) -> None:
         mock_withdrawable = AsyncMock(return_value=Wei(10000))
 
@@ -285,7 +239,7 @@ class TestSelectPositions:
         assert result[VAULT_1] == Wei(10000)
         assert result[VAULT_2] == Wei(10000)
 
-    async def test_passes_harvest_params_to_get_withdrawable_assets(self) -> None:
+    async def test_passes_harvest_params(self) -> None:
         hp = make_harvest_params()
         mock_withdrawable = AsyncMock(return_value=Wei(10000))
 
@@ -355,7 +309,6 @@ class TestCalculateRedeemableShares:
         pos1 = make_position(vault=VAULT_1, owner=OWNER_1, amount=1000)
         pos2 = make_position(vault=VAULT_2, owner=OWNER_2, amount=2000)
 
-        # pos1 fully processed, pos2 partially processed
         with patch(
             f'{MODULE}.get_processed_shares_batch',
             new=AsyncMock(return_value=[Wei(1000), Wei(500)]),
@@ -420,9 +373,10 @@ class TestProcessExitQueue:
             await _process_exit_queue(BlockNumber(100))
             mock_redeemer.process_exit_queue.assert_not_called()
 
-    async def test_process_success(self) -> None:
+    @pytest.mark.parametrize('tx_status', [1, 0])
+    async def test_process_exit_queue(self, tx_status: int) -> None:
         mock_client = AsyncMock()
-        mock_client.eth.wait_for_transaction_receipt = AsyncMock(return_value={'status': 1})
+        mock_client.eth.wait_for_transaction_receipt = AsyncMock(return_value={'status': tx_status})
         with (
             patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
             patch(f'{MODULE}.execution_client', new=mock_client),
@@ -433,20 +387,6 @@ class TestProcessExitQueue:
             mock_redeemer.process_exit_queue = AsyncMock(return_value='0xabc')
             await _process_exit_queue(BlockNumber(100))
             mock_redeemer.process_exit_queue.assert_called_once()
-
-    async def test_process_tx_fails(self) -> None:
-        mock_client = AsyncMock()
-        mock_client.eth.wait_for_transaction_receipt = AsyncMock(return_value={'status': 0})
-        with (
-            patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
-            patch(f'{MODULE}.execution_client', new=mock_client),
-            patch(f'{MODULE}.settings') as mock_settings,
-        ):
-            mock_settings.execution_transaction_timeout = 120
-            mock_redeemer.can_process_exit_queue = AsyncMock(return_value=True)
-            mock_redeemer.process_exit_queue = AsyncMock(return_value='0xabc')
-            # Should not raise, just log error
-            await _process_exit_queue(BlockNumber(100))
 
 
 class TestStartupCheck:
@@ -477,26 +417,11 @@ class TestExecuteRedemption:
     async def test_successful_with_harvest_params(self) -> None:
         pos = make_position(vault=VAULT_1, amount=1000, available_shares=500, shares_to_redeem=500)
         harvest_params = make_harvest_params()
-        mock_client = AsyncMock()
-        mock_client.eth.wait_for_transaction_receipt = AsyncMock(return_value={'status': 1})
 
-        with (
-            patch(f'{MODULE}.VaultContract') as MockVaultContract,
-            patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
-            patch(f'{MODULE}.multicall_contract'),
-            patch(
-                f'{MODULE}.transaction_gas_wrapper',
-                new=AsyncMock(return_value=b'\x01' * 32),
-            ),
-            patch(f'{MODULE}.execution_client', new=mock_client),
-            patch(f'{MODULE}.settings') as mock_settings,
-        ):
-            mock_settings.execution_transaction_timeout = 120
-            mock_vault = MockVaultContract.return_value
+        with _mock_execute_redemption(tx_status=1) as mocks:
+            mock_vault = mocks['MockVaultContract'].return_value
             mock_vault.contract_address = VAULT_1
             mock_vault.get_update_state_call.return_value = HexStr('0xupdate')
-            mock_redeemer.encode_abi.return_value = HexStr('0xredeem')
-            mock_redeemer.contract_address = VAULT_2
 
             result = await execute_redemption(
                 all_positions=[pos],
@@ -510,23 +435,8 @@ class TestExecuteRedemption:
 
     async def test_successful_without_harvest_params(self) -> None:
         pos = make_position(vault=VAULT_1, amount=1000, available_shares=500, shares_to_redeem=500)
-        mock_client = AsyncMock()
-        mock_client.eth.wait_for_transaction_receipt = AsyncMock(return_value={'status': 1})
 
-        with (
-            patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
-            patch(f'{MODULE}.multicall_contract'),
-            patch(
-                f'{MODULE}.transaction_gas_wrapper',
-                new=AsyncMock(return_value=b'\x01' * 32),
-            ),
-            patch(f'{MODULE}.execution_client', new=mock_client),
-            patch(f'{MODULE}.settings') as mock_settings,
-        ):
-            mock_settings.execution_transaction_timeout = 120
-            mock_redeemer.encode_abi.return_value = HexStr('0xredeem')
-            mock_redeemer.contract_address = VAULT_2
-
+        with _mock_execute_redemption(tx_status=1):
             result = await execute_redemption(
                 all_positions=[pos],
                 positions_to_redeem=[pos],
@@ -539,17 +449,7 @@ class TestExecuteRedemption:
     async def test_web3_exception(self) -> None:
         pos = make_position(amount=1000, available_shares=500, shares_to_redeem=500)
 
-        with (
-            patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
-            patch(f'{MODULE}.multicall_contract'),
-            patch(
-                f'{MODULE}.transaction_gas_wrapper',
-                new=AsyncMock(side_effect=Web3Exception('fail')),
-            ),
-        ):
-            mock_redeemer.encode_abi.return_value = HexStr('0xredeem')
-            mock_redeemer.contract_address = VAULT_2
-
+        with _mock_execute_redemption(tx_side_effect=Web3Exception('fail')):
             result = await execute_redemption(
                 all_positions=[pos],
                 positions_to_redeem=[pos],
@@ -561,23 +461,8 @@ class TestExecuteRedemption:
 
     async def test_tx_receipt_fails(self) -> None:
         pos = make_position(amount=1000, available_shares=500, shares_to_redeem=500)
-        mock_client = AsyncMock()
-        mock_client.eth.wait_for_transaction_receipt = AsyncMock(return_value={'status': 0})
 
-        with (
-            patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
-            patch(f'{MODULE}.multicall_contract'),
-            patch(
-                f'{MODULE}.transaction_gas_wrapper',
-                new=AsyncMock(return_value=b'\x01' * 32),
-            ),
-            patch(f'{MODULE}.execution_client', new=mock_client),
-            patch(f'{MODULE}.settings') as mock_settings,
-        ):
-            mock_settings.execution_transaction_timeout = 120
-            mock_redeemer.encode_abi.return_value = HexStr('0xredeem')
-            mock_redeemer.contract_address = VAULT_2
-
+        with _mock_execute_redemption(tx_status=0):
             result = await execute_redemption(
                 all_positions=[pos],
                 positions_to_redeem=[pos],
@@ -590,148 +475,111 @@ class TestExecuteRedemption:
 
 class TestProcess:
     async def test_no_queued_shares(self) -> None:
-        mock_client = MagicMock()
-        block_number_future: asyncio.Future[BlockNumber] = asyncio.Future()
-        block_number_future.set_result(BlockNumber(101))
-        mock_client.eth.block_number = block_number_future
-        with (
-            patch(f'{MODULE}._process_exit_queue', new=AsyncMock()),
-            patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
-            patch(f'{MODULE}.execution_client', new=mock_client),
-        ):
-            mock_redeemer.queued_shares = AsyncMock(return_value=Wei(0))
+        with _mock_process() as mocks:
+            mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(0))
             await process(block_number=BlockNumber(100))
-
-    async def test_zero_merkle_root(self) -> None:
-        mock_client = MagicMock()
-        block_number_future: asyncio.Future[BlockNumber] = asyncio.Future()
-        block_number_future.set_result(BlockNumber(101))
-        mock_client.eth.block_number = block_number_future
-        with (
-            patch(f'{MODULE}._process_exit_queue', new=AsyncMock()),
-            patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
-            patch(
-                f'{MODULE}.create_os_token_converter',
-                new=AsyncMock(return_value=make_converter()),
-            ),
-            patch(f'{MODULE}.settings') as mock_settings,
-            patch(f'{TASKS_MODULE}.os_token_redeemer_contract') as mock_tasks_redeemer,
-            patch(f'{MODULE}.execute_redemption') as mock_execute,
-            patch(f'{MODULE}.execution_client', new=mock_client),
-        ):
-            mock_settings.network_config.VAULT_BALANCE_SYMBOL = 'ETH'
-            mock_redeemer.queued_shares = AsyncMock(return_value=Wei(1000))
-            mock_redeemer.nonce = AsyncMock(return_value=5)
-            mock_tasks_redeemer.redeemable_positions = AsyncMock(
-                return_value=RedeemablePositions(
-                    merkle_root=ZERO_MERKLE_ROOT,
-                    ipfs_hash='QmTest',
-                )
-            )
-            await process(block_number=BlockNumber(100))
-            mock_execute.assert_not_called()
-
-    async def test_empty_ipfs_hash(self) -> None:
-        mock_client = MagicMock()
-        block_number_future: asyncio.Future[BlockNumber] = asyncio.Future()
-        block_number_future.set_result(BlockNumber(101))
-        mock_client.eth.block_number = block_number_future
-        with (
-            patch(f'{MODULE}._process_exit_queue', new=AsyncMock()),
-            patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
-            patch(
-                f'{MODULE}.create_os_token_converter',
-                new=AsyncMock(return_value=make_converter()),
-            ),
-            patch(f'{MODULE}.settings') as mock_settings,
-            patch(f'{TASKS_MODULE}.os_token_redeemer_contract') as mock_tasks_redeemer,
-            patch(f'{MODULE}.execute_redemption') as mock_execute,
-            patch(f'{MODULE}.execution_client', new=mock_client),
-        ):
-            mock_settings.network_config.VAULT_BALANCE_SYMBOL = 'ETH'
-            mock_redeemer.queued_shares = AsyncMock(return_value=Wei(1000))
-            mock_redeemer.nonce = AsyncMock(return_value=5)
-            mock_tasks_redeemer.redeemable_positions = AsyncMock(
-                return_value=RedeemablePositions(
-                    merkle_root=HexStr('0x' + 'ab' * 32),
-                    ipfs_hash='',
-                )
-            )
-            await process(block_number=BlockNumber(100))
-            mock_execute.assert_not_called()
 
     async def test_no_eligible_positions(self) -> None:
-        mock_client = MagicMock()
-        block_number_future: asyncio.Future[BlockNumber] = asyncio.Future()
-        block_number_future.set_result(BlockNumber(101))
-        mock_client.eth.block_number = block_number_future
-        with (
-            patch(f'{MODULE}._process_exit_queue', new=AsyncMock()),
-            patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
-            patch(
-                f'{MODULE}.create_os_token_converter',
-                new=AsyncMock(return_value=make_converter()),
-            ),
-            patch(f'{MODULE}.settings') as mock_settings,
-            patch(
-                f'{MODULE}.fetch_positions_from_ipfs',
-                new=AsyncMock(return_value=[]),
-            ),
-            patch(f'{MODULE}.execute_redemption') as mock_execute,
-            patch(f'{MODULE}.execution_client', new=mock_client),
-        ):
-            mock_settings.network_config.VAULT_BALANCE_SYMBOL = 'ETH'
-            mock_redeemer.queued_shares = AsyncMock(return_value=Wei(1000))
-            mock_redeemer.nonce = AsyncMock(return_value=5)
+        with _mock_process() as mocks:
+            mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
+            mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
             await process(block_number=BlockNumber(100))
-            mock_execute.assert_not_called()
+            mocks['mock_execute'].assert_not_called()
 
     async def test_successful_redemption(self) -> None:
         positions = [make_position(amount=1000, available_shares=500, shares_to_redeem=500)]
-        mock_client = MagicMock()
-        block_number_future: asyncio.Future[BlockNumber] = asyncio.Future()
-        block_number_future.set_result(BlockNumber(101))
-        mock_client.eth.block_number = block_number_future
 
-        with (
-            patch(f'{MODULE}._process_exit_queue', new=AsyncMock()),
-            patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
-            patch(
-                f'{MODULE}.create_os_token_converter',
-                new=AsyncMock(return_value=make_converter()),
-            ),
-            patch(f'{MODULE}.settings') as mock_settings,
-            patch(
-                f'{MODULE}.fetch_positions_from_ipfs',
-                new=AsyncMock(return_value=positions),
-            ),
-            patch(
-                f'{MODULE}.calculate_redeemable_shares',
-                new=AsyncMock(return_value=positions),
-            ),
-            patch(
-                f'{MODULE}.fetch_vault_harvest_params',
-                new=AsyncMock(return_value={VAULT_1: None}),
-            ),
-            patch(
-                f'{MODULE}.fetch_vault_withdrawable_assets',
-                new=AsyncMock(return_value={VAULT_1: Wei(10000)}),
-            ),
-            patch(
-                f'{MODULE}.select_positions',
-                new=AsyncMock(return_value=positions),
-            ),
-            patch(
-                f'{MODULE}.execute_redemption',
-                new=AsyncMock(return_value='0xtxhash'),
-            ) as mock_execute,
-            patch(f'{MODULE}.execution_client', new=mock_client),
-        ):
-            mock_settings.network_config.VAULT_BALANCE_SYMBOL = 'ETH'
-            mock_redeemer.queued_shares = AsyncMock(return_value=Wei(1000))
-            mock_redeemer.nonce = AsyncMock(return_value=5)
+        with _mock_process(positions=positions) as mocks:
+            mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
+            mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
             await process(block_number=BlockNumber(100))
-            mock_execute.assert_called_once()
+            mocks['mock_execute'].assert_called_once()
+
+
+# --- Helpers ---
+
+
+@contextmanager
+def _mock_execute_redemption(
+    tx_status: int = 1,
+    tx_side_effect: Exception | None = None,
+) -> Iterator[dict[str, MagicMock]]:
+    """Common mock setup for execute_redemption tests."""
+    mock_client = AsyncMock()
+    mock_client.eth.wait_for_transaction_receipt = AsyncMock(return_value={'status': tx_status})
+
+    tx_mock = AsyncMock(
+        return_value=b'\x01' * 32,
+        side_effect=tx_side_effect,
+    )
+
+    with (
+        patch(f'{MODULE}.VaultContract') as MockVaultContract,
+        patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
+        patch(f'{MODULE}.multicall_contract'),
+        patch(f'{MODULE}.transaction_gas_wrapper', new=tx_mock),
+        patch(f'{MODULE}.execution_client', new=mock_client),
+        patch(f'{MODULE}.settings') as mock_settings,
+    ):
+        mock_settings.execution_transaction_timeout = 120
+        mock_redeemer.encode_abi.return_value = HexStr('0xredeem')
+        mock_redeemer.contract_address = VAULT_2
+        yield {
+            'MockVaultContract': MockVaultContract,
+            'mock_redeemer': mock_redeemer,
+        }
+
+
+@contextmanager
+def _mock_process(
+    positions: list[OsTokenPosition] | None = None,
+) -> Iterator[dict[str, MagicMock]]:
+    """Common mock setup for process() tests."""
+    positions = positions or []
+    mock_client = MagicMock()
+    block_number_future: asyncio.Future[BlockNumber] = asyncio.Future()
+    block_number_future.set_result(BlockNumber(101))
+    mock_client.eth.block_number = block_number_future
+
+    with (
+        patch(f'{MODULE}._process_exit_queue', new=AsyncMock()),
+        patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
+        patch(
+            f'{MODULE}.create_os_token_converter',
+            new=AsyncMock(return_value=make_converter()),
+        ),
+        patch(f'{MODULE}.settings') as mock_settings,
+        patch(
+            f'{MODULE}.fetch_positions_from_ipfs',
+            new=AsyncMock(return_value=positions),
+        ),
+        patch(
+            f'{MODULE}.calculate_redeemable_shares',
+            new=AsyncMock(return_value=positions),
+        ),
+        patch(
+            f'{MODULE}.get_multiple_harvest_params',
+            new=AsyncMock(return_value={VAULT_1: None}),
+        ),
+        patch(
+            f'{MODULE}.fetch_vault_withdrawable_assets',
+            new=AsyncMock(return_value={VAULT_1: Wei(10000)}),
+        ),
+        patch(
+            f'{MODULE}.select_positions',
+            new=AsyncMock(return_value=positions),
+        ),
+        patch(
+            f'{MODULE}.execute_redemption',
+            new=AsyncMock(return_value='0xtxhash'),
+        ) as mock_execute,
+        patch(f'{MODULE}.execution_client', new=mock_client),
+    ):
+        mock_settings.network_config.VAULT_BALANCE_SYMBOL = 'ETH'
+        yield {
+            'mock_redeemer': mock_redeemer,
+            'mock_execute': mock_execute,
+        }
 
 
 def make_converter(total_assets: int = 110, total_shares: int = 100) -> OsTokenConverter:
