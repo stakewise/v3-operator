@@ -81,36 +81,36 @@ class TestFetchHarvestParamsByVault:
     async def test_single_vault(self) -> None:
         pos = make_position(vault=VAULT_1, available_shares=500)
         hp = make_harvest_params()
-        mock_harvest = AsyncMock(return_value=hp)
+        mock_batch = AsyncMock(return_value={VAULT_1: hp})
 
-        with patch(f'{MODULE}.get_harvest_params', mock_harvest):
+        with patch(f'{MODULE}.get_multiple_harvest_params', mock_batch):
             result = await fetch_vault_harvest_params([pos], BlockNumber(100))
 
         assert result[VAULT_1] is hp
-        mock_harvest.assert_called_once_with(VAULT_1, BlockNumber(100))
+        mock_batch.assert_called_once_with([VAULT_1], BlockNumber(100))
 
     async def test_multiple_vaults(self) -> None:
         pos1 = make_position(vault=VAULT_1, available_shares=500)
         pos2 = make_position(vault=VAULT_2, available_shares=800)
         hp = make_harvest_params()
-        mock_harvest = AsyncMock(return_value=hp)
+        mock_batch = AsyncMock(return_value={VAULT_1: hp, VAULT_2: hp})
 
-        with patch(f'{MODULE}.get_harvest_params', mock_harvest):
+        with patch(f'{MODULE}.get_multiple_harvest_params', mock_batch):
             result = await fetch_vault_harvest_params([pos1, pos2], BlockNumber(100))
 
         assert len(result) == 2
-        assert mock_harvest.call_count == 2
+        mock_batch.assert_called_once()
 
     async def test_deduplicates_vaults(self) -> None:
         pos1 = make_position(vault=VAULT_1, owner=OWNER_1, available_shares=500)
         pos2 = make_position(vault=VAULT_1, owner=OWNER_2, available_shares=800)
-        mock_harvest = AsyncMock(return_value=None)
+        mock_batch = AsyncMock(return_value={VAULT_1: None})
 
-        with patch(f'{MODULE}.get_harvest_params', mock_harvest):
+        with patch(f'{MODULE}.get_multiple_harvest_params', mock_batch):
             result = await fetch_vault_harvest_params([pos1, pos2], BlockNumber(100))
 
         assert len(result) == 1
-        mock_harvest.assert_called_once_with(VAULT_1, BlockNumber(100))
+        mock_batch.assert_called_once_with([VAULT_1], BlockNumber(100))
 
 
 class TestSelectPositions:

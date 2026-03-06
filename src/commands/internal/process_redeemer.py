@@ -20,7 +20,7 @@ from src.common.contracts import (
     os_token_redeemer_contract,
 )
 from src.common.execution import transaction_gas_wrapper
-from src.common.harvest import get_harvest_params
+from src.common.harvest import get_multiple_harvest_params
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.typings import HarvestParams
 from src.common.utils import log_verbose
@@ -293,12 +293,8 @@ async def fetch_vault_harvest_params(
     block_number: BlockNumber,
 ) -> dict[ChecksumAddress, HarvestParams | None]:
     """Fetch harvest params for each unique vault in redeemable positions."""
-    vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None] = {}
-    for vault_address in {pos.vault for pos in redeemable}:
-        vault_to_harvest_params[vault_address] = await get_harvest_params(
-            vault_address, block_number
-        )
-    return vault_to_harvest_params
+    vaults = list({pos.vault for pos in redeemable})
+    return await get_multiple_harvest_params(vaults, block_number)
 
 
 async def fetch_vault_withdrawable_assets(
