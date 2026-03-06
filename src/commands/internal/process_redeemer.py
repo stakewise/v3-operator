@@ -160,6 +160,10 @@ async def process(block_number: BlockNumber) -> None:
     # Step 1: Process exit queue
     await _process_exit_queue(block_number)
 
+    # Re-fetch block number after exit queue processing
+    # to ensure we read the latest on-chain state
+    block_number = await execution_client.eth.block_number
+
     # Step 2: Check queued shares
     queued_shares = await os_token_redeemer_contract.queued_shares(block_number)
     if queued_shares == 0:
@@ -188,20 +192,25 @@ async def process(block_number: BlockNumber) -> None:
         return
 
     # Step 4: Calculate redeemable shares
-    redeemable = await calculate_redeemable_shares(all_positions, tree_nonce, block_number)
-    if not redeemable:
+    os_token_positions = await calculate_redeemable_shares(all_positions, tree_nonce, block_number)
+    if not os_token_positions:
         logger.info('No redeemable positions found. Skipping to next interval.')
         return
 
     # Step 5: Fetch harvest params per vault
-    vault_to_harvest_params = await fetch_harvest_params_by_vault(redeemable, block_number)
+    vault_to_harvest_params = await fetch_vault_harvest_params(os_token_positions, block_number)
+    vault_to_withdrawable_assets = await fetch_vault_withdrawable_assets(
+        vaults={p.vault for p in os_token_positions},
+        vault_to_harvest_params=vault_to_harvest_params,
+    )
 
     # Step 6: Select positions
     positions_to_redeem = await select_positions(
-        redeemable=redeemable,
+        os_token_positions=os_token_positions,
         queued_shares=queued_shares,
         converter=os_token_converter,
         vault_to_harvest_params=vault_to_harvest_params,
+        vault_to_withdrawable_assets=vault_to_withdrawable_assets,
     )
 
     if not positions_to_redeem:
@@ -279,7 +288,7 @@ async def calculate_redeemable_shares(
     return redeemable
 
 
-async def fetch_harvest_params_by_vault(
+async def fetch_vault_harvest_params(
     redeemable: list[OsTokenPosition],
     block_number: BlockNumber,
 ) -> dict[ChecksumAddress, HarvestParams | None]:
@@ -292,11 +301,25 @@ async def fetch_harvest_params_by_vault(
     return vault_to_harvest_params
 
 
+async def fetch_vault_withdrawable_assets(
+    vaults: set[ChecksumAddress],
+    vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None],
+) -> dict[ChecksumAddress, Wei]:
+    """Fetch harvest params for each unique vault in redeemable positions."""
+    vault_to_withdrawable_assets: dict[ChecksumAddress, Wei] = {}
+    for vault in vaults:
+        vault_to_withdrawable_assets[vault] = await get_withdrawable_assets(
+            vault, vault_to_harvest_params.get(vault)
+        )
+    return vault_to_withdrawable_assets
+
+
 async def select_positions(
-    redeemable: list[OsTokenPosition],
+    os_token_positions: list[OsTokenPosition],
     queued_shares: int,
     converter: OsTokenConverter,
     vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None],
+    vault_to_withdrawable_assets: dict[ChecksumAddress, Wei],
 ) -> list[OsTokenPosition]:
     """Select positions to redeem, capped by queued_shares and withdrawable assets.
 
@@ -305,16 +328,8 @@ async def select_positions(
     """
     # Group positions by vault
     vault_to_positions: defaultdict[ChecksumAddress, list[OsTokenPosition]] = defaultdict(list)
-    for position in redeemable:
+    for position in os_token_positions:
         vault_to_positions[position.vault].append(position)
-
-    vault_to_withdrawable: dict[ChecksumAddress, Wei] = {}
-
-    # Fetch withdrawable assets per vault
-    for vault_address in vault_to_positions:
-        vault_to_withdrawable[vault_address] = await get_withdrawable_assets(
-            vault_address, vault_to_harvest_params.get(vault_address)
-        )
 
     positions_to_redeem: list[OsTokenPosition] = []
     remaining_shares = queued_shares
@@ -326,7 +341,7 @@ async def select_positions(
 
             shares_to_redeem = Wei(min(position.available_shares, remaining_shares))
             redeemable_assets = converter.to_assets(shares_to_redeem)
-            withdrawable = vault_to_withdrawable[vault_address]
+            withdrawable = vault_to_withdrawable_assets[vault_address]
 
             # If assets exceed withdrawable, try meta-vault sub-vault redemption
             if redeemable_assets > withdrawable:
@@ -337,11 +352,14 @@ async def select_positions(
                     withdrawable,
                     vault_to_harvest_params[vault_address],
                 )
-                vault_to_withdrawable[vault_address] = withdrawable
+                vault_to_withdrawable_assets[vault_address] = withdrawable
 
-                # Still insufficient after meta-vault attempt
+                # Still insufficient after meta-vault attempt — try partial fill
                 if redeemable_assets > withdrawable:
-                    continue
+                    shares_to_redeem = converter.to_shares(withdrawable)
+                    if shares_to_redeem <= 0:
+                        continue
+                    redeemable_assets = converter.to_assets(shares_to_redeem)
 
             logger.info(
                 'Position Owner: %s, Vault: %s, Shares to Redeem: %s',
@@ -358,11 +376,8 @@ async def select_positions(
                     shares_to_redeem=shares_to_redeem,
                 )
             )
-            vault_to_withdrawable[vault_address] = Wei(withdrawable - redeemable_assets)
+            vault_to_withdrawable_assets[vault_address] = Wei(withdrawable - redeemable_assets)
             remaining_shares -= shares_to_redeem
-
-        if remaining_shares <= 0:
-            break
 
     return positions_to_redeem
 
@@ -467,7 +482,7 @@ def build_multi_proof(
     tree_nonce: int,
     all_positions: list[OsTokenPosition],
     positions_to_redeem: list[OsTokenPosition],
-) -> MultiProof[tuple[bytes, int]]:
+) -> MultiProof[tuple[int, ChecksumAddress, int, ChecksumAddress]]:
     """Build a merkle multiproof from all positions, proving the positions to redeem."""
     all_leaves = [p.merkle_leaf(tree_nonce) for p in all_positions]
     tree = StandardMerkleTree.of(
