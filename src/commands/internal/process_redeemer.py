@@ -197,10 +197,11 @@ async def process(block_number: BlockNumber) -> None:
         logger.info('No redeemable positions found. Skipping to next interval.')
         return
 
-    # Step 5: Fetch harvest params per vault
-    vault_to_harvest_params = await fetch_vault_harvest_params(os_token_positions, block_number)
+    # Step 5: Fetch vault params
+    vaults = {p.vault for p in os_token_positions}
+    vault_to_harvest_params = await get_multiple_harvest_params(list(vaults), block_number)
     vault_to_withdrawable_assets = await fetch_vault_withdrawable_assets(
-        vaults={p.vault for p in os_token_positions},
+        vaults=vaults,
         vault_to_harvest_params=vault_to_harvest_params,
     )
 
@@ -286,15 +287,6 @@ async def calculate_redeemable_shares(
             )
 
     return redeemable
-
-
-async def fetch_vault_harvest_params(
-    redeemable: list[OsTokenPosition],
-    block_number: BlockNumber,
-) -> dict[ChecksumAddress, HarvestParams | None]:
-    """Fetch harvest params for each unique vault in redeemable positions."""
-    vaults = list({pos.vault for pos in redeemable})
-    return await get_multiple_harvest_params(vaults, block_number)
 
 
 async def fetch_vault_withdrawable_assets(
