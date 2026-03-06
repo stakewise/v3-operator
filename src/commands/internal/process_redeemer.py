@@ -293,7 +293,6 @@ async def fetch_vault_withdrawable_assets(
     vaults: set[ChecksumAddress],
     vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None],
 ) -> dict[ChecksumAddress, Wei]:
-    """Fetch harvest params for each unique vault in redeemable positions."""
     vault_to_withdrawable_assets: dict[ChecksumAddress, Wei] = {}
     for vault in vaults:
         vault_to_withdrawable_assets[vault] = await get_withdrawable_assets(
@@ -391,7 +390,7 @@ async def _try_redeem_meta_vault(
             vault_address,
             tx_hash,
         )
-    except RuntimeError:
+    except (Web3Exception, RuntimeError):
         logger.error(
             'redeemSubVaultsAssets failed for vault %s. '
             'Proceeding with current withdrawable assets.',

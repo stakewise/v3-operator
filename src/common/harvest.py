@@ -24,27 +24,31 @@ async def get_multiple_harvest_params(
 ) -> dict[ChecksumAddress, HarvestParams | None]:
     """Get harvest params for multiple vaults.
 
-    IPFS data and last rewards are fetched once, then reused for all vaults.
+    Checks can_harvest for all vaults first, then fetches IPFS data only
+    if at least one vault is harvestable.
     """
-    results: dict[ChecksumAddress, HarvestParams | None] = {}
     if not vaults:
-        return results
+        return {}
 
     last_rewards = await keeper_contract.get_last_rewards_update(block_number)
     if last_rewards is None:
         return {vault: None for vault in vaults}
 
-    ipfs_data = await ipfs_fetch_client.fetch_json(last_rewards.ipfs_hash)
+    harvestable_vaults: list[ChecksumAddress] = [
+        vault for vault in vaults if await keeper_contract.can_harvest(vault, block_number)
+    ]
 
-    for vault in vaults:
-        if not await keeper_contract.can_harvest(vault, block_number):
-            results[vault] = None
-            continue
+    if not harvestable_vaults:
+        return {vault: None for vault in vaults}
 
+    ipfs_data = cast(dict, await ipfs_fetch_client.fetch_json(last_rewards.ipfs_hash))
+
+    results: dict[ChecksumAddress, HarvestParams | None] = {vault: None for vault in vaults}
+    for vault in harvestable_vaults:
         vault_contract = VaultContract(vault)
         results[vault] = await _extract_harvest_params(
             vault_contract=vault_contract,
-            ipfs_data=cast(dict, ipfs_data),
+            ipfs_data=ipfs_data,
             rewards_root=last_rewards.rewards_root,
         )
 
