@@ -251,7 +251,6 @@ async def _process_exit_queue(block_number: BlockNumber) -> None:
 
 
 async def fetch_positions_from_ipfs(block_number: BlockNumber) -> list[OsTokenPosition]:
-    """Collect ALL positions from IPFS. No filtering — needed for correct merkle tree."""
     positions: list[OsTokenPosition] = []
     async for position in iter_os_token_positions(block_number=block_number):
         positions.append(position)
@@ -310,8 +309,8 @@ async def select_positions(
 ) -> list[OsTokenPosition]:
     """Select positions to redeem, capped by queued_shares and withdrawable assets.
 
-    Per-position: if assets exceed withdrawable, attempt meta-vault sub-vault redemption
-    for just that position's deficit.
+    Per-vault: if total assets needed exceed withdrawable, attempt meta-vault sub-vault
+    redemption once for the full deficit before processing individual positions.
     """
     # Group positions by vault
     vault_to_positions: defaultdict[ChecksumAddress, list[OsTokenPosition]] = defaultdict(list)
@@ -322,31 +321,44 @@ async def select_positions(
     remaining_shares = queued_shares
 
     for vault_address, positions in vault_to_positions.items():
+        if remaining_shares <= 0:
+            break
+
+        withdrawable = vault_to_withdrawable_assets[vault_address]
+
+        # Calculate total potential assets needed for this vault
+        total_vault_shares = Wei(
+            min(
+                sum(p.available_shares for p in positions),
+                remaining_shares,
+            )
+        )
+        total_vault_assets = converter.to_assets(total_vault_shares)
+
+        # Try meta-vault sub-vault redemption once per vault
+        if total_vault_assets > withdrawable:
+            deficit = Wei(total_vault_assets - withdrawable)
+            withdrawable = await _try_redeem_meta_vault(
+                vault_address,
+                deficit,
+                withdrawable,
+                vault_to_harvest_params[vault_address],
+            )
+            vault_to_withdrawable_assets[vault_address] = withdrawable
+
         for position in positions:
             if remaining_shares <= 0:
                 break
 
             shares_to_redeem = Wei(min(position.available_shares, remaining_shares))
             redeemable_assets = converter.to_assets(shares_to_redeem)
-            withdrawable = vault_to_withdrawable_assets[vault_address]
 
-            # If assets exceed withdrawable, try meta-vault sub-vault redemption
+            # Partial fill if assets exceed withdrawable
             if redeemable_assets > withdrawable:
-                deficit = Wei(redeemable_assets - withdrawable)
-                withdrawable = await _try_redeem_meta_vault(
-                    vault_address,
-                    deficit,
-                    withdrawable,
-                    vault_to_harvest_params[vault_address],
-                )
-                vault_to_withdrawable_assets[vault_address] = withdrawable
-
-                # Still insufficient after meta-vault attempt — try partial fill
-                if redeemable_assets > withdrawable:
-                    shares_to_redeem = converter.to_shares(withdrawable)
-                    if shares_to_redeem <= 0:
-                        continue
-                    redeemable_assets = converter.to_assets(shares_to_redeem)
+                shares_to_redeem = converter.to_shares(withdrawable)
+                if shares_to_redeem <= 0:
+                    continue
+                redeemable_assets = converter.to_assets(shares_to_redeem)
 
             logger.info(
                 'Position Owner: %s, Vault: %s, Shares to Redeem: %s',
@@ -363,8 +375,10 @@ async def select_positions(
                     shares_to_redeem=shares_to_redeem,
                 )
             )
-            vault_to_withdrawable_assets[vault_address] = Wei(withdrawable - redeemable_assets)
+            withdrawable = Wei(withdrawable - redeemable_assets)
             remaining_shares -= shares_to_redeem
+
+        vault_to_withdrawable_assets[vault_address] = withdrawable
 
     return positions_to_redeem
 
