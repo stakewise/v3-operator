@@ -150,8 +150,9 @@ class BaseEncoder:
 class VaultContract(ContractWrapper, VaultStateMixin):
     abi_path = 'abi/IEthVault.json'
 
-    async def vault_id(self) -> str:
-        return await self.contract.functions.vaultId().call()
+    async def vault_id(self) -> HexStr:
+        raw = await self.contract.functions.vaultId().call()
+        return Web3.to_hex(raw)
 
     async def get_registered_validators_public_keys(
         self, from_block: BlockNumber, to_block: BlockNumber
