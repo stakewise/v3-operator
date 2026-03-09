@@ -2,6 +2,7 @@ import asyncio
 import logging
 import sys
 from collections import defaultdict
+from dataclasses import replace
 from pathlib import Path
 
 import click
@@ -312,7 +313,6 @@ async def select_positions(
     Per-vault: if total assets needed exceed withdrawable, attempt meta-vault sub-vault
     redemption once for the full deficit before processing individual positions.
     """
-    # Group positions by vault
     vault_to_positions: defaultdict[ChecksumAddress, list[OsTokenPosition]] = defaultdict(list)
     for position in os_token_positions:
         vault_to_positions[position.vault].append(position)
@@ -324,27 +324,14 @@ async def select_positions(
         if remaining_shares <= 0:
             break
 
-        withdrawable = vault_to_withdrawable_assets[vault_address]
-
-        # Calculate total potential assets needed for this vault
-        total_vault_shares = Wei(
-            min(
-                sum(p.available_shares for p in positions),
-                remaining_shares,
-            )
+        withdrawable = await _compute_vault_withdrawable_assets(
+            vault_address=vault_address,
+            withdrawable=vault_to_withdrawable_assets[vault_address],
+            positions=positions,
+            converter=converter,
+            remaining_shares=remaining_shares,
+            harvest_params=vault_to_harvest_params[vault_address],
         )
-        total_vault_assets = converter.to_assets(total_vault_shares)
-
-        # Try meta-vault sub-vault redemption once per vault
-        if total_vault_assets > withdrawable:
-            deficit = Wei(total_vault_assets - withdrawable)
-            withdrawable = await _try_redeem_meta_vault(
-                vault_address,
-                deficit,
-                withdrawable,
-                vault_to_harvest_params[vault_address],
-            )
-            vault_to_withdrawable_assets[vault_address] = withdrawable
 
         for position in positions:
             if remaining_shares <= 0:
@@ -353,7 +340,6 @@ async def select_positions(
             shares_to_redeem = Wei(min(position.available_shares, remaining_shares))
             redeemable_assets = converter.to_assets(shares_to_redeem)
 
-            # Partial fill if assets exceed withdrawable
             if redeemable_assets > withdrawable:
                 shares_to_redeem = converter.to_shares(withdrawable)
                 if shares_to_redeem <= 0:
@@ -366,21 +352,42 @@ async def select_positions(
                 position.vault,
                 shares_to_redeem,
             )
-            positions_to_redeem.append(
-                OsTokenPosition(
-                    vault=position.vault,
-                    owner=position.owner,
-                    amount=position.amount,
-                    available_shares=position.available_shares,
-                    shares_to_redeem=shares_to_redeem,
-                )
-            )
+            positions_to_redeem.append(replace(position, shares_to_redeem=shares_to_redeem))
             withdrawable = Wei(withdrawable - redeemable_assets)
             remaining_shares -= shares_to_redeem
 
-        vault_to_withdrawable_assets[vault_address] = withdrawable
-
     return positions_to_redeem
+
+
+# pylint: disable-next=too-many-arguments
+async def _compute_vault_withdrawable_assets(
+    withdrawable: Wei,
+    vault_address: ChecksumAddress,
+    harvest_params: HarvestParams | None,
+    positions: list[OsTokenPosition],
+    remaining_shares: int,
+    converter: OsTokenConverter,
+) -> Wei:
+    """Compute withdrawable assets for a vault, attempting meta-vault redemption if needed."""
+    # Pre-compute total assets needed across all positions in this vault
+    total_vault_assets = Wei(0)
+    for position in positions:
+        if remaining_shares <= 0:
+            break
+        shares = Wei(min(position.available_shares, remaining_shares))
+        total_vault_assets = Wei(total_vault_assets + converter.to_assets(shares))
+        remaining_shares -= shares
+
+    # redeem meta vault
+    if total_vault_assets > withdrawable:
+        deficit = Wei(total_vault_assets - withdrawable)
+        withdrawable = await _try_redeem_meta_vault(
+            vault_address,
+            deficit,
+            withdrawable,
+            harvest_params,
+        )
+    return withdrawable
 
 
 async def _try_redeem_meta_vault(
