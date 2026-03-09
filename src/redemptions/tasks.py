@@ -28,11 +28,18 @@ async def get_redemption_assets(chain_head: ChainHead) -> Wei:
     Get redemption assets for operator's vault.
     For Gno networks return value in GNO-Wei.
     """
+    # The contract increments nonce during setRedeemablePositions,
+    # but uses nonce - 1 for leaf hash computation during redemption.
+    nonce = await os_token_redeemer_contract.nonce(chain_head.block_number) - 1
+    if nonce == 0:
+        logger.info('Zero nonce for redemption. Skipping redemption assets.')
+        return Wei(0)
+
     protocol_config = await get_protocol_config()
 
     # Aggregate redemption assets per vault
     vault_to_redemption_assets = await get_vault_to_redemption_assets(
-        chain_head=chain_head, protocol_config=protocol_config
+        chain_head=chain_head, tree_nonce=nonce - 1, protocol_config=protocol_config
     )
     # Distribute redemption assets from meta vaults to their underlying vaults
     vault_to_redemption_assets = await distribute_meta_vault_redemption_assets(
@@ -44,7 +51,7 @@ async def get_redemption_assets(chain_head: ChainHead) -> Wei:
 
 
 async def get_vault_to_redemption_assets(
-    chain_head: ChainHead, protocol_config: ProtocolConfig
+    chain_head: ChainHead, tree_nonce: int, protocol_config: ProtocolConfig
 ) -> defaultdict[ChecksumAddress, Wei]:
     """
     Get redemption assets per vault.
@@ -67,13 +74,14 @@ async def get_vault_to_redemption_assets(
 
     vault_to_redemption_assets = await aggregate_redemption_assets_by_vaults(
         total_redemption_assets,
+        tree_nonce=tree_nonce,
         block_number=chain_head.block_number,
     )
     return vault_to_redemption_assets
 
 
 async def aggregate_redemption_assets_by_vaults(
-    total_redemption_assets: Wei, block_number: BlockNumber | None = None
+    total_redemption_assets: Wei, tree_nonce: int, block_number: BlockNumber | None = None
 ) -> defaultdict[ChecksumAddress, Wei]:
     """
     Iterate through redeemable positions until the total redemption assets are exhausted.
@@ -88,9 +96,6 @@ async def aggregate_redemption_assets_by_vaults(
     os_token_converter = await create_os_token_converter(block_number)
     total_redemption_shares = os_token_converter.to_shares(total_redemption_assets)
 
-    # The contract increments nonce during setRedeemablePositions,
-    # but uses nonce - 1 for leaf hash computation during redemption.
-    tree_nonce = await os_token_redeemer_contract.nonce(block_number) - 1
     vault_to_unprocessed_shares: defaultdict[ChecksumAddress, Wei] = defaultdict(lambda: Wei(0))
 
     # Iterate through redeemable positions until total redemption shares are exhausted

@@ -176,6 +176,9 @@ async def process(block_number: BlockNumber) -> None:
     # The contract increments nonce during setRedeemablePositions,
     # but uses nonce - 1 for leaf hash computation during redemption.
     nonce = await os_token_redeemer_contract.nonce(block_number)
+    if nonce == 0:
+        logger.info('Zero nonce for redemption. Skipping to next interval.')
+        return
     tree_nonce = nonce - 1
 
     queued_assets = os_token_converter.to_assets(queued_shares)
@@ -490,7 +493,7 @@ def build_multi_proof(
     tree_nonce: int,
     all_positions: list[OsTokenPosition],
     positions_to_redeem: list[OsTokenPosition],
-) -> MultiProof[tuple[int, ChecksumAddress, int, ChecksumAddress]]:
+) -> MultiProof[tuple[int, ChecksumAddress, Wei, ChecksumAddress]]:
     """Build a merkle multiproof from all positions, proving the positions to redeem."""
     all_leaves = [p.merkle_leaf(tree_nonce) for p in all_positions]
     tree = StandardMerkleTree.of(
