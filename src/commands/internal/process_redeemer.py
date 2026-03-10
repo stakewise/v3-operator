@@ -12,7 +12,7 @@ from multiproof.standard import MultiProof
 from sw_utils import InterruptHandler
 from web3 import Web3
 from web3.exceptions import Web3Exception
-from web3.types import Wei
+from web3.types import Gwei, Wei
 
 from src.common.clients import close_clients, execution_client, setup_clients
 from src.common.contracts import (
@@ -44,6 +44,8 @@ from src.validators.execution import get_withdrawable_assets
 logger = logging.getLogger(__name__)
 
 DEFAULT_INTERVAL = 60  # 1 minute
+DEFAULT_MIN_QUEUED_ASSETS = Web3.to_wei(0.1, 'ether')
+DEFAULT_MIN_QUEUED_ASSETS_GWEI = Web3.from_wei(DEFAULT_MIN_QUEUED_ASSETS, 'gwei')
 
 
 @click.option(
@@ -80,6 +82,13 @@ DEFAULT_INTERVAL = 60  # 1 minute
     default=DEFAULT_INTERVAL,
     envvar='INTERVAL',
     help='Sleep interval in seconds between processing rounds.',
+)
+@click.option(
+    '--min-queued-assets-gwei',
+    type=int,
+    default=DEFAULT_MIN_QUEUED_ASSETS_GWEI,
+    envvar='MIN_QUEUED_ASSETS_GWEI',
+    help='Minimum queued assets (in Gwei) to trigger redemption processing.',
 )
 @click.option(
     '--log-level',
@@ -121,6 +130,7 @@ def process_redeemer(
     verbose: bool,
     log_level: str,
     interval: int,
+    min_queued_assets_gwei: int,
     wallet_file: str | None,
     wallet_password_file: str | None,
 ) -> None:
@@ -137,13 +147,16 @@ def process_redeemer(
         log_level=log_level,
     )
     try:
-        asyncio.run(main(interval=interval))
+        asyncio.run(main(interval=interval, min_queued_assets=Gwei(min_queued_assets_gwei)))
     except Exception as e:
         log_verbose(e)
         sys.exit(1)
 
 
-async def main(interval: int = DEFAULT_INTERVAL) -> None:
+async def main(
+    interval: int,
+    min_queued_assets: Gwei,
+) -> None:
     setup_logging()
     await setup_clients()
     await _startup_check()
@@ -151,14 +164,17 @@ async def main(interval: int = DEFAULT_INTERVAL) -> None:
         with InterruptHandler() as interrupt_handler:
             while not interrupt_handler.exit:
                 block_number = await execution_client.eth.block_number
-                await process(block_number=block_number)
+                await process(block_number=block_number, min_queued_assets=min_queued_assets)
                 await interrupt_handler.sleep(interval)
 
     finally:
         await close_clients()
 
 
-async def process(block_number: BlockNumber) -> None:
+async def process(
+    block_number: BlockNumber,
+    min_queued_assets: Gwei,
+) -> None:
     # Step 1: Process exit queue
     await _process_exit_queue(block_number)
 
@@ -168,8 +184,10 @@ async def process(block_number: BlockNumber) -> None:
 
     # Step 2: Check queued shares
     queued_shares = await os_token_redeemer_contract.queued_shares(block_number)
-    if queued_shares == 0:
-        logger.info('No queued shares for redemption. Skipping to next interval.')
+    if queued_shares < Web3.to_wei(min_queued_assets, 'gwei'):
+        logger.info(
+            'Queued shares for redemption are below min-queued-assets. Skipping to next interval.'
+        )
         return
 
     os_token_converter = await create_os_token_converter(block_number)
@@ -189,6 +207,14 @@ async def process(block_number: BlockNumber) -> None:
         Web3.from_wei(queued_assets, 'ether'),
         settings.network_config.VAULT_BALANCE_SYMBOL,
     )
+
+    if queued_assets < min_queued_assets:
+        logger.info(
+            'Queued assets %s below threshold %s. Skipping to next interval.',
+            Web3.from_wei(queued_assets, 'ether'),
+            Web3.from_wei(min_queued_assets, 'ether'),
+        )
+        return
 
     # Step 3: Fetch ALL positions from IPFS (needed for correct merkle tree)
     all_positions = await fetch_positions_from_ipfs(block_number)
