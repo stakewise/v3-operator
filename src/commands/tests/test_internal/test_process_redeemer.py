@@ -9,7 +9,7 @@ from hexbytes import HexBytes
 from sw_utils.tests import faker
 from web3 import Web3
 from web3.exceptions import Web3Exception
-from web3.types import Wei
+from web3.types import Gwei, Wei
 
 from src.commands.internal.process_redeemer import (
     _process_exit_queue,
@@ -19,7 +19,6 @@ from src.commands.internal.process_redeemer import (
     calculate_redeemable_shares,
     execute_redemption,
     fetch_positions_from_ipfs,
-    fetch_vault_withdrawable_assets,
     process,
     select_positions,
 )
@@ -225,33 +224,6 @@ class TestSelectPositions:
         assert positions_to_redeem[0].shares_to_redeem == Wei(500)
 
 
-class TestFetchVaultWithdrawableAssets:
-    async def test_calls_withdrawable_per_vault(self) -> None:
-        mock_withdrawable = AsyncMock(return_value=Wei(10000))
-
-        with patch(f'{MODULE}.get_withdrawable_assets', mock_withdrawable):
-            result = await fetch_vault_withdrawable_assets(
-                vaults={VAULT_1, VAULT_2},
-                vault_to_harvest_params={VAULT_1: None, VAULT_2: None},
-            )
-
-        assert mock_withdrawable.call_count == 2
-        assert result[VAULT_1] == Wei(10000)
-        assert result[VAULT_2] == Wei(10000)
-
-    async def test_passes_harvest_params(self) -> None:
-        hp = make_harvest_params()
-        mock_withdrawable = AsyncMock(return_value=Wei(10000))
-
-        with patch(f'{MODULE}.get_withdrawable_assets', mock_withdrawable):
-            await fetch_vault_withdrawable_assets(
-                vaults={VAULT_1},
-                vault_to_harvest_params={VAULT_1: hp},
-            )
-
-        mock_withdrawable.assert_called_once_with(VAULT_1, hp)
-
-
 # --- Async function tests (with mocks) ---
 
 
@@ -288,7 +260,7 @@ class TestCalculateRedeemableShares:
             new=AsyncMock(return_value=[Wei(1000)]),
         ):
             result = await calculate_redeemable_shares(
-                [pos], tree_nonce=5, block_number=BlockNumber(100)
+                [pos], nonce=5, block_number=BlockNumber(100)
             )
         assert result == []
 
@@ -299,7 +271,7 @@ class TestCalculateRedeemableShares:
             new=AsyncMock(return_value=[Wei(300)]),
         ):
             result = await calculate_redeemable_shares(
-                [pos], tree_nonce=5, block_number=BlockNumber(100)
+                [pos], nonce=5, block_number=BlockNumber(100)
             )
         assert len(result) == 1
         assert result[0].available_shares == Wei(700)
@@ -314,7 +286,7 @@ class TestCalculateRedeemableShares:
             new=AsyncMock(return_value=[Wei(1000), Wei(500)]),
         ):
             result = await calculate_redeemable_shares(
-                [pos1, pos2], tree_nonce=5, block_number=BlockNumber(100)
+                [pos1, pos2], nonce=5, block_number=BlockNumber(100)
             )
         assert len(result) == 1
         assert result[0].owner == OWNER_2
@@ -427,7 +399,7 @@ class TestExecuteRedemption:
                 all_positions=[pos],
                 positions_to_redeem=[pos],
                 vault_to_harvest_params={VAULT_1: harvest_params},
-                tree_nonce=5,
+                nonce=5,
             )
 
         assert result is not None
@@ -441,7 +413,7 @@ class TestExecuteRedemption:
                 all_positions=[pos],
                 positions_to_redeem=[pos],
                 vault_to_harvest_params={VAULT_1: None},
-                tree_nonce=5,
+                nonce=5,
             )
 
         assert result is not None
@@ -454,7 +426,7 @@ class TestExecuteRedemption:
                 all_positions=[pos],
                 positions_to_redeem=[pos],
                 vault_to_harvest_params={VAULT_1: None},
-                tree_nonce=5,
+                nonce=5,
             )
 
         assert result is None
@@ -467,7 +439,7 @@ class TestExecuteRedemption:
                 all_positions=[pos],
                 positions_to_redeem=[pos],
                 vault_to_harvest_params={VAULT_1: None},
-                tree_nonce=5,
+                nonce=5,
             )
 
         assert result is None
@@ -477,13 +449,20 @@ class TestProcess:
     async def test_no_queued_shares(self) -> None:
         with _mock_process() as mocks:
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(0))
-            await process(block_number=BlockNumber(100))
+            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(1))
+
+    async def test_below_threshold(self) -> None:
+        with _mock_process() as mocks:
+            # 500 wei queued shares, threshold is 1000 Gwei
+            mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(500))
+            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(1000))
+            mocks['mock_execute'].assert_not_called()
 
     async def test_no_eligible_positions(self) -> None:
         with _mock_process() as mocks:
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
             mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
-            await process(block_number=BlockNumber(100))
+            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(0))
             mocks['mock_execute'].assert_not_called()
 
     async def test_successful_redemption(self) -> None:
@@ -492,7 +471,7 @@ class TestProcess:
         with _mock_process(positions=positions) as mocks:
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
             mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
-            await process(block_number=BlockNumber(100))
+            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(0))
             mocks['mock_execute'].assert_called_once()
 
 
@@ -562,8 +541,8 @@ def _mock_process(
             new=AsyncMock(return_value={VAULT_1: None}),
         ),
         patch(
-            f'{MODULE}.fetch_vault_withdrawable_assets',
-            new=AsyncMock(return_value={VAULT_1: Wei(10000)}),
+            f'{MODULE}.get_withdrawable_assets',
+            new=AsyncMock(return_value=Wei(10000)),
         ),
         patch(
             f'{MODULE}.select_positions',
