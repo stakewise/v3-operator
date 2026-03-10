@@ -108,7 +108,7 @@ def node_manager_start(
     withdrawals_address: ChecksumAddress,
 ) -> None:
     network_config = NETWORKS[network]
-    vault = network_config.ETH_COMMUNITY_VAULT_ADDRESS
+    vault = network_config.COMMUNITY_VAULT_ADDRESS
     vault_dir = Path(data_dir) / vault.lower()
 
     settings.set(
