@@ -44,8 +44,8 @@ from src.validators.execution import get_withdrawable_assets
 logger = logging.getLogger(__name__)
 
 DEFAULT_INTERVAL = 60  # 1 minute
-DEFAULT_MIN_QUEUED_ASSETS = Web3.to_wei(0.1, 'ether')
-DEFAULT_MIN_QUEUED_ASSETS_GWEI = Web3.from_wei(DEFAULT_MIN_QUEUED_ASSETS, 'gwei')
+DEFAULT_MIN_QUEUED_SHARES = Web3.to_wei(0.1, 'ether')
+DEFAULT_MIN_QUEUED_SHARES_GWEI = Web3.from_wei(DEFAULT_MIN_QUEUED_SHARES, 'gwei')
 
 
 @click.option(
@@ -84,11 +84,11 @@ DEFAULT_MIN_QUEUED_ASSETS_GWEI = Web3.from_wei(DEFAULT_MIN_QUEUED_ASSETS, 'gwei'
     help='Sleep interval in seconds between processing rounds.',
 )
 @click.option(
-    '--min-queued-assets-gwei',
+    '--min-queued-shares-gwei',
     type=int,
-    default=DEFAULT_MIN_QUEUED_ASSETS_GWEI,
-    envvar='MIN_QUEUED_ASSETS_GWEI',
-    help='Minimum queued assets (in Gwei) to trigger redemption processing.',
+    default=DEFAULT_MIN_QUEUED_SHARES_GWEI,
+    envvar='MIN_QUEUED_SHARES_GWEI',
+    help='Minimum queued shares (in Gwei) to trigger redemption processing.',
 )
 @click.option(
     '--log-level',
@@ -184,13 +184,15 @@ async def process(
 
     # Step 2: Check queued shares
     queued_shares = await os_token_redeemer_contract.queued_shares(block_number)
-    if queued_shares < Web3.to_wei(min_queued_assets, 'gwei'):
+    os_token_converter = await create_os_token_converter(block_number)
+    queued_assets = os_token_converter.to_assets(queued_shares)
+    if queued_assets < Web3.to_wei(min_queued_assets, 'gwei'):
         logger.info(
-            'Queued shares for redemption are below min-queued-assets. Skipping to next interval.'
+            'Queued assets %s below threshold %s. Skipping to next interval.',
+            Web3.from_wei(queued_assets, 'ether'),
+            Web3.from_wei(Web3.to_wei(min_queued_assets, 'gwei'), 'ether'),
         )
         return
-
-    os_token_converter = await create_os_token_converter(block_number)
 
     # The Merkle root was calculated before the nonce was incremented
     # in setRedeemablePositions, so we use the previous nonce for Merkle proofs.
@@ -200,22 +202,12 @@ async def process(
         return
     prev_nonce = nonce - 1
 
-    queued_assets = os_token_converter.to_assets(queued_shares)
     logger.info(
-        'Queued Shares for Redemption: %s (~%s %s)',
+        'Process queued shares for Redemption: %s (~%s %s)',
         queued_shares,
         Web3.from_wei(queued_assets, 'ether'),
         settings.network_config.VAULT_BALANCE_SYMBOL,
     )
-
-    if queued_assets < min_queued_assets:
-        logger.info(
-            'Queued assets %s below threshold %s. Skipping to next interval.',
-            Web3.from_wei(queued_assets, 'ether'),
-            Web3.from_wei(min_queued_assets, 'ether'),
-        )
-        return
-
     # Step 3: Fetch ALL positions from IPFS (needed for correct merkle tree)
     all_positions = await fetch_positions_from_ipfs(block_number)
     if not all_positions:

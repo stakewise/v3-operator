@@ -30,7 +30,7 @@ async def get_redemption_assets(chain_head: ChainHead) -> Wei:
     """
     # The contract increments nonce during setRedeemablePositions,
     # but uses nonce - 1 for leaf hash computation during redemption.
-    nonce = await os_token_redeemer_contract.nonce(chain_head.block_number) - 1
+    nonce = await os_token_redeemer_contract.nonce(chain_head.block_number)
     if nonce == 0:
         logger.info('Zero nonce for redemption. Skipping redemption assets.')
         return Wei(0)
