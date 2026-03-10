@@ -125,6 +125,7 @@ def process_redeemer(
     wallet_password_file: str | None,
 ) -> None:
     settings.set(
+        # No specific vault address is set — redemptions are processed across all vaults.
         vault=ZERO_CHECKSUM_ADDRESS,
         vault_dir=Path.home() / '.stakewise',
         execution_endpoints=execution_endpoints,
@@ -173,13 +174,13 @@ async def process(block_number: BlockNumber) -> None:
 
     os_token_converter = await create_os_token_converter(block_number)
 
-    # The contract increments nonce during setRedeemablePositions,
-    # but uses nonce - 1 for leaf hash computation during redemption.
+    # The Merkle root was calculated before the nonce was incremented
+    # in setRedeemablePositions, so we use the previous nonce for Merkle proofs.
     nonce = await os_token_redeemer_contract.nonce(block_number)
     if nonce == 0:
         logger.info('Zero nonce for redemption. Skipping to next interval.')
         return
-    tree_nonce = nonce - 1
+    prev_nonce = nonce - 1
 
     queued_assets = os_token_converter.to_assets(queued_shares)
     logger.info(
@@ -196,7 +197,7 @@ async def process(block_number: BlockNumber) -> None:
         return
 
     # Step 4: Calculate redeemable shares
-    os_token_positions = await calculate_redeemable_shares(all_positions, tree_nonce, block_number)
+    os_token_positions = await calculate_redeemable_shares(all_positions, prev_nonce, block_number)
     if not os_token_positions:
         logger.info('No redeemable positions found. Skipping to next interval.')
         return
@@ -204,10 +205,15 @@ async def process(block_number: BlockNumber) -> None:
     # Step 5: Fetch vault params
     vaults = {p.vault for p in os_token_positions}
     vault_to_harvest_params = await get_multiple_harvest_params(list(vaults), block_number)
-    vault_to_withdrawable_assets = await fetch_vault_withdrawable_assets(
-        vaults=vaults,
-        vault_to_harvest_params=vault_to_harvest_params,
-    )
+    # vault_to_withdrawable_assets = await fetch_vault_withdrawable_assets(
+    #     vaults=vaults,
+    #     vault_to_harvest_params=vault_to_harvest_params,
+    # )
+    vault_to_withdrawable_assets: dict[ChecksumAddress, Wei] = {}
+    for vault in vaults:
+        vault_to_withdrawable_assets[vault] = await get_withdrawable_assets(
+            vault, vault_to_harvest_params.get(vault)
+        )
 
     # Step 6: Select positions
     positions_to_redeem = await select_positions(
@@ -227,7 +233,7 @@ async def process(block_number: BlockNumber) -> None:
         all_positions=all_positions,
         positions_to_redeem=positions_to_redeem,
         vault_to_harvest_params=vault_to_harvest_params,
-        tree_nonce=tree_nonce,
+        nonce=prev_nonce,
     )
     if tx_hash:
         logger.info(
@@ -263,7 +269,7 @@ async def fetch_positions_from_ipfs(block_number: BlockNumber) -> list[OsTokenPo
 
 async def calculate_redeemable_shares(
     all_positions: list[OsTokenPosition],
-    tree_nonce: int,
+    nonce: int,
     block_number: BlockNumber,
 ) -> list[OsTokenPosition]:
     """Query processed shares and return positions with available_shares > 0."""
@@ -273,7 +279,7 @@ async def calculate_redeemable_shares(
         batch = all_positions[i : i + batch_size]
         processed_shares_batch = await get_processed_shares_batch(
             os_token_positions_batch=batch,
-            nonce=tree_nonce,
+            nonce=nonce,
             block_number=block_number,
         )
         for position, processed_shares in zip(batch, processed_shares_batch):
@@ -290,18 +296,6 @@ async def calculate_redeemable_shares(
             )
 
     return redeemable
-
-
-async def fetch_vault_withdrawable_assets(
-    vaults: set[ChecksumAddress],
-    vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None],
-) -> dict[ChecksumAddress, Wei]:
-    vault_to_withdrawable_assets: dict[ChecksumAddress, Wei] = {}
-    for vault in vaults:
-        vault_to_withdrawable_assets[vault] = await get_withdrawable_assets(
-            vault, vault_to_harvest_params.get(vault)
-        )
-    return vault_to_withdrawable_assets
 
 
 async def select_positions(
@@ -327,9 +321,9 @@ async def select_positions(
         if remaining_shares <= 0:
             break
 
-        withdrawable = await _compute_vault_withdrawable_assets(
+        withdrawable_assets = await _compute_vault_withdrawable_assets(
             vault_address=vault_address,
-            withdrawable=vault_to_withdrawable_assets[vault_address],
+            withdrawable_assets=vault_to_withdrawable_assets[vault_address],
             positions=positions,
             converter=converter,
             remaining_shares=remaining_shares,
@@ -343,8 +337,8 @@ async def select_positions(
             shares_to_redeem = Wei(min(position.available_shares, remaining_shares))
             redeemable_assets = converter.to_assets(shares_to_redeem)
 
-            if redeemable_assets > withdrawable:
-                shares_to_redeem = converter.to_shares(withdrawable)
+            if redeemable_assets > withdrawable_assets:
+                shares_to_redeem = converter.to_shares(withdrawable_assets)
                 if shares_to_redeem <= 0:
                     continue
                 redeemable_assets = converter.to_assets(shares_to_redeem)
@@ -356,7 +350,7 @@ async def select_positions(
                 shares_to_redeem,
             )
             positions_to_redeem.append(replace(position, shares_to_redeem=shares_to_redeem))
-            withdrawable = Wei(withdrawable - redeemable_assets)
+            withdrawable_assets = Wei(withdrawable_assets - redeemable_assets)
             remaining_shares -= shares_to_redeem
 
     return positions_to_redeem
@@ -364,7 +358,7 @@ async def select_positions(
 
 # pylint: disable-next=too-many-arguments
 async def _compute_vault_withdrawable_assets(
-    withdrawable: Wei,
+    withdrawable_assets: Wei,
     vault_address: ChecksumAddress,
     harvest_params: HarvestParams | None,
     positions: list[OsTokenPosition],
@@ -382,15 +376,15 @@ async def _compute_vault_withdrawable_assets(
         remaining_shares -= shares
 
     # redeem meta vault
-    if total_vault_assets > withdrawable:
-        deficit = Wei(total_vault_assets - withdrawable)
-        withdrawable = await _try_redeem_meta_vault(
+    if total_vault_assets > withdrawable_assets:
+        deficit = Wei(total_vault_assets - withdrawable_assets)
+        withdrawable_assets = await _try_redeem_meta_vault(
             vault_address,
             deficit,
-            withdrawable,
+            withdrawable_assets,
             harvest_params,
         )
-    return withdrawable
+    return withdrawable_assets
 
 
 async def _try_redeem_meta_vault(
@@ -430,13 +424,13 @@ async def execute_redemption(
     all_positions: list[OsTokenPosition],
     positions_to_redeem: list[OsTokenPosition],
     vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None],
-    tree_nonce: int,
+    nonce: int,
 ) -> HexStr | None:
     """Build multiproof from all positions and execute the redemption transaction."""
     multiproof = build_multi_proof(
         all_positions=all_positions,
         positions_to_redeem=positions_to_redeem,
-        tree_nonce=tree_nonce,
+        tree_nonce=nonce,
     )
     calls: list[tuple[ChecksumAddress, HexStr]] = []
 

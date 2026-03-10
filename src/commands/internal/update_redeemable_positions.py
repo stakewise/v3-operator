@@ -167,6 +167,7 @@ def update_redeemable_positions(
         access_key=api_access_key,
     )
     settings.set(
+        # No specific vault address is set — redemptions are updated across all vaults.
         vault=ZERO_CHECKSUM_ADDRESS,
         vault_dir=Path.home() / '.stakewise',
         execution_endpoints=execution_endpoints,
