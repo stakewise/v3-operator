@@ -55,24 +55,31 @@ class LeverageStrategyPosition:
 
 @dataclass
 class OsTokenPosition:
+    """
+    Represents leaf shares to redeem for a given vault and owner.
+    Mirrors the OsTokenPosition structure from the OsTokenRedeemer contract.
+    Note: This is distinct from the OsTokenPosition in the VaultOsToken contract,
+    which represents a debt position.
+    """
+
     owner: ChecksumAddress
     vault: ChecksumAddress
-    amount: Wei
+    leaf_shares: Wei
 
     def as_dict(self) -> dict:
         return {
             'owner': self.owner,
             'vault': self.vault,
-            'amount': str(self.amount),
+            'leaf_shares': str(self.leaf_shares),
         }
 
     def merkle_leaf(self, nonce: int) -> tuple[int, ChecksumAddress, Wei, ChecksumAddress]:
-        return nonce, self.vault, self.amount, self.owner
+        return nonce, self.vault, self.leaf_shares, self.owner
 
     def leaf_hash(self, nonce: int) -> bytes:
         """Get the Merkle leaf hash"""
         return standard_leaf_hash(
-            values=(nonce, self.vault, self.amount, self.owner),
+            values=(nonce, self.vault, self.leaf_shares, self.owner),
             types=['uint256', 'address', 'uint256', 'address'],
         )
 
