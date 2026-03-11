@@ -301,14 +301,14 @@ async def calculate_redeemable_shares(
             block_number=block_number,
         )
         for position, processed_shares in zip(batch, processed_shares_batch):
-            available_shares = position.amount - processed_shares
+            available_shares = position.leaf_shares - processed_shares
             if available_shares <= 0:
                 continue
             redeemable.append(
                 OsTokenPosition(
                     owner=position.owner,
                     vault=position.vault,
-                    amount=position.amount,
+                    leaf_shares=position.leaf_shares,
                     available_shares=Wei(available_shares),
                 )
             )
@@ -466,7 +466,7 @@ async def execute_redemption(
     # Maps to Solidity struct:
     # OsTokenPosition(address vault, address owner, uint256 leafShares, uint256 sharesToRedeem)
     positions_arg = [
-        (pos.vault, pos.owner, pos.amount, pos.shares_to_redeem) for pos in positions_to_redeem
+        (pos.vault, pos.owner, pos.leaf_shares, pos.shares_to_redeem) for pos in positions_to_redeem
     ]
     redeem_call = os_token_redeemer_contract.encode_abi(
         fn_name='redeemOsTokenPositions',

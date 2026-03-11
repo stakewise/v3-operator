@@ -1,9 +1,11 @@
+from collections import defaultdict
 from unittest.mock import patch
 
 import pytest
 from eth_typing import HexStr
 from sw_utils import ChainHead
 from sw_utils.tests import faker
+from web3.types import Gwei
 
 from src.common.tests.factories import create_chain_head
 from src.common.tests.utils import ether_to_gwei
@@ -287,6 +289,84 @@ class TestConsolidationSelector:
         # Validator 10 can still be target even if already in consolidating_target_indexes,
         # so validator 11 consolidates into validator 10
         assert result == [(consensus_validators[0], consensus_validators[1])]
+
+    def test_balance_accounts_for_pending_consolidation_balances(self):
+        """Test that pending incoming consolidation balances are included in target balance check."""
+        consensus_validators = [
+            create_consensus_validator(
+                index=10,
+                activation_epoch=1,
+                is_compounding=True,
+                balance=ether_to_gwei(32.0),
+            ),
+            # This validator is already consolidating into target (index 10)
+            create_consensus_validator(
+                index=11,
+                activation_epoch=1,
+                is_compounding=False,
+                balance=ether_to_gwei(32.0),
+            ),
+            # This validator is a new candidate source
+            create_consensus_validator(
+                index=12,
+                activation_epoch=1,
+                is_compounding=False,
+                balance=ether_to_gwei(32.0),
+            ),
+        ]
+
+        with patch.object(settings, 'max_validator_balance_gwei', ether_to_gwei(90)):
+            selector = create_manager(
+                vault_validators=[v.public_key for v in consensus_validators],
+                consensus_validators=consensus_validators,
+                consolidating_source_indexes={11},
+                consolidating_target_indexes={10},
+                pending_incoming_balances={10: ether_to_gwei(32.0)},
+            )
+            result = selector.get_target_source()
+            # Target (index 10) has 32 ETH balance + 32 ETH pending = 64 ETH effective
+            # Adding source (index 12) with 32 ETH would make 96 ETH > 90 ETH max
+            # So no source should be selected; should switch index 12 from 0x01 to 0x02
+            assert result == [(consensus_validators[2], consensus_validators[2])]
+
+    def test_target_selection_accounts_for_pending_consolidation_balances(self):
+        """Test that target with smallest effective balance (including pending) is selected."""
+        consensus_validators = [
+            # Target 1: 32 ETH balance + 32 ETH pending = 64 ETH effective
+            create_consensus_validator(
+                index=10,
+                activation_epoch=1,
+                is_compounding=True,
+                balance=ether_to_gwei(32.0),
+            ),
+            # Target 2: 40 ETH balance, no pending = 40 ETH effective
+            create_consensus_validator(
+                index=11,
+                activation_epoch=1,
+                is_compounding=True,
+                balance=ether_to_gwei(40.0),
+            ),
+            # Source candidate
+            create_consensus_validator(
+                index=12,
+                activation_epoch=1,
+                is_compounding=False,
+                balance=ether_to_gwei(32.0),
+            ),
+        ]
+
+        with patch.object(settings, 'max_validator_balance_gwei', ether_to_gwei(100)):
+            selector = create_manager(
+                vault_validators=[v.public_key for v in consensus_validators],
+                consensus_validators=consensus_validators,
+                consolidating_source_indexes=set(),
+                consolidating_target_indexes={10},
+                pending_incoming_balances={10: ether_to_gwei(32.0)},
+            )
+            result = selector.get_target_source()
+            # Target 2 (index 11) should be selected because its effective balance (40 ETH)
+            # is less than target 1's effective balance (32 + 32 = 64 ETH)
+            assert result == [(consensus_validators[1], consensus_validators[2])]
 
     def test_excludes_validator_in_target_indexes_as_source(self):
         """Test that source validator is excluded if it's in consolidating_target_indexes"""
@@ -727,6 +807,49 @@ class TestConsolidationChecker:
         ):
             selector.get_target_source()
 
+    def test_max_balance_accounts_for_pending_incoming_consolidations(self):
+        """Balance check must include pending incoming consolidation balances to the target."""
+        source_pk = faker.validator_public_key()
+        target_pk = faker.validator_public_key()
+        consolidation_keys = ConsolidationKeys(
+            source_public_keys=[source_pk],
+            target_public_key=target_pk,
+        )
+
+        consensus_validators = [
+            create_consensus_validator(
+                public_key=source_pk,
+                index=10,
+                activation_epoch=1,
+                is_compounding=False,
+                balance=ether_to_gwei(32.0),
+            ),
+            create_consensus_validator(
+                public_key=target_pk,
+                index=11,
+                activation_epoch=1,
+                is_compounding=True,
+                balance=ether_to_gwei(32.0),
+            ),
+        ]
+
+        # Target (32 ETH) + pending incoming (32 ETH) + source (32 ETH) = 96 ETH > 90 ETH
+        # Should raise because total exceeds max_validator_balance_gwei
+        with patch.object(settings, 'max_validator_balance_gwei', ether_to_gwei(90)):
+            checker = create_manager(
+                consolidation_keys=consolidation_keys,
+                vault_validators=[v.public_key for v in consensus_validators],
+                consensus_validators=consensus_validators,
+                consolidating_target_indexes={11},
+                pending_incoming_balances={11: ether_to_gwei(32.0)},
+            )
+
+            with pytest.raises(
+                ConsolidationError,
+                match='Cannot consolidate validators, total balance exceeds',
+            ):
+                checker.get_target_source()
+
 
 def create_manager(
     consolidation_keys: ConsolidationKeys | None = None,
@@ -737,6 +860,7 @@ def create_manager(
     consolidating_source_indexes: set[int] | None = None,
     consolidating_target_indexes: set[int] | None = None,
     pending_partial_withdrawals_indexes: set[int] | None = None,
+    pending_incoming_balances: dict[int, Gwei] | None = None,
 ) -> ConsolidationSelector | ConsolidationChecker:
     self: ConsolidationChecker | ConsolidationSelector
     if chain_head is None:
@@ -770,4 +894,9 @@ def create_manager(
         self.pending_partial_withdrawals_indexes = pending_partial_withdrawals_indexes
     else:
         self.pending_partial_withdrawals_indexes = set()
+
+    if pending_incoming_balances is not None:
+        self.pending_incoming_balances = defaultdict(lambda: Gwei(0), pending_incoming_balances)
+    else:
+        self.pending_incoming_balances = defaultdict(lambda: Gwei(0))
     return self

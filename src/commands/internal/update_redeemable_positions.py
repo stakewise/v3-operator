@@ -300,7 +300,7 @@ async def process(
     if not os_token_positions:
         logger.info('No redeemable os token positions to upload, exiting...')
         return
-    total_redeemable = sum(p.amount for p in os_token_positions)
+    total_redeemable = sum(p.leaf_shares for p in os_token_positions)
     logger.info(
         'Created %(count)s redeemable os token positions. '
         'Total redeemed %(os_token_symbol)s amount: '
@@ -483,11 +483,13 @@ def create_os_token_positions(
                 OsTokenPosition(
                     owner=allocator.address,
                     vault=vault_address,
-                    amount=Wei(vault_amount),
+                    leaf_shares=Wei(vault_amount),
                 )
             )
             position_ltv[allocator.address, vault_address] = vault_ltv[vault_address]
-    os_token_positions.sort(key=lambda p: (position_ltv[p.owner, p.vault], p.amount), reverse=True)
+    os_token_positions.sort(
+        key=lambda p: (position_ltv[p.owner, p.vault], p.leaf_shares), reverse=True
+    )
     return os_token_positions
 
 

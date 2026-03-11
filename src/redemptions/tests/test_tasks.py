@@ -56,7 +56,7 @@ class TestAggregateRedemptionAssetsByVaults:
             {
                 'owner': faker.eth_address(),
                 'vault': vault_1,
-                'amount': leaf_shares,
+                'leaf_shares': leaf_shares,
             }
         ]
         processed_shares_batch = [processed_shares]
@@ -117,12 +117,12 @@ class TestAggregateRedemptionAssetsByVaults:
             {
                 'owner': faker.eth_address(),
                 'vault': vault_1,
-                'amount': leaf_shares['vault_1'],
+                'leaf_shares': leaf_shares['vault_1'],
             },
             {
                 'owner': faker.eth_address(),
                 'vault': vault_2,
-                'amount': leaf_shares['vault_2'],
+                'leaf_shares': leaf_shares['vault_2'],
             },
         ]
         processed_shares_batch = [processed_shares['vault_1'], processed_shares['vault_2']]
@@ -166,7 +166,7 @@ class TestAggregateRedemptionAssetsByVaults:
                 {
                     'owner': faker.eth_address(),
                     'vault': vault_1,
-                    'amount': leaf_shares_1,
+                    'leaf_shares': leaf_shares_1,
                 }
             )
             if index < redemption_users_count_per_vault:
@@ -180,7 +180,7 @@ class TestAggregateRedemptionAssetsByVaults:
                 {
                     'owner': faker.eth_address(),
                     'vault': vault_2,
-                    'amount': leaf_shares_2,
+                    'leaf_shares': leaf_shares_2,
                 }
             )
 

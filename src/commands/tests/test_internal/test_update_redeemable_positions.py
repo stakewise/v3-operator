@@ -48,7 +48,7 @@ def test_create_os_token_positions_single_vault():
         address_1: Wei(0),
     }
     result = create_os_token_positions(allocators, kept_tokens, 0)
-    assert result == [OsTokenPosition(owner=address_1, vault=vault_1, amount=Wei(150))]
+    assert result == [OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(150))]
 
 
 def test_create_os_token_positions_kept_tokens():
@@ -69,7 +69,7 @@ def test_create_os_token_positions_kept_tokens():
         address_1: Wei(100),
     }
     result = create_os_token_positions(allocators, kept_tokens, 0)
-    assert result == [OsTokenPosition(owner=address_1, vault=vault_1, amount=Wei(50))]
+    assert result == [OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(50))]
 
 
 def test_create_os_token_positions_multiple_allocators():
@@ -100,7 +100,7 @@ def test_create_os_token_positions_multiple_allocators():
         address_2: Wei(75),
     }
     result = create_os_token_positions(allocators, kept_tokens, 0)
-    assert result == [OsTokenPosition(owner=address_1, vault=vault_1, amount=Wei(150))]
+    assert result == [OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(150))]
 
 
 def test_create_os_token_positions_multiple_vaults_1():
@@ -123,8 +123,8 @@ def test_create_os_token_positions_multiple_vaults_1():
     ]
     result = create_os_token_positions(allocators, {}, 0)
     assert result == [
-        OsTokenPosition(owner=address_1, vault=vault_1, amount=Wei(150)),
-        OsTokenPosition(owner=address_1, vault=vault_2, amount=Wei(150)),
+        OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(150)),
+        OsTokenPosition(owner=address_1, vault=vault_2, leaf_shares=Wei(150)),
     ]
 
 
@@ -150,8 +150,8 @@ def test_create_os_token_positions_multiple_vaults_2():
     }
     result = create_os_token_positions(allocators, kept_tokens, 0)
     assert result == [
-        OsTokenPosition(owner=address_1, vault=vault_2, amount=Wei(600)),
-        OsTokenPosition(owner=address_1, vault=vault_1, amount=Wei(299)),
+        OsTokenPosition(owner=address_1, vault=vault_2, leaf_shares=Wei(600)),
+        OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(299)),
     ]
 
 
@@ -177,8 +177,8 @@ def test_create_os_token_positions_multiple_vaults_3():
     }
     result = create_os_token_positions(allocators, kept_tokens, 0)
     assert result == [
-        OsTokenPosition(owner=address_1, vault=vault_2, amount=Wei(900)),
-        OsTokenPosition(owner=address_1, vault=vault_1, amount=Wei(0)),
+        OsTokenPosition(owner=address_1, vault=vault_2, leaf_shares=Wei(900)),
+        OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(0)),
     ]
 
 
@@ -204,7 +204,7 @@ def test_create_os_token_positions_min_minted_shares():
     }
     result = create_os_token_positions(allocators, kept_tokens, 300)
     assert result == [
-        OsTokenPosition(owner=address_1, vault=vault_2, amount=Wei(600)),
+        OsTokenPosition(owner=address_1, vault=vault_2, leaf_shares=Wei(600)),
     ]
 
 
@@ -244,9 +244,9 @@ def test_create_os_token_positions_ordering_by_ltv_and_amount():
     result = create_os_token_positions(allocators, {}, 0)
     # sorted by ltv desc, then amount desc
     assert result == [
-        OsTokenPosition(owner=address_2, vault=vault_1, amount=Wei(500)),
-        OsTokenPosition(owner=address_3, vault=vault_2, amount=Wei(200)),
-        OsTokenPosition(owner=address_1, vault=vault_1, amount=Wei(1000)),
+        OsTokenPosition(owner=address_2, vault=vault_1, leaf_shares=Wei(500)),
+        OsTokenPosition(owner=address_3, vault=vault_2, leaf_shares=Wei(200)),
+        OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(1000)),
     ]
 
 
@@ -515,7 +515,7 @@ class TestUpdateOsTokenPositions:
             result = runner.invoke(update_redeemable_positions, args, input='\n')
             assert result.exit_code == 0
             mock_upload_json.assert_called_once_with(
-                [{'owner': address_1, 'vault': vault_1, 'amount': '2563636363636363637'}]
+                [{'owner': address_1, 'vault': vault_1, 'leaf_shares': '2563636363636363637'}]
             )
             assert (
                 '0x9bb2ee30813b89e23e6bbfa1b78706c008f71489750571c81d3b33289647bec1'
@@ -573,7 +573,7 @@ class TestUpdateOsTokenPositions:
             result = runner.invoke(update_redeemable_positions, args, input='\n')
             assert result.exit_code == 0
             mock_upload_json.assert_called_once_with(
-                [{'owner': address_1, 'vault': vault_1, 'amount': '10000000000000000000'}]
+                [{'owner': address_1, 'vault': vault_1, 'leaf_shares': '10000000000000000000'}]
             )
             assert (
                 '0x9b4419ebea301ed07e591b477e69499f35e4c3cd69538c2f22a6a014b06e5bbd'
@@ -581,7 +581,7 @@ class TestUpdateOsTokenPositions:
             )
 
     @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
-    async def test_min_os_token_position_amount(
+    async def test_min_leaf_shares(
         self,
         vault_address: str,
         execution_endpoints: str,
@@ -635,7 +635,7 @@ class TestUpdateOsTokenPositions:
             mock_upload_json.assert_not_called()
 
     @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
-    async def test_min_os_token_position_amount_after_kept_shares(
+    async def test_min_leaf_shares_after_kept_shares(
         self,
         vault_address: str,
         execution_endpoints: str,

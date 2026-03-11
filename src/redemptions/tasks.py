@@ -111,8 +111,7 @@ async def aggregate_redemption_assets_by_vaults(
             os_token_position_batch, processed_shares_batch
         ):
             vault = os_token_position.vault
-            leaf_shares = os_token_position.amount
-            unprocessed_shares = leaf_shares - processed_shares
+            unprocessed_shares = os_token_position.leaf_shares - processed_shares
 
             # Skip if no unprocessed shares, handle rounding errors
             if unprocessed_shares <= 1:
@@ -157,13 +156,13 @@ async def iter_os_token_positions(
     data = cast(list[dict], await ipfs_fetch_client.fetch_json(redeemable_positions.ipfs_hash))
 
     # data structure example:
-    # [{"owner:" 0x01, "amount": 100000, "vault": 0x02}, ...]
+    # [{"owner:" 0x01, "leaf_shares": 100000, "vault": 0x02}, ...]
 
     for item in data:
         yield OsTokenPosition(
             owner=Web3.to_checksum_address(item['owner']),
             vault=Web3.to_checksum_address(item['vault']),
-            amount=Wei(int(item['amount'])),
+            leaf_shares=Wei(int(item['leaf_shares'])),
         )
 
 
