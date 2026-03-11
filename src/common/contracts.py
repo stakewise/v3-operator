@@ -293,6 +293,10 @@ class VaultEncoder(BaseEncoder):
         )
 
 
+class NodesManagerContract(ContractWrapper):
+    abi_path = 'abi/INodesManager.json'
+
+
 class ValidatorsRegistryContract(ContractWrapper):
     abi_path = 'abi/IValidatorsRegistry.json'
     settings_key = 'VALIDATORS_REGISTRY_CONTRACT_ADDRESS'

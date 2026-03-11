@@ -1,0 +1,65 @@
+[
+  {
+    "type": "function",
+    "name": "registerValidators",
+    "inputs": [
+      {
+        "name": "keeperParams",
+        "type": "tuple",
+        "internalType": "struct IKeeperValidators.ApprovalParams",
+        "components": [
+          {
+            "name": "validatorsRegistryRoot",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "deadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "validators",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "signatures",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "exitSignaturesIpfsHash",
+            "type": "string",
+            "internalType": "string"
+          }
+        ]
+      },
+      {
+        "name": "oracleSignatures",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "fundValidators",
+    "inputs": [
+      {
+        "name": "validators",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "oracleSignatures",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  }
+]
