@@ -44,8 +44,8 @@ from src.validators.execution import get_withdrawable_assets
 logger = logging.getLogger(__name__)
 
 DEFAULT_INTERVAL = 60  # 1 minute
-DEFAULT_MIN_QUEUED_SHARES = Web3.to_wei(0.1, 'ether')
-DEFAULT_MIN_QUEUED_SHARES_GWEI = Web3.from_wei(DEFAULT_MIN_QUEUED_SHARES, 'gwei')
+DEFAULT_MIN_QUEUED_ASSETS = Web3.to_wei(0.1, 'ether')
+DEFAULT_MIN_QUEUED_ASSETS_GWEI = Web3.from_wei(DEFAULT_MIN_QUEUED_ASSETS, 'gwei')
 
 
 @click.option(
@@ -84,11 +84,11 @@ DEFAULT_MIN_QUEUED_SHARES_GWEI = Web3.from_wei(DEFAULT_MIN_QUEUED_SHARES, 'gwei'
     help='Sleep interval in seconds between processing rounds.',
 )
 @click.option(
-    '--min-queued-shares-gwei',
+    '--min-queued-assets-gwei',
     type=int,
-    default=DEFAULT_MIN_QUEUED_SHARES_GWEI,
-    envvar='MIN_QUEUED_SHARES_GWEI',
-    help='Minimum queued shares (in Gwei) to trigger redemption processing.',
+    default=DEFAULT_MIN_QUEUED_ASSETS_GWEI,
+    envvar='MIN_QUEUED_ASSETS_GWEI',
+    help='Minimum queued assets (in Gwei) to trigger redemption processing.',
 )
 @click.option(
     '--log-level',
@@ -223,10 +223,6 @@ async def process(
     # Step 5: Fetch vault params
     vaults = {p.vault for p in os_token_positions}
     vault_to_harvest_params = await get_multiple_harvest_params(list(vaults), block_number)
-    # vault_to_withdrawable_assets = await fetch_vault_withdrawable_assets(
-    #     vaults=vaults,
-    #     vault_to_harvest_params=vault_to_harvest_params,
-    # )
     vault_to_withdrawable_assets: dict[ChecksumAddress, Wei] = {}
     for vault in vaults:
         vault_to_withdrawable_assets[vault] = await get_withdrawable_assets(
@@ -323,86 +319,84 @@ async def select_positions(
     vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None],
     vault_to_withdrawable_assets: dict[ChecksumAddress, Wei],
 ) -> list[OsTokenPosition]:
-    """Select positions to redeem, capped by queued_shares and withdrawable assets.
+    """Select positions to redeem in IPFS order, capped by queued shares and withdrawable assets.
 
-    Per-vault: if total assets needed exceed withdrawable, attempt meta-vault sub-vault
-    redemption once for the full deficit before processing individual positions.
+    Pre-computes meta-vault redemptions for all vaults, then iterates positions
+    in their original IPFS ordering.
     """
-    vault_to_positions: defaultdict[ChecksumAddress, list[OsTokenPosition]] = defaultdict(list)
-    for position in os_token_positions:
-        vault_to_positions[position.vault].append(position)
+    vault_to_withdrawable_assets = await _redeem_meta_vaults(
+        os_token_positions=os_token_positions,
+        queued_shares=queued_shares,
+        converter=converter,
+        vault_to_harvest_params=vault_to_harvest_params,
+        vault_to_withdrawable_assets=vault_to_withdrawable_assets,
+    )
 
     positions_to_redeem: list[OsTokenPosition] = []
     remaining_shares = queued_shares
 
-    for vault_address, positions in vault_to_positions.items():
+    for position in os_token_positions:
         if remaining_shares <= 0:
             break
 
-        withdrawable_assets = await _compute_vault_withdrawable_assets(
-            vault_address=vault_address,
-            withdrawable_assets=vault_to_withdrawable_assets[vault_address],
-            positions=positions,
-            converter=converter,
-            remaining_shares=remaining_shares,
-            harvest_params=vault_to_harvest_params[vault_address],
-        )
+        withdrawable_assets = vault_to_withdrawable_assets.get(position.vault, Wei(0))
+        shares_to_redeem = Wei(min(position.available_shares, remaining_shares))
+        redeemable_assets = converter.to_assets(shares_to_redeem)
 
-        for position in positions:
-            if remaining_shares <= 0:
-                break
-
-            shares_to_redeem = Wei(min(position.available_shares, remaining_shares))
+        if redeemable_assets > withdrawable_assets:
+            shares_to_redeem = converter.to_shares(withdrawable_assets)
+            if shares_to_redeem <= 0:
+                continue
             redeemable_assets = converter.to_assets(shares_to_redeem)
 
-            if redeemable_assets > withdrawable_assets:
-                shares_to_redeem = converter.to_shares(withdrawable_assets)
-                if shares_to_redeem <= 0:
-                    continue
-                redeemable_assets = converter.to_assets(shares_to_redeem)
-
-            logger.info(
-                'Position Owner: %s, Vault: %s, Shares to Redeem: %s',
-                position.owner,
-                position.vault,
-                shares_to_redeem,
-            )
-            positions_to_redeem.append(replace(position, shares_to_redeem=shares_to_redeem))
-            withdrawable_assets = Wei(withdrawable_assets - redeemable_assets)
-            remaining_shares -= shares_to_redeem
+        logger.info(
+            'Position Owner: %s, Vault: %s, Shares to Redeem: %s',
+            position.owner,
+            position.vault,
+            shares_to_redeem,
+        )
+        positions_to_redeem.append(replace(position, shares_to_redeem=shares_to_redeem))
+        vault_to_withdrawable_assets[position.vault] = Wei(withdrawable_assets - redeemable_assets)
+        remaining_shares -= shares_to_redeem
 
     return positions_to_redeem
 
 
-# pylint: disable-next=too-many-arguments
-async def _compute_vault_withdrawable_assets(
-    withdrawable_assets: Wei,
-    vault_address: ChecksumAddress,
-    harvest_params: HarvestParams | None,
-    positions: list[OsTokenPosition],
-    remaining_shares: int,
+async def _redeem_meta_vaults(
+    os_token_positions: list[OsTokenPosition],
+    queued_shares: int,
     converter: OsTokenConverter,
-) -> Wei:
-    """Compute withdrawable assets for a vault, attempting meta-vault redemption if needed."""
-    # Pre-compute total assets needed across all positions in this vault
-    total_vault_assets = Wei(0)
-    for position in positions:
-        if remaining_shares <= 0:
-            break
-        shares = Wei(min(position.available_shares, remaining_shares))
-        total_vault_assets = Wei(total_vault_assets + converter.to_assets(shares))
-        remaining_shares -= shares
+    vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None],
+    vault_to_withdrawable_assets: dict[ChecksumAddress, Wei],
+) -> dict[ChecksumAddress, Wei]:
+    """Pre-compute meta-vault redemptions for all vaults that need them.
 
-    # redeem meta vault
-    if total_vault_assets > withdrawable_assets:
-        deficit = Wei(total_vault_assets - withdrawable_assets)
-        withdrawable_assets = await _try_redeem_meta_vault(
-            vault_address,
-            deficit,
-            withdrawable_assets,
-            harvest_params,
-        )
-    return withdrawable_assets
+    Estimates per-vault asset needs from positions (in IPFS order, capped by queued shares),
+    then attempts meta-vault redemption for any vault with a deficit.
+    Returns updated vault-to-withdrawable mapping.
+    """
+    vault_to_withdrawable = dict(vault_to_withdrawable_assets)
+    vault_to_needed: defaultdict[ChecksumAddress, Wei] = defaultdict(lambda: Wei(0))
+    remaining = queued_shares
+
+    for pos in os_token_positions:
+        if remaining <= 0:
+            break
+        shares = Wei(min(pos.available_shares, remaining))
+        vault_to_needed[pos.vault] = Wei(vault_to_needed[pos.vault] + converter.to_assets(shares))
+        remaining -= shares
+
+    for vault, needed in vault_to_needed.items():
+        withdrawable = vault_to_withdrawable.get(vault, Wei(0))
+        if needed > withdrawable:
+            vault_to_withdrawable[vault] = await _try_redeem_meta_vault(
+                vault,
+                Wei(needed - withdrawable),
+                withdrawable,
+                vault_to_harvest_params.get(vault),
+            )
+
+    return vault_to_withdrawable
 
 
 async def _try_redeem_meta_vault(
