@@ -387,7 +387,7 @@ async def _redeem_meta_vaults(
         if needed > withdrawable:
             vault_to_withdrawable[vault] = await _try_redeem_meta_vault(
                 vault,
-                Wei(needed - withdrawable),
+                needed,
                 withdrawable,
                 vault_to_harvest_params.get(vault),
             )
