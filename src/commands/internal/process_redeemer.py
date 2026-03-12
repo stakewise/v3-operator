@@ -15,11 +15,7 @@ from web3.exceptions import Web3Exception
 from web3.types import Gwei, Wei
 
 from src.common.clients import close_clients, execution_client, setup_clients
-from src.common.contracts import (
-    VaultContract,
-    multicall_contract,
-    os_token_redeemer_contract,
-)
+from src.common.contracts import os_token_redeemer_contract
 from src.common.execution import transaction_gas_wrapper
 from src.common.harvest import get_multiple_harvest_params
 from src.common.logging import LOG_LEVELS, setup_logging
@@ -347,7 +343,7 @@ async def select_positions(
             shares_to_redeem = converter.to_shares(withdrawable_assets)
             if shares_to_redeem <= 0:
                 continue
-            redeemable_assets = converter.to_assets(shares_to_redeem)
+            redeemable_assets = withdrawable_assets
 
         logger.info(
             'Position Owner: %s, Vault: %s, Shares to Redeem: %s',
@@ -444,16 +440,23 @@ async def execute_redemption(
         positions_to_redeem=positions_to_redeem,
         tree_nonce=nonce,
     )
-    calls: list[tuple[ChecksumAddress, HexStr]] = []
+    calls: list[HexStr] = []
 
     for vault in set(pos.vault for pos in positions_to_redeem):
         harvest_params = vault_to_harvest_params.get(vault)
         if harvest_params:
-            vault_contract = VaultContract(vault)
             calls.append(
-                (
-                    vault_contract.contract_address,
-                    vault_contract.get_update_state_call(harvest_params),
+                os_token_redeemer_contract.encode_abi(
+                    fn_name='updateVaultState',
+                    args=[
+                        vault,
+                        (
+                            harvest_params.rewards_root,
+                            harvest_params.reward,
+                            harvest_params.unlocked_mev_reward,
+                            harvest_params.proof,
+                        ),
+                    ],
                 )
             )
 
@@ -462,14 +465,15 @@ async def execute_redemption(
     positions_arg = [
         (pos.vault, pos.owner, pos.leaf_shares, pos.shares_to_redeem) for pos in positions_to_redeem
     ]
-    redeem_call = os_token_redeemer_contract.encode_abi(
-        fn_name='redeemOsTokenPositions',
-        args=[positions_arg, multiproof.proof, multiproof.proof_flags],
+    calls.append(
+        os_token_redeemer_contract.encode_abi(
+            fn_name='redeemOsTokenPositions',
+            args=[positions_arg, multiproof.proof, multiproof.proof_flags],
+        )
     )
-    calls.append((os_token_redeemer_contract.contract_address, redeem_call))
 
     try:
-        tx_function = multicall_contract.functions.aggregate(calls)
+        tx_function = os_token_redeemer_contract.functions.multicall(calls)
         tx = await transaction_gas_wrapper(tx_function=tx_function)
     except Web3Exception:
         logger.exception('Failed to redeem os token positions')

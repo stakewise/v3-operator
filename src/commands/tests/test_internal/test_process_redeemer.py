@@ -393,10 +393,6 @@ class TestExecuteRedemption:
         harvest_params = make_harvest_params()
 
         with _mock_execute_redemption(tx_status=1) as mocks:
-            mock_vault = mocks['MockVaultContract'].return_value
-            mock_vault.contract_address = VAULT_1
-            mock_vault.get_update_state_call.return_value = HexStr('0xupdate')
-
             result = await execute_redemption(
                 all_positions=[pos],
                 positions_to_redeem=[pos],
@@ -405,7 +401,14 @@ class TestExecuteRedemption:
             )
 
         assert result is not None
-        mock_vault.get_update_state_call.assert_called_once_with(harvest_params)
+        # Verify encode_abi was called for updateVaultState and redeemOsTokenPositions
+        encode_calls = mocks['mock_redeemer'].encode_abi.call_args_list
+        assert any(
+            c.kwargs.get('fn_name') == 'updateVaultState'
+            or (c.args and c.args[0] == 'updateVaultState')
+            for c in encode_calls
+            if c.kwargs.get('fn_name') or c.args
+        )
 
     async def test_successful_without_harvest_params(self) -> None:
         pos = make_position(
@@ -497,18 +500,14 @@ def _mock_execute_redemption(
     )
 
     with (
-        patch(f'{MODULE}.VaultContract') as MockVaultContract,
         patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
-        patch(f'{MODULE}.multicall_contract'),
         patch(f'{MODULE}.transaction_gas_wrapper', new=tx_mock),
         patch(f'{MODULE}.execution_client', new=mock_client),
         patch(f'{MODULE}.settings') as mock_settings,
     ):
         mock_settings.execution_transaction_timeout = 120
-        mock_redeemer.encode_abi.return_value = HexStr('0xredeem')
-        mock_redeemer.contract_address = VAULT_2
+        mock_redeemer.encode_abi.return_value = HexStr('0xencoded')
         yield {
-            'MockVaultContract': MockVaultContract,
             'mock_redeemer': mock_redeemer,
         }
 
