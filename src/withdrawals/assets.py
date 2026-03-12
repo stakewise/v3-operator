@@ -50,7 +50,7 @@ async def get_queued_assets(
     Get exit queue missing assets.
     For Gno networks return value in mGNO-Gwei.
     """
-    harvest_params = await get_harvest_params(chain_head.block_number)
+    harvest_params = await get_harvest_params(settings.vault, chain_head.block_number)
 
     # Get exit queue cumulative tickets
     exit_queue_cumulative_ticket = (
