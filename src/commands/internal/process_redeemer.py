@@ -15,7 +15,11 @@ from web3.exceptions import Web3Exception
 from web3.types import Gwei, Wei
 
 from src.common.clients import close_clients, execution_client, setup_clients
-from src.common.contracts import os_token_redeemer_contract
+from src.common.contracts import (
+    MetaVaultContract,
+    SubVaultsRegistryContract,
+    os_token_redeemer_contract,
+)
 from src.common.execution import transaction_gas_wrapper
 from src.common.harvest import get_multiple_harvest_params
 from src.common.logging import LOG_LEVELS, setup_logging
@@ -25,6 +29,7 @@ from src.common.wallet import wallet
 from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
 from src.meta_vault.service import is_meta_vault
+from src.meta_vault.typings import SubVaultRedemption
 from src.redemptions.os_token_converter import (
     OsTokenConverter,
     create_os_token_converter,
@@ -403,29 +408,64 @@ async def _try_redeem_meta_vault(
 ) -> Wei:
     """If vault is a meta-vault, redeem sub-vaults for the deficit.
 
+    Handles nested meta vaults by building a bottom-up redemption order
+    and processing deepest nested vaults first.
+
     Returns the (possibly updated) withdrawable assets.
     """
     if not await is_meta_vault(vault_address):
         return current_withdrawable
 
     logger.info('Vault %s is a meta-vault with insufficient withdrawable assets.', vault_address)
-    try:
-        tx_hash = await os_token_redeemer_contract.redeem_sub_vaults_assets(vault_address, deficit)
-        logger.info(
-            'redeemSubVaultsAssets confirmed for vault %s. Tx Hash: %s',
-            vault_address,
-            tx_hash,
-        )
-    except (Web3Exception, RuntimeError):
-        logger.error(
-            'redeemSubVaultsAssets failed for vault %s. '
-            'Proceeding with current withdrawable assets.',
-            vault_address,
-        )
-        return current_withdrawable
+
+    redeem_order = await _build_meta_vault_redeem_order(vault_address, deficit)
+
+    for redeem_entry in redeem_order:
+        try:
+            tx_hash = await os_token_redeemer_contract.redeem_sub_vaults_assets(
+                redeem_entry.vault, redeem_entry.assets
+            )
+            logger.info(
+                'redeemSubVaultsAssets confirmed for vault %s. Tx Hash: %s',
+                redeem_entry.vault,
+                tx_hash,
+            )
+        except (Web3Exception, RuntimeError):
+            logger.error(
+                'redeemSubVaultsAssets failed for vault %s. '
+                'Proceeding with current withdrawable assets.',
+                redeem_entry.vault,
+            )
+            return current_withdrawable
 
     # Re-query actual withdrawable assets on-chain after sub-vault redemption
     return await get_withdrawable_assets(vault_address, harvest_params)
+
+
+async def _build_meta_vault_redeem_order(
+    vault: ChecksumAddress,
+    deficit: Wei,
+) -> list[SubVaultRedemption]:
+    """Build bottom-up order of meta vault redemptions for nested meta vaults.
+
+    For MetaVault A with sub-vault B (also a meta vault) with sub-vaults C, D:
+    returns [(B, deficit_B), (A, deficit_A)] so B is redeemed first.
+    """
+    order: list[SubVaultRedemption] = []
+
+    meta_vault_contract = MetaVaultContract(vault)
+    registry_address = await meta_vault_contract.sub_vaults_registry()
+    registry = SubVaultsRegistryContract(registry_address)
+
+    redemptions = await registry.calculate_sub_vaults_redemptions(deficit)
+
+    for redemption in redemptions:
+        if redemption.assets > 0 and await is_meta_vault(redemption.vault):
+            nested_order = await _build_meta_vault_redeem_order(redemption.vault, redemption.assets)
+            order.extend(nested_order)
+
+    order.append(SubVaultRedemption(vault=vault, assets=deficit))
+    return order
 
 
 async def execute_redemption(
