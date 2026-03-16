@@ -440,7 +440,7 @@ async def _try_redeem_meta_vault(
                 redeem_entry.vault,
                 tx_hash,
             )
-        except (Web3Exception, RuntimeError):
+        except (Web3Exception, RuntimeError, ValueError):
             logger.error(
                 'redeemSubVaultsAssets failed for vault %s. '
                 'Proceeding with current withdrawable assets.',
