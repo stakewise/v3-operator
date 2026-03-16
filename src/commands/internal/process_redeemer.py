@@ -418,13 +418,23 @@ async def _try_redeem_meta_vault(
 
     logger.info('Vault %s is a meta-vault with insufficient withdrawable assets.', vault_address)
 
-    redeem_order = await _build_meta_vault_redeem_order(vault_address, deficit)
+    try:
+        redeem_order = await _build_meta_vault_redeem_order(vault_address, deficit)
+    except Exception:
+        logger.exception(
+            'Failed to build meta-vault redeem order for vault %s. '
+            'Proceeding with current withdrawable assets.',
+            vault_address,
+        )
+        return current_withdrawable
 
+    any_succeeded = False
     for redeem_entry in redeem_order:
         try:
             tx_hash = await os_token_redeemer_contract.redeem_sub_vaults_assets(
                 redeem_entry.vault, redeem_entry.assets
             )
+            any_succeeded = True
             logger.info(
                 'redeemSubVaultsAssets confirmed for vault %s. Tx Hash: %s',
                 redeem_entry.vault,
@@ -436,6 +446,8 @@ async def _try_redeem_meta_vault(
                 'Proceeding with current withdrawable assets.',
                 redeem_entry.vault,
             )
+            if any_succeeded:
+                return await get_withdrawable_assets(vault_address, harvest_params)
             return current_withdrawable
 
     # Re-query actual withdrawable assets on-chain after sub-vault redemption
