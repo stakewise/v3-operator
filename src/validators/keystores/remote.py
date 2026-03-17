@@ -143,7 +143,8 @@ class RemoteSignerKeystore(BaseKeystore):
             public_key_bytes, validator_index, fork, message
         )
 
-        bls.Verify(public_key_bytes, message, exit_signature)
+        if not bls.Verify(public_key_bytes, message, exit_signature):
+            raise ValueError('Exit signature verification failed')
         return exit_signature
 
     @staticmethod
