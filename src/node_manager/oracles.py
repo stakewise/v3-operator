@@ -6,6 +6,7 @@ from collections import defaultdict
 from typing import Callable, Sequence, TypeVar
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
+from eth_account.messages import encode_defunct
 from eth_typing import ChecksumAddress, HexStr
 from sw_utils.common import urljoin
 from sw_utils.typings import ProtocolConfig
@@ -24,7 +25,8 @@ from src.common.utils import (
     get_current_timestamp,
     warning_verbose,
 )
-from src.config.settings import ORACLES_VALIDATORS_TIMEOUT, settings
+from src.common.wallet import wallet
+from src.config.settings import ORACLES_VALIDATORS_TIMEOUT
 from src.node_manager.typings import (
     EligibleOperator,
     NodeManagerApprovalRequest,
@@ -188,7 +190,6 @@ async def create_approval_request(
 
     request = NodeManagerApprovalRequest(
         validator_index=validators_start_index,
-        vault_address=settings.vault,
         operator_address=operator_address,
         validators_root=registry_root,
         public_keys=[],
@@ -197,6 +198,7 @@ async def create_approval_request(
         exit_signature_shards=[],
         deadline=deadline,
         amounts=[],
+        signature=_sign_deadline(deadline),
     )
 
     for validator_index, validator in enumerate(validators, validators_start_index):
@@ -279,11 +281,11 @@ def create_funding_request(
 ) -> NodeManagerFundingRequest:
     """Build a NodesManager funding request for validator top-ups."""
     return NodeManagerFundingRequest(
-        vault_address=settings.vault,
         operator_address=operator_address,
         public_keys=list(validator_fundings.keys()),
         amounts=[int(amount) for amount in validator_fundings.values()],
         deadline=deadline,
+        signature=_sign_deadline(deadline),
     )
 
 
@@ -493,3 +495,9 @@ async def _send_request(
 
     logger.debug('Received community vault response from %s: %s', url, data)
     return parser(data)
+
+
+def _sign_deadline(deadline: int) -> HexStr:
+    """EIP-191 personal_sign of the deadline timestamp."""
+    message = encode_defunct(text=str(deadline))
+    return HexStr(wallet.sign_message(message).signature.hex())
