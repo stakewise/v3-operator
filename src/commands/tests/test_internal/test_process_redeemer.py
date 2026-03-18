@@ -12,6 +12,7 @@ from web3.exceptions import Web3Exception
 from web3.types import Gwei, Wei
 
 from src.commands.internal.process_redeemer import (
+    _build_meta_vault_redeem_order,
     _process_exit_queue,
     _startup_check,
     _try_redeem_meta_vault,
@@ -23,6 +24,7 @@ from src.commands.internal.process_redeemer import (
     select_positions,
 )
 from src.common.typings import HarvestParams
+from src.meta_vault.typings import SubVaultRedemption
 from src.redemptions.os_token_converter import OsTokenConverter
 from src.redemptions.typings import OsTokenPosition
 
@@ -30,8 +32,10 @@ MODULE = 'src.commands.internal.process_redeemer'
 
 VAULT_1 = Web3.to_checksum_address('0x' + '11' * 20)
 VAULT_2 = Web3.to_checksum_address('0x' + '22' * 20)
+VAULT_3 = Web3.to_checksum_address('0x' + '55' * 20)
 OWNER_1 = Web3.to_checksum_address('0x' + '33' * 20)
 OWNER_2 = Web3.to_checksum_address('0x' + '44' * 20)
+REGISTRY_1 = Web3.to_checksum_address('0x' + '66' * 20)
 
 
 # --- Pure function tests (no mocks) ---
@@ -307,6 +311,10 @@ class TestTryRedeemMetaVault:
     async def test_meta_vault_successful_redeem(self) -> None:
         with (
             patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
+            patch(
+                f'{MODULE}._build_meta_vault_redeem_order',
+                new=AsyncMock(return_value=[SubVaultRedemption(vault=VAULT_1, assets=Wei(400))]),
+            ),
             patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
             patch(
                 f'{MODULE}.get_withdrawable_assets',
@@ -326,6 +334,10 @@ class TestTryRedeemMetaVault:
     async def test_meta_vault_failed_redeem(self) -> None:
         with (
             patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
+            patch(
+                f'{MODULE}._build_meta_vault_redeem_order',
+                new=AsyncMock(return_value=[SubVaultRedemption(vault=VAULT_1, assets=Wei(400))]),
+            ),
             patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
         ):
             mock_redeemer.redeem_sub_vaults_assets = AsyncMock(side_effect=RuntimeError('fail'))
@@ -336,6 +348,144 @@ class TestTryRedeemMetaVault:
                 harvest_params=None,
             )
         assert result == Wei(100)
+
+    async def test_nested_meta_vault_all_succeed(self) -> None:
+        """Nested meta vault B is redeemed before parent A."""
+        with (
+            patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
+            patch(
+                f'{MODULE}._build_meta_vault_redeem_order',
+                new=AsyncMock(
+                    return_value=[
+                        SubVaultRedemption(vault=VAULT_2, assets=Wei(200)),
+                        SubVaultRedemption(vault=VAULT_1, assets=Wei(400)),
+                    ]
+                ),
+            ),
+            patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
+            patch(
+                f'{MODULE}.get_withdrawable_assets',
+                new=AsyncMock(return_value=Wei(500)),
+            ),
+        ):
+            mock_redeemer.redeem_sub_vaults_assets = AsyncMock(return_value='0xabc')
+            result = await _try_redeem_meta_vault(
+                vault_address=VAULT_1,
+                deficit=Wei(400),
+                current_withdrawable=Wei(100),
+                harvest_params=None,
+            )
+        assert result == Wei(500)
+        calls = mock_redeemer.redeem_sub_vaults_assets.call_args_list
+        assert len(calls) == 2
+        assert calls[0].args == (VAULT_2, Wei(200))
+        assert calls[1].args == (VAULT_1, Wei(400))
+
+    async def test_nested_meta_vault_nested_fails(self) -> None:
+        """If nested redemption fails, returns current_withdrawable."""
+        with (
+            patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
+            patch(
+                f'{MODULE}._build_meta_vault_redeem_order',
+                new=AsyncMock(
+                    return_value=[
+                        SubVaultRedemption(vault=VAULT_2, assets=Wei(200)),
+                        SubVaultRedemption(vault=VAULT_1, assets=Wei(400)),
+                    ]
+                ),
+            ),
+            patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
+        ):
+            mock_redeemer.redeem_sub_vaults_assets = AsyncMock(
+                side_effect=RuntimeError('nested fail')
+            )
+            result = await _try_redeem_meta_vault(
+                vault_address=VAULT_1,
+                deficit=Wei(400),
+                current_withdrawable=Wei(100),
+                harvest_params=None,
+            )
+        assert result == Wei(100)
+        # Only the first call (nested vault) was attempted
+        mock_redeemer.redeem_sub_vaults_assets.assert_called_once_with(VAULT_2, Wei(200))
+
+
+class TestBuildMetaVaultRedeemOrder:
+    async def test_flat_meta_vault_no_nesting(self) -> None:
+        """Meta vault with only regular sub-vaults returns single entry."""
+        mock_registry = AsyncMock()
+        mock_registry.calculate_sub_vaults_redemptions = AsyncMock(return_value=[])
+
+        with (
+            patch(f'{MODULE}.MetaVaultContract') as mock_mv_cls,
+            patch(f'{MODULE}.SubVaultsRegistryContract', return_value=mock_registry),
+            patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=False)),
+        ):
+            mock_mv_cls.return_value.sub_vaults_registry = AsyncMock(return_value=REGISTRY_1)
+            result = await _build_meta_vault_redeem_order(VAULT_1, Wei(400))
+
+        assert result == [SubVaultRedemption(vault=VAULT_1, assets=Wei(400))]
+
+    async def test_nested_meta_vault(self) -> None:
+        """MetaVault A has sub-vault B (meta vault). Order: B first, then A."""
+        redemption_b = SubVaultRedemption(vault=VAULT_2, assets=Wei(200))
+        redemption_c = SubVaultRedemption(vault=VAULT_3, assets=Wei(100))
+
+        # Registry for A returns B (meta) and C (regular)
+        mock_registry_a = AsyncMock()
+        mock_registry_a.calculate_sub_vaults_redemptions = AsyncMock(
+            return_value=[redemption_b, redemption_c]
+        )
+        # Registry for B returns no nested meta vaults
+        mock_registry_b = AsyncMock()
+        mock_registry_b.calculate_sub_vaults_redemptions = AsyncMock(return_value=[])
+
+        registry_a = Web3.to_checksum_address('0x' + 'aa' * 20)
+        registry_b = Web3.to_checksum_address('0x' + 'bb' * 20)
+
+        async def mock_is_meta_vault(addr: ChecksumAddress) -> bool:
+            return addr in (VAULT_1, VAULT_2)
+
+        def mock_meta_vault_contract(addr: ChecksumAddress) -> MagicMock:
+            m = MagicMock()
+            if addr == VAULT_1:
+                m.sub_vaults_registry = AsyncMock(return_value=registry_a)
+            else:
+                m.sub_vaults_registry = AsyncMock(return_value=registry_b)
+            return m
+
+        def mock_registry_contract(addr: ChecksumAddress) -> AsyncMock:
+            if addr == registry_a:
+                return mock_registry_a
+            return mock_registry_b
+
+        with (
+            patch(f'{MODULE}.MetaVaultContract', side_effect=mock_meta_vault_contract),
+            patch(f'{MODULE}.SubVaultsRegistryContract', side_effect=mock_registry_contract),
+            patch(f'{MODULE}.is_meta_vault', side_effect=mock_is_meta_vault),
+        ):
+            result = await _build_meta_vault_redeem_order(VAULT_1, Wei(400))
+
+        assert result == [
+            SubVaultRedemption(vault=VAULT_2, assets=Wei(200)),
+            SubVaultRedemption(vault=VAULT_1, assets=Wei(400)),
+        ]
+
+    async def test_skips_zero_asset_redemptions(self) -> None:
+        """Sub-vaults with zero assets are not recursed into."""
+        redemption = SubVaultRedemption(vault=VAULT_2, assets=Wei(0))
+        mock_registry = AsyncMock()
+        mock_registry.calculate_sub_vaults_redemptions = AsyncMock(return_value=[redemption])
+
+        with (
+            patch(f'{MODULE}.MetaVaultContract') as mock_mv_cls,
+            patch(f'{MODULE}.SubVaultsRegistryContract', return_value=mock_registry),
+            patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
+        ):
+            mock_mv_cls.return_value.sub_vaults_registry = AsyncMock(return_value=REGISTRY_1)
+            result = await _build_meta_vault_redeem_order(VAULT_1, Wei(400))
+
+        assert result == [SubVaultRedemption(vault=VAULT_1, assets=Wei(400))]
 
 
 class TestProcessExitQueue:
