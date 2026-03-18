@@ -25,8 +25,18 @@ OPERATOR_USER_AGENT = f'StakeWise Operator {src.__version__}'
 
 
 class Database:
+    def __init__(self) -> None:
+        self._conn: Connection | None = None
+
     def get_db_connection(self) -> Connection:
-        return sqlite3.connect(settings.database)
+        if not self._conn:
+            self._conn = sqlite3.connect(settings.database)
+        return self._conn
+
+    def close(self) -> None:
+        if self._conn:
+            self._conn.close()
+        self._conn = None
 
     def create_db_dir(self) -> None:
         settings.database.parent.mkdir(parents=True, exist_ok=True)
@@ -139,6 +149,7 @@ async def setup_clients() -> None:
 
 async def close_clients() -> None:
     logger.debug('Closing active sessions...')
+    db_client.close()
     await execution_client.provider.disconnect()
     await execution_non_retry_client.provider.disconnect()
     await consensus_client.disconnect()
