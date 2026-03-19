@@ -172,6 +172,12 @@ class TestProcessFunding:
         ):
             yield
 
+    @staticmethod
+    @contextmanager
+    def patch_settings(**kwargs):
+        with patch.multiple(settings, create=True, **kwargs):
+            yield
+
     @pytest.mark.usefixtures('fake_settings')
     async def test_no_compounding_validators(self):
         """Returns vault_assets unchanged when no compounding validators exist."""
@@ -327,7 +333,7 @@ class TestProcessFunding:
             self.patch_is_funding_interval_passed(True),
             self.patch_fund_compounding_validators(HexStr('0xabc')) as mock_fund,
         ):
-            settings.validators_fetch_chunk_size = 100
+
             vault_assets = ether_to_gwei(100)
             await self.subtask.process_funding(vault_assets=vault_assets, harvest_params=None)
 
@@ -354,8 +360,6 @@ class TestProcessFunding:
         # max_balance=64, balance=40, pending=10 → effective=50, capacity=14
         # vault_assets=30 > capacity=14, so 14 goes to pub_key_1
         # remaining 16 (>= min_deposit 10) goes to pub_key_2 (balance=32, capacity=32)
-        max_balance = ether_to_gwei(64)
-        settings.max_validator_balance_gwei = max_balance
         consensus_balance_1 = ether_to_gwei(40)
         consensus_balance_2 = ether_to_gwei(32)
         pending_amount = ether_to_gwei(10)
@@ -391,12 +395,12 @@ class TestProcessFunding:
         ]
 
         with (
+            self.patch_settings(max_validator_balance_gwei=ether_to_gwei(64)),
             self.patch_get_latest_vault_v2_validator_public_keys(),
             patch('src.validators.consensus.consensus_client', mock_consensus),
             self.patch_is_funding_interval_passed(True),
             self.patch_fund_compounding_validators(HexStr('0xabc')) as mock_fund,
         ):
-            settings.validators_fetch_chunk_size = 100
             vault_assets = ether_to_gwei(30)
             await self.subtask.process_funding(vault_assets=vault_assets, harvest_params=None)
 
@@ -426,9 +430,6 @@ class TestProcessFunding:
         # non-compounding balance=32 but should be excluded
         # vault_assets=40 overwhelms compounding capacity (24),
         # but remaining 16 must NOT go to the non-compounding validator
-        max_balance = ether_to_gwei(64)
-        settings.max_validator_balance_gwei = max_balance
-
         consensus_validators_data = [
             {
                 'index': '1',
@@ -458,12 +459,12 @@ class TestProcessFunding:
         mock_consensus.get_pending_deposits.return_value = []
 
         with (
+            self.patch_settings(max_validator_balance_gwei=ether_to_gwei(64)),
             self.patch_get_latest_vault_v2_validator_public_keys(),
             patch('src.validators.consensus.consensus_client', mock_consensus),
             self.patch_is_funding_interval_passed(True),
             self.patch_fund_compounding_validators(HexStr('0xabc')) as mock_fund,
         ):
-            settings.validators_fetch_chunk_size = 100
             vault_assets = ether_to_gwei(40)
             await self.subtask.process_funding(vault_assets=vault_assets, harvest_params=None)
 
@@ -503,7 +504,7 @@ class TestProcessFunding:
             self.patch_is_funding_interval_passed(True),
             self.patch_fund_compounding_validators(HexStr('0xabc')) as mock_fund,
         ):
-            settings.validators_fetch_chunk_size = 100
+
             vault_assets = ether_to_gwei(100)
             await self.subtask.process_funding(vault_assets=vault_assets, harvest_params=None)
 
@@ -519,9 +520,8 @@ class TestProcessFunding:
         pub_key_3 = faker.validator_public_key()
         tx_hash = HexStr('0xabc')
 
-        settings.max_validator_balance_gwei = ether_to_gwei(64)
-
         with (
+            self.patch_settings(max_validator_balance_gwei=ether_to_gwei(64)),
             self.patch_compounding_validators_balances(
                 {
                     pub_key_1: ether_to_gwei(32),
