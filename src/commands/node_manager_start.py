@@ -8,10 +8,11 @@ from eth_typing import ChecksumAddress
 from sw_utils import InterruptHandler
 
 from src.common.clients import close_clients, setup_clients
+from src.common.contracts import nodes_manager_contract
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_address
-from src.config.networks import AVAILABLE_NETWORKS, NETWORKS
+from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import (
     DEFAULT_CONSENSUS_ENDPOINT,
     DEFAULT_EXECUTION_ENDPOINT,
@@ -107,8 +108,39 @@ def node_manager_start(
     network: str,
     withdrawals_address: ChecksumAddress,
 ) -> None:
-    network_config = NETWORKS[network]
-    vault = network_config.COMMUNITY_VAULT_ADDRESS
+
+    try:
+        asyncio.run(
+            _start(
+                network=network,
+                consensus_endpoints=consensus_endpoints,
+                execution_endpoints=execution_endpoints,
+                execution_jwt_secret=execution_jwt_secret,
+                verbose=verbose,
+                data_dir=data_dir,
+                log_level=log_level,
+                log_format=log_format,
+                withdrawals_address=withdrawals_address,
+            )
+        )
+    except Exception as e:
+        log_verbose(e)
+        sys.exit(1)
+
+
+# pylint: disable-next=too-many-arguments
+async def _start(
+    consensus_endpoints: str,
+    execution_endpoints: str,
+    execution_jwt_secret: str | None,
+    verbose: bool,
+    data_dir: str,
+    log_level: str,
+    log_format: str,
+    network: str,
+    withdrawals_address: ChecksumAddress,
+) -> None:
+    vault = await nodes_manager_contract.vault()
     vault_dir = Path(data_dir) / vault.lower()
 
     settings.set(
@@ -123,14 +155,6 @@ def node_manager_start(
         log_format=log_format,
     )
 
-    try:
-        asyncio.run(_start(withdrawals_address))
-    except Exception as e:
-        log_verbose(e)
-        sys.exit(1)
-
-
-async def _start(withdrawals_address: ChecksumAddress) -> None:
     setup_logging()
     await setup_clients()
     try:
