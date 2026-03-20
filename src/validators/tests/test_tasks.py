@@ -182,24 +182,32 @@ class TestProcessFunding:
     async def test_no_compounding_validators(self):
         """Returns vault_assets unchanged when no compounding validators exist."""
         vault_assets = ether_to_gwei(100)
-        with self.patch_compounding_validators_balances({}):
+        with (
+            self.patch_compounding_validators_balances({}),
+            self.patch_fund_compounding_validators(None) as mock_fund,
+        ):
             result = await self.subtask.process_funding(
                 vault_assets=vault_assets, harvest_params=None
             )
         assert result == vault_assets
+        mock_fund.assert_not_called()
 
     @pytest.mark.usefixtures('fake_settings')
     async def test_no_funding_needed(self):
         """Returns vault_assets unchanged when validators are already at max balance."""
         vault_assets = ether_to_gwei(100)
         pub_key = faker.validator_public_key()
-        with self.patch_compounding_validators_balances(
-            {pub_key: settings.max_validator_balance_gwei}
+        with (
+            self.patch_compounding_validators_balances(
+                {pub_key: settings.max_validator_balance_gwei}
+            ),
+            self.patch_fund_compounding_validators(None) as mock_fund,
         ):
             result = await self.subtask.process_funding(
                 vault_assets=vault_assets, harvest_params=None
             )
         assert result == vault_assets
+        mock_fund.assert_not_called()
 
     @pytest.mark.usefixtures('fake_settings')
     async def test_funding_interval_not_passed(self):
@@ -209,9 +217,11 @@ class TestProcessFunding:
         with (
             self.patch_compounding_validators_balances({pub_key: ether_to_gwei(32)}),
             self.patch_is_funding_interval_passed(False),
+            self.patch_fund_compounding_validators(None) as mock_fund,
         ):
             with pytest.raises(FundingException, match='Funding interval has not passed yet'):
                 await self.subtask.process_funding(vault_assets=vault_assets, harvest_params=None)
+        mock_fund.assert_not_called()
 
     @pytest.mark.usefixtures('fake_settings')
     async def test_successful_funding_single_validator(self):
