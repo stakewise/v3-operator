@@ -243,8 +243,10 @@ class TestProcessFunding:
         call_kwargs = mock_fund.call_args[1]
         assert call_kwargs['harvest_params'] is None
         assert call_kwargs['relayer'] is None
+        fundings = dict(call_kwargs['validator_fundings'])
+        assert pub_key in fundings
         # funding amount should reduce vault_assets
-        funded = sum(amount for _, amount in call_kwargs['validator_fundings'])
+        funded = sum(fundings.values())
         assert result == Gwei(max(vault_assets - funded, 0))
 
     @pytest.mark.usefixtures('fake_settings')
@@ -270,6 +272,7 @@ class TestProcessFunding:
         tx_hash = HexStr('0xabc')
 
         with (
+            self.patch_settings(max_validator_balance_gwei=ether_to_gwei(64)),
             self.patch_compounding_validators_balances(
                 {
                     pub_key_1: ether_to_gwei(32),
@@ -283,9 +286,13 @@ class TestProcessFunding:
                 vault_assets=vault_assets, harvest_params=None
             )
 
-        # Both validators should be funded in one batch (< VALIDATORS_FUNDING_BATCH_SIZE)
+        # Both validators should be funded
         mock_fund.assert_called_once()
-        funded = sum(amount for _, amount in mock_fund.call_args[1]['validator_fundings'])
+        fundings = dict(mock_fund.call_args[1]['validator_fundings'])
+        assert pub_key_1 in fundings
+        assert pub_key_2 in fundings
+
+        funded = sum(fundings.values())
         assert result == Gwei(max(vault_assets - funded, 0))
 
     # Funding prioritizes highest balances first, so we test both cases:
@@ -349,9 +356,9 @@ class TestProcessFunding:
 
         # Only active compounding validator should be funded, not the exiting one
         mock_fund.assert_called_once()
-        funded_keys = [key for key, _ in mock_fund.call_args[1]['validator_fundings']]
-        assert pub_key_active in funded_keys
-        assert pub_key_exiting not in funded_keys
+        fundings = dict(mock_fund.call_args[1]['validator_fundings'])
+        assert fundings[pub_key_active] == vault_assets
+        assert pub_key_exiting not in fundings
 
     async def test_fetch_compounding_includes_pending_deposits(
         self, vault_validator_crud, compounding_creds
@@ -415,7 +422,7 @@ class TestProcessFunding:
             await self.subtask.process_funding(vault_assets=vault_assets, harvest_params=None)
 
         mock_fund.assert_called_once()
-        fundings = {k: v for k, v in mock_fund.call_args[1]['validator_fundings']}
+        fundings = dict(mock_fund.call_args[1]['validator_fundings'])
         # pub_key_1: capacity = 64 - (40 + 10) = 14
         assert fundings[pub_key_1] == ether_to_gwei(14)
         # pub_key_2: gets remaining 30 - 14 = 16
@@ -479,7 +486,7 @@ class TestProcessFunding:
             await self.subtask.process_funding(vault_assets=vault_assets, harvest_params=None)
 
         mock_fund.assert_called_once()
-        fundings = {k: v for k, v in mock_fund.call_args[1]['validator_fundings']}
+        fundings = dict(mock_fund.call_args[1]['validator_fundings'])
         # Only compounding validator funded, capped at its capacity
         assert fundings[pub_key_compounding] == ether_to_gwei(24)
         assert pub_key_non_compounding not in fundings
@@ -519,8 +526,8 @@ class TestProcessFunding:
             await self.subtask.process_funding(vault_assets=vault_assets, harvest_params=None)
 
         mock_fund.assert_called_once()
-        funded_keys = [key for key, _ in mock_fund.call_args[1]['validator_fundings']]
-        assert pub_key in funded_keys
+        fundings = dict(mock_fund.call_args[1]['validator_fundings'])
+        assert fundings[pub_key] == vault_assets
 
     @pytest.mark.usefixtures('fake_settings')
     async def test_funding_batching(self):
@@ -551,10 +558,16 @@ class TestProcessFunding:
         # 3 validators split into 2 batches: [2, 1]
         assert mock_fund.call_count == 2
 
-        batch_1 = mock_fund.call_args_list[0][1]['validator_fundings']
-        batch_2 = mock_fund.call_args_list[1][1]['validator_fundings']
+        batch_1 = dict(mock_fund.call_args_list[0][1]['validator_fundings'])
+        batch_2 = dict(mock_fund.call_args_list[1][1]['validator_fundings'])
         assert len(batch_1) == 2
         assert len(batch_2) == 1
 
-        total_funded = sum(a for _, a in batch_1) + sum(a for _, a in batch_2)
+        # Funding sorts by balance descending: pub_key_3 (34), pub_key_2 (33), pub_key_1 (32)
+        # max_balance=64, so capacity = 64 - balance for each
+        assert batch_1[pub_key_3] == ether_to_gwei(64 - 34)
+        assert batch_1[pub_key_2] == ether_to_gwei(64 - 33)
+        assert batch_2[pub_key_1] == ether_to_gwei(64 - 32)
+
+        total_funded = sum(batch_1.values()) + sum(batch_2.values())
         assert result == Gwei(max(vault_assets - total_funded, 0))
