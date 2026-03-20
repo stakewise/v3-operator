@@ -22,15 +22,13 @@ from sw_utils.pectra import get_pectra_vault_version
 from web3 import Web3
 from web3.exceptions import BadFunctionCallOutput
 
-from src.common.clients import OPERATOR_USER_AGENT, db_client
+from src.common.clients import OPERATOR_USER_AGENT
 from src.common.clients import execution_client as default_execution_client
-from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import (
     VaultContract,
     keeper_contract,
     validators_registry_contract,
 )
-from src.common.execution import check_wallet_balance
 from src.common.harvest import get_harvest_params
 from src.common.protocol_config import get_protocol_config
 from src.common.utils import format_error, round_down, warning_verbose
@@ -39,99 +37,14 @@ from src.config.networks import NETWORKS
 from src.config.settings import (
     DEFAULT_CONSENSUS_ENDPOINT,
     DEFAULT_EXECUTION_ENDPOINT,
-    WITHDRAWALS_INTERVAL,
     settings,
 )
 from src.validators.execution import get_withdrawable_assets
-from src.validators.keystores.local import LocalKeystore
 from src.validators.relayer import RelayerClient
 
 logger = logging.getLogger(__name__)
 
 IPFS_HASH_EXAMPLE = 'QmawUdo17Fvo7xa6ARCUSMV1eoVwPtVuzx8L8Crj2xozWm'
-
-
-# pylint: disable-next=too-many-statements
-async def startup_checks() -> None:
-    validate_settings()
-
-    logger.info('Checking connection to database...')
-    db_client.create_db_dir()
-    with db_client.get_db_connection() as conn:
-        conn.cursor()
-    logger.info('Connected to database %s.', settings.database)
-
-    if settings.run_nodes:
-        # Wait a bit for nodes to start
-        await asyncio.sleep(10)
-
-    logger.info('Checking connection to consensus nodes...')
-    await wait_for_consensus_node()
-
-    logger.info('Checking connection to execution nodes...')
-    await wait_for_execution_node()
-
-    logger.info('Checking consensus nodes network...')
-    await _check_consensus_nodes_network()
-
-    logger.info('Checking execution nodes network...')
-    await check_execution_nodes_network()
-
-    logger.info('Checking that consensus and execution nodes are in sync...')
-    chain_state = await get_chain_finalized_head()
-    await wait_execution_catch_up_consensus(chain_state)
-
-    if settings.claim_fee_splitter:
-        logger.info('Checking graph nodes...')
-        await wait_for_graph_node_sync_to_chain_head()
-
-    logger.info('Checking oracles config...')
-    await _check_events_logs()
-
-    logger.info('Checking vault address %s...', settings.vault)
-    await _check_vault_address()
-
-    await _check_vault_withdrawable_assets()
-
-    logger.info('Checking wallet balance %s...', wallet.address)
-    await check_wallet_balance()
-
-    logger.info('Checking connection to ipfs nodes...')
-    healthy_ipfs_endpoints = await _check_ipfs_endpoints()
-
-    logger.info('Connected to ipfs nodes at %s.', ', '.join(healthy_ipfs_endpoints))
-
-    logger.info('Checking connection to oracles set...')
-    healthy_oracles = await collect_healthy_oracles()
-    logger.info('Connected to oracles at %s', ', '.join(healthy_oracles))
-
-    await check_vault_version()
-
-    if settings.enable_metrics:
-        logger.info('Checking metrics server...')
-        check_metrics_port()
-
-    if (
-        not settings.relayer_endpoint
-        and settings.keystore_cls_str == LocalKeystore.__name__
-        and not settings.disable_validators_registration
-    ):
-        logger.info('Checking keystores dir...')
-        wait_for_keystores_dir()
-        logger.info('Found keystores dir')
-
-    await check_validators_manager()
-
-    if settings.relayer_endpoint:
-        logger.info('Checking Relayer endpoint %s...', settings.relayer_endpoint)
-        await _check_relayer_endpoint()
-
-    protocol_config = await get_protocol_config()
-    if WITHDRAWALS_INTERVAL > protocol_config.force_withdrawals_period:
-        raise ValueError(
-            'WITHDRAWALS_INTERVAL setting should be less than '
-            f'force withdrawals period({protocol_config.force_withdrawals_period} seconds)'
-        )
 
 
 def validate_settings() -> None:
@@ -352,7 +265,7 @@ def wait_for_keystores_dir() -> None:
         time.sleep(15)
 
 
-async def _check_consensus_nodes_network() -> None:
+async def check_consensus_nodes_network() -> None:
     """
     Checks that consensus node network is the same as settings.network
     """
@@ -425,7 +338,7 @@ async def _aiohttp_fetch(session: ClientSession, url: str) -> str:
     return url
 
 
-async def _check_ipfs_endpoints() -> list[str]:
+async def check_ipfs_endpoints() -> list[str]:
     healthy_ipfs_endpoints = []
 
     for endpoint in settings.ipfs_fetch_endpoints:
@@ -472,7 +385,7 @@ async def check_vault_version() -> None:
         raise RuntimeError(f'Please upgrade Vault {settings.vault} to the latest version.')
 
 
-async def _check_events_logs() -> None:
+async def check_events_logs() -> None:
     """Check that EL client didn't prune logs"""
     events = await keeper_contract.events.ConfigUpdated.get_logs(
         from_block=settings.network_config.CONFIG_UPDATE_EVENT_BLOCK,
@@ -494,7 +407,7 @@ async def _check_events_logs() -> None:
         )
 
 
-async def _check_vault_withdrawable_assets() -> None:
+async def check_vault_withdrawable_assets() -> None:
     harvest_params = await get_harvest_params()
     withdrawable_assets = await get_withdrawable_assets(harvest_params=harvest_params)
 
@@ -508,7 +421,7 @@ async def _check_vault_withdrawable_assets() -> None:
     )
 
 
-async def _check_relayer_endpoint() -> None:
+async def check_relayer_endpoint() -> None:
     info = await RelayerClient().get_info()
 
     if info.network != settings.network:
@@ -518,7 +431,7 @@ async def _check_relayer_endpoint() -> None:
         )
 
 
-async def _check_vault_address() -> None:
+async def check_vault_address() -> None:
     try:
         await VaultContract(address=settings.vault).version()
     except BadFunctionCallOutput as e:
