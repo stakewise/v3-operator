@@ -54,7 +54,7 @@ jobs:
         uses: pr-mpt/actions-commit-hash@v2
 
       - name: Trivy Setup
-        uses: aquasecurity/setup-trivy@v0.2.0
+        uses: aquasecurity/setup-trivy@v0.2.4
         with:
           cache: true
           version: v0.68.2
