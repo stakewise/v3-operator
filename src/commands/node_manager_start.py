@@ -19,6 +19,7 @@ from src.config.settings import (
     LOG_PLAIN,
     settings,
 )
+from src.node_manager.startup_check import startup_checks
 from src.node_manager.tasks import NodeManagerTask
 
 logger = logging.getLogger(__name__)
@@ -133,6 +134,9 @@ def node_manager_start(
 async def _start(withdrawals_address: ChecksumAddress) -> None:
     setup_logging()
     await setup_clients()
+
+    if not settings.skip_startup_checks:
+        await startup_checks(withdrawals_address)
     try:
         logger.info(
             'Started node manager service, polling eligibility for %s',

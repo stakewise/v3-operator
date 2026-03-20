@@ -660,6 +660,12 @@ class NodesManagerContract(ContractWrapper):
     abi_path = 'abi/INodesManager.json'
     settings_key = 'NODES_MANAGER_CONTRACT_ADDRESS'
 
+    async def vault(self) -> ChecksumAddress:
+        return await self.contract.functions.vault().call()
+
+    async def validators_manager(self, withdrawals_address: ChecksumAddress) -> ChecksumAddress:
+        return await self.contract.functions.validatorsManagers(withdrawals_address).call()
+
 
 validators_registry_contract = ValidatorsRegistryContract()
 keeper_contract = KeeperContract()
