@@ -66,7 +66,7 @@ async def get_meta_vault_redemption_assets(
     )
 
     for sub_vault_redemption in sub_vaults_redemptions:
-        if await is_meta_vault(sub_vault_redemption.vault):
+        if sub_vault_redemption.assets > 0 and await is_meta_vault(sub_vault_redemption.vault):
             sub_vault_assets = await get_meta_vault_redemption_assets(
                 meta_vault_address=sub_vault_redemption.vault,
                 assets_to_redeem=sub_vault_redemption.assets,
