@@ -23,7 +23,6 @@ from src.common.startup_check import (
 )
 from src.common.wallet import wallet
 from src.config.settings import settings
-from src.validators.keystores.local import LocalKeystore
 
 logger = logging.getLogger(__name__)
 
@@ -76,14 +75,9 @@ async def startup_checks(withdrawals_address: ChecksumAddress) -> None:
         logger.info('Checking metrics server...')
         check_metrics_port()
 
-    if (
-        not settings.relayer_endpoint
-        and settings.keystore_cls_str == LocalKeystore.__name__
-        and not settings.disable_validators_registration
-    ):
-        logger.info('Checking keystores dir...')
-        wait_for_keystores_dir()
-        logger.info('Found keystores dir')
+    logger.info('Checking keystores dir...')
+    wait_for_keystores_dir()
+    logger.info('Found keystores dir')
 
     await _check_validators_manager(withdrawals_address)
 
