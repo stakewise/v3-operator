@@ -321,10 +321,13 @@ def get_funding_amounts(
     compounding_validators_balances: dict[HexStr, Gwei], vault_assets: Gwei
 ) -> dict[HexStr, Gwei]:
     result = {}
+    # Order validators by balance descending to fund those with the highest balance first
     for public_key, balance in sorted(
         compounding_validators_balances.items(), key=lambda item: item[1], reverse=True
     ):
+        # Fund as much as possible to reach max balance
         remaining_capacity = settings.max_validator_balance_gwei - balance
+        # Make sure funding amount is above the minimum threshold
         if remaining_capacity >= settings.min_deposit_amount_gwei:
             val_amount = min(remaining_capacity, vault_assets)
             result[public_key] = Gwei(val_amount)
