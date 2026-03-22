@@ -98,6 +98,7 @@ class NodeManagerTask(BaseTask):
         )
 
         tx_hash = await register_validators(
+            withdrawals_address=self.withdrawals_address,
             approval=approval,
             validators=validators,
             validators_registry_root=request.validators_root,
@@ -137,6 +138,7 @@ class NodeManagerTask(BaseTask):
             )
 
             tx_hash = await fund_validators(
+                withdrawals_address=self.withdrawals_address,
                 signatures=signatures,
                 validator_fundings=batch,
             )

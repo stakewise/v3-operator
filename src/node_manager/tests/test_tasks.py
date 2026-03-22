@@ -47,6 +47,7 @@ class TestProcessBlock:
         mock_poll.assert_awaited_once()
 
     @pytest.mark.asyncio
+    @patch(f'{MODULE}.fetch_compounding_validators_balances', new_callable=AsyncMock)
     @patch(f'{MODULE}.poll_eligible_operators', new_callable=AsyncMock)
     @patch(f'{MODULE}.get_protocol_config', new_callable=AsyncMock)
     @patch(f'{MODULE}.check_gas_price', new_callable=AsyncMock, return_value=True)
@@ -55,6 +56,7 @@ class TestProcessBlock:
         mock_gas: AsyncMock,
         mock_config: AsyncMock,
         mock_poll: AsyncMock,
+        mock_balances: AsyncMock,
     ) -> None:
         """Operators not matching withdrawals_address are skipped."""
         mock_poll.return_value = [
@@ -62,7 +64,7 @@ class TestProcessBlock:
         ]
         task = _make_task()
         await task.process_block(MagicMock())
-        # _process_funding and _process_registration should not be called
+        mock_balances.assert_not_awaited()
 
     @pytest.mark.asyncio
     @patch(f'{MODULE}.register_validators', new_callable=AsyncMock, return_value='0xtxhash')

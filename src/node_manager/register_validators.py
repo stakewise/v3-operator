@@ -1,7 +1,7 @@
 import logging
 from typing import Any, Sequence
 
-from eth_typing import HexStr
+from eth_typing import ChecksumAddress, HexStr
 from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.exceptions import ContractLogicError
@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 async def register_validators(
+    withdrawals_address: ChecksumAddress,
     approval: NodeManagerRegistrationOraclesApproval,
     validators: Sequence[Validator],
     validators_registry_root: HexStr,
@@ -49,19 +50,16 @@ async def register_validators(
         approval.ipfs_hash,
     )
 
-    nodes_manager_contract = NodesManagerContract(
-        address=settings.network_config.COMMUNITY_VAULT_CONTRACT_ADDRESS
-    )
     logger.info('Submitting community vault registration transaction')
     return await _submit_tx(
-        nodes_manager_contract,
         'registerValidators',
-        (keeper_params, approval.nm_signatures),
+        (withdrawals_address, keeper_params, approval.nm_signatures),
         'register community vault validator(s)',
     )
 
 
 async def fund_validators(
+    withdrawals_address: ChecksumAddress,
     signatures: bytes,
     validator_fundings: dict[HexStr, Gwei],
 ) -> HexStr | None:
@@ -82,33 +80,31 @@ async def fund_validators(
     ]
     encoded_validators = b''.join(tx_validators)
 
-    nodes_manager_contract = NodesManagerContract(
-        address=settings.network_config.COMMUNITY_VAULT_CONTRACT_ADDRESS
-    )
     logger.info(
         'Submitting community vault funding transaction for %d validator(s)', len(validators)
     )
     return await _submit_tx(
-        nodes_manager_contract,
         'fundValidators',
-        (encoded_validators, signatures),
+        (withdrawals_address, encoded_validators, signatures),
         'fund community vault validator(s)',
     )
 
 
 async def _submit_tx(
-    nodes_manager_contract: NodesManagerContract,
     tx_function_name: str,
     tx_args: tuple[Any, ...],
-    action: str,
+    log_action: str,
 ) -> HexStr | None:
     """Estimate gas, submit transaction, and wait for confirmation."""
+    nodes_manager_contract = NodesManagerContract(
+        address=settings.network_config.COMMUNITY_VAULT_CONTRACT_ADDRESS
+    )
     fn = getattr(nodes_manager_contract.functions, tx_function_name)
 
     try:
         await fn(*tx_args).estimate_gas()
     except (ValueError, ContractLogicError) as e:
-        logger.error('Failed to %s: %s', action, format_error(e))
+        logger.error('Failed to %s: %s', log_action, format_error(e))
         if settings.verbose:
             logger.exception(e)
         return None
@@ -118,18 +114,18 @@ async def _submit_tx(
         tx_params = await gas_manager.get_high_priority_tx_params()
         tx = await fn(*tx_args).transact(tx_params)
     except Exception as e:
-        logger.error('Failed to %s: %s', action, format_error(e))
+        logger.error('Failed to %s: %s', log_action, format_error(e))
         if settings.verbose:
             logger.exception(e)
         return None
 
     tx_hash = Web3.to_hex(tx)
-    logger.info('Waiting for %s transaction %s confirmation', action, tx_hash)
+    logger.info('Waiting for %s transaction %s confirmation', log_action, tx_hash)
     tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
         tx, timeout=settings.execution_transaction_timeout
     )
     if not tx_receipt['status']:
-        logger.error('%s transaction failed', action.capitalize())
+        logger.error('%s transaction failed', log_action.capitalize())
         return None
 
     return tx_hash
