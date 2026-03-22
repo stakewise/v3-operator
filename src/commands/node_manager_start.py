@@ -26,6 +26,7 @@ from src.config.settings import (
     LOG_PLAIN,
     settings,
 )
+from src.node_manager.startup_check import startup_checks
 from src.node_manager.tasks import NodeManagerTask
 from src.validators.database import (
     CheckpointCrud,
@@ -217,6 +218,9 @@ async def _start(
 ) -> None:
     setup_logging()
     await setup_clients()
+
+    if not settings.skip_startup_checks:
+        await startup_checks(withdrawals_address)
     try:
         NetworkValidatorCrud().setup()
         VaultValidatorCrud().setup()
