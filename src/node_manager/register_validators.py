@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 async def register_validators(
-    withdrawals_address: ChecksumAddress,
+    operator_address: ChecksumAddress,
     approval: NodeManagerRegistrationOraclesApproval,
     validators: Sequence[Validator],
     validators_registry_root: HexStr,
@@ -53,13 +53,13 @@ async def register_validators(
     logger.info('Submitting community vault registration transaction')
     return await _submit_tx(
         'registerValidators',
-        (withdrawals_address, keeper_params, approval.nm_signatures),
+        (operator_address, keeper_params, approval.nm_signatures),
         'register community vault validator(s)',
     )
 
 
 async def fund_validators(
-    withdrawals_address: ChecksumAddress,
+    operator_address: ChecksumAddress,
     signatures: bytes,
     validator_fundings: dict[HexStr, Gwei],
 ) -> HexStr | None:
@@ -85,7 +85,7 @@ async def fund_validators(
     )
     return await _submit_tx(
         'fundValidators',
-        (withdrawals_address, encoded_validators, signatures),
+        (operator_address, encoded_validators, signatures),
         'fund community vault validator(s)',
     )
 

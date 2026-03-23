@@ -32,7 +32,7 @@ class TestRegisterValidators:
         mock_registry.get_registry_root = AsyncMock(return_value=HexStr('0xnewroot'))
 
         result = await register_validators(
-            withdrawals_address=OPERATOR_ADDR,
+            operator_address=OPERATOR_ADDR,
             approval=_make_approval(),
             validators=[],
             validators_registry_root=HexStr('0xoldroot'),
@@ -53,7 +53,7 @@ class TestRegisterValidators:
         mock_registry.get_registry_root = AsyncMock(return_value=root)
 
         result = await register_validators(
-            withdrawals_address=OPERATOR_ADDR,
+            operator_address=OPERATOR_ADDR,
             approval=_make_approval(),
             validators=[],
             validators_registry_root=root,
@@ -77,7 +77,7 @@ class TestRegisterValidators:
         mock_registry.get_registry_root = AsyncMock(return_value=root)
 
         result = await register_validators(
-            withdrawals_address=OPERATOR_ADDR,
+            operator_address=OPERATOR_ADDR,
             approval=_make_approval(),
             validators=[],
             validators_registry_root=root,
@@ -101,7 +101,7 @@ class TestFundValidators:
             HexStr('0x' + 'aa' * 48): Gwei(2000000000),
         }
         result = await fund_validators(
-            withdrawals_address=OPERATOR_ADDR,
+            operator_address=OPERATOR_ADDR,
             signatures=b'\x00' * 130,
             validator_fundings=fundings,
         )

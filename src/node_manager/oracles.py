@@ -49,7 +49,7 @@ REGISTER_VALIDATORS_PATH = '/nodes-manager/register-validators'
 FUND_VALIDATORS_PATH = '/nodes-manager/fund-validators'
 
 
-# --- Eligible operators polling ---
+# Eligible operators polling
 
 
 async def poll_eligible_operators(
@@ -170,7 +170,7 @@ async def poll_registration_approval(
             )
 
 
-# --- Registration approval polling ---
+# Registration approval polling
 
 
 # pylint: disable-next=too-many-arguments
@@ -236,7 +236,7 @@ async def create_approval_request(
     return request
 
 
-# --- Funding approval polling ---
+# Funding approval polling
 
 
 async def poll_funding_approval(
@@ -289,7 +289,7 @@ def create_funding_request(
     )
 
 
-# --- Generic oracle request helpers ---
+# Generic oracle request helpers
 
 
 async def send_registration_requests(

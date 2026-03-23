@@ -29,10 +29,10 @@ class NodeManagerTask(BaseTask):
 
     def __init__(
         self,
-        withdrawals_address: ChecksumAddress,
+        operator_address: ChecksumAddress,
         keystore: BaseKeystore,
     ) -> None:
-        self.withdrawals_address = withdrawals_address
+        self.operator_address = operator_address
         self.keystore = keystore
 
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
@@ -44,13 +44,13 @@ class NodeManagerTask(BaseTask):
         eligible_operators = await poll_eligible_operators(protocol_config)
 
         for operator in eligible_operators:
-            if operator.address != self.withdrawals_address:
+            if operator.address != self.operator_address:
                 continue
 
             amount_eth = Web3.from_wei(operator.amount, 'ether')
             logger.info(
                 'Operator %s is eligible to register/fund %s ETH worth of validators',
-                self.withdrawals_address,
+                self.operator_address,
                 amount_eth,
             )
 
@@ -59,7 +59,7 @@ class NodeManagerTask(BaseTask):
             # Fund existing compounding validators first
             amount_gwei = await self._process_funding(
                 amount=amount_gwei,
-                operator_address=self.withdrawals_address,
+                operator_address=self.operator_address,
                 protocol_config=protocol_config,
             )
 
@@ -70,7 +70,7 @@ class NodeManagerTask(BaseTask):
             )
             return
 
-        logger.debug('Operator %s is not eligible', self.withdrawals_address)
+        logger.debug('Operator %s is not eligible', self.operator_address)
 
     async def _process_registration(
         self,
@@ -94,11 +94,11 @@ class NodeManagerTask(BaseTask):
         request, approval = await poll_registration_approval(
             keystore=self.keystore,
             validators=validators,
-            operator_address=self.withdrawals_address,
+            operator_address=self.operator_address,
         )
 
         tx_hash = await register_validators(
-            withdrawals_address=self.withdrawals_address,
+            operator_address=self.operator_address,
             approval=approval,
             validators=validators,
             validators_registry_root=request.validators_root,
@@ -138,7 +138,7 @@ class NodeManagerTask(BaseTask):
             )
 
             tx_hash = await fund_validators(
-                withdrawals_address=self.withdrawals_address,
+                operator_address=self.operator_address,
                 signatures=signatures,
                 validator_fundings=batch,
             )

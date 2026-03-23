@@ -58,7 +58,7 @@ class TestProcessBlock:
         mock_poll: AsyncMock,
         mock_balances: AsyncMock,
     ) -> None:
-        """Operators not matching withdrawals_address are skipped."""
+        """Operators not matching operator_address are skipped."""
         mock_poll.return_value = [
             EligibleOperator(address=OTHER_ADDR, amount=Wei(32000000000000000000)),
         ]
@@ -215,6 +215,6 @@ def _make_protocol_config() -> MagicMock:
 def _make_task() -> NodeManagerTask:
     keystore = MagicMock()
     return NodeManagerTask(
-        withdrawals_address=OPERATOR_ADDR,
+        operator_address=OPERATOR_ADDR,
         keystore=keystore,
     )

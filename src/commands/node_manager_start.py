@@ -92,9 +92,9 @@ logger = logging.getLogger(__name__)
     f'Default is {NETWORKS[MAINNET].MAX_FEE_PER_GAS_GWEI} Gwei',
 )
 @click.option(
-    '--withdrawals-address',
+    '--operator-address',
     callback=validate_eth_address,
-    envvar='WITHDRAWALS_ADDRESS',
+    envvar='OPERATOR_ADDRESS',
     prompt='Enter your operator withdrawals (cold wallet) address',
     help='The operator withdrawals (cold wallet) address.',
 )
@@ -172,7 +172,7 @@ def node_manager_start(
     log_level: str,
     log_format: str,
     network: str,
-    withdrawals_address: ChecksumAddress,
+    operator_address: ChecksumAddress,
     max_fee_per_gas_gwei: int | None,
     validator_type: ValidatorType,
     max_validator_balance_gwei: int | None,
@@ -207,20 +207,20 @@ def node_manager_start(
     )
 
     try:
-        asyncio.run(_start(withdrawals_address))
+        asyncio.run(_start(operator_address))
     except Exception as e:
         log_verbose(e)
         sys.exit(1)
 
 
 async def _start(
-    withdrawals_address: ChecksumAddress,
+    operator_address: ChecksumAddress,
 ) -> None:
     setup_logging()
     await setup_clients()
 
     if not settings.skip_startup_checks:
-        await startup_checks(withdrawals_address)
+        await startup_checks(operator_address)
     try:
         NetworkValidatorCrud().setup()
         VaultValidatorCrud().setup()
@@ -239,11 +239,11 @@ async def _start(
 
         logger.info(
             'Started node manager service, polling eligibility for %s',
-            withdrawals_address,
+            operator_address,
         )
         with InterruptHandler() as interrupt_handler:
             task = NodeManagerTask(
-                withdrawals_address=withdrawals_address,
+                operator_address=operator_address,
                 keystore=keystore,
             )
             await task.run(interrupt_handler)

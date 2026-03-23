@@ -20,8 +20,6 @@ from src.node_manager.typings import (
     NodeManagerRegistrationOraclesApproval,
 )
 
-# --- process_registration_approvals tests ---
-
 
 class TestProcessRegistrationApprovals:
     def test_basic_consensus(self) -> None:
@@ -103,9 +101,6 @@ class TestProcessRegistrationApprovals:
         assert result.keeper_signatures[65:] == b'\xff' * 65
 
 
-# --- process_funding_approvals tests ---
-
-
 class TestProcessFundingApprovals:
     def test_basic_funding(self) -> None:
         approvals = {
@@ -142,9 +137,6 @@ class TestProcessFundingApprovals:
         assert signatures[65:] == b'\xff' * 65
 
 
-# --- Parser tests ---
-
-
 class TestParsers:
     def test_parse_registration_response(self) -> None:
         keeper_sig_hex = '0x' + 'ab' * 65
@@ -168,9 +160,6 @@ class TestParsers:
         data = {'signature': sig_hex}
         result = _parse_funding_response(data)
         assert result.signature == Web3.to_bytes(hexstr=sig_hex)
-
-
-# --- create_funding_request tests ---
 
 
 class TestCreateFundingRequest:
