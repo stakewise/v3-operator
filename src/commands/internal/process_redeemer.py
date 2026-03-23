@@ -298,15 +298,15 @@ async def calculate_redeemable_shares(
             block_number=block_number,
         )
         for position, processed_shares in zip(batch, processed_shares_batch):
-            available_shares = position.leaf_shares - processed_shares
-            if available_shares <= 0:
+            unprocessed_shares = position.leaf_shares - processed_shares
+            if unprocessed_shares <= 0:
                 continue
             redeemable.append(
                 OsTokenPosition(
                     owner=position.owner,
                     vault=position.vault,
                     leaf_shares=position.leaf_shares,
-                    available_shares=Wei(available_shares),
+                    unprocessed_shares=Wei(unprocessed_shares),
                 )
             )
 
@@ -322,8 +322,8 @@ async def select_positions(
 ) -> list[OsTokenPosition]:
     """Select positions to redeem in IPFS order, capped by queued shares and withdrawable assets.
 
-    Pre-computes meta-vault redemptions for all vaults, then iterates positions
-    in their original IPFS ordering.
+    Submits meta-vault redeem transactions, then iterates positions
+    in their original IPFS ordering, filling ``shares_to_redeem`` for each selected position.
     """
     vault_to_withdrawable_assets = await _redeem_meta_vaults(
         os_token_positions=os_token_positions,
@@ -336,12 +336,13 @@ async def select_positions(
     positions_to_redeem: list[OsTokenPosition] = []
     remaining_shares = queued_shares
 
+    # Fill shares_to_redeem for each position, capped by remaining shares and withdrawable assets
     for position in os_token_positions:
         if remaining_shares <= 0:
             break
 
         withdrawable_assets = vault_to_withdrawable_assets.get(position.vault, Wei(0))
-        shares_to_redeem = Wei(min(position.available_shares, remaining_shares))
+        shares_to_redeem = Wei(min(position.unprocessed_shares, remaining_shares))
         redeemable_assets = converter.to_assets(shares_to_redeem)
 
         if redeemable_assets > withdrawable_assets:
@@ -383,7 +384,7 @@ async def _redeem_meta_vaults(
     for pos in os_token_positions:
         if remaining <= 0:
             break
-        shares = Wei(min(pos.available_shares, remaining))
+        shares = Wei(min(pos.unprocessed_shares, remaining))
         vault_to_needed[pos.vault] = Wei(vault_to_needed[pos.vault] + converter.to_assets(shares))
         remaining -= shares
 
@@ -456,7 +457,7 @@ async def _try_redeem_meta_vault(
 
 async def _build_meta_vault_redeem_order(
     vault: ChecksumAddress,
-    deficit: Wei,
+    assets: Wei,
 ) -> list[SubVaultRedemption]:
     """Build bottom-up order of meta vault redemptions for nested meta vaults.
 
@@ -469,14 +470,14 @@ async def _build_meta_vault_redeem_order(
     registry_address = await meta_vault_contract.sub_vaults_registry()
     registry = SubVaultsRegistryContract(registry_address)
 
-    redemptions = await registry.calculate_sub_vaults_redemptions(deficit)
+    redemptions = await registry.calculate_sub_vaults_redemptions(assets)
 
     for redemption in redemptions:
         if redemption.assets > 0 and await is_meta_vault(redemption.vault):
             nested_order = await _build_meta_vault_redeem_order(redemption.vault, redemption.assets)
             order.extend(nested_order)
 
-    order.append(SubVaultRedemption(vault=vault, assets=deficit))
+    order.append(SubVaultRedemption(vault=vault, assets=assets))
     return order
 
 
