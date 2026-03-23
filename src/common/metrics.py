@@ -1,13 +1,9 @@
 import logging
 from typing import cast
 
-from prometheus_client import Gauge, Info, start_http_server
-from sw_utils import InterruptHandler
+from prometheus_client import Counter, Gauge, Info, start_http_server
 
 import src
-from src.common.clients import execution_client
-from src.common.consensus import get_chain_finalized_head
-from src.common.tasks import BaseTask
 from src.config.settings import settings
 
 
@@ -77,13 +73,19 @@ class Metrics:
         )
         self.queued_assets = Gauge(
             'queued_assets',
-            'The amount of withdrawable assets',
+            'The amount of queued assets',
             namespace=settings.metrics_prefix,
             labelnames=['network'],
         )
         self.last_withdrawal_block = Gauge(
             'last_withdrawal_block',
             'The block number of last withdrawal from validators',
+            namespace=settings.metrics_prefix,
+            labelnames=['network'],
+        )
+        self.exception_count = Counter(
+            'exception_count',
+            'The number of exceptions occurred',
             namespace=settings.metrics_prefix,
             labelnames=['network'],
         )
@@ -110,14 +112,3 @@ logger = logging.getLogger(__name__)
 async def metrics_server() -> None:
     logger.info('Starting metrics server')
     start_http_server(settings.metrics_port, settings.metrics_host)
-
-
-class MetricsTask(BaseTask):
-    async def process_block(self, interrupt_handler: InterruptHandler) -> None:
-        metrics.set_app_version()
-
-        chain_state = await get_chain_finalized_head()
-        latest_block_number = await execution_client.eth.get_block_number()
-
-        metrics.block_number.labels(network=settings.network).set(latest_block_number)
-        metrics.slot_number.labels(network=settings.network).set(chain_state.slot)
