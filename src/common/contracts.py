@@ -677,16 +677,18 @@ class NodesManagerContract(ContractWrapper):
             to_block=to_block,
         )
 
+    # OperatorNonceType.LastStateUpdate enum value in the contract
+    LAST_STATE_UPDATE_NONCE_TYPE = 2
+
     async def get_state_data(self) -> tuple[bytes, int, int, int]:
         """Returns (root, updateDelay, lastUpdateTimestamp, currentNonce)."""
-        return await self.functions.stateData().call()
+        return await self.contract.functions.stateData().call()
 
     async def get_operator_last_state_nonce(self, operator: ChecksumAddress) -> int:
-        """Get operator's LastStateUpdate nonce (enum value 2)."""
-        return await self.functions.operatorNonces(operator, 2).call()
-
-    async def can_update_state(self) -> bool:
-        return await self.functions.canUpdateState().call()
+        """Get operator's LastStateUpdate nonce."""
+        return await self.contract.functions.operatorNonces(
+            operator, self.LAST_STATE_UPDATE_NONCE_TYPE
+        ).call()
 
 
 class NodesManagerEncoder(BaseEncoder):

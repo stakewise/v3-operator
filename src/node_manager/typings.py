@@ -21,14 +21,3 @@ class OperatorStateUpdateParams:
     cum_penalty_assets: int
     cum_earned_fee_shares: int
     proof: list[HexBytes]
-
-
-@dataclass
-class OperatorIpfsState:
-    """Raw operator state data from IPFS."""
-
-    address: ChecksumAddress
-    total_assets: int
-    cum_penalty_assets: int
-    cum_earned_fee_shares: int
-    proof: list[str]

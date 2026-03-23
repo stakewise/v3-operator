@@ -54,22 +54,16 @@ class StateSyncTask(BaseTask):
         nm_contract = NodesManagerContract()
         app_state = AppState()
 
-        # 1. Check if state can be updated
-        if not await nm_contract.can_update_state():
-            logger.debug('State update not available')
-            return
-
-        # 2. Get current state nonce
+        # 1. Get current state nonce and check if operator already synced
         state_data = await nm_contract.get_state_data()
         current_nonce = state_data[3]
 
-        # 3. Check if operator already synced
         operator_nonce = await nm_contract.get_operator_last_state_nonce(self.operator_address)
         if operator_nonce == current_nonce:
             logger.debug('Operator %s state already synced', self.operator_address)
             return
 
-        # 4. Find the StateUpdated event to get IPFS hash
+        # 2. Find the StateUpdated event to get IPFS hash
         from_block = app_state.state_sync_block or settings.network_config.KEEPER_GENESIS_BLOCK
         to_block = await nm_contract.execution_client.eth.get_block_number()
         event = await nm_contract.get_last_state_updated_event(
@@ -85,23 +79,26 @@ class StateSyncTask(BaseTask):
 
         ipfs_hash: str = event['args']['stateIpfsHash']
 
-        # 5. Fetch operator state from IPFS
+        # 3. Fetch operator state from IPFS
         operator_params = await fetch_operator_state_from_ipfs(ipfs_hash, self.operator_address)
         if not operator_params:
             logger.warning('Operator %s not found in state IPFS data', self.operator_address)
             return
 
-        # 6. Check gas price
+        # 4. Check gas price
         if not await check_gas_price():
             logger.debug('Gas price too high, skipping state sync')
             return
 
-        # 7. Check if vault needs harvesting, get harvest params if so
+        # 5. Check if vault needs harvesting, get harvest params if so
         harvest_params = None
         if await keeper_contract.can_harvest(settings.vault):
             harvest_params = await get_harvest_params()
+            if harvest_params is None:
+                logger.warning('Vault requires harvesting but failed to fetch harvest params')
+                return
 
-        # 8. Submit transaction
+        # 6. Submit transaction
         tx_hash = await submit_state_sync_transaction(
             operator_address=self.operator_address,
             params=operator_params,

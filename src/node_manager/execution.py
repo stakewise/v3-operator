@@ -8,7 +8,7 @@ from src.common.clients import execution_client, ipfs_fetch_client
 from src.common.contracts import NodesManagerContract, NodesManagerEncoder
 from src.common.execution import transaction_gas_wrapper
 from src.common.typings import HarvestParams
-from src.node_manager.typings import OperatorIpfsState, OperatorStateUpdateParams
+from src.node_manager.typings import OperatorStateUpdateParams
 
 logger = logging.getLogger(__name__)
 
@@ -24,19 +24,11 @@ async def fetch_operator_state_from_ipfs(
         if address != operator_address:
             continue
 
-        state = OperatorIpfsState(
-            address=address,
+        return OperatorStateUpdateParams(
             total_assets=int(operator_data['totalAssets']),
             cum_penalty_assets=int(operator_data['cumPenaltyAssets']),
             cum_earned_fee_shares=int(operator_data['cumEarnedFeeShares']),
-            proof=operator_data['proof'],
-        )
-
-        return OperatorStateUpdateParams(
-            total_assets=state.total_assets,
-            cum_penalty_assets=state.cum_penalty_assets,
-            cum_earned_fee_shares=state.cum_earned_fee_shares,
-            proof=[HexBytes(Web3.to_bytes(hexstr=HexStr(p))) for p in state.proof],
+            proof=[HexBytes(Web3.to_bytes(hexstr=HexStr(p))) for p in operator_data['proof']],
         )
 
     return None
