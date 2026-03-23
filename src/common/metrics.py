@@ -1,7 +1,7 @@
 import logging
 from typing import cast
 
-from prometheus_client import Gauge, Info, start_http_server
+from prometheus_client import Counter, Gauge, Info, start_http_server
 
 import src
 from src.config.settings import settings
@@ -83,7 +83,7 @@ class Metrics:
             namespace=settings.metrics_prefix,
             labelnames=['network'],
         )
-        self.exception_count = Gauge(
+        self.exception_count = Counter(
             'exception_count',
             'The number of exceptions occurred',
             namespace=settings.metrics_prefix,
