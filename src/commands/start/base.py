@@ -5,14 +5,15 @@ from sw_utils import InterruptHandler
 
 import src
 from src.commands.nodes.node_start import main as run_nodes
+from src.commands.start.startup_check import startup_checks
 from src.common.clients import close_clients, setup_clients
 from src.common.consensus import get_chain_finalized_head
 from src.common.execution import WalletTask
 from src.common.logging import setup_logging
-from src.common.metrics import MetricsTask, metrics, metrics_server
+from src.common.metrics import metrics, metrics_server
 from src.common.protocol_config import update_oracles_cache
-from src.common.startup_check import startup_checks, wait_execution_catch_up_consensus
-from src.common.tasks import BaseTask
+from src.common.startup_check import wait_execution_catch_up_consensus
+from src.common.tasks import BaseTask, MetricsTask
 from src.common.utils import get_build_version
 from src.config.settings import settings
 from src.exits.tasks import ExitSignatureTask

@@ -1,44 +1,9 @@
-import pytest
 from eth_typing import BlockNumber
 from sw_utils.tests import faker
 
 from src.config.settings import settings
-from src.validators.database import (
-    CheckpointCrud,
-    NetworkValidatorCrud,
-    VaultValidatorCrud,
-)
+from src.validators.database import CheckpointCrud
 from src.validators.typings import NetworkValidator, VaultValidator
-
-
-@pytest.fixture
-def network_validator_crud(fake_settings):
-    crud = NetworkValidatorCrud()
-    crud.setup()
-    yield crud
-    settings.database.unlink(missing_ok=True)
-
-
-@pytest.fixture
-def checkpoint_crud(fake_settings):
-    crud = CheckpointCrud()
-    crud.setup()
-    yield crud
-    settings.database.unlink(missing_ok=True)
-
-
-@pytest.fixture
-def checkpoint_crud_no_setup(fake_settings):
-    yield CheckpointCrud()
-    settings.database.unlink(missing_ok=True)
-
-
-@pytest.fixture
-def vault_validator_crud(fake_settings):
-    crud = VaultValidatorCrud()
-    crud.setup()
-    yield crud
-    settings.database.unlink(missing_ok=True)
 
 
 class TestNetworkValidatorCrud:
