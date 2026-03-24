@@ -20,7 +20,7 @@ from src.config.settings import (
     settings,
 )
 from src.node_manager.startup_check import startup_checks
-from src.node_manager.tasks import NodeManagerTask
+from src.node_manager.tasks import NodeManagerTask, StateSyncTask
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +143,9 @@ async def _start(withdrawals_address: ChecksumAddress) -> None:
             withdrawals_address,
         )
         with InterruptHandler() as interrupt_handler:
-            await NodeManagerTask(withdrawals_address).run(interrupt_handler)
+            await asyncio.gather(
+                NodeManagerTask(withdrawals_address).run(interrupt_handler),
+                StateSyncTask(withdrawals_address).run(interrupt_handler),
+            )
     finally:
         await close_clients()
