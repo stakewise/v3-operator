@@ -403,11 +403,11 @@ async def _redeem_meta_vaults(
 
 async def _try_redeem_meta_vault(
     vault_address: ChecksumAddress,
-    deficit: Wei,
+    assets: Wei,
     current_withdrawable: Wei,
     harvest_params: HarvestParams | None,
 ) -> Wei:
-    """If vault is a meta-vault, redeem sub-vaults for the deficit.
+    """If vault is a meta-vault, redeem sub-vaults for the needed assets.
 
     Handles nested meta vaults by building a bottom-up redemption order
     and processing deepest nested vaults first.
@@ -420,7 +420,7 @@ async def _try_redeem_meta_vault(
     logger.info('Vault %s is a meta-vault with insufficient withdrawable assets.', vault_address)
 
     try:
-        redeem_order = await _build_meta_vault_redeem_order(vault_address, deficit)
+        redeem_order = await _build_meta_vault_redeem_order(vault_address, assets)
     except Exception:
         logger.exception(
             'Failed to build meta-vault redeem order for vault %s. '
@@ -462,7 +462,7 @@ async def _build_meta_vault_redeem_order(
     """Build bottom-up order of meta vault redemptions for nested meta vaults.
 
     For MetaVault A with sub-vault B (also a meta vault) with sub-vaults C, D:
-    returns [(B, deficit_B), (A, deficit_A)] so B is redeemed first.
+    returns [(B, assets_B), (A, assets_A)] so B is redeemed first.
     """
     order: list[SubVaultRedemption] = []
 
