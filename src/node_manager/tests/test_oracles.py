@@ -1,21 +1,16 @@
 import pytest
-from eth_typing import ChecksumAddress, HexStr
+from eth_typing import ChecksumAddress
 from web3 import Web3
-from web3.types import Gwei
 
 from src.common.exceptions import (
     InvalidOraclesRequestError,
     NotEnoughOracleApprovalsError,
 )
 from src.node_manager.oracles import (
-    _parse_funding_response,
     _parse_registration_response,
-    create_funding_request,
-    process_funding_approvals,
     process_registration_approvals,
 )
 from src.node_manager.typings import (
-    NodeManagerFundingApproval,
     NodeManagerRegistrationApproval,
     NodeManagerRegistrationOraclesApproval,
 )
@@ -101,42 +96,6 @@ class TestProcessRegistrationApprovals:
         assert result.keeper_signatures[65:] == b'\xff' * 65
 
 
-class TestProcessFundingApprovals:
-    def test_basic_funding(self) -> None:
-        approvals = {
-            _make_address(1): _make_funding_approval(b'\xaa' * 65),
-            _make_address(2): _make_funding_approval(b'\xbb' * 65),
-        }
-        signatures = process_funding_approvals(approvals, votes_threshold=2)
-        assert len(signatures) == 2 * 65
-
-    def test_truncates_to_threshold(self) -> None:
-        """Only threshold-many signatures are included, sorted by address."""
-        approvals = {_make_address(i): _make_funding_approval(bytes([i]) * 65) for i in range(1, 6)}
-        signatures = process_funding_approvals(approvals, votes_threshold=3)
-        assert len(signatures) == 3 * 65
-
-    def test_empty_raises(self) -> None:
-        with pytest.raises(InvalidOraclesRequestError):
-            process_funding_approvals({}, votes_threshold=1)
-
-    def test_below_threshold_raises(self) -> None:
-        approvals = {_make_address(1): _make_funding_approval()}
-        with pytest.raises(NotEnoughOracleApprovalsError):
-            process_funding_approvals(approvals, votes_threshold=2)
-
-    def test_signatures_sorted_by_address(self) -> None:
-        addr_low = _make_address(1)
-        addr_high = _make_address(0xFF)
-        approvals = {
-            addr_high: _make_funding_approval(b'\xff' * 65),
-            addr_low: _make_funding_approval(b'\x01' * 65),
-        }
-        signatures = process_funding_approvals(approvals, votes_threshold=2)
-        assert signatures[:65] == b'\x01' * 65
-        assert signatures[65:] == b'\xff' * 65
-
-
 class TestParsers:
     def test_parse_registration_response(self) -> None:
         keeper_sig_hex = '0x' + 'ab' * 65
@@ -154,35 +113,6 @@ class TestParsers:
         assert result.nm_signature == Web3.to_bytes(hexstr=nm_sig_hex)
         assert result.ipfs_hash == 'QmTest'
         assert result.deadline == 12345
-
-    def test_parse_funding_response(self) -> None:
-        sig_hex = '0x' + 'ef' * 65
-        data = {'signature': sig_hex}
-        result = _parse_funding_response(data)
-        assert result.signature == Web3.to_bytes(hexstr=sig_hex)
-
-
-class TestCreateFundingRequest:
-    def test_builds_request(self) -> None:
-        operator = _make_address(42)
-        fundings: dict[HexStr, Gwei] = {
-            HexStr('0x' + 'aa' * 48): Gwei(32000000000),
-            HexStr('0x' + 'bb' * 48): Gwei(16000000000),
-        }
-        deadline = 999
-
-        with pytest.MonkeyPatch.context() as mp:
-            mp.setattr(
-                'src.node_manager.oracles._sign_deadline',
-                lambda d: HexStr('0xfakesig'),
-            )
-            request = create_funding_request(fundings, operator, deadline)
-
-        assert request.operator_address == operator
-        assert request.public_keys == list(fundings.keys())
-        assert request.amounts == [32000000000, 16000000000]
-        assert request.deadline == 999
-        assert request.signature == '0xfakesig'
 
 
 # --- Helpers ---
@@ -205,7 +135,3 @@ def _make_registration_approval(
         ipfs_hash=ipfs_hash,
         deadline=deadline,
     )
-
-
-def _make_funding_approval(sig: bytes = b'\xaa' * 65) -> NodeManagerFundingApproval:
-    return NodeManagerFundingApproval(signature=sig)

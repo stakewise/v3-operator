@@ -6,15 +6,8 @@ from sw_utils.typings import Oracle, ProtocolConfig
 from web3 import Web3
 from web3.types import Wei
 
-from src.node_manager.oracles import (
-    poll_eligible_operators,
-    send_funding_requests,
-    send_registration_requests,
-)
-from src.node_manager.typings import (
-    NodeManagerApprovalRequest,
-    NodeManagerFundingRequest,
-)
+from src.node_manager.oracles import poll_eligible_operators, send_registration_requests
+from src.node_manager.typings import NodeManagerApprovalRequest
 
 # --- poll_eligible_operators tests ---
 
@@ -147,34 +140,6 @@ class TestSendRegistrationRequests:
         assert len(approvals) == 1
 
 
-# --- send_funding_requests tests ---
-
-
-@pytest.mark.usefixtures('fake_settings')
-class TestSendFundingRequests:
-    @pytest.mark.asyncio
-    async def test_collects_approvals(self) -> None:
-        config = _make_protocol_config(
-            [['http://oracle1'], ['http://oracle2']],
-            threshold=2,
-        )
-        request = _make_funding_request()
-        sig = '0x' + 'ef' * 65
-
-        with aioresponses() as m:
-            m.post(
-                'http://oracle1/nodes-manager/fund-validators',
-                payload={'signature': sig},
-            )
-            m.post(
-                'http://oracle2/nodes-manager/fund-validators',
-                payload={'signature': sig},
-            )
-            approvals = await send_funding_requests(config, request)
-
-        assert len(approvals) == 2
-
-
 # --- Helpers ---
 
 # Pre-generated distinct public keys (64 hex bytes each) so each Oracle gets a unique address.
@@ -216,15 +181,5 @@ def _make_registration_request() -> NodeManagerApprovalRequest:
         exit_signature_shards=[[HexStr('0xexitshard1')]],
         deadline=1000,
         amounts=[32000000000],
-        signature=HexStr('0xsig'),
-    )
-
-
-def _make_funding_request() -> NodeManagerFundingRequest:
-    return NodeManagerFundingRequest(
-        operator_address=_make_address(42),
-        public_keys=[HexStr('0x' + 'aa' * 48)],
-        amounts=[32000000000],
-        deadline=1000,
         signature=HexStr('0xsig'),
     )
