@@ -1,15 +1,17 @@
 import logging
 
-from eth_typing import ChecksumAddress
+from eth_typing import BlockNumber, ChecksumAddress
 from sw_utils import InterruptHandler
 from sw_utils.typings import ProtocolConfig
 from web3 import Web3
 from web3.types import Gwei
 
+from src.common.clients import execution_client
 from src.common.execution import check_gas_price
 from src.common.protocol_config import get_protocol_config
 from src.common.tasks import BaseTask
 from src.config.settings import settings
+from src.node_manager.database import OperatorValidatorCrud
 from src.node_manager.oracles import (
     poll_eligible_operators,
     poll_funding_approval,
@@ -19,6 +21,7 @@ from src.node_manager.register_validators import fund_validators, register_valid
 from src.validators.consensus import fetch_compounding_validators_balances
 from src.validators.keystores.base import BaseKeystore
 from src.validators.tasks import get_deposits_amounts, get_funding_amounts
+from src.validators.typings import VaultValidator
 from src.validators.utils import get_validators_for_registration
 
 logger = logging.getLogger(__name__)
@@ -108,6 +111,14 @@ class NodeManagerTask(BaseTask):
         if tx_hash:
             pub_keys = ', '.join([v.public_key for v in validators])
             logger.info('Registered community vault validators %s: tx=%s', pub_keys, tx_hash)
+            tx_data = await execution_client.eth.get_transaction(tx_hash)
+            block_number = BlockNumber(tx_data['blockNumber'])
+            OperatorValidatorCrud().save_operator_validators(
+                [
+                    VaultValidator(public_key=v.public_key, block_number=block_number)
+                    for v in validators
+                ]
+            )
 
     async def _process_funding(
         self,
@@ -117,6 +128,14 @@ class NodeManagerTask(BaseTask):
     ) -> Gwei:
         """Fund existing compounding validators. Returns remaining eligible amount."""
         compounding_balances = await fetch_compounding_validators_balances()
+        if not compounding_balances:
+            return amount
+
+        # Filter to only this operator's validators
+        operator_keys = OperatorValidatorCrud().get_operator_public_keys()
+        compounding_balances = {
+            k: v for k, v in compounding_balances.items() if k in operator_keys
+        }
         if not compounding_balances:
             return amount
 
