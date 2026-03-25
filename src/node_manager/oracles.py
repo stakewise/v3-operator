@@ -164,6 +164,8 @@ async def poll_registration_approval(
                 e.num_votes,
                 e.threshold,
             )
+        except InvalidOraclesRequestError:
+            logger.error('All oracles failed to respond for community vault registration')
 
 
 # Registration approval polling

@@ -83,7 +83,7 @@ class TestRegisterValidators:
         mock_exec.eth.wait_for_transaction_receipt = AsyncMock(return_value={'status': 1})
 
         with (
-            patch(f'{MODULE}.NodesManagerContract', return_value=mock_contract),
+            patch(f'{MODULE}.nodes_manager_contract', mock_contract),
             patch(f'{MODULE}.build_gas_manager', return_value=gm),
             patch(f'{MODULE}.execution_client', mock_exec),
         ):
@@ -116,7 +116,7 @@ class TestRegisterValidators:
         mock_contract = MagicMock()
         mock_contract.functions.registerValidators = mock_fn
 
-        with patch(f'{MODULE}.NodesManagerContract', return_value=mock_contract):
+        with patch(f'{MODULE}.nodes_manager_contract', mock_contract):
             result = await register_validators(
                 operator_address=OPERATOR_ADDR,
                 approval=_make_approval(),
@@ -153,7 +153,7 @@ class TestRegisterValidators:
         mock_exec.eth.wait_for_transaction_receipt = AsyncMock(return_value={'status': 0})
 
         with (
-            patch(f'{MODULE}.NodesManagerContract', return_value=mock_contract),
+            patch(f'{MODULE}.nodes_manager_contract', mock_contract),
             patch(f'{MODULE}.build_gas_manager', return_value=gm),
             patch(f'{MODULE}.execution_client', mock_exec),
         ):
