@@ -7,7 +7,7 @@ from web3 import Web3
 from web3.exceptions import ContractLogicError
 
 from src.common.clients import execution_client
-from src.common.contracts import NodesManagerContract, validators_registry_contract
+from src.common.contracts import nodes_manager_contract, validators_registry_contract
 from src.common.execution import build_gas_manager
 from src.common.utils import format_error
 from src.config.settings import settings
@@ -50,9 +50,6 @@ async def register_validators(
         approval.ipfs_hash,
     )
 
-    nodes_manager_contract = NodesManagerContract(
-        address=settings.network_config.COMMUNITY_VAULT_CONTRACT_ADDRESS
-    )
     logger.info('Submitting community vault registration transaction')
 
     try:
