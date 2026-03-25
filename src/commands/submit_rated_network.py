@@ -131,17 +131,21 @@ async def _report_validators(
 async def graph_get_vault_validators(vault: str) -> list[str]:
     query = gql(
         """
-        query Validators($vaultAddress: String!, $first: Int, $skip: Int) {
+        query Validators($vaultAddress: String!, $first: Int, $lastID: String) {
           vaultValidators(
             vaultAddress: $vaultAddress
             statusIn: ["active_ongoing"]
+            where: { id_gt: $lastID }
+            orderBy: id
             first: $first
-            skip: $skip
           ) {
+            id
             publicKey
           }
         }
         """
     )
-    resource = await graph_client.fetch_pages(query, params={'vaultAddress': vault})
+    resource = await graph_client.fetch_pages(
+        query, params={'vaultAddress': vault}, cursor_pagination=True
+    )
     return [validator['publicKey'] for validator in resource]

@@ -19,7 +19,7 @@ async def graph_get_vaults(
     """
     Returns mapping from vault address to Vault object
     """
-    where_conditions: list[str] = []
+    where_conditions: list[str] = ['id_gt: $lastID']
     params: dict = {}
 
     if vaults == []:
@@ -33,18 +33,15 @@ async def graph_get_vaults(
         where_conditions.append('isMetaVault: $isMetaVault')
         params['isMetaVault'] = is_meta_vault
 
-    where_conditions_str = '\n'.join(where_conditions)
-    where_clause = f'where: {{ {where_conditions_str} }}' if where_conditions else ''
-
-    filters = ['first: $first', 'skip: $skip']
-
-    if where_clause:
-        filters.append(where_clause)
+    where_conditions_str = ', '.join(where_conditions)
+    where_clause = f'where: {{ {where_conditions_str} }}'
 
     query = f"""
-        query VaultQuery($first: Int, $skip: Int, $vaults: [String], $isMetaVault: Boolean) {{
+        query VaultQuery($first: Int, $lastID: String, $vaults: [String], $isMetaVault: Boolean) {{
             vaults(
-                {', '.join(filters)}
+                first: $first,
+                orderBy: id,
+                {where_clause}
             ) {{
                 id
                 isMetaVault
@@ -60,7 +57,7 @@ async def graph_get_vaults(
         }}
         """
 
-    response = await graph_client.fetch_pages(gql(query), params)
+    response = await graph_client.fetch_pages(gql(query), params, cursor_pagination=True)
 
     graph_vaults_map: dict[ChecksumAddress, Vault] = {}
 
@@ -80,12 +77,11 @@ async def graph_get_exit_requests_for_meta_vault(
     """
     query = gql(
         """
-        query exitRequestQuery($owner: String, $first: Int, $skip: Int) {
+        query exitRequestQuery($owner: String, $first: Int, $lastID: String) {
           exitRequests(
-            where: { owner: $owner, isClaimed: false },
-            orderBy: positionTicket,
-            first: $first,
-            skip: $skip
+            where: { owner: $owner, isClaimed: false, id_gt: $lastID },
+            orderBy: id,
+            first: $first
           ) {
             id
             positionTicket
@@ -105,11 +101,15 @@ async def graph_get_exit_requests_for_meta_vault(
         """
     )
     params = {'owner': meta_vault.lower()}
-    response = await graph_client.fetch_pages(query, params=params)
+    response = await graph_client.fetch_pages(query, params=params, cursor_pagination=True)
     result = defaultdict(list)
 
     for data in response:
         vault = Web3.to_checksum_address(data['vault']['id'])
         result[vault].append(ExitRequest.from_graph(data))
+
+    # Preserve positionTicket ordering per vault
+    for vault in result:
+        result[vault].sort(key=lambda er: er.position_ticket)
 
     return result
