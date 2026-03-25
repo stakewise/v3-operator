@@ -306,7 +306,7 @@ class TestTryRedeemMetaVault:
         with patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=False)):
             result = await _try_redeem_meta_vault(
                 vault_address=VAULT_1,
-                deficit=Wei(400),
+                assets=Wei(400),
                 current_withdrawable=Wei(100),
                 harvest_params=None,
             )
@@ -328,7 +328,7 @@ class TestTryRedeemMetaVault:
             mock_redeemer.redeem_sub_vaults_assets = AsyncMock(return_value='0xabc')
             result = await _try_redeem_meta_vault(
                 vault_address=VAULT_1,
-                deficit=Wei(400),
+                assets=Wei(400),
                 current_withdrawable=Wei(100),
                 harvest_params=None,
             )
@@ -347,7 +347,7 @@ class TestTryRedeemMetaVault:
             mock_redeemer.redeem_sub_vaults_assets = AsyncMock(side_effect=RuntimeError('fail'))
             result = await _try_redeem_meta_vault(
                 vault_address=VAULT_1,
-                deficit=Wei(400),
+                assets=Wei(400),
                 current_withdrawable=Wei(100),
                 harvest_params=None,
             )
@@ -375,7 +375,7 @@ class TestTryRedeemMetaVault:
             mock_redeemer.redeem_sub_vaults_assets = AsyncMock(return_value='0xabc')
             result = await _try_redeem_meta_vault(
                 vault_address=VAULT_1,
-                deficit=Wei(400),
+                assets=Wei(400),
                 current_withdrawable=Wei(100),
                 harvest_params=None,
             )
@@ -405,7 +405,7 @@ class TestTryRedeemMetaVault:
             )
             result = await _try_redeem_meta_vault(
                 vault_address=VAULT_1,
-                deficit=Wei(400),
+                assets=Wei(400),
                 current_withdrawable=Wei(100),
                 harvest_params=None,
             )
