@@ -72,8 +72,8 @@ async def graph_get_exit_requests_for_meta_vault(
     meta_vault: ChecksumAddress,
 ) -> dict[ChecksumAddress, list[ExitRequest]]:
     """
-    Returns mapping from sub-vault address to list of ExitRequest objects
-    Skips claimed exit requests and those with exitedAssets == 0
+    Returns mapping from sub-vault address to list of ExitRequest objects.
+    Skips claimed exit requests.
     """
     query = gql(
         """
