@@ -91,7 +91,7 @@ async def _report_validators(
     token: str,
     network: str,
 ) -> None:
-    validators = await graph_get_vault_validators(vault)
+    validators = await backend_graph_get_vault_validators(vault)
     if not validators:
         click.secho('No validators found or failed to fetch validators.', bold=True, fg='red')
         return
@@ -128,24 +128,20 @@ async def _report_validators(
             )
 
 
-async def graph_get_vault_validators(vault: str) -> list[str]:
+async def backend_graph_get_vault_validators(vault: str) -> list[str]:
     query = gql(
         """
-        query Validators($vaultAddress: String!, $first: Int, $lastID: String) {
+        query Validators($vaultAddress: String!, $first: Int, $skip: Int) {
           vaultValidators(
             vaultAddress: $vaultAddress
             statusIn: ["active_ongoing"]
-            where: { id_gt: $lastID }
-            orderBy: id
             first: $first
+            skip: $skip
           ) {
-            id
             publicKey
           }
         }
         """
     )
-    resource = await graph_client.fetch_pages(
-        query, params={'vaultAddress': vault}, cursor_pagination=True
-    )
+    resource = await graph_client.fetch_pages(query, params={'vaultAddress': vault})
     return [validator['publicKey'] for validator in resource]
