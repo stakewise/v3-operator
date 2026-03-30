@@ -21,13 +21,13 @@ class TestProcessRegistrationApprovals:
         """All oracles agree on the same ipfs_hash and deadline."""
         approvals = {
             _make_address(1): _make_registration_approval(
-                keeper_sig=b'\x11' * 65, nm_sig=b'\x21' * 65
+                keeper_sig=b'\x11' * 65, sig=b'\x21' * 65
             ),
             _make_address(2): _make_registration_approval(
-                keeper_sig=b'\x12' * 65, nm_sig=b'\x22' * 65
+                keeper_sig=b'\x12' * 65, sig=b'\x22' * 65
             ),
             _make_address(3): _make_registration_approval(
-                keeper_sig=b'\x13' * 65, nm_sig=b'\x23' * 65
+                keeper_sig=b'\x13' * 65, sig=b'\x23' * 65
             ),
         }
         result = process_registration_approvals(approvals, votes_threshold=2)
@@ -37,7 +37,7 @@ class TestProcessRegistrationApprovals:
         assert result.deadline == 1000
         # Signatures are sorted by oracle address (ascending int value) and truncated to threshold
         assert len(result.keeper_signatures) == 2 * 65
-        assert len(result.nm_signatures) == 2 * 65
+        assert len(result.signatures) == 2 * 65
 
     def test_exact_threshold(self) -> None:
         """Exactly threshold votes should succeed."""
@@ -87,8 +87,8 @@ class TestProcessRegistrationApprovals:
         addr_low = _make_address(1)
         addr_high = _make_address(0xFF)
         approvals = {
-            addr_high: _make_registration_approval(keeper_sig=b'\xff' * 65, nm_sig=b'\xfe' * 65),
-            addr_low: _make_registration_approval(keeper_sig=b'\x01' * 65, nm_sig=b'\x02' * 65),
+            addr_high: _make_registration_approval(keeper_sig=b'\xff' * 65, sig=b'\xfe' * 65),
+            addr_low: _make_registration_approval(keeper_sig=b'\x01' * 65, sig=b'\x02' * 65),
         }
         result = process_registration_approvals(approvals, votes_threshold=2)
         # addr_low (0x01) sorts before addr_high (0xff)
@@ -99,18 +99,18 @@ class TestProcessRegistrationApprovals:
 class TestParsers:
     def test_parse_registration_response(self) -> None:
         keeper_sig_hex = '0x' + 'ab' * 65
-        nm_sig_hex = '0x' + 'cd' * 65
+        sig_hex = '0x' + 'cd' * 65
         data = {
             'keeperParams': {
                 'signature': keeper_sig_hex,
                 'ipfs_hash': 'QmTest',
                 'deadline': 12345,
             },
-            'signature': nm_sig_hex,
+            'signature': sig_hex,
         }
         result = _parse_registration_response(data)
         assert result.keeper_signature == Web3.to_bytes(hexstr=keeper_sig_hex)
-        assert result.nm_signature == Web3.to_bytes(hexstr=nm_sig_hex)
+        assert result.signature == Web3.to_bytes(hexstr=sig_hex)
         assert result.ipfs_hash == 'QmTest'
         assert result.deadline == 12345
 
@@ -125,13 +125,13 @@ def _make_address(i: int) -> ChecksumAddress:
 
 def _make_registration_approval(
     keeper_sig: bytes = b'\x01' * 65,
-    nm_sig: bytes = b'\x02' * 65,
+    sig: bytes = b'\x02' * 65,
     ipfs_hash: str = 'QmTest123',
     deadline: int = 1000,
 ) -> NodeManagerRegistrationApproval:
     return NodeManagerRegistrationApproval(
         keeper_signature=keeper_sig,
-        nm_signature=nm_sig,
+        signature=sig,
         ipfs_hash=ipfs_hash,
         deadline=deadline,
     )

@@ -170,7 +170,7 @@ class TestRegisterValidators:
 def _make_approval() -> NodeManagerRegistrationOraclesApproval:
     return NodeManagerRegistrationOraclesApproval(
         keeper_signatures=b'\x01' * 65,
-        nm_signatures=b'\x02' * 65,
+        signatures=b'\x02' * 65,
         ipfs_hash='QmTest',
         deadline=1000,
     )

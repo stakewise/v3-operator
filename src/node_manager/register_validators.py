@@ -50,11 +50,11 @@ async def register_validators(
         approval.ipfs_hash,
     )
 
-    logger.info('Submitting community vault registration transaction')
+    logger.info('Submitting community vault validator registration transaction')
 
     try:
         await nodes_manager_contract.functions.registerValidators(
-            operator_address, keeper_params, approval.nm_signatures
+            operator_address, keeper_params, approval.signatures
         ).estimate_gas()
     except (ValueError, ContractLogicError) as e:
         logger.error('Failed to register community vault validator(s): %s', format_error(e))
@@ -66,7 +66,7 @@ async def register_validators(
         gas_manager = build_gas_manager()
         tx_params = await gas_manager.get_high_priority_tx_params()
         tx = await nodes_manager_contract.functions.registerValidators(
-            operator_address, keeper_params, approval.nm_signatures
+            operator_address, keeper_params, approval.signatures
         ).transact(tx_params)
     except Exception as e:
         logger.error('Failed to register community vault validator(s): %s', format_error(e))

@@ -4,7 +4,7 @@ from eth_typing import ChecksumAddress
 from sw_utils import InterruptHandler
 from sw_utils.typings import ProtocolConfig
 from web3 import Web3
-from web3.types import Gwei
+from web3.types import Gwei, Wei
 
 from src.common.execution import check_gas_price
 from src.common.protocol_config import get_protocol_config
@@ -36,36 +36,39 @@ class NodeManagerTask(BaseTask):
             return
 
         protocol_config = await get_protocol_config()
+
+        eligible_amount = await self._get_eligible_amount(protocol_config)
+        if eligible_amount is None:
+            return
+
+        logger.info(
+            'Operator %s is eligible to register/fund %s ETH worth of validators',
+            self.operator_address,
+            eligible_amount,
+        )
+
+        amount_gwei = Gwei(int(Web3.from_wei(eligible_amount, 'gwei')))
+
+        # Fund existing compounding validators first
+        amount_gwei = await self._process_funding(
+            amount=amount_gwei,
+            operator_address=self.operator_address,
+            protocol_config=protocol_config,
+        )
+
+        # Register new validators with remaining amount
+        await self._process_registration(
+            amount=amount_gwei,
+            protocol_config=protocol_config,
+        )
+
+    async def _get_eligible_amount(self, protocol_config: ProtocolConfig) -> Wei | None:
         eligible_operators = await poll_eligible_operators(protocol_config)
 
         for operator in eligible_operators:
-            if operator.address != self.operator_address:
-                continue
-
-            amount_eth = Web3.from_wei(operator.amount, 'ether')
-            logger.info(
-                'Operator %s is eligible to register/fund %s ETH worth of validators',
-                self.operator_address,
-                amount_eth,
-            )
-
-            amount_gwei = Gwei(int(Web3.from_wei(operator.amount, 'gwei')))
-
-            # Fund existing compounding validators first
-            amount_gwei = await self._process_funding(
-                amount=amount_gwei,
-                operator_address=self.operator_address,
-                protocol_config=protocol_config,
-            )
-
-            # Register new validators with remaining amount
-            await self._process_registration(
-                amount=amount_gwei,
-                protocol_config=protocol_config,
-            )
-            return
-
-        logger.debug('Operator %s is not eligible', self.operator_address)
+            if operator.address == self.operator_address:
+                return operator.amount
+        return None
 
     async def _process_registration(
         self,

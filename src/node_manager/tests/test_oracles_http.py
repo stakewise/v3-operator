@@ -88,7 +88,7 @@ class TestSendRegistrationRequests:
         )
         request = _make_registration_request()
         keeper_sig = '0x' + 'ab' * 65
-        nm_sig = '0x' + 'cd' * 65
+        sig = '0x' + 'cd' * 65
 
         oracle_response = {
             'keeperParams': {
@@ -96,7 +96,7 @@ class TestSendRegistrationRequests:
                 'ipfs_hash': 'QmTestHash',
                 'deadline': 1000,
             },
-            'signature': nm_sig,
+            'signature': sig,
         }
 
         with aioresponses() as m:

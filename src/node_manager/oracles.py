@@ -228,7 +228,8 @@ async def create_approval_request(
 
     if not request.public_keys:
         raise ValueError(
-            'Failed to build approval request: no validators with valid exit signature shards'
+            'Failed to build validator registration request:'
+            ' no validators with valid exit signature shards'
         )
 
     return request
@@ -255,7 +256,7 @@ def _parse_registration_response(data: dict) -> NodeManagerRegistrationApproval:
     keeper_params = data['keeperParams']
     return NodeManagerRegistrationApproval(
         keeper_signature=Web3.to_bytes(hexstr=keeper_params['signature']),
-        nm_signature=Web3.to_bytes(hexstr=data['signature']),
+        signature=Web3.to_bytes(hexstr=data['signature']),
         ipfs_hash=keeper_params['ipfs_hash'],
         deadline=keeper_params['deadline'],
     )
@@ -270,7 +271,7 @@ def process_registration_approvals(
         tuple[str, int], list[tuple[ChecksumAddress, NodeManagerRegistrationApproval]]
     ] = defaultdict(list)
     for address, approval in approvals.items():
-        candidates[(approval.ipfs_hash, approval.deadline)].append((address, approval))
+        candidates[approval.ipfs_hash, approval.deadline].append((address, approval))
 
     if not candidates:
         raise InvalidOraclesRequestError()
@@ -283,14 +284,14 @@ def process_registration_approvals(
     sorted_votes = sorted(votes, key=lambda x: Web3.to_int(hexstr=x[0]))[:votes_threshold]
 
     keeper_signatures = b''
-    nm_signatures = b''
+    signatures = b''
     for _, approval in sorted_votes:
         keeper_signatures += approval.keeper_signature
-        nm_signatures += approval.nm_signature
+        signatures += approval.signature
 
     return NodeManagerRegistrationOraclesApproval(
         keeper_signatures=keeper_signatures,
-        nm_signatures=nm_signatures,
+        signatures=signatures,
         ipfs_hash=winner[0],
         deadline=winner[1],
     )
