@@ -42,11 +42,12 @@ async def register_validators(
         Web3.to_bytes(tx_validator)
         for tx_validator in encode_tx_validator_list(validators=validators)
     ]
+    signatures = Web3.to_bytes(hexstr=approval.signatures)
     keeper_params = (
         Bytes32(Web3.to_bytes(hexstr=validators_registry_root)),
         approval.deadline,
         b''.join(tx_validators),
-        approval.keeper_signatures,
+        Web3.to_bytes(hexstr=approval.keeper_signatures),
         approval.ipfs_hash,
     )
 
@@ -54,7 +55,7 @@ async def register_validators(
 
     try:
         await nodes_manager_contract.functions.registerValidators(
-            operator_address, keeper_params, approval.signatures
+            operator_address, keeper_params, signatures
         ).estimate_gas()
     except (ValueError, ContractLogicError) as e:
         logger.error('Failed to register community vault validator(s): %s', format_error(e))
@@ -66,7 +67,7 @@ async def register_validators(
         gas_manager = build_gas_manager()
         tx_params = await gas_manager.get_high_priority_tx_params()
         tx = await nodes_manager_contract.functions.registerValidators(
-            operator_address, keeper_params, approval.signatures
+            operator_address, keeper_params, signatures
         ).transact(tx_params)
     except Exception as e:
         logger.error('Failed to register community vault validator(s): %s', format_error(e))

@@ -33,8 +33,8 @@ class NodeManagerApprovalRequest:
 class NodeManagerRegistrationApproval:
     """Single oracle's registration response with both signature types."""
 
-    signature: bytes
-    keeper_signature: bytes
+    signature: HexStr
+    keeper_signature: HexStr
     ipfs_hash: str
     deadline: int
 
@@ -43,7 +43,7 @@ class NodeManagerRegistrationApproval:
 class NodeManagerRegistrationOraclesApproval:
     """Combined registration approval from multiple oracles."""
 
-    signatures: bytes
-    keeper_signatures: bytes
+    signatures: HexStr
+    keeper_signatures: HexStr
     ipfs_hash: str
     deadline: int

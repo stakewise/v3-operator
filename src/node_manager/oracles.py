@@ -255,8 +255,8 @@ def _parse_registration_response(data: dict) -> NodeManagerRegistrationApproval:
     """Parse oracle response containing both keeper and NM signatures."""
     keeper_params = data['keeperParams']
     return NodeManagerRegistrationApproval(
-        keeper_signature=Web3.to_bytes(hexstr=keeper_params['signature']),
-        signature=Web3.to_bytes(hexstr=data['signature']),
+        keeper_signature=HexStr(keeper_params['signature']),
+        signature=HexStr(data['signature']),
         ipfs_hash=keeper_params['ipfs_hash'],
         deadline=keeper_params['deadline'],
     )
@@ -283,15 +283,15 @@ def process_registration_approvals(
 
     sorted_votes = sorted(votes, key=lambda x: Web3.to_int(hexstr=x[0]))[:votes_threshold]
 
-    keeper_signatures = b''
-    signatures = b''
+    keeper_signatures: list[HexStr] = []
+    signatures: list[HexStr] = []
     for _, approval in sorted_votes:
-        keeper_signatures += approval.keeper_signature
-        signatures += approval.signature
+        keeper_signatures.append(approval.keeper_signature)
+        signatures.append(approval.signature)
 
     return NodeManagerRegistrationOraclesApproval(
-        keeper_signatures=keeper_signatures,
-        signatures=signatures,
+        keeper_signatures=HexStr('0x' + ''.join(s.removeprefix('0x') for s in keeper_signatures)),
+        signatures=HexStr('0x' + ''.join(s.removeprefix('0x') for s in signatures)),
         ipfs_hash=winner[0],
         deadline=winner[1],
     )

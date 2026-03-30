@@ -1,5 +1,5 @@
 import pytest
-from eth_typing import ChecksumAddress
+from eth_typing import ChecksumAddress, HexStr
 from web3 import Web3
 
 from src.common.exceptions import (
@@ -21,13 +21,13 @@ class TestProcessRegistrationApprovals:
         """All oracles agree on the same ipfs_hash and deadline."""
         approvals = {
             _make_address(1): _make_registration_approval(
-                keeper_sig=b'\x11' * 65, sig=b'\x21' * 65
+                keeper_sig=HexStr('0x' + '11' * 65), sig=HexStr('0x' + '21' * 65)
             ),
             _make_address(2): _make_registration_approval(
-                keeper_sig=b'\x12' * 65, sig=b'\x22' * 65
+                keeper_sig=HexStr('0x' + '12' * 65), sig=HexStr('0x' + '22' * 65)
             ),
             _make_address(3): _make_registration_approval(
-                keeper_sig=b'\x13' * 65, sig=b'\x23' * 65
+                keeper_sig=HexStr('0x' + '13' * 65), sig=HexStr('0x' + '23' * 65)
             ),
         }
         result = process_registration_approvals(approvals, votes_threshold=2)
@@ -36,8 +36,9 @@ class TestProcessRegistrationApprovals:
         assert result.ipfs_hash == 'QmTest123'
         assert result.deadline == 1000
         # Signatures are sorted by oracle address (ascending int value) and truncated to threshold
-        assert len(result.keeper_signatures) == 2 * 65
-        assert len(result.signatures) == 2 * 65
+        # HexStr: '0x' prefix + 2 hex chars per byte × 65 bytes × 2 sigs = 262 chars
+        assert len(Web3.to_bytes(hexstr=result.keeper_signatures)) == 2 * 65
+        assert len(Web3.to_bytes(hexstr=result.signatures)) == 2 * 65
 
     def test_exact_threshold(self) -> None:
         """Exactly threshold votes should succeed."""
@@ -46,7 +47,7 @@ class TestProcessRegistrationApprovals:
             _make_address(2): _make_registration_approval(),
         }
         result = process_registration_approvals(approvals, votes_threshold=2)
-        assert len(result.keeper_signatures) == 2 * 65
+        assert len(Web3.to_bytes(hexstr=result.keeper_signatures)) == 2 * 65
 
     def test_below_threshold_raises(self) -> None:
         approvals = {
@@ -87,13 +88,18 @@ class TestProcessRegistrationApprovals:
         addr_low = _make_address(1)
         addr_high = _make_address(0xFF)
         approvals = {
-            addr_high: _make_registration_approval(keeper_sig=b'\xff' * 65, sig=b'\xfe' * 65),
-            addr_low: _make_registration_approval(keeper_sig=b'\x01' * 65, sig=b'\x02' * 65),
+            addr_high: _make_registration_approval(
+                keeper_sig=HexStr('0x' + 'ff' * 65), sig=HexStr('0x' + 'fe' * 65)
+            ),
+            addr_low: _make_registration_approval(
+                keeper_sig=HexStr('0x' + '01' * 65), sig=HexStr('0x' + '02' * 65)
+            ),
         }
         result = process_registration_approvals(approvals, votes_threshold=2)
         # addr_low (0x01) sorts before addr_high (0xff)
-        assert result.keeper_signatures[:65] == b'\x01' * 65
-        assert result.keeper_signatures[65:] == b'\xff' * 65
+        keeper_bytes = Web3.to_bytes(hexstr=result.keeper_signatures)
+        assert keeper_bytes[:65] == b'\x01' * 65
+        assert keeper_bytes[65:] == b'\xff' * 65
 
 
 class TestParsers:
@@ -109,8 +115,8 @@ class TestParsers:
             'signature': sig_hex,
         }
         result = _parse_registration_response(data)
-        assert result.keeper_signature == Web3.to_bytes(hexstr=keeper_sig_hex)
-        assert result.signature == Web3.to_bytes(hexstr=sig_hex)
+        assert result.keeper_signature == keeper_sig_hex
+        assert result.signature == sig_hex
         assert result.ipfs_hash == 'QmTest'
         assert result.deadline == 12345
 
@@ -124,8 +130,8 @@ def _make_address(i: int) -> ChecksumAddress:
 
 
 def _make_registration_approval(
-    keeper_sig: bytes = b'\x01' * 65,
-    sig: bytes = b'\x02' * 65,
+    keeper_sig: HexStr = HexStr('0x' + '01' * 65),
+    sig: HexStr = HexStr('0x' + '02' * 65),
     ipfs_hash: str = 'QmTest123',
     deadline: int = 1000,
 ) -> NodeManagerRegistrationApproval:
