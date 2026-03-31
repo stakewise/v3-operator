@@ -196,7 +196,7 @@ async def create_approval_request(
         exit_signature_shards=[],
         deadline=deadline,
         amounts=[],
-        signature=_sign_deadline(deadline),
+        validators_manager_signature=_sign_deadline(deadline),
     )
 
     for validator_index, validator in enumerate(validators, validators_start_index):

@@ -26,7 +26,7 @@ class NodeManagerApprovalRequest:
     exit_signature_shards: list[list[HexStr]]
     deadline: int
     amounts: list[int]
-    signature: HexStr
+    validators_manager_signature: HexStr
 
 
 @dataclass

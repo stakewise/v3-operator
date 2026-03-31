@@ -181,5 +181,5 @@ def _make_registration_request() -> NodeManagerApprovalRequest:
         exit_signature_shards=[[HexStr('0xexitshard1')]],
         deadline=1000,
         amounts=[32000000000],
-        signature=HexStr('0xsig'),
+        validators_manager_signature=HexStr('0xsig'),
     )
