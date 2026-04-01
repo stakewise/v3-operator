@@ -1,12 +1,11 @@
 import logging
 
-from eth_typing import BlockNumber, ChecksumAddress
+from eth_typing import ChecksumAddress
 from sw_utils import InterruptHandler
 from sw_utils.typings import ProtocolConfig
 from web3 import Web3
 from web3.types import Gwei, Wei
 
-from src.common.clients import execution_client
 from src.common.execution import check_gas_price
 from src.common.protocol_config import get_protocol_config
 from src.common.tasks import BaseTask
@@ -22,7 +21,6 @@ from src.node_manager.register_validators import fund_validators, register_valid
 from src.validators.consensus import fetch_compounding_validators_balances
 from src.validators.keystores.base import BaseKeystore
 from src.validators.tasks import get_deposits_amounts, get_funding_amounts
-from src.validators.typings import VaultValidator
 from src.validators.utils import get_validators_for_registration
 
 logger = logging.getLogger(__name__)
@@ -125,10 +123,6 @@ class NodeManagerTask(BaseTask):
         if tx_hash:
             pub_keys = ', '.join([v.public_key for v in validators])
             logger.info('Registered community vault validators %s: tx=%s', pub_keys, tx_hash)
-            tx_data = await execution_client.eth.get_transaction(tx_hash)
-            metrics.last_registration_block.labels(network=settings.network).set(
-                tx_data['blockNumber']
-            )
 
     async def _process_funding(
         self,

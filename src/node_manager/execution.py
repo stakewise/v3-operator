@@ -1,6 +1,6 @@
 import logging
 
-from eth_typing import BlockNumber, ChecksumAddress
+from eth_typing import BlockNumber, ChecksumAddress, HexStr
 from sw_utils import EventProcessor, EventScanner
 from web3 import Web3
 from web3.types import EventData
@@ -57,10 +57,10 @@ async def scan_operator_validators_events(
     OperatorValidatorCrud().update_checkpoint(block_number)
 
 
-def _parse_public_keys(public_keys_bytes: bytes) -> list[str]:
+def _parse_public_keys(public_keys_bytes: bytes) -> list[HexStr]:
     """Parse concatenated 48-byte BLS public keys into hex strings."""
-    result: list[str] = []
+    result: list[HexStr] = []
     for i in range(0, len(public_keys_bytes), BLS_PUBLIC_KEY_LENGTH):
         key_bytes = public_keys_bytes[i : i + BLS_PUBLIC_KEY_LENGTH]
-        result.append(Web3.to_hex(key_bytes))
+        result.append(HexStr(Web3.to_hex(key_bytes)))
     return result

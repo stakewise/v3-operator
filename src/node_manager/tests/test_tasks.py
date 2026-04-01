@@ -353,20 +353,6 @@ class TestProcessBlockV2:
 
 
 @pytest.mark.usefixtures('fake_settings')
-class TestProcessFunding:
-    @pytest.mark.asyncio
-    async def test_stub_returns_full_amount(self) -> None:
-        """Current stub _process_funding returns full amount unchanged."""
-        task = _make_task()
-        result = await task._process_funding(
-            amount=Gwei(64000000000),
-            operator_address=OPERATOR_ADDR,
-            protocol_config=_make_protocol_config(),
-        )
-        assert result == Gwei(64000000000)
-
-
-@pytest.mark.usefixtures('fake_settings')
 class TestProcessRegistration:
     @pytest.mark.asyncio
     @patch(f'{MODULE}.get_deposits_amounts', return_value=[])

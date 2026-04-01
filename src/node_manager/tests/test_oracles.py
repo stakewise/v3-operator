@@ -7,10 +7,13 @@ from src.common.exceptions import (
     NotEnoughOracleApprovalsError,
 )
 from src.node_manager.oracles import (
+    _parse_funding_response,
     _parse_registration_response,
+    process_funding_approvals,
     process_registration_approvals,
 )
 from src.node_manager.typings import (
+    NodeManagerFundingApproval,
     NodeManagerRegistrationApproval,
     NodeManagerRegistrationOraclesApproval,
 )
@@ -106,7 +109,68 @@ class TestProcessRegistrationApprovals:
         assert result.keeper_signatures[1] == keeper_sig_high
 
 
+class TestProcessFundingApprovals:
+    def test_basic_consensus(self) -> None:
+        """All oracles respond — signatures sorted by address, truncated to threshold."""
+        sig_0 = HexStr(faker.account_signature())
+        sig_1 = HexStr(faker.account_signature())
+        sig_2 = HexStr(faker.account_signature())
+        approvals = {
+            ORACLE_ADDRESSES[0]: _make_funding_approval(sig=sig_0),
+            ORACLE_ADDRESSES[1]: _make_funding_approval(sig=sig_1),
+            ORACLE_ADDRESSES[2]: _make_funding_approval(sig=sig_2),
+        }
+        result = process_funding_approvals(approvals, votes_threshold=2)
+
+        assert isinstance(result, list)
+        assert len(result) == 2
+        assert result == [sig_0, sig_1]
+
+    def test_exact_threshold(self) -> None:
+        """Exactly threshold votes should succeed."""
+        sig_0 = HexStr(faker.account_signature())
+        sig_1 = HexStr(faker.account_signature())
+        approvals = {
+            ORACLE_ADDRESSES[0]: _make_funding_approval(sig=sig_0),
+            ORACLE_ADDRESSES[1]: _make_funding_approval(sig=sig_1),
+        }
+        result = process_funding_approvals(approvals, votes_threshold=2)
+        assert result == [sig_0, sig_1]
+
+    def test_below_threshold_raises(self) -> None:
+        approvals = {
+            ORACLE_ADDRESSES[0]: _make_funding_approval(),
+        }
+        with pytest.raises(NotEnoughOracleApprovalsError) as exc_info:
+            process_funding_approvals(approvals, votes_threshold=2)
+        assert exc_info.value.num_votes == 1
+        assert exc_info.value.threshold == 2
+
+    def test_empty_approvals_raises(self) -> None:
+        with pytest.raises(InvalidOraclesRequestError):
+            process_funding_approvals({}, votes_threshold=1)
+
+    def test_signatures_sorted_by_address(self) -> None:
+        """Signatures are returned in ascending oracle address order."""
+        addr_low = ORACLE_ADDRESSES[0]
+        addr_high = ORACLE_ADDRESSES[-1]
+        sig_low = HexStr(faker.account_signature())
+        sig_high = HexStr(faker.account_signature())
+        approvals = {
+            addr_high: _make_funding_approval(sig=sig_high),
+            addr_low: _make_funding_approval(sig=sig_low),
+        }
+        result = process_funding_approvals(approvals, votes_threshold=2)
+        assert result == [sig_low, sig_high]
+
+
 class TestParsers:
+    def test_parse_funding_response(self) -> None:
+        sig_hex = faker.account_signature()
+        data = {'signature': sig_hex}
+        result = _parse_funding_response(data)
+        assert result.signature == sig_hex
+
     def test_parse_registration_response(self) -> None:
         keeper_sig_hex = faker.account_signature()
         sig_hex = faker.account_signature()
@@ -126,6 +190,14 @@ class TestParsers:
 
 
 # --- Helpers ---
+
+
+def _make_funding_approval(
+    sig: HexStr | None = None,
+) -> NodeManagerFundingApproval:
+    if sig is None:
+        sig = HexStr(faker.account_signature())
+    return NodeManagerFundingApproval(signature=sig)
 
 
 def _make_registration_approval(

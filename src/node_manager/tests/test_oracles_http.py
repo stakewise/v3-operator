@@ -6,8 +6,15 @@ from sw_utils.typings import Oracle, ProtocolConfig
 from web3 import Web3
 
 from src.common.tests.utils import ether_to_gwei
-from src.node_manager.oracles import poll_eligible_operators, send_registration_requests
-from src.node_manager.typings import NodeManagerApprovalRequest
+from src.node_manager.oracles import (
+    poll_eligible_operators,
+    send_funding_requests,
+    send_registration_requests,
+)
+from src.node_manager.typings import (
+    NodeManagerApprovalRequest,
+    NodeManagerFundingRequest,
+)
 
 # --- poll_eligible_operators tests ---
 
@@ -141,6 +148,56 @@ class TestSendRegistrationRequests:
         assert len(approvals) == 1
 
 
+# --- send_funding_requests tests ---
+
+
+@pytest.mark.usefixtures('fake_settings')
+class TestSendFundingRequests:
+    @pytest.mark.asyncio
+    async def test_collects_approvals(self) -> None:
+        config = _make_protocol_config(
+            [['http://oracle1'], ['http://oracle2']],
+            threshold=2,
+        )
+        request = _make_funding_request()
+        signature = faker.account_signature()
+
+        oracle_response = {'signature': signature}
+
+        with aioresponses() as m:
+            m.post(
+                'http://oracle1/nodes-manager/fund-validators',
+                payload=oracle_response,
+            )
+            m.post(
+                'http://oracle2/nodes-manager/fund-validators',
+                payload=oracle_response,
+            )
+            approvals = await send_funding_requests(config, request)
+
+        assert len(approvals) == 2
+
+    @pytest.mark.asyncio
+    async def test_partial_failure(self) -> None:
+        """One oracle fails, the other succeeds — still returns what we got."""
+        config = _make_protocol_config(
+            [['http://oracle1'], ['http://oracle2']],
+            threshold=1,
+        )
+        request = _make_funding_request()
+        oracle_response = {'signature': faker.account_signature()}
+
+        with aioresponses() as m:
+            m.post('http://oracle1/nodes-manager/fund-validators', status=500)
+            m.post(
+                'http://oracle2/nodes-manager/fund-validators',
+                payload=oracle_response,
+            )
+            approvals = await send_funding_requests(config, request)
+
+        assert len(approvals) == 1
+
+
 # --- Helpers ---
 
 _ORACLE_PUBKEYS: list[HexStr] = [HexStr(faker.account_public_key()) for _ in range(9)]
@@ -163,6 +220,16 @@ def _make_protocol_config(
         validators_threshold=threshold,
         signature_validity_period=60,
         validators_approval_batch_limit=10,
+    )
+
+
+def _make_funding_request() -> NodeManagerFundingRequest:
+    return NodeManagerFundingRequest(
+        operator_address=faker.eth_address(),
+        public_keys=[HexStr(faker.validator_public_key())],
+        amounts=[ether_to_gwei(32)],
+        deadline=1000,
+        validators_manager_signature=HexStr(faker.account_signature()),
     )
 
 
