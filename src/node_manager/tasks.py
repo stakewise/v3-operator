@@ -9,6 +9,7 @@ from web3.types import Gwei, Wei
 from src.common.execution import check_gas_price
 from src.common.protocol_config import get_protocol_config
 from src.common.tasks import BaseTask
+from src.common.typings import ValidatorType
 from src.config.settings import settings
 from src.node_manager.oracles import poll_eligible_operators, poll_registration_approval
 from src.node_manager.register_validators import register_validators
@@ -49,18 +50,28 @@ class NodeManagerTask(BaseTask):
 
         amount_gwei = Gwei(int(Web3.from_wei(eligible_amount, 'gwei')))
 
+        if settings.validator_type == ValidatorType.V1:
+            if not settings.disable_validators_registration:
+                await self._process_registration(
+                    amount=amount_gwei,
+                    protocol_config=protocol_config,
+                )
+            return
+
         # Fund existing compounding validators first
-        amount_gwei = await self._process_funding(
-            amount=amount_gwei,
-            operator_address=self.operator_address,
-            protocol_config=protocol_config,
-        )
+        if not settings.disable_validators_funding:
+            amount_gwei = await self._process_funding(
+                amount=amount_gwei,
+                operator_address=self.operator_address,
+                protocol_config=protocol_config,
+            )
 
         # Register new validators with remaining amount
-        await self._process_registration(
-            amount=amount_gwei,
-            protocol_config=protocol_config,
-        )
+        if not settings.disable_validators_registration:
+            await self._process_registration(
+                amount=amount_gwei,
+                protocol_config=protocol_config,
+            )
 
     async def _get_eligible_amount(self, protocol_config: ProtocolConfig) -> Wei | None:
         eligible_operators = await poll_eligible_operators(protocol_config)
