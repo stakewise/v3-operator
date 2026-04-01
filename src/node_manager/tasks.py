@@ -1,20 +1,28 @@
 import logging
 
-from eth_typing import ChecksumAddress
+from eth_typing import BlockNumber, ChecksumAddress
 from sw_utils import InterruptHandler
 from sw_utils.typings import ProtocolConfig
 from web3 import Web3
 from web3.types import Gwei, Wei
 
+from src.common.clients import execution_client
 from src.common.execution import check_gas_price
 from src.common.protocol_config import get_protocol_config
 from src.common.tasks import BaseTask
 from src.common.typings import ValidatorType
 from src.config.settings import settings
-from src.node_manager.oracles import poll_eligible_operators, poll_registration_approval
-from src.node_manager.register_validators import register_validators
+from src.node_manager.database import OperatorValidatorCrud
+from src.node_manager.oracles import (
+    poll_eligible_operators,
+    poll_funding_approval,
+    poll_registration_approval,
+)
+from src.node_manager.register_validators import fund_validators, register_validators
+from src.validators.consensus import fetch_compounding_validators_balances
 from src.validators.keystores.base import BaseKeystore
-from src.validators.tasks import get_deposits_amounts
+from src.validators.tasks import get_deposits_amounts, get_funding_amounts
+from src.validators.typings import VaultValidator
 from src.validators.utils import get_validators_for_registration
 
 logger = logging.getLogger(__name__)
@@ -117,6 +125,10 @@ class NodeManagerTask(BaseTask):
         if tx_hash:
             pub_keys = ', '.join([v.public_key for v in validators])
             logger.info('Registered community vault validators %s: tx=%s', pub_keys, tx_hash)
+            tx_data = await execution_client.eth.get_transaction(tx_hash)
+            metrics.last_registration_block.labels(network=settings.network).set(
+                tx_data['blockNumber']
+            )
 
     async def _process_funding(
         self,
@@ -124,8 +136,47 @@ class NodeManagerTask(BaseTask):
         operator_address: ChecksumAddress,
         protocol_config: ProtocolConfig,
     ) -> Gwei:
-        # linter mock
-        logger.info(
-            'amount: %s; operator: %s; protocol: %s', amount, operator_address, protocol_config
-        )
-        return Gwei(amount)
+        """Fund existing compounding validators. Returns remaining eligible amount."""
+        compounding_balances = await fetch_compounding_validators_balances()
+        if not compounding_balances:
+            return amount
+
+        # Filter to only this operator's validators
+        operator_keys = OperatorValidatorCrud().get_operator_public_keys()
+        compounding_balances = {k: v for k, v in compounding_balances.items() if k in operator_keys}
+        if not compounding_balances:
+            return amount
+
+        validator_fundings = get_funding_amounts(compounding_balances, amount)
+        if not validator_fundings:
+            return amount
+
+        funded_total = Gwei(0)
+        batch_limit = protocol_config.validators_approval_batch_limit
+
+        # Process in batches
+        funding_items = list(validator_fundings.items())
+        for i in range(0, len(funding_items), batch_limit):
+            batch = dict(funding_items[i : i + batch_limit])
+
+            signatures = await poll_funding_approval(
+                validator_fundings=batch,
+                operator_address=operator_address,
+            )
+
+            tx_hash = await fund_validators(
+                operator_address=self.operator_address,
+                signatures=signatures,
+                validator_fundings=batch,
+            )
+
+            if tx_hash:
+                batch_total = sum(batch.values())
+                funded_total = Gwei(funded_total + batch_total)
+                pub_keys = ', '.join(batch.keys())
+                logger.info('Funded community vault validators %s: tx=%s', pub_keys, tx_hash)
+            else:
+                logger.warning('Community vault funding batch failed, stopping funding')
+                break
+
+        return Gwei(amount - funded_total)
