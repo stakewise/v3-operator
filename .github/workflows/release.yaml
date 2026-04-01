@@ -14,15 +14,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
       - name: Set up python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: 3.12.12
 
       - name: Install Poetry
-        uses: Gr1N/setup-poetry@v8
+        uses: snok/install-poetry@76e04a911780d5b312d89783f7b1cd627778900a # v1
         with:
           poetry-version: "1.8.3"
 
@@ -143,7 +143,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
       - name: Install build dependencies for Linux
         run: |
@@ -159,12 +159,12 @@ jobs:
         if: matrix.os == 'macos-14'
 
       - name: Set up python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: ${{ matrix.PYTHON_VERSION }}
 
       - name: Install Poetry
-        uses: Gr1N/setup-poetry@v8
+        uses: snok/install-poetry@76e04a911780d5b312d89783f7b1cd627778900a # v1
         with:
           poetry-version: "1.8.3"
 
@@ -184,7 +184,7 @@ jobs:
         run: ${{ matrix.BUILD_CMD }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ matrix.OS }}
           path: /tmp/artifacts/*
@@ -195,7 +195,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: /tmp/artifacts
 
@@ -208,7 +208,7 @@ jobs:
         run: echo "RELEASE_VERSION=$(echo $GITHUB_REF | cut -d / -f 3)" >> "$GITHUB_ENV"
 
       - name: Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
           fail_on_unmatched_files: true
           files: |
