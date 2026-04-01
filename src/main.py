@@ -10,9 +10,6 @@ from src.commands.create_keys import create_keys
 from src.commands.create_wallet import create_wallet
 from src.commands.exit_validators import exit_validators
 from src.commands.init import init
-from src.commands.nodes.node_install import node_install
-from src.commands.nodes.node_start import node_start
-from src.commands.nodes.node_status import node_status_command as node_status
 from src.commands.process_meta_vaults import process_meta_vaults
 from src.commands.recover import recover
 from src.commands.setup_remote_signer import setup_remote_signer
@@ -22,6 +19,9 @@ from src.commands.start.relayer import start_relayer
 from src.commands.start.remote_signer import start_remote_signer
 from src.commands.submit_rated_network import submit_rated_network
 from src.common.utils import get_build_version
+from src.nodewise.commands.node_install import node_install
+from src.nodewise.commands.node_start import node_start
+from src.nodewise.commands.node_status import node_status_command as node_status
 from src.remote_db.commands import remote_db_group
 
 build = get_build_version()
