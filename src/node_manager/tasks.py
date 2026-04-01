@@ -104,6 +104,7 @@ class NodeManagerTask(BaseTask):
             keystore=self.keystore,
             validators=validators,
             operator_address=self.operator_address,
+            protocol_config=protocol_config,
         )
 
         tx_hash = await register_validators(
