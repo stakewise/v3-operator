@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from eth_typing import ChecksumAddress, HexStr
-from web3 import Web3
+from sw_utils.tests.factories import faker
 from web3.exceptions import ContractLogicError
 
 from src.node_manager.register_validators import register_validators
@@ -10,7 +10,7 @@ from src.node_manager.typings import NodeManagerRegistrationOraclesApproval
 
 MODULE = 'src.node_manager.register_validators'
 
-OPERATOR_ADDR: ChecksumAddress = Web3.to_checksum_address('0x' + 'aa' * 20)
+OPERATOR_ADDR: ChecksumAddress = faker.eth_address()
 
 
 @pytest.mark.usefixtures('fake_settings')
@@ -24,13 +24,13 @@ class TestRegisterValidators:
         mock_index: AsyncMock,
     ) -> None:
         """If registry root changed since approval, return None."""
-        mock_registry.get_registry_root = AsyncMock(return_value=HexStr('0xnewroot'))
+        mock_registry.get_registry_root = AsyncMock(return_value=faker.merkle_root())
 
         result = await register_validators(
             operator_address=OPERATOR_ADDR,
             approval=_make_approval(),
             validators=[],
-            validators_registry_root=HexStr('0xoldroot'),
+            validators_registry_root=faker.merkle_root(),
             validator_index=5,
         )
         assert result is None
@@ -44,7 +44,7 @@ class TestRegisterValidators:
         mock_index: AsyncMock,
     ) -> None:
         """If validator index changed, return None."""
-        root = HexStr('0x' + 'ab' * 32)
+        root = HexStr(faker.merkle_root())
         mock_registry.get_registry_root = AsyncMock(return_value=root)
 
         result = await register_validators(
@@ -66,7 +66,7 @@ class TestRegisterValidators:
         mock_index: AsyncMock,
         mock_encode: MagicMock,
     ) -> None:
-        root = HexStr('0x' + 'ab' * 32)
+        root = HexStr(faker.merkle_root())
         mock_registry.get_registry_root = AsyncMock(return_value=root)
 
         mock_fn = MagicMock()
@@ -107,7 +107,7 @@ class TestRegisterValidators:
         mock_index: AsyncMock,
         mock_encode: MagicMock,
     ) -> None:
-        root = HexStr('0x' + 'ab' * 32)
+        root = HexStr(faker.merkle_root())
         mock_registry.get_registry_root = AsyncMock(return_value=root)
 
         mock_fn = MagicMock()
@@ -136,7 +136,7 @@ class TestRegisterValidators:
         mock_index: AsyncMock,
         mock_encode: MagicMock,
     ) -> None:
-        root = HexStr('0x' + 'ab' * 32)
+        root = HexStr(faker.merkle_root())
         mock_registry.get_registry_root = AsyncMock(return_value=root)
 
         mock_fn = MagicMock()
@@ -169,8 +169,8 @@ class TestRegisterValidators:
 
 def _make_approval() -> NodeManagerRegistrationOraclesApproval:
     return NodeManagerRegistrationOraclesApproval(
-        keeper_signatures=HexStr('0x' + '01' * 65),
-        signatures=HexStr('0x' + '02' * 65),
-        ipfs_hash='QmTest',
+        keeper_signatures=HexStr(faker.account_signature()),
+        signatures=HexStr(faker.account_signature()),
+        ipfs_hash=faker.ipfs_hash(),
         deadline=1000,
     )

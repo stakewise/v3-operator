@@ -1,11 +1,13 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from eth_typing import HexStr
+from eth_typing import ChecksumAddress, HexStr
+from sw_utils.tests.factories import faker
 from sw_utils.typings import ProtocolConfig
 from web3 import Web3
 from web3.types import Gwei, Wei
 
+from src.common.tests.utils import ether_to_gwei
 from src.node_manager.tasks import NodeManagerTask
 from src.node_manager.typings import (
     EligibleOperator,
@@ -14,8 +16,8 @@ from src.node_manager.typings import (
 )
 from src.validators.typings import Validator
 
-OPERATOR_ADDR = Web3.to_checksum_address('0x' + 'aa' * 20)
-OTHER_ADDR = Web3.to_checksum_address('0x' + 'bb' * 20)
+OPERATOR_ADDR: ChecksumAddress = faker.eth_address()
+OTHER_ADDR: ChecksumAddress = faker.eth_address()
 
 MODULE = 'src.node_manager.tasks'
 
@@ -59,7 +61,7 @@ class TestProcessBlock:
         """Operators not matching operator_address are skipped."""
         mock_config.return_value = _make_protocol_config()
         mock_poll.return_value = [
-            EligibleOperator(address=OTHER_ADDR, amount=Wei(32000000000000000000)),
+            EligibleOperator(address=OTHER_ADDR, amount=Wei(Web3.to_wei(32, 'ether'))),
         ]
         task = _make_task()
         await task.process_block(MagicMock())
@@ -87,19 +89,19 @@ class TestProcessBlock:
         """Full flow: eligible operator → stub funding → register new validators."""
         mock_config.return_value = _make_protocol_config()
         mock_poll.return_value = [
-            EligibleOperator(address=OPERATOR_ADDR, amount=Wei(32000000000000000000)),
+            EligibleOperator(address=OPERATOR_ADDR, amount=Wei(Web3.to_wei(32, 'ether'))),
         ]
-        mock_deposits.return_value = [Gwei(32000000000)]
+        mock_deposits.return_value = [ether_to_gwei(32)]
 
         validator = Validator(
-            public_key=HexStr('0x' + 'cc' * 48),
-            amount=Gwei(32000000000),
-            deposit_signature=HexStr('0x' + 'dd' * 96),
+            public_key=HexStr(faker.validator_public_key()),
+            amount=ether_to_gwei(32),
+            deposit_signature=HexStr(faker.validator_signature()),
         )
         mock_get_validators.return_value = [validator]
 
         request = MagicMock(spec=NodeManagerApprovalRequest)
-        request.validators_root = HexStr('0x' + 'ee' * 32)
+        request.validators_root = HexStr(faker.merkle_root())
         request.validator_index = 0
         approval = MagicMock(spec=NodeManagerRegistrationOraclesApproval)
         mock_poll_reg.return_value = (request, approval)
@@ -137,7 +139,7 @@ class TestProcessRegistration:
 
     @pytest.mark.asyncio
     @patch(f'{MODULE}.get_validators_for_registration', new_callable=AsyncMock, return_value=[])
-    @patch(f'{MODULE}.get_deposits_amounts', return_value=[Gwei(32000000000)])
+    @patch(f'{MODULE}.get_deposits_amounts', return_value=[ether_to_gwei(32)])
     async def test_no_validators_skips(
         self,
         mock_deposits: MagicMock,
@@ -145,7 +147,7 @@ class TestProcessRegistration:
     ) -> None:
         task = _make_task()
         await task._process_registration(
-            amount=Gwei(32000000000),
+            amount=ether_to_gwei(32),
             protocol_config=_make_protocol_config(),
         )
         mock_get_validators.assert_awaited_once()

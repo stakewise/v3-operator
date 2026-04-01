@@ -1,5 +1,6 @@
 import pytest
 from eth_typing import ChecksumAddress, HexStr
+from sw_utils.tests.factories import faker
 from web3 import Web3
 
 from src.common.exceptions import (
@@ -15,19 +16,26 @@ from src.node_manager.typings import (
     NodeManagerRegistrationOraclesApproval,
 )
 
+ORACLE_ADDRESSES: list[ChecksumAddress] = sorted(
+    [faker.eth_address() for _ in range(5)],
+)
+
 
 class TestProcessRegistrationApprovals:
     def test_basic_consensus(self) -> None:
         """All oracles agree on the same ipfs_hash and deadline."""
         approvals = {
-            _make_address(1): _make_registration_approval(
-                keeper_sig=HexStr('0x' + '11' * 65), sig=HexStr('0x' + '21' * 65)
+            ORACLE_ADDRESSES[0]: _make_registration_approval(
+                keeper_sig=HexStr(faker.account_signature()),
+                sig=HexStr(faker.account_signature()),
             ),
-            _make_address(2): _make_registration_approval(
-                keeper_sig=HexStr('0x' + '12' * 65), sig=HexStr('0x' + '22' * 65)
+            ORACLE_ADDRESSES[1]: _make_registration_approval(
+                keeper_sig=HexStr(faker.account_signature()),
+                sig=HexStr(faker.account_signature()),
             ),
-            _make_address(3): _make_registration_approval(
-                keeper_sig=HexStr('0x' + '13' * 65), sig=HexStr('0x' + '23' * 65)
+            ORACLE_ADDRESSES[2]: _make_registration_approval(
+                keeper_sig=HexStr(faker.account_signature()),
+                sig=HexStr(faker.account_signature()),
             ),
         }
         result = process_registration_approvals(approvals, votes_threshold=2)
@@ -43,15 +51,15 @@ class TestProcessRegistrationApprovals:
     def test_exact_threshold(self) -> None:
         """Exactly threshold votes should succeed."""
         approvals = {
-            _make_address(1): _make_registration_approval(),
-            _make_address(2): _make_registration_approval(),
+            ORACLE_ADDRESSES[0]: _make_registration_approval(),
+            ORACLE_ADDRESSES[1]: _make_registration_approval(),
         }
         result = process_registration_approvals(approvals, votes_threshold=2)
         assert len(Web3.to_bytes(hexstr=result.keeper_signatures)) == 2 * 65
 
     def test_below_threshold_raises(self) -> None:
         approvals = {
-            _make_address(1): _make_registration_approval(),
+            ORACLE_ADDRESSES[0]: _make_registration_approval(),
         }
         with pytest.raises(NotEnoughOracleApprovalsError) as exc_info:
             process_registration_approvals(approvals, votes_threshold=2)
@@ -65,9 +73,9 @@ class TestProcessRegistrationApprovals:
     def test_split_vote_picks_majority(self) -> None:
         """When oracles disagree on ipfs_hash/deadline, pick the group with the most votes."""
         approvals = {
-            _make_address(1): _make_registration_approval(ipfs_hash='QmA', deadline=100),
-            _make_address(2): _make_registration_approval(ipfs_hash='QmB', deadline=200),
-            _make_address(3): _make_registration_approval(ipfs_hash='QmA', deadline=100),
+            ORACLE_ADDRESSES[0]: _make_registration_approval(ipfs_hash='QmA', deadline=100),
+            ORACLE_ADDRESSES[1]: _make_registration_approval(ipfs_hash='QmB', deadline=200),
+            ORACLE_ADDRESSES[2]: _make_registration_approval(ipfs_hash='QmA', deadline=100),
         }
         result = process_registration_approvals(approvals, votes_threshold=2)
         assert result.ipfs_hash == 'QmA'
@@ -76,36 +84,35 @@ class TestProcessRegistrationApprovals:
     def test_split_vote_below_threshold(self) -> None:
         """No group reaches threshold → error."""
         approvals = {
-            _make_address(1): _make_registration_approval(ipfs_hash='QmA', deadline=100),
-            _make_address(2): _make_registration_approval(ipfs_hash='QmB', deadline=200),
-            _make_address(3): _make_registration_approval(ipfs_hash='QmC', deadline=300),
+            ORACLE_ADDRESSES[0]: _make_registration_approval(ipfs_hash='QmA', deadline=100),
+            ORACLE_ADDRESSES[1]: _make_registration_approval(ipfs_hash='QmB', deadline=200),
+            ORACLE_ADDRESSES[2]: _make_registration_approval(ipfs_hash='QmC', deadline=300),
         }
         with pytest.raises(NotEnoughOracleApprovalsError):
             process_registration_approvals(approvals, votes_threshold=2)
 
     def test_signatures_sorted_by_address(self) -> None:
         """Signatures are concatenated in ascending oracle address order."""
-        addr_low = _make_address(1)
-        addr_high = _make_address(0xFF)
+        addr_low = ORACLE_ADDRESSES[0]
+        addr_high = ORACLE_ADDRESSES[-1]
+        keeper_sig_low = HexStr(faker.account_signature())
+        keeper_sig_high = HexStr(faker.account_signature())
+        sig_low = HexStr(faker.account_signature())
+        sig_high = HexStr(faker.account_signature())
         approvals = {
-            addr_high: _make_registration_approval(
-                keeper_sig=HexStr('0x' + 'ff' * 65), sig=HexStr('0x' + 'fe' * 65)
-            ),
-            addr_low: _make_registration_approval(
-                keeper_sig=HexStr('0x' + '01' * 65), sig=HexStr('0x' + '02' * 65)
-            ),
+            addr_high: _make_registration_approval(keeper_sig=keeper_sig_high, sig=sig_high),
+            addr_low: _make_registration_approval(keeper_sig=keeper_sig_low, sig=sig_low),
         }
         result = process_registration_approvals(approvals, votes_threshold=2)
-        # addr_low (0x01) sorts before addr_high (0xff)
         keeper_bytes = Web3.to_bytes(hexstr=result.keeper_signatures)
-        assert keeper_bytes[:65] == b'\x01' * 65
-        assert keeper_bytes[65:] == b'\xff' * 65
+        assert keeper_bytes[:65] == Web3.to_bytes(hexstr=keeper_sig_low)
+        assert keeper_bytes[65:] == Web3.to_bytes(hexstr=keeper_sig_high)
 
 
 class TestParsers:
     def test_parse_registration_response(self) -> None:
-        keeper_sig_hex = '0x' + 'ab' * 65
-        sig_hex = '0x' + 'cd' * 65
+        keeper_sig_hex = faker.account_signature()
+        sig_hex = faker.account_signature()
         data = {
             'keeperParams': {
                 'signature': keeper_sig_hex,
@@ -124,17 +131,16 @@ class TestParsers:
 # --- Helpers ---
 
 
-def _make_address(i: int) -> ChecksumAddress:
-    """Generate a deterministic checksum address from an integer."""
-    return Web3.to_checksum_address(f'0x{i:040x}')
-
-
 def _make_registration_approval(
-    keeper_sig: HexStr = HexStr('0x' + '01' * 65),
-    sig: HexStr = HexStr('0x' + '02' * 65),
+    keeper_sig: HexStr | None = None,
+    sig: HexStr | None = None,
     ipfs_hash: str = 'QmTest123',
     deadline: int = 1000,
 ) -> NodeManagerRegistrationApproval:
+    if keeper_sig is None:
+        keeper_sig = HexStr(faker.account_signature())
+    if sig is None:
+        sig = HexStr(faker.account_signature())
     return NodeManagerRegistrationApproval(
         keeper_signature=keeper_sig,
         signature=sig,

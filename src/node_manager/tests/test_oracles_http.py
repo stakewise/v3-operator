@@ -1,11 +1,11 @@
 import pytest
 from aioresponses import aioresponses
-from eth_typing import ChecksumAddress, HexStr
-from sw_utils.tests.factories import get_mocked_protocol_config
+from eth_typing import HexStr
+from sw_utils.tests.factories import faker, get_mocked_protocol_config
 from sw_utils.typings import Oracle, ProtocolConfig
 from web3 import Web3
-from web3.types import Wei
 
+from src.common.tests.utils import ether_to_gwei
 from src.node_manager.oracles import poll_eligible_operators, send_registration_requests
 from src.node_manager.typings import NodeManagerApprovalRequest
 
@@ -17,8 +17,9 @@ class TestPollEligibleOperators:
     @pytest.mark.asyncio
     async def test_returns_eligible_operators(self) -> None:
         config = _make_protocol_config([['http://oracle1']])
+        operator_address = faker.eth_address()
         response_data = [
-            {'address': _make_address(10).lower(), 'amount': 32000000000000000000},
+            {'address': operator_address.lower(), 'amount': Web3.to_wei(32, 'ether')},
         ]
 
         with aioresponses() as m:
@@ -29,8 +30,8 @@ class TestPollEligibleOperators:
             result = await poll_eligible_operators(config)
 
         assert len(result) == 1
-        assert result[0].address == _make_address(10)
-        assert result[0].amount == Wei(32000000000000000000)
+        assert result[0].address == operator_address
+        assert result[0].amount == Web3.to_wei(32, 'ether')
 
     @pytest.mark.asyncio
     async def test_returns_empty_on_all_failures(self) -> None:
@@ -51,7 +52,7 @@ class TestPollEligibleOperators:
             [['http://oracle1'], ['http://oracle2']],
         )
         response_data = [
-            {'address': _make_address(10).lower(), 'amount': 100},
+            {'address': faker.eth_address().lower(), 'amount': 100},
         ]
 
         with aioresponses() as m:
@@ -65,7 +66,7 @@ class TestPollEligibleOperators:
     async def test_replica_fallback(self) -> None:
         """If first replica fails, tries the next one."""
         config = _make_protocol_config([['http://replica1', 'http://replica2']])
-        response_data = [{'address': _make_address(10).lower(), 'amount': 100}]
+        response_data = [{'address': faker.eth_address().lower(), 'amount': 100}]
 
         with aioresponses() as m:
             m.get('http://replica1/nodes-manager/eligible-operators', status=500)
@@ -87,16 +88,16 @@ class TestSendRegistrationRequests:
             threshold=2,
         )
         request = _make_registration_request()
-        keeper_sig = '0x' + 'ab' * 65
-        sig = '0x' + 'cd' * 65
+        keeper_signature = faker.account_signature()
+        signature = faker.account_signature()
 
         oracle_response = {
             'keeperParams': {
-                'signature': keeper_sig,
-                'ipfs_hash': 'QmTestHash',
+                'signature': keeper_signature,
+                'ipfs_hash': faker.ipfs_hash(),
                 'deadline': 1000,
             },
-            'signature': sig,
+            'signature': signature,
         }
 
         with aioresponses() as m:
@@ -122,11 +123,11 @@ class TestSendRegistrationRequests:
         request = _make_registration_request()
         oracle_response = {
             'keeperParams': {
-                'signature': '0x' + 'ab' * 65,
-                'ipfs_hash': 'QmTestHash',
+                'signature': faker.account_signature(),
+                'ipfs_hash': faker.ipfs_hash(),
                 'deadline': 1000,
             },
-            'signature': '0x' + 'cd' * 65,
+            'signature': faker.account_signature(),
         }
 
         with aioresponses() as m:
@@ -142,12 +143,7 @@ class TestSendRegistrationRequests:
 
 # --- Helpers ---
 
-# Pre-generated distinct public keys (64 hex bytes each) so each Oracle gets a unique address.
-_ORACLE_PUBKEYS: list[HexStr] = [HexStr(f'{i:02x}' * 64) for i in range(1, 10)]
-
-
-def _make_address(i: int) -> ChecksumAddress:
-    return Web3.to_checksum_address(f'0x{i:040x}')
+_ORACLE_PUBKEYS: list[HexStr] = [HexStr(faker.account_public_key()) for _ in range(9)]
 
 
 def _make_protocol_config(
@@ -173,13 +169,13 @@ def _make_protocol_config(
 def _make_registration_request() -> NodeManagerApprovalRequest:
     return NodeManagerApprovalRequest(
         validator_index=0,
-        operator_address=_make_address(42),
-        validators_root=HexStr('0x' + 'ab' * 32),
-        public_keys=[HexStr('0x' + 'cc' * 48)],
-        deposit_signatures=[HexStr('0x' + 'dd' * 96)],
-        public_key_shards=[[HexStr('0xshard1')]],
-        exit_signature_shards=[[HexStr('0xexitshard1')]],
+        operator_address=faker.eth_address(),
+        validators_root=HexStr(faker.merkle_root()),
+        public_keys=[HexStr(faker.validator_public_key())],
+        deposit_signatures=[HexStr(faker.validator_signature())],
+        public_key_shards=[[HexStr(faker.validator_public_key())]],
+        exit_signature_shards=[[HexStr(faker.validator_signature())]],
         deadline=1000,
-        amounts=[32000000000],
-        validators_manager_signature=HexStr('0xsig'),
+        amounts=[ether_to_gwei(32)],
+        validators_manager_signature=HexStr(faker.account_signature()),
     )
