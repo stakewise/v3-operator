@@ -256,7 +256,7 @@ def _parse_registration_response(data: dict) -> NodeManagerRegistrationApproval:
     keeper_params = data['keeperParams']
     return NodeManagerRegistrationApproval(
         keeper_signature=HexStr(keeper_params['signature']),
-        signature=HexStr(data['signature']),
+        nodes_manager_signature=HexStr(data['signature']),
         ipfs_hash=keeper_params['ipfs_hash'],
         deadline=keeper_params['deadline'],
     )
@@ -287,11 +287,11 @@ def process_registration_approvals(
     signatures: list[HexStr] = []
     for _, approval in sorted_votes:
         keeper_signatures.append(approval.keeper_signature)
-        signatures.append(approval.signature)
+        signatures.append(approval.nodes_manager_signature)
 
     return NodeManagerRegistrationOraclesApproval(
-        keeper_signatures=HexStr('0x' + ''.join(s.removeprefix('0x') for s in keeper_signatures)),
-        signatures=HexStr('0x' + ''.join(s.removeprefix('0x') for s in signatures)),
+        keeper_signatures=keeper_signatures,
+        signatures=signatures,
         ipfs_hash=winner[0],
         deadline=winner[1],
     )

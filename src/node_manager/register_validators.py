@@ -42,12 +42,12 @@ async def register_validators(
         Web3.to_bytes(tx_validator)
         for tx_validator in encode_tx_validator_list(validators=validators)
     ]
-    signatures = Web3.to_bytes(hexstr=approval.signatures)
+    signatures = b''.join(Web3.to_bytes(hexstr=s) for s in approval.signatures)
     keeper_params = (
         Bytes32(Web3.to_bytes(hexstr=validators_registry_root)),
         approval.deadline,
         b''.join(tx_validators),
-        Web3.to_bytes(hexstr=approval.keeper_signatures),
+        b''.join(Web3.to_bytes(hexstr=s) for s in approval.keeper_signatures),
         approval.ipfs_hash,
     )
 

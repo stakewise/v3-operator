@@ -169,8 +169,8 @@ class TestRegisterValidators:
 
 def _make_approval() -> NodeManagerRegistrationOraclesApproval:
     return NodeManagerRegistrationOraclesApproval(
-        keeper_signatures=HexStr(faker.account_signature()),
-        signatures=HexStr(faker.account_signature()),
+        keeper_signatures=[HexStr(faker.account_signature())],
+        signatures=[HexStr(faker.account_signature())],
         ipfs_hash=faker.ipfs_hash(),
         deadline=1000,
     )
