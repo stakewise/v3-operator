@@ -251,7 +251,7 @@ async def send_registration_requests(
 
 
 def _parse_registration_response(data: dict) -> NodeManagerRegistrationApproval:
-    """Parse oracle response containing both keeper and NM signatures."""
+    """Parse oracle response containing both keeper and Nodes Manager signatures."""
     keeper_params = data['keeper_params']
     return NodeManagerRegistrationApproval(
         keeper_signature=HexStr(keeper_params['signature']),
@@ -265,7 +265,7 @@ def process_registration_approvals(
     approvals: dict[ChecksumAddress, NodeManagerRegistrationApproval],
     votes_threshold: int,
 ) -> NodeManagerRegistrationOraclesApproval:
-    """Combine registration approvals into separate keeper and NM signature blobs."""
+    """Combine registration approvals into separate keeper and Nodes Manager signature blobs."""
     candidates: dict[
         tuple[str, int], list[tuple[ChecksumAddress, NodeManagerRegistrationApproval]]
     ] = defaultdict(list)
