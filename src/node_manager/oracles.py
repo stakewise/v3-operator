@@ -243,9 +243,9 @@ async def create_approval_request(
 async def poll_funding_approval(
     validator_fundings: dict[HexStr, Gwei],
     operator_address: ChecksumAddress,
+    protocol_config: ProtocolConfig,
 ) -> list[HexStr]:
     """Poll oracles until funding approval is obtained."""
-    protocol_config = await get_protocol_config()
     deadline: int | None = None
     request: NodeManagerFundingRequest | None = None
 

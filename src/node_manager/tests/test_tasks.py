@@ -24,6 +24,19 @@ OTHER_ADDR: ChecksumAddress = faker.eth_address()
 MODULE = 'src.node_manager.tasks'
 
 
+@pytest.fixture(autouse=True)
+def _mock_scan_events() -> None:
+    """Mock scan and chain head for all tests calling process_block."""
+    chain_head = MagicMock(block_number=100)
+    with (
+        patch(f'{MODULE}.scan_node_manager_validators_events', new_callable=AsyncMock),
+        patch(
+            f'{MODULE}.get_chain_finalized_head', new_callable=AsyncMock, return_value=chain_head
+        ),
+    ):
+        yield
+
+
 @pytest.mark.usefixtures('fake_settings')
 class TestProcessBlock:
     @pytest.mark.asyncio
@@ -71,7 +84,9 @@ class TestProcessBlock:
         mock_poll.assert_awaited_once()
 
     @pytest.mark.asyncio
-    @patch(f'{MODULE}.OperatorValidatorCrud')
+    @patch(
+        f'{MODULE}.fetch_compounding_validators_balances', new_callable=AsyncMock, return_value={}
+    )
     @patch(f'{MODULE}.register_validators', new_callable=AsyncMock, return_value='0xtxhash')
     @patch(f'{MODULE}.poll_registration_approval', new_callable=AsyncMock)
     @patch(f'{MODULE}.get_validators_for_registration', new_callable=AsyncMock)
@@ -88,7 +103,7 @@ class TestProcessBlock:
         mock_get_validators: AsyncMock,
         mock_poll_reg: AsyncMock,
         mock_register: AsyncMock,
-        mock_crud: MagicMock,
+        mock_balances: AsyncMock,
     ) -> None:
         """Full flow: eligible operator → stub funding → register new validators."""
         mock_config.return_value = _make_protocol_config()
@@ -110,15 +125,10 @@ class TestProcessBlock:
         approval = MagicMock(spec=NodeManagerRegistrationOraclesApproval)
         mock_poll_reg.return_value = (request, approval)
 
-        mock_exec = AsyncMock()
-        mock_exec.eth.get_transaction = AsyncMock(return_value={'blockNumber': 100})
-
         task = _make_task()
-        with patch(f'{MODULE}.execution_client', mock_exec):
-            await task.process_block(MagicMock())
+        await task.process_block(MagicMock())
 
         mock_register.assert_awaited_once()
-        mock_crud().save_operator_validators.assert_called_once()
 
 
 @pytest.mark.usefixtures('fake_settings')
@@ -171,41 +181,6 @@ class TestProcessBlockV1:
 
 class TestProcessFunding:
     @pytest.mark.asyncio
-    @patch(f'{MODULE}.get_funding_amounts')
-    @patch(f'{MODULE}.OperatorValidatorCrud')
-    @patch(f'{MODULE}.fetch_compounding_validators_balances', new_callable=AsyncMock)
-    async def test_filters_non_operator_validators(
-        self,
-        mock_balances: AsyncMock,
-        mock_crud: MagicMock,
-        mock_funding_amounts: MagicMock,
-    ) -> None:
-        """Compounding validators not owned by operator are filtered out."""
-        operator_key = HexStr('0x' + 'aa' * 48)
-        other_key = HexStr('0x' + 'bb' * 48)
-        mock_balances.return_value = {
-            operator_key: Gwei(30000000000),
-            other_key: Gwei(30000000000),
-        }
-        mock_crud().get_operator_public_keys.return_value = {operator_key}
-        mock_funding_amounts.return_value = {}
-
-        task = _make_task()
-        await task._process_funding(
-            amount=Gwei(64000000000),
-            operator_address=OPERATOR_ADDR,
-            protocol_config=_make_protocol_config(),
-        )
-        # get_funding_amounts should only receive operator's validator
-        mock_funding_amounts.assert_called_once()
-        balances_arg = mock_funding_amounts.call_args[1].get(
-            'compounding_validators_balances',
-            mock_funding_amounts.call_args[0][0],
-        )
-        assert operator_key in balances_arg
-        assert other_key not in balances_arg
-
-    @pytest.mark.asyncio
     @patch(f'{MODULE}.register_validators', new_callable=AsyncMock)
     @patch(f'{MODULE}.poll_eligible_operators', new_callable=AsyncMock)
     @patch(f'{MODULE}.get_protocol_config', new_callable=AsyncMock)
@@ -236,6 +211,9 @@ class TestProcessBlockV2:
     """V2 validator type: calls funding first, then registration."""
 
     @pytest.mark.asyncio
+    @patch(
+        f'{MODULE}.fetch_compounding_validators_balances', new_callable=AsyncMock, return_value={}
+    )
     @patch(f'{MODULE}.register_validators', new_callable=AsyncMock, return_value='0xtxhash')
     @patch(f'{MODULE}.poll_registration_approval', new_callable=AsyncMock)
     @patch(f'{MODULE}.get_validators_for_registration', new_callable=AsyncMock)
@@ -252,6 +230,7 @@ class TestProcessBlockV2:
         mock_get_validators: AsyncMock,
         mock_poll_reg: AsyncMock,
         mock_register: AsyncMock,
+        mock_balances: AsyncMock,
     ) -> None:
         settings.validator_type = ValidatorType.V2
         mock_config.return_value = _make_protocol_config()
@@ -291,11 +270,6 @@ class TestProcessBlockV2:
         mock_poll: AsyncMock,
         mock_deposits: MagicMock,
         mock_register: AsyncMock,
-        mock_balances: AsyncMock,
-        mock_funding_amounts: MagicMock,
-        mock_poll_funding: AsyncMock,
-        mock_fund: AsyncMock,
-        mock_crud: MagicMock,
     ) -> None:
         """V2 with disable_validators_funding skips funding but still tries registration."""
         settings.validator_type = ValidatorType.V2
@@ -304,9 +278,6 @@ class TestProcessBlockV2:
         mock_poll.return_value = [
             EligibleOperator(address=OPERATOR_ADDR, amount=Wei(Web3.to_wei(32, 'ether'))),
         ]
-        mock_balances.return_value = {HexStr('0x' + 'aa' * 48): Gwei(30000000000)}
-        mock_funding_amounts.return_value = {HexStr('0x' + 'aa' * 48): Gwei(2000000000)}
-        mock_crud().get_operator_public_keys.return_value = {HexStr('0x' + 'aa' * 48)}
 
         task = _make_task()
         await task.process_block(MagicMock())
@@ -315,6 +286,9 @@ class TestProcessBlockV2:
         mock_deposits.assert_called_once()
 
     @pytest.mark.asyncio
+    @patch(
+        f'{MODULE}.fetch_compounding_validators_balances', new_callable=AsyncMock, return_value={}
+    )
     @patch(f'{MODULE}.register_validators', new_callable=AsyncMock)
     @patch(f'{MODULE}.get_deposits_amounts')
     @patch(f'{MODULE}.poll_eligible_operators', new_callable=AsyncMock)
@@ -328,10 +302,6 @@ class TestProcessBlockV2:
         mock_deposits: MagicMock,
         mock_register: AsyncMock,
         mock_balances: AsyncMock,
-        mock_funding_amounts: MagicMock,
-        mock_poll_funding: AsyncMock,
-        mock_fund: AsyncMock,
-        mock_crud: MagicMock,
     ) -> None:
         """V2 with disable_validators_registration skips registration after funding."""
         settings.validator_type = ValidatorType.V2
@@ -340,10 +310,6 @@ class TestProcessBlockV2:
         mock_poll.return_value = [
             EligibleOperator(address=OPERATOR_ADDR, amount=Wei(Web3.to_wei(32, 'ether'))),
         ]
-        """When a funding tx fails, stop and return original amount."""
-        mock_balances.return_value = {HexStr('0x' + 'aa' * 48): Gwei(30000000000)}
-        mock_funding_amounts.return_value = {HexStr('0x' + 'aa' * 48): Gwei(2000000000)}
-        mock_crud().get_operator_public_keys.return_value = {HexStr('0x' + 'aa' * 48)}
 
         task = _make_task()
         await task.process_block(MagicMock())

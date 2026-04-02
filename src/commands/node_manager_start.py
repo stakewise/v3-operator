@@ -26,7 +26,7 @@ from src.config.settings import (
     LOG_PLAIN,
     settings,
 )
-from src.node_manager.execution import scan_operator_validators_events
+from src.node_manager.execution import scan_node_manager_validators_events
 from src.node_manager.startup_check import startup_checks
 from src.node_manager.tasks import NodeManagerTask
 from src.validators.database import (
@@ -34,7 +34,6 @@ from src.validators.database import (
     NetworkValidatorCrud,
     VaultValidatorCrud,
 )
-from src.validators.execution import scan_validators_events
 from src.validators.keystores.load import load_keystore
 
 logger = logging.getLogger(__name__)
@@ -233,10 +232,10 @@ async def _start(
         chain_state = await get_chain_finalized_head()
 
         logger.info('Syncing validator events...')
-        await scan_validators_events(chain_state.block_number, is_startup=True)
-
-        logger.info('Syncing operator validator events...')
-        await scan_operator_validators_events(operator_address, chain_state.block_number)
+        await scan_node_manager_validators_events(
+            operator_address=operator_address,
+            block_number=chain_state.block_number,
+        )
 
         logger.info('Updating oracles cache...')
         await update_oracles_cache()

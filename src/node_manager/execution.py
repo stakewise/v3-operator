@@ -8,7 +8,7 @@ from web3.types import EventData
 from src.common.clients import execution_non_retry_client
 from src.common.contracts import NodesManagerContract
 from src.config.settings import settings
-from src.node_manager.database import OperatorValidatorCrud
+from src.validators.database import CheckpointCrud, VaultValidatorCrud
 from src.validators.typings import VaultValidator
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ class OperatorValidatorsProcessor(EventProcessor):
         self.contract = NodesManagerContract(execution_client=execution_non_retry_client).contract
 
     async def get_from_block(self) -> BlockNumber:
-        checkpoint = OperatorValidatorCrud().get_checkpoint()
+        checkpoint = CheckpointCrud().get_validators_checkpoint()
         if not checkpoint:
             return settings.network_config.KEEPER_GENESIS_BLOCK
         return BlockNumber(checkpoint + 1)
@@ -43,10 +43,10 @@ class OperatorValidatorsProcessor(EventProcessor):
                 validators.append(VaultValidator(public_key=pub_key, block_number=block_number))
 
         if validators:
-            OperatorValidatorCrud().save_operator_validators(validators)
+            VaultValidatorCrud().save_vault_validators(validators)
 
 
-async def scan_operator_validators_events(
+async def scan_node_manager_validators_events(
     operator_address: ChecksumAddress,
     block_number: BlockNumber,
 ) -> None:
@@ -54,7 +54,7 @@ async def scan_operator_validators_events(
     processor = OperatorValidatorsProcessor(operator_address)
     scanner = EventScanner(processor)
     await scanner.process_new_events(block_number)
-    OperatorValidatorCrud().update_checkpoint(block_number)
+    CheckpointCrud().update_validators_checkpoint(block_number)
 
 
 def _parse_public_keys(public_keys_bytes: bytes) -> list[HexStr]:

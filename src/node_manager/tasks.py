@@ -6,12 +6,13 @@ from sw_utils.typings import ProtocolConfig
 from web3 import Web3
 from web3.types import Gwei, Wei
 
+from src.common.consensus import get_chain_finalized_head
 from src.common.execution import check_gas_price
 from src.common.protocol_config import get_protocol_config
 from src.common.tasks import BaseTask
 from src.common.typings import ValidatorType
 from src.config.settings import settings
-from src.node_manager.database import OperatorValidatorCrud
+from src.node_manager.execution import scan_node_manager_validators_events
 from src.node_manager.oracles import (
     poll_eligible_operators,
     poll_funding_approval,
@@ -38,6 +39,12 @@ class NodeManagerTask(BaseTask):
         self.keystore = keystore
 
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
+        chain_head = await get_chain_finalized_head()
+        await scan_node_manager_validators_events(
+            operator_address=self.operator_address,
+            block_number=chain_head.block_number,
+        )
+
         if not await check_gas_price(high_priority=True):
             logger.debug('Gas price too high, skipping validators registration')
             return
@@ -136,12 +143,6 @@ class NodeManagerTask(BaseTask):
         if not compounding_balances:
             return amount
 
-        # Filter to only this operator's validators
-        operator_keys = OperatorValidatorCrud().get_operator_public_keys()
-        compounding_balances = {k: v for k, v in compounding_balances.items() if k in operator_keys}
-        if not compounding_balances:
-            return amount
-
         validator_fundings = get_funding_amounts(compounding_balances, amount)
         if not validator_fundings:
             return amount
@@ -157,6 +158,7 @@ class NodeManagerTask(BaseTask):
             signatures = await poll_funding_approval(
                 validator_fundings=batch,
                 operator_address=operator_address,
+                protocol_config=protocol_config,
             )
 
             tx_hash = await fund_validators(
