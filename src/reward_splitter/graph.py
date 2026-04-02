@@ -15,10 +15,13 @@ async def graph_get_reward_splitters(
 ) -> list[RewardSplitter]:
     query = gql(
         '''
-        query Query($block: Int, $first: Int, $skip: Int, $claimer: Bytes, $vault: String) {
+        query Query($block: Int, $first: Int, $lastID: String, $claimer: Bytes, $vault: String) {
             rewardSplitters(
                 block: {number: $block},
+                first: $first,
+                orderBy: id,
                 where: {
+                    id_gt: $lastID,
                     claimer: $claimer,
                     vault: $vault,
                     version_gte: 3,
@@ -43,7 +46,7 @@ async def graph_get_reward_splitters(
         'claimer': claimer.lower(),
         'vault': vault.lower(),
     }
-    response = await graph_client.fetch_pages(query, params=params)
+    response = await graph_client.fetch_pages(query, params=params, cursor_pagination=True)
     reward_splitters = []
 
     for reward_splitter_item in response:
@@ -71,10 +74,13 @@ async def graph_get_claimable_exit_requests(
     """
     query = gql(
         '''
-        query Query($block: Int, $first: Int, $skip: Int, $receivers: [String]) {
+        query Query($block: Int, $first: Int, $lastID: String, $receivers: [String]) {
             exitRequests(
                 block: {number: $block},
+                first: $first,
+                orderBy: id,
                 where: {
+                    id_gt: $lastID,
                     receiver_in: $receivers,
                     isClaimable: true,
                     isClaimed: false
@@ -103,7 +109,7 @@ async def graph_get_claimable_exit_requests(
         'block': block_number,
         'receivers': [rs.lower() for rs in receivers],
     }
-    response = await graph_client.fetch_pages(query, params=params)
+    response = await graph_client.fetch_pages(query, params=params, cursor_pagination=True)
 
     exit_requests: dict[ChecksumAddress, list[ExitRequest]] = defaultdict(list)
 
