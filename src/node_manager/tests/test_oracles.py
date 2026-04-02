@@ -25,16 +25,16 @@ class TestProcessRegistrationApprovals:
         """All oracles agree on the same ipfs_hash and deadline."""
         approvals = {
             ORACLE_ADDRESSES[0]: _make_registration_approval(
-                keeper_sig=HexStr(faker.account_signature()),
-                sig=HexStr(faker.account_signature()),
+                keeper_sig=faker.account_signature(),
+                sig=faker.account_signature(),
             ),
             ORACLE_ADDRESSES[1]: _make_registration_approval(
-                keeper_sig=HexStr(faker.account_signature()),
-                sig=HexStr(faker.account_signature()),
+                keeper_sig=faker.account_signature(),
+                sig=faker.account_signature(),
             ),
             ORACLE_ADDRESSES[2]: _make_registration_approval(
-                keeper_sig=HexStr(faker.account_signature()),
-                sig=HexStr(faker.account_signature()),
+                keeper_sig=faker.account_signature(),
+                sig=faker.account_signature(),
             ),
         }
         result = process_registration_approvals(approvals, votes_threshold=2)
@@ -44,7 +44,7 @@ class TestProcessRegistrationApprovals:
         assert result.deadline == 1000
         # Signatures are sorted by oracle address (ascending int value) and truncated to threshold
         assert len(result.keeper_signatures) == 2
-        assert len(result.signatures) == 2
+        assert len(result.nodes_manager_signatures) == 2
 
     def test_exact_threshold(self) -> None:
         """Exactly threshold votes should succeed."""
@@ -93,10 +93,10 @@ class TestProcessRegistrationApprovals:
         """Signatures are concatenated in ascending oracle address order."""
         addr_low = ORACLE_ADDRESSES[0]
         addr_high = ORACLE_ADDRESSES[-1]
-        keeper_sig_low = HexStr(faker.account_signature())
-        keeper_sig_high = HexStr(faker.account_signature())
-        sig_low = HexStr(faker.account_signature())
-        sig_high = HexStr(faker.account_signature())
+        keeper_sig_low = faker.account_signature()
+        keeper_sig_high = faker.account_signature()
+        sig_low = faker.account_signature()
+        sig_high = faker.account_signature()
         approvals = {
             addr_high: _make_registration_approval(keeper_sig=keeper_sig_high, sig=sig_high),
             addr_low: _make_registration_approval(keeper_sig=keeper_sig_low, sig=sig_low),
@@ -111,12 +111,12 @@ class TestParsers:
         keeper_sig_hex = faker.account_signature()
         sig_hex = faker.account_signature()
         data = {
-            'keeperParams': {
+            'keeper_params': {
                 'signature': keeper_sig_hex,
                 'ipfs_hash': 'QmTest',
                 'deadline': 12345,
             },
-            'signature': sig_hex,
+            'nodes_manager_signature': sig_hex,
         }
         result = _parse_registration_response(data)
         assert result.keeper_signature == keeper_sig_hex
@@ -135,9 +135,9 @@ def _make_registration_approval(
     deadline: int = 1000,
 ) -> NodeManagerRegistrationApproval:
     if keeper_sig is None:
-        keeper_sig = HexStr(faker.account_signature())
+        keeper_sig = faker.account_signature()
     if sig is None:
-        sig = HexStr(faker.account_signature())
+        sig = faker.account_signature()
     return NodeManagerRegistrationApproval(
         keeper_signature=keeper_sig,
         nodes_manager_signature=sig,

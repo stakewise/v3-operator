@@ -1,7 +1,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from eth_typing import ChecksumAddress, HexStr
+from eth_typing import ChecksumAddress
 from sw_utils.tests.factories import faker
 from sw_utils.typings import Bytes32
 from web3 import Web3
@@ -17,7 +17,6 @@ OPERATOR_ADDR: ChecksumAddress = faker.eth_address()
 
 @pytest.mark.usefixtures('fake_settings')
 class TestRegisterValidators:
-    @pytest.mark.asyncio
     @patch(f'{MODULE}.get_validators_start_index', new_callable=AsyncMock, return_value=5)
     @patch(f'{MODULE}.validators_registry_contract')
     async def test_returns_none_on_root_change(
@@ -37,7 +36,6 @@ class TestRegisterValidators:
         )
         assert result is None
 
-    @pytest.mark.asyncio
     @patch(f'{MODULE}.get_validators_start_index', new_callable=AsyncMock, return_value=10)
     @patch(f'{MODULE}.validators_registry_contract')
     async def test_returns_none_on_index_change(
@@ -46,7 +44,7 @@ class TestRegisterValidators:
         mock_index: AsyncMock,
     ) -> None:
         """If validator index changed, return None."""
-        root = HexStr(faker.merkle_root())
+        root = faker.merkle_root()
         mock_registry.get_registry_root = AsyncMock(return_value=root)
 
         result = await register_validators(
@@ -58,7 +56,6 @@ class TestRegisterValidators:
         )
         assert result is None
 
-    @pytest.mark.asyncio
     @patch(f'{MODULE}.encode_tx_validator_list', return_value=[b'\x00' * 100])
     @patch(f'{MODULE}.get_validators_start_index', new_callable=AsyncMock, return_value=5)
     @patch(f'{MODULE}.validators_registry_contract')
@@ -68,7 +65,7 @@ class TestRegisterValidators:
         mock_index: AsyncMock,
         mock_encode: MagicMock,
     ) -> None:
-        root = HexStr(faker.merkle_root())
+        root = faker.merkle_root()
         mock_registry.get_registry_root = AsyncMock(return_value=root)
         approval = _make_approval()
 
@@ -99,7 +96,9 @@ class TestRegisterValidators:
             )
         assert result is not None
 
-        expected_signatures = b''.join(Web3.to_bytes(hexstr=s) for s in approval.signatures)
+        expected_signatures = b''.join(
+            Web3.to_bytes(hexstr=s) for s in approval.nodes_manager_signatures
+        )
         expected_keeper_params = (
             Bytes32(Web3.to_bytes(hexstr=root)),
             approval.deadline,
@@ -109,7 +108,6 @@ class TestRegisterValidators:
         )
         mock_fn.assert_called_with(OPERATOR_ADDR, expected_keeper_params, expected_signatures)
 
-    @pytest.mark.asyncio
     @patch(f'{MODULE}.encode_tx_validator_list', return_value=[b'\x00' * 100])
     @patch(f'{MODULE}.get_validators_start_index', new_callable=AsyncMock, return_value=5)
     @patch(f'{MODULE}.validators_registry_contract')
@@ -119,7 +117,7 @@ class TestRegisterValidators:
         mock_index: AsyncMock,
         mock_encode: MagicMock,
     ) -> None:
-        root = HexStr(faker.merkle_root())
+        root = faker.merkle_root()
         mock_registry.get_registry_root = AsyncMock(return_value=root)
 
         mock_fn = MagicMock()
@@ -138,7 +136,6 @@ class TestRegisterValidators:
             )
         assert result is None
 
-    @pytest.mark.asyncio
     @patch(f'{MODULE}.encode_tx_validator_list', return_value=[b'\x00' * 100])
     @patch(f'{MODULE}.get_validators_start_index', new_callable=AsyncMock, return_value=5)
     @patch(f'{MODULE}.validators_registry_contract')
@@ -148,7 +145,7 @@ class TestRegisterValidators:
         mock_index: AsyncMock,
         mock_encode: MagicMock,
     ) -> None:
-        root = HexStr(faker.merkle_root())
+        root = faker.merkle_root()
         mock_registry.get_registry_root = AsyncMock(return_value=root)
 
         mock_fn = MagicMock()
@@ -181,8 +178,8 @@ class TestRegisterValidators:
 
 def _make_approval() -> NodeManagerRegistrationOraclesApproval:
     return NodeManagerRegistrationOraclesApproval(
-        keeper_signatures=[HexStr(faker.account_signature())],
-        signatures=[HexStr(faker.account_signature())],
+        keeper_signatures=[faker.account_signature()],
+        nodes_manager_signatures=[faker.account_signature()],
         ipfs_hash=faker.ipfs_hash(),
         deadline=1000,
     )
