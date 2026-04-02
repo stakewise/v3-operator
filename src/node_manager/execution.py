@@ -28,7 +28,7 @@ class OperatorValidatorsProcessor(EventProcessor):
     async def get_from_block(self) -> BlockNumber:
         checkpoint = CheckpointCrud().get_validators_checkpoint()
         if not checkpoint:
-            return settings.network_config.KEEPER_GENESIS_BLOCK
+            return settings.network_config.NODES_MANAGER_GENESIS_BLOCK
         return BlockNumber(checkpoint + 1)
 
     # pylint: disable-next=unused-argument

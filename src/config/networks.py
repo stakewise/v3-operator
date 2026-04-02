@@ -52,6 +52,7 @@ class NetworkConfig(BaseNetworkConfig):
     EXECUTION_REQUEST_QUEUE_STORAGE_OFFSET: int
     TARGET_WITHDRAWAL_REQUESTS_PER_BLOCK: int
     TARGET_CONSOLIDATION_REQUESTS_PER_BLOCK: int
+    NODES_MANAGER_GENESIS_BLOCK: BlockNumber
     NODE_CONFIG: NodeConfig
 
 
@@ -130,6 +131,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         EXECUTION_REQUEST_QUEUE_STORAGE_OFFSET=4,
         TARGET_WITHDRAWAL_REQUESTS_PER_BLOCK=2,
         TARGET_CONSOLIDATION_REQUESTS_PER_BLOCK=1,
+        NODES_MANAGER_GENESIS_BLOCK=BlockNumber(0),
         NODE_CONFIG=NodeConfig(
             CONSENSUS_CHECKPOINT_SYNC_URL='https://beaconstate.info/',
             ERA_URL='https://data.ethpandaops.io/era1/mainnet/',
@@ -188,6 +190,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         EXECUTION_REQUEST_QUEUE_STORAGE_OFFSET=4,
         TARGET_WITHDRAWAL_REQUESTS_PER_BLOCK=2,
         TARGET_CONSOLIDATION_REQUESTS_PER_BLOCK=1,
+        NODES_MANAGER_GENESIS_BLOCK=BlockNumber(0),
         NODE_CONFIG=NodeConfig(
             CONSENSUS_CHECKPOINT_SYNC_URL='https://hoodi.beaconstate.info/',
             ERA_URL='',
@@ -246,6 +249,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         EXECUTION_REQUEST_QUEUE_STORAGE_OFFSET=4,
         TARGET_WITHDRAWAL_REQUESTS_PER_BLOCK=2,
         TARGET_CONSOLIDATION_REQUESTS_PER_BLOCK=1,
+        NODES_MANAGER_GENESIS_BLOCK=BlockNumber(0),
         NODE_CONFIG=NodeConfig(
             CONSENSUS_CHECKPOINT_SYNC_URL='https://beacon.gnosischain.com/',
             ERA_URL='',
