@@ -3,6 +3,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from eth_typing import ChecksumAddress, HexStr
 from sw_utils.tests.factories import faker
+from sw_utils.typings import Bytes32
+from web3 import Web3
 from web3.exceptions import ContractLogicError
 from web3.types import Gwei
 
@@ -70,6 +72,7 @@ class TestRegisterValidators:
     ) -> None:
         root = HexStr(faker.merkle_root())
         mock_registry.get_registry_root = AsyncMock(return_value=root)
+        approval = _make_approval()
 
         mock_fn = MagicMock()
         mock_fn.return_value.estimate_gas = AsyncMock()
@@ -91,13 +94,22 @@ class TestRegisterValidators:
         ):
             result = await register_validators(
                 operator_address=OPERATOR_ADDR,
-                approval=_make_approval(),
+                approval=approval,
                 validators=[],
                 validators_registry_root=root,
                 validator_index=5,
             )
         assert result is not None
-        mock_fn.assert_called()
+
+        expected_signatures = b''.join(Web3.to_bytes(hexstr=s) for s in approval.signatures)
+        expected_keeper_params = (
+            Bytes32(Web3.to_bytes(hexstr=root)),
+            approval.deadline,
+            b''.join(Web3.to_bytes(v) for v in mock_encode.return_value),
+            b''.join(Web3.to_bytes(hexstr=s) for s in approval.keeper_signatures),
+            approval.ipfs_hash,
+        )
+        mock_fn.assert_called_with(OPERATOR_ADDR, expected_keeper_params, expected_signatures)
 
     @pytest.mark.asyncio
     @patch(f'{MODULE}.encode_tx_validator_list', return_value=[b'\x00' * 100])

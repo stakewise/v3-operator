@@ -18,7 +18,6 @@ from src.common.exceptions import (
     InvalidOraclesRequestError,
     NotEnoughOracleApprovalsError,
 )
-from src.common.protocol_config import get_protocol_config
 from src.common.utils import (
     RateLimiter,
     format_error,
@@ -123,10 +122,10 @@ async def poll_registration_approval(
     keystore: BaseKeystore,
     validators: Sequence[Validator],
     operator_address: ChecksumAddress,
+    protocol_config: ProtocolConfig,
 ) -> tuple[NodeManagerApprovalRequest, NodeManagerRegistrationOraclesApproval]:
     """Poll oracles until registration approval is obtained."""
     oracles_request: NodeManagerApprovalRequest | None = None
-    protocol_config = await get_protocol_config()
     deadline: int | None = None
     validators_registry_root = await validators_registry_contract.get_registry_root()
 

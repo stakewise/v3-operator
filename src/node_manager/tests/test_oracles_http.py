@@ -4,6 +4,7 @@ from eth_typing import HexStr
 from sw_utils.tests.factories import faker, get_mocked_protocol_config
 from sw_utils.typings import Oracle, ProtocolConfig
 from web3 import Web3
+from web3.types import Wei
 
 from src.common.tests.utils import ether_to_gwei
 from src.node_manager.oracles import (
@@ -58,8 +59,9 @@ class TestPollEligibleOperators:
         config = _make_protocol_config(
             [['http://oracle1'], ['http://oracle2']],
         )
+        address = faker.eth_address().lower()
         response_data = [
-            {'address': faker.eth_address().lower(), 'amount': 100},
+            {'address': address, 'amount': 100},
         ]
 
         with aioresponses() as m:
@@ -68,12 +70,15 @@ class TestPollEligibleOperators:
             result = await poll_eligible_operators(config)
 
         assert len(result) == 1
+        assert result[0].address == Web3.to_checksum_address(address)
+        assert result[0].amount == Wei(100)
 
     @pytest.mark.asyncio
     async def test_replica_fallback(self) -> None:
         """If first replica fails, tries the next one."""
         config = _make_protocol_config([['http://replica1', 'http://replica2']])
-        response_data = [{'address': faker.eth_address().lower(), 'amount': 100}]
+        address = faker.eth_address().lower()
+        response_data = [{'address': address, 'amount': 100}]
 
         with aioresponses() as m:
             m.get('http://replica1/nodes-manager/eligible-operators', status=500)
@@ -81,6 +86,8 @@ class TestPollEligibleOperators:
             result = await poll_eligible_operators(config)
 
         assert len(result) == 1
+        assert result[0].address == Web3.to_checksum_address(address)
+        assert result[0].amount == Wei(100)
 
 
 # --- send_registration_requests tests ---
@@ -119,6 +126,9 @@ class TestSendRegistrationRequests:
             approvals = await send_registration_requests(config, request)
 
         assert len(approvals) == 2
+        for approval in approvals.values():
+            assert approval.keeper_signature == keeper_signature
+            assert approval.nodes_manager_signature == signature
 
     @pytest.mark.asyncio
     async def test_partial_failure(self) -> None:
@@ -128,13 +138,15 @@ class TestSendRegistrationRequests:
             threshold=1,
         )
         request = _make_registration_request()
+        keeper_signature = faker.account_signature()
+        signature = faker.account_signature()
         oracle_response = {
             'keeperParams': {
-                'signature': faker.account_signature(),
+                'signature': keeper_signature,
                 'ipfs_hash': faker.ipfs_hash(),
                 'deadline': 1000,
             },
-            'signature': faker.account_signature(),
+            'signature': signature,
         }
 
         with aioresponses() as m:
@@ -146,6 +158,9 @@ class TestSendRegistrationRequests:
             approvals = await send_registration_requests(config, request)
 
         assert len(approvals) == 1
+        approval = next(iter(approvals.values()))
+        assert approval.keeper_signature == keeper_signature
+        assert approval.nodes_manager_signature == signature
 
 
 # --- send_funding_requests tests ---
