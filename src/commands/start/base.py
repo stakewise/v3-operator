@@ -4,7 +4,6 @@ import logging
 from sw_utils import InterruptHandler
 
 import src
-from src.commands.nodes.node_start import main as run_nodes
 from src.commands.start.startup_check import startup_checks
 from src.common.clients import close_clients, setup_clients
 from src.common.consensus import get_chain_finalized_head
@@ -18,6 +17,7 @@ from src.common.utils import get_build_version
 from src.config.settings import settings
 from src.exits.tasks import ExitSignatureTask
 from src.harvest.tasks import HarvestTask
+from src.nodewise.commands.node_start import main as run_nodes
 from src.reward_splitter.tasks import SplitRewardTask
 from src.validators.database import (
     CheckpointCrud,
