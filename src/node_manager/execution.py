@@ -62,5 +62,5 @@ def _parse_public_keys(public_keys_bytes: bytes) -> list[HexStr]:
     result: list[HexStr] = []
     for i in range(0, len(public_keys_bytes), BLS_PUBLIC_KEY_LENGTH):
         key_bytes = public_keys_bytes[i : i + BLS_PUBLIC_KEY_LENGTH]
-        result.append(HexStr(Web3.to_hex(key_bytes)))
+        result.append(Web3.to_hex(key_bytes))
     return result

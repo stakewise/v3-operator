@@ -32,6 +32,7 @@ class NetworkConfig(BaseNetworkConfig):
     OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS: ChecksumAddress
     COMMUNITY_VAULT_CONTRACT_ADDRESS: ChecksumAddress
     NODES_MANAGER_CONTRACT_ADDRESS: ChecksumAddress
+    NODES_MANAGER_GENESIS_BLOCK: BlockNumber
     WALLET_MIN_BALANCE: Wei
     STAKEWISE_API_URL: str
     STAKEWISE_GRAPH_ENDPOINT: str
@@ -52,7 +53,6 @@ class NetworkConfig(BaseNetworkConfig):
     EXECUTION_REQUEST_QUEUE_STORAGE_OFFSET: int
     TARGET_WITHDRAWAL_REQUESTS_PER_BLOCK: int
     TARGET_CONSOLIDATION_REQUESTS_PER_BLOCK: int
-    NODES_MANAGER_GENESIS_BLOCK: BlockNumber
     NODE_CONFIG: NodeConfig
 
 
@@ -109,6 +109,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         ),
         COMMUNITY_VAULT_CONTRACT_ADDRESS=ZERO_CHECKSUM_ADDRESS,
         NODES_MANAGER_CONTRACT_ADDRESS=ZERO_CHECKSUM_ADDRESS,
+        NODES_MANAGER_GENESIS_BLOCK=BlockNumber(0),
         WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
         STAKEWISE_API_URL='https://mainnet-api.stakewise.io/graphql',
         STAKEWISE_GRAPH_ENDPOINT=(
@@ -131,7 +132,6 @@ NETWORKS: dict[str, NetworkConfig] = {
         EXECUTION_REQUEST_QUEUE_STORAGE_OFFSET=4,
         TARGET_WITHDRAWAL_REQUESTS_PER_BLOCK=2,
         TARGET_CONSOLIDATION_REQUESTS_PER_BLOCK=1,
-        NODES_MANAGER_GENESIS_BLOCK=BlockNumber(0),
         NODE_CONFIG=NodeConfig(
             CONSENSUS_CHECKPOINT_SYNC_URL='https://beaconstate.info/',
             ERA_URL='https://data.ethpandaops.io/era1/mainnet/',
@@ -170,6 +170,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS=ZERO_CHECKSUM_ADDRESS,
         COMMUNITY_VAULT_CONTRACT_ADDRESS=ZERO_CHECKSUM_ADDRESS,
         NODES_MANAGER_CONTRACT_ADDRESS=ZERO_CHECKSUM_ADDRESS,
+        NODES_MANAGER_GENESIS_BLOCK=BlockNumber(0),
         WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
         STAKEWISE_API_URL='https://hoodi-api.stakewise.io/graphql',
         STAKEWISE_GRAPH_ENDPOINT='https://graphs.stakewise.io/hoodi/subgraphs/name/stakewise/prod',
@@ -190,7 +191,6 @@ NETWORKS: dict[str, NetworkConfig] = {
         EXECUTION_REQUEST_QUEUE_STORAGE_OFFSET=4,
         TARGET_WITHDRAWAL_REQUESTS_PER_BLOCK=2,
         TARGET_CONSOLIDATION_REQUESTS_PER_BLOCK=1,
-        NODES_MANAGER_GENESIS_BLOCK=BlockNumber(0),
         NODE_CONFIG=NodeConfig(
             CONSENSUS_CHECKPOINT_SYNC_URL='https://hoodi.beaconstate.info/',
             ERA_URL='',
@@ -227,6 +227,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS=ZERO_CHECKSUM_ADDRESS,
         COMMUNITY_VAULT_CONTRACT_ADDRESS=ZERO_CHECKSUM_ADDRESS,
         NODES_MANAGER_CONTRACT_ADDRESS=ZERO_CHECKSUM_ADDRESS,
+        NODES_MANAGER_GENESIS_BLOCK=BlockNumber(0),
         WALLET_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
         STAKEWISE_API_URL='https://gnosis-api.stakewise.io/graphql',
         STAKEWISE_GRAPH_ENDPOINT=(
@@ -249,7 +250,6 @@ NETWORKS: dict[str, NetworkConfig] = {
         EXECUTION_REQUEST_QUEUE_STORAGE_OFFSET=4,
         TARGET_WITHDRAWAL_REQUESTS_PER_BLOCK=2,
         TARGET_CONSOLIDATION_REQUESTS_PER_BLOCK=1,
-        NODES_MANAGER_GENESIS_BLOCK=BlockNumber(0),
         NODE_CONFIG=NodeConfig(
             CONSENSUS_CHECKPOINT_SYNC_URL='https://beacon.gnosischain.com/',
             ERA_URL='',
