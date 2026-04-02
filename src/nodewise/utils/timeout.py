@@ -4,7 +4,7 @@ import time
 from types import TracebackType
 from typing import Any, Literal
 
-from src.nodes.exceptions import NodeException
+from src.nodewise.exceptions import NodeException
 
 
 class Timeout(Exception):
