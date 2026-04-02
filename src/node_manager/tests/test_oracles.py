@@ -112,9 +112,9 @@ class TestProcessRegistrationApprovals:
 class TestProcessFundingApprovals:
     def test_basic_consensus(self) -> None:
         """All oracles respond — signatures sorted by address, truncated to threshold."""
-        sig_0 = HexStr(faker.account_signature())
-        sig_1 = HexStr(faker.account_signature())
-        sig_2 = HexStr(faker.account_signature())
+        sig_0 = faker.account_signature()
+        sig_1 = faker.account_signature()
+        sig_2 = faker.account_signature()
         approvals = {
             ORACLE_ADDRESSES[0]: _make_funding_approval(sig=sig_0),
             ORACLE_ADDRESSES[1]: _make_funding_approval(sig=sig_1),
@@ -128,8 +128,8 @@ class TestProcessFundingApprovals:
 
     def test_exact_threshold(self) -> None:
         """Exactly threshold votes should succeed."""
-        sig_0 = HexStr(faker.account_signature())
-        sig_1 = HexStr(faker.account_signature())
+        sig_0 = faker.account_signature()
+        sig_1 = faker.account_signature()
         approvals = {
             ORACLE_ADDRESSES[0]: _make_funding_approval(sig=sig_0),
             ORACLE_ADDRESSES[1]: _make_funding_approval(sig=sig_1),
@@ -154,8 +154,8 @@ class TestProcessFundingApprovals:
         """Signatures are returned in ascending oracle address order."""
         addr_low = ORACLE_ADDRESSES[0]
         addr_high = ORACLE_ADDRESSES[-1]
-        sig_low = HexStr(faker.account_signature())
-        sig_high = HexStr(faker.account_signature())
+        sig_low = faker.account_signature()
+        sig_high = faker.account_signature()
         approvals = {
             addr_high: _make_funding_approval(sig=sig_high),
             addr_low: _make_funding_approval(sig=sig_low),
@@ -167,9 +167,9 @@ class TestProcessFundingApprovals:
 class TestParsers:
     def test_parse_funding_response(self) -> None:
         sig_hex = faker.account_signature()
-        data = {'signature': sig_hex}
+        data = {'nodes_manager_signature': sig_hex}
         result = _parse_funding_response(data)
-        assert result.signature == sig_hex
+        assert result.nodes_manager_signature == sig_hex
 
     def test_parse_registration_response(self) -> None:
         keeper_sig_hex = faker.account_signature()
@@ -196,8 +196,8 @@ def _make_funding_approval(
     sig: HexStr | None = None,
 ) -> NodeManagerFundingApproval:
     if sig is None:
-        sig = HexStr(faker.account_signature())
-    return NodeManagerFundingApproval(signature=sig)
+        sig = faker.account_signature()
+    return NodeManagerFundingApproval(nodes_manager_signature=sig)
 
 
 def _make_registration_approval(

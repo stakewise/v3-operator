@@ -320,9 +320,9 @@ async def send_funding_requests(
 
 
 def _parse_funding_response(data: dict) -> NodeManagerFundingApproval:
-    """Parse oracle response for funding (single NM signature)."""
+    """Parse oracle response for funding (single Node Manager signature)."""
     return NodeManagerFundingApproval(
-        signature=HexStr(data['signature']),
+        nodes_manager_signature=HexStr(data['nodes_manager_signature']),
     )
 
 
@@ -376,7 +376,7 @@ def process_funding_approvals(
     approvals: dict[ChecksumAddress, NodeManagerFundingApproval],
     votes_threshold: int,
 ) -> list[HexStr]:
-    """Combine funding approvals into sorted NM signature list."""
+    """Combine funding approvals into sorted Node Manager signature list."""
     if not approvals:
         raise InvalidOraclesRequestError()
 
@@ -389,7 +389,7 @@ def process_funding_approvals(
 
     signatures: list[HexStr] = []
     for _, approval in sorted_oracles:
-        signatures.append(approval.signature)
+        signatures.append(approval.nodes_manager_signature)
 
     return signatures
 

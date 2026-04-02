@@ -3,7 +3,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from eth_typing import ChecksumAddress, HexStr
 from sw_utils.tests.factories import faker
-from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.exceptions import ContractLogicError
 from web3.types import Gwei
@@ -102,7 +101,7 @@ class TestRegisterValidators:
             Web3.to_bytes(hexstr=s) for s in approval.nodes_manager_signatures
         )
         expected_keeper_params = (
-            Bytes32(Web3.to_bytes(hexstr=root)),
+            Web3.to_bytes(hexstr=root),
             approval.deadline,
             b''.join(Web3.to_bytes(v) for v in mock_encode.return_value),
             b''.join(Web3.to_bytes(hexstr=s) for s in approval.keeper_signatures),
@@ -180,7 +179,6 @@ class TestRegisterValidators:
 
 @pytest.mark.usefixtures('fake_settings')
 class TestFundValidators:
-    @pytest.mark.asyncio
     @patch(f'{MODULE}.encode_tx_validator_list', return_value=[b'\x00' * 100])
     async def test_success(
         self,
@@ -200,12 +198,11 @@ class TestFundValidators:
         ):
             result = await fund_validators(
                 operator_address=OPERATOR_ADDR,
-                signatures=[HexStr(faker.account_signature())],
+                signatures=[faker.account_signature()],
                 validator_fundings=_make_validator_fundings(),
             )
         assert result is not None
 
-    @pytest.mark.asyncio
     @patch(f'{MODULE}.encode_tx_validator_list', return_value=[b'\x00' * 100])
     async def test_transaction_error_returns_none(
         self,
@@ -218,12 +215,11 @@ class TestFundValidators:
         ):
             result = await fund_validators(
                 operator_address=OPERATOR_ADDR,
-                signatures=[HexStr(faker.account_signature())],
+                signatures=[faker.account_signature()],
                 validator_fundings=_make_validator_fundings(),
             )
         assert result is None
 
-    @pytest.mark.asyncio
     @patch(f'{MODULE}.encode_tx_validator_list', return_value=[b'\x00' * 100])
     async def test_failed_tx_receipt_returns_none(
         self,
@@ -242,7 +238,7 @@ class TestFundValidators:
         ):
             result = await fund_validators(
                 operator_address=OPERATOR_ADDR,
-                signatures=[HexStr(faker.account_signature())],
+                signatures=[faker.account_signature()],
                 validator_fundings=_make_validator_fundings(),
             )
         assert result is None
@@ -250,7 +246,7 @@ class TestFundValidators:
 
 def _make_validator_fundings() -> dict[HexStr, Gwei]:
     return {
-        HexStr(faker.validator_public_key()): Gwei(ether_to_gwei(32)),
+        faker.validator_public_key(): ether_to_gwei(32),
     }
 
 

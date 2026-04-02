@@ -4,7 +4,6 @@ from eth_typing import HexStr
 from sw_utils.tests.factories import faker, get_mocked_protocol_config
 from sw_utils.typings import Oracle, ProtocolConfig
 from web3 import Web3
-from web3.types import Wei
 
 from src.common.tests.utils import ether_to_gwei
 from src.node_manager.oracles import (
@@ -68,7 +67,7 @@ class TestPollEligibleOperators:
 
         assert len(result) == 1
         assert result[0].address == Web3.to_checksum_address(address)
-        assert result[0].amount == Wei(100)
+        assert result[0].amount == 100
 
     async def test_replica_fallback(self) -> None:
         """If first replica fails, tries the next one."""
@@ -83,7 +82,7 @@ class TestPollEligibleOperators:
 
         assert len(result) == 1
         assert result[0].address == Web3.to_checksum_address(address)
-        assert result[0].amount == Wei(100)
+        assert result[0].amount == 100
 
 
 # --- send_registration_requests tests ---
@@ -162,7 +161,6 @@ class TestSendRegistrationRequests:
 
 @pytest.mark.usefixtures('fake_settings')
 class TestSendFundingRequests:
-    @pytest.mark.asyncio
     async def test_collects_approvals(self) -> None:
         config = _make_protocol_config(
             [['http://oracle1'], ['http://oracle2']],
@@ -171,7 +169,7 @@ class TestSendFundingRequests:
         request = _make_funding_request()
         signature = faker.account_signature()
 
-        oracle_response = {'signature': signature}
+        oracle_response = {'nodes_manager_signature': signature}
 
         with aioresponses() as m:
             m.post(
@@ -186,7 +184,6 @@ class TestSendFundingRequests:
 
         assert len(approvals) == 2
 
-    @pytest.mark.asyncio
     async def test_partial_failure(self) -> None:
         """One oracle fails, the other succeeds — still returns what we got."""
         config = _make_protocol_config(
@@ -194,7 +191,7 @@ class TestSendFundingRequests:
             threshold=1,
         )
         request = _make_funding_request()
-        oracle_response = {'signature': faker.account_signature()}
+        oracle_response = {'nodes_manager_signature': faker.account_signature()}
 
         with aioresponses() as m:
             m.post('http://oracle1/nodes-manager/fund-validators', status=500)
@@ -235,10 +232,10 @@ def _make_protocol_config(
 def _make_funding_request() -> NodeManagerFundingRequest:
     return NodeManagerFundingRequest(
         operator_address=faker.eth_address(),
-        public_keys=[HexStr(faker.validator_public_key())],
+        public_keys=[faker.validator_public_key()],
         amounts=[ether_to_gwei(32)],
         deadline=1000,
-        validators_manager_signature=HexStr(faker.account_signature()),
+        validators_manager_signature=faker.account_signature(),
     )
 
 

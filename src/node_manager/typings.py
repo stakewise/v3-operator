@@ -42,9 +42,9 @@ class NodeManagerFundingRequest:
 
 @dataclass
 class NodeManagerFundingApproval:
-    """Single oracle's funding response (NM signature only)."""
+    """Single oracle's funding response (Node Manager signature only)."""
 
-    signature: HexStr
+    nodes_manager_signature: HexStr
 
 
 @dataclass

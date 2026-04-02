@@ -5,7 +5,6 @@ from eth_typing import ChecksumAddress
 from sw_utils.tests.factories import faker
 from sw_utils.typings import ProtocolConfig
 from web3 import Web3
-from web3.types import Gwei, Wei
 
 from src.common.tests.utils import ether_to_gwei
 from src.common.typings import ValidatorType
@@ -73,7 +72,7 @@ class TestProcessBlock:
         """Operators not matching operator_address are skipped."""
         mock_config.return_value = _make_protocol_config()
         mock_poll.return_value = [
-            EligibleOperator(address=OTHER_ADDR, amount=Wei(Web3.to_wei(32, 'ether'))),
+            EligibleOperator(address=OTHER_ADDR, amount=Web3.to_wei(32, 'ether')),
         ]
         task = _make_task()
         await task.process_block(MagicMock())
@@ -104,7 +103,7 @@ class TestProcessBlock:
         """Full flow: eligible operator → stub funding → register new validators."""
         mock_config.return_value = _make_protocol_config()
         mock_poll.return_value = [
-            EligibleOperator(address=OPERATOR_ADDR, amount=Wei(Web3.to_wei(32, 'ether'))),
+            EligibleOperator(address=OPERATOR_ADDR, amount=Web3.to_wei(32, 'ether')),
         ]
         mock_deposits.return_value = [ether_to_gwei(32)]
 
@@ -151,7 +150,7 @@ class TestProcessBlockV1:
         settings.validator_type = ValidatorType.V1
         mock_config.return_value = _make_protocol_config()
         mock_poll.return_value = [
-            EligibleOperator(address=OPERATOR_ADDR, amount=Wei(Web3.to_wei(32, 'ether'))),
+            EligibleOperator(address=OPERATOR_ADDR, amount=Web3.to_wei(32, 'ether')),
         ]
         mock_deposits.return_value = [ether_to_gwei(32)]
 
@@ -191,7 +190,7 @@ class TestProcessFunding:
         settings.disable_validators_registration = True
         mock_config.return_value = _make_protocol_config()
         mock_poll.return_value = [
-            EligibleOperator(address=OPERATOR_ADDR, amount=Wei(Web3.to_wei(32, 'ether'))),
+            EligibleOperator(address=OPERATOR_ADDR, amount=Web3.to_wei(32, 'ether')),
         ]
 
         task = _make_task()
@@ -204,7 +203,6 @@ class TestProcessFunding:
 class TestProcessBlockV2:
     """V2 validator type: calls funding first, then registration."""
 
-    @pytest.mark.asyncio
     @patch(
         f'{MODULE}.fetch_compounding_validators_balances', new_callable=AsyncMock, return_value={}
     )
@@ -229,7 +227,7 @@ class TestProcessBlockV2:
         settings.validator_type = ValidatorType.V2
         mock_config.return_value = _make_protocol_config()
         mock_poll.return_value = [
-            EligibleOperator(address=OPERATOR_ADDR, amount=Wei(Web3.to_wei(32, 'ether'))),
+            EligibleOperator(address=OPERATOR_ADDR, amount=Web3.to_wei(32, 'ether')),
         ]
         mock_deposits.return_value = [ether_to_gwei(32)]
 
@@ -269,7 +267,7 @@ class TestProcessBlockV2:
         settings.disable_validators_funding = True
         mock_config.return_value = _make_protocol_config()
         mock_poll.return_value = [
-            EligibleOperator(address=OPERATOR_ADDR, amount=Wei(Web3.to_wei(32, 'ether'))),
+            EligibleOperator(address=OPERATOR_ADDR, amount=Web3.to_wei(32, 'ether')),
         ]
 
         task = _make_task()
@@ -300,7 +298,7 @@ class TestProcessBlockV2:
         settings.disable_validators_registration = True
         mock_config.return_value = _make_protocol_config()
         mock_poll.return_value = [
-            EligibleOperator(address=OPERATOR_ADDR, amount=Wei(Web3.to_wei(32, 'ether'))),
+            EligibleOperator(address=OPERATOR_ADDR, amount=Web3.to_wei(32, 'ether')),
         ]
 
         task = _make_task()
@@ -321,7 +319,7 @@ class TestProcessRegistration:
     ) -> None:
         task = _make_task()
         await task._process_registration(
-            amount=Gwei(100),
+            amount=100,
             protocol_config=_make_protocol_config(),
         )
         mock_register.assert_not_awaited()
