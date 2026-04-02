@@ -61,7 +61,7 @@ class NodeManagerRegistrationApproval:
 class NodeManagerRegistrationOraclesApproval:
     """Combined registration approval from multiple oracles."""
 
-    signatures: list[HexStr]
+    nodes_manager_signatures: list[HexStr]
     keeper_signatures: list[HexStr]
     ipfs_hash: str
     deadline: int

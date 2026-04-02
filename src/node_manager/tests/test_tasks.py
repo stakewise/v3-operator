@@ -1,7 +1,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from eth_typing import ChecksumAddress, HexStr
+from eth_typing import ChecksumAddress
 from sw_utils.tests.factories import faker
 from sw_utils.typings import ProtocolConfig
 from web3 import Web3
@@ -39,7 +39,6 @@ def _mock_scan_events() -> None:
 
 @pytest.mark.usefixtures('fake_settings')
 class TestProcessBlock:
-    @pytest.mark.asyncio
     @patch(f'{MODULE}.check_gas_price', new_callable=AsyncMock, return_value=False)
     async def test_skips_when_gas_too_high(self, mock_gas: AsyncMock) -> None:
         task = _make_task()
@@ -49,7 +48,6 @@ class TestProcessBlock:
 
         mock_gas.assert_awaited_once_with(high_priority=True)
 
-    @pytest.mark.asyncio
     @patch(f'{MODULE}.poll_eligible_operators', new_callable=AsyncMock, return_value=[])
     @patch(f'{MODULE}.get_protocol_config', new_callable=AsyncMock)
     @patch(f'{MODULE}.check_gas_price', new_callable=AsyncMock, return_value=True)
@@ -63,7 +61,6 @@ class TestProcessBlock:
         await task.process_block(MagicMock())
         mock_poll.assert_awaited_once()
 
-    @pytest.mark.asyncio
     @patch(f'{MODULE}.poll_eligible_operators', new_callable=AsyncMock)
     @patch(f'{MODULE}.get_protocol_config', new_callable=AsyncMock)
     @patch(f'{MODULE}.check_gas_price', new_callable=AsyncMock, return_value=True)
@@ -83,7 +80,6 @@ class TestProcessBlock:
         # Should not proceed to registration for other operator
         mock_poll.assert_awaited_once()
 
-    @pytest.mark.asyncio
     @patch(
         f'{MODULE}.fetch_compounding_validators_balances', new_callable=AsyncMock, return_value={}
     )
@@ -113,14 +109,14 @@ class TestProcessBlock:
         mock_deposits.return_value = [ether_to_gwei(32)]
 
         validator = Validator(
-            public_key=HexStr(faker.validator_public_key()),
+            public_key=faker.validator_public_key(),
             amount=ether_to_gwei(32),
-            deposit_signature=HexStr(faker.validator_signature()),
+            deposit_signature=faker.validator_signature(),
         )
         mock_get_validators.return_value = [validator]
 
         request = MagicMock(spec=NodeManagerApprovalRequest)
-        request.validators_root = HexStr(faker.merkle_root())
+        request.validators_root = faker.merkle_root()
         request.validator_index = 0
         approval = MagicMock(spec=NodeManagerRegistrationOraclesApproval)
         mock_poll_reg.return_value = (request, approval)
@@ -135,7 +131,6 @@ class TestProcessBlock:
 class TestProcessBlockV1:
     """V1 validator type: skips funding, goes straight to registration."""
 
-    @pytest.mark.asyncio
     @patch(f'{MODULE}.register_validators', new_callable=AsyncMock, return_value='0xtxhash')
     @patch(f'{MODULE}.poll_registration_approval', new_callable=AsyncMock)
     @patch(f'{MODULE}.get_validators_for_registration', new_callable=AsyncMock)
@@ -161,14 +156,14 @@ class TestProcessBlockV1:
         mock_deposits.return_value = [ether_to_gwei(32)]
 
         validator = Validator(
-            public_key=HexStr(faker.validator_public_key()),
+            public_key=faker.validator_public_key(),
             amount=ether_to_gwei(32),
-            deposit_signature=HexStr(faker.validator_signature()),
+            deposit_signature=faker.validator_signature(),
         )
         mock_get_validators.return_value = [validator]
 
         request = MagicMock(spec=NodeManagerApprovalRequest)
-        request.validators_root = HexStr(faker.merkle_root())
+        request.validators_root = faker.merkle_root()
         request.validator_index = 0
         approval = MagicMock(spec=NodeManagerRegistrationOraclesApproval)
         mock_poll_reg.return_value = (request, approval)
@@ -180,7 +175,6 @@ class TestProcessBlockV1:
 
 
 class TestProcessFunding:
-    @pytest.mark.asyncio
     @patch(f'{MODULE}.register_validators', new_callable=AsyncMock)
     @patch(f'{MODULE}.poll_eligible_operators', new_callable=AsyncMock)
     @patch(f'{MODULE}.get_protocol_config', new_callable=AsyncMock)
@@ -240,14 +234,14 @@ class TestProcessBlockV2:
         mock_deposits.return_value = [ether_to_gwei(32)]
 
         validator = Validator(
-            public_key=HexStr(faker.validator_public_key()),
+            public_key=faker.validator_public_key(),
             amount=ether_to_gwei(32),
-            deposit_signature=HexStr(faker.validator_signature()),
+            deposit_signature=faker.validator_signature(),
         )
         mock_get_validators.return_value = [validator]
 
         request = MagicMock(spec=NodeManagerApprovalRequest)
-        request.validators_root = HexStr(faker.merkle_root())
+        request.validators_root = faker.merkle_root()
         request.validator_index = 0
         approval = MagicMock(spec=NodeManagerRegistrationOraclesApproval)
         mock_poll_reg.return_value = (request, approval)
@@ -257,7 +251,6 @@ class TestProcessBlockV2:
 
         mock_register.assert_awaited_once()
 
-    @pytest.mark.asyncio
     @patch(f'{MODULE}.register_validators', new_callable=AsyncMock)
     @patch(f'{MODULE}.get_deposits_amounts', return_value=[])
     @patch(f'{MODULE}.poll_eligible_operators', new_callable=AsyncMock)
@@ -285,7 +278,6 @@ class TestProcessBlockV2:
         # Registration path was entered (get_deposits_amounts called with original amount)
         mock_deposits.assert_called_once()
 
-    @pytest.mark.asyncio
     @patch(
         f'{MODULE}.fetch_compounding_validators_balances', new_callable=AsyncMock, return_value={}
     )
@@ -320,22 +312,28 @@ class TestProcessBlockV2:
 
 @pytest.mark.usefixtures('fake_settings')
 class TestProcessRegistration:
-    @pytest.mark.asyncio
+    @patch(f'{MODULE}.register_validators', new_callable=AsyncMock)
     @patch(f'{MODULE}.get_deposits_amounts', return_value=[])
-    async def test_no_amounts_skips(self, mock_deposits: MagicMock) -> None:
+    async def test_no_amounts_skips(
+        self,
+        mock_deposits: MagicMock,
+        mock_register: AsyncMock,
+    ) -> None:
         task = _make_task()
         await task._process_registration(
             amount=Gwei(100),
             protocol_config=_make_protocol_config(),
         )
+        mock_register.assert_not_awaited()
 
-    @pytest.mark.asyncio
+    @patch(f'{MODULE}.register_validators', new_callable=AsyncMock)
     @patch(f'{MODULE}.get_validators_for_registration', new_callable=AsyncMock, return_value=[])
     @patch(f'{MODULE}.get_deposits_amounts', return_value=[ether_to_gwei(32)])
     async def test_no_validators_skips(
         self,
         mock_deposits: MagicMock,
         mock_get_validators: AsyncMock,
+        mock_register: AsyncMock,
     ) -> None:
         task = _make_task()
         await task._process_registration(
@@ -343,14 +341,16 @@ class TestProcessRegistration:
             protocol_config=_make_protocol_config(),
         )
         mock_get_validators.assert_awaited_once()
+        mock_register.assert_not_awaited()
 
-    @pytest.mark.asyncio
+    @patch(f'{MODULE}.register_validators', new_callable=AsyncMock)
     @patch(f'{MODULE}.get_validators_for_registration', new_callable=AsyncMock, return_value=[])
     @patch(f'{MODULE}.get_deposits_amounts')
     async def test_amounts_truncated_to_batch_limit(
         self,
         mock_deposits: MagicMock,
         mock_get_validators: AsyncMock,
+        mock_register: AsyncMock,
     ) -> None:
         """Amounts list is truncated to validators_approval_batch_limit."""
         mock_deposits.return_value = [ether_to_gwei(32)] * 5
@@ -369,6 +369,7 @@ class TestProcessRegistration:
             'amounts', call_args.args[1] if len(call_args.args) > 1 else None
         )
         assert len(amounts_arg) == 2
+        mock_register.assert_not_awaited()
 
 
 def _make_protocol_config() -> MagicMock:

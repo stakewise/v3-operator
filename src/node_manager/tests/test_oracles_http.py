@@ -22,7 +22,6 @@ from src.node_manager.typings import (
 
 @pytest.mark.usefixtures('fake_settings')
 class TestPollEligibleOperators:
-    @pytest.mark.asyncio
     async def test_returns_eligible_operators(self) -> None:
         config = _make_protocol_config([['http://oracle1']])
         operator_address = faker.eth_address()
@@ -41,7 +40,6 @@ class TestPollEligibleOperators:
         assert result[0].address == operator_address
         assert result[0].amount == Web3.to_wei(32, 'ether')
 
-    @pytest.mark.asyncio
     async def test_returns_empty_on_all_failures(self) -> None:
         config = _make_protocol_config([['http://oracle1']])
 
@@ -54,7 +52,6 @@ class TestPollEligibleOperators:
 
         assert result == []
 
-    @pytest.mark.asyncio
     async def test_falls_back_to_next_oracle(self) -> None:
         config = _make_protocol_config(
             [['http://oracle1'], ['http://oracle2']],
@@ -73,7 +70,6 @@ class TestPollEligibleOperators:
         assert result[0].address == Web3.to_checksum_address(address)
         assert result[0].amount == Wei(100)
 
-    @pytest.mark.asyncio
     async def test_replica_fallback(self) -> None:
         """If first replica fails, tries the next one."""
         config = _make_protocol_config([['http://replica1', 'http://replica2']])
@@ -95,7 +91,6 @@ class TestPollEligibleOperators:
 
 @pytest.mark.usefixtures('fake_settings')
 class TestSendRegistrationRequests:
-    @pytest.mark.asyncio
     async def test_collects_approvals(self) -> None:
         config = _make_protocol_config(
             [['http://oracle1'], ['http://oracle2']],
@@ -106,12 +101,12 @@ class TestSendRegistrationRequests:
         signature = faker.account_signature()
 
         oracle_response = {
-            'keeperParams': {
+            'keeper_params': {
                 'signature': keeper_signature,
                 'ipfs_hash': faker.ipfs_hash(),
                 'deadline': 1000,
             },
-            'signature': signature,
+            'nodes_manager_signature': signature,
         }
 
         with aioresponses() as m:
@@ -130,7 +125,6 @@ class TestSendRegistrationRequests:
             assert approval.keeper_signature == keeper_signature
             assert approval.nodes_manager_signature == signature
 
-    @pytest.mark.asyncio
     async def test_partial_failure(self) -> None:
         """One oracle fails, the other succeeds — still returns what we got."""
         config = _make_protocol_config(
@@ -141,12 +135,12 @@ class TestSendRegistrationRequests:
         keeper_signature = faker.account_signature()
         signature = faker.account_signature()
         oracle_response = {
-            'keeperParams': {
+            'keeper_params': {
                 'signature': keeper_signature,
                 'ipfs_hash': faker.ipfs_hash(),
                 'deadline': 1000,
             },
-            'signature': signature,
+            'nodes_manager_signature': signature,
         }
 
         with aioresponses() as m:
@@ -215,7 +209,7 @@ class TestSendFundingRequests:
 
 # --- Helpers ---
 
-_ORACLE_PUBKEYS: list[HexStr] = [HexStr(faker.account_public_key()) for _ in range(9)]
+_ORACLE_PUBKEYS: list[HexStr] = [faker.account_public_key() for _ in range(9)]
 
 
 def _make_protocol_config(
@@ -252,12 +246,12 @@ def _make_registration_request() -> NodeManagerApprovalRequest:
     return NodeManagerApprovalRequest(
         validator_index=0,
         operator_address=faker.eth_address(),
-        validators_root=HexStr(faker.merkle_root()),
-        public_keys=[HexStr(faker.validator_public_key())],
-        deposit_signatures=[HexStr(faker.validator_signature())],
-        public_key_shards=[[HexStr(faker.validator_public_key())]],
-        exit_signature_shards=[[HexStr(faker.validator_signature())]],
+        validators_root=faker.merkle_root(),
+        public_keys=[faker.validator_public_key()],
+        deposit_signatures=[faker.validator_signature()],
+        public_key_shards=[[faker.validator_public_key()]],
+        exit_signature_shards=[[faker.validator_signature()]],
         deadline=1000,
         amounts=[ether_to_gwei(32)],
-        validators_manager_signature=HexStr(faker.account_signature()),
+        validators_manager_signature=faker.account_signature(),
     )
