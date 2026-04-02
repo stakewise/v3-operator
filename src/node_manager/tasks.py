@@ -6,11 +6,13 @@ from sw_utils.typings import ProtocolConfig
 from web3 import Web3
 from web3.types import Gwei, Wei
 
+from src.common.consensus import get_chain_finalized_head
 from src.common.execution import check_gas_price
 from src.common.protocol_config import get_protocol_config
 from src.common.tasks import BaseTask
 from src.common.typings import ValidatorType
 from src.config.settings import settings
+from src.node_manager.execution import scan_node_manager_validators_events
 from src.node_manager.oracles import poll_eligible_operators, poll_registration_approval
 from src.node_manager.register_validators import register_validators
 from src.validators.keystores.base import BaseKeystore
@@ -32,6 +34,12 @@ class NodeManagerTask(BaseTask):
         self.keystore = keystore
 
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
+        chain_head = await get_chain_finalized_head()
+        await scan_node_manager_validators_events(
+            operator_address=self.operator_address,
+            block_number=chain_head.block_number,
+        )
+
         if not await check_gas_price(high_priority=True):
             logger.debug('Gas price too high, skipping validators registration')
             return

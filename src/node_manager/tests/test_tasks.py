@@ -24,6 +24,19 @@ OTHER_ADDR: ChecksumAddress = faker.eth_address()
 MODULE = 'src.node_manager.tasks'
 
 
+@pytest.fixture(autouse=True)
+def _mock_scan_events() -> None:
+    """Mock scan and chain head for all tests calling process_block."""
+    chain_head = MagicMock(block_number=100)
+    with (
+        patch(f'{MODULE}.scan_node_manager_validators_events', new_callable=AsyncMock),
+        patch(
+            f'{MODULE}.get_chain_finalized_head', new_callable=AsyncMock, return_value=chain_head
+        ),
+    ):
+        yield
+
+
 @pytest.mark.usefixtures('fake_settings')
 class TestProcessBlock:
     @patch(f'{MODULE}.check_gas_price', new_callable=AsyncMock, return_value=False)
