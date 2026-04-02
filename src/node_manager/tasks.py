@@ -50,14 +50,6 @@ class NodeManagerTask(BaseTask):
 
         amount_gwei = Gwei(int(Web3.from_wei(eligible_amount, 'gwei')))
 
-        if settings.validator_type == ValidatorType.V1:
-            if not settings.disable_validators_registration:
-                await self._process_registration(
-                    amount=amount_gwei,
-                    protocol_config=protocol_config,
-                )
-            return
-
         # Fund existing compounding validators first
         if not settings.disable_validators_funding:
             amount_gwei = await self._process_funding(
@@ -87,7 +79,7 @@ class NodeManagerTask(BaseTask):
         protocol_config: ProtocolConfig,
     ) -> None:
         """Register new validators with the eligible amount."""
-        amounts = get_deposits_amounts(amount, settings.validator_type)
+        amounts = get_deposits_amounts(amount, ValidatorType.V2)
         if not amounts:
             logger.info('No remaining amount for new validator registration')
             return

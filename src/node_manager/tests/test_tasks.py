@@ -8,7 +8,6 @@ from web3 import Web3
 from web3.types import Gwei, Wei
 
 from src.common.tests.utils import ether_to_gwei
-from src.common.typings import ValidatorType
 from src.config.settings import settings
 from src.node_manager.tasks import NodeManagerTask
 from src.node_manager.typings import (
@@ -111,128 +110,15 @@ class TestProcessBlock:
 
 
 @pytest.mark.usefixtures('fake_settings')
-class TestProcessBlockV1:
-    """V1 validator type: skips funding, goes straight to registration."""
-
-    @patch(f'{MODULE}.register_validators', new_callable=AsyncMock, return_value='0xtxhash')
-    @patch(f'{MODULE}.poll_registration_approval', new_callable=AsyncMock)
-    @patch(f'{MODULE}.get_validators_for_registration', new_callable=AsyncMock)
-    @patch(f'{MODULE}.get_deposits_amounts')
-    @patch(f'{MODULE}.poll_eligible_operators', new_callable=AsyncMock)
-    @patch(f'{MODULE}.get_protocol_config', new_callable=AsyncMock)
-    @patch(f'{MODULE}.check_gas_price', new_callable=AsyncMock, return_value=True)
-    async def test_v1_skips_funding_and_registers(
-        self,
-        mock_gas: AsyncMock,
-        mock_config: AsyncMock,
-        mock_poll: AsyncMock,
-        mock_deposits: MagicMock,
-        mock_get_validators: AsyncMock,
-        mock_poll_reg: AsyncMock,
-        mock_register: AsyncMock,
-    ) -> None:
-        settings.validator_type = ValidatorType.V1
-        mock_config.return_value = _make_protocol_config()
-        mock_poll.return_value = [
-            EligibleOperator(address=OPERATOR_ADDR, amount=Wei(Web3.to_wei(32, 'ether'))),
-        ]
-        mock_deposits.return_value = [ether_to_gwei(32)]
-
-        validator = Validator(
-            public_key=faker.validator_public_key(),
-            amount=ether_to_gwei(32),
-            deposit_signature=faker.validator_signature(),
-        )
-        mock_get_validators.return_value = [validator]
-
-        request = MagicMock(spec=NodeManagerApprovalRequest)
-        request.validators_root = faker.merkle_root()
-        request.validator_index = 0
-        approval = MagicMock(spec=NodeManagerRegistrationOraclesApproval)
-        mock_poll_reg.return_value = (request, approval)
-
-        task = _make_task()
-        await task.process_block(MagicMock())
-
-        mock_register.assert_awaited_once()
-
-    @patch(f'{MODULE}.register_validators', new_callable=AsyncMock)
-    @patch(f'{MODULE}.poll_eligible_operators', new_callable=AsyncMock)
-    @patch(f'{MODULE}.get_protocol_config', new_callable=AsyncMock)
-    @patch(f'{MODULE}.check_gas_price', new_callable=AsyncMock, return_value=True)
-    async def test_v1_disable_registration_skips(
-        self,
-        mock_gas: AsyncMock,
-        mock_config: AsyncMock,
-        mock_poll: AsyncMock,
-        mock_register: AsyncMock,
-    ) -> None:
-        """V1 with disable_validators_registration returns early."""
-        settings.validator_type = ValidatorType.V1
-        settings.disable_validators_registration = True
-        mock_config.return_value = _make_protocol_config()
-        mock_poll.return_value = [
-            EligibleOperator(address=OPERATOR_ADDR, amount=Wei(Web3.to_wei(32, 'ether'))),
-        ]
-
-        task = _make_task()
-        await task.process_block(MagicMock())
-
-        mock_register.assert_not_awaited()
-
-
-@pytest.mark.usefixtures('fake_settings')
-class TestProcessBlockV2:
-    """V2 validator type: calls funding first, then registration."""
-
-    @patch(f'{MODULE}.register_validators', new_callable=AsyncMock, return_value='0xtxhash')
-    @patch(f'{MODULE}.poll_registration_approval', new_callable=AsyncMock)
-    @patch(f'{MODULE}.get_validators_for_registration', new_callable=AsyncMock)
-    @patch(f'{MODULE}.get_deposits_amounts')
-    @patch(f'{MODULE}.poll_eligible_operators', new_callable=AsyncMock)
-    @patch(f'{MODULE}.get_protocol_config', new_callable=AsyncMock)
-    @patch(f'{MODULE}.check_gas_price', new_callable=AsyncMock, return_value=True)
-    async def test_v2_calls_funding_then_registration(
-        self,
-        mock_gas: AsyncMock,
-        mock_config: AsyncMock,
-        mock_poll: AsyncMock,
-        mock_deposits: MagicMock,
-        mock_get_validators: AsyncMock,
-        mock_poll_reg: AsyncMock,
-        mock_register: AsyncMock,
-    ) -> None:
-        settings.validator_type = ValidatorType.V2
-        mock_config.return_value = _make_protocol_config()
-        mock_poll.return_value = [
-            EligibleOperator(address=OPERATOR_ADDR, amount=Wei(Web3.to_wei(32, 'ether'))),
-        ]
-        mock_deposits.return_value = [ether_to_gwei(32)]
-
-        validator = Validator(
-            public_key=faker.validator_public_key(),
-            amount=ether_to_gwei(32),
-            deposit_signature=faker.validator_signature(),
-        )
-        mock_get_validators.return_value = [validator]
-
-        request = MagicMock(spec=NodeManagerApprovalRequest)
-        request.validators_root = faker.merkle_root()
-        request.validator_index = 0
-        approval = MagicMock(spec=NodeManagerRegistrationOraclesApproval)
-        mock_poll_reg.return_value = (request, approval)
-
-        task = _make_task()
-        await task.process_block(MagicMock())
-
-        mock_register.assert_awaited_once()
+class TestProcessBlockDisableFlags:
+    """Tests for disable_validators_funding and disable_validators_registration flags."""
 
     @patch(f'{MODULE}.register_validators', new_callable=AsyncMock)
     @patch(f'{MODULE}.get_deposits_amounts', return_value=[])
     @patch(f'{MODULE}.poll_eligible_operators', new_callable=AsyncMock)
     @patch(f'{MODULE}.get_protocol_config', new_callable=AsyncMock)
     @patch(f'{MODULE}.check_gas_price', new_callable=AsyncMock, return_value=True)
-    async def test_v2_disable_funding_skips_to_registration(
+    async def test_disable_funding_skips_to_registration(
         self,
         mock_gas: AsyncMock,
         mock_config: AsyncMock,
@@ -240,8 +126,7 @@ class TestProcessBlockV2:
         mock_deposits: MagicMock,
         mock_register: AsyncMock,
     ) -> None:
-        """V2 with disable_validators_funding skips funding but still tries registration."""
-        settings.validator_type = ValidatorType.V2
+        """With disable_validators_funding, skips funding but still tries registration."""
         settings.disable_validators_funding = True
         mock_config.return_value = _make_protocol_config()
         mock_poll.return_value = [
@@ -259,7 +144,7 @@ class TestProcessBlockV2:
     @patch(f'{MODULE}.poll_eligible_operators', new_callable=AsyncMock)
     @patch(f'{MODULE}.get_protocol_config', new_callable=AsyncMock)
     @patch(f'{MODULE}.check_gas_price', new_callable=AsyncMock, return_value=True)
-    async def test_v2_disable_registration_skips_registration(
+    async def test_disable_registration_skips_registration(
         self,
         mock_gas: AsyncMock,
         mock_config: AsyncMock,
@@ -267,8 +152,7 @@ class TestProcessBlockV2:
         mock_deposits: MagicMock,
         mock_register: AsyncMock,
     ) -> None:
-        """V2 with disable_validators_registration skips registration after funding."""
-        settings.validator_type = ValidatorType.V2
+        """With disable_validators_registration, skips registration after funding."""
         settings.disable_validators_registration = True
         mock_config.return_value = _make_protocol_config()
         mock_poll.return_value = [
