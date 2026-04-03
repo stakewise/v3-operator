@@ -33,10 +33,16 @@ from src.config.settings import DEFAULT_NETWORK
 )
 @click.option(
     '--vault',
-    prompt='Enter your vault address',
     help='The vault address.',
     type=str,
     envvar='VAULT',
+    callback=validate_eth_address,
+)
+@click.option(
+    '--community-operator',
+    help='The operator address for community vault.',
+    type=str,
+    envvar='COMMUNITY_OPERATOR',
     callback=validate_eth_address,
 )
 @click.option(
@@ -51,15 +57,33 @@ from src.config.settings import DEFAULT_NETWORK
     ),
 )
 @click.command(help='Initializes config data directory and generates mnemonic.')
+# pylint: disable-next=too-many-arguments
 def init(
     language: str,
     no_verify: bool,
-    vault: ChecksumAddress,
+    vault: ChecksumAddress | None,
+    community_operator: ChecksumAddress | None,
     network: str,
     data_dir: str,
 ) -> None:
+    if vault and community_operator:
+        raise click.ClickException(
+            'Options --vault and --community-operator are mutually exclusive.'
+        )
+
+    if community_operator:
+        address: ChecksumAddress = community_operator
+    elif vault:
+        address = vault
+    else:
+        address = click.prompt(
+            'Enter your vault address',
+            type=str,
+            value_proc=lambda v: validate_eth_address(None, None, v),
+        )
+
     config = OperatorConfig(
-        vault=vault,
+        address=address,
         data_dir=Path(data_dir),
     )
     if config.config_path.is_file():

@@ -14,9 +14,15 @@ from src.config.config import OperatorConfig
 @click.option(
     '--vault',
     help='The address of the vault.',
-    prompt='Enter the vault address',
     type=str,
     envvar='VAULT',
+    callback=validate_eth_address,
+)
+@click.option(
+    '--community-operator',
+    help='The operator address for community vault.',
+    type=str,
+    envvar='COMMUNITY_OPERATOR',
     callback=validate_eth_address,
 )
 @click.option(
@@ -55,14 +61,31 @@ from src.config.config import OperatorConfig
 @click.command(help='Creates the validator keys from the mnemonic.')
 # pylint: disable-next=too-many-arguments
 def create_keys(
-    vault: ChecksumAddress,
+    vault: ChecksumAddress | None,
+    community_operator: ChecksumAddress | None,
     mnemonic: str,
     count: int,
     data_dir: str,
     per_keystore_password: bool,
     concurrency: int | None,
 ) -> None:
-    operator_config = OperatorConfig(vault, Path(data_dir))
+    if vault and community_operator:
+        raise click.ClickException(
+            'Options --vault and --community-operator are mutually exclusive.'
+        )
+
+    if community_operator:
+        address: ChecksumAddress = community_operator
+    elif vault:
+        address = vault
+    else:
+        address = click.prompt(
+            'Enter the vault address',
+            type=str,
+            value_proc=lambda v: validate_eth_address(None, None, v),
+        )
+
+    operator_config = OperatorConfig(address, Path(data_dir))
     operator_config.load(mnemonic)
 
     credentials = CredentialManager.generate_credentials(

@@ -18,11 +18,11 @@ class OperatorConfig:
 
     def __init__(
         self,
-        vault: HexAddress,
+        address: HexAddress,
         data_dir: Path,
     ):
-        self.vault = Web3.to_checksum_address(vault)
-        self.vault_dir = Path(data_dir) / vault.lower()
+        self.address = Web3.to_checksum_address(address)
+        self.vault_dir = Path(data_dir) / address.lower()
         self.config_path = self.vault_dir / 'config.json'
 
     @property
@@ -56,7 +56,7 @@ class OperatorConfig:
             self.first_public_key = config.get('first_public_key')
         else:
             raise click.ClickException(
-                f'Config for vault {self.vault} does not exist. Please run "init" command.'
+                f'Config for !!! {self.address} does not exist. Please run "init" command.'
             )
         self._validate(mnemonic)
 
