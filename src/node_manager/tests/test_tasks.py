@@ -247,6 +247,120 @@ class TestProcessRegistration:
         mock_register.assert_not_awaited()
 
 
+@pytest.mark.usefixtures('fake_settings')
+class TestProcessFunding:
+    """Tests for _process_funding: end-to-end, multi-batch, and partial failure."""
+
+    @patch(f'{MODULE}.fund_validators', new_callable=AsyncMock, return_value='0xtxhash')
+    @patch(f'{MODULE}.poll_funding_approval', new_callable=AsyncMock, return_value=['0xsig'])
+    @patch(f'{MODULE}.get_funding_amounts')
+    @patch(f'{MODULE}.fetch_compounding_validators_balances', new_callable=AsyncMock)
+    async def test_single_batch_success(
+        self,
+        mock_balances: AsyncMock,
+        mock_funding_amounts: MagicMock,
+        mock_poll: AsyncMock,
+        mock_fund: AsyncMock,
+    ) -> None:
+        """Happy path: balances found, funding computed, single batch succeeds."""
+        public_key = faker.validator_public_key()
+        mock_balances.return_value = {public_key: ether_to_gwei(32)}
+        mock_funding_amounts.return_value = {public_key: ether_to_gwei(10)}
+
+        task = _make_task()
+        remaining = await task._process_funding(
+            amount=ether_to_gwei(64),
+            operator_address=OPERATOR_ADDR,
+            protocol_config=_make_protocol_config(),
+        )
+
+        assert remaining == ether_to_gwei(64) - ether_to_gwei(10)
+        mock_poll.assert_awaited_once()
+        mock_fund.assert_awaited_once()
+
+    @patch(f'{MODULE}.fund_validators', new_callable=AsyncMock, return_value='0xtxhash')
+    @patch(f'{MODULE}.poll_funding_approval', new_callable=AsyncMock, return_value=['0xsig'])
+    @patch(f'{MODULE}.get_funding_amounts')
+    @patch(f'{MODULE}.fetch_compounding_validators_balances', new_callable=AsyncMock)
+    async def test_multi_batch(
+        self,
+        mock_balances: AsyncMock,
+        mock_funding_amounts: MagicMock,
+        mock_poll: AsyncMock,
+        mock_fund: AsyncMock,
+    ) -> None:
+        """Three validators with batch_limit=2 produces two batches."""
+        keys = [faker.validator_public_key() for _ in range(3)]
+        mock_balances.return_value = {k: ether_to_gwei(32) for k in keys}
+        mock_funding_amounts.return_value = {k: ether_to_gwei(10) for k in keys}
+
+        config = _make_protocol_config()
+        config.validators_approval_batch_limit = 2
+
+        task = _make_task()
+        remaining = await task._process_funding(
+            amount=ether_to_gwei(64),
+            operator_address=OPERATOR_ADDR,
+            protocol_config=config,
+        )
+
+        assert remaining == ether_to_gwei(64) - ether_to_gwei(30)
+        assert mock_poll.await_count == 2
+        assert mock_fund.await_count == 2
+
+    @patch(f'{MODULE}.fund_validators', new_callable=AsyncMock)
+    @patch(f'{MODULE}.poll_funding_approval', new_callable=AsyncMock, return_value=['0xsig'])
+    @patch(f'{MODULE}.get_funding_amounts')
+    @patch(f'{MODULE}.fetch_compounding_validators_balances', new_callable=AsyncMock)
+    async def test_partial_failure_stops_funding(
+        self,
+        mock_balances: AsyncMock,
+        mock_funding_amounts: MagicMock,
+        mock_poll: AsyncMock,
+        mock_fund: AsyncMock,
+    ) -> None:
+        """First batch succeeds, second fails — remaining reflects only first batch."""
+        keys = [faker.validator_public_key() for _ in range(3)]
+        mock_balances.return_value = {k: ether_to_gwei(32) for k in keys}
+        mock_funding_amounts.return_value = {k: ether_to_gwei(10) for k in keys}
+        mock_fund.side_effect = ['0xtxhash', None]
+
+        config = _make_protocol_config()
+        config.validators_approval_batch_limit = 2
+
+        task = _make_task()
+        remaining = await task._process_funding(
+            amount=ether_to_gwei(64),
+            operator_address=OPERATOR_ADDR,
+            protocol_config=config,
+        )
+
+        # Only first batch (2 validators × 10 ETH) funded; second batch failed
+        assert remaining == ether_to_gwei(64) - ether_to_gwei(20)
+        assert mock_fund.await_count == 2
+        # poll was called for both batches (approval fetched before tx attempt)
+        assert mock_poll.await_count == 2
+
+    @patch(f'{MODULE}.get_funding_amounts', return_value={})
+    @patch(f'{MODULE}.fetch_compounding_validators_balances', new_callable=AsyncMock)
+    async def test_no_funding_amounts_returns_original(
+        self,
+        mock_balances: AsyncMock,
+        mock_funding_amounts: MagicMock,
+    ) -> None:
+        """When get_funding_amounts returns empty dict, amount is unchanged."""
+        mock_balances.return_value = {faker.validator_public_key(): ether_to_gwei(32)}
+
+        task = _make_task()
+        remaining = await task._process_funding(
+            amount=ether_to_gwei(64),
+            operator_address=OPERATOR_ADDR,
+            protocol_config=_make_protocol_config(),
+        )
+
+        assert remaining == ether_to_gwei(64)
+
+
 def _make_protocol_config() -> MagicMock:
     config = MagicMock(spec=ProtocolConfig)
     config.validators_approval_batch_limit = 10
