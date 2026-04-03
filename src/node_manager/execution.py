@@ -31,12 +31,9 @@ class OperatorValidatorsProcessor(EventProcessor):
             return settings.network_config.NODES_MANAGER_GENESIS_BLOCK
         return BlockNumber(checkpoint + 1)
 
-    # pylint: disable-next=unused-argument
     async def process_events(self, events: list[EventData], to_block: BlockNumber) -> None:
         validators: list[VaultValidator] = []
         for event in events:
-            if event['args']['operator'] != self.operator_address:
-                continue
             public_keys_bytes: bytes = event['args']['publicKeys']
             block_number = BlockNumber(event['blockNumber'])
             for pub_key in _parse_public_keys(public_keys_bytes):
@@ -44,6 +41,7 @@ class OperatorValidatorsProcessor(EventProcessor):
 
         if validators:
             VaultValidatorCrud().save_vault_validators(validators)
+        CheckpointCrud().update_validators_checkpoint(to_block)
 
 
 async def scan_node_manager_validators_events(
@@ -52,9 +50,8 @@ async def scan_node_manager_validators_events(
 ) -> None:
     """Scans NodesManager ValidatorsRegistered events for the given operator."""
     processor = OperatorValidatorsProcessor(operator_address)
-    scanner = EventScanner(processor)
+    scanner = EventScanner(processor, argument_filters={'operator': operator_address})
     await scanner.process_new_events(block_number)
-    CheckpointCrud().update_validators_checkpoint(block_number)
 
 
 def _parse_public_keys(public_keys_bytes: bytes) -> list[HexStr]:
