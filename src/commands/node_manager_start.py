@@ -11,7 +11,6 @@ from web3.types import Gwei
 from src.common.clients import close_clients, setup_clients
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.protocol_config import update_oracles_cache
-from src.common.typings import ValidatorType
 from src.common.utils import log_verbose
 from src.common.validators import (
     validate_eth_address,
@@ -64,19 +63,6 @@ logger = logging.getLogger(__name__)
     help=f'The maximum validator balance in Gwei. '
     f'Default is {NETWORKS[MAINNET].MAX_VALIDATOR_BALANCE_GWEI} Gwei',
     callback=validate_max_validator_balance_gwei,
-)
-@click.option(
-    '--validator-type',
-    help='Type of the validators to register:'
-    f' {ValidatorType.V1.value} or {ValidatorType.V2.value}.',
-    envvar='VALIDATOR_TYPE',
-    default=ValidatorType.V2.value,
-    type=click.Choice(
-        [x.value for x in ValidatorType],
-        case_sensitive=False,
-    ),
-    callback=lambda ctx, param, value: ValidatorType(value),
-    show_default=True,
 )
 @click.option(
     '--max-fee-per-gas-gwei',
@@ -168,7 +154,6 @@ def node_manager_start(
     network: str,
     operator_address: ChecksumAddress,
     max_fee_per_gas_gwei: int | None,
-    validator_type: ValidatorType,
     max_validator_balance_gwei: int | None,
     wallet_file: str | None,
     wallet_password_file: str | None,
@@ -190,7 +175,6 @@ def node_manager_start(
         log_level=log_level,
         log_format=log_format,
         max_fee_per_gas_gwei=max_fee_per_gas_gwei,
-        validator_type=validator_type,
         max_validator_balance_gwei=(
             Gwei(max_validator_balance_gwei) if max_validator_balance_gwei else None
         ),
