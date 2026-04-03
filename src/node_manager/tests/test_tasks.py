@@ -2,6 +2,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from eth_typing import ChecksumAddress
+from sw_utils import EventScanner
 from sw_utils.tests.factories import faker
 from sw_utils.typings import ProtocolConfig
 from web3 import Web3
@@ -21,6 +22,16 @@ OPERATOR_ADDR: ChecksumAddress = faker.eth_address()
 OTHER_ADDR: ChecksumAddress = faker.eth_address()
 
 MODULE = 'src.node_manager.tasks'
+
+
+@pytest.fixture(autouse=True)
+def _mock_scan_events() -> None:
+    """Mock chain head for all tests calling process_block."""
+    chain_head = MagicMock(block_number=100)
+    with patch(
+        f'{MODULE}.get_chain_finalized_head', new_callable=AsyncMock, return_value=chain_head
+    ):
+        yield
 
 
 @pytest.mark.usefixtures('fake_settings')
@@ -249,7 +260,10 @@ def _make_protocol_config() -> MagicMock:
 
 def _make_task() -> NodeManagerTask:
     keystore = MagicMock()
+    validators_scanner = MagicMock(spec=EventScanner)
+    validators_scanner.process_new_events = AsyncMock()
     return NodeManagerTask(
         operator_address=OPERATOR_ADDR,
         keystore=keystore,
+        validators_scanner=validators_scanner,
     )
