@@ -28,15 +28,12 @@ class OperatorValidatorsProcessor(EventProcessor):
     async def get_from_block(self) -> BlockNumber:
         checkpoint = CheckpointCrud().get_validators_checkpoint()
         if not checkpoint:
-            return settings.network_config.KEEPER_GENESIS_BLOCK
+            return settings.network_config.NODES_MANAGER_GENESIS_BLOCK
         return BlockNumber(checkpoint + 1)
 
-    # pylint: disable-next=unused-argument
     async def process_events(self, events: list[EventData], to_block: BlockNumber) -> None:
         validators: list[VaultValidator] = []
         for event in events:
-            if event['args']['operator'] != self.operator_address:
-                continue
             public_keys_bytes: bytes = event['args']['publicKeys']
             block_number = BlockNumber(event['blockNumber'])
             for pub_key in _parse_public_keys(public_keys_bytes):
@@ -44,17 +41,15 @@ class OperatorValidatorsProcessor(EventProcessor):
 
         if validators:
             VaultValidatorCrud().save_vault_validators(validators)
+        CheckpointCrud().update_validators_checkpoint(to_block)
 
 
-async def scan_node_manager_validators_events(
+def create_operator_validators_scanner(
     operator_address: ChecksumAddress,
-    block_number: BlockNumber,
-) -> None:
-    """Scans NodesManager ValidatorsRegistered events for the given operator."""
+) -> EventScanner:
+    """Create a reusable EventScanner for NodesManager ValidatorsRegistered events."""
     processor = OperatorValidatorsProcessor(operator_address)
-    scanner = EventScanner(processor)
-    await scanner.process_new_events(block_number)
-    CheckpointCrud().update_validators_checkpoint(block_number)
+    return EventScanner(processor, argument_filters={'operator': operator_address})
 
 
 def _parse_public_keys(public_keys_bytes: bytes) -> list[HexStr]:
@@ -62,5 +57,5 @@ def _parse_public_keys(public_keys_bytes: bytes) -> list[HexStr]:
     result: list[HexStr] = []
     for i in range(0, len(public_keys_bytes), BLS_PUBLIC_KEY_LENGTH):
         key_bytes = public_keys_bytes[i : i + BLS_PUBLIC_KEY_LENGTH]
-        result.append(HexStr(Web3.to_hex(key_bytes)))
+        result.append(Web3.to_hex(key_bytes))
     return result

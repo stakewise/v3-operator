@@ -7,7 +7,7 @@ from pathlib import Path
 from web3 import AsyncWeb3
 
 from src.config.settings import settings
-from src.nodes.typings import ExecutionSyncRecord
+from src.nodewise.typings import ExecutionSyncRecord
 
 logger = logging.getLogger(__name__)
 

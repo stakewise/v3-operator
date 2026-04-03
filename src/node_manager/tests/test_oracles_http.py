@@ -4,6 +4,7 @@ from eth_typing import HexStr
 from sw_utils.tests.factories import faker, get_mocked_protocol_config
 from sw_utils.typings import Oracle, ProtocolConfig
 from web3 import Web3
+from web3.types import Wei
 
 from src.common.tests.utils import ether_to_gwei
 from src.node_manager.oracles import (
@@ -67,7 +68,7 @@ class TestPollEligibleOperators:
 
         assert len(result) == 1
         assert result[0].address == Web3.to_checksum_address(address)
-        assert result[0].amount == 100
+        assert result[0].amount == Wei(100)
 
     async def test_replica_fallback(self) -> None:
         """If first replica fails, tries the next one."""
@@ -82,7 +83,7 @@ class TestPollEligibleOperators:
 
         assert len(result) == 1
         assert result[0].address == Web3.to_checksum_address(address)
-        assert result[0].amount == 100
+        assert result[0].amount == Wei(100)
 
 
 # --- send_registration_requests tests ---

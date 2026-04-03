@@ -11,7 +11,7 @@ from src.common.logging import setup_logging
 from src.common.validators import validate_eth_address
 from src.config.config import OperatorConfig
 from src.config.settings import LOG_PLAIN, settings
-from src.nodes.status import (
+from src.nodewise.status import (
     get_consensus_node_status,
     get_execution_node_status,
     get_validator_activity_stats,

@@ -1,7 +1,7 @@
 import logging
 
 from eth_typing import ChecksumAddress
-from sw_utils import InterruptHandler
+from sw_utils import EventScanner, InterruptHandler
 from sw_utils.typings import ProtocolConfig
 from web3 import Web3
 from web3.types import Gwei, Wei
@@ -12,7 +12,6 @@ from src.common.protocol_config import get_protocol_config
 from src.common.tasks import BaseTask
 from src.common.typings import ValidatorType
 from src.config.settings import settings
-from src.node_manager.execution import scan_node_manager_validators_events
 from src.node_manager.oracles import (
     poll_eligible_operators,
     poll_funding_approval,
@@ -34,16 +33,15 @@ class NodeManagerTask(BaseTask):
         self,
         operator_address: ChecksumAddress,
         keystore: BaseKeystore,
+        validators_scanner: EventScanner,
     ) -> None:
         self.operator_address = operator_address
         self.keystore = keystore
+        self.validators_scanner = validators_scanner
 
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         chain_head = await get_chain_finalized_head()
-        await scan_node_manager_validators_events(
-            operator_address=self.operator_address,
-            block_number=chain_head.block_number,
-        )
+        await self.validators_scanner.process_new_events(chain_head.block_number)
 
         if not await check_gas_price(high_priority=True):
             logger.debug('Gas price too high, skipping validators registration')
@@ -62,14 +60,6 @@ class NodeManagerTask(BaseTask):
         )
 
         amount_gwei = Gwei(int(Web3.from_wei(eligible_amount, 'gwei')))
-
-        if settings.validator_type == ValidatorType.V1:
-            if not settings.disable_validators_registration:
-                await self._process_registration(
-                    amount=amount_gwei,
-                    protocol_config=protocol_config,
-                )
-            return
 
         # Fund existing compounding validators first
         if not settings.disable_validators_funding:
@@ -100,7 +90,7 @@ class NodeManagerTask(BaseTask):
         protocol_config: ProtocolConfig,
     ) -> None:
         """Register new validators with the eligible amount."""
-        amounts = get_deposits_amounts(amount, settings.validator_type)
+        amounts = get_deposits_amounts(amount, ValidatorType.V2)
         if not amounts:
             logger.info('No remaining amount for new validator registration')
             return
