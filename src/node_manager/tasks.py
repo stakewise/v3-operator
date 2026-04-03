@@ -1,7 +1,7 @@
 import logging
 
 from eth_typing import ChecksumAddress
-from sw_utils import InterruptHandler
+from sw_utils import EventScanner, InterruptHandler
 from sw_utils.typings import ProtocolConfig
 from web3 import Web3
 from web3.types import Gwei, Wei
@@ -12,7 +12,6 @@ from src.common.protocol_config import get_protocol_config
 from src.common.tasks import BaseTask
 from src.common.typings import ValidatorType
 from src.config.settings import settings
-from src.node_manager.execution import scan_node_manager_validators_events
 from src.node_manager.oracles import poll_eligible_operators, poll_registration_approval
 from src.node_manager.register_validators import register_validators
 from src.validators.keystores.base import BaseKeystore
@@ -29,16 +28,15 @@ class NodeManagerTask(BaseTask):
         self,
         operator_address: ChecksumAddress,
         keystore: BaseKeystore,
+        validators_scanner: EventScanner,
     ) -> None:
         self.operator_address = operator_address
         self.keystore = keystore
+        self.validators_scanner = validators_scanner
 
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         chain_head = await get_chain_finalized_head()
-        await scan_node_manager_validators_events(
-            operator_address=self.operator_address,
-            block_number=chain_head.block_number,
-        )
+        await self.validators_scanner.process_new_events(chain_head.block_number)
 
         if not await check_gas_price(high_priority=True):
             logger.debug('Gas price too high, skipping validators registration')

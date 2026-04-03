@@ -44,14 +44,12 @@ class OperatorValidatorsProcessor(EventProcessor):
         CheckpointCrud().update_validators_checkpoint(to_block)
 
 
-async def scan_node_manager_validators_events(
+def create_operator_validators_scanner(
     operator_address: ChecksumAddress,
-    block_number: BlockNumber,
-) -> None:
-    """Scans NodesManager ValidatorsRegistered events for the given operator."""
+) -> EventScanner:
+    """Create a reusable EventScanner for NodesManager ValidatorsRegistered events."""
     processor = OperatorValidatorsProcessor(operator_address)
-    scanner = EventScanner(processor, argument_filters={'operator': operator_address})
-    await scanner.process_new_events(block_number)
+    return EventScanner(processor, argument_filters={'operator': operator_address})
 
 
 def _parse_public_keys(public_keys_bytes: bytes) -> list[HexStr]:
