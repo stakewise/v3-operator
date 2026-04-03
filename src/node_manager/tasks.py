@@ -146,22 +146,24 @@ class StateSyncTask(BaseTask):
         self.operator_address = operator_address
 
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
-        nm_contract = NodesManagerContract()
+        node_manager_contract = NodesManagerContract()
         app_state = AppState()
 
         # 1. Get current state nonce and check if operator already synced
-        state_data = await nm_contract.get_state_data()
+        state_data = await node_manager_contract.get_state_data()
         current_nonce = state_data[3]
 
-        operator_nonce = await nm_contract.get_operator_last_state_nonce(self.operator_address)
+        operator_nonce = await node_manager_contract.get_operator_last_state_nonce(
+            self.operator_address
+        )
         if operator_nonce == current_nonce:
             logger.debug('Operator %s state already synced', self.operator_address)
             return
 
         # 2. Find the StateUpdated event to get IPFS hash
         from_block = app_state.state_sync_block or settings.network_config.KEEPER_GENESIS_BLOCK
-        to_block = await nm_contract.execution_client.eth.get_block_number()
-        event = await nm_contract.get_last_state_updated_event(
+        to_block = await node_manager_contract.execution_client.eth.get_block_number()
+        event = await node_manager_contract.get_last_state_updated_event(
             from_block=BlockNumber(from_block),
             to_block=BlockNumber(to_block),
         )

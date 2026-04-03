@@ -661,6 +661,9 @@ class NodesManagerContract(ContractWrapper):
     abi_path = 'abi/INodesManager.json'
     settings_key = 'NODES_MANAGER_CONTRACT_ADDRESS'
 
+    # OperatorNonceType.LastStateUpdate enum value in the contract
+    LAST_STATE_UPDATE_NONCE_TYPE = 2
+
     async def vault(self) -> ChecksumAddress:
         return await self.contract.functions.vault().call()
 
@@ -676,9 +679,6 @@ class NodesManagerContract(ContractWrapper):
             from_block=from_block,
             to_block=to_block,
         )
-
-    # OperatorNonceType.LastStateUpdate enum value in the contract
-    LAST_STATE_UPDATE_NONCE_TYPE = 2
 
     async def get_state_data(self) -> tuple[bytes, int, int, int]:
         """Returns (root, updateDelay, lastUpdateTimestamp, currentNonce)."""

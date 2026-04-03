@@ -40,7 +40,7 @@ async def submit_state_sync_transaction(
     harvest_params: HarvestParams | None = None,
 ) -> HexStr | None:
     """Submit updateOperatorState, optionally batched with updateVaultState via multicall."""
-    nm_contract = NodesManagerContract()
+    node_manager_contract = NodesManagerContract()
     encoder = NodesManagerEncoder()
 
     if harvest_params is not None:
@@ -48,11 +48,11 @@ async def submit_state_sync_transaction(
             encoder.update_vault_state(harvest_params),
             encoder.update_operator_state(operator_address, params),
         ]
-        tx_function = nm_contract.contract.functions.multicall(
+        tx_function = node_manager_contract.contract.functions.multicall(
             [Web3.to_bytes(hexstr=c) for c in calls]
         )
     else:
-        tx_function = nm_contract.contract.functions.updateOperatorState(
+        tx_function = node_manager_contract.contract.functions.updateOperatorState(
             operator_address,
             (
                 params.total_assets,
