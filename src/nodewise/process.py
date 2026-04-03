@@ -14,10 +14,10 @@ from src.common.startup_check import (
 )
 from src.config.networks import NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
-from src.nodes.exceptions import NodeException, NodeFailedToStartError
-from src.nodes.lighthouse import update_validator_definitions_file
-from src.nodes.typings import StdStreams
-from src.nodes.utils.proc import kill_proc
+from src.nodewise.exceptions import NodeException, NodeFailedToStartError
+from src.nodewise.lighthouse import update_validator_definitions_file
+from src.nodewise.typings import StdStreams
+from src.nodewise.utils.proc import kill_proc
 from src.validators.keystores.local import LocalKeystore
 
 logger = logging.getLogger(__name__)

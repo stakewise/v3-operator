@@ -27,7 +27,7 @@ from src.config.settings import settings
 logger = logging.getLogger(__name__)
 
 
-async def startup_checks(withdrawals_address: ChecksumAddress) -> None:
+async def startup_checks(operator_address: ChecksumAddress) -> None:
     validate_settings()
 
     logger.info('Checking connection to database...')
@@ -79,7 +79,7 @@ async def startup_checks(withdrawals_address: ChecksumAddress) -> None:
     wait_for_keystores_dir()
     logger.info('Found keystores dir')
 
-    await _check_validators_manager(withdrawals_address)
+    await _check_validators_manager(operator_address)
 
     await _check_community_vault()
 
@@ -93,8 +93,8 @@ async def _check_community_vault() -> None:
         )
 
 
-async def _check_validators_manager(withdrawals_address: ChecksumAddress) -> None:
-    validators_manager = await nodes_manager_contract.validators_manager(withdrawals_address)
+async def _check_validators_manager(operator_address: ChecksumAddress) -> None:
+    validators_manager = await nodes_manager_contract.validators_manager(operator_address)
 
     if validators_manager != wallet.account.address:
         raise ClickException(
