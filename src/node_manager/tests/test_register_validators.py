@@ -1,13 +1,14 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from eth_typing import ChecksumAddress
+from eth_typing import ChecksumAddress, HexStr
 from sw_utils.tests.factories import faker
-from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.exceptions import ContractLogicError
+from web3.types import Gwei
 
-from src.node_manager.register_validators import register_validators
+from src.common.tests.utils import ether_to_gwei
+from src.node_manager.register_validators import fund_validators, register_validators
 from src.node_manager.typings import NodeManagerRegistrationOraclesApproval
 
 MODULE = 'src.node_manager.register_validators'
@@ -100,7 +101,7 @@ class TestRegisterValidators:
             Web3.to_bytes(hexstr=s) for s in approval.nodes_manager_signatures
         )
         expected_keeper_params = (
-            Bytes32(Web3.to_bytes(hexstr=root)),
+            Web3.to_bytes(hexstr=root),
             approval.deadline,
             b''.join(Web3.to_bytes(v) for v in mock_encode.return_value),
             b''.join(Web3.to_bytes(hexstr=s) for s in approval.keeper_signatures),
@@ -174,6 +175,79 @@ class TestRegisterValidators:
                 validator_index=5,
             )
         assert result is None
+
+
+@pytest.mark.usefixtures('fake_settings')
+class TestFundValidators:
+    @patch(f'{MODULE}.encode_tx_validator_list', return_value=[b'\x00' * 100])
+    async def test_success(
+        self,
+        mock_encode: MagicMock,
+    ) -> None:
+        mock_exec = MagicMock()
+        mock_exec.eth.wait_for_transaction_receipt = AsyncMock(return_value={'status': 1})
+
+        with (
+            patch(f'{MODULE}.nodes_manager_contract', MagicMock()),
+            patch(
+                f'{MODULE}.transaction_gas_wrapper',
+                new_callable=AsyncMock,
+                return_value=b'\x01' * 32,
+            ),
+            patch(f'{MODULE}.execution_client', mock_exec),
+        ):
+            result = await fund_validators(
+                operator_address=OPERATOR_ADDR,
+                signatures=[faker.account_signature()],
+                validator_fundings=_make_validator_fundings(),
+            )
+        assert result is not None
+
+    @patch(f'{MODULE}.encode_tx_validator_list', return_value=[b'\x00' * 100])
+    async def test_transaction_error_returns_none(
+        self,
+        mock_encode: MagicMock,
+    ) -> None:
+        with patch(
+            f'{MODULE}.transaction_gas_wrapper',
+            new_callable=AsyncMock,
+            side_effect=Exception('tx failed'),
+        ):
+            result = await fund_validators(
+                operator_address=OPERATOR_ADDR,
+                signatures=[faker.account_signature()],
+                validator_fundings=_make_validator_fundings(),
+            )
+        assert result is None
+
+    @patch(f'{MODULE}.encode_tx_validator_list', return_value=[b'\x00' * 100])
+    async def test_failed_tx_receipt_returns_none(
+        self,
+        mock_encode: MagicMock,
+    ) -> None:
+        mock_exec = MagicMock()
+        mock_exec.eth.wait_for_transaction_receipt = AsyncMock(return_value={'status': 0})
+
+        with (
+            patch(
+                f'{MODULE}.transaction_gas_wrapper',
+                new_callable=AsyncMock,
+                return_value=b'\x01' * 32,
+            ),
+            patch(f'{MODULE}.execution_client', mock_exec),
+        ):
+            result = await fund_validators(
+                operator_address=OPERATOR_ADDR,
+                signatures=[faker.account_signature()],
+                validator_fundings=_make_validator_fundings(),
+            )
+        assert result is None
+
+
+def _make_validator_fundings() -> dict[HexStr, Gwei]:
+    return {
+        faker.validator_public_key(): ether_to_gwei(32),
+    }
 
 
 def _make_approval() -> NodeManagerRegistrationOraclesApproval:
