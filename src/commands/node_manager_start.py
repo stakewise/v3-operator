@@ -25,7 +25,7 @@ from src.config.settings import (
     settings,
 )
 from src.node_manager.startup_check import startup_checks
-from src.node_manager.tasks import NodeManagerTask
+from src.node_manager.tasks import NodeManagerTask, StateSyncTask
 from src.validators.database import NetworkValidatorCrud
 from src.validators.keystores.load import load_keystore
 
@@ -213,10 +213,11 @@ async def _start(
             operator_address,
         )
         with InterruptHandler() as interrupt_handler:
-            task = NodeManagerTask(
-                operator_address=operator_address,
-                keystore=keystore,
+            await asyncio.gather(
+                NodeManagerTask(operator_address=operator_address, keystore=keystore).run(
+                    interrupt_handler
+                ),
+                StateSyncTask(operator_address).run(interrupt_handler),
             )
-            await task.run(interrupt_handler)
     finally:
         await close_clients()
