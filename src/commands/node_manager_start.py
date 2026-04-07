@@ -9,6 +9,7 @@ from sw_utils import InterruptHandler
 from web3.types import Gwei
 
 from src.common.clients import close_clients, setup_clients
+from src.common.consensus import get_chain_finalized_head
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.protocol_config import update_oracles_cache
 from src.common.utils import log_verbose
@@ -24,9 +25,14 @@ from src.config.settings import (
     LOG_PLAIN,
     settings,
 )
+from src.node_manager.execution import create_operator_validators_scanner
 from src.node_manager.startup_check import startup_checks
 from src.node_manager.tasks import NodeManagerTask, StateSyncTask
-from src.validators.database import NetworkValidatorCrud
+from src.validators.database import (
+    CheckpointCrud,
+    NetworkValidatorCrud,
+    VaultValidatorCrud,
+)
 from src.validators.keystores.load import load_keystore
 
 logger = logging.getLogger(__name__)
@@ -201,10 +207,18 @@ async def _start(
         await startup_checks(operator_address)
     try:
         NetworkValidatorCrud().setup()
+        VaultValidatorCrud().setup()
+        CheckpointCrud().setup()
 
         keystore = await load_keystore()
+        validators_scanner = create_operator_validators_scanner(operator_address)
 
         # start operator tasks
+        chain_state = await get_chain_finalized_head()
+
+        logger.info('Syncing validator events...')
+        await validators_scanner.process_new_events(chain_state.block_number)
+
         logger.info('Updating oracles cache...')
         await update_oracles_cache()
 
@@ -214,9 +228,11 @@ async def _start(
         )
         with InterruptHandler() as interrupt_handler:
             await asyncio.gather(
-                NodeManagerTask(operator_address=operator_address, keystore=keystore).run(
-                    interrupt_handler
-                ),
+                NodeManagerTask(
+                    operator_address=operator_address,
+                    keystore=keystore,
+                    validators_scanner=validators_scanner,
+                ).run(interrupt_handler),
                 StateSyncTask(operator_address).run(interrupt_handler),
             )
     finally:

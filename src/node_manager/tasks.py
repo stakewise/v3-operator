@@ -1,12 +1,13 @@
 import logging
 
 from eth_typing import ChecksumAddress
-from sw_utils import InterruptHandler
+from sw_utils import EventScanner, InterruptHandler
 from sw_utils.typings import ProtocolConfig
 from web3 import Web3
 from web3.types import BlockNumber, Gwei, Wei
 
 from src.common.app_state import AppState
+from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import NodesManagerContract, keeper_contract
 from src.common.execution import check_gas_price
 from src.common.harvest import get_harvest_params
@@ -18,10 +19,15 @@ from src.node_manager.execution import (
     fetch_operator_state_from_ipfs,
     submit_state_sync_transaction,
 )
-from src.node_manager.oracles import poll_eligible_operators, poll_registration_approval
-from src.node_manager.register_validators import register_validators
+from src.node_manager.oracles import (
+    poll_eligible_operators,
+    poll_funding_approval,
+    poll_registration_approval,
+)
+from src.node_manager.register_validators import fund_validators, register_validators
+from src.validators.consensus import fetch_compounding_validators_balances
 from src.validators.keystores.base import BaseKeystore
-from src.validators.tasks import get_deposits_amounts
+from src.validators.tasks import get_deposits_amounts, get_funding_amounts
 from src.validators.utils import get_validators_for_registration
 
 logger = logging.getLogger(__name__)
@@ -34,11 +40,16 @@ class NodeManagerTask(BaseTask):
         self,
         operator_address: ChecksumAddress,
         keystore: BaseKeystore,
+        validators_scanner: EventScanner,
     ) -> None:
         self.operator_address = operator_address
         self.keystore = keystore
+        self.validators_scanner = validators_scanner
 
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
+        chain_head = await get_chain_finalized_head()
+        await self.validators_scanner.process_new_events(chain_head.block_number)
+
         if not await check_gas_price(high_priority=True):
             logger.debug('Gas price too high, skipping validators registration')
             return
@@ -124,11 +135,45 @@ class NodeManagerTask(BaseTask):
         operator_address: ChecksumAddress,
         protocol_config: ProtocolConfig,
     ) -> Gwei:
-        # linter mock
-        logger.info(
-            'amount: %s; operator: %s; protocol: %s', amount, operator_address, protocol_config
-        )
-        return Gwei(amount)
+        """Fund existing compounding validators. Returns remaining eligible amount."""
+        compounding_balances = await fetch_compounding_validators_balances()
+        if not compounding_balances:
+            return amount
+
+        validator_fundings = get_funding_amounts(compounding_balances, amount)
+        if not validator_fundings:
+            return amount
+
+        funded_total = Gwei(0)
+        batch_limit = protocol_config.validators_approval_batch_limit
+
+        # Process in batches
+        funding_items = list(validator_fundings.items())
+        for i in range(0, len(funding_items), batch_limit):
+            batch = dict(funding_items[i : i + batch_limit])
+
+            signatures = await poll_funding_approval(
+                validator_fundings=batch,
+                operator_address=operator_address,
+                protocol_config=protocol_config,
+            )
+
+            tx_hash = await fund_validators(
+                operator_address=self.operator_address,
+                signatures=signatures,
+                validator_fundings=batch,
+            )
+
+            if tx_hash:
+                batch_total = sum(batch.values())
+                funded_total = Gwei(funded_total + batch_total)
+                pub_keys = ', '.join(batch.keys())
+                logger.info('Funded community vault validators %s: tx=%s', pub_keys, tx_hash)
+            else:
+                logger.warning('Community vault funding batch failed, stopping funding')
+                break
+
+        return Gwei(amount - funded_total)
 
 
 class StateSyncTask(BaseTask):
