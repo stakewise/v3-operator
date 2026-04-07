@@ -11,7 +11,7 @@ from eth_typing import ChecksumAddress, HexStr
 from sw_utils.common import urljoin
 from sw_utils.typings import ProtocolConfig
 from web3 import Web3
-from web3.types import Wei
+from web3.types import Gwei, Wei
 
 from src.common.contracts import validators_registry_contract
 from src.common.exceptions import (
@@ -29,6 +29,8 @@ from src.config.settings import ORACLES_VALIDATORS_TIMEOUT
 from src.node_manager.typings import (
     EligibleOperator,
     NodeManagerApprovalRequest,
+    NodeManagerFundingApproval,
+    NodeManagerFundingRequest,
     NodeManagerRegistrationApproval,
     NodeManagerRegistrationOraclesApproval,
 )
@@ -43,6 +45,7 @@ logger = logging.getLogger(__name__)
 
 ELIGIBLE_OPERATORS_PATH = '/nodes-manager/eligible-operators'
 REGISTER_VALIDATORS_PATH = '/nodes-manager/register-validators'
+FUND_VALIDATORS_PATH = '/nodes-manager/fund-validators'
 
 # Eligible operators polling
 
@@ -234,6 +237,59 @@ async def create_approval_request(
     return request
 
 
+# Funding approval polling
+
+
+async def poll_funding_approval(
+    validator_fundings: dict[HexStr, Gwei],
+    operator_address: ChecksumAddress,
+    protocol_config: ProtocolConfig,
+) -> list[HexStr]:
+    """Poll oracles until funding approval is obtained."""
+    deadline: int | None = None
+    request: NodeManagerFundingRequest | None = None
+
+    approvals_min_interval = 1
+    rate_limiter = RateLimiter(approvals_min_interval)
+
+    while True:
+        await rate_limiter.ensure_interval()
+
+        current_timestamp = get_current_timestamp()
+        if request is None or deadline is None or deadline <= current_timestamp:
+            deadline = current_timestamp + protocol_config.signature_validity_period
+            request = create_funding_request(
+                validator_fundings=validator_fundings,
+                operator_address=operator_address,
+                deadline=deadline,
+            )
+
+        try:
+            raw_approvals = await send_funding_requests(protocol_config, request)
+            return process_funding_approvals(raw_approvals, protocol_config.validators_threshold)
+        except NotEnoughOracleApprovalsError as e:
+            logger.error(
+                'Not enough oracle approvals for community vault funding: %d. Threshold is %d.',
+                e.num_votes,
+                e.threshold,
+            )
+
+
+def create_funding_request(
+    validator_fundings: dict[HexStr, Gwei],
+    operator_address: ChecksumAddress,
+    deadline: int,
+) -> NodeManagerFundingRequest:
+    """Build a NodesManager funding request for validator top-ups."""
+    return NodeManagerFundingRequest(
+        operator_address=operator_address,
+        public_keys=list(validator_fundings.keys()),
+        amounts=[int(amount) for amount in validator_fundings.values()],
+        deadline=deadline,
+        validators_manager_signature=_sign_deadline(deadline),
+    )
+
+
 # Generic oracle request helpers
 
 
@@ -247,6 +303,26 @@ async def send_registration_requests(
         dataclasses.asdict(request),
         REGISTER_VALIDATORS_PATH,
         _parse_registration_response,
+    )
+
+
+async def send_funding_requests(
+    protocol_config: ProtocolConfig,
+    request: NodeManagerFundingRequest,
+) -> dict[ChecksumAddress, NodeManagerFundingApproval]:
+    """Request funding approval from all oracles in parallel."""
+    return await _send_oracle_requests(
+        protocol_config,
+        dataclasses.asdict(request),
+        FUND_VALIDATORS_PATH,
+        _parse_funding_response,
+    )
+
+
+def _parse_funding_response(data: dict) -> NodeManagerFundingApproval:
+    """Parse oracle response for funding (single Node Manager signature)."""
+    return NodeManagerFundingApproval(
+        nodes_manager_signature=HexStr(data['nodes_manager_signature']),
     )
 
 
@@ -294,6 +370,28 @@ def process_registration_approvals(
         ipfs_hash=winner[0],
         deadline=winner[1],
     )
+
+
+def process_funding_approvals(
+    approvals: dict[ChecksumAddress, NodeManagerFundingApproval],
+    votes_threshold: int,
+) -> list[HexStr]:
+    """Combine funding approvals into sorted Node Manager signature list."""
+    if not approvals:
+        raise InvalidOraclesRequestError()
+
+    if len(approvals) < votes_threshold:
+        raise NotEnoughOracleApprovalsError(num_votes=len(approvals), threshold=votes_threshold)
+
+    sorted_oracles = sorted(approvals.items(), key=lambda x: Web3.to_int(hexstr=x[0]))[
+        :votes_threshold
+    ]
+
+    signatures: list[HexStr] = []
+    for _, approval in sorted_oracles:
+        signatures.append(approval.nodes_manager_signature)
+
+    return signatures
 
 
 async def _send_oracle_requests(

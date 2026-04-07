@@ -12,10 +12,15 @@ from src.common.protocol_config import get_protocol_config
 from src.common.tasks import BaseTask
 from src.common.typings import ValidatorType
 from src.config.settings import settings
-from src.node_manager.oracles import poll_eligible_operators, poll_registration_approval
-from src.node_manager.register_validators import register_validators
+from src.node_manager.oracles import (
+    poll_eligible_operators,
+    poll_funding_approval,
+    poll_registration_approval,
+)
+from src.node_manager.register_validators import fund_validators, register_validators
+from src.validators.consensus import fetch_compounding_validators_balances
 from src.validators.keystores.base import BaseKeystore
-from src.validators.tasks import get_deposits_amounts
+from src.validators.tasks import get_deposits_amounts, get_funding_amounts
 from src.validators.utils import get_validators_for_registration
 
 logger = logging.getLogger(__name__)
@@ -123,8 +128,42 @@ class NodeManagerTask(BaseTask):
         operator_address: ChecksumAddress,
         protocol_config: ProtocolConfig,
     ) -> Gwei:
-        # linter mock
-        logger.info(
-            'amount: %s; operator: %s; protocol: %s', amount, operator_address, protocol_config
-        )
-        return Gwei(amount)
+        """Fund existing compounding validators. Returns remaining eligible amount."""
+        compounding_balances = await fetch_compounding_validators_balances()
+        if not compounding_balances:
+            return amount
+
+        validator_fundings = get_funding_amounts(compounding_balances, amount)
+        if not validator_fundings:
+            return amount
+
+        funded_total = Gwei(0)
+        batch_limit = protocol_config.validators_approval_batch_limit
+
+        # Process in batches
+        funding_items = list(validator_fundings.items())
+        for i in range(0, len(funding_items), batch_limit):
+            batch = dict(funding_items[i : i + batch_limit])
+
+            signatures = await poll_funding_approval(
+                validator_fundings=batch,
+                operator_address=operator_address,
+                protocol_config=protocol_config,
+            )
+
+            tx_hash = await fund_validators(
+                operator_address=self.operator_address,
+                signatures=signatures,
+                validator_fundings=batch,
+            )
+
+            if tx_hash:
+                batch_total = sum(batch.values())
+                funded_total = Gwei(funded_total + batch_total)
+                pub_keys = ', '.join(batch.keys())
+                logger.info('Funded community vault validators %s: tx=%s', pub_keys, tx_hash)
+            else:
+                logger.warning('Community vault funding batch failed, stopping funding')
+                break
+
+        return Gwei(amount - funded_total)

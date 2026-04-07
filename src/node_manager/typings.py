@@ -30,6 +30,24 @@ class NodeManagerApprovalRequest:
 
 
 @dataclass
+class NodeManagerFundingRequest:
+    """Funding request for NodesManager validator top-up."""
+
+    operator_address: ChecksumAddress
+    public_keys: list[HexStr]
+    amounts: list[int]
+    deadline: int
+    validators_manager_signature: HexStr
+
+
+@dataclass
+class NodeManagerFundingApproval:
+    """Single oracle's funding response (Node Manager signature only)."""
+
+    nodes_manager_signature: HexStr
+
+
+@dataclass
 class NodeManagerRegistrationApproval:
     """Single oracle's registration response with both signature types."""
 
