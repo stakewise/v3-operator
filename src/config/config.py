@@ -56,7 +56,7 @@ class OperatorConfig:
             self.first_public_key = config.get('first_public_key')
         else:
             raise click.ClickException(
-                f'Config for !!! {self.address} does not exist. Please run "init" command.'
+                f'Config for address {self.address} does not exist. Please run "init" command.'
             )
         self._validate(mnemonic)
 
