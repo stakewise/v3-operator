@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import patch
 
 from click.testing import CliRunner
@@ -71,3 +72,46 @@ class TestCreateMnemonic:
         result = runner.invoke(init, args)
         assert result.exit_code == 2
         assert "Invalid value for '--language': 'bad' is not one of" in result.output.strip()
+
+    def test_community_operator(self, mnemonic_mock, data_dir: Path, runner: CliRunner):
+        operator_address = faker.eth_address()
+        network = 'hoodi'
+        args = [
+            '--data-dir',
+            str(data_dir),
+            '--language',
+            'english',
+            '--community-operator',
+            operator_address,
+            '--no-verify',
+            '--network',
+            network,
+        ]
+        result = runner.invoke(init, args)
+        assert result.exit_code == 0
+
+        expected_dir = data_dir / operator_address.lower()
+        assert expected_dir.is_dir()
+        assert (expected_dir / 'config.json').is_file()
+
+    def test_vault_and_community_operator_mutually_exclusive(
+        self, mnemonic_mock, data_dir, runner: CliRunner
+    ):
+        vault = faker.eth_address()
+        operator_address = faker.eth_address()
+        args = [
+            '--data-dir',
+            str(data_dir),
+            '--language',
+            'english',
+            '--vault',
+            vault,
+            '--community-operator',
+            operator_address,
+            '--no-verify',
+            '--network',
+            'hoodi',
+        ]
+        result = runner.invoke(init, args)
+        assert result.exit_code == 1
+        assert 'mutually exclusive' in result.output

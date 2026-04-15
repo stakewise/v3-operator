@@ -17,7 +17,8 @@ from src.common.validators import (
     validate_eth_address,
     validate_max_validator_balance_gwei,
 )
-from src.config.networks import AVAILABLE_NETWORKS, MAINNET, NETWORKS
+from src.config.config import OperatorConfig
+from src.config.networks import MAINNET, NETWORKS
 from src.config.settings import (
     DEFAULT_CONSENSUS_ENDPOINT,
     DEFAULT_EXECUTION_ENDPOINT,
@@ -78,21 +79,11 @@ logger = logging.getLogger(__name__)
     f'Default is {NETWORKS[MAINNET].MAX_FEE_PER_GAS_GWEI} Gwei',
 )
 @click.option(
-    '--operator-address',
+    '--community-operator',
     callback=validate_eth_address,
-    envvar='OPERATOR_ADDRESS',
+    envvar='COMMUNITY_OPERATOR',
     prompt='Enter your operator withdrawals (cold wallet) address',
     help='The operator withdrawals (cold wallet) address.',
-)
-@click.option(
-    '--network',
-    help='The network to run on.',
-    type=click.Choice(
-        AVAILABLE_NETWORKS,
-        case_sensitive=False,
-    ),
-    envvar='NETWORK',
-    prompt='Enter the network',
 )
 @click.option(
     '--data-dir',
@@ -157,8 +148,7 @@ def node_manager_start(
     data_dir: str,
     log_level: str,
     log_format: str,
-    network: str,
-    operator_address: ChecksumAddress,
+    community_operator: ChecksumAddress,
     max_fee_per_gas_gwei: int | None,
     max_validator_balance_gwei: int | None,
     wallet_file: str | None,
@@ -166,14 +156,16 @@ def node_manager_start(
     keystores_dir: str | None,
     keystores_password_file: str | None,
 ) -> None:
-    network_config = NETWORKS[network]
+    operator_config = OperatorConfig(community_operator, Path(data_dir))
+    operator_config.load()
+
+    network_config = NETWORKS[operator_config.network]
     vault = network_config.COMMUNITY_VAULT_CONTRACT_ADDRESS
-    vault_dir = Path(data_dir) / vault.lower()
 
     settings.set(
         vault=vault,
-        vault_dir=vault_dir,
-        network=network,
+        vault_dir=operator_config.vault_dir,
+        network=operator_config.network,
         consensus_endpoints=consensus_endpoints,
         execution_endpoints=execution_endpoints,
         execution_jwt_secret=execution_jwt_secret,
@@ -191,7 +183,7 @@ def node_manager_start(
     )
 
     try:
-        asyncio.run(_start(operator_address))
+        asyncio.run(_start(community_operator))
     except Exception as e:
         log_verbose(e)
         sys.exit(1)

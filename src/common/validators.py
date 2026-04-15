@@ -23,7 +23,7 @@ def validate_mnemonic(ctx: click.Context, param: click.Parameter, value: str) ->
 
 
 def validate_eth_address(
-    ctx: click.Context, param: click.Parameter, value: str | None
+    ctx: click.Context | None, param: click.Parameter | None, value: str | None
 ) -> ChecksumAddress | None:
     if not value:
         return None
