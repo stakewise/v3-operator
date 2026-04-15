@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from eth_typing import ChecksumAddress, HexStr
+from hexbytes import HexBytes
 from web3.types import Wei
 
 
@@ -65,3 +66,13 @@ class NodeManagerRegistrationOraclesApproval:
     keeper_signatures: list[HexStr]
     ipfs_hash: str
     deadline: int
+
+
+@dataclass
+class OperatorStateUpdateParams:
+    """Parameters for updateOperatorState contract call."""
+
+    total_assets: int
+    cum_penalty_assets: int
+    cum_earned_fee_shares: int
+    proof: list[HexBytes]

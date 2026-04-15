@@ -27,7 +27,7 @@ from src.config.settings import (
 )
 from src.node_manager.execution import create_operator_validators_scanner
 from src.node_manager.startup_check import startup_checks
-from src.node_manager.tasks import NodeManagerTask
+from src.node_manager.tasks import NodeManagerTask, StateSyncTask
 from src.validators.database import (
     CheckpointCrud,
     NetworkValidatorCrud,
@@ -227,11 +227,13 @@ async def _start(
             operator_address,
         )
         with InterruptHandler() as interrupt_handler:
-            task = NodeManagerTask(
-                operator_address=operator_address,
-                keystore=keystore,
-                validators_scanner=validators_scanner,
+            await asyncio.gather(
+                NodeManagerTask(
+                    operator_address=operator_address,
+                    keystore=keystore,
+                    validators_scanner=validators_scanner,
+                ).run(interrupt_handler),
+                StateSyncTask(operator_address).run(interrupt_handler),
             )
-            await task.run(interrupt_handler)
     finally:
         await close_clients()
