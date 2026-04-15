@@ -28,7 +28,7 @@ class TestAggregateRedemptionAssetsByVaults:
 
         with self.patch(redeemable_positions=redeemable_positions):
             redemption_assets_by_vaults = await aggregate_redemption_assets_by_vaults(
-                total_redemption_assets
+                total_redemption_assets, tree_nonce=0
             )
             assert redemption_assets_by_vaults == {}
 
@@ -66,7 +66,7 @@ class TestAggregateRedemptionAssetsByVaults:
             processed_shares_batch=processed_shares_batch,
         ):
             redemption_assets_by_vaults = await aggregate_redemption_assets_by_vaults(
-                total_redemption_assets
+                total_redemption_assets, tree_nonce=0
             )
             assert len(redemption_assets_by_vaults) <= 1  # length can be 0 if no assets to redeem
             assert redemption_assets_by_vaults[vault_1] == expected_redeemed_assets
@@ -132,7 +132,7 @@ class TestAggregateRedemptionAssetsByVaults:
             processed_shares_batch=processed_shares_batch,
         ):
             redemption_assets_by_vaults = await aggregate_redemption_assets_by_vaults(
-                total_redemption_assets
+                total_redemption_assets, tree_nonce=0
             )
             # length can be less than 2 if no assets to redeem
             assert len(redemption_assets_by_vaults) <= 2
@@ -200,7 +200,7 @@ class TestAggregateRedemptionAssetsByVaults:
             processed_shares_batches=processed_shares_batches,
         ):
             redemption_assets_by_vaults = await aggregate_redemption_assets_by_vaults(
-                total_redemption_assets
+                total_redemption_assets, tree_nonce=0
             )
             assert len(redemption_assets_by_vaults) == 2
             assert redemption_assets_by_vaults[vault_1] == redemption_shares_vault_1 * Decimal(
