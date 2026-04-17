@@ -68,5 +68,6 @@ jobs:
           vuln-type: "os,library"
           severity: "CRITICAL,HIGH"
           ignore-unfixed: true
+          skip-setup-trivy: true
         env:
           TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db
