@@ -527,7 +527,7 @@ class TestStateSyncProcessBlock:
     @patch(f'{MODULE}.check_gas_price', new_callable=AsyncMock, return_value=True)
     @patch(f'{MODULE}.fetch_operator_state_from_ipfs', new_callable=AsyncMock)
     @patch(f'{MODULE}.NodesManagerContract')
-    async def test_updates_state_sync_block_checkpoint(
+    async def test_updates_operator_state_sync_block_checkpoint(
         self,
         mock_nm_cls: MagicMock,
         mock_fetch: AsyncMock,
@@ -535,7 +535,7 @@ class TestStateSyncProcessBlock:
         mock_keeper: MagicMock,
         mock_submit: AsyncMock,
     ) -> None:
-        """AppState.state_sync_block is updated to the event's block number."""
+        """AppState.operator_state_sync_block is updated to the event's block number."""
         _setup_nm_contract(mock_nm_cls, event_block_number=42)
         mock_fetch.return_value = _make_operator_params()
         mock_keeper.can_harvest = AsyncMock(return_value=False)
@@ -544,7 +544,7 @@ class TestStateSyncProcessBlock:
         await task.process_block(MagicMock())
 
         app_state = AppState()
-        assert app_state.state_sync_block == 42
+        assert app_state.operator_state_sync_block == 42
 
 
 def _setup_nm_contract(

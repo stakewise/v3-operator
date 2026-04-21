@@ -104,9 +104,7 @@ async def submit_state_sync_transaction(
             encoder.update_vault_state(harvest_params),
             encoder.update_operator_state(operator_address, params),
         ]
-        tx_function = node_manager_contract.contract.functions.multicall(
-            [Web3.to_bytes(hexstr=c) for c in calls]
-        )
+        tx_function = node_manager_contract.contract.functions.multicall(calls)
     else:
         tx_function = node_manager_contract.contract.functions.updateOperatorState(
             operator_address,

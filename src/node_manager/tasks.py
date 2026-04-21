@@ -197,7 +197,10 @@ class StateSyncTask(BaseTask):
             return
 
         # 2. Find the StateUpdated event to get IPFS hash
-        from_block = app_state.state_sync_block or settings.network_config.KEEPER_GENESIS_BLOCK
+        from_block = (
+            app_state.operator_state_sync_block
+            or settings.network_config.NODES_MANAGER_GENESIS_BLOCK
+        )
         to_block = await node_manager_contract.execution_client.eth.get_block_number()
         event = await node_manager_contract.get_last_state_updated_event(
             from_block=BlockNumber(from_block),
@@ -208,7 +211,7 @@ class StateSyncTask(BaseTask):
             return
 
         # Update checkpoint
-        app_state.state_sync_block = BlockNumber(event['blockNumber'])
+        app_state.operator_state_sync_block = BlockNumber(event['blockNumber'])
 
         ipfs_hash: str = event['args']['stateIpfsHash']
 

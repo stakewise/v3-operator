@@ -726,9 +726,6 @@ class NodesManagerEncoder(BaseEncoder):
             ],
         )
 
-    def multicall(self, data: list[HexStr]) -> HexStr:
-        return self.contract.encode_abi(fn_name='multicall', args=[data])
-
 
 validators_registry_contract = ValidatorsRegistryContract()
 keeper_contract = KeeperContract()
