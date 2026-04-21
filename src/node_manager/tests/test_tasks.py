@@ -535,7 +535,7 @@ class TestStateSyncProcessBlock:
         mock_keeper: MagicMock,
         mock_submit: AsyncMock,
     ) -> None:
-        """AppState.operator_state_sync_block is updated to the event's block number."""
+        """AppState.operator_state_sync_block is updated to the chain head block number."""
         _setup_nm_contract(mock_nm_cls, event_block_number=42)
         mock_fetch.return_value = _make_operator_params()
         mock_keeper.can_harvest = AsyncMock(return_value=False)
@@ -544,7 +544,7 @@ class TestStateSyncProcessBlock:
         await task.process_block(MagicMock())
 
         app_state = AppState()
-        assert app_state.operator_state_sync_block == 42
+        assert app_state.operator_state_sync_block == 100
 
 
 def _setup_nm_contract(
