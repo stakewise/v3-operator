@@ -184,7 +184,8 @@ class StateSyncTask(BaseTask):
 
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         node_manager_contract = NodesManagerContract()
-        app_state = AppState()
+        chain_head = await get_chain_finalized_head()
+        block_number = chain_head.block_number
 
         # 1. Get current state nonce and check if operator already synced
         current_nonce = await node_manager_contract.get_state_nonce()
@@ -196,22 +197,16 @@ class StateSyncTask(BaseTask):
             logger.debug('Operator %s state already synced', self.operator_address)
             return
 
+        app_state = AppState()
         # 2. Find the StateUpdated event to get IPFS hash
-        from_block = (
-            app_state.operator_state_sync_block
-            or settings.network_config.NODES_MANAGER_GENESIS_BLOCK
-        )
-        to_block = await node_manager_contract.execution_client.eth.get_block_number()
         event = await node_manager_contract.get_last_state_updated_event(
-            from_block=BlockNumber(from_block),
-            to_block=BlockNumber(to_block),
+            from_block=self._get_from_block(app_state),
+            to_block=block_number,
         )
         if not event:
-            logger.debug('No StateUpdated event found')
+            # Update checkpoint
+            app_state.operator_state_sync_block = block_number
             return
-
-        # Update checkpoint
-        app_state.operator_state_sync_block = BlockNumber(event['blockNumber'])
 
         ipfs_hash: str = event['args']['stateIpfsHash']
 
@@ -242,3 +237,10 @@ class StateSyncTask(BaseTask):
         )
         if tx_hash:
             logger.info('State sync successful: %s', tx_hash)
+            # Update checkpoint
+            app_state.operator_state_sync_block = block_number
+
+    def _get_from_block(self, app_state: AppState) -> BlockNumber:
+        if app_state.operator_state_sync_block:
+            return BlockNumber(app_state.operator_state_sync_block + 1)
+        return settings.network_config.NODES_MANAGER_GENESIS_BLOCK
