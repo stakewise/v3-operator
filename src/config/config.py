@@ -22,7 +22,7 @@ class OperatorConfig:
         data_dir: Path,
     ):
         self.address = Web3.to_checksum_address(address)
-        self.vault_dir = Path(data_dir) / address.lower()
+        self.vault_dir = Path(data_dir) / self.address.lower()
         self.config_path = self.vault_dir / 'config.json'
 
     @property

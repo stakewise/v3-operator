@@ -163,7 +163,7 @@ def node_manager_start(
     vault = network_config.COMMUNITY_VAULT_CONTRACT_ADDRESS
     if vault == ZERO_CHECKSUM_ADDRESS:
         raise click.ClickException(
-            f'Community vault is not deployed on {operator_config.network} network.'
+            f'Community vault is not deployed on the {operator_config.network} network.'
         )
 
     settings.set(
