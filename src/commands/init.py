@@ -4,7 +4,7 @@ import click
 from eth_typing import ChecksumAddress
 
 from src.common.language import LANGUAGES, create_new_mnemonic
-from src.common.validators import validate_eth_address
+from src.common.validators import resolve_operator_address, validate_eth_address
 from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_NETWORK
@@ -66,21 +66,7 @@ def init(
     network: str,
     data_dir: str,
 ) -> None:
-    if vault and community_operator:
-        raise click.ClickException(
-            'Options --vault and --community-operator are mutually exclusive.'
-        )
-
-    if community_operator:
-        address: ChecksumAddress = community_operator
-    elif vault:
-        address = vault
-    else:
-        address = click.prompt(
-            'Enter your vault address',
-            type=str,
-            value_proc=lambda v: validate_eth_address(None, None, v),
-        )
+    address = resolve_operator_address(vault, community_operator)
 
     config = OperatorConfig(
         address=address,

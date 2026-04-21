@@ -8,7 +8,11 @@ from eth_typing import ChecksumAddress
 
 from src.common.password import get_or_create_password_file
 from src.common.utils import greenify
-from src.common.validators import validate_eth_address, validate_mnemonic
+from src.common.validators import (
+    resolve_operator_address,
+    validate_eth_address,
+    validate_mnemonic,
+)
 from src.config.config import OperatorConfig
 
 
@@ -48,21 +52,7 @@ def create_wallet(
     vault: ChecksumAddress | None,
     community_operator: ChecksumAddress | None,
 ) -> None:
-    if vault and community_operator:
-        raise click.ClickException(
-            'Options --vault and --community-operator are mutually exclusive.'
-        )
-
-    if community_operator:
-        address: ChecksumAddress = community_operator
-    elif vault:
-        address = vault
-    else:
-        address = click.prompt(
-            'Enter the vault address',
-            type=str,
-            value_proc=lambda v: validate_eth_address(None, None, v),
-        )
+    address = resolve_operator_address(vault, community_operator)
 
     operator_config = OperatorConfig(address, Path(data_dir))
     operator_config.load(mnemonic)
@@ -70,11 +60,11 @@ def create_wallet(
     wallet_dir = operator_config.vault_dir / 'wallet'
 
     wallet_dir.mkdir(parents=True, exist_ok=True)
-    address = _generate_encrypted_wallet(mnemonic, wallet_dir)
+    wallet_address = _generate_encrypted_wallet(mnemonic, wallet_dir)
     click.echo(
         f'Done. '
         f'The wallet and password saved to {greenify(wallet_dir)} directory. '
-        f'The wallet address is: {greenify(address)}'
+        f'The wallet address is: {greenify(wallet_address)}'
     )
 
 

@@ -18,7 +18,7 @@ from src.common.validators import (
     validate_max_validator_balance_gwei,
 )
 from src.config.config import OperatorConfig
-from src.config.networks import MAINNET, NETWORKS
+from src.config.networks import MAINNET, NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import (
     DEFAULT_CONSENSUS_ENDPOINT,
     DEFAULT_EXECUTION_ENDPOINT,
@@ -161,6 +161,10 @@ def node_manager_start(
 
     network_config = NETWORKS[operator_config.network]
     vault = network_config.COMMUNITY_VAULT_CONTRACT_ADDRESS
+    if vault == ZERO_CHECKSUM_ADDRESS:
+        raise click.ClickException(
+            f'Community vault is not deployed on {operator_config.network} network.'
+        )
 
     settings.set(
         vault=vault,
