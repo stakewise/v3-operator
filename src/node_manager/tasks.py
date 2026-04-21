@@ -187,8 +187,7 @@ class StateSyncTask(BaseTask):
         app_state = AppState()
 
         # 1. Get current state nonce and check if operator already synced
-        state_data = await node_manager_contract.get_state_data()
-        current_nonce = state_data[3]
+        current_nonce = await node_manager_contract.get_state_nonce()
 
         operator_nonce = await node_manager_contract.get_operator_last_state_nonce(
             self.operator_address

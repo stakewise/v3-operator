@@ -680,9 +680,10 @@ class NodesManagerContract(ContractWrapper):
             to_block=to_block,
         )
 
-    async def get_state_data(self) -> tuple[bytes, int, int, int]:
-        """Returns (root, updateDelay, lastUpdateTimestamp, currentNonce)."""
-        return await self.contract.functions.stateData().call()
+    async def get_state_nonce(self) -> int:
+        state_data = await self.contract.functions.stateData().call()
+        # stateData returns (root, updateDelay, lastUpdateTimestamp, currentNonce)
+        return state_data[3]
 
     async def get_operator_last_state_nonce(self, operator: ChecksumAddress) -> int:
         """Get operator's LastStateUpdate nonce."""

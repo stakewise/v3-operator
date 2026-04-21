@@ -376,13 +376,13 @@ class TestStateSyncProcessBlock:
     ) -> None:
         """Returns early when operator nonce matches current nonce."""
         nm_instance = mock_nm_cls.return_value
-        nm_instance.get_state_data = AsyncMock(return_value=(b'', 0, 0, 5))
+        nm_instance.get_state_nonce = AsyncMock(return_value=5)
         nm_instance.get_operator_last_state_nonce = AsyncMock(return_value=5)
 
         task = StateSyncTask(operator_address=OPERATOR_ADDR)
         await task.process_block(MagicMock())
 
-        nm_instance.get_state_data.assert_awaited_once()
+        nm_instance.get_state_nonce.assert_awaited_once()
         nm_instance.get_operator_last_state_nonce.assert_awaited_once_with(OPERATOR_ADDR)
         nm_instance.get_last_state_updated_event.assert_not_called()
 
@@ -393,7 +393,7 @@ class TestStateSyncProcessBlock:
     ) -> None:
         """Returns early when no StateUpdated event is found."""
         nm_instance = mock_nm_cls.return_value
-        nm_instance.get_state_data = AsyncMock(return_value=(b'', 0, 0, 5))
+        nm_instance.get_state_nonce = AsyncMock(return_value=5)
         nm_instance.get_operator_last_state_nonce = AsyncMock(return_value=3)
         nm_instance.execution_client = MagicMock()
         nm_instance.execution_client.eth.get_block_number = AsyncMock(return_value=100)
@@ -555,7 +555,7 @@ def _setup_nm_contract(
 ) -> MagicMock:
     """Configure a mock NodesManagerContract with common defaults."""
     nm_instance = mock_nm_cls.return_value
-    nm_instance.get_state_data = AsyncMock(return_value=(b'', 0, 0, current_nonce))
+    nm_instance.get_state_nonce = AsyncMock(return_value=current_nonce)
     nm_instance.get_operator_last_state_nonce = AsyncMock(return_value=operator_nonce)
     nm_instance.execution_client = MagicMock()
     nm_instance.execution_client.eth.get_block_number = AsyncMock(return_value=200)
