@@ -1,7 +1,9 @@
+from typing import cast
+
 from hexbytes import HexBytes
 from sw_utils.networks import GNO_NETWORKS
 from web3 import Web3
-from web3.types import BlockNumber, Wei
+from web3.types import BlockNumber, ChecksumAddress, Wei
 
 from src.common.clients import ipfs_fetch_client
 from src.common.contracts import VaultContract, keeper_contract
@@ -9,30 +11,57 @@ from src.common.typings import HarvestParams
 from src.config.settings import settings
 
 
-async def get_harvest_params(block_number: BlockNumber | None = None) -> HarvestParams | None:
-    if not await keeper_contract.can_harvest(settings.vault, block_number):
-        return None
+async def get_harvest_params(
+    vault: ChecksumAddress, block_number: BlockNumber | None = None
+) -> HarvestParams | None:
+    """Get harvest params for a single vault."""
+    result = await get_multiple_harvest_params([vault], block_number)
+    return result[vault]
+
+
+async def get_multiple_harvest_params(
+    vaults: list[ChecksumAddress], block_number: BlockNumber | None = None
+) -> dict[ChecksumAddress, HarvestParams | None]:
+    """Get harvest params for multiple vaults.
+
+    Checks can_harvest for all vaults first, then fetches IPFS data only
+    if at least one vault is harvestable.
+    """
+    if not vaults:
+        return {}
 
     last_rewards = await keeper_contract.get_last_rewards_update(block_number)
     if last_rewards is None:
-        return None
+        return {vault: None for vault in vaults}
 
-    vault_contract = VaultContract(settings.vault)
-    harvest_params = await _fetch_harvest_params_from_ipfs(
-        vault_contract=vault_contract,
-        ipfs_hash=last_rewards.ipfs_hash,
-        rewards_root=last_rewards.rewards_root,
-    )
-    return harvest_params
+    harvestable_vaults: list[ChecksumAddress] = [
+        vault for vault in vaults if await keeper_contract.can_harvest(vault, block_number)
+    ]
+
+    if not harvestable_vaults:
+        return {vault: None for vault in vaults}
+
+    ipfs_data = cast(dict, await ipfs_fetch_client.fetch_json(last_rewards.ipfs_hash))
+
+    results: dict[ChecksumAddress, HarvestParams | None] = {vault: None for vault in vaults}
+    for vault in harvestable_vaults:
+        vault_contract = VaultContract(vault)
+        results[vault] = await _extract_harvest_params(
+            vault_contract=vault_contract,
+            ipfs_data=ipfs_data,
+            rewards_root=last_rewards.rewards_root,
+        )
+
+    return results
 
 
-async def _fetch_harvest_params_from_ipfs(
-    vault_contract: VaultContract, ipfs_hash: str, rewards_root: bytes
+async def _extract_harvest_params(
+    vault_contract: VaultContract, ipfs_data: dict, rewards_root: bytes
 ) -> HarvestParams | None:
-    ipfs_data = await ipfs_fetch_client.fetch_json(ipfs_hash)
+    """Extract harvest params for a single vault from pre-fetched IPFS data."""
     mev_escrow = await vault_contract.mev_escrow()
 
-    for vault_data in ipfs_data['vaults']:  # type: ignore
+    for vault_data in ipfs_data['vaults']:
         if vault_contract.contract_address != Web3.to_checksum_address(vault_data['vault']):
             continue
 
