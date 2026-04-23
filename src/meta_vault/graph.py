@@ -46,7 +46,9 @@ async def graph_get_vaults(
                 id
                 isMetaVault
                 subVaults {{
-                    subVault
+                  subVault {{
+                    id
+                  }}
                 }}
                 canHarvest
                 proof
