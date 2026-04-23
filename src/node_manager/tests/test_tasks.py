@@ -9,7 +9,6 @@ from sw_utils.typings import ProtocolConfig
 from web3 import Web3
 from web3.types import Gwei
 
-from src.common.app_state import AppState
 from src.common.tests.utils import ether_to_gwei
 from src.common.typings import HarvestParams
 from src.config.settings import settings
@@ -521,30 +520,6 @@ class TestStateSyncProcessBlock:
         await task.process_block(MagicMock())
 
         mock_submit.assert_not_awaited()
-
-    @patch(f'{MODULE}.submit_state_sync_transaction', new_callable=AsyncMock, return_value='0xabc')
-    @patch(f'{MODULE}.keeper_contract')
-    @patch(f'{MODULE}.check_gas_price', new_callable=AsyncMock, return_value=True)
-    @patch(f'{MODULE}.fetch_operator_state_from_ipfs', new_callable=AsyncMock)
-    @patch(f'{MODULE}.NodesManagerContract')
-    async def test_updates_operator_state_sync_block_checkpoint(
-        self,
-        mock_nm_cls: MagicMock,
-        mock_fetch: AsyncMock,
-        mock_gas: AsyncMock,
-        mock_keeper: MagicMock,
-        mock_submit: AsyncMock,
-    ) -> None:
-        """AppState.operator_state_sync_block is updated to the chain head block number."""
-        _setup_nm_contract(mock_nm_cls, event_block_number=42)
-        mock_fetch.return_value = _make_operator_params()
-        mock_keeper.can_harvest = AsyncMock(return_value=False)
-
-        task = StateSyncTask(operator_address=OPERATOR_ADDR)
-        await task.process_block(MagicMock())
-
-        app_state = AppState()
-        assert app_state.operator_state_sync_block == 100
 
 
 def _setup_nm_contract(

@@ -4,9 +4,8 @@ from eth_typing import ChecksumAddress
 from sw_utils import EventScanner, InterruptHandler
 from sw_utils.typings import ProtocolConfig
 from web3 import Web3
-from web3.types import BlockNumber, Gwei, Wei
+from web3.types import Gwei, Wei
 
-from src.common.app_state import AppState
 from src.common.consensus import get_chain_finalized_head
 from src.common.contracts import NodesManagerContract, keeper_contract
 from src.common.execution import check_gas_price
@@ -197,15 +196,12 @@ class StateSyncTask(BaseTask):
             logger.debug('Operator %s state already synced', self.operator_address)
             return
 
-        app_state = AppState()
         # 2. Find the StateUpdated event to get IPFS hash
         event = await node_manager_contract.get_last_state_updated_event(
-            from_block=self._get_from_block(app_state),
+            from_block=settings.network_config.NODES_MANAGER_GENESIS_BLOCK,
             to_block=block_number,
         )
         if not event:
-            # Update checkpoint
-            app_state.operator_state_sync_block = block_number
             return
 
         ipfs_hash: str = event['args']['stateIpfsHash']
@@ -224,7 +220,7 @@ class StateSyncTask(BaseTask):
         # 5. Check if vault needs harvesting, get harvest params if so
         harvest_params = None
         if await keeper_contract.can_harvest(settings.vault):
-            harvest_params = await get_harvest_params()
+            harvest_params = await get_harvest_params(settings.vault)
             if harvest_params is None:
                 logger.warning('Vault requires harvesting but failed to fetch harvest params')
                 return
@@ -237,10 +233,3 @@ class StateSyncTask(BaseTask):
         )
         if tx_hash:
             logger.info('State sync successful: %s', tx_hash)
-            # Update checkpoint
-            app_state.operator_state_sync_block = block_number
-
-    def _get_from_block(self, app_state: AppState) -> BlockNumber:
-        if app_state.operator_state_sync_block:
-            return BlockNumber(app_state.operator_state_sync_block + 1)
-        return settings.network_config.NODES_MANAGER_GENESIS_BLOCK

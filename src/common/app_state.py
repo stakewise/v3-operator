@@ -24,6 +24,5 @@ class AppState(metaclass=Singleton):
         self.partial_withdrawal_block: BlockNumber | None = None
         self.reward_splitter_block: BlockNumber | None = None
         self.network_validators_block: BlockNumber | None = None
-        self.operator_state_sync_block: BlockNumber | None = None
         self.exit_signature_update_cache = ExitSignatureUpdateCache()
         self.oracles_cache: OraclesCache | None = None
