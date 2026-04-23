@@ -24,15 +24,10 @@ class NetworkConfig(BaseNetworkConfig):
     VAULT_BALANCE_SYMBOL: str
     OS_TOKEN_BALANCE_SYMBOL: str
     DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS: ChecksumAddress
-    VALIDATORS_CHECKER_CONTRACT_ADDRESS: ChecksumAddress
-    OS_TOKEN_REDEEMER_CONTRACT_ADDRESS: ChecksumAddress
     CONSOLIDATION_CONTRACT_ADDRESS: ChecksumAddress
     WITHDRAWAL_CONTRACT_ADDRESS: ChecksumAddress
     OS_TOKEN_CONTRACT_ADDRESS: ChecksumAddress
     OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS: ChecksumAddress
-    COMMUNITY_VAULT_CONTRACT_ADDRESS: ChecksumAddress
-    NODES_MANAGER_CONTRACT_ADDRESS: ChecksumAddress
-    NODES_MANAGER_GENESIS_BLOCK: BlockNumber
     WALLET_MIN_BALANCE: Wei
     STAKEWISE_API_URL: str
     STAKEWISE_GRAPH_ENDPOINT: str
@@ -91,10 +86,6 @@ NETWORKS: dict[str, NetworkConfig] = {
         DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x75AB6DdCe07556639333d3Df1eaa684F5735223e'
         ),
-        VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xA89629B41477560d49dd56ef1a59BD214362aCDC'
-        ),
-        OS_TOKEN_REDEEMER_CONTRACT_ADDRESS=ZERO_CHECKSUM_ADDRESS,
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
         ),
@@ -107,9 +98,6 @@ NETWORKS: dict[str, NetworkConfig] = {
         OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0xf7d4e7273E5015C96728A6b02f31C505eE184603'
         ),
-        COMMUNITY_VAULT_CONTRACT_ADDRESS=ZERO_CHECKSUM_ADDRESS,
-        NODES_MANAGER_CONTRACT_ADDRESS=ZERO_CHECKSUM_ADDRESS,
-        NODES_MANAGER_GENESIS_BLOCK=BlockNumber(0),
         WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
         STAKEWISE_API_URL='https://mainnet-api.stakewise.io/graphql',
         STAKEWISE_GRAPH_ENDPOINT=(
@@ -152,12 +140,6 @@ NETWORKS: dict[str, NetworkConfig] = {
         DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x93a3f880E07B27dacA6Ef2d3C23E77DBd6294487'
         ),
-        VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0x4464460A201f735f111C445282914fC3314c709e'
-        ),
-        OS_TOKEN_REDEEMER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xb99f388b081724aaDB73e6Fc06B5de2F76E08bf2'
-        ),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
         ),
@@ -168,9 +150,6 @@ NETWORKS: dict[str, NetworkConfig] = {
             '0x7345fC8268459413beE9e9dd327f31283C65Ee7e'
         ),
         OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS=ZERO_CHECKSUM_ADDRESS,
-        COMMUNITY_VAULT_CONTRACT_ADDRESS=ZERO_CHECKSUM_ADDRESS,
-        NODES_MANAGER_CONTRACT_ADDRESS=ZERO_CHECKSUM_ADDRESS,
-        NODES_MANAGER_GENESIS_BLOCK=BlockNumber(0),
         WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
         STAKEWISE_API_URL='https://hoodi-api.stakewise.io/graphql',
         STAKEWISE_GRAPH_ENDPOINT='https://graphs.stakewise.io/hoodi/subgraphs/name/stakewise/prod',
@@ -211,10 +190,6 @@ NETWORKS: dict[str, NetworkConfig] = {
         DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x58e16621B5c0786D6667D2d54E28A20940269E16'
         ),
-        VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xA89629B41477560d49dd56ef1a59BD214362aCDC'
-        ),
-        OS_TOKEN_REDEEMER_CONTRACT_ADDRESS=ZERO_CHECKSUM_ADDRESS,
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
         ),
@@ -225,9 +200,6 @@ NETWORKS: dict[str, NetworkConfig] = {
             '0xF490c80aAE5f2616d3e3BDa2483E30C4CB21d1A0'
         ),
         OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS=ZERO_CHECKSUM_ADDRESS,
-        COMMUNITY_VAULT_CONTRACT_ADDRESS=ZERO_CHECKSUM_ADDRESS,
-        NODES_MANAGER_CONTRACT_ADDRESS=ZERO_CHECKSUM_ADDRESS,
-        NODES_MANAGER_GENESIS_BLOCK=BlockNumber(0),
         WALLET_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
         STAKEWISE_API_URL='https://gnosis-api.stakewise.io/graphql',
         STAKEWISE_GRAPH_ENDPOINT=(

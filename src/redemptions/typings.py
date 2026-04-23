@@ -65,6 +65,8 @@ class OsTokenPosition:
     owner: ChecksumAddress
     vault: ChecksumAddress
     leaf_shares: Wei
+    unprocessed_shares: Wei = Wei(0)
+    shares_to_redeem: Wei = Wei(0)
 
     def as_dict(self) -> dict:
         return {
