@@ -112,7 +112,7 @@ async def _fetch_eligible_operators(
     return [
         EligibleOperator(
             address=Web3.to_checksum_address(item['address']),
-            amount=Wei(item['amount']),
+            amount=Wei(int(item['amount'])),
         )
         for item in data
     ]

@@ -8,15 +8,21 @@ from src.common.credentials import Credential, CredentialManager
 from src.common.password import generate_password, get_or_create_password_file
 from src.common.utils import greenify
 from src.common.validators import validate_eth_address, validate_mnemonic
-from src.config.config import OperatorConfig
+from src.config.config import OperatorConfig, resolve_config_address
 
 
 @click.option(
     '--vault',
     help='The address of the vault.',
-    prompt='Enter the vault address',
     type=str,
     envvar='VAULT',
+    callback=validate_eth_address,
+)
+@click.option(
+    '--community-operator',
+    help='The operator address for community vault.',
+    type=str,
+    envvar='COMMUNITY_OPERATOR',
     callback=validate_eth_address,
 )
 @click.option(
@@ -55,14 +61,17 @@ from src.config.config import OperatorConfig
 @click.command(help='Creates the validator keys from the mnemonic.')
 # pylint: disable-next=too-many-arguments
 def create_keys(
-    vault: ChecksumAddress,
+    vault: ChecksumAddress | None,
+    community_operator: ChecksumAddress | None,
     mnemonic: str,
     count: int,
     data_dir: str,
     per_keystore_password: bool,
     concurrency: int | None,
 ) -> None:
-    operator_config = OperatorConfig(vault, Path(data_dir))
+    config_address = resolve_config_address(vault, community_operator)
+
+    operator_config = OperatorConfig(config_address, Path(data_dir))
     operator_config.load(mnemonic)
 
     credentials = CredentialManager.generate_credentials(

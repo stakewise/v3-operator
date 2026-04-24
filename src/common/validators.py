@@ -27,13 +27,7 @@ def validate_eth_address(
 ) -> ChecksumAddress | None:
     if not value:
         return None
-    try:
-        if is_address(value):
-            return to_checksum_address(value)
-    except ValueError:
-        pass
-
-    raise click.BadParameter('Invalid Ethereum address')
+    return to_checksum_address_or_raise(value)
 
 
 def validate_eth_addresses(
@@ -148,3 +142,12 @@ def validate_min_deposit_amount_gwei(ctx: click.Context, param: click.Parameter,
 def _is_public_key(value: str) -> bool:
     public_key_length = 98
     return is_hexstr(value) and len(value) == public_key_length
+
+
+def to_checksum_address_or_raise(value: str) -> ChecksumAddress:
+    try:
+        if is_address(value):
+            return to_checksum_address(value)
+    except ValueError:
+        pass
+    raise click.BadParameter('Invalid Ethereum address')

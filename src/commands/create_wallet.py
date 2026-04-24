@@ -9,7 +9,7 @@ from eth_typing import ChecksumAddress
 from src.common.password import get_or_create_password_file
 from src.common.utils import greenify
 from src.common.validators import validate_eth_address, validate_mnemonic
-from src.config.config import OperatorConfig
+from src.config.config import OperatorConfig, resolve_config_address
 
 
 @click.option(
@@ -30,24 +30,37 @@ from src.config.config import OperatorConfig
 @click.option(
     '--vault',
     help='The address of the vault.',
-    prompt='Enter the vault address',
     type=str,
     envvar='VAULT',
     callback=validate_eth_address,
 )
+@click.option(
+    '--community-operator',
+    help='The operator address for community vault.',
+    type=str,
+    envvar='COMMUNITY_OPERATOR',
+    callback=validate_eth_address,
+)
 @click.command(help='Creates the encrypted wallet from the mnemonic.')
-def create_wallet(mnemonic: str, data_dir: str, vault: ChecksumAddress) -> None:
-    operator_config = OperatorConfig(vault, Path(data_dir))
+def create_wallet(
+    mnemonic: str,
+    data_dir: str,
+    vault: ChecksumAddress | None,
+    community_operator: ChecksumAddress | None,
+) -> None:
+    config_address = resolve_config_address(vault, community_operator)
+
+    operator_config = OperatorConfig(config_address, Path(data_dir))
     operator_config.load(mnemonic)
 
     wallet_dir = operator_config.vault_dir / 'wallet'
 
     wallet_dir.mkdir(parents=True, exist_ok=True)
-    address = _generate_encrypted_wallet(mnemonic, wallet_dir)
+    wallet_address = _generate_encrypted_wallet(mnemonic, wallet_dir)
     click.echo(
         f'Done. '
         f'The wallet and password saved to {greenify(wallet_dir)} directory. '
-        f'The wallet address is: {greenify(address)}'
+        f'The wallet address is: {greenify(wallet_address)}'
     )
 
 

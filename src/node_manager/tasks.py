@@ -62,7 +62,7 @@ class NodeManagerTask(BaseTask):
         logger.info(
             'Operator %s is eligible to register/fund %s ETH worth of validators',
             self.operator_address,
-            eligible_amount,
+            Web3.from_wei(eligible_amount, 'ether'),
         )
 
         amount_gwei = Gwei(int(Web3.from_wei(eligible_amount, 'gwei')))

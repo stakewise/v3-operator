@@ -5,7 +5,7 @@ from eth_typing import ChecksumAddress
 
 from src.common.language import LANGUAGES, create_new_mnemonic
 from src.common.validators import validate_eth_address
-from src.config.config import OperatorConfig
+from src.config.config import OperatorConfig, resolve_config_address
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_NETWORK
 
@@ -33,10 +33,16 @@ from src.config.settings import DEFAULT_NETWORK
 )
 @click.option(
     '--vault',
-    prompt='Enter your vault address',
     help='The vault address.',
     type=str,
     envvar='VAULT',
+    callback=validate_eth_address,
+)
+@click.option(
+    '--community-operator',
+    help='The operator address for community vault.',
+    type=str,
+    envvar='COMMUNITY_OPERATOR',
     callback=validate_eth_address,
 )
 @click.option(
@@ -51,15 +57,19 @@ from src.config.settings import DEFAULT_NETWORK
     ),
 )
 @click.command(help='Initializes config data directory and generates mnemonic.')
+# pylint: disable-next=too-many-arguments
 def init(
     language: str,
     no_verify: bool,
-    vault: ChecksumAddress,
+    vault: ChecksumAddress | None,
+    community_operator: ChecksumAddress | None,
     network: str,
     data_dir: str,
 ) -> None:
+    config_address = resolve_config_address(vault, community_operator)
+
     config = OperatorConfig(
-        vault=vault,
+        address=config_address,
         data_dir=Path(data_dir),
     )
     if config.config_path.is_file():

@@ -4,10 +4,11 @@ import shutil
 from pathlib import Path
 
 import click
-from eth_typing import HexAddress
+from eth_typing import ChecksumAddress, HexAddress
 from web3 import Web3
 
 from src.common.credentials import CredentialManager
+from src.common.validators import to_checksum_address_or_raise
 from src.config.networks import AVAILABLE_NETWORKS
 
 
@@ -18,11 +19,11 @@ class OperatorConfig:
 
     def __init__(
         self,
-        vault: HexAddress,
+        address: HexAddress,
         data_dir: Path,
     ):
-        self.vault = Web3.to_checksum_address(vault)
-        self.vault_dir = Path(data_dir) / vault.lower()
+        self.address = Web3.to_checksum_address(address)
+        self.vault_dir = Path(data_dir) / address.lower()
         self.config_path = self.vault_dir / 'config.json'
 
     @property
@@ -56,7 +57,7 @@ class OperatorConfig:
             self.first_public_key = config.get('first_public_key')
         else:
             raise click.ClickException(
-                f'Config for vault {self.vault} does not exist. Please run "init" command.'
+                f'Config for address {self.address} does not exist. Please run "init" command.'
             )
         self._validate(mnemonic)
 
@@ -130,3 +131,27 @@ class OperatorConfig:
             raise click.ClickException(
                 "Invalid 'first_public_key'. Expected a 98-character hexadecimal string."
             )
+
+
+def resolve_config_address(
+    vault: ChecksumAddress | None,
+    community_operator: ChecksumAddress | None,
+) -> ChecksumAddress:
+    """Resolve the address for vault/community-operator commands.
+
+    Enforces mutual exclusion of --vault and --community-operator
+    and prompts interactively if neither was provided.
+    """
+    if vault and community_operator:
+        raise click.ClickException(
+            'Options --vault and --community-operator are mutually exclusive.'
+        )
+    if community_operator:
+        return community_operator
+    if vault:
+        return vault
+    return click.prompt(
+        'Enter the vault address',
+        type=str,
+        value_proc=to_checksum_address_or_raise,
+    )
