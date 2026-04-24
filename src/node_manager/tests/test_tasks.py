@@ -381,8 +381,10 @@ class TestStateSyncProcessBlock:
         task = StateSyncTask(operator_address=OPERATOR_ADDR)
         await task.process_block(MagicMock())
 
-        nm_instance.get_state_nonce.assert_awaited_once()
-        nm_instance.get_operator_last_state_nonce.assert_awaited_once_with(OPERATOR_ADDR)
+        nm_instance.get_state_nonce.assert_awaited_once_with(100)
+        nm_instance.get_operator_last_state_nonce.assert_awaited_once_with(
+            OPERATOR_ADDR, block_number=100
+        )
         nm_instance.get_last_state_updated_event.assert_not_called()
 
     @patch(f'{MODULE}.NodesManagerContract')
