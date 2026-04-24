@@ -117,7 +117,9 @@ async def submit_state_sync_transaction(
         )
 
     tx_hash = await transaction_gas_wrapper(tx_function)
-    receipt = await execution_client.eth.wait_for_transaction_receipt(tx_hash)
+    receipt = await execution_client.eth.wait_for_transaction_receipt(
+        tx_hash, timeout=settings.execution_transaction_timeout
+    )
 
     if not receipt['status']:
         logger.error('State sync transaction failed: %s', Web3.to_hex(tx_hash))
