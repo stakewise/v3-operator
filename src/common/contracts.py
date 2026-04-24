@@ -29,6 +29,7 @@ from src.config.settings import (
     settings,
 )
 from src.meta_vault.typings import SubVaultExitRequest, SubVaultRedemption
+from src.node_manager.typings import OperatorStateUpdateParams
 from src.redemptions.typings import RedeemablePositions
 from src.validators.typings import V2ValidatorEventData
 from src.withdrawals.typings import WithdrawalEvent
@@ -690,11 +691,72 @@ class NodesManagerContract(ContractWrapper):
     abi_path = 'abi/INodesManager.json'
     settings_key = 'NODES_MANAGER_CONTRACT_ADDRESS'
 
+    # OperatorNonceType.LastStateUpdate enum value in the contract
+    LAST_STATE_UPDATE_NONCE_TYPE = 2
+
     async def vault(self) -> ChecksumAddress:
         return await self.contract.functions.vault().call()
 
     async def validators_manager(self, withdrawals_address: ChecksumAddress) -> ChecksumAddress:
         return await self.contract.functions.validatorsManagers(withdrawals_address).call()
+
+    async def get_last_state_updated_event(
+        self, from_block: BlockNumber, to_block: BlockNumber
+    ) -> EventData | None:
+        """Fetch the latest StateUpdated event."""
+        return await self._get_last_event(
+            cast(type[AsyncContractEvent], self.contract.events.StateUpdated),
+            from_block=from_block,
+            to_block=to_block,
+        )
+
+    async def get_state_nonce(self, block_number: BlockNumber) -> int:
+        state_data = await self.contract.functions.stateData().call(block_identifier=block_number)
+        # stateData returns (root, updateDelay, lastUpdateTimestamp, currentNonce)
+        return state_data[3]
+
+    async def get_operator_last_state_nonce(
+        self, operator: ChecksumAddress, block_number: BlockNumber
+    ) -> int:
+        """Get operator's LastStateUpdate nonce."""
+        return await self.contract.functions.operatorNonces(
+            operator, self.LAST_STATE_UPDATE_NONCE_TYPE
+        ).call(block_identifier=block_number)
+
+
+class NodesManagerEncoder(BaseEncoder):
+    """Helper class to encode NodesManager contract ABI calls."""
+
+    contract_class = NodesManagerContract
+
+    def update_vault_state(self, harvest_params: HarvestParams) -> HexStr:
+        return self.contract.encode_abi(
+            fn_name='updateVaultState',
+            args=[
+                (
+                    harvest_params.rewards_root,
+                    harvest_params.reward,
+                    harvest_params.unlocked_mev_reward,
+                    harvest_params.proof,
+                )
+            ],
+        )
+
+    def update_operator_state(
+        self, operator: ChecksumAddress, params: OperatorStateUpdateParams
+    ) -> HexStr:
+        return self.contract.encode_abi(
+            fn_name='updateOperatorState',
+            args=[
+                operator,
+                (
+                    params.total_assets,
+                    params.cum_penalty_assets,
+                    params.cum_earned_fee_shares,
+                    params.proof,
+                ),
+            ],
+        )
 
 
 validators_registry_contract = ValidatorsRegistryContract()
