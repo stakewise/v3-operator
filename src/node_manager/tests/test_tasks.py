@@ -3,7 +3,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
-from sw_utils import EventScanner
 from sw_utils.tests.factories import faker
 from sw_utils.typings import ProtocolConfig
 from web3 import Web3
@@ -29,11 +28,11 @@ MODULE = 'src.node_manager.tasks'
 
 @pytest.fixture(autouse=True)
 def _mock_scan_events() -> None:
-    """Mock chain head for all tests calling process_block."""
+    """Mock chain head and validator event scanning for all tests calling process_block."""
     chain_head = MagicMock(block_number=100)
     with patch(
         f'{MODULE}.get_chain_finalized_head', new_callable=AsyncMock, return_value=chain_head
-    ):
+    ), patch(f'{MODULE}.scan_validators_events', new_callable=AsyncMock):
         yield
 
 
@@ -256,12 +255,14 @@ class TestProcessFunding:
 
     @patch(f'{MODULE}.fund_validators', new_callable=AsyncMock, return_value='0xtxhash')
     @patch(f'{MODULE}.poll_funding_approval', new_callable=AsyncMock, return_value=['0xsig'])
+    @patch(f'{MODULE}.get_validators_for_funding', new_callable=AsyncMock)
     @patch(f'{MODULE}.get_funding_amounts')
     @patch(f'{MODULE}.fetch_compounding_validators_balances', new_callable=AsyncMock)
     async def test_single_batch_success(
         self,
         mock_balances: AsyncMock,
         mock_funding_amounts: MagicMock,
+        mock_get_validators: AsyncMock,
         mock_poll: AsyncMock,
         mock_fund: AsyncMock,
     ) -> None:
@@ -269,6 +270,7 @@ class TestProcessFunding:
         public_key = faker.validator_public_key()
         mock_balances.return_value = {public_key: ether_to_gwei(32)}
         mock_funding_amounts.return_value = {public_key: ether_to_gwei(10)}
+        mock_get_validators.return_value = [_make_validator(public_key, ether_to_gwei(10))]
 
         task = _make_task()
         remaining = await task._process_funding(
@@ -283,12 +285,14 @@ class TestProcessFunding:
 
     @patch(f'{MODULE}.fund_validators', new_callable=AsyncMock, return_value='0xtxhash')
     @patch(f'{MODULE}.poll_funding_approval', new_callable=AsyncMock, return_value=['0xsig'])
+    @patch(f'{MODULE}.get_validators_for_funding', new_callable=AsyncMock)
     @patch(f'{MODULE}.get_funding_amounts')
     @patch(f'{MODULE}.fetch_compounding_validators_balances', new_callable=AsyncMock)
     async def test_multi_batch(
         self,
         mock_balances: AsyncMock,
         mock_funding_amounts: MagicMock,
+        mock_get_validators: AsyncMock,
         mock_poll: AsyncMock,
         mock_fund: AsyncMock,
     ) -> None:
@@ -296,6 +300,7 @@ class TestProcessFunding:
         keys = [faker.validator_public_key() for _ in range(3)]
         mock_balances.return_value = {k: ether_to_gwei(32) for k in keys}
         mock_funding_amounts.return_value = {k: ether_to_gwei(10) for k in keys}
+        mock_get_validators.return_value = [_make_validator(k, ether_to_gwei(10)) for k in keys]
 
         config = _make_protocol_config()
         config.validators_approval_batch_limit = 2
@@ -313,12 +318,14 @@ class TestProcessFunding:
 
     @patch(f'{MODULE}.fund_validators', new_callable=AsyncMock)
     @patch(f'{MODULE}.poll_funding_approval', new_callable=AsyncMock, return_value=['0xsig'])
+    @patch(f'{MODULE}.get_validators_for_funding', new_callable=AsyncMock)
     @patch(f'{MODULE}.get_funding_amounts')
     @patch(f'{MODULE}.fetch_compounding_validators_balances', new_callable=AsyncMock)
     async def test_partial_failure_stops_funding(
         self,
         mock_balances: AsyncMock,
         mock_funding_amounts: MagicMock,
+        mock_get_validators: AsyncMock,
         mock_poll: AsyncMock,
         mock_fund: AsyncMock,
     ) -> None:
@@ -326,6 +333,7 @@ class TestProcessFunding:
         keys = [faker.validator_public_key() for _ in range(3)]
         mock_balances.return_value = {k: ether_to_gwei(32) for k in keys}
         mock_funding_amounts.return_value = {k: ether_to_gwei(10) for k in keys}
+        mock_get_validators.return_value = [_make_validator(k, ether_to_gwei(10)) for k in keys]
         mock_fund.side_effect = ['0xtxhash', None]
 
         config = _make_protocol_config()
@@ -562,10 +570,15 @@ def _make_protocol_config() -> MagicMock:
 
 def _make_task() -> NodeManagerTask:
     keystore = MagicMock()
-    validators_scanner = MagicMock(spec=EventScanner)
-    validators_scanner.process_new_events = AsyncMock()
     return NodeManagerTask(
         operator_address=OPERATOR_ADDR,
         keystore=keystore,
-        validators_scanner=validators_scanner,
+    )
+
+
+def _make_validator(public_key: str, amount: Gwei) -> Validator:
+    return Validator(
+        public_key=public_key,
+        amount=amount,
+        deposit_signature=faker.validator_signature(),
     )

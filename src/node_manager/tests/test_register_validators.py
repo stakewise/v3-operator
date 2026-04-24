@@ -1,15 +1,15 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from eth_typing import ChecksumAddress, HexStr
+from eth_typing import ChecksumAddress
 from sw_utils.tests.factories import faker
 from web3 import Web3
 from web3.exceptions import ContractLogicError
-from web3.types import Gwei
 
 from src.common.tests.utils import ether_to_gwei
 from src.node_manager.register_validators import fund_validators, register_validators
 from src.node_manager.typings import NodeManagerRegistrationOraclesApproval
+from src.validators.typings import Validator
 
 MODULE = 'src.node_manager.register_validators'
 
@@ -199,7 +199,7 @@ class TestFundValidators:
             result = await fund_validators(
                 operator_address=OPERATOR_ADDR,
                 signatures=[faker.account_signature()],
-                validator_fundings=_make_validator_fundings(),
+                validators=_make_validators(),
             )
         assert result is not None
 
@@ -216,7 +216,7 @@ class TestFundValidators:
             result = await fund_validators(
                 operator_address=OPERATOR_ADDR,
                 signatures=[faker.account_signature()],
-                validator_fundings=_make_validator_fundings(),
+                validators=_make_validators(),
             )
         assert result is None
 
@@ -239,15 +239,19 @@ class TestFundValidators:
             result = await fund_validators(
                 operator_address=OPERATOR_ADDR,
                 signatures=[faker.account_signature()],
-                validator_fundings=_make_validator_fundings(),
+                validators=_make_validators(),
             )
         assert result is None
 
 
-def _make_validator_fundings() -> dict[HexStr, Gwei]:
-    return {
-        faker.validator_public_key(): ether_to_gwei(32),
-    }
+def _make_validators() -> list[Validator]:
+    return [
+        Validator(
+            public_key=faker.validator_public_key(),
+            amount=ether_to_gwei(32),
+            deposit_signature=faker.validator_signature(),
+        )
+    ]
 
 
 def _make_approval() -> NodeManagerRegistrationOraclesApproval:

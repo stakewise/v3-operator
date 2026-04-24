@@ -26,7 +26,7 @@ from src.config.settings import (
     LOG_PLAIN,
     settings,
 )
-from src.node_manager.execution import create_operator_validators_scanner
+from src.node_manager.execution import scan_validators_events
 from src.node_manager.startup_check import startup_checks
 from src.node_manager.tasks import NodeManagerTask, StateSyncTask
 from src.validators.database import (
@@ -35,6 +35,7 @@ from src.validators.database import (
     VaultValidatorCrud,
 )
 from src.validators.keystores.load import load_keystore
+from src.validators.tasks import load_genesis_validators
 
 logger = logging.getLogger(__name__)
 
@@ -206,14 +207,19 @@ async def _start(
         VaultValidatorCrud().setup()
         CheckpointCrud().setup()
 
-        keystore = await load_keystore()
-        validators_scanner = create_operator_validators_scanner(operator_address)
+        # load network validators from ipfs dump
+        await load_genesis_validators()
 
+        keystore = await load_keystore()
         # start operator tasks
         chain_state = await get_chain_finalized_head()
 
         logger.info('Syncing validator events...')
-        await validators_scanner.process_new_events(chain_state.block_number)
+        await scan_validators_events(
+            operator_address=operator_address,
+            block_number=chain_state.block_number,
+            is_startup=True,
+        )
 
         logger.info('Updating oracles cache...')
         await update_oracles_cache()
@@ -227,7 +233,6 @@ async def _start(
                 NodeManagerTask(
                     operator_address=operator_address,
                     keystore=keystore,
-                    validators_scanner=validators_scanner,
                 ).run(interrupt_handler),
                 StateSyncTask(operator_address).run(interrupt_handler),
             )

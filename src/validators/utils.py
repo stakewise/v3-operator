@@ -41,6 +41,26 @@ async def get_validators_for_registration(
     return validators
 
 
+async def get_validators_for_funding(
+    keystore: BaseKeystore,
+    validator_fundings: dict[HexStr, Gwei],
+) -> Sequence[Validator]:
+    """Returns list of validators for funding."""
+    validators = []
+    for public_key, amount in validator_fundings.items():
+        deposit_data = await keystore.get_deposit_data(public_key=public_key, amount=amount)
+        validators.append(
+            Validator(
+                public_key=Web3.to_hex(deposit_data['pubkey']),
+                deposit_signature=Web3.to_hex(deposit_data['signature']),
+                amount=Gwei(int(deposit_data['amount'])),
+                # deposit_data_root=Web3.to_hex(deposit_data['deposit_data_root']),
+            )
+        )
+
+    return validators
+
+
 def get_withdrawal_credentials() -> Bytes32:
     """Returns withdrawal credentials based on the validator type."""
     if settings.validator_type == ValidatorType.V1:

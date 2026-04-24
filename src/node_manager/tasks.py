@@ -1,7 +1,7 @@
 import logging
 
 from eth_typing import ChecksumAddress
-from sw_utils import EventScanner, InterruptHandler
+from sw_utils import InterruptHandler
 from sw_utils.typings import ProtocolConfig
 from web3 import Web3
 from web3.types import Gwei, Wei
@@ -16,6 +16,7 @@ from src.common.typings import ValidatorType
 from src.config.settings import settings
 from src.node_manager.execution import (
     fetch_operator_state_from_ipfs,
+    scan_validators_events,
     submit_state_sync_transaction,
 )
 from src.node_manager.oracles import (
@@ -27,7 +28,10 @@ from src.node_manager.register_validators import fund_validators, register_valid
 from src.validators.consensus import fetch_compounding_validators_balances
 from src.validators.keystores.base import BaseKeystore
 from src.validators.tasks import get_deposits_amounts, get_funding_amounts
-from src.validators.utils import get_validators_for_registration
+from src.validators.utils import (
+    get_validators_for_funding,
+    get_validators_for_registration,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,15 +43,17 @@ class NodeManagerTask(BaseTask):
         self,
         operator_address: ChecksumAddress,
         keystore: BaseKeystore,
-        validators_scanner: EventScanner,
     ) -> None:
         self.operator_address = operator_address
         self.keystore = keystore
-        self.validators_scanner = validators_scanner
 
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         chain_head = await get_chain_finalized_head()
-        await self.validators_scanner.process_new_events(chain_head.block_number)
+        await scan_validators_events(
+            operator_address=self.operator_address,
+            block_number=chain_head.block_number,
+            is_startup=True,
+        )
 
         if not await check_gas_price(high_priority=True):
             logger.debug('Gas price too high, skipping validators registration')
@@ -143,16 +149,20 @@ class NodeManagerTask(BaseTask):
         if not validator_fundings:
             return amount
 
+        validators = await get_validators_for_funding(self.keystore, validator_fundings)
+        if not validators:
+            logger.warning('No available validators keystores for funding')
+            return amount
+
         funded_total = Gwei(0)
         batch_limit = protocol_config.validators_approval_batch_limit
 
         # Process in batches
-        funding_items = list(validator_fundings.items())
-        for i in range(0, len(funding_items), batch_limit):
-            batch = dict(funding_items[i : i + batch_limit])
+        for i in range(0, len(validators), batch_limit):
+            batch = validators[i : i + batch_limit]
 
             signatures = await poll_funding_approval(
-                validator_fundings=batch,
+                validators=batch,
                 operator_address=operator_address,
                 protocol_config=protocol_config,
             )
@@ -160,13 +170,13 @@ class NodeManagerTask(BaseTask):
             tx_hash = await fund_validators(
                 operator_address=self.operator_address,
                 signatures=signatures,
-                validator_fundings=batch,
+                validators=batch,
             )
 
             if tx_hash:
-                batch_total = sum(batch.values())
+                batch_total = sum(v.amount for v in batch)
                 funded_total = Gwei(funded_total + batch_total)
-                pub_keys = ', '.join(batch.keys())
+                pub_keys = ', '.join([v.public_key for v in batch])
                 logger.info('Funded community vault validators %s: tx=%s', pub_keys, tx_hash)
             else:
                 logger.warning('Community vault funding batch failed, stopping funding')

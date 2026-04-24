@@ -17,6 +17,10 @@ from src.common.typings import HarvestParams
 from src.config.settings import settings
 from src.node_manager.typings import OperatorStateUpdateParams
 from src.validators.database import CheckpointCrud, VaultValidatorCrud
+from src.validators.execution import (
+    NetworkValidatorsProcessor,
+    NetworkValidatorsStartupProcessor,
+)
 from src.validators.typings import VaultValidator
 
 logger = logging.getLogger(__name__)
@@ -49,15 +53,27 @@ class OperatorValidatorsProcessor(EventProcessor):
 
         if validators:
             VaultValidatorCrud().save_vault_validators(validators)
-        CheckpointCrud().update_validators_checkpoint(to_block)
+        CheckpointCrud().update_validators_checkpoint(block_number=to_block)
 
 
-def create_operator_validators_scanner(
-    operator_address: ChecksumAddress,
-) -> EventScanner:
-    """Create a reusable EventScanner for NodesManager ValidatorsRegistered events."""
-    processor = OperatorValidatorsProcessor(operator_address)
-    return EventScanner(processor, argument_filters={'operator': operator_address})
+async def scan_validators_events(
+    operator_address: ChecksumAddress, block_number: BlockNumber, is_startup: bool
+) -> None:
+    """Scans new vault and network validators for the given block number."""
+    network_validators_processor: NetworkValidatorsStartupProcessor | NetworkValidatorsProcessor
+    if is_startup:
+        network_validators_processor = NetworkValidatorsStartupProcessor()
+    else:
+        network_validators_processor = NetworkValidatorsProcessor()
+
+    network_validators_scanner = EventScanner(network_validators_processor)
+    await network_validators_scanner.process_new_events(block_number)
+
+    operator_validators_processor = OperatorValidatorsProcessor(operator_address)
+    operator_validators_scanner = EventScanner(
+        operator_validators_processor, argument_filters={'operator': operator_address}
+    )
+    await operator_validators_scanner.process_new_events(block_number)
 
 
 def _parse_public_keys(public_keys_bytes: bytes) -> list[HexStr]:
