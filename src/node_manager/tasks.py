@@ -187,10 +187,10 @@ class StateSyncTask(BaseTask):
         block_number = chain_head.block_number
 
         # 1. Get current state nonce and check if operator already synced
-        current_nonce = await node_manager_contract.get_state_nonce()
+        current_nonce = await node_manager_contract.get_state_nonce(block_number)
 
         operator_nonce = await node_manager_contract.get_operator_last_state_nonce(
-            self.operator_address
+            self.operator_address, block_number=block_number
         )
         if operator_nonce == current_nonce:
             logger.debug('Operator %s state already synced', self.operator_address)

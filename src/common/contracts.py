@@ -710,16 +710,18 @@ class NodesManagerContract(ContractWrapper):
             to_block=to_block,
         )
 
-    async def get_state_nonce(self) -> int:
-        state_data = await self.contract.functions.stateData().call()
+    async def get_state_nonce(self, block_number: BlockNumber) -> int:
+        state_data = await self.contract.functions.stateData().call(block_identifier=block_number)
         # stateData returns (root, updateDelay, lastUpdateTimestamp, currentNonce)
         return state_data[3]
 
-    async def get_operator_last_state_nonce(self, operator: ChecksumAddress) -> int:
+    async def get_operator_last_state_nonce(
+        self, operator: ChecksumAddress, block_number: BlockNumber
+    ) -> int:
         """Get operator's LastStateUpdate nonce."""
         return await self.contract.functions.operatorNonces(
             operator, self.LAST_STATE_UPDATE_NONCE_TYPE
-        ).call()
+        ).call(block_identifier=block_number)
 
 
 class NodesManagerEncoder(BaseEncoder):
