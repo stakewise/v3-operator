@@ -8,12 +8,8 @@ from eth_typing import ChecksumAddress
 
 from src.common.password import get_or_create_password_file
 from src.common.utils import greenify
-from src.common.validators import (
-    resolve_operator_address,
-    validate_eth_address,
-    validate_mnemonic,
-)
-from src.config.config import OperatorConfig
+from src.common.validators import validate_eth_address, validate_mnemonic
+from src.config.config import OperatorConfig, resolve_config_address
 
 
 @click.option(
@@ -52,9 +48,9 @@ def create_wallet(
     vault: ChecksumAddress | None,
     community_operator: ChecksumAddress | None,
 ) -> None:
-    address = resolve_operator_address(vault, community_operator)
+    config_address = resolve_config_address(vault, community_operator)
 
-    operator_config = OperatorConfig(address, Path(data_dir))
+    operator_config = OperatorConfig(config_address, Path(data_dir))
     operator_config.load(mnemonic)
 
     wallet_dir = operator_config.vault_dir / 'wallet'

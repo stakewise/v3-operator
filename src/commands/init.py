@@ -4,8 +4,8 @@ import click
 from eth_typing import ChecksumAddress
 
 from src.common.language import LANGUAGES, create_new_mnemonic
-from src.common.validators import resolve_operator_address, validate_eth_address
-from src.config.config import OperatorConfig
+from src.common.validators import validate_eth_address
+from src.config.config import OperatorConfig, resolve_config_address
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_NETWORK
 
@@ -66,10 +66,10 @@ def init(
     network: str,
     data_dir: str,
 ) -> None:
-    address = resolve_operator_address(vault, community_operator)
+    config_address = resolve_config_address(vault, community_operator)
 
     config = OperatorConfig(
-        address=address,
+        address=config_address,
         data_dir=Path(data_dir),
     )
     if config.config_path.is_file():

@@ -4,10 +4,11 @@ import shutil
 from pathlib import Path
 
 import click
-from eth_typing import HexAddress
+from eth_typing import ChecksumAddress, HexAddress
 from web3 import Web3
 
 from src.common.credentials import CredentialManager
+from src.common.validators import to_checksum_address_or_raise
 from src.config.networks import AVAILABLE_NETWORKS
 
 
@@ -130,3 +131,27 @@ class OperatorConfig:
             raise click.ClickException(
                 "Invalid 'first_public_key'. Expected a 98-character hexadecimal string."
             )
+
+
+def resolve_config_address(
+    vault: ChecksumAddress | None,
+    community_operator: ChecksumAddress | None,
+) -> ChecksumAddress:
+    """Resolve the address for vault/community-operator commands.
+
+    Enforces mutual exclusion of --vault and --community-operator
+    and prompts interactively if neither was provided.
+    """
+    if vault and community_operator:
+        raise click.ClickException(
+            'Options --vault and --community-operator are mutually exclusive.'
+        )
+    if community_operator:
+        return community_operator
+    if vault:
+        return vault
+    return click.prompt(
+        'Enter the vault address',
+        type=str,
+        value_proc=to_checksum_address_or_raise,
+    )

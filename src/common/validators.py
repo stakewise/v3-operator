@@ -17,30 +17,6 @@ from src.config.settings import (
 )
 
 
-def resolve_operator_address(
-    vault: ChecksumAddress | None,
-    community_operator: ChecksumAddress | None,
-) -> ChecksumAddress:
-    """Resolve the address for vault/community-operator commands.
-
-    Enforces mutual exclusion of --vault and --community-operator
-    and prompts interactively if neither was provided.
-    """
-    if vault and community_operator:
-        raise click.ClickException(
-            'Options --vault and --community-operator are mutually exclusive.'
-        )
-    if community_operator:
-        return community_operator
-    if vault:
-        return vault
-    return click.prompt(
-        'Enter the vault address',
-        type=str,
-        value_proc=_to_checksum_address_or_raise,
-    )
-
-
 def validate_mnemonic(ctx: click.Context, param: click.Parameter, value: str) -> str:
     value = value.replace('"', '')
     return verify_mnemonic(value)
@@ -51,7 +27,7 @@ def validate_eth_address(
 ) -> ChecksumAddress | None:
     if not value:
         return None
-    return _to_checksum_address_or_raise(value)
+    return to_checksum_address_or_raise(value)
 
 
 def validate_eth_addresses(
@@ -168,7 +144,7 @@ def _is_public_key(value: str) -> bool:
     return is_hexstr(value) and len(value) == public_key_length
 
 
-def _to_checksum_address_or_raise(value: str) -> ChecksumAddress:
+def to_checksum_address_or_raise(value: str) -> ChecksumAddress:
     try:
         if is_address(value):
             return to_checksum_address(value)
