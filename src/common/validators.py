@@ -7,6 +7,7 @@ from eth_utils import is_address, is_hexstr, to_checksum_address
 from web3 import Web3
 
 from src.common.language import validate_mnemonic as verify_mnemonic
+from src.config.networks import NETWORKS, NetworkConfig
 from src.config.settings import (
     MAX_EFFECTIVE_BALANCE,
     MAX_EFFECTIVE_BALANCE_GWEI,
@@ -17,11 +18,12 @@ from src.config.settings import (
 )
 
 
-def resolve_operator_address(
+def validate_vault_and_community_operator(
+    network: str,
     vault: ChecksumAddress | None,
     community_operator: ChecksumAddress | None,
-) -> ChecksumAddress:
-    """Resolve the address for vault/community-operator commands.
+) -> tuple[ChecksumAddress, ChecksumAddress | None]:
+    """Validate the vault address for vault/community-operator commands.
 
     Enforces mutual exclusion of --vault and --community-operator
     and prompts interactively if neither was provided.
@@ -31,14 +33,16 @@ def resolve_operator_address(
             'Options --vault and --community-operator are mutually exclusive.'
         )
     if community_operator:
-        return community_operator
-    if vault:
-        return vault
-    return click.prompt(
-        'Enter the vault address',
-        type=str,
-        value_proc=_to_checksum_address_or_raise,
-    )
+        vault = NETWORKS[network].COMMUNITY_VAULT_CONTRACT_ADDRESS
+        return vault, community_operator
+    
+    if not vault:
+        vault = click.prompt(
+            'Enter the vault address',
+            type=str,
+            value_proc=_to_checksum_address_or_raise,
+        )
+    return vault, None
 
 
 def validate_mnemonic(ctx: click.Context, param: click.Parameter, value: str) -> str:

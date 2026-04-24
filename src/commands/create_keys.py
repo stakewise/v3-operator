@@ -8,7 +8,7 @@ from src.common.credentials import Credential, CredentialManager
 from src.common.password import generate_password, get_or_create_password_file
 from src.common.utils import greenify
 from src.common.validators import (
-    resolve_operator_address,
+    validate_vault_and_community_operator,
     validate_eth_address,
     validate_mnemonic,
 )
@@ -73,9 +73,9 @@ def create_keys(
     per_keystore_password: bool,
     concurrency: int | None,
 ) -> None:
-    address = resolve_operator_address(vault, community_operator)
+    vault, community_operator = validate_vault_and_community_operator(network, vault, community_operator)
 
-    operator_config = OperatorConfig(address, Path(data_dir))
+    operator_config = OperatorConfig(vault=vault, community_operator=community_operator, data_dir=Path(data_dir))
     operator_config.load(mnemonic)
 
     credentials = CredentialManager.generate_credentials(

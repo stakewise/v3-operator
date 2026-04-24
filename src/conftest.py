@@ -91,7 +91,7 @@ def test_mnemonic() -> str:
 
 @pytest.fixture
 def _init_config(vault_address: HexAddress, data_dir: Path, test_mnemonic: str) -> None:
-    config = OperatorConfig(address=vault_address, data_dir=data_dir)
+    config = OperatorConfig(vault=vault_address, data_dir=data_dir)
     config.save(HOODI, test_mnemonic)
 
 
