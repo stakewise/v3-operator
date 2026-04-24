@@ -7,11 +7,17 @@ from web3 import Web3
 from web3.types import Gwei, Wei
 
 from src.common.consensus import get_chain_finalized_head
+from src.common.contracts import NodesManagerContract, keeper_contract
 from src.common.execution import check_gas_price
+from src.common.harvest import get_harvest_params
 from src.common.protocol_config import get_protocol_config
 from src.common.tasks import BaseTask
 from src.common.typings import ValidatorType
 from src.config.settings import settings
+from src.node_manager.execution import (
+    fetch_operator_state_from_ipfs,
+    submit_state_sync_transaction,
+)
 from src.node_manager.oracles import (
     poll_eligible_operators,
     poll_funding_approval,
@@ -167,3 +173,63 @@ class NodeManagerTask(BaseTask):
                 break
 
         return Gwei(amount - funded_total)
+
+
+class StateSyncTask(BaseTask):
+    """Periodically syncs operator state after global state updates."""
+
+    def __init__(self, operator_address: ChecksumAddress) -> None:
+        self.operator_address = operator_address
+
+    async def process_block(self, interrupt_handler: InterruptHandler) -> None:
+        node_manager_contract = NodesManagerContract()
+        chain_head = await get_chain_finalized_head()
+        block_number = chain_head.block_number
+
+        # 1. Get current state nonce and check if operator already synced
+        current_nonce = await node_manager_contract.get_state_nonce(block_number)
+
+        operator_nonce = await node_manager_contract.get_operator_last_state_nonce(
+            self.operator_address, block_number=block_number
+        )
+        if operator_nonce == current_nonce:
+            logger.debug('Operator %s state already synced', self.operator_address)
+            return
+
+        # 2. Find the StateUpdated event to get IPFS hash
+        event = await node_manager_contract.get_last_state_updated_event(
+            from_block=settings.network_config.NODES_MANAGER_GENESIS_BLOCK,
+            to_block=block_number,
+        )
+        if not event:
+            return
+
+        ipfs_hash: str = event['args']['stateIpfsHash']
+
+        # 3. Fetch operator state from IPFS
+        operator_params = await fetch_operator_state_from_ipfs(ipfs_hash, self.operator_address)
+        if not operator_params:
+            logger.warning('Operator %s not found in state IPFS data', self.operator_address)
+            return
+
+        # 4. Check gas price
+        if not await check_gas_price():
+            logger.debug('Gas price too high, skipping state sync')
+            return
+
+        # 5. Check if vault needs harvesting, get harvest params if so
+        harvest_params = None
+        if await keeper_contract.can_harvest(settings.vault):
+            harvest_params = await get_harvest_params(settings.vault)
+            if harvest_params is None:
+                logger.warning('Vault requires harvesting but failed to fetch harvest params')
+                return
+
+        # 6. Submit transaction
+        tx_hash = await submit_state_sync_transaction(
+            operator_address=self.operator_address,
+            params=operator_params,
+            harvest_params=harvest_params,
+        )
+        if tx_hash:
+            logger.info('State sync successful: %s', tx_hash)
