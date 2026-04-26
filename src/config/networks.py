@@ -50,6 +50,13 @@ class NetworkConfig(BaseNetworkConfig):
     TARGET_CONSOLIDATION_REQUESTS_PER_BLOCK: int
     NODE_CONFIG: NodeConfig
 
+    @property
+    def MAX_VALIDATOR_BALANCE(self) -> int:
+        """Returns the maximum validator balance in ETH (or GNO on Gnosis)."""
+        return Gwei(
+            int(Web3.from_wei(Web3.to_wei(self.MAX_VALIDATOR_BALANCE_GWEI, 'gwei'), 'ether'))
+        )
+
 
 @dataclass
 class NodeConfig:
