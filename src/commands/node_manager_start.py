@@ -14,8 +14,9 @@ from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.protocol_config import update_oracles_cache
 from src.common.utils import log_verbose
 from src.common.validators import (
+    ETH_AMOUNT_TYPE,
     validate_eth_address,
-    validate_max_validator_balance_gwei,
+    validate_max_validator_balance,
 )
 from src.config.config import OperatorConfig
 from src.config.networks import MAINNET, NETWORKS, ZERO_CHECKSUM_ADDRESS
@@ -64,12 +65,12 @@ logger = logging.getLogger(__name__)
     help='Absolute path to the wallet.',
 )
 @click.option(
-    '--max-validator-balance-gwei',
-    type=int,
-    envvar='MAX_VALIDATOR_BALANCE_GWEI',
-    help=f'The maximum validator balance in Gwei. '
-    f'Default is {NETWORKS[MAINNET].MAX_VALIDATOR_BALANCE_GWEI} Gwei',
-    callback=validate_max_validator_balance_gwei,
+    '--max-validator-balance',
+    type=ETH_AMOUNT_TYPE,
+    envvar='MAX_VALIDATOR_BALANCE',
+    help=f'The maximum validator balance in ETH. '
+    f'Default is {NETWORKS[MAINNET].MAX_VALIDATOR_BALANCE} ETH',
+    callback=validate_max_validator_balance,
 )
 @click.option(
     '--max-fee-per-gas-gwei',
@@ -150,7 +151,7 @@ def node_manager_start(
     log_format: str,
     community_operator: ChecksumAddress,
     max_fee_per_gas_gwei: int | None,
-    max_validator_balance_gwei: int | None,
+    max_validator_balance: Gwei | None,
     wallet_file: str | None,
     wallet_password_file: str | None,
     keystores_dir: str | None,
@@ -177,9 +178,7 @@ def node_manager_start(
         log_level=log_level,
         log_format=log_format,
         max_fee_per_gas_gwei=max_fee_per_gas_gwei,
-        max_validator_balance_gwei=(
-            Gwei(max_validator_balance_gwei) if max_validator_balance_gwei else None
-        ),
+        max_validator_balance_gwei=max_validator_balance,
         keystores_dir=keystores_dir,
         keystores_password_file=keystores_password_file,
         wallet_file=wallet_file,

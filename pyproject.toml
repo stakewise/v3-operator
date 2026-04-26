@@ -138,4 +138,5 @@ ignore_names = [
     "validators_root",  # ApprovalRequest
     "previous_version", "current_version", "genesis_validators_root", "fork_info", "voluntary_exit", "deposit",  # remote.py
     "rounding",  # decimal context
+    "convert",  # click.ParamType
 ]

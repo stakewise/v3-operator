@@ -7,9 +7,10 @@ from click.decorators import FC
 from src.common.logging import LOG_LEVELS
 from src.common.typings import ValidatorType
 from src.common.validators import (
+    ETH_AMOUNT_TYPE,
     validate_eth_address,
-    validate_max_validator_balance_gwei,
-    validate_min_deposit_amount_gwei,
+    validate_max_validator_balance,
+    validate_min_deposit_amount,
 )
 from src.config.networks import GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
@@ -19,9 +20,9 @@ from src.config.settings import (
     DEFAULT_METRICS_HOST,
     DEFAULT_METRICS_PORT,
     DEFAULT_METRICS_PREFIX,
-    DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
+    DEFAULT_MIN_DEPOSIT_AMOUNT_ETH,
     DEFAULT_MIN_DEPOSIT_DELAY,
-    DEFAULT_VAULT_MIN_BALANCE_GWEI,
+    DEFAULT_VAULT_MIN_BALANCE_ETH,
     LOG_FORMATS,
     LOG_PLAIN,
 )
@@ -210,31 +211,31 @@ start_common_options = [
         type=int,
     ),
     click.option(
-        '--min-deposit-amount-gwei',
-        type=int,
-        envvar='MIN_DEPOSIT_AMOUNT_GWEI',
-        help='Minimum amount in gwei to deposit into validator.',
-        default=DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
-        callback=validate_min_deposit_amount_gwei,
+        '--min-deposit-amount',
+        type=ETH_AMOUNT_TYPE,
+        envvar='MIN_DEPOSIT_AMOUNT',
+        help='Minimum amount in ETH to deposit into validator.',
+        default=DEFAULT_MIN_DEPOSIT_AMOUNT_ETH,
+        callback=validate_min_deposit_amount,
         show_default=True,
     ),
     click.option(
-        '--vault-min-balance-gwei',
-        type=int,
-        envvar='VAULT_MIN_BALANCE_GWEI',
-        help='The amount of assets (ETH/GNO) in Gwei '
-        'that should be kept in the vault and not sent for staking.',
-        default=DEFAULT_VAULT_MIN_BALANCE_GWEI,
+        '--vault-min-balance',
+        type=ETH_AMOUNT_TYPE,
+        envvar='VAULT_MIN_BALANCE',
+        help='The amount of assets (ETH/GNO) that should be kept in the vault '
+        'and not sent for staking.',
+        default=DEFAULT_VAULT_MIN_BALANCE_ETH,
         show_default=True,
     ),
     click.option(
-        '--max-validator-balance-gwei',
-        type=int,
-        envvar='MAX_VALIDATOR_BALANCE_GWEI',
-        help=f'The maximum validator balance in Gwei.'
-        f'Default is {NETWORKS[MAINNET].MAX_VALIDATOR_BALANCE_GWEI} Gwei for Ethereum, '
-        f'{NETWORKS[GNOSIS].MAX_VALIDATOR_BALANCE_GWEI} Gwei for Gnosis.',
-        callback=validate_max_validator_balance_gwei,
+        '--max-validator-balance',
+        type=ETH_AMOUNT_TYPE,
+        envvar='MAX_VALIDATOR_BALANCE',
+        help=f'The maximum validator balance in ETH. '
+        f'Default is {NETWORKS[MAINNET].MAX_VALIDATOR_BALANCE} ETH for Ethereum, '
+        f'{NETWORKS[GNOSIS].MAX_VALIDATOR_BALANCE} GNO for Gnosis.',
+        callback=validate_max_validator_balance,
     ),
     click.option(
         '--min-deposit-delay',

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from datetime import timedelta
+from decimal import Decimal
 
 from ens.constants import EMPTY_ADDR_HEX
 from eth_typing import BlockNumber, ChecksumAddress
@@ -49,6 +50,11 @@ class NetworkConfig(BaseNetworkConfig):
     TARGET_WITHDRAWAL_REQUESTS_PER_BLOCK: int
     TARGET_CONSOLIDATION_REQUESTS_PER_BLOCK: int
     NODE_CONFIG: NodeConfig
+
+    @property
+    def MAX_VALIDATOR_BALANCE(self) -> Decimal:
+        """Returns the maximum validator balance in ETH (or GNO on Gnosis)."""
+        return Decimal(Web3.from_wei(Web3.to_wei(self.MAX_VALIDATOR_BALANCE_GWEI, 'gwei'), 'ether'))
 
 
 @dataclass

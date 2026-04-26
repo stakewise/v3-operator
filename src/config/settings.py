@@ -20,9 +20,11 @@ DEFAULT_HASHI_VAULT_ENGINE_NAME = 'secret'
 
 DEFAULT_MIN_DEPOSIT_AMOUNT = Web3.to_wei(10, 'ether')
 DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI = Gwei(int(Web3.from_wei(DEFAULT_MIN_DEPOSIT_AMOUNT, 'gwei')))
+DEFAULT_MIN_DEPOSIT_AMOUNT_ETH = Web3.from_wei(DEFAULT_MIN_DEPOSIT_AMOUNT, 'ether')
 
 DEFAULT_VAULT_MIN_BALANCE = Web3.to_wei(0, 'ether')
 DEFAULT_VAULT_MIN_BALANCE_GWEI = Gwei(int(Web3.from_wei(DEFAULT_VAULT_MIN_BALANCE, 'gwei')))
+DEFAULT_VAULT_MIN_BALANCE_ETH = Web3.from_wei(DEFAULT_VAULT_MIN_BALANCE, 'ether')
 
 DEFAULT_MIN_DEPOSIT_DELAY = 3600  # 1 hour
 
@@ -429,9 +431,10 @@ VALIDATORS_FUNDING_BATCH_SIZE = decouple_config(
     'VALIDATORS_FUNDING_BATCH_SIZE', cast=int, default=10
 )
 
-# Minimum amount of rewards to process reward splitter
-FEE_SPLITTER_MIN_ASSETS: int = decouple_config(
-    'FEE_SPLITTER_MIN_ASSETS', default=Web3.to_wei('0.001', 'ether'), cast=int
+# Minimum amount of rewards (in ETH/GNO) required to process the reward splitter.
+FEE_SPLITTER_MIN_ASSETS: Wei = Web3.to_wei(
+    decouple_config('FEE_SPLITTER_MIN_ASSETS', default='0.001'),
+    'ether',
 )
 FEE_SPLITTER_INTERVAL: int = decouple_config(
     'FEE_SPLITTER_INTERVAL', default=86400, cast=int  # every 24 hr
