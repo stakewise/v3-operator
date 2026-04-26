@@ -156,7 +156,11 @@ def validate_max_validator_balance(
     return value
 
 
-def validate_min_deposit_amount(ctx: click.Context, param: click.Parameter, value: Gwei) -> Gwei:
+def validate_min_deposit_amount(
+    ctx: click.Context, param: click.Parameter, value: Gwei | None
+) -> Gwei | None:
+    if not value:
+        return None
     if value < MIN_DEPOSIT_AMOUNT_GWEI:
         raise click.BadParameter(
             f'--min-deposit-amount must be greater than or equal to '
