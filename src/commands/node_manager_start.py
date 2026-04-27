@@ -68,7 +68,7 @@ logger = logging.getLogger(__name__)
     '--max-validator-balance',
     type=ETH_AMOUNT_TYPE,
     envvar='MAX_VALIDATOR_BALANCE',
-    help=f'The maximum validator balance in ETH. '
+    help=f'The maximum validator balance in ETH (or GNO on Gnosis). '
     f'Default is {NETWORKS[MAINNET].MAX_VALIDATOR_BALANCE} ETH',
     callback=validate_max_validator_balance,
 )

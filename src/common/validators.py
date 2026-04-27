@@ -19,6 +19,8 @@ from src.config.settings import (
     MIN_DEPOSIT_AMOUNT_GWEI,
 )
 
+_GWEI_PER_ETH = Decimal(10) ** 9
+
 
 class EthAmountParamType(click.ParamType):
     """Click parameter type that accepts an ETH amount as a decimal and returns Gwei."""
@@ -39,8 +41,14 @@ class EthAmountParamType(click.ParamType):
             self.fail(f'{value!r} is not a valid decimal ETH amount.', param, ctx)
         if eth_amount < 0:
             self.fail('ETH amount must be non-negative.', param, ctx)
-
-        return Gwei(int(Web3.from_wei(Web3.to_wei(eth_amount, 'ether'), 'gwei')))
+        gwei_amount = eth_amount * _GWEI_PER_ETH
+        if gwei_amount != gwei_amount.to_integral_value():
+            self.fail(
+                'ETH amount must be an exact multiple of 1 gwei (0.000000001 ETH).',
+                param,
+                ctx,
+            )
+        return Gwei(int(gwei_amount))
 
 
 ETH_AMOUNT_TYPE = EthAmountParamType()
@@ -159,7 +167,7 @@ def validate_max_validator_balance(
 def validate_min_deposit_amount(
     ctx: click.Context, param: click.Parameter, value: Gwei | None
 ) -> Gwei | None:
-    if not value:
+    if value is None:
         return None
     if value < MIN_DEPOSIT_AMOUNT_GWEI:
         raise click.BadParameter(
