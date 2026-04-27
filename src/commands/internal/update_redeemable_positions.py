@@ -248,7 +248,8 @@ async def process(
     """
     Fetch redeemable os token positions, calculate kept os token amounts and upload to IPFS.
     """
-    block_number = await execution_client.eth.get_block_number()
+    finalized_block = await execution_client.eth.get_block('finalized')
+    block_number = finalized_block['number']
     logger.info('Fetching allocators from the subgraph...')
     allocators = await graph_get_allocators(block_number)
     logger.info('Fetched %s allocators from the subgraph', len(allocators))
