@@ -34,6 +34,9 @@ async def graph_get_allocators(block_number: BlockNumber) -> list[Allocator]:
           ){
           vault {
             id
+            osTokenConfig {
+              id
+            }
           }
           id
           address
@@ -49,6 +52,9 @@ async def graph_get_allocators(block_number: BlockNumber) -> list[Allocator]:
     response = await graph_client.fetch_pages(query, params=params, cursor_pagination=True)
     positions_by_allocator: defaultdict[str, list[VaultOsTokenPosition]] = defaultdict(list)
     for item in response:
+        # filter legacy vaults. ID can be checksum address, skip cast to int
+        if item['vault']['osTokenConfig']['id'] == '1':
+            continue
         if int(item['mintedOsTokenShares']) > 0:
             positions_by_allocator[item['address']].append(
                 VaultOsTokenPosition(
