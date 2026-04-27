@@ -511,6 +511,7 @@ class TestUpdateOsTokenPositions:
                 side_effect=[allocators, leverage_positions, os_token_holders],
             ),
             patch_ipfs_client() as mock_upload_json,
+            patch_startup_check(),
         ):
             result = runner.invoke(update_redeemable_positions, args, input='\n')
             assert result.exit_code == 0
@@ -569,6 +570,7 @@ class TestUpdateOsTokenPositions:
                 side_effect=[allocators, leverage_positions, os_token_holders],
             ),
             patch_ipfs_client() as mock_upload_json,
+            patch_startup_check(),
         ):
             result = runner.invoke(update_redeemable_positions, args, input='\n')
             assert result.exit_code == 0
@@ -629,6 +631,7 @@ class TestUpdateOsTokenPositions:
                 side_effect=[allocators, leverage_positions, os_token_holders],
             ),
             patch_ipfs_client() as mock_upload_json,
+            patch_startup_check(),
         ):
             result = runner.invoke(update_redeemable_positions, args, input='\n')
             assert result.exit_code == 0
@@ -688,6 +691,7 @@ class TestUpdateOsTokenPositions:
                 side_effect=[allocators, leverage_positions, os_token_holders],
             ),
             patch_ipfs_client() as mock_upload_json,
+            patch_startup_check(),
         ):
             result = runner.invoke(update_redeemable_positions, args, input='\n')
             assert result.exit_code == 0
@@ -771,3 +775,12 @@ def patch_ipfs_client():
         'src.commands.internal.update_redeemable_positions.build_ipfs_upload_clients', mock_build
     ):
         yield mock_upload_json
+
+
+@contextlib.contextmanager
+def patch_startup_check():
+    with patch(
+        'src.commands.internal.update_redeemable_positions._startup_check',
+        new=AsyncMock(),
+    ):
+        yield
