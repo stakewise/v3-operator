@@ -26,6 +26,11 @@ from src.common.contracts import (
     os_token_redeemer_contract,
 )
 from src.common.logging import LOG_LEVELS, setup_logging
+from src.common.startup_check import (
+    check_execution_nodes_network,
+    wait_for_execution_node,
+    wait_for_graph_node_sync_to_chain_head,
+)
 from src.common.utils import log_verbose
 from src.config.networks import AVAILABLE_NETWORKS, MAINNET, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
@@ -112,11 +117,6 @@ logger = logging.getLogger(__name__)
     help='API endpoint for the Arbitrum execution node. Should only be specified for mainnet.',
 )
 @click.option(
-    '--no-confirm',
-    is_flag=True,
-    help='Skips confirmation messages when provided. Default is false.',
-)
-@click.option(
     '--log-level',
     type=click.Choice(
         LOG_LEVELS,
@@ -151,7 +151,6 @@ def update_redeemable_positions(
     graph_endpoint: str,
     arbitrum_endpoint: str | None,
     network: str,
-    no_confirm: bool,
     verbose: bool,
     log_level: str,
     min_os_token_position_amount_gwei: int,
@@ -201,7 +200,6 @@ def update_redeemable_positions(
                             min_os_token_position_amount_gwei=Gwei(
                                 min_os_token_position_amount_gwei
                             ),
-                            no_confirm=no_confirm,
                             api_config=api_config,
                         )
                     )
@@ -213,7 +211,6 @@ def update_redeemable_positions(
                     main(
                         arbitrum_config=arbitrum_config,
                         min_os_token_position_amount_gwei=Gwei(min_os_token_position_amount_gwei),
-                        no_confirm=no_confirm,
                         api_config=api_config,
                     )
                 )
@@ -227,16 +224,15 @@ def update_redeemable_positions(
 async def main(
     arbitrum_config: ArbitrumConfig | None,
     min_os_token_position_amount_gwei: Gwei,
-    no_confirm: bool,
     api_config: ApiConfig,
 ) -> None:
     setup_logging()
     await setup_clients()
+    await _startup_check(arbitrum_config)
     try:
         await process(
             arbitrum_config=arbitrum_config,
             min_os_token_position_amount_gwei=min_os_token_position_amount_gwei,
-            no_confirm=no_confirm,
             api_config=api_config,
         )
     finally:
@@ -247,7 +243,6 @@ async def main(
 async def process(
     arbitrum_config: ArbitrumConfig | None,
     min_os_token_position_amount_gwei: Gwei,
-    no_confirm: bool,
     api_config: ApiConfig,
 ) -> None:
     """
@@ -312,12 +307,6 @@ async def process(
             'total_redeemable_eth': Web3.from_wei(total_redeemable, 'ether'),
         },
     )
-    if not no_confirm:
-        click.confirm(
-            'Proceed with uploading redeemable os token positions to IPFS?',
-            default=True,
-            abort=True,
-        )
     ipfs_upload_client = build_ipfs_upload_clients()
     ipfs_hash = await ipfs_upload_client.upload_json([p.as_dict() for p in os_token_positions])
     click.echo(f'Redeemable os token positions uploaded to IPFS: hash={ipfs_hash}')
@@ -503,3 +492,46 @@ def _reduce_boosted_amount(
             boosted_amount = boost_os_token_shares.get(key, Wei(0))
             vault_share.minted_shares = Wei(max(0, vault_share.minted_shares - boosted_amount))
     return allocators
+
+
+async def _startup_check(arbitrum_config: ArbitrumConfig | None) -> None:
+    """Verify connectivity to execution nodes, the graph node, and IPFS upload clients."""
+    logger.info('Checking connection to execution nodes...')
+    await wait_for_execution_node()
+
+    logger.info('Checking execution nodes network...')
+    await check_execution_nodes_network()
+
+    if arbitrum_config:
+        logger.info('Checking connection to Arbitrum execution node...')
+        await _check_arbitrum_execution_node(arbitrum_config)
+
+    logger.info('Checking connection to graph node...')
+    await wait_for_graph_node_sync_to_chain_head()
+
+    logger.info('Checking IPFS upload clients...')
+    await _check_ipfs_upload_clients()
+
+
+async def _check_arbitrum_execution_node(arbitrum_config: ArbitrumConfig) -> None:
+    arb_execution_client = get_execution_client([arbitrum_config.EXECUTION_ENDPOINT])
+    try:
+        block_number = await arb_execution_client.eth.block_number
+        if block_number <= 0:
+            raise RuntimeError(
+                f'Arbitrum execution node {arbitrum_config.EXECUTION_ENDPOINT} '
+                f'is not ready, current block number: {block_number}'
+            )
+        logger.info(
+            'Connected to Arbitrum execution node at %s. Current block number: %s',
+            arbitrum_config.EXECUTION_ENDPOINT,
+            block_number,
+        )
+    finally:
+        await arb_execution_client.provider.disconnect()
+
+
+async def _check_ipfs_upload_clients() -> None:
+    ipfs_upload_client = build_ipfs_upload_clients()
+    ipfs_hash = await ipfs_upload_client.upload_json({'a': 'b'})
+    logger.info('Connected to IPFS upload clients. Test hash: %s', ipfs_hash)
