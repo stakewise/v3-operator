@@ -69,7 +69,7 @@ logger = logging.getLogger(__name__)
     type=ETH_AMOUNT_TYPE,
     envvar='MAX_VALIDATOR_BALANCE',
     help=f'The maximum validator balance in ETH (or GNO on Gnosis). '
-    f'Default is {NETWORKS[MAINNET].MAX_VALIDATOR_BALANCE} ETH',
+    f'Default is {NETWORKS[MAINNET].MAX_VALIDATOR_BALANCE_ETH} ETH',
     callback=validate_max_validator_balance,
 )
 @click.option(

@@ -37,6 +37,7 @@ from src.config.networks import NETWORKS
 from src.config.settings import (
     DEFAULT_CONSENSUS_ENDPOINT,
     DEFAULT_EXECUTION_ENDPOINT,
+    FEE_SPLITTER_MIN_ASSETS,
     settings,
 )
 from src.validators.execution import get_withdrawable_assets
@@ -48,6 +49,12 @@ IPFS_HASH_EXAMPLE = 'QmawUdo17Fvo7xa6ARCUSMV1eoVwPtVuzx8L8Crj2xozWm'
 
 
 def validate_settings() -> None:
+    if settings.claim_fee_splitter:
+        logger.info(
+            'Current minimum for fee splitter assets: %s %s',
+            FEE_SPLITTER_MIN_ASSETS,
+            settings.network_config.VAULT_BALANCE_SYMBOL,
+        )
     if not settings.graph_endpoint and settings.claim_fee_splitter:
         raise ClickException('GRAPH_ENDPOINT is missing')
 

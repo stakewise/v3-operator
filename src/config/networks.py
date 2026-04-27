@@ -52,7 +52,7 @@ class NetworkConfig(BaseNetworkConfig):
     NODE_CONFIG: NodeConfig
 
     @property
-    def MAX_VALIDATOR_BALANCE(self) -> Decimal:
+    def MAX_VALIDATOR_BALANCE_ETH(self) -> Decimal:
         """Returns the maximum validator balance in ETH (or GNO on Gnosis)."""
         return Decimal(Web3.from_wei(Web3.to_wei(self.MAX_VALIDATOR_BALANCE_GWEI, 'gwei'), 'ether'))
 

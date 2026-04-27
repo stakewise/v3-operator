@@ -129,8 +129,8 @@ logger = logging.getLogger(__name__)
     type=ETH_AMOUNT_TYPE,
     envvar='MAX_VALIDATOR_BALANCE',
     help=f'The maximum validator balance in ETH (or GNO on Gnosis). '
-    f'Default is {NETWORKS[MAINNET].MAX_VALIDATOR_BALANCE} ETH for Ethereum, '
-    f'{NETWORKS[GNOSIS].MAX_VALIDATOR_BALANCE} GNO for Gnosis.',
+    f'Default is {NETWORKS[MAINNET].MAX_VALIDATOR_BALANCE_ETH} ETH for Ethereum, '
+    f'{NETWORKS[GNOSIS].MAX_VALIDATOR_BALANCE_ETH} GNO for Gnosis.',
     callback=validate_max_validator_balance,
 )
 @click.option(
