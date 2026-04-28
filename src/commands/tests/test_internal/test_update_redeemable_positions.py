@@ -396,6 +396,7 @@ class TestUpdateOsTokenPositions:
             {
                 'vault': {
                     'id': vault_1.lower(),
+                    'osTokenConfig': {'id': '2'},
                 },
                 'id': address_1.lower(),
                 'address': address_1,
@@ -405,6 +406,7 @@ class TestUpdateOsTokenPositions:
             {
                 'vault': {
                     'id': vault_2.lower(),
+                    'osTokenConfig': {'id': '2'},
                 },
                 'id': address_2.lower(),
                 'address': address_2,
@@ -537,6 +539,7 @@ class TestUpdateOsTokenPositions:
             {
                 'vault': {
                     'id': vault_1.lower(),
+                    'osTokenConfig': {'id': '2'},
                 },
                 'id': address_1.lower(),
                 'address': address_1,
@@ -596,6 +599,7 @@ class TestUpdateOsTokenPositions:
             {
                 'vault': {
                     'id': vault_1.lower(),
+                    'osTokenConfig': {'id': '2'},
                 },
                 'id': address_1.lower(),
                 'address': address_1,
@@ -651,6 +655,7 @@ class TestUpdateOsTokenPositions:
             {
                 'vault': {
                     'id': vault_1.lower(),
+                    'osTokenConfig': {'id': '2'},
                 },
                 'id': address_1.lower(),
                 'address': address_1,
