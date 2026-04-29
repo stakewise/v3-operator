@@ -9,7 +9,6 @@ repos:
     rev: v0.5
     hooks:
       - id: unify
-        language_version: python3.10
 
   - repo: local
     hooks:
@@ -88,6 +87,7 @@ repos:
     rev: 'v2.13'
     hooks:
       - id: vulture
+        language_version: python3.12
         args: ["src/"]
         files: no-files
         always_run: true
