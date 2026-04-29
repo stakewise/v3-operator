@@ -53,12 +53,6 @@ jobs:
       - id: commit-hash
         uses: prompt/actions-commit-hash@01d19a83c242e1851c9aa6cf9625092ecd095d09 # v2
 
-      - name: Trivy Setup
-        uses: aquasecurity/setup-trivy@3fb12ec12f41e471780db15c232d5dd185dcb514 # v0.2.6
-        with:
-          cache: true
-          version: v0.68.2
-
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
@@ -68,5 +62,3 @@ jobs:
           vuln-type: "os,library"
           severity: "CRITICAL,HIGH"
           ignore-unfixed: true
-        env:
-          TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db

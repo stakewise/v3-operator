@@ -118,11 +118,7 @@ DEFAULT_MIN_QUEUED_ASSETS_GWEI = Web3.from_wei(DEFAULT_MIN_QUEUED_ASSETS, 'gwei'
         case_sensitive=False,
     ),
 )
-@click.command(
-    help='Monitors the EthOsTokenRedeemer/GnoOsTokenRedeemer contracts'
-    ' and automatically processes OsToken position redemptions'
-    ' and exit queue checkpoints.'
-)
+@click.command(help='Processes redemptions and exit queue checkpoints.')
 # pylint: disable-next=too-many-arguments
 def process_redeemer(
     execution_endpoints: str,
