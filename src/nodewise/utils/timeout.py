@@ -25,7 +25,7 @@ class Timeout(Exception):
     def __str__(self) -> str:
         if self.seconds is None:
             return ''
-        return f"{self.seconds} seconds"
+        return f'{self.seconds} seconds'
 
     def __enter__(self) -> Timeout:
         self.start()
