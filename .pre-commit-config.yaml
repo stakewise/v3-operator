@@ -1,3 +1,6 @@
+default_language_version:
+  python: python3.12
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.4.0
@@ -9,7 +12,6 @@ repos:
     rev: v0.5
     hooks:
       - id: unify
-        language_version: python3.12
 
   - repo: local
     hooks:
@@ -88,7 +90,6 @@ repos:
     rev: 'v2.13'
     hooks:
       - id: vulture
-        language_version: python3.12
         args: ["src/"]
         files: no-files
         always_run: true
