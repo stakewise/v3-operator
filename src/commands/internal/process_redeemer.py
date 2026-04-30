@@ -164,8 +164,7 @@ async def main(
     try:
         with InterruptHandler() as interrupt_handler:
             while not interrupt_handler.exit:
-                block_number = await execution_client.eth.block_number
-                await process(block_number=block_number, min_queued_assets=min_queued_assets)
+                await process(min_queued_assets=min_queued_assets)
                 await interrupt_handler.sleep(interval)
 
     finally:
@@ -173,12 +172,8 @@ async def main(
 
 
 async def process(
-    block_number: BlockNumber,
     min_queued_assets: Gwei,
 ) -> None:
-
-    # Re-fetch block number after exit queue processing
-    # to ensure we read the latest on-chain state
     block_number = await execution_client.eth.block_number
 
     # Check queued shares
@@ -254,7 +249,11 @@ async def process(
             len(positions_to_redeem),
             tx_hash,
         )
-        await _process_exit_queue(block_number)
+
+    # Re-fetch block number after redemption processing
+    # to ensure we read the latest on-chain state
+    block_number = await execution_client.eth.block_number
+    await _process_exit_queue(block_number)
 
 
 async def _process_exit_queue(block_number: BlockNumber) -> None:
