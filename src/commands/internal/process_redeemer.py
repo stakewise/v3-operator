@@ -112,7 +112,7 @@ DEFAULT_MIN_QUEUED_ASSETS_GWEI = Web3.from_wei(DEFAULT_MIN_QUEUED_ASSETS, 'gwei'
 )
 @click.option(
     '--skip-harvest',
-    help='',
+    help='If set, stop execution and do not harvest meta vaults that require a state update.',
     envvar='SKIP_HARVEST',
     is_flag=True,
 )
