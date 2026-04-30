@@ -319,7 +319,7 @@ class TestTryRedeemMetaVault:
                 vault_address=VAULT_1,
                 assets=Wei(400),
                 current_withdrawable=Wei(100),
-                harvest_params=None,
+                vault_to_harvest_params={VAULT_1: None},
                 skip_harvest=False,
             )
         assert result == Wei(100)
@@ -343,7 +343,7 @@ class TestTryRedeemMetaVault:
                 vault_address=VAULT_1,
                 assets=Wei(400),
                 current_withdrawable=Wei(100),
-                harvest_params=None,
+                vault_to_harvest_params={VAULT_1: None},
                 skip_harvest=False,
             )
         assert result == Wei(600)
@@ -364,7 +364,7 @@ class TestTryRedeemMetaVault:
                 vault_address=VAULT_1,
                 assets=Wei(400),
                 current_withdrawable=Wei(100),
-                harvest_params=None,
+                vault_to_harvest_params={VAULT_1: None},
                 skip_harvest=False,
             )
         assert result == Wei(100)
@@ -394,7 +394,7 @@ class TestTryRedeemMetaVault:
                 vault_address=VAULT_1,
                 assets=Wei(400),
                 current_withdrawable=Wei(100),
-                harvest_params=None,
+                vault_to_harvest_params={VAULT_1: None},
                 skip_harvest=False,
             )
         assert result == Wei(500)
@@ -426,12 +426,62 @@ class TestTryRedeemMetaVault:
                 vault_address=VAULT_1,
                 assets=Wei(400),
                 current_withdrawable=Wei(100),
-                harvest_params=None,
+                vault_to_harvest_params={VAULT_1: None},
                 skip_harvest=False,
             )
         assert result == Wei(100)
         # Only the first call (nested vault) was attempted
         mock_redeemer.redeem_sub_vaults_assets.assert_called_once_with(VAULT_2, Wei(200))
+
+    async def test_harvest_clears_consumed_params(self) -> None:
+        """After harvest, consumed harvest params are cleared so callers
+        don't apply update_state twice and trigger a revert."""
+        original_params = make_harvest_params()
+        vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None] = {
+            VAULT_1: original_params,
+            VAULT_2: original_params,
+        }
+        # After harvest, on-chain can_harvest is False for VAULT_1; VAULT_2 is unaffected
+        refreshed = {VAULT_1: None, VAULT_2: original_params}
+
+        captured_get_withdrawable: list[HarvestParams | None] = []
+
+        async def fake_get_withdrawable(
+            vault: ChecksumAddress, harvest_params: HarvestParams | None
+        ) -> Wei:
+            captured_get_withdrawable.append(harvest_params)
+            return Wei(600)
+
+        with (
+            patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
+            patch(f'{MODULE}.is_meta_vault_harvested', new=AsyncMock(return_value=False)),
+            patch(f'{MODULE}.harvest_meta_vault', new=AsyncMock()) as mock_harvest,
+            patch(
+                f'{MODULE}.get_multiple_harvest_params',
+                new=AsyncMock(return_value=refreshed),
+            ),
+            patch(
+                f'{MODULE}._build_meta_vault_redeem_order',
+                new=AsyncMock(return_value=[SubVaultRedemption(vault=VAULT_1, assets=Wei(400))]),
+            ),
+            patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
+            patch(f'{MODULE}.get_withdrawable_assets', new=fake_get_withdrawable),
+        ):
+            mock_redeemer.redeem_sub_vaults_assets = AsyncMock(return_value='0xabc')
+            await _try_redeem_meta_vault(
+                vault_address=VAULT_1,
+                assets=Wei(400),
+                current_withdrawable=Wei(100),
+                vault_to_harvest_params=vault_to_harvest_params,
+                skip_harvest=False,
+            )
+
+        mock_harvest.assert_awaited_once_with(VAULT_1)
+        # Consumed params for harvested vault are cleared in place
+        assert vault_to_harvest_params == {VAULT_1: None, VAULT_2: original_params}
+        # get_withdrawable_assets was called with the refreshed (None) params,
+        # not the stale original_params
+        assert captured_get_withdrawable == [None]
 
 
 class TestBuildMetaVaultRedeemOrder:

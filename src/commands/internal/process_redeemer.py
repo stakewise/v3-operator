@@ -432,7 +432,7 @@ async def _redeem_meta_vaults(
                 vault_address=vault,
                 assets=needed,
                 current_withdrawable=withdrawable,
-                harvest_params=vault_to_harvest_params.get(vault),
+                vault_to_harvest_params=vault_to_harvest_params,
                 skip_harvest=skip_harvest,
             )
 
@@ -443,13 +443,18 @@ async def _try_redeem_meta_vault(
     vault_address: ChecksumAddress,
     assets: Wei,
     current_withdrawable: Wei,
-    harvest_params: HarvestParams | None,
+    vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None],
     skip_harvest: bool,
 ) -> Wei:
     """If vault is a meta-vault, redeem sub-vaults for the needed assets.
 
     Handles nested meta vaults by building a bottom-up redemption order
     and processing deepest nested vaults first.
+
+    On harvest, mutates ``vault_to_harvest_params`` in place to drop params
+    for vaults whose state was just updated on-chain — applying those params
+    again (in ``get_withdrawable_assets`` or ``execute_redemption``) would
+    revert.
 
     Returns the (possibly updated) withdrawable assets.
     """
@@ -463,6 +468,7 @@ async def _try_redeem_meta_vault(
                 'stopping vaults redemption processing...'
             )
         await harvest_meta_vault(vault_address)
+        await _refresh_harvest_params(vault_to_harvest_params)
 
     logger.info('Vault %s is a meta-vault with insufficient withdrawable assets.', vault_address)
 
@@ -495,11 +501,13 @@ async def _try_redeem_meta_vault(
                 redeem_entry.vault,
             )
             if any_succeeded:
-                return await get_withdrawable_assets(vault_address, harvest_params)
+                return await get_withdrawable_assets(
+                    vault_address, vault_to_harvest_params.get(vault_address)
+                )
             return current_withdrawable
 
     # Re-query actual withdrawable assets on-chain after sub-vault redemption
-    return await get_withdrawable_assets(vault_address, harvest_params)
+    return await get_withdrawable_assets(vault_address, vault_to_harvest_params.get(vault_address))
 
 
 async def _build_meta_vault_redeem_order(
@@ -622,3 +630,19 @@ def build_multi_proof(
     )
     redeem_leaves = [p.merkle_leaf(tree_nonce) for p in positions_to_redeem]
     return tree.get_multi_proof(redeem_leaves)
+
+
+async def _refresh_harvest_params(
+    vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None],
+) -> None:
+    """Refresh the harvest params dict in place against the latest on-chain state.
+
+    Called after a meta vault harvest consumes ``update_state`` for some subset
+    of the tracked vaults. Vaults that were just updated will have
+    ``can_harvest`` return False on-chain and are reset to ``None``, so callers
+    don't apply consumed params again and trigger a revert.
+    """
+    if not vault_to_harvest_params:
+        return
+    refreshed = await get_multiple_harvest_params(list(vault_to_harvest_params.keys()))
+    vault_to_harvest_params.update(refreshed)
