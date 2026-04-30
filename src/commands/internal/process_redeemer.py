@@ -174,6 +174,31 @@ async def main(
 async def process(
     min_queued_assets: Gwei,
 ) -> None:
+    """Run one redemption iteration and always process the exit queue at the end.
+
+    The exit-queue call must happen on every iteration (including early-return
+    paths such as below-threshold queued assets, zero nonce, no positions, or
+    no eligible positions). Using ``try/finally`` ensures that any early
+    ``return`` inside ``_redeem_os_token_positions`` still runs the exit-queue
+    step, while exceptions are propagated to the caller as before.
+    """
+    try:
+        await _redeem_os_token_positions(min_queued_assets=min_queued_assets)
+    finally:
+        # Re-fetch block number after redemption processing
+        # to ensure we read the latest on-chain state.
+        block_number = await execution_client.eth.block_number
+        await _process_exit_queue(block_number)
+
+
+async def _redeem_os_token_positions(
+    min_queued_assets: Gwei,
+) -> None:
+    """Perform the OsToken redemption flow for a single iteration.
+
+    Returns early without raising when there is nothing to redeem; the caller
+    is responsible for processing the exit queue regardless of the outcome.
+    """
     block_number = await execution_client.eth.block_number
 
     # Check queued shares
@@ -249,11 +274,6 @@ async def process(
             len(positions_to_redeem),
             tx_hash,
         )
-
-    # Re-fetch block number after redemption processing
-    # to ensure we read the latest on-chain state
-    block_number = await execution_client.eth.block_number
-    await _process_exit_queue(block_number)
 
 
 async def _process_exit_queue(block_number: BlockNumber) -> None:

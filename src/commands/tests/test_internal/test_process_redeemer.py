@@ -689,6 +689,7 @@ class TestProcess:
         with _mock_process() as mocks:
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(0))
             await process(min_queued_assets=Gwei(1))
+            mocks['mock_exit_queue'].assert_called_once()
 
     async def test_below_threshold(self) -> None:
         with _mock_process() as mocks:
@@ -696,6 +697,15 @@ class TestProcess:
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(500))
             await process(min_queued_assets=Gwei(1000))
             mocks['mock_execute'].assert_not_called()
+            mocks['mock_exit_queue'].assert_called_once()
+
+    async def test_zero_nonce(self) -> None:
+        with _mock_process() as mocks:
+            mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
+            mocks['mock_redeemer'].nonce = AsyncMock(return_value=0)
+            await process(min_queued_assets=Gwei(0))
+            mocks['mock_execute'].assert_not_called()
+            mocks['mock_exit_queue'].assert_called_once()
 
     async def test_no_eligible_positions(self) -> None:
         with _mock_process() as mocks:
@@ -703,6 +713,7 @@ class TestProcess:
             mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
             await process(min_queued_assets=Gwei(0))
             mocks['mock_execute'].assert_not_called()
+            mocks['mock_exit_queue'].assert_called_once()
 
     async def test_successful_redemption(self) -> None:
         positions = [make_position(leaf_shares=1000, unprocessed_shares=500, shares_to_redeem=500)]
@@ -712,6 +723,15 @@ class TestProcess:
             mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
             await process(min_queued_assets=Gwei(0))
             mocks['mock_execute'].assert_called_once()
+            mocks['mock_exit_queue'].assert_called_once()
+
+    async def test_exit_queue_runs_even_when_redemption_raises(self) -> None:
+        """Unexpected exceptions in the redemption flow must not skip the exit queue."""
+        with _mock_process() as mocks:
+            mocks['mock_redeemer'].queued_shares = AsyncMock(side_effect=RuntimeError('boom'))
+            with pytest.raises(RuntimeError, match='boom'):
+                await process(min_queued_assets=Gwei(0))
+            mocks['mock_exit_queue'].assert_called_once()
 
 
 # --- Helpers ---
@@ -751,12 +771,16 @@ def _mock_process(
     """Common mock setup for process() tests."""
     positions = positions or []
     mock_client = MagicMock()
+    # ``execution_client.eth.block_number`` is awaited at least twice per
+    # ``process()`` call (once at the top of the redemption flow, once in the
+    # ``finally`` before ``_process_exit_queue``). A done Future is idempotent
+    # on ``await`` so the same instance can be reused.
     block_number_future: asyncio.Future[BlockNumber] = asyncio.Future()
     block_number_future.set_result(BlockNumber(101))
     mock_client.eth.block_number = block_number_future
 
     with (
-        patch(f'{MODULE}._process_exit_queue', new=AsyncMock()),
+        patch(f'{MODULE}._process_exit_queue', new=AsyncMock()) as mock_exit_queue,
         patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
         patch(
             f'{MODULE}.create_os_token_converter',
@@ -793,6 +817,7 @@ def _mock_process(
         yield {
             'mock_redeemer': mock_redeemer,
             'mock_execute': mock_execute,
+            'mock_exit_queue': mock_exit_queue,
         }
 
 
