@@ -517,6 +517,24 @@ class TestTryRedeemMetaVault:
         mock_build_order.assert_not_called()
         mock_redeemer.redeem_sub_vaults_assets.assert_not_called()
 
+    async def test_skip_harvest_raises_for_unharvested_vault(self) -> None:
+        """With --skip-harvest set, an unharvested meta vault raises and
+        harvest_meta_vault is not called, halting redemption processing."""
+        with (
+            patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
+            patch(f'{MODULE}.is_meta_vault_harvested', new=AsyncMock(return_value=False)),
+            patch(f'{MODULE}.harvest_meta_vault', new=AsyncMock()) as mock_harvest,
+        ):
+            with pytest.raises(RuntimeError, match='is not harvested'):
+                await _try_redeem_meta_vault(
+                    vault_address=VAULT_1,
+                    assets=Wei(400),
+                    current_withdrawable=Wei(100),
+                    vault_to_harvest_params={VAULT_1: None},
+                    skip_harvest=True,
+                )
+        mock_harvest.assert_not_awaited()
+
 
 class TestBuildMetaVaultRedeemOrder:
     async def test_flat_meta_vault_no_nesting(self) -> None:
