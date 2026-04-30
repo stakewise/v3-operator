@@ -20,7 +20,7 @@ from src.common.contracts import (
     SubVaultsRegistryContract,
     os_token_redeemer_contract,
 )
-from src.common.execution import transaction_gas_wrapper
+from src.common.execution import check_gas_price, transaction_gas_wrapper
 from src.common.harvest import get_multiple_harvest_params
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.typings import HarvestParams
@@ -207,6 +207,9 @@ async def process(
     min_queued_assets: Gwei,
     skip_harvest: bool,
 ) -> None:
+    if not await check_gas_price():
+        return
+
     # Step 1: Process exit queue
     await _process_exit_queue(block_number)
 
@@ -469,6 +472,11 @@ async def _try_redeem_meta_vault(
             )
         await harvest_meta_vault(vault_address)
         await _refresh_harvest_params(vault_to_harvest_params)
+        current_withdrawable = await get_withdrawable_assets(
+            vault_address, vault_to_harvest_params.get(vault_address)
+        )
+        if current_withdrawable >= assets:
+            return current_withdrawable
 
     logger.info('Vault %s is a meta-vault with insufficient withdrawable assets.', vault_address)
 
