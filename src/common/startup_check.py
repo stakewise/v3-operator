@@ -16,9 +16,9 @@ from sw_utils import (
     IpfsFetchClient,
     get_consensus_client,
     get_execution_client,
+    is_vault_upgraded_to_pectra,
 )
 from sw_utils.graph.client import GraphClient as SWGraphClient
-from sw_utils.pectra import get_pectra_vault_version
 from web3 import Web3
 from web3.exceptions import BadFunctionCallOutput
 
@@ -381,7 +381,8 @@ async def check_validators_manager() -> None:
 
 async def check_vault_version() -> None:
     vault_contract = VaultContract(settings.vault)
-    if await vault_contract.version() < get_pectra_vault_version(settings.network, settings.vault):
+    vault_version = await vault_contract.version()
+    if not is_vault_upgraded_to_pectra(settings.network, settings.vault, vault_version):
         raise RuntimeError(f'Please upgrade Vault {settings.vault} to the latest version.')
 
 
