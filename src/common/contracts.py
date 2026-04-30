@@ -462,8 +462,24 @@ class MetaVaultEncoder(BaseEncoder):
         )
 
 
+class V4MetaVaultContract(ContractWrapper):
+    """V4 refers to contracts release version, not to be confused with vault versioning"""
+
+    abi_path = 'abi/IV4EthMetaVault.json'
+
+    async def is_state_update_required(self, block_number: BlockNumber | None = None) -> bool:
+        return await self.contract.functions.isStateUpdateRequired().call(
+            block_identifier=block_number
+        )
+
+
 class SubVaultsRegistryContract(ContractWrapper):
     abi_path = 'abi/ISubVaultsRegistry.json'
+
+    async def is_state_update_required(self, block_number: BlockNumber | None = None) -> bool:
+        return await self.contract.functions.isStateUpdateRequired().call(
+            block_identifier=block_number
+        )
 
     async def get_last_rewards_nonce_updated_event(
         self, from_block: BlockNumber, to_block: BlockNumber

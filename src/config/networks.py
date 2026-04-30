@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass, fields
 from datetime import timedelta
 
 from ens.constants import EMPTY_ADDR_HEX
@@ -15,6 +15,14 @@ AVAILABLE_NETWORKS = [MAINNET, HOODI, GNOSIS]
 RATED_NETWORKS = [MAINNET]
 
 ZERO_CHECKSUM_ADDRESS = Web3.to_checksum_address(EMPTY_ADDR_HEX)  # noqa: E501
+
+
+def _load_base_kwargs(network: str) -> dict:
+    # Shallow per-field copy. `dataclasses.asdict` would recurse and convert
+    # nested dataclasses (e.g. `ContractRelease` inside `CONTRACTS_RELEASES`)
+    # into plain dicts, breaking attribute access on them.
+    base = BASE_NETWORKS[network]
+    return {f.name: getattr(base, f.name) for f in fields(base)}
 
 
 @dataclass
@@ -79,7 +87,7 @@ class NodeConfig:
 
 NETWORKS: dict[str, NetworkConfig] = {
     MAINNET: NetworkConfig(
-        **asdict(BASE_NETWORKS[MAINNET]),
+        **_load_base_kwargs(MAINNET),
         WALLET_BALANCE_SYMBOL='ETH',
         VAULT_BALANCE_SYMBOL='ETH',
         OS_TOKEN_BALANCE_SYMBOL='osETH',
@@ -133,7 +141,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         ),
     ),
     HOODI: NetworkConfig(
-        **asdict(BASE_NETWORKS[HOODI]),
+        **_load_base_kwargs(HOODI),
         WALLET_BALANCE_SYMBOL='HoodiETH',
         VAULT_BALANCE_SYMBOL='HoodiETH',
         OS_TOKEN_BALANCE_SYMBOL='osETH',
@@ -183,7 +191,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         ),
     ),
     GNOSIS: NetworkConfig(
-        **asdict(BASE_NETWORKS[GNOSIS]),
+        **_load_base_kwargs(GNOSIS),
         WALLET_BALANCE_SYMBOL='xDAI',
         VAULT_BALANCE_SYMBOL='GNO',
         OS_TOKEN_BALANCE_SYMBOL='osGNO',

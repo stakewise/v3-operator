@@ -87,6 +87,7 @@ class TestSelectPositions:
             converter=make_converter(),
             vault_to_harvest_params={},
             vault_to_withdrawable_assets={},
+            skip_harvest=False,
         )
         assert positions_to_redeem == []
 
@@ -99,6 +100,7 @@ class TestSelectPositions:
             converter=make_converter(),
             vault_to_harvest_params={VAULT_1: None},
             vault_to_withdrawable_assets={VAULT_1: Wei(1000)},
+            skip_harvest=False,
         )
         assert len(positions_to_redeem) == 1
         assert positions_to_redeem[0].shares_to_redeem == Wei(500)
@@ -113,6 +115,7 @@ class TestSelectPositions:
                 converter=make_converter(100, 100),
                 vault_to_harvest_params={VAULT_1: None},
                 vault_to_withdrawable_assets={VAULT_1: Wei(100)},
+                skip_harvest=False,
             )
         assert len(positions_to_redeem) == 1
         assert positions_to_redeem[0].shares_to_redeem == Wei(100)
@@ -127,6 +130,7 @@ class TestSelectPositions:
                 converter=make_converter(100, 100),
                 vault_to_harvest_params={VAULT_1: None},
                 vault_to_withdrawable_assets={VAULT_1: Wei(0)},
+                skip_harvest=False,
             )
         assert positions_to_redeem == []
 
@@ -139,6 +143,7 @@ class TestSelectPositions:
             converter=make_converter(),
             vault_to_harvest_params={VAULT_1: None},
             vault_to_withdrawable_assets={VAULT_1: Wei(10000)},
+            skip_harvest=False,
         )
         assert len(positions_to_redeem) == 1
         assert positions_to_redeem[0].shares_to_redeem == Wei(200)
@@ -154,6 +159,7 @@ class TestSelectPositions:
                 converter=make_converter(100, 100),
                 vault_to_harvest_params={VAULT_1: None},
                 vault_to_withdrawable_assets={VAULT_1: Wei(700)},
+                skip_harvest=False,
             )
         assert len(positions_to_redeem) == 2
         assert positions_to_redeem[0].owner == OWNER_1
@@ -171,6 +177,7 @@ class TestSelectPositions:
             converter=make_converter(100, 100),
             vault_to_harvest_params={VAULT_1: None, VAULT_2: None},
             vault_to_withdrawable_assets={VAULT_1: Wei(10000), VAULT_2: Wei(10000)},
+            skip_harvest=False,
         )
         assert len(positions_to_redeem) == 2
 
@@ -184,6 +191,7 @@ class TestSelectPositions:
             converter=make_converter(100, 100),
             vault_to_harvest_params={VAULT_1: None, VAULT_2: None},
             vault_to_withdrawable_assets={VAULT_1: Wei(10000), VAULT_2: Wei(10000)},
+            skip_harvest=False,
         )
         assert len(positions_to_redeem) == 1
         assert positions_to_redeem[0].vault == VAULT_1
@@ -197,6 +205,7 @@ class TestSelectPositions:
             converter=make_converter(),
             vault_to_harvest_params={VAULT_1: None},
             vault_to_withdrawable_assets={VAULT_1: Wei(10000)},
+            skip_harvest=False,
         )
         assert positions_to_redeem[0].leaf_shares == Wei(1000)
         assert positions_to_redeem[0].shares_to_redeem == Wei(200)
@@ -211,6 +220,7 @@ class TestSelectPositions:
             converter=make_converter(100, 100),
             vault_to_harvest_params={VAULT_1: None},
             vault_to_withdrawable_assets={VAULT_1: Wei(10000)},
+            skip_harvest=False,
         )
         assert len(positions_to_redeem) == 1
         assert positions_to_redeem[0].owner == OWNER_1
@@ -226,6 +236,7 @@ class TestSelectPositions:
                 converter=make_converter(100, 100),
                 vault_to_harvest_params={VAULT_1: None},
                 vault_to_withdrawable_assets={VAULT_1: Wei(500)},
+                skip_harvest=False,
             )
         assert len(positions_to_redeem) == 1
         assert positions_to_redeem[0].owner == OWNER_1
@@ -309,12 +320,14 @@ class TestTryRedeemMetaVault:
                 assets=Wei(400),
                 current_withdrawable=Wei(100),
                 harvest_params=None,
+                skip_harvest=False,
             )
         assert result == Wei(100)
 
     async def test_meta_vault_successful_redeem(self) -> None:
         with (
             patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
+            patch(f'{MODULE}.is_meta_vault_harvested', new=AsyncMock(return_value=True)),
             patch(
                 f'{MODULE}._build_meta_vault_redeem_order',
                 new=AsyncMock(return_value=[SubVaultRedemption(vault=VAULT_1, assets=Wei(400))]),
@@ -331,6 +344,7 @@ class TestTryRedeemMetaVault:
                 assets=Wei(400),
                 current_withdrawable=Wei(100),
                 harvest_params=None,
+                skip_harvest=False,
             )
         assert result == Wei(600)
         mock_redeemer.redeem_sub_vaults_assets.assert_called_once_with(VAULT_1, Wei(400))
@@ -338,6 +352,7 @@ class TestTryRedeemMetaVault:
     async def test_meta_vault_failed_redeem(self) -> None:
         with (
             patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
+            patch(f'{MODULE}.is_meta_vault_harvested', new=AsyncMock(return_value=True)),
             patch(
                 f'{MODULE}._build_meta_vault_redeem_order',
                 new=AsyncMock(return_value=[SubVaultRedemption(vault=VAULT_1, assets=Wei(400))]),
@@ -350,6 +365,7 @@ class TestTryRedeemMetaVault:
                 assets=Wei(400),
                 current_withdrawable=Wei(100),
                 harvest_params=None,
+                skip_harvest=False,
             )
         assert result == Wei(100)
 
@@ -357,6 +373,7 @@ class TestTryRedeemMetaVault:
         """Nested meta vault B is redeemed before parent A."""
         with (
             patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
+            patch(f'{MODULE}.is_meta_vault_harvested', new=AsyncMock(return_value=True)),
             patch(
                 f'{MODULE}._build_meta_vault_redeem_order',
                 new=AsyncMock(
@@ -378,6 +395,7 @@ class TestTryRedeemMetaVault:
                 assets=Wei(400),
                 current_withdrawable=Wei(100),
                 harvest_params=None,
+                skip_harvest=False,
             )
         assert result == Wei(500)
         calls = mock_redeemer.redeem_sub_vaults_assets.call_args_list
@@ -389,6 +407,7 @@ class TestTryRedeemMetaVault:
         """If nested redemption fails, returns current_withdrawable."""
         with (
             patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
+            patch(f'{MODULE}.is_meta_vault_harvested', new=AsyncMock(return_value=True)),
             patch(
                 f'{MODULE}._build_meta_vault_redeem_order',
                 new=AsyncMock(
@@ -408,6 +427,7 @@ class TestTryRedeemMetaVault:
                 assets=Wei(400),
                 current_withdrawable=Wei(100),
                 harvest_params=None,
+                skip_harvest=False,
             )
         assert result == Wei(100)
         # Only the first call (nested vault) was attempted
@@ -610,20 +630,28 @@ class TestProcess:
     async def test_no_queued_shares(self) -> None:
         with _mock_process() as mocks:
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(0))
-            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(1))
+            await process(
+                block_number=BlockNumber(100), min_queued_assets=Gwei(1), skip_harvest=False
+            )
 
     async def test_below_threshold(self) -> None:
         with _mock_process() as mocks:
             # 500 wei queued shares, threshold is 1000 Gwei
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(500))
-            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(1000))
+            await process(
+                block_number=BlockNumber(100),
+                min_queued_assets=Gwei(1000),
+                skip_harvest=False,
+            )
             mocks['mock_execute'].assert_not_called()
 
     async def test_no_eligible_positions(self) -> None:
         with _mock_process() as mocks:
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
             mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
-            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(0))
+            await process(
+                block_number=BlockNumber(100), min_queued_assets=Gwei(0), skip_harvest=False
+            )
             mocks['mock_execute'].assert_not_called()
 
     async def test_successful_redemption(self) -> None:
@@ -632,7 +660,9 @@ class TestProcess:
         with _mock_process(positions=positions) as mocks:
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
             mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
-            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(0))
+            await process(
+                block_number=BlockNumber(100), min_queued_assets=Gwei(0), skip_harvest=False
+            )
             mocks['mock_execute'].assert_called_once()
 
 

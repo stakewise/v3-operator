@@ -28,7 +28,9 @@ from src.common.utils import log_verbose
 from src.common.wallet import wallet
 from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
-from src.meta_vault.service import is_meta_vault
+from src.meta_vault.graph import graph_get_vaults
+from src.meta_vault.service import is_meta_vault, is_meta_vault_harvested
+from src.meta_vault.tasks import process_meta_vault_tree
 from src.meta_vault.typings import SubVaultRedemption
 from src.redemptions.os_token_converter import (
     OsTokenConverter,
@@ -78,6 +80,13 @@ DEFAULT_MIN_QUEUED_ASSETS_GWEI = Web3.from_wei(DEFAULT_MIN_QUEUED_ASSETS, 'gwei'
     ' when connecting to execution nodes.',
 )
 @click.option(
+    '--graph-endpoint',
+    type=str,
+    envvar='GRAPH_ENDPOINT',
+    # default is endpoint from network config
+    help='API endpoint for graph node.',
+)
+@click.option(
     '--interval',
     type=int,
     default=DEFAULT_INTERVAL,
@@ -100,6 +109,12 @@ DEFAULT_MIN_QUEUED_ASSETS_GWEI = Web3.from_wei(DEFAULT_MIN_QUEUED_ASSETS, 'gwei'
     default='INFO',
     envvar='LOG_LEVEL',
     help='The log level.',
+)
+@click.option(
+    '--skip-harvest',
+    help='',
+    envvar='SKIP_HARVEST',
+    is_flag=True,
 )
 @click.option(
     '-v',
@@ -128,6 +143,8 @@ def process_redeemer(
     execution_endpoints: str,
     execution_jwt_secret: str | None,
     network: str,
+    graph_endpoint: str | None,
+    skip_harvest: bool,
     verbose: bool,
     log_level: str,
     interval: int,
@@ -141,6 +158,7 @@ def process_redeemer(
         vault_dir=Path.home() / '.stakewise',
         execution_endpoints=execution_endpoints,
         execution_jwt_secret=execution_jwt_secret,
+        graph_endpoint=graph_endpoint,
         verbose=verbose,
         network=network,
         wallet_file=wallet_file,
@@ -148,7 +166,13 @@ def process_redeemer(
         log_level=log_level,
     )
     try:
-        asyncio.run(main(interval=interval, min_queued_assets=Gwei(min_queued_assets_gwei)))
+        asyncio.run(
+            main(
+                interval=interval,
+                min_queued_assets=Gwei(min_queued_assets_gwei),
+                skip_harvest=skip_harvest,
+            )
+        )
     except Exception as e:
         log_verbose(e)
         sys.exit(1)
@@ -157,6 +181,7 @@ def process_redeemer(
 async def main(
     interval: int,
     min_queued_assets: Gwei,
+    skip_harvest: bool,
 ) -> None:
     setup_logging()
     await setup_clients()
@@ -165,16 +190,22 @@ async def main(
         with InterruptHandler() as interrupt_handler:
             while not interrupt_handler.exit:
                 block_number = await execution_client.eth.block_number
-                await process(block_number=block_number, min_queued_assets=min_queued_assets)
+                await process(
+                    block_number=block_number,
+                    min_queued_assets=min_queued_assets,
+                    skip_harvest=skip_harvest,
+                )
                 await interrupt_handler.sleep(interval)
 
     finally:
         await close_clients()
 
 
+# pylint: disable-next=too-many-locals
 async def process(
     block_number: BlockNumber,
     min_queued_assets: Gwei,
+    skip_harvest: bool,
 ) -> None:
     # Step 1: Process exit queue
     await _process_exit_queue(block_number)
@@ -237,6 +268,7 @@ async def process(
         converter=os_token_converter,
         vault_to_harvest_params=vault_to_harvest_params,
         vault_to_withdrawable_assets=vault_to_withdrawable_assets,
+        skip_harvest=skip_harvest,
     )
 
     if not positions_to_redeem:
@@ -313,12 +345,14 @@ async def calculate_redeemable_shares(
     return redeemable
 
 
+# pylint: disable-next=too-many-arguments
 async def select_positions(
     os_token_positions: list[OsTokenPosition],
     queued_shares: int,
     converter: OsTokenConverter,
     vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None],
     vault_to_withdrawable_assets: dict[ChecksumAddress, Wei],
+    skip_harvest: bool,
 ) -> list[OsTokenPosition]:
     """Select positions to redeem in IPFS order, capped by queued shares and withdrawable assets.
 
@@ -331,6 +365,7 @@ async def select_positions(
         converter=converter,
         vault_to_harvest_params=vault_to_harvest_params,
         vault_to_withdrawable_assets=vault_to_withdrawable_assets,
+        skip_harvest=skip_harvest,
     )
 
     positions_to_redeem: list[OsTokenPosition] = []
@@ -364,12 +399,14 @@ async def select_positions(
     return positions_to_redeem
 
 
+# pylint: disable-next=too-many-arguments
 async def _redeem_meta_vaults(
     os_token_positions: list[OsTokenPosition],
     queued_shares: int,
     converter: OsTokenConverter,
     vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None],
     vault_to_withdrawable_assets: dict[ChecksumAddress, Wei],
+    skip_harvest: bool,
 ) -> dict[ChecksumAddress, Wei]:
     """Pre-compute meta-vault redemptions for all vaults that need them.
 
@@ -392,10 +429,11 @@ async def _redeem_meta_vaults(
         withdrawable = vault_to_withdrawable.get(vault, Wei(0))
         if needed > withdrawable:
             vault_to_withdrawable[vault] = await _try_redeem_meta_vault(
-                vault,
-                needed,
-                withdrawable,
-                vault_to_harvest_params.get(vault),
+                vault_address=vault,
+                assets=needed,
+                current_withdrawable=withdrawable,
+                harvest_params=vault_to_harvest_params.get(vault),
+                skip_harvest=skip_harvest,
             )
 
     return vault_to_withdrawable
@@ -406,6 +444,7 @@ async def _try_redeem_meta_vault(
     assets: Wei,
     current_withdrawable: Wei,
     harvest_params: HarvestParams | None,
+    skip_harvest: bool,
 ) -> Wei:
     """If vault is a meta-vault, redeem sub-vaults for the needed assets.
 
@@ -416,6 +455,14 @@ async def _try_redeem_meta_vault(
     """
     if not await is_meta_vault(vault_address):
         return current_withdrawable
+
+    if not await is_meta_vault_harvested(vault_address):
+        if skip_harvest:
+            raise RuntimeError(
+                f'Meta vault {vault_address} is not harvested, '
+                'stopping vaults redemption processing...'
+            )
+        await harvest_meta_vault(vault_address)
 
     logger.info('Vault %s is a meta-vault with insufficient withdrawable assets.', vault_address)
 
@@ -542,6 +589,16 @@ async def execute_redemption(
         return None
 
     return tx_hash
+
+
+async def harvest_meta_vault(vault: ChecksumAddress) -> None:
+    meta_vaults_map = await graph_get_vaults(
+        is_meta_vault=True,
+    )
+    try:
+        await process_meta_vault_tree(vault=vault, meta_vaults_map=meta_vaults_map)
+    except Exception as e:
+        raise RuntimeError(f'Failed to process meta vault tree for vault {vault}') from e
 
 
 async def _startup_check() -> None:
