@@ -160,8 +160,7 @@ async def main(
     try:
         with InterruptHandler() as interrupt_handler:
             while not interrupt_handler.exit:
-                block_number = await execution_client.eth.block_number
-                await process(block_number=block_number, min_queued_assets=min_queued_assets)
+                await process(min_queued_assets=min_queued_assets)
                 await interrupt_handler.sleep(interval)
 
     finally:
@@ -169,17 +168,36 @@ async def main(
 
 
 async def process(
-    block_number: BlockNumber,
     min_queued_assets: Gwei,
 ) -> None:
-    # Step 1: Process exit queue
-    await _process_exit_queue(block_number)
+    """Run one redemption iteration and always process the exit queue at the end.
 
-    # Re-fetch block number after exit queue processing
-    # to ensure we read the latest on-chain state
+    The exit-queue call must happen on every iteration (including early-return
+    paths such as below-threshold queued assets, zero nonce, no positions, or
+    no eligible positions). Using ``try/finally`` ensures that any early
+    ``return`` inside ``_redeem_os_token_positions`` still runs the exit-queue
+    step, while exceptions are propagated to the caller as before.
+    """
+    try:
+        await _redeem_os_token_positions(min_queued_assets=min_queued_assets)
+    finally:
+        # Re-fetch block number after redemption processing
+        # to ensure we read the latest on-chain state.
+        block_number = await execution_client.eth.block_number
+        await _process_exit_queue(block_number)
+
+
+async def _redeem_os_token_positions(
+    min_queued_assets: Gwei,
+) -> None:
+    """Perform the OsToken redemption flow for a single iteration.
+
+    Returns early without raising when there is nothing to redeem; the caller
+    is responsible for processing the exit queue regardless of the outcome.
+    """
     block_number = await execution_client.eth.block_number
 
-    # Step 2: Check queued shares
+    # Check queued shares
     queued_shares = await os_token_redeemer_contract.queued_shares(block_number)
     os_token_converter = await create_os_token_converter(block_number)
     queued_assets = os_token_converter.to_assets(queued_shares)
@@ -205,19 +223,19 @@ async def process(
         Web3.from_wei(queued_assets, 'ether'),
         settings.network_config.VAULT_BALANCE_SYMBOL,
     )
-    # Step 3: Fetch ALL positions from IPFS (needed for correct merkle tree)
+    # Fetch ALL positions from IPFS (needed for correct merkle tree)
     all_positions = await fetch_positions_from_ipfs(block_number)
     if not all_positions:
         logger.info('No positions found. Skipping to next interval.')
         return
 
-    # Step 4: Calculate redeemable shares
+    # Calculate redeemable shares
     os_token_positions = await calculate_redeemable_shares(all_positions, prev_nonce, block_number)
     if not os_token_positions:
         logger.info('No redeemable positions found. Skipping to next interval.')
         return
 
-    # Step 5: Fetch vault params
+    # Fetch vault params
     vaults = {p.vault for p in os_token_positions}
     vault_to_harvest_params = await get_multiple_harvest_params(list(vaults), block_number)
     vault_to_withdrawable_assets: dict[ChecksumAddress, Wei] = {}
@@ -226,7 +244,7 @@ async def process(
             vault, vault_to_harvest_params.get(vault)
         )
 
-    # Step 6: Select positions
+    # Select positions
     positions_to_redeem = await select_positions(
         os_token_positions=os_token_positions,
         queued_shares=queued_shares,
@@ -239,7 +257,7 @@ async def process(
         logger.info('No positions eligible for redemption.')
         return
 
-    # Step 7: Execute redemption (uses all_positions for complete merkle tree)
+    # Execute redemption (uses all_positions for complete merkle tree)
     tx_hash = await execute_redemption(
         all_positions=all_positions,
         positions_to_redeem=positions_to_redeem,
@@ -406,7 +424,10 @@ async def _try_redeem_meta_vault(
     """If vault is a meta-vault, redeem sub-vaults for the needed assets.
 
     Handles nested meta vaults by building a bottom-up redemption order
-    and processing deepest nested vaults first.
+    and processing deepest nested vaults first. Each entry in the redemption
+    order corresponds to a meta-vault that requires a sub-vault redemption to
+    reach its target withdrawable assets; vaults that already have enough
+    withdrawable to cover their target are skipped to avoid no-op transactions.
 
     Returns the (possibly updated) withdrawable assets.
     """
@@ -420,6 +441,16 @@ async def _try_redeem_meta_vault(
     except Exception:
         logger.exception(
             'Failed to build meta-vault redeem order for vault %s. '
+            'Proceeding with current withdrawable assets.',
+            vault_address,
+        )
+        return current_withdrawable
+
+    if not redeem_order:
+        # No sub-vault redemption is needed for this meta-vault: the on-chain
+        # calculator reported that withdrawable assets already cover the target.
+        logger.info(
+            'No sub-vault redemption needed for meta-vault %s. '
             'Proceeding with current withdrawable assets.',
             vault_address,
         )
@@ -447,7 +478,10 @@ async def _try_redeem_meta_vault(
                 return await get_withdrawable_assets(vault_address, harvest_params)
             return current_withdrawable
 
-    # Re-query actual withdrawable assets on-chain after sub-vault redemption
+    # Re-query actual withdrawable assets on-chain after sub-vault redemption.
+    # Note: redeemSubVaultsAssets may return 0 on-chain if no sub-vault assets
+    # were successfully redeemed, in which case the post-call withdrawable is
+    # unchanged from the pre-call value.
     return await get_withdrawable_assets(vault_address, harvest_params)
 
 
@@ -459,6 +493,11 @@ async def _build_meta_vault_redeem_order(
 
     For MetaVault A with sub-vault B (also a meta vault) with sub-vaults C, D:
     returns [(B, assets_B), (A, assets_A)] so B is redeemed first.
+
+    Skips any meta-vault whose current withdrawable assets already cover the
+    target. This avoids invoking ``redeemSubVaultsAssets`` when no redemption
+    is actually planned from that vault, since the function would otherwise
+    pull assets from sub-vaults unnecessarily.
     """
     order: list[SubVaultRedemption] = []
 
@@ -466,7 +505,13 @@ async def _build_meta_vault_redeem_order(
     registry_address = await meta_vault_contract.sub_vaults_registry()
     registry = SubVaultsRegistryContract(registry_address)
 
+    # ``calculateSubVaultsRedemptions`` returns the per-sub-vault breakdown
+    # required to cover the deficit. An empty result means the meta-vault
+    # already has enough withdrawable assets to satisfy ``assets``, so no
+    # sub-vault redemption is needed at this level.
     redemptions = await registry.calculate_sub_vaults_redemptions(assets)
+    if not redemptions:
+        return order
 
     for redemption in redemptions:
         if redemption.assets > 0 and await is_meta_vault(redemption.vault):

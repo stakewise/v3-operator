@@ -312,6 +312,26 @@ class TestTryRedeemMetaVault:
             )
         assert result == Wei(100)
 
+    async def test_meta_vault_no_redeem_order_skips_call(self) -> None:
+        """When the redeem order is empty, no on-chain call is made."""
+        with (
+            patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
+            patch(
+                f'{MODULE}._build_meta_vault_redeem_order',
+                new=AsyncMock(return_value=[]),
+            ),
+            patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
+        ):
+            mock_redeemer.redeem_sub_vaults_assets = AsyncMock()
+            result = await _try_redeem_meta_vault(
+                vault_address=VAULT_1,
+                assets=Wei(400),
+                current_withdrawable=Wei(100),
+                harvest_params=None,
+            )
+        assert result == Wei(100)
+        mock_redeemer.redeem_sub_vaults_assets.assert_not_called()
+
     async def test_meta_vault_successful_redeem(self) -> None:
         with (
             patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
@@ -415,10 +435,26 @@ class TestTryRedeemMetaVault:
 
 
 class TestBuildMetaVaultRedeemOrder:
-    async def test_flat_meta_vault_no_nesting(self) -> None:
-        """Meta vault with only regular sub-vaults returns single entry."""
+    async def test_empty_redemptions_skips_vault(self) -> None:
+        """Empty redemptions means the vault already has enough withdrawable; skip it."""
         mock_registry = AsyncMock()
         mock_registry.calculate_sub_vaults_redemptions = AsyncMock(return_value=[])
+
+        with (
+            patch(f'{MODULE}.MetaVaultContract') as mock_mv_cls,
+            patch(f'{MODULE}.SubVaultsRegistryContract', return_value=mock_registry),
+            patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=False)),
+        ):
+            mock_mv_cls.return_value.sub_vaults_registry = AsyncMock(return_value=REGISTRY_1)
+            result = await _build_meta_vault_redeem_order(VAULT_1, Wei(400))
+
+        assert result == []
+
+    async def test_flat_meta_vault_no_nesting(self) -> None:
+        """Meta vault with only regular sub-vaults returns single entry."""
+        redemption = SubVaultRedemption(vault=VAULT_2, assets=Wei(400))
+        mock_registry = AsyncMock()
+        mock_registry.calculate_sub_vaults_redemptions = AsyncMock(return_value=[redemption])
 
         with (
             patch(f'{MODULE}.MetaVaultContract') as mock_mv_cls,
@@ -434,15 +470,18 @@ class TestBuildMetaVaultRedeemOrder:
         """MetaVault A has sub-vault B (meta vault). Order: B first, then A."""
         redemption_b = SubVaultRedemption(vault=VAULT_2, assets=Wei(200))
         redemption_c = SubVaultRedemption(vault=VAULT_3, assets=Wei(100))
+        nested_redemption = SubVaultRedemption(vault=VAULT_3, assets=Wei(200))
 
         # Registry for A returns B (meta) and C (regular)
         mock_registry_a = AsyncMock()
         mock_registry_a.calculate_sub_vaults_redemptions = AsyncMock(
             return_value=[redemption_b, redemption_c]
         )
-        # Registry for B returns no nested meta vaults
+        # Registry for B returns a regular sub-vault — B has a real deficit.
         mock_registry_b = AsyncMock()
-        mock_registry_b.calculate_sub_vaults_redemptions = AsyncMock(return_value=[])
+        mock_registry_b.calculate_sub_vaults_redemptions = AsyncMock(
+            return_value=[nested_redemption]
+        )
 
         registry_a = Web3.to_checksum_address('0x' + 'aa' * 20)
         registry_b = Web3.to_checksum_address('0x' + 'bb' * 20)
@@ -474,6 +513,45 @@ class TestBuildMetaVaultRedeemOrder:
             SubVaultRedemption(vault=VAULT_2, assets=Wei(200)),
             SubVaultRedemption(vault=VAULT_1, assets=Wei(400)),
         ]
+
+    async def test_nested_meta_vault_with_sufficient_withdrawable_skipped(self) -> None:
+        """Nested meta-vault with empty redemptions (already covered) is skipped."""
+        redemption_b = SubVaultRedemption(vault=VAULT_2, assets=Wei(200))
+        redemption_c = SubVaultRedemption(vault=VAULT_3, assets=Wei(100))
+
+        mock_registry_a = AsyncMock()
+        mock_registry_a.calculate_sub_vaults_redemptions = AsyncMock(
+            return_value=[redemption_b, redemption_c]
+        )
+        # B already has enough withdrawable to cover what A needs from it.
+        mock_registry_b = AsyncMock()
+        mock_registry_b.calculate_sub_vaults_redemptions = AsyncMock(return_value=[])
+
+        registry_a = Web3.to_checksum_address('0x' + 'aa' * 20)
+        registry_b = Web3.to_checksum_address('0x' + 'bb' * 20)
+
+        async def mock_is_meta_vault(addr: ChecksumAddress) -> bool:
+            return addr in (VAULT_1, VAULT_2)
+
+        def mock_meta_vault_contract(addr: ChecksumAddress) -> MagicMock:
+            m = MagicMock()
+            m.sub_vaults_registry = AsyncMock(
+                return_value=registry_a if addr == VAULT_1 else registry_b
+            )
+            return m
+
+        def mock_registry_contract(addr: ChecksumAddress) -> AsyncMock:
+            return mock_registry_a if addr == registry_a else mock_registry_b
+
+        with (
+            patch(f'{MODULE}.MetaVaultContract', side_effect=mock_meta_vault_contract),
+            patch(f'{MODULE}.SubVaultsRegistryContract', side_effect=mock_registry_contract),
+            patch(f'{MODULE}.is_meta_vault', side_effect=mock_is_meta_vault),
+        ):
+            result = await _build_meta_vault_redeem_order(VAULT_1, Wei(400))
+
+        # B is skipped because it already has enough withdrawable; only A remains.
+        assert result == [SubVaultRedemption(vault=VAULT_1, assets=Wei(400))]
 
     async def test_skips_zero_asset_redemptions(self) -> None:
         """Sub-vaults with zero assets are not recursed into."""
@@ -610,21 +688,32 @@ class TestProcess:
     async def test_no_queued_shares(self) -> None:
         with _mock_process() as mocks:
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(0))
-            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(1))
+            await process(min_queued_assets=Gwei(1))
+            mocks['mock_exit_queue'].assert_called_once()
 
     async def test_below_threshold(self) -> None:
         with _mock_process() as mocks:
             # 500 wei queued shares, threshold is 1000 Gwei
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(500))
-            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(1000))
+            await process(min_queued_assets=Gwei(1000))
             mocks['mock_execute'].assert_not_called()
+            mocks['mock_exit_queue'].assert_called_once()
+
+    async def test_zero_nonce(self) -> None:
+        with _mock_process() as mocks:
+            mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
+            mocks['mock_redeemer'].nonce = AsyncMock(return_value=0)
+            await process(min_queued_assets=Gwei(0))
+            mocks['mock_execute'].assert_not_called()
+            mocks['mock_exit_queue'].assert_called_once()
 
     async def test_no_eligible_positions(self) -> None:
         with _mock_process() as mocks:
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
             mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
-            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(0))
+            await process(min_queued_assets=Gwei(0))
             mocks['mock_execute'].assert_not_called()
+            mocks['mock_exit_queue'].assert_called_once()
 
     async def test_successful_redemption(self) -> None:
         positions = [make_position(leaf_shares=1000, unprocessed_shares=500, shares_to_redeem=500)]
@@ -632,8 +721,17 @@ class TestProcess:
         with _mock_process(positions=positions) as mocks:
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
             mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
-            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(0))
+            await process(min_queued_assets=Gwei(0))
             mocks['mock_execute'].assert_called_once()
+            mocks['mock_exit_queue'].assert_called_once()
+
+    async def test_exit_queue_runs_even_when_redemption_raises(self) -> None:
+        """Unexpected exceptions in the redemption flow must not skip the exit queue."""
+        with _mock_process() as mocks:
+            mocks['mock_redeemer'].queued_shares = AsyncMock(side_effect=RuntimeError('boom'))
+            with pytest.raises(RuntimeError, match='boom'):
+                await process(min_queued_assets=Gwei(0))
+            mocks['mock_exit_queue'].assert_called_once()
 
 
 # --- Helpers ---
@@ -673,12 +771,16 @@ def _mock_process(
     """Common mock setup for process() tests."""
     positions = positions or []
     mock_client = MagicMock()
+    # ``execution_client.eth.block_number`` is awaited at least twice per
+    # ``process()`` call (once at the top of the redemption flow, once in the
+    # ``finally`` before ``_process_exit_queue``). A done Future is idempotent
+    # on ``await`` so the same instance can be reused.
     block_number_future: asyncio.Future[BlockNumber] = asyncio.Future()
     block_number_future.set_result(BlockNumber(101))
     mock_client.eth.block_number = block_number_future
 
     with (
-        patch(f'{MODULE}._process_exit_queue', new=AsyncMock()),
+        patch(f'{MODULE}._process_exit_queue', new=AsyncMock()) as mock_exit_queue,
         patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
         patch(
             f'{MODULE}.create_os_token_converter',
@@ -715,6 +817,7 @@ def _mock_process(
         yield {
             'mock_redeemer': mock_redeemer,
             'mock_execute': mock_execute,
+            'mock_exit_queue': mock_exit_queue,
         }
 
 
