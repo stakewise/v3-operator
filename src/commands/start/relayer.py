@@ -55,9 +55,9 @@ def start_relayer(
     metrics_prefix: str,
     validator_type: ValidatorType,
     concurrency: int | None,
-    min_deposit_amount_gwei: int,
-    vault_min_balance_gwei: int,
-    max_validator_balance_gwei: int | None,
+    min_deposit_amount: Gwei,
+    vault_min_balance: Gwei,
+    max_validator_balance: Gwei | None,
     min_deposit_delay: int,
     data_dir: str,
     log_level: str,
@@ -102,11 +102,9 @@ def start_relayer(
         log_format=log_format,
         relayer_endpoint=relayer_endpoint,
         concurrency=concurrency,
-        min_deposit_amount_gwei=Gwei(min_deposit_amount_gwei),
-        vault_min_balance_gwei=Gwei(vault_min_balance_gwei),
-        max_validator_balance_gwei=(
-            Gwei(max_validator_balance_gwei) if max_validator_balance_gwei else None
-        ),
+        min_deposit_amount_gwei=min_deposit_amount,
+        vault_min_balance_gwei=vault_min_balance,
+        max_validator_balance_gwei=max_validator_balance,
         min_deposit_delay=min_deposit_delay,
         max_withdrawal_request_fee_gwei=Gwei(max_withdrawal_request_fee_gwei),
     )

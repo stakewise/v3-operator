@@ -13,10 +13,10 @@ from src.commands.start.base import log_start, setup_sentry
 from src.common.clients import setup_clients
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import log_verbose
-from src.common.validators import validate_eth_addresses
+from src.common.validators import ETH_AMOUNT_TYPE, validate_eth_addresses
 from src.config.networks import AVAILABLE_NETWORKS, GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
-    DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
+    DEFAULT_MIN_DEPOSIT_AMOUNT_ETH,
     LOG_FORMATS,
     LOG_PLAIN,
     settings,
@@ -64,12 +64,12 @@ logger = logging.getLogger(__name__)
     is_flag=True,
 )
 @click.option(
-    '--min-deposit-amount-gwei',
-    type=int,
-    envvar='MIN_DEPOSIT_AMOUNT_GWEI',
-    help='Minimum amount in gwei that must accumulate in the vault '
+    '--min-deposit-amount',
+    type=ETH_AMOUNT_TYPE,
+    envvar='MIN_DEPOSIT_AMOUNT',
+    help='Minimum amount in ETH that must accumulate in the vault '
     'to trigger deposits to the sub-vaults.',
-    default=DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
+    default=DEFAULT_MIN_DEPOSIT_AMOUNT_ETH,
     show_default=True,
 )
 @click.option(
@@ -137,7 +137,7 @@ def process_meta_vaults(
     wallet_file: str | None,
     wallet_password_file: str | None,
     max_fee_per_gas_gwei: int | None,
-    min_deposit_amount_gwei: int,
+    min_deposit_amount: Gwei,
 ) -> None:
     # Validate wallet configuration
     has_private_key = settings.wallet_private_key is not None
@@ -170,7 +170,7 @@ def process_meta_vaults(
         max_fee_per_gas_gwei=max_fee_per_gas_gwei,
         log_level=log_level,
         log_format=log_format,
-        meta_vault_min_deposit_amount_gwei=Gwei(min_deposit_amount_gwei),
+        meta_vault_min_deposit_amount_gwei=min_deposit_amount,
     )
     try:
         asyncio.run(main(vault_addresses))

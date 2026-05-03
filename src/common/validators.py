@@ -1,10 +1,13 @@
 # pylint: disable=unused-argument
 import re
+from decimal import Decimal, InvalidOperation
+from typing import Any
 
 import click
 from eth_typing import ChecksumAddress, HexStr
 from eth_utils import is_address, is_hexstr, to_checksum_address
 from web3 import Web3
+from web3.types import Gwei
 
 from src.common.language import validate_mnemonic as verify_mnemonic
 from src.config.settings import (
@@ -15,6 +18,40 @@ from src.config.settings import (
     MIN_DEPOSIT_AMOUNT,
     MIN_DEPOSIT_AMOUNT_GWEI,
 )
+
+_GWEI_PER_ETH = Decimal(10) ** 9
+
+
+class EthAmountParamType(click.ParamType):
+    """Click parameter type that accepts an ETH amount as a decimal and returns Gwei."""
+
+    name = 'decimal'
+
+    def convert(
+        self,
+        value: Any,
+        param: click.Parameter | None,
+        ctx: click.Context | None,
+    ) -> Gwei | None:
+        if value is None:
+            return None
+        try:
+            eth_amount = Decimal(str(value))
+        except (InvalidOperation, ValueError):
+            self.fail(f'{value!r} is not a valid decimal ETH amount.', param, ctx)
+        if eth_amount < 0:
+            self.fail('ETH amount must be non-negative.', param, ctx)
+        gwei_amount = eth_amount * _GWEI_PER_ETH
+        if gwei_amount != gwei_amount.to_integral_value():
+            self.fail(
+                'ETH amount must be an exact multiple of 1 gwei (0.000000001 ETH).',
+                param,
+                ctx,
+            )
+        return Gwei(int(gwei_amount))
+
+
+ETH_AMOUNT_TYPE = EthAmountParamType()
 
 
 def validate_mnemonic(ctx: click.Context, param: click.Parameter, value: str) -> str:
@@ -109,32 +146,33 @@ def validate_indexes(ctx: click.Context, param: click.Parameter, value: str) -> 
     return [int(i) for i in value.split(',')]
 
 
-def validate_max_validator_balance_gwei(
-    ctx: click.Context, param: click.Parameter, value: int
-) -> int | None:
+def validate_max_validator_balance(
+    ctx: click.Context, param: click.Parameter, value: Gwei | None
+) -> Gwei | None:
     if not value:
         return None
     if value < MIN_ACTIVATION_BALANCE_GWEI:
         raise click.BadParameter(
-            f'max-validator-balance-gwei must be greater than or equal to '
-            f'{MIN_ACTIVATION_BALANCE_GWEI} Gwei '
-            f'({Web3.from_wei(MIN_ACTIVATION_BALANCE, 'ether')} ETH)'
+            f'--max-validator-balance must be greater than or equal to '
+            f'{Web3.from_wei(MIN_ACTIVATION_BALANCE, 'ether')} ETH'
         )
     if value > MAX_EFFECTIVE_BALANCE_GWEI:
         raise click.BadParameter(
-            f'max-validator-balance-gwei must be less than or equal to '
-            f'{MAX_EFFECTIVE_BALANCE_GWEI} Gwei '
-            f'({Web3.from_wei(MAX_EFFECTIVE_BALANCE, 'ether')} ETH)'
+            f'--max-validator-balance must be less than or equal to '
+            f'{Web3.from_wei(MAX_EFFECTIVE_BALANCE, 'ether')} ETH'
         )
     return value
 
 
-def validate_min_deposit_amount_gwei(ctx: click.Context, param: click.Parameter, value: int) -> int:
+def validate_min_deposit_amount(
+    ctx: click.Context, param: click.Parameter, value: Gwei | None
+) -> Gwei | None:
+    if value is None:
+        return None
     if value < MIN_DEPOSIT_AMOUNT_GWEI:
         raise click.BadParameter(
-            f'min-deposit-amount-gwei must be greater than or equal to '
-            f'{MIN_DEPOSIT_AMOUNT_GWEI} Gwei '
-            f'({Web3.from_wei(MIN_DEPOSIT_AMOUNT, 'ether')} ETH)'
+            f'--min-deposit-amount must be greater than or equal to '
+            f'{Web3.from_wei(MIN_DEPOSIT_AMOUNT, 'ether')} ETH'
         )
     return value
 

@@ -22,8 +22,9 @@ from src.common.protocol_config import get_protocol_config
 from src.common.startup_check import check_validators_manager
 from src.common.utils import log_verbose
 from src.common.validators import (
+    ETH_AMOUNT_TYPE,
     validate_eth_address,
-    validate_max_validator_balance_gwei,
+    validate_max_validator_balance,
     validate_public_key,
     validate_public_keys,
     validate_public_keys_file,
@@ -124,13 +125,13 @@ logger = logging.getLogger(__name__)
     envvar='RELAYER_ENDPOINT',
 )
 @click.option(
-    '--max-validator-balance-gwei',
-    type=int,
-    envvar='MAX_VALIDATOR_BALANCE_GWEI',
-    help=f'The maximum validator balance in Gwei.'
-    f'Default is {NETWORKS[MAINNET].MAX_VALIDATOR_BALANCE_GWEI} Gwei for Ethereum, '
-    f'{NETWORKS[GNOSIS].MAX_VALIDATOR_BALANCE_GWEI} Gwei for Gnosis.',
-    callback=validate_max_validator_balance_gwei,
+    '--max-validator-balance',
+    type=ETH_AMOUNT_TYPE,
+    envvar='MAX_VALIDATOR_BALANCE',
+    help=f'The maximum validator balance in ETH (or GNO on Gnosis). '
+    f'Default is {NETWORKS[MAINNET].MAX_VALIDATOR_BALANCE_ETH} ETH for Ethereum, '
+    f'{NETWORKS[GNOSIS].MAX_VALIDATOR_BALANCE_ETH} GNO for Gnosis.',
+    callback=validate_max_validator_balance,
 )
 @click.option(
     '--max-consolidation-request-fee-gwei',
@@ -197,7 +198,7 @@ def consolidate(
     target_public_key: HexStr | None,
     exclude_public_keys_file: Path | None,
     relayer_endpoint: str | None,
-    max_validator_balance_gwei: int | None,
+    max_validator_balance: Gwei | None,
     vault_first_block: BlockNumber | None,
 ) -> None:
     if all([source_public_keys, source_public_keys_file]):
@@ -248,9 +249,7 @@ def consolidate(
         wallet_file=wallet_file,
         wallet_password_file=wallet_password_file,
         relayer_endpoint=relayer_endpoint,
-        max_validator_balance_gwei=(
-            Gwei(max_validator_balance_gwei) if max_validator_balance_gwei else None
-        ),
+        max_validator_balance_gwei=max_validator_balance,
         verbose=verbose,
         log_level=log_level,
         vault_first_block=vault_first_block,
