@@ -5,7 +5,8 @@ from dataclasses import replace
 from pathlib import Path
 
 import click
-from eth_typing import BlockNumber, ChecksumAddress
+from eth_typing import BlockNumber, ChecksumAddress, HexStr
+from hexbytes import HexBytes
 from multiproof import StandardMerkleTree
 from multiproof.standard import MultiProof
 from sw_utils import InterruptHandler
@@ -18,12 +19,12 @@ from src.common.contracts import (
     MetaVaultContract,
     SubVaultsRegistryContract,
     VaultContract,
+    multicall_contract,
     os_token_redeemer_contract,
 )
 from src.common.execution import check_gas_price, transaction_gas_wrapper
 from src.common.harvest import get_multiple_harvest_params
 from src.common.logging import LOG_LEVELS, setup_logging
-from src.common.typings import HarvestParams
 from src.common.utils import log_verbose
 from src.common.wallet import wallet
 from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
@@ -308,9 +309,9 @@ async def update_vaults_state(
     """Bring every vault in ``vaults`` up to date on-chain.
 
     Meta vaults that need a state update are harvested via process_meta_vault_tree.
-    Regular vaults with pending updates have ``updateState`` submitted as a standalone
-    transaction. After this call, ``get_withdrawable_assets`` and
-    ``redeemSubVaultsAssets`` operate on fresh state without harvest_params plumbing.
+    Regular vaults with pending updates are batched into a single multicall
+    submitting ``updateState`` for each. After this call, ``get_withdrawable_assets``
+    and ``redeemSubVaultsAssets`` operate on fresh state without harvest_params plumbing.
     """
     regular_vaults: list[ChecksumAddress] = []
     for vault in vaults:
@@ -326,11 +327,27 @@ async def update_vaults_state(
         return
 
     vault_to_harvest_params = await get_multiple_harvest_params(regular_vaults, block_number)
+    calls: list[tuple[ChecksumAddress, HexStr]] = []
     for vault in regular_vaults:
         harvest_params = vault_to_harvest_params.get(vault)
         if harvest_params is None:
             continue
-        await _submit_update_vault_state(vault=vault, harvest_params=harvest_params)
+        vault_contract = VaultContract(vault)
+        calls.append(
+            (vault_contract.contract_address, vault_contract.get_update_state_call(harvest_params))
+        )
+
+    if not calls:
+        return
+
+    tx_hash = await multicall_contract.tx_aggregate(calls)
+    logger.info('Waiting for Update State multicall tx %s confirmation', tx_hash)
+    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
+        HexBytes(Web3.to_bytes(hexstr=tx_hash)), timeout=settings.execution_transaction_timeout
+    )
+    if not tx_receipt['status']:
+        raise RuntimeError(f'Update State multicall tx failed. Tx Hash: {tx_hash}')
+    logger.info('Update State multicall confirmed. Tx Hash: %s', tx_hash)
 
 
 async def redeem_positions(
@@ -547,35 +564,6 @@ async def _submit_redeem_position(
         tx_hash,
     )
     return True
-
-
-async def _submit_update_vault_state(
-    vault: ChecksumAddress,
-    harvest_params: HarvestParams,
-) -> None:
-    """Submit a standalone updateState transaction for a regular vault."""
-    vault_contract = VaultContract(vault)
-    tx_function = vault_contract.contract.functions.updateState(
-        (
-            harvest_params.rewards_root,
-            harvest_params.reward,
-            harvest_params.unlocked_mev_reward,
-            harvest_params.proof,
-        )
-    )
-    try:
-        tx = await transaction_gas_wrapper(tx_function=tx_function)
-    except Web3Exception as e:
-        raise RuntimeError(f'Failed updateState for vault {vault}') from e
-
-    tx_hash = Web3.to_hex(tx)
-    logger.info('Waiting for updateState tx %s (vault %s) confirmation', tx_hash, vault)
-    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
-        tx, timeout=settings.execution_transaction_timeout
-    )
-    if not tx_receipt['status']:
-        raise RuntimeError(f'updateState tx failed for vault {vault}. Tx Hash: {tx_hash}')
-    logger.info('updateState confirmed for vault %s. Tx Hash: %s', vault, tx_hash)
 
 
 def _build_multi_proof(
