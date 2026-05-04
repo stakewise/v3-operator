@@ -26,7 +26,7 @@ from src.config.settings import (
     LOG_PLAIN,
     settings,
 )
-from src.node_manager.execution import scan_validators_events
+from src.node_manager.execution import scan_node_manager_validators_events
 from src.node_manager.startup_check import startup_checks
 from src.node_manager.tasks import NodeManagerTask, StateSyncTask
 from src.validators.database import (
@@ -215,7 +215,7 @@ async def _start(
         chain_state = await get_chain_finalized_head()
 
         logger.info('Syncing validator events...')
-        await scan_validators_events(
+        await scan_node_manager_validators_events(
             operator_address=operator_address,
             block_number=chain_state.block_number,
             is_startup=True,

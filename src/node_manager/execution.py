@@ -56,7 +56,7 @@ class OperatorValidatorsProcessor(EventProcessor):
         CheckpointCrud().update_validators_checkpoint(block_number=to_block)
 
 
-async def scan_validators_events(
+async def scan_node_manager_validators_events(
     operator_address: ChecksumAddress, block_number: BlockNumber, is_startup: bool
 ) -> None:
     """Scans new vault and network validators for the given block number."""

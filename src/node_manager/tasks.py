@@ -16,7 +16,7 @@ from src.common.typings import ValidatorType
 from src.config.settings import settings
 from src.node_manager.execution import (
     fetch_operator_state_from_ipfs,
-    scan_validators_events,
+    scan_node_manager_validators_events,
     submit_state_sync_transaction,
 )
 from src.node_manager.oracles import (
@@ -49,10 +49,10 @@ class NodeManagerTask(BaseTask):
 
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         chain_head = await get_chain_finalized_head()
-        await scan_validators_events(
+        await scan_node_manager_validators_events(
             operator_address=self.operator_address,
             block_number=chain_head.block_number,
-            is_startup=True,
+            is_startup=False,
         )
 
         if not await check_gas_price(high_priority=True):
