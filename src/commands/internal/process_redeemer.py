@@ -311,14 +311,13 @@ async def update_vaults_state(
     Meta vaults that need a state update are harvested via process_meta_vault_tree.
     Regular vaults with pending updates are batched into a single multicall
     submitting ``updateState`` for each. After this call, ``get_withdrawable_assets``
-    and ``redeemSubVaultsAssets`` operate on fresh state without harvest_params plumbing.
+    reflects fresh state, so subsequent redemption decisions can be made without
+    threading harvest_params through every read.
     """
     regular_vaults: list[ChecksumAddress] = []
     for vault in vaults:
         if await is_meta_vault(vault):
-            # is_meta_vault_state_update_required is inverted: it returns True when
-            # state is up-to-date and False when an update is required.
-            if not await is_meta_vault_state_update_required(vault):
+            if await is_meta_vault_state_update_required(vault):
                 await harvest_meta_vault(vault)
         else:
             regular_vaults.append(vault)
@@ -366,7 +365,8 @@ async def redeem_positions(
     - Cap shares by both remaining queued shares and withdrawable assets.
     - Submit a redeemOsTokenPositions transaction for the single position.
 
-    Stops once queued shares are exhausted.
+    Stops once queued shares are exhausted, or aborts the round if a single
+    position's redemption transaction fails.
     """
     remaining_shares = queued_shares
     vault_to_withdrawable: dict[ChecksumAddress, Wei] = {}
@@ -529,7 +529,7 @@ async def _submit_redeem_position(
             positions_arg, multiproof.proof, multiproof.proof_flags
         )
         tx = await transaction_gas_wrapper(tx_function=tx_function)
-    except Web3Exception:
+    except (Web3Exception, RuntimeError, ValueError):
         logger.exception(
             'Failed to redeem position (vault %s, owner %s)',
             position.vault,

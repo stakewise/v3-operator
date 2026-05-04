@@ -380,7 +380,7 @@ class TestUpdateVaultsState:
             patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
             patch(
                 f'{MODULE}.is_meta_vault_state_update_required',
-                new=AsyncMock(return_value=False),
+                new=AsyncMock(return_value=True),
             ),
             patch(f'{MODULE}.harvest_meta_vault', new=AsyncMock()) as mock_harvest,
             patch(f'{MODULE}.get_multiple_harvest_params', new=AsyncMock(return_value={})),
@@ -393,7 +393,7 @@ class TestUpdateVaultsState:
             patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
             patch(
                 f'{MODULE}.is_meta_vault_state_update_required',
-                new=AsyncMock(return_value=True),
+                new=AsyncMock(return_value=False),
             ),
             patch(f'{MODULE}.harvest_meta_vault', new=AsyncMock()) as mock_harvest,
             patch(f'{MODULE}.get_multiple_harvest_params', new=AsyncMock(return_value={})),
@@ -471,7 +471,7 @@ class TestUpdateVaultsState:
             patch(f'{MODULE}.is_meta_vault', side_effect=is_meta),
             patch(
                 f'{MODULE}.is_meta_vault_state_update_required',
-                new=AsyncMock(return_value=False),
+                new=AsyncMock(return_value=True),
             ),
             patch(f'{MODULE}.harvest_meta_vault', new=AsyncMock()) as mock_harvest,
             patch(

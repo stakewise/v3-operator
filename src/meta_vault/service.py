@@ -105,8 +105,8 @@ async def is_meta_vault_state_update_required(meta_vault_address: ChecksumAddres
         meta_vault_contract = MetaVaultContract(meta_vault_address)
         sub_vaults_registry_address = await meta_vault_contract.sub_vaults_registry()
         sub_vaults_registry_contract = SubVaultsRegistryContract(sub_vaults_registry_address)
-        return not await sub_vaults_registry_contract.is_state_update_required()
+        return await sub_vaults_registry_contract.is_state_update_required()
 
     # V4 release: canUpdateState is on the vault contract directly
     v4_meta_vault_contract = V4MetaVaultContract(meta_vault_address)
-    return not await v4_meta_vault_contract.is_state_update_required()
+    return await v4_meta_vault_contract.is_state_update_required()
