@@ -4,7 +4,7 @@ from typing import Iterator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from eth_typing import BlockNumber, ChecksumAddress, HexStr
+from eth_typing import BlockNumber, ChecksumAddress
 from hexbytes import HexBytes
 from sw_utils.tests import faker
 from web3 import Web3
@@ -14,14 +14,15 @@ from web3.types import Gwei, Wei
 from src.commands.internal.process_redeemer import (
     _build_meta_vault_redeem_order,
     _process_exit_queue,
+    _redeem_meta_vault_sub_vaults,
     _startup_check,
-    _try_redeem_meta_vault,
-    build_multi_proof,
+    _submit_update_vault_state,
+    _build_multi_proof,
     calculate_redeemable_shares,
-    execute_redemption,
     fetch_positions_from_ipfs,
     process,
-    select_positions,
+    redeem_positions,
+    update_vaults_state,
 )
 from src.common.typings import HarvestParams
 from src.meta_vault.typings import SubVaultRedemption
@@ -44,7 +45,7 @@ REGISTRY_1 = Web3.to_checksum_address('0x' + '66' * 20)
 class TestBuildMultiProof:
     def test_single_position(self) -> None:
         position = make_position(leaf_shares=1000, unprocessed_shares=500)
-        result = build_multi_proof(
+        result = _build_multi_proof(
             tree_nonce=5,
             all_positions=[position],
             positions_to_redeem=[position],
@@ -57,7 +58,7 @@ class TestBuildMultiProof:
             vault=VAULT_2, owner=OWNER_2, leaf_shares=2000, unprocessed_shares=1000
         )
 
-        result = build_multi_proof(
+        result = _build_multi_proof(
             tree_nonce=5,
             all_positions=[pos1, pos2],
             positions_to_redeem=[pos1],
@@ -71,7 +72,7 @@ class TestBuildMultiProof:
             vault=VAULT_2, owner=OWNER_2, leaf_shares=2000, unprocessed_shares=1000
         )
 
-        result = build_multi_proof(
+        result = _build_multi_proof(
             tree_nonce=5,
             all_positions=[pos1, pos2],
             positions_to_redeem=[pos1, pos2],
@@ -79,168 +80,219 @@ class TestBuildMultiProof:
         assert len(result.leaves) == 2
 
 
-class TestSelectPositions:
+class TestRedeemPositions:
     async def test_empty_positions(self) -> None:
-        positions_to_redeem = await select_positions(
-            os_token_positions=[],
-            queued_shares=10000,
-            converter=make_converter(),
-            vault_to_harvest_params={},
-            vault_to_withdrawable_assets={},
-            skip_harvest=False,
-        )
-        assert positions_to_redeem == []
+        with _mock_redeem_positions() as mocks:
+            await redeem_positions(
+                all_positions=[],
+                os_token_positions=[],
+                queued_shares=10000,
+                converter=make_converter(),
+                nonce=5,
+            )
+        mocks['tx_mock'].assert_not_called()
 
     async def test_single_position_sufficient_assets(self) -> None:
         position = make_position(unprocessed_shares=500)
 
-        positions_to_redeem = await select_positions(
-            os_token_positions=[position],
-            queued_shares=10000,
-            converter=make_converter(),
-            vault_to_harvest_params={VAULT_1: None},
-            vault_to_withdrawable_assets={VAULT_1: Wei(1000)},
-            skip_harvest=False,
-        )
-        assert len(positions_to_redeem) == 1
-        assert positions_to_redeem[0].shares_to_redeem == Wei(500)
+        with _mock_redeem_positions(withdrawable=Wei(1000)) as mocks:
+            await redeem_positions(
+                all_positions=[position],
+                os_token_positions=[position],
+                queued_shares=10000,
+                converter=make_converter(),
+                nonce=5,
+            )
+
+        assert mocks['tx_mock'].await_count == 1
+        positions_arg = _captured_positions_arg(mocks)
+        assert positions_arg[0][3] == Wei(500)  # shares_to_redeem
 
     async def test_single_position_insufficient_assets_partial_fill(self) -> None:
         position = make_position(unprocessed_shares=500)
 
-        with patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=False)):
-            positions_to_redeem = await select_positions(
+        with _mock_redeem_positions(withdrawable=Wei(100)) as mocks:
+            await redeem_positions(
+                all_positions=[position],
                 os_token_positions=[position],
                 queued_shares=10000,
                 converter=make_converter(100, 100),
-                vault_to_harvest_params={VAULT_1: None},
-                vault_to_withdrawable_assets={VAULT_1: Wei(100)},
-                skip_harvest=False,
+                nonce=5,
             )
-        assert len(positions_to_redeem) == 1
-        assert positions_to_redeem[0].shares_to_redeem == Wei(100)
 
-    async def test_single_position_zero_withdrawable(self) -> None:
+        assert mocks['tx_mock'].await_count == 1
+        positions_arg = _captured_positions_arg(mocks)
+        assert positions_arg[0][3] == Wei(100)
+
+    async def test_single_position_zero_withdrawable_skipped(self) -> None:
         position = make_position(unprocessed_shares=500)
 
-        with patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=False)):
-            positions_to_redeem = await select_positions(
+        with _mock_redeem_positions(withdrawable=Wei(0)) as mocks:
+            await redeem_positions(
+                all_positions=[position],
                 os_token_positions=[position],
                 queued_shares=10000,
                 converter=make_converter(100, 100),
-                vault_to_harvest_params={VAULT_1: None},
-                vault_to_withdrawable_assets={VAULT_1: Wei(0)},
-                skip_harvest=False,
+                nonce=5,
             )
-        assert positions_to_redeem == []
+
+        mocks['tx_mock'].assert_not_called()
 
     async def test_queued_shares_limits_redemption(self) -> None:
         position = make_position(unprocessed_shares=500)
 
-        positions_to_redeem = await select_positions(
-            os_token_positions=[position],
-            queued_shares=200,
-            converter=make_converter(),
-            vault_to_harvest_params={VAULT_1: None},
-            vault_to_withdrawable_assets={VAULT_1: Wei(10000)},
-            skip_harvest=False,
-        )
-        assert len(positions_to_redeem) == 1
-        assert positions_to_redeem[0].shares_to_redeem == Wei(200)
+        with _mock_redeem_positions(withdrawable=Wei(10000)) as mocks:
+            await redeem_positions(
+                all_positions=[position],
+                os_token_positions=[position],
+                queued_shares=200,
+                converter=make_converter(),
+                nonce=5,
+            )
 
-    async def test_multiple_positions_limited_by_withdrawable_assets(self) -> None:
+        assert mocks['tx_mock'].await_count == 1
+        positions_arg = _captured_positions_arg(mocks)
+        assert positions_arg[0][3] == Wei(200)
+
+    async def test_multiple_positions_share_vault_cache(self) -> None:
+        """Withdrawable is fetched once per vault, decremented after each redemption."""
         pos1 = make_position(owner=OWNER_1, unprocessed_shares=500)
         pos2 = make_position(owner=OWNER_2, unprocessed_shares=1000)
 
-        with patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=False)):
-            positions_to_redeem = await select_positions(
+        get_withdrawable = AsyncMock(return_value=Wei(700))
+        with _mock_redeem_positions(get_withdrawable=get_withdrawable) as mocks:
+            await redeem_positions(
+                all_positions=[pos1, pos2],
                 os_token_positions=[pos1, pos2],
                 queued_shares=10000,
                 converter=make_converter(100, 100),
-                vault_to_harvest_params={VAULT_1: None},
-                vault_to_withdrawable_assets={VAULT_1: Wei(700)},
-                skip_harvest=False,
+                nonce=5,
             )
-        assert len(positions_to_redeem) == 2
-        assert positions_to_redeem[0].owner == OWNER_1
-        assert positions_to_redeem[0].shares_to_redeem == Wei(500)
-        assert positions_to_redeem[1].owner == OWNER_2
-        assert positions_to_redeem[1].shares_to_redeem == Wei(200)
 
-    async def test_multiple_vaults_both_selected(self) -> None:
-        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, unprocessed_shares=500)
-        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, unprocessed_shares=800)
+        # Two redemption transactions (one per position)
+        assert mocks['tx_mock'].await_count == 2
+        # Single fetch — second position uses cached value
+        assert get_withdrawable.await_count == 1
 
-        positions_to_redeem = await select_positions(
-            os_token_positions=[pos1, pos2],
-            queued_shares=10000,
-            converter=make_converter(100, 100),
-            vault_to_harvest_params={VAULT_1: None, VAULT_2: None},
-            vault_to_withdrawable_assets={VAULT_1: Wei(10000), VAULT_2: Wei(10000)},
-            skip_harvest=False,
-        )
-        assert len(positions_to_redeem) == 2
+        first_position = mocks['tx_calls'][0][0][0]
+        second_position = mocks['tx_calls'][1][0][0]
+        assert first_position[1] == OWNER_1 and first_position[3] == Wei(500)
+        assert second_position[1] == OWNER_2 and second_position[3] == Wei(200)
 
     async def test_stops_across_vaults_when_queued_shares_exhausted(self) -> None:
         pos1 = make_position(vault=VAULT_1, owner=OWNER_1, unprocessed_shares=500)
         pos2 = make_position(vault=VAULT_2, owner=OWNER_2, unprocessed_shares=800)
 
-        positions_to_redeem = await select_positions(
-            os_token_positions=[pos1, pos2],
-            queued_shares=500,
-            converter=make_converter(100, 100),
-            vault_to_harvest_params={VAULT_1: None, VAULT_2: None},
-            vault_to_withdrawable_assets={VAULT_1: Wei(10000), VAULT_2: Wei(10000)},
-            skip_harvest=False,
-        )
-        assert len(positions_to_redeem) == 1
-        assert positions_to_redeem[0].vault == VAULT_1
+        with _mock_redeem_positions(withdrawable=Wei(10000)) as mocks:
+            await redeem_positions(
+                all_positions=[pos1, pos2],
+                os_token_positions=[pos1, pos2],
+                queued_shares=500,
+                converter=make_converter(100, 100),
+                nonce=5,
+            )
 
-    async def test_preserves_original_amount(self) -> None:
+        # Only the first position's vault is redeemed
+        assert mocks['tx_mock'].await_count == 1
+        positions_arg = _captured_positions_arg(mocks)
+        assert positions_arg[0][0] == VAULT_1
+
+    async def test_preserves_original_leaf_shares_in_call(self) -> None:
         pos = make_position(leaf_shares=1000, unprocessed_shares=500)
 
-        positions_to_redeem = await select_positions(
-            os_token_positions=[pos],
-            queued_shares=200,
-            converter=make_converter(),
-            vault_to_harvest_params={VAULT_1: None},
-            vault_to_withdrawable_assets={VAULT_1: Wei(10000)},
-            skip_harvest=False,
-        )
-        assert positions_to_redeem[0].leaf_shares == Wei(1000)
-        assert positions_to_redeem[0].shares_to_redeem == Wei(200)
+        with _mock_redeem_positions(withdrawable=Wei(10000)) as mocks:
+            await redeem_positions(
+                all_positions=[pos],
+                os_token_positions=[pos],
+                queued_shares=200,
+                converter=make_converter(),
+                nonce=5,
+            )
 
-    async def test_stops_within_vault_when_queued_shares_exhausted(self) -> None:
-        pos1 = make_position(owner=OWNER_1, unprocessed_shares=400)
-        pos2 = make_position(owner=OWNER_2, unprocessed_shares=300)
+        positions_arg = _captured_positions_arg(mocks)
+        # leafShares preserved, sharesToRedeem capped by queued_shares
+        assert positions_arg[0][2] == Wei(1000)
+        assert positions_arg[0][3] == Wei(200)
 
-        positions_to_redeem = await select_positions(
-            os_token_positions=[pos1, pos2],
-            queued_shares=400,
-            converter=make_converter(100, 100),
-            vault_to_harvest_params={VAULT_1: None},
-            vault_to_withdrawable_assets={VAULT_1: Wei(10000)},
-            skip_harvest=False,
-        )
-        assert len(positions_to_redeem) == 1
-        assert positions_to_redeem[0].owner == OWNER_1
+    async def test_meta_vault_redeem_sub_vaults_when_short(self) -> None:
+        """Meta vault short on withdrawable triggers sub-vault redemption then refetches."""
+        pos = make_position(unprocessed_shares=500)
+        # First call: short. Second call (post sub-vault redeem): plenty.
+        get_withdrawable = AsyncMock(side_effect=[Wei(100), Wei(1000)])
 
-    async def test_partial_fills_first_then_exhausts_withdrawable(self) -> None:
-        pos1 = make_position(owner=OWNER_1, unprocessed_shares=1000)
-        pos2 = make_position(owner=OWNER_2, unprocessed_shares=100)
+        with (
+            _mock_redeem_positions(get_withdrawable=get_withdrawable, is_meta_vault=True) as mocks,
+            patch(f'{MODULE}._redeem_meta_vault_sub_vaults', new=AsyncMock()) as mock_redeem_sub,
+        ):
+            await redeem_positions(
+                all_positions=[pos],
+                os_token_positions=[pos],
+                queued_shares=10000,
+                converter=make_converter(100, 100),
+                nonce=5,
+            )
 
-        with patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=False)):
-            positions_to_redeem = await select_positions(
+        mock_redeem_sub.assert_awaited_once()
+        assert get_withdrawable.await_count == 2
+        positions_arg = _captured_positions_arg(mocks)
+        assert positions_arg[0][3] == Wei(500)
+
+    async def test_meta_vault_redeem_still_short_partial_fill(self) -> None:
+        """Sub-vault redemption helped but didn't fully cover — partial fill."""
+        pos = make_position(unprocessed_shares=500)
+        get_withdrawable = AsyncMock(side_effect=[Wei(100), Wei(300)])
+
+        with (
+            _mock_redeem_positions(get_withdrawable=get_withdrawable, is_meta_vault=True) as mocks,
+            patch(f'{MODULE}._redeem_meta_vault_sub_vaults', new=AsyncMock()),
+        ):
+            await redeem_positions(
+                all_positions=[pos],
+                os_token_positions=[pos],
+                queued_shares=10000,
+                converter=make_converter(100, 100),
+                nonce=5,
+            )
+
+        positions_arg = _captured_positions_arg(mocks)
+        assert positions_arg[0][3] == Wei(300)
+
+    async def test_web3_exception_aborts_iteration(self) -> None:
+        """A failed redemption aborts the loop; subsequent positions are not attempted."""
+        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, unprocessed_shares=500)
+        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, unprocessed_shares=500)
+
+        with _mock_redeem_positions(
+            withdrawable=Wei(10000),
+            tx_side_effects=[Web3Exception('boom'), b'\x02' * 32],
+        ) as mocks:
+            await redeem_positions(
+                all_positions=[pos1, pos2],
                 os_token_positions=[pos1, pos2],
                 queued_shares=10000,
                 converter=make_converter(100, 100),
-                vault_to_harvest_params={VAULT_1: None},
-                vault_to_withdrawable_assets={VAULT_1: Wei(500)},
-                skip_harvest=False,
+                nonce=5,
             )
-        assert len(positions_to_redeem) == 1
-        assert positions_to_redeem[0].owner == OWNER_1
-        assert positions_to_redeem[0].shares_to_redeem == Wei(500)
+
+        # Only the first position is attempted; loop aborted
+        assert mocks['tx_mock'].await_count == 1
+
+    async def test_tx_receipt_failure_aborts_iteration(self) -> None:
+        """A failed receipt aborts the loop; subsequent positions are not attempted."""
+        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, unprocessed_shares=500)
+        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, unprocessed_shares=500)
+
+        with _mock_redeem_positions(withdrawable=Wei(10000), tx_status=0) as mocks:
+            await redeem_positions(
+                all_positions=[pos1, pos2],
+                os_token_positions=[pos1, pos2],
+                queued_shares=10000,
+                converter=make_converter(100, 100),
+                nonce=5,
+            )
+
+        # Only the first position is attempted
+        assert mocks['tx_mock'].await_count == 1
 
 
 # --- Async function tests (with mocks) ---
@@ -312,74 +364,113 @@ class TestCalculateRedeemableShares:
         assert result[0].unprocessed_shares == Wei(1500)
 
 
-class TestTryRedeemMetaVault:
-    async def test_not_meta_vault(self) -> None:
-        with patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=False)):
-            result = await _try_redeem_meta_vault(
-                vault_address=VAULT_1,
-                assets=Wei(400),
-                current_withdrawable=Wei(100),
-                vault_to_harvest_params={VAULT_1: None},
-                skip_harvest=False,
-            )
-        assert result == Wei(100)
+class TestUpdateVaultsState:
+    async def test_no_vaults(self) -> None:
+        with (
+            patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=False)) as m_is_meta,
+            patch(
+                f'{MODULE}.get_multiple_harvest_params', new=AsyncMock(return_value={})
+            ) as m_params,
+        ):
+            await update_vaults_state(vaults=[], block_number=BlockNumber(100))
+        m_is_meta.assert_not_called()
+        m_params.assert_not_called()
 
-    async def test_meta_vault_successful_redeem(self) -> None:
+    async def test_meta_vault_needs_harvest(self) -> None:
         with (
             patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
             patch(
-                f'{MODULE}.is_meta_vault_state_update_required', new=AsyncMock(return_value=True)
+                f'{MODULE}.is_meta_vault_state_update_required',
+                new=AsyncMock(return_value=False),
             ),
+            patch(f'{MODULE}.harvest_meta_vault', new=AsyncMock()) as mock_harvest,
+            patch(f'{MODULE}.get_multiple_harvest_params', new=AsyncMock(return_value={})),
+        ):
+            await update_vaults_state(vaults=[VAULT_1], block_number=BlockNumber(100))
+        mock_harvest.assert_awaited_once_with(VAULT_1)
+
+    async def test_meta_vault_already_up_to_date(self) -> None:
+        with (
+            patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
+            patch(
+                f'{MODULE}.is_meta_vault_state_update_required',
+                new=AsyncMock(return_value=True),
+            ),
+            patch(f'{MODULE}.harvest_meta_vault', new=AsyncMock()) as mock_harvest,
+            patch(f'{MODULE}.get_multiple_harvest_params', new=AsyncMock(return_value={})),
+        ):
+            await update_vaults_state(vaults=[VAULT_1], block_number=BlockNumber(100))
+        mock_harvest.assert_not_called()
+
+    async def test_regular_vault_with_harvest_params(self) -> None:
+        params = make_harvest_params()
+        with (
+            patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=False)),
+            patch(
+                f'{MODULE}.get_multiple_harvest_params',
+                new=AsyncMock(return_value={VAULT_1: params}),
+            ),
+            patch(f'{MODULE}._submit_update_vault_state', new=AsyncMock()) as mock_submit,
+        ):
+            await update_vaults_state(vaults=[VAULT_1], block_number=BlockNumber(100))
+        mock_submit.assert_awaited_once_with(vault=VAULT_1, harvest_params=params)
+
+    async def test_regular_vault_no_harvest_params(self) -> None:
+        with (
+            patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=False)),
+            patch(
+                f'{MODULE}.get_multiple_harvest_params',
+                new=AsyncMock(return_value={VAULT_1: None}),
+            ),
+            patch(f'{MODULE}._submit_update_vault_state', new=AsyncMock()) as mock_submit,
+        ):
+            await update_vaults_state(vaults=[VAULT_1], block_number=BlockNumber(100))
+        mock_submit.assert_not_called()
+
+    async def test_mix_of_meta_and_regular_vaults(self) -> None:
+        """Meta vault is harvested, regular vault gets updateState; harvest params
+        are fetched only for the regular vaults."""
+        params = make_harvest_params()
+
+        async def is_meta(addr: ChecksumAddress) -> bool:
+            return addr == VAULT_1
+
+        with (
+            patch(f'{MODULE}.is_meta_vault', side_effect=is_meta),
+            patch(
+                f'{MODULE}.is_meta_vault_state_update_required',
+                new=AsyncMock(return_value=False),
+            ),
+            patch(f'{MODULE}.harvest_meta_vault', new=AsyncMock()) as mock_harvest,
+            patch(
+                f'{MODULE}.get_multiple_harvest_params',
+                new=AsyncMock(return_value={VAULT_2: params}),
+            ) as mock_params,
+            patch(f'{MODULE}._submit_update_vault_state', new=AsyncMock()) as mock_submit,
+        ):
+            await update_vaults_state(vaults=[VAULT_1, VAULT_2], block_number=BlockNumber(100))
+
+        mock_harvest.assert_awaited_once_with(VAULT_1)
+        mock_params.assert_awaited_once_with([VAULT_2], BlockNumber(100))
+        mock_submit.assert_awaited_once_with(vault=VAULT_2, harvest_params=params)
+
+
+class TestRedeemMetaVaultSubVaults:
+    async def test_successful_redeem(self) -> None:
+        with (
             patch(
                 f'{MODULE}._build_meta_vault_redeem_order',
                 new=AsyncMock(return_value=[SubVaultRedemption(vault=VAULT_1, assets=Wei(400))]),
             ),
             patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
-            patch(
-                f'{MODULE}.get_withdrawable_assets',
-                new=AsyncMock(return_value=Wei(600)),
-            ),
         ):
             mock_redeemer.redeem_sub_vaults_assets = AsyncMock(return_value='0xabc')
-            result = await _try_redeem_meta_vault(
-                vault_address=VAULT_1,
-                assets=Wei(400),
-                current_withdrawable=Wei(100),
-                vault_to_harvest_params={VAULT_1: None},
-                skip_harvest=False,
-            )
-        assert result == Wei(600)
-        mock_redeemer.redeem_sub_vaults_assets.assert_called_once_with(VAULT_1, Wei(400))
+            await _redeem_meta_vault_sub_vaults(vault_address=VAULT_1, assets=Wei(400))
+        mock_redeemer.redeem_sub_vaults_assets.assert_awaited_once_with(VAULT_1, Wei(400))
 
-    async def test_meta_vault_failed_redeem(self) -> None:
+    async def test_failed_redeem_aborts_sequence(self) -> None:
+        """A failure stops the sequence; remaining entries are not attempted."""
         with (
-            patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
-            patch(
-                f'{MODULE}.is_meta_vault_state_update_required', new=AsyncMock(return_value=True)
-            ),
-            patch(
-                f'{MODULE}._build_meta_vault_redeem_order',
-                new=AsyncMock(return_value=[SubVaultRedemption(vault=VAULT_1, assets=Wei(400))]),
-            ),
-            patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
-        ):
-            mock_redeemer.redeem_sub_vaults_assets = AsyncMock(side_effect=RuntimeError('fail'))
-            result = await _try_redeem_meta_vault(
-                vault_address=VAULT_1,
-                assets=Wei(400),
-                current_withdrawable=Wei(100),
-                vault_to_harvest_params={VAULT_1: None},
-                skip_harvest=False,
-            )
-        assert result == Wei(100)
-
-    async def test_nested_meta_vault_all_succeed(self) -> None:
-        """Nested meta vault B is redeemed before parent A."""
-        with (
-            patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
-            patch(
-                f'{MODULE}.is_meta_vault_state_update_required', new=AsyncMock(return_value=True)
-            ),
             patch(
                 f'{MODULE}._build_meta_vault_redeem_order',
                 new=AsyncMock(
@@ -390,164 +481,45 @@ class TestTryRedeemMetaVault:
                 ),
             ),
             patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
+        ):
+            mock_redeemer.redeem_sub_vaults_assets = AsyncMock(side_effect=RuntimeError('fail'))
+            await _redeem_meta_vault_sub_vaults(vault_address=VAULT_1, assets=Wei(400))
+        mock_redeemer.redeem_sub_vaults_assets.assert_awaited_once_with(VAULT_2, Wei(200))
+
+    async def test_nested_meta_vault_all_succeed(self) -> None:
+        """Nested meta vault is redeemed before parent, in order."""
+        with (
             patch(
-                f'{MODULE}.get_withdrawable_assets',
-                new=AsyncMock(return_value=Wei(500)),
+                f'{MODULE}._build_meta_vault_redeem_order',
+                new=AsyncMock(
+                    return_value=[
+                        SubVaultRedemption(vault=VAULT_2, assets=Wei(200)),
+                        SubVaultRedemption(vault=VAULT_1, assets=Wei(400)),
+                    ]
+                ),
             ),
+            patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
         ):
             mock_redeemer.redeem_sub_vaults_assets = AsyncMock(return_value='0xabc')
-            result = await _try_redeem_meta_vault(
-                vault_address=VAULT_1,
-                assets=Wei(400),
-                current_withdrawable=Wei(100),
-                vault_to_harvest_params={VAULT_1: None},
-                skip_harvest=False,
-            )
-        assert result == Wei(500)
+            await _redeem_meta_vault_sub_vaults(vault_address=VAULT_1, assets=Wei(400))
+
         calls = mock_redeemer.redeem_sub_vaults_assets.call_args_list
         assert len(calls) == 2
         assert calls[0].args == (VAULT_2, Wei(200))
         assert calls[1].args == (VAULT_1, Wei(400))
 
-    async def test_nested_meta_vault_nested_fails(self) -> None:
-        """If nested redemption fails, returns current_withdrawable."""
+    async def test_build_order_failure_returns_silently(self) -> None:
+        """Failure to build the redeem order is logged and swallowed."""
         with (
-            patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
-            patch(
-                f'{MODULE}.is_meta_vault_state_update_required', new=AsyncMock(return_value=True)
-            ),
             patch(
                 f'{MODULE}._build_meta_vault_redeem_order',
-                new=AsyncMock(
-                    return_value=[
-                        SubVaultRedemption(vault=VAULT_2, assets=Wei(200)),
-                        SubVaultRedemption(vault=VAULT_1, assets=Wei(400)),
-                    ]
-                ),
+                new=AsyncMock(side_effect=RuntimeError('boom')),
             ),
             patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
-        ):
-            mock_redeemer.redeem_sub_vaults_assets = AsyncMock(
-                side_effect=RuntimeError('nested fail')
-            )
-            result = await _try_redeem_meta_vault(
-                vault_address=VAULT_1,
-                assets=Wei(400),
-                current_withdrawable=Wei(100),
-                vault_to_harvest_params={VAULT_1: None},
-                skip_harvest=False,
-            )
-        assert result == Wei(100)
-        # Only the first call (nested vault) was attempted
-        mock_redeemer.redeem_sub_vaults_assets.assert_called_once_with(VAULT_2, Wei(200))
-
-    async def test_harvest_clears_consumed_params(self) -> None:
-        """After harvest, consumed harvest params are cleared so callers
-        don't apply update_state twice and trigger a revert."""
-        original_params = make_harvest_params()
-        vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None] = {
-            VAULT_1: original_params,
-            VAULT_2: original_params,
-        }
-        # After harvest, on-chain can_harvest is False for VAULT_1; VAULT_2 is unaffected
-        refreshed = {VAULT_1: None, VAULT_2: original_params}
-
-        captured_get_withdrawable: list[HarvestParams | None] = []
-        # First call: post-harvest pre-redeem check (< assets, forces redeem path).
-        # Second call: post-redeem final value.
-        withdrawable_returns = [Wei(150), Wei(600)]
-
-        async def fake_get_withdrawable(
-            vault: ChecksumAddress, harvest_params: HarvestParams | None
-        ) -> Wei:
-            captured_get_withdrawable.append(harvest_params)
-            return withdrawable_returns.pop(0)
-
-        with (
-            patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
-            patch(
-                f'{MODULE}.is_meta_vault_state_update_required', new=AsyncMock(return_value=False)
-            ),
-            patch(f'{MODULE}.harvest_meta_vault', new=AsyncMock()) as mock_harvest,
-            patch(
-                f'{MODULE}.get_multiple_harvest_params',
-                new=AsyncMock(return_value=refreshed),
-            ),
-            patch(
-                f'{MODULE}._build_meta_vault_redeem_order',
-                new=AsyncMock(return_value=[SubVaultRedemption(vault=VAULT_1, assets=Wei(400))]),
-            ),
-            patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
-            patch(f'{MODULE}.get_withdrawable_assets', new=fake_get_withdrawable),
-        ):
-            mock_redeemer.redeem_sub_vaults_assets = AsyncMock(return_value='0xabc')
-            result = await _try_redeem_meta_vault(
-                vault_address=VAULT_1,
-                assets=Wei(400),
-                current_withdrawable=Wei(100),
-                vault_to_harvest_params=vault_to_harvest_params,
-                skip_harvest=False,
-            )
-
-        assert result == Wei(600)
-        mock_harvest.assert_awaited_once_with(VAULT_1)
-        mock_redeemer.redeem_sub_vaults_assets.assert_awaited_once()
-        # Consumed params for harvested vault are cleared in place
-        assert vault_to_harvest_params == {VAULT_1: None, VAULT_2: original_params}
-        # Both get_withdrawable_assets calls used the refreshed (None) params,
-        # not the stale original_params
-        assert captured_get_withdrawable == [None, None]
-
-    async def test_harvest_alone_resolves_deficit(self) -> None:
-        """When harvest raises withdrawable above the deficit, skip the
-        redeem loop entirely to avoid unnecessary transactions."""
-        with (
-            patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
-            patch(
-                f'{MODULE}.is_meta_vault_state_update_required', new=AsyncMock(return_value=False)
-            ),
-            patch(f'{MODULE}.harvest_meta_vault', new=AsyncMock()) as mock_harvest,
-            patch(f'{MODULE}.get_multiple_harvest_params', new=AsyncMock(return_value={})),
-            patch(f'{MODULE}._build_meta_vault_redeem_order', new=AsyncMock()) as mock_build_order,
-            patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
-            patch(
-                f'{MODULE}.get_withdrawable_assets',
-                new=AsyncMock(return_value=Wei(500)),
-            ),
         ):
             mock_redeemer.redeem_sub_vaults_assets = AsyncMock()
-            result = await _try_redeem_meta_vault(
-                vault_address=VAULT_1,
-                assets=Wei(400),
-                current_withdrawable=Wei(100),
-                vault_to_harvest_params={VAULT_1: None},
-                skip_harvest=False,
-            )
-
-        assert result == Wei(500)
-        mock_harvest.assert_awaited_once_with(VAULT_1)
-        mock_build_order.assert_not_called()
+            await _redeem_meta_vault_sub_vaults(vault_address=VAULT_1, assets=Wei(400))
         mock_redeemer.redeem_sub_vaults_assets.assert_not_called()
-
-    async def test_skip_harvest_raises_for_unharvested_vault(self) -> None:
-        """With --skip-harvest set, an unharvested meta vault raises and
-        harvest_meta_vault is not called, halting redemption processing."""
-        with (
-            patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
-            patch(
-                f'{MODULE}.is_meta_vault_state_update_required', new=AsyncMock(return_value=False)
-            ),
-            patch(f'{MODULE}.harvest_meta_vault', new=AsyncMock()) as mock_harvest,
-        ):
-            with pytest.raises(RuntimeError, match='is not harvested'):
-                await _try_redeem_meta_vault(
-                    vault_address=VAULT_1,
-                    assets=Wei(400),
-                    current_withdrawable=Wei(100),
-                    vault_to_harvest_params={VAULT_1: None},
-                    skip_harvest=True,
-                )
-        mock_harvest.assert_not_awaited()
 
 
 class TestBuildMetaVaultRedeemOrder:
@@ -675,100 +647,85 @@ class TestStartupCheck:
                 await _startup_check()
 
 
-class TestExecuteRedemption:
-    async def test_successful_with_harvest_params(self) -> None:
-        pos = make_position(
-            vault=VAULT_1, leaf_shares=1000, unprocessed_shares=500, shares_to_redeem=500
-        )
-        harvest_params = make_harvest_params()
+class TestSubmitUpdateVaultState:
+    async def test_successful(self) -> None:
+        params = make_harvest_params()
+        mock_client = AsyncMock()
+        mock_client.eth.wait_for_transaction_receipt = AsyncMock(return_value={'status': 1})
 
-        with _mock_execute_redemption(tx_status=1) as mocks:
-            result = await execute_redemption(
-                all_positions=[pos],
-                positions_to_redeem=[pos],
-                vault_to_harvest_params={VAULT_1: harvest_params},
-                nonce=5,
-            )
+        tx_mock = AsyncMock(return_value=b'\x01' * 32)
+        with (
+            patch(f'{MODULE}.VaultContract') as mock_vault_cls,
+            patch(f'{MODULE}.transaction_gas_wrapper', new=tx_mock),
+            patch(f'{MODULE}.execution_client', new=mock_client),
+            patch(f'{MODULE}.settings') as mock_settings,
+        ):
+            mock_settings.execution_transaction_timeout = 120
+            mock_vault = MagicMock()
+            mock_vault.contract.functions.updateState = MagicMock(return_value='tx_function')
+            mock_vault_cls.return_value = mock_vault
 
-        assert result is not None
-        # Verify encode_abi was called for updateVaultState and redeemOsTokenPositions
-        encode_calls = mocks['mock_redeemer'].encode_abi.call_args_list
-        assert any(
-            c.kwargs.get('fn_name') == 'updateVaultState'
-            or (c.args and c.args[0] == 'updateVaultState')
-            for c in encode_calls
-            if c.kwargs.get('fn_name') or c.args
-        )
+            await _submit_update_vault_state(vault=VAULT_1, harvest_params=params)
 
-    async def test_successful_without_harvest_params(self) -> None:
-        pos = make_position(
-            vault=VAULT_1, leaf_shares=1000, unprocessed_shares=500, shares_to_redeem=500
-        )
+        # Tx wrapper called with the encoded function
+        tx_mock.assert_awaited_once()
+        # Receipt was awaited
+        mock_client.eth.wait_for_transaction_receipt.assert_awaited_once()
 
-        with _mock_execute_redemption(tx_status=1):
-            result = await execute_redemption(
-                all_positions=[pos],
-                positions_to_redeem=[pos],
-                vault_to_harvest_params={VAULT_1: None},
-                nonce=5,
-            )
+    async def test_tx_status_failure_raises(self) -> None:
+        params = make_harvest_params()
+        mock_client = AsyncMock()
+        mock_client.eth.wait_for_transaction_receipt = AsyncMock(return_value={'status': 0})
 
-        assert result is not None
+        tx_mock = AsyncMock(return_value=b'\x01' * 32)
+        with (
+            patch(f'{MODULE}.VaultContract') as mock_vault_cls,
+            patch(f'{MODULE}.transaction_gas_wrapper', new=tx_mock),
+            patch(f'{MODULE}.execution_client', new=mock_client),
+            patch(f'{MODULE}.settings') as mock_settings,
+        ):
+            mock_settings.execution_transaction_timeout = 120
+            mock_vault = MagicMock()
+            mock_vault.contract.functions.updateState = MagicMock(return_value='tx_function')
+            mock_vault_cls.return_value = mock_vault
 
-    async def test_web3_exception(self) -> None:
-        pos = make_position(leaf_shares=1000, unprocessed_shares=500, shares_to_redeem=500)
+            with pytest.raises(RuntimeError, match='updateState tx failed'):
+                await _submit_update_vault_state(vault=VAULT_1, harvest_params=params)
 
-        with _mock_execute_redemption(tx_side_effect=Web3Exception('fail')):
-            result = await execute_redemption(
-                all_positions=[pos],
-                positions_to_redeem=[pos],
-                vault_to_harvest_params={VAULT_1: None},
-                nonce=5,
-            )
+    async def test_web3_exception_raises(self) -> None:
+        params = make_harvest_params()
+        tx_mock = AsyncMock(side_effect=Web3Exception('fail'))
+        with (
+            patch(f'{MODULE}.VaultContract') as mock_vault_cls,
+            patch(f'{MODULE}.transaction_gas_wrapper', new=tx_mock),
+        ):
+            mock_vault = MagicMock()
+            mock_vault.contract.functions.updateState = MagicMock(return_value='tx_function')
+            mock_vault_cls.return_value = mock_vault
 
-        assert result is None
-
-    async def test_tx_receipt_fails(self) -> None:
-        pos = make_position(leaf_shares=1000, unprocessed_shares=500, shares_to_redeem=500)
-
-        with _mock_execute_redemption(tx_status=0):
-            result = await execute_redemption(
-                all_positions=[pos],
-                positions_to_redeem=[pos],
-                vault_to_harvest_params={VAULT_1: None},
-                nonce=5,
-            )
-
-        assert result is None
+            with pytest.raises(RuntimeError, match='Failed updateState'):
+                await _submit_update_vault_state(vault=VAULT_1, harvest_params=params)
 
 
 class TestProcess:
     async def test_no_queued_shares(self) -> None:
         with _mock_process() as mocks:
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(0))
-            await process(
-                block_number=BlockNumber(100), min_queued_assets=Gwei(1), skip_harvest=False
-            )
+            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(1))
 
     async def test_below_threshold(self) -> None:
         with _mock_process() as mocks:
             # 500 wei queued shares, threshold is 1000 Gwei
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(500))
-            await process(
-                block_number=BlockNumber(100),
-                min_queued_assets=Gwei(1000),
-                skip_harvest=False,
-            )
-            mocks['mock_execute'].assert_not_called()
+            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(1000))
+            mocks['mock_redeem'].assert_not_called()
 
     async def test_no_eligible_positions(self) -> None:
         with _mock_process() as mocks:
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
             mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
-            await process(
-                block_number=BlockNumber(100), min_queued_assets=Gwei(0), skip_harvest=False
-            )
-            mocks['mock_execute'].assert_not_called()
+            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(0))
+            mocks['mock_redeem'].assert_not_called()
 
     async def test_successful_redemption(self) -> None:
         positions = [make_position(leaf_shares=1000, unprocessed_shares=500, shares_to_redeem=500)]
@@ -776,40 +733,68 @@ class TestProcess:
         with _mock_process(positions=positions) as mocks:
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
             mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
-            await process(
-                block_number=BlockNumber(100), min_queued_assets=Gwei(0), skip_harvest=False
-            )
-            mocks['mock_execute'].assert_called_once()
+            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(0))
+            mocks['mock_update_state'].assert_awaited_once()
+            mocks['mock_redeem'].assert_awaited_once()
 
 
 # --- Helpers ---
 
 
 @contextmanager
-def _mock_execute_redemption(
+def _mock_redeem_positions(
+    withdrawable: Wei | None = None,
+    get_withdrawable: AsyncMock | None = None,
+    is_meta_vault: bool = False,
     tx_status: int = 1,
-    tx_side_effect: Exception | None = None,
+    tx_side_effects: list[bytes | Exception] | None = None,
 ) -> Iterator[dict[str, MagicMock]]:
-    """Common mock setup for execute_redemption tests."""
+    """Mock setup for redeem_positions tests.
+
+    ``withdrawable`` sets a constant return for get_withdrawable_assets; pass
+    ``get_withdrawable`` to override with an explicit AsyncMock.
+    """
+    if get_withdrawable is None:
+        get_withdrawable = AsyncMock(
+            return_value=withdrawable if withdrawable is not None else Wei(0)
+        )
+
     mock_client = AsyncMock()
     mock_client.eth.wait_for_transaction_receipt = AsyncMock(return_value={'status': tx_status})
 
-    tx_mock = AsyncMock(
-        return_value=b'\x01' * 32,
-        side_effect=tx_side_effect,
-    )
+    if tx_side_effects is not None:
+        tx_mock = AsyncMock(side_effect=tx_side_effects)
+    else:
+        tx_mock = AsyncMock(return_value=b'\x01' * 32)
+
+    tx_calls: list = []
+
+    def capture_redeem_call(*args: object, **kwargs: object) -> str:
+        tx_calls.append(args)
+        return 'tx_function'
 
     with (
+        patch(f'{MODULE}.get_withdrawable_assets', new=get_withdrawable),
+        patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=is_meta_vault)),
         patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
         patch(f'{MODULE}.transaction_gas_wrapper', new=tx_mock),
         patch(f'{MODULE}.execution_client', new=mock_client),
         patch(f'{MODULE}.settings') as mock_settings,
     ):
         mock_settings.execution_transaction_timeout = 120
-        mock_redeemer.encode_abi.return_value = HexStr('0xencoded')
+        mock_redeemer.contract.functions.redeemOsTokenPositions = MagicMock(
+            side_effect=capture_redeem_call
+        )
         yield {
+            'tx_mock': tx_mock,
+            'tx_calls': tx_calls,
             'mock_redeemer': mock_redeemer,
         }
+
+
+def _captured_positions_arg(mocks: dict[str, MagicMock]) -> list:
+    """Return the positions list from the first redeemOsTokenPositions call."""
+    return mocks['tx_calls'][0][0]
 
 
 @contextmanager
@@ -841,27 +826,20 @@ def _mock_process(
             new=AsyncMock(return_value=positions),
         ),
         patch(
-            f'{MODULE}.get_multiple_harvest_params',
-            new=AsyncMock(return_value={VAULT_1: None}),
-        ),
+            f'{MODULE}.update_vaults_state',
+            new=AsyncMock(),
+        ) as mock_update_state,
         patch(
-            f'{MODULE}.get_withdrawable_assets',
-            new=AsyncMock(return_value=Wei(10000)),
-        ),
-        patch(
-            f'{MODULE}.select_positions',
-            new=AsyncMock(return_value=positions),
-        ),
-        patch(
-            f'{MODULE}.execute_redemption',
-            new=AsyncMock(return_value='0xtxhash'),
-        ) as mock_execute,
+            f'{MODULE}.redeem_positions',
+            new=AsyncMock(),
+        ) as mock_redeem,
         patch(f'{MODULE}.execution_client', new=mock_client),
     ):
         mock_settings.network_config.VAULT_BALANCE_SYMBOL = 'ETH'
         yield {
             'mock_redeemer': mock_redeemer,
-            'mock_execute': mock_execute,
+            'mock_redeem': mock_redeem,
+            'mock_update_state': mock_update_state,
         }
 
 

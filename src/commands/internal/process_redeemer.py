@@ -1,12 +1,11 @@
 import asyncio
 import logging
 import sys
-from collections import defaultdict
 from dataclasses import replace
 from pathlib import Path
 
 import click
-from eth_typing import BlockNumber, ChecksumAddress, HexStr
+from eth_typing import BlockNumber, ChecksumAddress
 from multiproof import StandardMerkleTree
 from multiproof.standard import MultiProof
 from sw_utils import InterruptHandler
@@ -18,6 +17,7 @@ from src.common.clients import close_clients, execution_client, setup_clients
 from src.common.contracts import (
     MetaVaultContract,
     SubVaultsRegistryContract,
+    VaultContract,
     os_token_redeemer_contract,
 )
 from src.common.execution import check_gas_price, transaction_gas_wrapper
@@ -111,12 +111,6 @@ DEFAULT_MIN_QUEUED_ASSETS_GWEI = Web3.from_wei(DEFAULT_MIN_QUEUED_ASSETS, 'gwei'
     help='The log level.',
 )
 @click.option(
-    '--skip-harvest',
-    help='If set, stop execution and do not harvest meta vaults that require a state update.',
-    envvar='SKIP_HARVEST',
-    is_flag=True,
-)
-@click.option(
     '-v',
     '--verbose',
     help='Enable debug mode. Default is false.',
@@ -144,7 +138,6 @@ def process_redeemer(
     execution_jwt_secret: str | None,
     network: str,
     graph_endpoint: str | None,
-    skip_harvest: bool,
     verbose: bool,
     log_level: str,
     interval: int,
@@ -170,7 +163,6 @@ def process_redeemer(
             main(
                 interval=interval,
                 min_queued_assets=Gwei(min_queued_assets_gwei),
-                skip_harvest=skip_harvest,
             )
         )
     except Exception as e:
@@ -181,7 +173,6 @@ def process_redeemer(
 async def main(
     interval: int,
     min_queued_assets: Gwei,
-    skip_harvest: bool,
 ) -> None:
     setup_logging()
     await setup_clients()
@@ -193,7 +184,6 @@ async def main(
                 await process(
                     block_number=block_number,
                     min_queued_assets=min_queued_assets,
-                    skip_harvest=skip_harvest,
                 )
                 await interrupt_handler.sleep(interval)
 
@@ -201,11 +191,9 @@ async def main(
         await close_clients()
 
 
-# pylint: disable-next=too-many-locals
 async def process(
     block_number: BlockNumber,
     min_queued_assets: Gwei,
-    skip_harvest: bool,
 ) -> None:
     if not await check_gas_price():
         return
@@ -243,6 +231,7 @@ async def process(
         Web3.from_wei(queued_assets, 'ether'),
         settings.network_config.VAULT_BALANCE_SYMBOL,
     )
+
     # Step 3: Fetch ALL positions from IPFS (needed for correct merkle tree)
     all_positions = await fetch_positions_from_ipfs(block_number)
     if not all_positions:
@@ -255,59 +244,23 @@ async def process(
         logger.info('No redeemable positions found. Skipping to next interval.')
         return
 
-    # Step 5: Fetch vault params
-    vaults = {p.vault for p in os_token_positions}
-    vault_to_harvest_params = await get_multiple_harvest_params(list(vaults), block_number)
-    vault_to_withdrawable_assets: dict[ChecksumAddress, Wei] = {}
-    for vault in vaults:
-        vault_to_withdrawable_assets[vault] = await get_withdrawable_assets(
-            vault, vault_to_harvest_params.get(vault)
-        )
+    # Step 5: Bring every involved vault up to date on-chain so subsequent reads
+    # and redemption transactions run against fresh state — no harvest_params
+    # plumbing and no updateVaultState bundled in a multicall.
+    vaults = list({position.vault for position in os_token_positions})
+    await update_vaults_state(vaults=vaults, block_number=block_number)
 
-    # Step 6: Select positions
-    positions_to_redeem = await select_positions(
+    # Step 6: Redeem each position end-to-end in a single loop. Withdrawable assets
+    # are fetched once per vault and cached; meta vaults short on assets trigger
+    # sub-vault redemption inline; one redeemOsTokenPositions tx is submitted per
+    # position.
+    await redeem_positions(
+        all_positions=all_positions,
         os_token_positions=os_token_positions,
         queued_shares=queued_shares,
         converter=os_token_converter,
-        vault_to_harvest_params=vault_to_harvest_params,
-        vault_to_withdrawable_assets=vault_to_withdrawable_assets,
-        skip_harvest=skip_harvest,
-    )
-
-    if not positions_to_redeem:
-        logger.info('No positions eligible for redemption.')
-        return
-
-    # Step 7: Execute redemption (uses all_positions for complete merkle tree)
-    tx_hash = await execute_redemption(
-        all_positions=all_positions,
-        positions_to_redeem=positions_to_redeem,
-        vault_to_harvest_params=vault_to_harvest_params,
         nonce=prev_nonce,
     )
-    if tx_hash:
-        logger.info(
-            'Successfully redeemed %s OsToken positions. Transaction hash: %s',
-            len(positions_to_redeem),
-            tx_hash,
-        )
-
-
-async def _process_exit_queue(block_number: BlockNumber) -> None:
-    """Call processExitQueue() on the redeemer contract if canProcessExitQueue."""
-    can_process_exit_queue = await os_token_redeemer_contract.can_process_exit_queue(block_number)
-    if not can_process_exit_queue:
-        return
-    logger.info('Exit queue can be processed. Calling processExitQueue...')
-    tx_hash = await os_token_redeemer_contract.process_exit_queue()
-    logger.info('Waiting for processExitQueue transaction %s confirmation', tx_hash)
-    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
-        tx_hash, timeout=settings.execution_transaction_timeout
-    )
-    if not tx_receipt['status']:
-        logger.error('processExitQueue transaction failed. Tx Hash: %s', tx_hash)
-    else:
-        logger.info('processExitQueue confirmed. Tx Hash: %s', tx_hash)
 
 
 async def fetch_positions_from_ipfs(block_number: BlockNumber) -> list[OsTokenPosition]:
@@ -348,138 +301,143 @@ async def calculate_redeemable_shares(
     return redeemable
 
 
-# pylint: disable-next=too-many-arguments
-async def select_positions(
+async def update_vaults_state(
+    vaults: list[ChecksumAddress],
+    block_number: BlockNumber,
+) -> None:
+    """Bring every vault in ``vaults`` up to date on-chain.
+
+    Meta vaults that need a state update are harvested via process_meta_vault_tree.
+    Regular vaults with pending updates have ``updateState`` submitted as a standalone
+    transaction. After this call, ``get_withdrawable_assets`` and
+    ``redeemSubVaultsAssets`` operate on fresh state without harvest_params plumbing.
+    """
+    regular_vaults: list[ChecksumAddress] = []
+    for vault in vaults:
+        if await is_meta_vault(vault):
+            # is_meta_vault_state_update_required is inverted: it returns True when
+            # state is up-to-date and False when an update is required.
+            if not await is_meta_vault_state_update_required(vault):
+                await harvest_meta_vault(vault)
+        else:
+            regular_vaults.append(vault)
+
+    if not regular_vaults:
+        return
+
+    vault_to_harvest_params = await get_multiple_harvest_params(regular_vaults, block_number)
+    for vault in regular_vaults:
+        harvest_params = vault_to_harvest_params.get(vault)
+        if harvest_params is None:
+            continue
+        await _submit_update_vault_state(vault=vault, harvest_params=harvest_params)
+
+
+async def redeem_positions(
+    all_positions: list[OsTokenPosition],
     os_token_positions: list[OsTokenPosition],
     queued_shares: int,
     converter: OsTokenConverter,
-    vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None],
-    vault_to_withdrawable_assets: dict[ChecksumAddress, Wei],
-    skip_harvest: bool,
-) -> list[OsTokenPosition]:
-    """Select positions to redeem in IPFS order, capped by queued shares and withdrawable assets.
+    nonce: int,
+) -> None:
+    """Walk redeemable positions in IPFS order and redeem each one in turn.
 
-    Submits meta-vault redeem transactions, then iterates positions
-    in their original IPFS ordering, filling ``shares_to_redeem`` for each selected position.
+    Per position:
+    - Fetch the vault's withdrawable assets (cached per vault and decremented
+      after each successful redemption).
+    - For meta vaults short on withdrawable, redeem sub-vaults and refetch.
+    - Cap shares by both remaining queued shares and withdrawable assets.
+    - Submit a redeemOsTokenPositions transaction for the single position.
+
+    Stops once queued shares are exhausted.
     """
-    vault_to_withdrawable_assets = await _redeem_meta_vaults(
-        os_token_positions=os_token_positions,
-        queued_shares=queued_shares,
-        converter=converter,
-        vault_to_harvest_params=vault_to_harvest_params,
-        vault_to_withdrawable_assets=vault_to_withdrawable_assets,
-        skip_harvest=skip_harvest,
-    )
-
-    positions_to_redeem: list[OsTokenPosition] = []
     remaining_shares = queued_shares
+    vault_to_withdrawable: dict[ChecksumAddress, Wei] = {}
 
-    # Fill shares_to_redeem for each position, capped by remaining shares and withdrawable assets
     for position in os_token_positions:
         if remaining_shares <= 0:
             break
 
-        withdrawable_assets = vault_to_withdrawable_assets.get(position.vault, Wei(0))
         shares_to_redeem = Wei(min(position.unprocessed_shares, remaining_shares))
-        redeemable_assets = converter.to_assets(shares_to_redeem)
+        assets_to_redeem = converter.to_assets(shares_to_redeem)
 
-        if redeemable_assets > withdrawable_assets:
-            shares_to_redeem = converter.to_shares(withdrawable_assets)
-            if shares_to_redeem <= 0:
-                continue
-            redeemable_assets = withdrawable_assets
+        if position.vault not in vault_to_withdrawable:
+            vault_to_withdrawable[position.vault] = await get_withdrawable_assets(
+                position.vault, harvest_params=None
+            )
+        withdrawable = vault_to_withdrawable[position.vault]
 
-        logger.info(
-            'Position Owner: %s, Vault: %s, Shares to Redeem: %s',
-            position.owner,
-            position.vault,
-            shares_to_redeem,
-        )
-        positions_to_redeem.append(replace(position, shares_to_redeem=shares_to_redeem))
-        vault_to_withdrawable_assets[position.vault] = Wei(withdrawable_assets - redeemable_assets)
+        if withdrawable < assets_to_redeem and await is_meta_vault(position.vault):
+            await _redeem_meta_vault_sub_vaults(
+                vault_address=position.vault, assets=assets_to_redeem
+            )
+            withdrawable = await get_withdrawable_assets(position.vault, harvest_params=None)
+            vault_to_withdrawable[position.vault] = withdrawable
+
+        if withdrawable < assets_to_redeem:
+            shares_to_redeem = converter.to_shares(withdrawable)
+            assets_to_redeem = withdrawable
+
+        if shares_to_redeem <= 0:
+            continue
+
+        position_to_redeem = replace(position, shares_to_redeem=shares_to_redeem)
+        if not await _submit_redeem_position(
+            position=position_to_redeem,
+            all_positions=all_positions,
+            nonce=nonce,
+        ):
+            return
+
+        vault_to_withdrawable[position.vault] = Wei(withdrawable - assets_to_redeem)
         remaining_shares -= shares_to_redeem
 
-    return positions_to_redeem
+
+async def harvest_meta_vault(vault: ChecksumAddress) -> None:
+    meta_vaults_map = await graph_get_vaults(
+        is_meta_vault=True,
+    )
+    try:
+        await process_meta_vault_tree(vault=vault, meta_vaults_map=meta_vaults_map)
+    except Exception as e:
+        raise RuntimeError(f'Failed to process meta vault tree for vault {vault}') from e
 
 
-# pylint: disable-next=too-many-arguments
-async def _redeem_meta_vaults(
-    os_token_positions: list[OsTokenPosition],
-    queued_shares: int,
-    converter: OsTokenConverter,
-    vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None],
-    vault_to_withdrawable_assets: dict[ChecksumAddress, Wei],
-    skip_harvest: bool,
-) -> dict[ChecksumAddress, Wei]:
-    """Pre-compute meta-vault redemptions for all vaults that need them.
-
-    Estimates per-vault asset needs from positions (in IPFS order, capped by queued shares),
-    then attempts meta-vault redemption for any vault with a deficit.
-    Returns updated vault-to-withdrawable mapping.
-    """
-    vault_to_withdrawable = dict(vault_to_withdrawable_assets)
-    vault_to_needed: defaultdict[ChecksumAddress, Wei] = defaultdict(lambda: Wei(0))
-    remaining = queued_shares
-
-    for pos in os_token_positions:
-        if remaining <= 0:
-            break
-        shares = Wei(min(pos.unprocessed_shares, remaining))
-        vault_to_needed[pos.vault] = Wei(vault_to_needed[pos.vault] + converter.to_assets(shares))
-        remaining -= shares
-
-    for vault, needed in vault_to_needed.items():
-        withdrawable = vault_to_withdrawable.get(vault, Wei(0))
-        if needed > withdrawable:
-            vault_to_withdrawable[vault] = await _try_redeem_meta_vault(
-                vault_address=vault,
-                assets=needed,
-                current_withdrawable=withdrawable,
-                vault_to_harvest_params=vault_to_harvest_params,
-                skip_harvest=skip_harvest,
-            )
-
-    return vault_to_withdrawable
+async def _process_exit_queue(block_number: BlockNumber) -> None:
+    """Call processExitQueue() on the redeemer contract if canProcessExitQueue."""
+    can_process_exit_queue = await os_token_redeemer_contract.can_process_exit_queue(block_number)
+    if not can_process_exit_queue:
+        return
+    logger.info('Exit queue can be processed. Calling processExitQueue...')
+    tx_hash = await os_token_redeemer_contract.process_exit_queue()
+    logger.info('Waiting for processExitQueue transaction %s confirmation', tx_hash)
+    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
+        tx_hash, timeout=settings.execution_transaction_timeout
+    )
+    if not tx_receipt['status']:
+        logger.error('processExitQueue transaction failed. Tx Hash: %s', tx_hash)
+    else:
+        logger.info('processExitQueue confirmed. Tx Hash: %s', tx_hash)
 
 
-async def _try_redeem_meta_vault(
+async def _startup_check() -> None:
+    positions_manager = await os_token_redeemer_contract.positions_manager()
+    if positions_manager != wallet.account.address:
+        raise RuntimeError(
+            f'The Position Manager role must be assigned to the address {wallet.account.address}.'
+        )
+
+
+async def _redeem_meta_vault_sub_vaults(
     vault_address: ChecksumAddress,
     assets: Wei,
-    current_withdrawable: Wei,
-    vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None],
-    skip_harvest: bool,
-) -> Wei:
-    """If vault is a meta-vault, redeem sub-vaults for the needed assets.
+) -> None:
+    """Redeem from sub-vaults to bring a meta vault's withdrawable assets up to ``assets``.
 
-    Handles nested meta vaults by building a bottom-up redemption order
-    and processing deepest nested vaults first.
-
-    On harvest, mutates ``vault_to_harvest_params`` in place to drop params
-    for vaults whose state was just updated on-chain — applying those params
-    again (in ``get_withdrawable_assets`` or ``execute_redemption``) would
-    revert.
-
-    Returns the (possibly updated) withdrawable assets.
+    Builds a bottom-up redeem order so deepest nested meta vaults are redeemed first,
+    then submits one redeemSubVaultsAssets transaction per entry. Failures abort the
+    sequence; the caller refetches withdrawable to discover whatever progress was made.
     """
-    if not await is_meta_vault(vault_address):
-        return current_withdrawable
-
-    if not await is_meta_vault_state_update_required(vault_address):
-        if skip_harvest:
-            raise RuntimeError(
-                f'Meta vault {vault_address} is not harvested, '
-                'stopping vaults redemption processing...'
-            )
-        await harvest_meta_vault(vault_address)
-        await _refresh_harvest_params(vault_to_harvest_params)
-        current_withdrawable = await get_withdrawable_assets(
-            vault_address, vault_to_harvest_params.get(vault_address)
-        )
-        if current_withdrawable >= assets:
-            return current_withdrawable
-
-    logger.info('Vault %s is a meta-vault with insufficient withdrawable assets.', vault_address)
-
     try:
         redeem_order = await _build_meta_vault_redeem_order(vault_address, assets)
     except Exception:
@@ -488,34 +446,25 @@ async def _try_redeem_meta_vault(
             'Proceeding with current withdrawable assets.',
             vault_address,
         )
-        return current_withdrawable
+        return
 
-    any_succeeded = False
     for redeem_entry in redeem_order:
         try:
             tx_hash = await os_token_redeemer_contract.redeem_sub_vaults_assets(
                 redeem_entry.vault, redeem_entry.assets
             )
-            any_succeeded = True
             logger.info(
                 'redeemSubVaultsAssets confirmed for vault %s. Tx Hash: %s',
                 redeem_entry.vault,
                 tx_hash,
             )
         except (Web3Exception, RuntimeError, ValueError):
-            logger.error(
+            logger.exception(
                 'redeemSubVaultsAssets failed for vault %s. '
                 'Proceeding with current withdrawable assets.',
                 redeem_entry.vault,
             )
-            if any_succeeded:
-                return await get_withdrawable_assets(
-                    vault_address, vault_to_harvest_params.get(vault_address)
-                )
-            return current_withdrawable
-
-    # Re-query actual withdrawable assets on-chain after sub-vault redemption
-    return await get_withdrawable_assets(vault_address, vault_to_harvest_params.get(vault_address))
+            return
 
 
 async def _build_meta_vault_redeem_order(
@@ -544,88 +493,92 @@ async def _build_meta_vault_redeem_order(
     return order
 
 
-async def execute_redemption(
+async def _submit_redeem_position(
+    position: OsTokenPosition,
     all_positions: list[OsTokenPosition],
-    positions_to_redeem: list[OsTokenPosition],
-    vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None],
     nonce: int,
-) -> HexStr | None:
-    """Build multiproof from all positions and execute the redemption transaction."""
-    multiproof = build_multi_proof(
-        all_positions=all_positions,
-        positions_to_redeem=positions_to_redeem,
+) -> bool:
+    """Submit one redeemOsTokenPositions transaction for a single position."""
+    multiproof = _build_multi_proof(
         tree_nonce=nonce,
+        all_positions=all_positions,
+        positions_to_redeem=[position],
     )
-    calls: list[HexStr] = []
-
-    for vault in set(pos.vault for pos in positions_to_redeem):
-        harvest_params = vault_to_harvest_params.get(vault)
-        if harvest_params:
-            calls.append(
-                os_token_redeemer_contract.encode_abi(
-                    fn_name='updateVaultState',
-                    args=[
-                        vault,
-                        (
-                            harvest_params.rewards_root,
-                            harvest_params.reward,
-                            harvest_params.unlocked_mev_reward,
-                            harvest_params.proof,
-                        ),
-                    ],
-                )
-            )
-
-    # Maps to Solidity struct:
-    # OsTokenPosition(address vault, address owner, uint256 leafShares, uint256 sharesToRedeem)
     positions_arg = [
-        (pos.vault, pos.owner, pos.leaf_shares, pos.shares_to_redeem) for pos in positions_to_redeem
+        (position.vault, position.owner, position.leaf_shares, position.shares_to_redeem)
     ]
-    calls.append(
-        os_token_redeemer_contract.encode_abi(
-            fn_name='redeemOsTokenPositions',
-            args=[positions_arg, multiproof.proof, multiproof.proof_flags],
-        )
-    )
-
     try:
-        tx_function = os_token_redeemer_contract.functions.multicall(calls)
+        tx_function = os_token_redeemer_contract.contract.functions.redeemOsTokenPositions(
+            positions_arg, multiproof.proof, multiproof.proof_flags
+        )
         tx = await transaction_gas_wrapper(tx_function=tx_function)
     except Web3Exception:
-        logger.exception('Failed to redeem os token positions')
-        return None
+        logger.exception(
+            'Failed to redeem position (vault %s, owner %s)',
+            position.vault,
+            position.owner,
+        )
+        return False
 
     tx_hash = Web3.to_hex(tx)
-    logger.info('Waiting for transaction %s confirmation', tx_hash)
+    logger.info(
+        'Waiting for redeemOsTokenPositions tx %s (vault %s, owner %s) confirmation',
+        tx_hash,
+        position.vault,
+        position.owner,
+    )
     tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
         tx, timeout=settings.execution_transaction_timeout
     )
     if not tx_receipt['status']:
-        logger.error('Failed to redeem os token positions...')
-        return None
+        logger.error(
+            'Failed to redeem position (vault %s, owner %s). Tx Hash: %s',
+            position.vault,
+            position.owner,
+            tx_hash,
+        )
+        return False
 
-    return tx_hash
+    logger.info(
+        'Redeemed %s shares for position (vault %s, owner %s). Tx Hash: %s',
+        position.shares_to_redeem,
+        position.vault,
+        position.owner,
+        tx_hash,
+    )
+    return True
 
 
-async def harvest_meta_vault(vault: ChecksumAddress) -> None:
-    meta_vaults_map = await graph_get_vaults(
-        is_meta_vault=True,
+async def _submit_update_vault_state(
+    vault: ChecksumAddress,
+    harvest_params: HarvestParams,
+) -> None:
+    """Submit a standalone updateState transaction for a regular vault."""
+    vault_contract = VaultContract(vault)
+    tx_function = vault_contract.contract.functions.updateState(
+        (
+            harvest_params.rewards_root,
+            harvest_params.reward,
+            harvest_params.unlocked_mev_reward,
+            harvest_params.proof,
+        )
     )
     try:
-        await process_meta_vault_tree(vault=vault, meta_vaults_map=meta_vaults_map)
-    except Exception as e:
-        raise RuntimeError(f'Failed to process meta vault tree for vault {vault}') from e
+        tx = await transaction_gas_wrapper(tx_function=tx_function)
+    except Web3Exception as e:
+        raise RuntimeError(f'Failed updateState for vault {vault}') from e
+
+    tx_hash = Web3.to_hex(tx)
+    logger.info('Waiting for updateState tx %s (vault %s) confirmation', tx_hash, vault)
+    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
+        tx, timeout=settings.execution_transaction_timeout
+    )
+    if not tx_receipt['status']:
+        raise RuntimeError(f'updateState tx failed for vault {vault}. Tx Hash: {tx_hash}')
+    logger.info('updateState confirmed for vault %s. Tx Hash: %s', vault, tx_hash)
 
 
-async def _startup_check() -> None:
-    positions_manager = await os_token_redeemer_contract.positions_manager()
-    if positions_manager != wallet.account.address:
-        raise RuntimeError(
-            f'The Position Manager role must be assigned to the address {wallet.account.address}.'
-        )
-
-
-def build_multi_proof(
+def _build_multi_proof(
     tree_nonce: int,
     all_positions: list[OsTokenPosition],
     positions_to_redeem: list[OsTokenPosition],
@@ -638,19 +591,3 @@ def build_multi_proof(
     )
     redeem_leaves = [p.merkle_leaf(tree_nonce) for p in positions_to_redeem]
     return tree.get_multi_proof(redeem_leaves)
-
-
-async def _refresh_harvest_params(
-    vault_to_harvest_params: dict[ChecksumAddress, HarvestParams | None],
-) -> None:
-    """Refresh the harvest params dict in place against the latest on-chain state.
-
-    Called after a meta vault harvest consumes ``update_state`` for some subset
-    of the tracked vaults. Vaults that were just updated will have
-    ``can_harvest`` return False on-chain and are reset to ``None``, so callers
-    don't apply consumed params again and trigger a revert.
-    """
-    if not vault_to_harvest_params:
-        return
-    refreshed = await get_multiple_harvest_params(list(vault_to_harvest_params.keys()))
-    vault_to_harvest_params.update(refreshed)
