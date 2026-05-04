@@ -95,7 +95,7 @@ async def is_meta_vault(vault_address: ChecksumAddress) -> bool:
     return vault_id in META_VAULT_IDS
 
 
-async def is_meta_vault_harvested(meta_vault_address: ChecksumAddress) -> bool:
+async def is_meta_vault_state_update_required(meta_vault_address: ChecksumAddress) -> bool:
     vault_version = await VaultContract(meta_vault_address).version()
 
     if is_meta_vault_upgraded_to_release(

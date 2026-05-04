@@ -29,7 +29,7 @@ from src.common.wallet import wallet
 from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
 from src.meta_vault.graph import graph_get_vaults
-from src.meta_vault.service import is_meta_vault, is_meta_vault_harvested
+from src.meta_vault.service import is_meta_vault, is_meta_vault_state_update_required
 from src.meta_vault.tasks import process_meta_vault_tree
 from src.meta_vault.typings import SubVaultRedemption
 from src.redemptions.os_token_converter import (
@@ -464,7 +464,7 @@ async def _try_redeem_meta_vault(
     if not await is_meta_vault(vault_address):
         return current_withdrawable
 
-    if not await is_meta_vault_harvested(vault_address):
+    if not await is_meta_vault_state_update_required(vault_address):
         if skip_harvest:
             raise RuntimeError(
                 f'Meta vault {vault_address} is not harvested, '

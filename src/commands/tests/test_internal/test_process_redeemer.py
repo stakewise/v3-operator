@@ -327,7 +327,9 @@ class TestTryRedeemMetaVault:
     async def test_meta_vault_successful_redeem(self) -> None:
         with (
             patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
-            patch(f'{MODULE}.is_meta_vault_harvested', new=AsyncMock(return_value=True)),
+            patch(
+                f'{MODULE}.is_meta_vault_state_update_required', new=AsyncMock(return_value=True)
+            ),
             patch(
                 f'{MODULE}._build_meta_vault_redeem_order',
                 new=AsyncMock(return_value=[SubVaultRedemption(vault=VAULT_1, assets=Wei(400))]),
@@ -352,7 +354,9 @@ class TestTryRedeemMetaVault:
     async def test_meta_vault_failed_redeem(self) -> None:
         with (
             patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
-            patch(f'{MODULE}.is_meta_vault_harvested', new=AsyncMock(return_value=True)),
+            patch(
+                f'{MODULE}.is_meta_vault_state_update_required', new=AsyncMock(return_value=True)
+            ),
             patch(
                 f'{MODULE}._build_meta_vault_redeem_order',
                 new=AsyncMock(return_value=[SubVaultRedemption(vault=VAULT_1, assets=Wei(400))]),
@@ -373,7 +377,9 @@ class TestTryRedeemMetaVault:
         """Nested meta vault B is redeemed before parent A."""
         with (
             patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
-            patch(f'{MODULE}.is_meta_vault_harvested', new=AsyncMock(return_value=True)),
+            patch(
+                f'{MODULE}.is_meta_vault_state_update_required', new=AsyncMock(return_value=True)
+            ),
             patch(
                 f'{MODULE}._build_meta_vault_redeem_order',
                 new=AsyncMock(
@@ -407,7 +413,9 @@ class TestTryRedeemMetaVault:
         """If nested redemption fails, returns current_withdrawable."""
         with (
             patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
-            patch(f'{MODULE}.is_meta_vault_harvested', new=AsyncMock(return_value=True)),
+            patch(
+                f'{MODULE}.is_meta_vault_state_update_required', new=AsyncMock(return_value=True)
+            ),
             patch(
                 f'{MODULE}._build_meta_vault_redeem_order',
                 new=AsyncMock(
@@ -457,7 +465,9 @@ class TestTryRedeemMetaVault:
 
         with (
             patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
-            patch(f'{MODULE}.is_meta_vault_harvested', new=AsyncMock(return_value=False)),
+            patch(
+                f'{MODULE}.is_meta_vault_state_update_required', new=AsyncMock(return_value=False)
+            ),
             patch(f'{MODULE}.harvest_meta_vault', new=AsyncMock()) as mock_harvest,
             patch(
                 f'{MODULE}.get_multiple_harvest_params',
@@ -493,7 +503,9 @@ class TestTryRedeemMetaVault:
         redeem loop entirely to avoid unnecessary transactions."""
         with (
             patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
-            patch(f'{MODULE}.is_meta_vault_harvested', new=AsyncMock(return_value=False)),
+            patch(
+                f'{MODULE}.is_meta_vault_state_update_required', new=AsyncMock(return_value=False)
+            ),
             patch(f'{MODULE}.harvest_meta_vault', new=AsyncMock()) as mock_harvest,
             patch(f'{MODULE}.get_multiple_harvest_params', new=AsyncMock(return_value={})),
             patch(f'{MODULE}._build_meta_vault_redeem_order', new=AsyncMock()) as mock_build_order,
@@ -522,7 +534,9 @@ class TestTryRedeemMetaVault:
         harvest_meta_vault is not called, halting redemption processing."""
         with (
             patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=True)),
-            patch(f'{MODULE}.is_meta_vault_harvested', new=AsyncMock(return_value=False)),
+            patch(
+                f'{MODULE}.is_meta_vault_state_update_required', new=AsyncMock(return_value=False)
+            ),
             patch(f'{MODULE}.harvest_meta_vault', new=AsyncMock()) as mock_harvest,
         ):
             with pytest.raises(RuntimeError, match='is not harvested'):
