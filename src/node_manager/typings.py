@@ -37,6 +37,7 @@ class NodeManagerFundingRequest:
     operator_address: ChecksumAddress
     public_keys: list[HexStr]
     amounts: list[int]
+    deposit_signatures: list[HexStr]
     deadline: int
     validators_manager_signature: HexStr
 

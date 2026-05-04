@@ -11,7 +11,7 @@ from eth_typing import ChecksumAddress, HexStr
 from sw_utils.common import urljoin
 from sw_utils.typings import ProtocolConfig
 from web3 import Web3
-from web3.types import Gwei, Wei
+from web3.types import Wei
 
 from src.common.contracts import validators_registry_contract
 from src.common.exceptions import (
@@ -241,7 +241,7 @@ async def create_approval_request(
 
 
 async def poll_funding_approval(
-    validator_fundings: dict[HexStr, Gwei],
+    validators: Sequence[Validator],
     operator_address: ChecksumAddress,
     protocol_config: ProtocolConfig,
 ) -> list[HexStr]:
@@ -259,7 +259,7 @@ async def poll_funding_approval(
         if request is None or deadline is None or deadline <= current_timestamp:
             deadline = current_timestamp + protocol_config.signature_validity_period
             request = create_funding_request(
-                validator_fundings=validator_fundings,
+                validators=validators,
                 operator_address=operator_address,
                 deadline=deadline,
             )
@@ -276,18 +276,30 @@ async def poll_funding_approval(
 
 
 def create_funding_request(
-    validator_fundings: dict[HexStr, Gwei],
+    validators: Sequence[Validator],
     operator_address: ChecksumAddress,
     deadline: int,
 ) -> NodeManagerFundingRequest:
     """Build a NodesManager funding request for validator top-ups."""
-    return NodeManagerFundingRequest(
+
+    request = NodeManagerFundingRequest(
         operator_address=operator_address,
-        public_keys=list(validator_fundings.keys()),
-        amounts=[int(amount) for amount in validator_fundings.values()],
+        public_keys=[],
+        amounts=[],
+        deposit_signatures=[],
         deadline=deadline,
         validators_manager_signature=_sign_deadline(deadline),
     )
+
+    for validator in validators:
+        if validator.deposit_signature is None:
+            raise ValueError('Deposit signature is required for validator')
+
+        request.public_keys.append(validator.public_key)
+        request.deposit_signatures.append(validator.deposit_signature)
+        request.amounts.append(validator.amount)
+
+    return request
 
 
 # Generic oracle request helpers
@@ -500,5 +512,5 @@ async def _send_request(
 
 def _sign_deadline(deadline: int) -> HexStr:
     """EIP-191 personal_sign of the deadline timestamp."""
-    message = encode_defunct(text=str(deadline))
+    message = encode_defunct(primitive=deadline.to_bytes(32, byteorder='big'))
     return HexStr(wallet.sign_message(message).signature.hex())

@@ -235,6 +235,7 @@ def _make_funding_request() -> NodeManagerFundingRequest:
         operator_address=faker.eth_address(),
         public_keys=[faker.validator_public_key()],
         amounts=[ether_to_gwei(32)],
+        deposit_signatures=[faker.validator_signature()],
         deadline=1000,
         validators_manager_signature=faker.account_signature(),
     )

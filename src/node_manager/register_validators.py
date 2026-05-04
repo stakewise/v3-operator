@@ -5,7 +5,6 @@ from eth_typing import ChecksumAddress, HexStr
 from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.exceptions import ContractLogicError
-from web3.types import Gwei
 
 from src.common.clients import execution_client
 from src.common.contracts import nodes_manager_contract, validators_registry_contract
@@ -93,17 +92,9 @@ async def register_validators(
 async def fund_validators(
     operator_address: ChecksumAddress,
     signatures: list[HexStr],
-    validator_fundings: dict[HexStr, Gwei],
+    validators: Sequence[Validator],
 ) -> HexStr | None:
     """Submit fundValidators transaction to NodesManager contract."""
-    validators = [
-        Validator(
-            public_key=public_key,
-            amount=amount,
-            deposit_signature=HexStr(Web3.to_hex(bytes(96))),
-        )
-        for public_key, amount in validator_fundings.items()
-    ]
     tx_validators = [
         Web3.to_bytes(tx_validator)
         for tx_validator in encode_tx_validator_list(validators=validators)
