@@ -32,7 +32,7 @@ def _mock_scan_events() -> None:
     chain_head = MagicMock(block_number=100)
     with patch(
         f'{MODULE}.get_chain_finalized_head', new_callable=AsyncMock, return_value=chain_head
-    ), patch(f'{MODULE}.scan_validators_events', new_callable=AsyncMock):
+    ), patch(f'{MODULE}.scan_node_manager_validators_events', new_callable=AsyncMock):
         yield
 
 
