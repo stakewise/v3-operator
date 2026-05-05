@@ -260,7 +260,7 @@ async def process(
         os_token_positions=os_token_positions,
         queued_shares=queued_shares,
         converter=os_token_converter,
-        nonce=prev_nonce,
+        tree_nonce=prev_nonce,
     )
 
 
@@ -315,10 +315,19 @@ async def update_vaults_state(
     threading harvest_params through every read.
     """
     regular_vaults: list[ChecksumAddress] = []
+    meta_vaults_map = await graph_get_vaults(
+        is_meta_vault=True,
+    )
     for vault in vaults:
         if await is_meta_vault(vault):
             if await is_meta_vault_state_update_required(vault):
-                await harvest_meta_vault(vault)
+                try:
+                    await process_meta_vault_tree(vault=vault, meta_vaults_map=meta_vaults_map)
+                except Exception as e:
+                    raise RuntimeError(
+                        f'Failed to process meta vault tree for vault {vault}'
+                    ) from e
+
         else:
             regular_vaults.append(vault)
 
@@ -354,7 +363,7 @@ async def redeem_positions(
     os_token_positions: list[OsTokenPosition],
     queued_shares: int,
     converter: OsTokenConverter,
-    nonce: int,
+    tree_nonce: int,
 ) -> None:
     """Walk redeemable positions in IPFS order and redeem each one in turn.
 
@@ -402,22 +411,12 @@ async def redeem_positions(
         if not await _submit_redeem_position(
             position=position_to_redeem,
             all_positions=all_positions,
-            nonce=nonce,
+            tree_nonce=tree_nonce,
         ):
             return
 
         vault_to_withdrawable[position.vault] = Wei(withdrawable - assets_to_redeem)
         remaining_shares -= shares_to_redeem
-
-
-async def harvest_meta_vault(vault: ChecksumAddress) -> None:
-    meta_vaults_map = await graph_get_vaults(
-        is_meta_vault=True,
-    )
-    try:
-        await process_meta_vault_tree(vault=vault, meta_vaults_map=meta_vaults_map)
-    except Exception as e:
-        raise RuntimeError(f'Failed to process meta vault tree for vault {vault}') from e
 
 
 async def _process_exit_queue(block_number: BlockNumber) -> None:
@@ -513,11 +512,11 @@ async def _build_meta_vault_redeem_order(
 async def _submit_redeem_position(
     position: OsTokenPosition,
     all_positions: list[OsTokenPosition],
-    nonce: int,
+    tree_nonce: int,
 ) -> bool:
     """Submit one redeemOsTokenPositions transaction for a single position."""
     multiproof = _build_multi_proof(
-        tree_nonce=nonce,
+        tree_nonce=tree_nonce,
         all_positions=all_positions,
         positions_to_redeem=[position],
     )
