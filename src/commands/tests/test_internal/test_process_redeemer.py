@@ -211,14 +211,22 @@ class TestRedeemPositions:
         assert submitted.shares_to_redeem == Wei(200)
 
     async def test_meta_vault_redeem_sub_vaults_when_short(self) -> None:
-        """Meta vault short on withdrawable triggers sub-vault redemption then refetches."""
+        """Meta vault short on withdrawable triggers sub-vault redemption then refetches.
+
+        After the redemption, the caller must wait for fallback execution endpoints to
+        catch up to the receipt block before re-reading withdrawable, otherwise a stale
+        read can underestimate available assets.
+        """
         pos = make_position(unprocessed_shares=500)
         # First call: short. Second call (post sub-vault redeem): plenty.
         get_withdrawable = AsyncMock(side_effect=[Wei(100), Wei(1000)])
 
         with (
             _mock_redeem_positions(withdrawable=get_withdrawable, is_meta_vault=True) as mocks,
-            patch(f'{MODULE}._redeem_meta_vault_sub_vaults', new=AsyncMock()) as mock_redeem_sub,
+            patch(
+                f'{MODULE}._redeem_meta_vault_sub_vaults',
+                new=AsyncMock(return_value=BlockNumber(900)),
+            ) as mock_redeem_sub,
         ):
             await redeem_positions(
                 all_positions=[pos],
@@ -229,8 +237,33 @@ class TestRedeemPositions:
             )
 
         mock_redeem_sub.assert_awaited_once()
+        # Sync barrier called with the receipt block before re-reading withdrawable.
+        mocks['wait_synced_mock'].assert_any_await(BlockNumber(900))
         assert get_withdrawable.await_count == 2
         assert _submitted_position(mocks).shares_to_redeem == Wei(500)
+
+    async def test_meta_vault_redeem_no_successful_tx_skips_sync_barrier(self) -> None:
+        """If sub-vault redemption submitted no successful tx, no sync barrier is needed."""
+        pos = make_position(unprocessed_shares=500)
+        get_withdrawable = AsyncMock(side_effect=[Wei(100), Wei(1000)])
+
+        with (
+            _mock_redeem_positions(withdrawable=get_withdrawable, is_meta_vault=True) as mocks,
+            patch(
+                f'{MODULE}._redeem_meta_vault_sub_vaults',
+                new=AsyncMock(return_value=None),
+            ),
+        ):
+            await redeem_positions(
+                all_positions=[pos],
+                os_token_positions=[pos],
+                queued_shares=10000,
+                converter=make_converter(100, 100),
+                tree_nonce=5,
+            )
+
+        # Only the post-position-submit sync, not a sub-vault sync.
+        mocks['wait_synced_mock'].assert_awaited_once_with(BlockNumber(123))
 
     async def test_meta_vault_redeem_still_short_partial_fill(self) -> None:
         """Sub-vault redemption helped but didn't fully cover — partial fill."""
@@ -239,7 +272,10 @@ class TestRedeemPositions:
 
         with (
             _mock_redeem_positions(withdrawable=get_withdrawable, is_meta_vault=True) as mocks,
-            patch(f'{MODULE}._redeem_meta_vault_sub_vaults', new=AsyncMock()),
+            patch(
+                f'{MODULE}._redeem_meta_vault_sub_vaults',
+                new=AsyncMock(return_value=BlockNumber(900)),
+            ),
         ):
             await redeem_positions(
                 all_positions=[pos],
@@ -261,7 +297,10 @@ class TestRedeemPositions:
 
         with (
             _mock_redeem_positions(withdrawable=get_withdrawable, is_meta_vault=True) as mocks,
-            patch(f'{MODULE}._redeem_meta_vault_sub_vaults', new=AsyncMock()),
+            patch(
+                f'{MODULE}._redeem_meta_vault_sub_vaults',
+                new=AsyncMock(return_value=BlockNumber(900)),
+            ),
         ):
             await redeem_positions(
                 all_positions=[pos1, pos2],
@@ -517,9 +556,12 @@ class TestRedeemMetaVaultSubVaults:
             ),
             patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
         ):
-            mock_redeemer.redeem_sub_vaults_assets = AsyncMock(return_value='0xabc')
-            await _redeem_meta_vault_sub_vaults(vault_address=VAULT_1, assets=Wei(400))
+            mock_redeemer.redeem_sub_vaults_assets = AsyncMock(
+                return_value=('0xabc', BlockNumber(789))
+            )
+            result = await _redeem_meta_vault_sub_vaults(vault_address=VAULT_1, assets=Wei(400))
         mock_redeemer.redeem_sub_vaults_assets.assert_awaited_once_with(VAULT_1, Wei(400))
+        assert result == BlockNumber(789)
 
     @pytest.mark.parametrize('exc_class', [Web3Exception, RuntimeError, ValueError])
     async def test_failed_redeem_aborts_sequence(self, exc_class: type[Exception]) -> None:
@@ -537,8 +579,9 @@ class TestRedeemMetaVaultSubVaults:
             patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
         ):
             mock_redeemer.redeem_sub_vaults_assets = AsyncMock(side_effect=exc_class('fail'))
-            await _redeem_meta_vault_sub_vaults(vault_address=VAULT_1, assets=Wei(400))
+            result = await _redeem_meta_vault_sub_vaults(vault_address=VAULT_1, assets=Wei(400))
         mock_redeemer.redeem_sub_vaults_assets.assert_awaited_once_with(VAULT_2, Wei(200))
+        assert result is None
 
     async def test_unexpected_exception_propagates(self) -> None:
         """Exceptions outside the (Web3Exception, RuntimeError, ValueError) catch list propagate."""
@@ -554,7 +597,10 @@ class TestRedeemMetaVaultSubVaults:
                 await _redeem_meta_vault_sub_vaults(vault_address=VAULT_1, assets=Wei(400))
 
     async def test_first_succeeds_second_fails(self) -> None:
-        """First sub-vault redemption succeeds; subsequent failure aborts after the second call."""
+        """First sub-vault redemption succeeds; subsequent failure aborts after the second call.
+
+        The block of the last successful tx is returned so the caller can sync endpoints.
+        """
         with (
             patch(
                 f'{MODULE}._build_meta_vault_redeem_order',
@@ -568,17 +614,18 @@ class TestRedeemMetaVaultSubVaults:
             patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
         ):
             mock_redeemer.redeem_sub_vaults_assets = AsyncMock(
-                side_effect=['0xabc', RuntimeError('fail')]
+                side_effect=[('0xabc', BlockNumber(700)), RuntimeError('fail')]
             )
-            await _redeem_meta_vault_sub_vaults(vault_address=VAULT_1, assets=Wei(400))
+            result = await _redeem_meta_vault_sub_vaults(vault_address=VAULT_1, assets=Wei(400))
 
         calls = mock_redeemer.redeem_sub_vaults_assets.call_args_list
         assert len(calls) == 2
         assert calls[0].args == (VAULT_2, Wei(200))
         assert calls[1].args == (VAULT_1, Wei(400))
+        assert result == BlockNumber(700)
 
     async def test_nested_meta_vault_all_succeed(self) -> None:
-        """Nested meta vault is redeemed before parent, in order."""
+        """Nested meta vault is redeemed before parent, in order; last receipt block returned."""
         with (
             patch(
                 f'{MODULE}._build_meta_vault_redeem_order',
@@ -591,13 +638,16 @@ class TestRedeemMetaVaultSubVaults:
             ),
             patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
         ):
-            mock_redeemer.redeem_sub_vaults_assets = AsyncMock(return_value='0xabc')
-            await _redeem_meta_vault_sub_vaults(vault_address=VAULT_1, assets=Wei(400))
+            mock_redeemer.redeem_sub_vaults_assets = AsyncMock(
+                side_effect=[('0xabc', BlockNumber(700)), ('0xdef', BlockNumber(800))]
+            )
+            result = await _redeem_meta_vault_sub_vaults(vault_address=VAULT_1, assets=Wei(400))
 
         calls = mock_redeemer.redeem_sub_vaults_assets.call_args_list
         assert len(calls) == 2
         assert calls[0].args == (VAULT_2, Wei(200))
         assert calls[1].args == (VAULT_1, Wei(400))
+        assert result == BlockNumber(800)
 
     async def test_build_order_failure_returns_silently(self) -> None:
         """Failure to build the redeem order is logged and swallowed."""
@@ -609,8 +659,9 @@ class TestRedeemMetaVaultSubVaults:
             patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
         ):
             mock_redeemer.redeem_sub_vaults_assets = AsyncMock()
-            await _redeem_meta_vault_sub_vaults(vault_address=VAULT_1, assets=Wei(400))
+            result = await _redeem_meta_vault_sub_vaults(vault_address=VAULT_1, assets=Wei(400))
         mock_redeemer.redeem_sub_vaults_assets.assert_not_called()
+        assert result is None
 
 
 class TestBuildMetaVaultRedeemOrder:

@@ -412,9 +412,11 @@ async def redeem_positions(
         withdrawable = vault_to_withdrawable[position.vault]
 
         if withdrawable < assets_to_redeem and await is_meta_vault(position.vault):
-            await _redeem_meta_vault_sub_vaults(
+            last_receipt_block = await _redeem_meta_vault_sub_vaults(
                 vault_address=position.vault, assets=assets_to_redeem
             )
+            if last_receipt_block is not None:
+                await wait_for_execution_endpoints_synced(last_receipt_block)
             withdrawable = await get_withdrawable_assets(position.vault, harvest_params=None)
             vault_to_withdrawable[position.vault] = withdrawable
 
@@ -468,12 +470,17 @@ async def _startup_check() -> None:
 async def _redeem_meta_vault_sub_vaults(
     vault_address: ChecksumAddress,
     assets: Wei,
-) -> None:
+) -> BlockNumber | None:
     """Redeem from sub-vaults to bring a meta vault's withdrawable assets up to ``assets``.
 
     Builds a bottom-up redeem order so deepest nested meta vaults are redeemed first,
     then submits one redeemSubVaultsAssets transaction per entry. Failures abort the
     sequence; the caller refetches withdrawable to discover whatever progress was made.
+
+    Returns the block number of the last successful redeemSubVaultsAssets receipt, or
+    ``None`` if no transaction succeeded. The caller uses this as a sync barrier so
+    subsequent withdrawable reads cannot land on a fallback endpoint that has not
+    yet seen the redemptions.
     """
     try:
         redeem_order = await _build_meta_vault_redeem_order(vault_address, assets)
@@ -483,11 +490,12 @@ async def _redeem_meta_vault_sub_vaults(
             'Proceeding with current withdrawable assets.',
             vault_address,
         )
-        return
+        return None
 
+    last_receipt_block: BlockNumber | None = None
     for redeem_entry in redeem_order:
         try:
-            tx_hash = await os_token_redeemer_contract.redeem_sub_vaults_assets(
+            tx_hash, receipt_block = await os_token_redeemer_contract.redeem_sub_vaults_assets(
                 redeem_entry.vault, redeem_entry.assets
             )
             logger.info(
@@ -495,13 +503,16 @@ async def _redeem_meta_vault_sub_vaults(
                 redeem_entry.vault,
                 tx_hash,
             )
+            last_receipt_block = receipt_block
         except (Web3Exception, RuntimeError, ValueError):
             logger.exception(
                 'redeemSubVaultsAssets failed for vault %s. '
                 'Proceeding with current withdrawable assets.',
                 redeem_entry.vault,
             )
-            return
+            return last_receipt_block
+
+    return last_receipt_block
 
 
 async def _build_meta_vault_redeem_order(
