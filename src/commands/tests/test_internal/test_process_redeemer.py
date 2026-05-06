@@ -286,7 +286,7 @@ class TestRedeemPositions:
 
         with _mock_redeem_positions(
             withdrawable=Wei(10000),
-            submit_results=[False, True],
+            submit_results=[None, BlockNumber(123)],
         ) as mocks:
             await redeem_positions(
                 all_positions=[pos1, pos2],
@@ -304,7 +304,7 @@ class TestRedeemPositions:
 
 
 class TestSubmitRedeemPosition:
-    async def test_success_returns_true(self) -> None:
+    async def test_success_returns_receipt_block(self) -> None:
         position = make_position(leaf_shares=1000, shares_to_redeem=500)
         with _mock_submit_redeem_position(tx_status=1) as mocks:
             result = await _submit_redeem_position(
@@ -312,12 +312,12 @@ class TestSubmitRedeemPosition:
                 all_positions=[position],
                 tree_nonce=5,
             )
-        assert result is True
+        assert result == BlockNumber(456)
         mocks['transaction_gas_wrapper'].assert_awaited_once()
         mocks['client'].eth.wait_for_transaction_receipt.assert_awaited_once()
 
-    async def test_tx_status_zero_returns_false(self) -> None:
-        """A reverted on-chain tx returns False without raising."""
+    async def test_tx_status_zero_returns_none(self) -> None:
+        """A reverted on-chain tx returns None without raising."""
         position = make_position(leaf_shares=1000, shares_to_redeem=500)
         with _mock_submit_redeem_position(tx_status=0):
             result = await _submit_redeem_position(
@@ -325,11 +325,11 @@ class TestSubmitRedeemPosition:
                 all_positions=[position],
                 tree_nonce=5,
             )
-        assert result is False
+        assert result is None
 
     @pytest.mark.parametrize('exc_class', [Web3Exception, RuntimeError, ValueError])
-    async def test_tx_build_failure_returns_false(self, exc_class: type[Exception]) -> None:
-        """Each caught exception during tx build/send returns False."""
+    async def test_tx_build_failure_returns_none(self, exc_class: type[Exception]) -> None:
+        """Each caught exception during tx build/send returns None."""
         position = make_position(leaf_shares=1000, shares_to_redeem=500)
         with _mock_submit_redeem_position(send_exception=exc_class('boom')) as mocks:
             result = await _submit_redeem_position(
@@ -337,7 +337,7 @@ class TestSubmitRedeemPosition:
                 all_positions=[position],
                 tree_nonce=5,
             )
-        assert result is False
+        assert result is None
         # Receipt is never awaited when the build step raised
         mocks['client'].eth.wait_for_transaction_receipt.assert_not_awaited()
 
@@ -827,14 +827,14 @@ class TestProcess:
 def _mock_redeem_positions(
     withdrawable: Wei | AsyncMock | None = None,
     is_meta_vault: bool = False,
-    submit_results: list[bool] | None = None,
+    submit_results: list[BlockNumber | None] | None = None,
 ) -> Iterator[dict[str, MagicMock]]:
     """Mock setup for redeem_positions tests.
 
     ``withdrawable`` may be a constant Wei value (returned on every call) or an
     AsyncMock for fine-grained control (e.g. ``side_effect=[...]`` for sequenced returns).
     ``submit_results`` controls per-call return values of _submit_redeem_position;
-    a False entry models a failed submission that should abort the round.
+    a ``None`` entry models a failed submission that should abort the round.
     """
     if isinstance(withdrawable, AsyncMock):
         get_withdrawable = withdrawable
@@ -846,15 +846,20 @@ def _mock_redeem_positions(
     if submit_results is not None:
         submit_mock = AsyncMock(side_effect=submit_results)
     else:
-        submit_mock = AsyncMock(return_value=True)
+        submit_mock = AsyncMock(return_value=BlockNumber(123))
 
     with (
         patch(f'{MODULE}.get_withdrawable_assets', new=get_withdrawable),
         patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=is_meta_vault)),
         patch(f'{MODULE}._submit_redeem_position', new=submit_mock),
+        patch(
+            f'{MODULE}.wait_for_execution_endpoints_synced',
+            new=AsyncMock(),
+        ) as wait_synced_mock,
     ):
         yield {
             'submit_mock': submit_mock,
+            'wait_synced_mock': wait_synced_mock,
         }
 
 
@@ -875,7 +880,9 @@ def _mock_submit_redeem_position(
     """
     tx = HexBytes(b'\xab' * 32)
     mock_client = AsyncMock()
-    mock_client.eth.wait_for_transaction_receipt = AsyncMock(return_value={'status': tx_status})
+    mock_client.eth.wait_for_transaction_receipt = AsyncMock(
+        return_value={'status': tx_status, 'blockNumber': BlockNumber(456)},
+    )
 
     if send_exception is not None:
         gas_wrapper = AsyncMock(side_effect=send_exception)

@@ -22,7 +22,11 @@ from src.common.contracts import (
     multicall_contract,
     os_token_redeemer_contract,
 )
-from src.common.execution import check_gas_price, transaction_gas_wrapper
+from src.common.execution import (
+    check_gas_price,
+    transaction_gas_wrapper,
+    wait_for_execution_endpoints_synced,
+)
 from src.common.harvest import get_multiple_harvest_params
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import log_verbose
@@ -196,17 +200,31 @@ async def process(
     block_number: BlockNumber,
     min_queued_assets: Gwei,
 ) -> None:
+    try:
+        await _redeem_os_token_positions(min_queued_assets=min_queued_assets)
+    finally:
+        # Re-fetch block number after redemption processing
+        # to ensure we read the latest on-chain state.
+        block_number = await execution_client.eth.block_number
+        await _process_exit_queue(block_number)
+
+
+async def _redeem_os_token_positions(
+    min_queued_assets: Gwei,
+) -> None:
+    """Perform the OsToken redemption flow for a single iteration.
+
+    Returns early without raising when there is nothing to redeem; the caller
+    is responsible for processing the exit queue regardless of the outcome.
+    """
     if not await check_gas_price():
         return
-
-    # Step 1: Process exit queue
-    await _process_exit_queue(block_number)
 
     # Re-fetch block number after exit queue processing
     # to ensure we read the latest on-chain state
     block_number = await execution_client.eth.block_number
 
-    # Step 2: Check queued shares
+    # Check queued shares
     queued_shares = await os_token_redeemer_contract.queued_shares(block_number)
     os_token_converter = await create_os_token_converter(block_number)
     queued_assets = os_token_converter.to_assets(queued_shares)
@@ -233,25 +251,25 @@ async def process(
         settings.network_config.VAULT_BALANCE_SYMBOL,
     )
 
-    # Step 3: Fetch ALL positions from IPFS (needed for correct merkle tree)
+    # Fetch ALL positions from IPFS (needed for correct merkle tree)
     all_positions = await fetch_positions_from_ipfs(block_number)
     if not all_positions:
         logger.info('No positions found. Skipping to next interval.')
         return
 
-    # Step 4: Calculate redeemable shares
+    # Calculate redeemable shares
     os_token_positions = await calculate_redeemable_shares(all_positions, prev_nonce, block_number)
     if not os_token_positions:
         logger.info('No redeemable positions found. Skipping to next interval.')
         return
 
-    # Step 5: Bring every involved vault up to date on-chain so subsequent reads
+    # Bring every involved vault up to date on-chain so subsequent reads
     # and redemption transactions run against fresh state — no harvest_params
     # plumbing and no updateVaultState bundled in a multicall.
     vaults = list({position.vault for position in os_token_positions})
     await update_vaults_state(vaults=vaults, block_number=block_number)
 
-    # Step 6: Redeem each position end-to-end in a single loop. Withdrawable assets
+    # Redeem each position end-to-end in a single loop. Withdrawable assets
     # are fetched once per vault and cached; meta vaults short on assets trigger
     # sub-vault redemption inline; one redeemOsTokenPositions tx is submitted per
     # position.
@@ -408,12 +426,15 @@ async def redeem_positions(
             continue
 
         position_to_redeem = replace(position, shares_to_redeem=shares_to_redeem)
-        if not await _submit_redeem_position(
+        receipt_block = await _submit_redeem_position(
             position=position_to_redeem,
             all_positions=all_positions,
             tree_nonce=tree_nonce,
-        ):
+        )
+        if receipt_block is None:
             return
+
+        await wait_for_execution_endpoints_synced(receipt_block)
 
         vault_to_withdrawable[position.vault] = Wei(withdrawable - assets_to_redeem)
         remaining_shares -= shares_to_redeem
@@ -513,8 +534,14 @@ async def _submit_redeem_position(
     position: OsTokenPosition,
     all_positions: list[OsTokenPosition],
     tree_nonce: int,
-) -> bool:
-    """Submit one redeemOsTokenPositions transaction for a single position."""
+) -> BlockNumber | None:
+    """Submit one redeemOsTokenPositions transaction for a single position.
+
+    Returns the receipt's block number on a confirmed successful transaction,
+    ``None`` otherwise. The caller uses the returned block as a sync barrier so
+    that subsequent reads (e.g. withdrawable balances for the next position)
+    cannot land on a fallback endpoint that has not yet seen the redemption.
+    """
     multiproof = _build_multi_proof(
         tree_nonce=tree_nonce,
         all_positions=all_positions,
@@ -534,7 +561,7 @@ async def _submit_redeem_position(
             position.vault,
             position.owner,
         )
-        return False
+        return None
 
     tx_hash = Web3.to_hex(tx)
     logger.info(
@@ -553,7 +580,7 @@ async def _submit_redeem_position(
             position.owner,
             tx_hash,
         )
-        return False
+        return None
 
     logger.info(
         'Redeemed %s shares for position (vault %s, owner %s). Tx Hash: %s',
@@ -562,7 +589,7 @@ async def _submit_redeem_position(
         position.owner,
         tx_hash,
     )
-    return True
+    return tx_receipt['blockNumber']
 
 
 def _build_multi_proof(
