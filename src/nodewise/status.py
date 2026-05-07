@@ -18,9 +18,9 @@ from src.common.utils import (
     warning_verbose,
 )
 from src.config.settings import settings
-from src.nodes.execution_sync_history import ExecutionSyncHistory
-from src.nodes.status_history import SYNC_STATUS_INTERVAL, SyncStatusHistory
-from src.nodes.typings import (
+from src.nodewise.execution_sync_history import ExecutionSyncHistory
+from src.nodewise.status_history import SYNC_STATUS_INTERVAL, SyncStatusHistory
+from src.nodewise.typings import (
     ExecutionSyncRecord,
     StatusHistoryRecord,
     SyncStageProgress,

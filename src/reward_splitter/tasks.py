@@ -61,7 +61,7 @@ class SplitRewardTask(BaseTask):
                 'Processing fee splitter %s ',
                 reward_splitter.address,
             )
-            harvest_params = await get_harvest_params()
+            harvest_params = await get_harvest_params(settings.vault)
             exit_requests = splitter_to_exit_requests.get(reward_splitter.address, [])  # nosec
 
             reward_splitter_calls = await _get_reward_splitter_calls(

@@ -19,7 +19,7 @@ class HarvestTask(BaseTask):
         """
 
         # check current gas prices
-        harvest_params = await get_harvest_params()
+        harvest_params = await get_harvest_params(settings.vault)
         if not harvest_params:
             return
 

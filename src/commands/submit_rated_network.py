@@ -25,6 +25,7 @@ from src.config.settings import settings
     prompt='Enter your vault address',
     help='The vault address.',
     type=str,
+    envvar='VAULT',
     callback=validate_eth_address,
 )
 @click.option(
@@ -34,6 +35,7 @@ from src.config.settings import settings
         AVAILABLE_NETWORKS,
         case_sensitive=False,
     ),
+    envvar='NETWORK',
 )
 @click.option(
     '--pool-tag',
@@ -89,7 +91,7 @@ async def _report_validators(
     token: str,
     network: str,
 ) -> None:
-    validators = await graph_get_vault_validators(vault)
+    validators = await backend_graph_get_vault_validators(vault)
     if not validators:
         click.secho('No validators found or failed to fetch validators.', bold=True, fg='red')
         return
@@ -126,7 +128,7 @@ async def _report_validators(
             )
 
 
-async def graph_get_vault_validators(vault: str) -> list[str]:
+async def backend_graph_get_vault_validators(vault: str) -> list[str]:
     query = gql(
         """
         query Validators($vaultAddress: String!, $first: Int, $skip: Int) {

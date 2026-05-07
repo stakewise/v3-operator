@@ -8,7 +8,7 @@ from sw_utils import ExtendedAsyncBeacon
 from web3 import AsyncWeb3
 
 from src.config.settings import settings
-from src.nodes.typings import StatusHistoryRecord
+from src.nodewise.typings import StatusHistoryRecord
 
 logger = logging.getLogger(__name__)
 

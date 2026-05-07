@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import sqlite3
 from functools import cached_property
@@ -21,6 +20,7 @@ from web3.middleware import SignAndSendRawMiddlewareBuilder
 
 import src
 from src.common.wallet import wallet
+from src.common.web3 import close_evicted_sessions
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -179,17 +179,11 @@ async def setup_clients() -> None:
         await graph_client.setup()
 
 
-async def close_clients(wait_sessions_close: bool = False) -> None:
-    logger.info('Closing active sessions...')
+async def close_clients() -> None:
+    logger.debug('Closing active sessions...')
     await execution_client.provider.disconnect()
     await execution_non_retry_client.provider.disconnect()
     await consensus_client.disconnect()
-
     if settings.graph_endpoint:
         await graph_client.disconnect()
-
-    # Waiting to ensure all web3 evicted sessions are closed
-    # Apply only if needed to avoid unnecessary delays during shutdown
-    # Check https://github.com/ethereum/web3.py/pull/3805
-    if wait_sessions_close:
-        await asyncio.sleep(max(settings.consensus_timeout, settings.execution_timeout))
+    await close_evicted_sessions()

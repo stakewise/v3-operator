@@ -203,6 +203,7 @@ def fake_settings(
     consensus_endpoints: str,
     execution_endpoints: str,
 ):
+    original = settings.__dict__.copy()
     settings.set(
         vault=vault_address,
         vault_dir=vault_dir,
@@ -213,6 +214,9 @@ def fake_settings(
         database_dir=str(data_dir),
         max_validator_balance_gwei=NETWORKS[HOODI].MAX_VALIDATOR_BALANCE_GWEI,
     )
+    yield
+    settings.__dict__.clear()
+    settings.__dict__.update(original)
 
 
 @pytest.fixture

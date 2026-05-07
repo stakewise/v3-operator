@@ -4,7 +4,7 @@ import asyncio
 import logging
 import signal
 
-from src.nodes.utils.timeout import Timeout
+from src.nodewise.utils.timeout import Timeout
 
 logger = logging.getLogger(__name__)
 

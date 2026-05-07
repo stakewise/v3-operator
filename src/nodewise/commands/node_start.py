@@ -11,16 +11,16 @@ from src.common.startup_check import check_hardware_requirements
 from src.common.validators import validate_eth_address
 from src.config.config import OperatorConfig
 from src.config.settings import LOG_DATE_FORMAT, settings
-from src.nodes.exceptions import NodeFailedToStartError
-from src.nodes.execution_sync_history import ExecutionSyncHistory
-from src.nodes.process import (
+from src.nodewise.exceptions import NodeFailedToStartError
+from src.nodewise.execution_sync_history import ExecutionSyncHistory
+from src.nodewise.process import (
     LighthouseProcessBuilder,
     LighthouseVCProcessBuilder,
     ProcessRunner,
     RethProcessBuilder,
 )
-from src.nodes.status_history import SyncStatusHistory
-from src.nodes.typings import StdStreams
+from src.nodewise.status_history import SyncStatusHistory
+from src.nodewise.typings import StdStreams
 
 logger = logging.getLogger(__name__)
 

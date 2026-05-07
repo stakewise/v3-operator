@@ -14,7 +14,7 @@ from src.common.execution import check_gas_price
 from src.common.harvest import get_harvest_params
 from src.common.metrics import metrics
 from src.common.protocol_config import get_protocol_config
-from src.common.typings import HarvestParams, ValidatorsRegistrationMode, ValidatorType
+from src.common.typings import HarvestParams, ValidatorType
 from src.config.settings import (
     MIN_ACTIVATION_BALANCE_GWEI,
     VALIDATORS_FUNDING_BATCH_SIZE,
@@ -50,7 +50,7 @@ class ValidatorRegistrationSubtask:
             await update_unused_validator_keys_metric(
                 keystore=self.keystore,
             )
-        harvest_params = await get_harvest_params()
+        harvest_params = await get_harvest_params(settings.vault)
 
         vault_assets = await get_vault_assets(harvest_params=harvest_params)
         vault_assets = Gwei(max(0, vault_assets - settings.vault_min_balance_gwei))
@@ -142,7 +142,7 @@ async def fund_compounding_validators(
     """
     logger.info('Started funding of %d validator(s)', len(validator_fundings))
     validators_manager_signature = HexStr('0x')
-    if settings.validators_registration_mode != ValidatorsRegistrationMode.AUTO:
+    if settings.relayer_endpoint:
         # fetch validators and signature from relayer
         validators_response = await cast(RelayerClient, relayer).fund_validators(
             validator_fundings=validator_fundings,
@@ -198,7 +198,7 @@ async def register_new_validators(
     validators_registry_root = await validators_registry_contract.get_registry_root()
     validators_manager_signature: HexStr | None = None
 
-    if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
+    if not settings.relayer_endpoint:
         validators = await get_validators_for_registration(
             keystore=cast(BaseKeystore, keystore),
             amounts=validators_amounts[:validators_batch_size],
@@ -262,7 +262,7 @@ async def register_new_validators(
 
 
 async def get_vault_assets(harvest_params: HarvestParams | None) -> Gwei:
-    vault_assets = await get_withdrawable_assets(harvest_params=harvest_params)
+    vault_assets = await get_withdrawable_assets(settings.vault, harvest_params=harvest_params)
     if settings.network in GNO_NETWORKS:
         # apply GNO -> mGNO exchange rate
         vault_assets = convert_to_mgno(vault_assets)
@@ -321,10 +321,13 @@ def _get_funding_amounts(
     compounding_validators_balances: dict[HexStr, Gwei], vault_assets: Gwei
 ) -> dict[HexStr, Gwei]:
     result = {}
+    # Order validators by balance descending to fund those with the highest balance first
     for public_key, balance in sorted(
         compounding_validators_balances.items(), key=lambda item: item[1], reverse=True
     ):
+        # Fund as much as possible to reach max balance
         remaining_capacity = settings.max_validator_balance_gwei - balance
+        # Make sure funding amount is above the minimum threshold
         if remaining_capacity >= settings.min_deposit_amount_gwei:
             val_amount = min(remaining_capacity, vault_assets)
             result[public_key] = Gwei(val_amount)

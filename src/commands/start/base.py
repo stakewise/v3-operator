@@ -4,20 +4,20 @@ import logging
 from sw_utils import InterruptHandler
 
 import src
-from src.commands.nodes.node_start import main as run_nodes
+from src.commands.start.startup_check import startup_checks
 from src.common.clients import close_clients, setup_clients
 from src.common.consensus import get_chain_finalized_head
 from src.common.execution import WalletTask
 from src.common.logging import setup_logging
-from src.common.metrics import MetricsTask, metrics, metrics_server
+from src.common.metrics import metrics, metrics_server
 from src.common.protocol_config import update_oracles_cache
-from src.common.startup_check import startup_checks, wait_execution_catch_up_consensus
-from src.common.tasks import BaseTask
-from src.common.typings import ValidatorsRegistrationMode
+from src.common.startup_check import wait_execution_catch_up_consensus
+from src.common.tasks import BaseTask, MetricsTask
 from src.common.utils import get_build_version
 from src.config.settings import settings
 from src.exits.tasks import ExitSignatureTask
 from src.harvest.tasks import HarvestTask
+from src.nodewise.commands.node_start import main as run_nodes
 from src.reward_splitter.tasks import SplitRewardTask
 from src.validators.database import (
     CheckpointCrud,
@@ -43,7 +43,7 @@ async def start_base() -> None:
     try:
         await process()
     finally:
-        await close_clients(wait_sessions_close=True)
+        await close_clients()
 
 
 async def process() -> None:
@@ -76,14 +76,10 @@ async def process() -> None:
     keystore: BaseKeystore | None = None
     relayer: RelayerClient | None = None
 
-    if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
-        if settings.disable_validators_registration:
-            keystore = None
-        else:
-            keystore = await load_keystore()
-
-    else:
+    if settings.relayer_endpoint:
         relayer = RelayerClient()
+    elif not settings.disable_validators_registration:
+        keystore = await load_keystore()
 
     # start operator tasks
     chain_state = await get_chain_finalized_head()
@@ -93,9 +89,6 @@ async def process() -> None:
 
     logger.info('Updating oracles cache...')
     await update_oracles_cache()
-
-    if settings.validators_registration_mode == ValidatorsRegistrationMode.API:
-        logger.info('Starting api mode')
 
     logger.info('Started operator service')
     metrics.service_started.labels(network=settings.network).set(1)

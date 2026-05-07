@@ -4,7 +4,7 @@ import time
 from types import TracebackType
 from typing import Any, Literal
 
-from src.nodes.exceptions import NodeException
+from src.nodewise.exceptions import NodeException
 
 
 class Timeout(Exception):
@@ -25,7 +25,7 @@ class Timeout(Exception):
     def __str__(self) -> str:
         if self.seconds is None:
             return ''
-        return f"{self.seconds} seconds"
+        return f'{self.seconds} seconds'
 
     def __enter__(self) -> Timeout:
         self.start()

@@ -2,6 +2,8 @@ from collections import defaultdict
 from typing import cast
 
 from eth_typing import BlockNumber, ChecksumAddress
+from sw_utils import memoize
+from sw_utils.networks import META_VAULT_IDS
 from web3.types import Wei
 
 from src.common.contracts import (
@@ -9,8 +11,6 @@ from src.common.contracts import (
     SubVaultsRegistryContract,
     VaultContract,
 )
-from src.common.decorators import memoize
-from src.config.settings import settings
 
 
 async def distribute_meta_vault_redemption_assets(
@@ -66,7 +66,7 @@ async def get_meta_vault_redemption_assets(
     )
 
     for sub_vault_redemption in sub_vaults_redemptions:
-        if await is_meta_vault(sub_vault_redemption.vault):
+        if sub_vault_redemption.assets > 0 and await is_meta_vault(sub_vault_redemption.vault):
             sub_vault_assets = await get_meta_vault_redemption_assets(
                 meta_vault_address=sub_vault_redemption.vault,
                 assets_to_redeem=sub_vault_redemption.assets,
@@ -84,10 +84,10 @@ async def get_meta_vault_redemption_assets(
 async def is_meta_vault(vault_address: ChecksumAddress) -> bool:
     """
     Checks if the given vault is a meta vault by comparing its vault ID
-    with the predefined META_VAULT_ID.
+    with the predefined META_VAULT_IDS.
 
     Memoization is used to minimize the number of EL calls.
     """
     vault_contract = VaultContract(vault_address)
     vault_id = await vault_contract.vault_id()
-    return vault_id == settings.network_config.META_VAULT_ID
+    return vault_id in META_VAULT_IDS

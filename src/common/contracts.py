@@ -1,4 +1,5 @@
 import asyncio
+import itertools
 import json
 from functools import cached_property
 from pathlib import Path
@@ -75,15 +76,28 @@ class ContractWrapper:
         argument_filters: dict | None = None,
     ) -> EventData | None:
         blocks_range = settings.events_blocks_range_interval
-        while to_block >= from_block:
-            events = await event.get_logs(
-                from_block=BlockNumber(max(to_block - blocks_range, from_block)),
-                to_block=to_block,
+
+        # Build all chunk ranges from newest to oldest
+        ranges: list[tuple[BlockNumber, BlockNumber]] = []
+        chunk_to = to_block
+        while chunk_to >= from_block:
+            chunk_from = BlockNumber(max(chunk_to - blocks_range, from_block))
+            ranges.append((chunk_from, chunk_to))
+            chunk_to = BlockNumber(chunk_to - blocks_range - 1)
+
+        async def fetch_chunk(chunk_from: BlockNumber, chunk_to: BlockNumber) -> list[EventData]:
+            return await event.get_logs(
+                from_block=chunk_from,
+                to_block=chunk_to,
                 argument_filters=argument_filters,
             )
-            if events:
-                return events[-1]
-            to_block = BlockNumber(to_block - blocks_range - 1)
+
+        # Process chunks in batches (newest-first), abort on first hit
+        for batch in itertools.batched(ranges, EVENTS_CONCURRENCY_LIMIT):
+            batch_results = await asyncio.gather(*[fetch_chunk(f, t) for f, t in batch])
+            for chunk_events in batch_results:
+                if chunk_events:
+                    return chunk_events[-1]
         return None
 
     async def _get_events(
@@ -136,8 +150,9 @@ class BaseEncoder:
 class VaultContract(ContractWrapper, VaultStateMixin):
     abi_path = 'abi/IEthVault.json'
 
-    async def vault_id(self) -> str:
-        return await self.contract.functions.vaultId().call()
+    async def vault_id(self) -> HexStr:
+        raw = await self.contract.functions.vaultId().call()
+        return Web3.to_hex(raw)
 
     async def get_registered_validators_public_keys(
         self, from_block: BlockNumber, to_block: BlockNumber
@@ -558,6 +573,36 @@ class OsTokenRedeemerContract(ContractWrapper):
             block_identifier=block_number
         )
 
+    async def positions_manager(self) -> ChecksumAddress:
+        return await self.contract.functions.positionsManager().call()
+
+    async def queued_shares(self, block_number: BlockNumber | None = None) -> Wei:
+        return await self.contract.functions.queuedShares().call(block_identifier=block_number)
+
+    async def can_process_exit_queue(self, block_number: BlockNumber | None = None) -> bool:
+        return await self.contract.functions.canProcessExitQueue().call(
+            block_identifier=block_number
+        )
+
+    async def process_exit_queue(self) -> HexStr:
+        tx_function = self.contract.functions.processExitQueue()
+        tx_hash = await transaction_gas_wrapper(tx_function)
+        return Web3.to_hex(tx_hash)
+
+    async def redeem_sub_vaults_assets(
+        self, vault_address: ChecksumAddress, assets_to_redeem: Wei
+    ) -> HexStr:
+        tx_function = self.contract.functions.redeemSubVaultsAssets(vault_address, assets_to_redeem)
+        tx_hash = await transaction_gas_wrapper(tx_function)
+        tx_receipt = await self.execution_client.eth.wait_for_transaction_receipt(
+            tx_hash, timeout=settings.execution_transaction_timeout
+        )
+        if not tx_receipt['status']:
+            raise RuntimeError(
+                f'redeemSubVaultsAssets transaction failed. Tx Hash: {Web3.to_hex(tx_hash)}'
+            )
+        return Web3.to_hex(tx_hash)
+
 
 class ValidatorsCheckerContract(ContractWrapper):
     abi_path = 'abi/IValidatorsChecker.json'
@@ -635,6 +680,7 @@ class ValidatorsCheckerContract(ContractWrapper):
             [
                 params.vault,
                 params.withdrawing_assets,
+                params.redemption_assets,
                 params.exit_queue_cumulative_ticket,
             ],
         )

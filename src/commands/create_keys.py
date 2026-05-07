@@ -16,6 +16,7 @@ from src.config.config import OperatorConfig
     help='The address of the vault.',
     prompt='Enter the vault address',
     type=str,
+    envvar='VAULT',
     callback=validate_eth_address,
 )
 @click.option(

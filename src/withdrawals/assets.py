@@ -37,18 +37,20 @@ EXITING_STATUSES = [
 ]
 
 
+# pylint: disable-next=too-many-arguments
 async def get_queued_assets(
     consensus_validators: list[ConsensusValidator],
     oracle_exiting_validators: list[ConsensusValidator],
     consolidations: list[PendingConsolidation],
     pending_partial_withdrawals: list[PendingPartialWithdrawal],
     chain_head: ChainHead,
+    redemption_assets: Wei,
 ) -> Gwei:
     """
     Get exit queue missing assets.
     For Gno networks return value in mGNO-Gwei.
     """
-    harvest_params = await get_harvest_params(chain_head.block_number)
+    harvest_params = await get_harvest_params(settings.vault, chain_head.block_number)
 
     # Get exit queue cumulative tickets
     exit_queue_cumulative_ticket = (
@@ -85,6 +87,7 @@ async def get_queued_assets(
         exit_queue_missing_assets_params=ExitQueueMissingAssetsParams(
             vault=settings.vault,
             withdrawing_assets=withdrawing_assets,
+            redemption_assets=redemption_assets,
             exit_queue_cumulative_ticket=exit_queue_cumulative_ticket,
         ),
         harvest_params=harvest_params,
