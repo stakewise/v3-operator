@@ -33,9 +33,10 @@ from src.common.utils import log_verbose
 from src.common.wallet import wallet
 from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
+from src.meta_vault.exceptions import ClaimDelayNotPassedException
 from src.meta_vault.graph import graph_get_vaults
 from src.meta_vault.service import is_meta_vault, is_meta_vault_state_update_required
-from src.meta_vault.tasks import process_meta_vault_tree
+from src.meta_vault.tasks import meta_vault_tree_update_state
 from src.meta_vault.typings import SubVaultRedemption
 from src.redemptions.os_token_converter import (
     OsTokenConverter,
@@ -337,17 +338,35 @@ async def update_vaults_state(
         is_meta_vault=True,
     )
     for vault in vaults:
-        if await is_meta_vault(vault):
-            if await is_meta_vault_state_update_required(vault):
-                try:
-                    await process_meta_vault_tree(vault=vault, meta_vaults_map=meta_vaults_map)
-                except Exception as e:
-                    raise RuntimeError(
-                        f'Failed to process meta vault tree for vault {vault}'
-                    ) from e
-
-        else:
+        if vault not in meta_vaults_map:
             regular_vaults.append(vault)
+            continue
+
+        if not await is_meta_vault_state_update_required(vault):
+            continue
+
+        root_meta_vault = meta_vaults_map[vault]
+        if not root_meta_vault.sub_vaults:
+            continue
+
+        # Update state for the meta vault tree only — skip the deposit-to-sub-vaults
+        # step that process_meta_vault_tree would otherwise perform. Pushing the meta
+        # vault's withdrawable assets back into sub-vaults here would force a follow-up
+        # redeemSubVaultsAssets to pull them right back up before redemption.
+        try:
+            await meta_vault_tree_update_state(
+                root_meta_vault=root_meta_vault,
+                meta_vaults_map=meta_vaults_map,
+            )
+        except ClaimDelayNotPassedException as e:
+            logger.error(
+                'Cannot update meta vault %s state because claim delay for exit request '
+                'with position ticket %s has not passed yet',
+                vault,
+                e.exit_request.position_ticket,
+            )
+        except Exception as e:
+            raise RuntimeError(f'Failed to update meta vault tree state for vault {vault}') from e
 
     if not regular_vaults:
         return

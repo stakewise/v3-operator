@@ -25,6 +25,7 @@ from src.commands.internal.process_redeemer import (
     update_vaults_state,
 )
 from src.common.typings import HarvestParams
+from src.meta_vault.exceptions import ClaimDelayNotPassedException
 from src.meta_vault.typings import SubVaultRedemption
 from src.redemptions.os_token_converter import OsTokenConverter
 from src.redemptions.typings import OsTokenPosition
@@ -462,7 +463,7 @@ class TestUpdateVaultsState:
     async def test_no_vaults(self) -> None:
         with _mock_update_vaults_state() as mocks:
             await update_vaults_state(vaults=[], block_number=BlockNumber(100))
-        mocks['is_meta_vault'].assert_not_called()
+        mocks['update_state'].assert_not_called()
         mocks['harvest_params'].assert_not_called()
 
     @pytest.mark.parametrize(
@@ -470,32 +471,63 @@ class TestUpdateVaultsState:
         [(True, 1), (False, 0)],
         ids=['needs_update', 'up_to_date'],
     )
-    async def test_meta_vault_process_tree_gated_by_needs_update(
+    async def test_meta_vault_update_state_gated_by_needs_update(
         self, needs_update: bool, expected_calls: int
     ) -> None:
-        """process_meta_vault_tree runs iff is_meta_vault_state_update_required is True.
-        When it does, graph_get_vaults' result is forwarded by identity."""
-        meta_vaults_map = {VAULT_1: MagicMock()}
+        """meta_vault_tree_update_state runs iff is_meta_vault_state_update_required is True.
+        When it does, the corresponding Vault entry from meta_vaults_map is forwarded
+        by identity along with the full meta_vaults_map."""
+        root_meta_vault = MagicMock()
+        meta_vaults_map = {VAULT_1: root_meta_vault}
         with _mock_update_vaults_state(
-            is_meta_vault=True,
             needs_update=needs_update,
             meta_vaults_map=meta_vaults_map,
         ) as mocks:
             await update_vaults_state(vaults=[VAULT_1], block_number=BlockNumber(100))
 
-        assert mocks['process_tree'].await_count == expected_calls
+        assert mocks['update_state'].await_count == expected_calls
         if needs_update:
             mocks['graph_get_vaults'].assert_awaited_once_with(is_meta_vault=True)
-            assert mocks['process_tree'].await_args.kwargs['vault'] == VAULT_1
-            assert mocks['process_tree'].await_args.kwargs['meta_vaults_map'] is meta_vaults_map
+            assert mocks['update_state'].await_args.kwargs['root_meta_vault'] is root_meta_vault
+            assert mocks['update_state'].await_args.kwargs['meta_vaults_map'] is meta_vaults_map
 
-    async def test_meta_vault_process_tree_failure_raises(self) -> None:
-        """A failure inside process_meta_vault_tree aborts the round."""
+    async def test_meta_vault_no_sub_vaults_skipped(self) -> None:
+        """A meta vault with no sub-vaults is skipped — nothing to update."""
+        empty_meta_vault = MagicMock()
+        empty_meta_vault.sub_vaults = []
         with _mock_update_vaults_state(
-            is_meta_vault=True, process_tree_exception=RuntimeError('boom')
+            meta_vaults_map={VAULT_1: empty_meta_vault},
+        ) as mocks:
+            await update_vaults_state(vaults=[VAULT_1], block_number=BlockNumber(100))
+        mocks['update_state'].assert_not_called()
+
+    async def test_meta_vault_update_state_failure_raises(self) -> None:
+        """A failure inside meta_vault_tree_update_state aborts the round."""
+        with _mock_update_vaults_state(
+            meta_vaults_map={VAULT_1: MagicMock()},
+            update_state_exception=RuntimeError('boom'),
         ):
-            with pytest.raises(RuntimeError, match='Failed to process meta vault tree'):
+            with pytest.raises(RuntimeError, match='Failed to update meta vault tree state'):
                 await update_vaults_state(vaults=[VAULT_1], block_number=BlockNumber(100))
+
+    async def test_meta_vault_claim_delay_logged_and_continues(self) -> None:
+        """ClaimDelayNotPassedException is caught, logged, and does not abort the round.
+
+        Regular vaults batched alongside the meta vault are still processed.
+        """
+        exit_request = MagicMock()
+        exit_request.vault = VAULT_1
+        exit_request.position_ticket = 1234
+        with _mock_update_vaults_state(
+            meta_vaults_map={VAULT_1: MagicMock()},
+            harvest_params={VAULT_2: make_harvest_params()},
+            update_state_exception=ClaimDelayNotPassedException(exit_request),
+        ) as mocks:
+            await update_vaults_state(vaults=[VAULT_1, VAULT_2], block_number=BlockNumber(100))
+        mocks['update_state'].assert_awaited_once()
+        mocks['multicall'].tx_aggregate.assert_awaited_once_with(
+            [(VAULT_2, ENCODED_UPDATE_STATE_CALL)]
+        )
 
     @pytest.mark.parametrize(
         'has_params, expected_multicall_calls',
@@ -507,9 +539,7 @@ class TestUpdateVaultsState:
     ) -> None:
         """A None entry in get_multiple_harvest_params skips that vault from the multicall."""
         params: HarvestParams | None = make_harvest_params() if has_params else None
-        with _mock_update_vaults_state(
-            is_meta_vault=False, harvest_params={VAULT_1: params}
-        ) as mocks:
+        with _mock_update_vaults_state(harvest_params={VAULT_1: params}) as mocks:
             await update_vaults_state(vaults=[VAULT_1], block_number=BlockNumber(100))
 
         assert mocks['multicall'].tx_aggregate.await_count == expected_multicall_calls
@@ -521,7 +551,6 @@ class TestUpdateVaultsState:
     async def test_multicall_tx_failure_raises(self) -> None:
         """A failed multicall receipt aborts the round."""
         with _mock_update_vaults_state(
-            is_meta_vault=False,
             harvest_params={VAULT_1: make_harvest_params()},
             multicall_tx_status=0,
         ):
@@ -529,18 +558,21 @@ class TestUpdateVaultsState:
                 await update_vaults_state(vaults=[VAULT_1], block_number=BlockNumber(100))
 
     async def test_mix_of_meta_and_regular_vaults(self) -> None:
-        """Meta vault is harvested via process_meta_vault_tree; regular vaults are
+        """Meta vault is harvested via meta_vault_tree_update_state; regular vaults are
         batched into a single multicall. Harvest params are fetched only for the
         regular vaults."""
         params = make_harvest_params()
+        meta_vaults_map = {VAULT_1: MagicMock()}
         with _mock_update_vaults_state(
-            is_meta_vault={VAULT_1: True, VAULT_2: False},
+            meta_vaults_map=meta_vaults_map,
             harvest_params={VAULT_2: params},
         ) as mocks:
             await update_vaults_state(vaults=[VAULT_1, VAULT_2], block_number=BlockNumber(100))
 
-        mocks['process_tree'].assert_awaited_once()
-        assert mocks['process_tree'].await_args.kwargs['vault'] == VAULT_1
+        mocks['update_state'].assert_awaited_once()
+        assert (
+            mocks['update_state'].await_args.kwargs['root_meta_vault'] is meta_vaults_map[VAULT_1]
+        )
         mocks['harvest_params'].assert_awaited_once_with([VAULT_2], BlockNumber(100))
         mocks['multicall'].tx_aggregate.assert_awaited_once_with(
             [(VAULT_2, ENCODED_UPDATE_STATE_CALL)]
@@ -960,37 +992,27 @@ ENCODED_UPDATE_STATE_CALL = HexStr('0xdeadbeef')
 
 @contextmanager
 def _mock_update_vaults_state(
-    is_meta_vault: bool | dict[ChecksumAddress, bool] = False,
     needs_update: bool = True,
     harvest_params: dict[ChecksumAddress, HarvestParams | None] | None = None,
     meta_vaults_map: dict | None = None,
-    process_tree_exception: BaseException | None = None,
+    update_state_exception: BaseException | None = None,
     multicall_tx_status: int = 1,
 ) -> Iterator[dict[str, MagicMock]]:
     """Mock setup for update_vaults_state tests.
 
-    ``is_meta_vault`` may be a bool (applied to every address) or a per-address
-    mapping. ``harvest_params`` is the dict returned by get_multiple_harvest_params;
-    a None value for a vault skips it from the multicall (production behavior).
-    ``process_tree_exception`` makes process_meta_vault_tree raise.
+    ``meta_vaults_map`` is the dict returned by graph_get_vaults; addresses present
+    in this map are treated as meta vaults by update_vaults_state. ``harvest_params``
+    is the dict returned by get_multiple_harvest_params; a None value for a vault
+    skips it from the multicall (production behavior). ``update_state_exception``
+    makes meta_vault_tree_update_state raise.
     """
     meta_vaults_map = {} if meta_vaults_map is None else meta_vaults_map
     harvest_params = {} if harvest_params is None else harvest_params
 
-    if isinstance(is_meta_vault, dict):
-        is_meta_lookup = is_meta_vault
-
-        async def is_meta_side_effect(addr: ChecksumAddress) -> bool:
-            return is_meta_lookup.get(addr, False)
-
-        is_meta_mock: AsyncMock = AsyncMock(side_effect=is_meta_side_effect)
+    if update_state_exception is not None:
+        update_state_mock = AsyncMock(side_effect=update_state_exception)
     else:
-        is_meta_mock = AsyncMock(return_value=is_meta_vault)
-
-    if process_tree_exception is not None:
-        process_tree_mock = AsyncMock(side_effect=process_tree_exception)
-    else:
-        process_tree_mock = AsyncMock()
+        update_state_mock = AsyncMock()
 
     def vault_factory(addr: ChecksumAddress) -> MagicMock:
         mock_vault = MagicMock()
@@ -1003,12 +1025,11 @@ def _mock_update_vaults_state(
             f'{MODULE}.graph_get_vaults',
             new=AsyncMock(return_value=meta_vaults_map),
         ) as mock_graph,
-        patch(f'{MODULE}.is_meta_vault', new=is_meta_mock),
         patch(
             f'{MODULE}.is_meta_vault_state_update_required',
             new=AsyncMock(return_value=needs_update),
         ),
-        patch(f'{MODULE}.process_meta_vault_tree', new=process_tree_mock),
+        patch(f'{MODULE}.meta_vault_tree_update_state', new=update_state_mock),
         patch(
             f'{MODULE}.get_multiple_harvest_params',
             new=AsyncMock(return_value=harvest_params),
@@ -1018,8 +1039,7 @@ def _mock_update_vaults_state(
     ):
         yield {
             'graph_get_vaults': mock_graph,
-            'is_meta_vault': is_meta_mock,
-            'process_tree': process_tree_mock,
+            'update_state': update_state_mock,
             'harvest_params': mock_harvest_params,
             'multicall': multicall_mocks['mock_multicall'],
             'vault_cls': mock_vault_cls,
