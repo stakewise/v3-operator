@@ -2,6 +2,9 @@ name: Docker
 
 on: [push]
 
+permissions:
+  contents: read
+
 jobs:
   docker:
     name: Build Docker Image (${{ matrix.platform }})
