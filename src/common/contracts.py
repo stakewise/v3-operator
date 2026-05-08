@@ -619,6 +619,34 @@ class OsTokenRedeemerContract(ContractWrapper):
             )
         return Web3.to_hex(tx_hash), tx_receipt['blockNumber']
 
+    async def update_vaults_state(
+        self, vault_to_harvest_params: dict[ChecksumAddress, HarvestParams]
+    ) -> HexStr:
+        """Batch ``updateVaultState`` calls into a single multicall on this contract."""
+        calls = [
+            self._encode_update_vault_state(vault, harvest_params)
+            for vault, harvest_params in vault_to_harvest_params.items()
+        ]
+        tx_function = self.contract.functions.multicall(calls)
+        tx_hash = await transaction_gas_wrapper(tx_function)
+        return Web3.to_hex(tx_hash)
+
+    def _encode_update_vault_state(
+        self, vault: ChecksumAddress, harvest_params: HarvestParams
+    ) -> HexStr:
+        return self.encode_abi(
+            'updateVaultState',
+            [
+                vault,
+                (
+                    harvest_params.rewards_root,
+                    harvest_params.reward,
+                    harvest_params.unlocked_mev_reward,
+                    harvest_params.proof,
+                ),
+            ],
+        )
+
 
 class ValidatorsCheckerContract(ContractWrapper):
     abi_path = 'abi/IValidatorsChecker.json'

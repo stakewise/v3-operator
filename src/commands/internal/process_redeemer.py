@@ -5,7 +5,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import click
-from eth_typing import BlockNumber, ChecksumAddress, HexStr
+from eth_typing import BlockNumber, ChecksumAddress
 from hexbytes import HexBytes
 from multiproof import StandardMerkleTree
 from multiproof.standard import MultiProof
@@ -18,8 +18,6 @@ from src.common.clients import close_clients, execution_client, setup_clients
 from src.common.contracts import (
     MetaVaultContract,
     SubVaultsRegistryContract,
-    VaultContract,
-    multicall_contract,
     os_token_redeemer_contract,
 )
 from src.common.execution import (
@@ -29,6 +27,7 @@ from src.common.execution import (
 )
 from src.common.harvest import get_multiple_harvest_params
 from src.common.logging import LOG_LEVELS, setup_logging
+from src.common.typings import HarvestParams
 from src.common.utils import log_verbose
 from src.common.wallet import wallet
 from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
@@ -266,7 +265,7 @@ async def _redeem_os_token_positions(
 
     # Bring every involved vault up to date on-chain so subsequent reads
     # and redemption transactions run against fresh state — no harvest_params
-    # plumbing and no updateVaultState bundled in a multicall.
+    # plumbing through redeemOsTokenPositions.
     vaults = list({position.vault for position in os_token_positions})
     await update_vaults_state(vaults=vaults, block_number=block_number)
 
@@ -328,10 +327,11 @@ async def update_vaults_state(
     """Bring every vault in ``vaults`` up to date on-chain.
 
     Meta vaults that need a state update are harvested via process_meta_vault_tree.
-    Regular vaults with pending updates are batched into a single multicall
-    submitting ``updateState`` for each. After this call, ``get_withdrawable_assets``
-    reflects fresh state, so subsequent redemption decisions can be made without
-    threading harvest_params through every read.
+    Regular vaults with pending updates are batched into a single ``multicall`` on
+    the OsTokenRedeemer contract submitting ``updateVaultState`` for each, so the
+    transaction is attributed to the redeemer on Etherscan. After this call,
+    ``get_withdrawable_assets`` reflects fresh state, so subsequent redemption
+    decisions can be made without threading harvest_params through every read.
     """
     regular_vaults: list[ChecksumAddress] = []
     meta_vaults_map = await graph_get_vaults(
@@ -371,28 +371,28 @@ async def update_vaults_state(
     if not regular_vaults:
         return
 
-    vault_to_harvest_params = await get_multiple_harvest_params(regular_vaults, block_number)
-    calls: list[tuple[ChecksumAddress, HexStr]] = []
-    for vault in regular_vaults:
-        harvest_params = vault_to_harvest_params.get(vault)
-        if harvest_params is None:
-            continue
-        vault_contract = VaultContract(vault)
-        calls.append(
-            (vault_contract.contract_address, vault_contract.get_update_state_call(harvest_params))
-        )
-
-    if not calls:
+    vault_to_harvest_params: dict[ChecksumAddress, HarvestParams] = {
+        vault: harvest_params
+        for vault, harvest_params in (
+            await get_multiple_harvest_params(regular_vaults, block_number)
+        ).items()
+        if harvest_params is not None
+    }
+    if not vault_to_harvest_params:
         return
 
-    tx_hash = await multicall_contract.tx_aggregate(calls)
-    logger.info('Waiting for Update State multicall tx %s confirmation', tx_hash)
+    tx_hash = await os_token_redeemer_contract.update_vaults_state(vault_to_harvest_params)
+    logger.info(
+        'Waiting for OsTokenRedeemer updateVaultState multicall tx %s confirmation', tx_hash
+    )
     tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
         HexBytes(Web3.to_bytes(hexstr=tx_hash)), timeout=settings.execution_transaction_timeout
     )
     if not tx_receipt['status']:
-        raise RuntimeError(f'Update State multicall tx failed. Tx Hash: {tx_hash}')
-    logger.info('Update State multicall confirmed. Tx Hash: %s', tx_hash)
+        raise RuntimeError(
+            f'OsTokenRedeemer updateVaultState multicall tx failed. Tx Hash: {tx_hash}'
+        )
+    logger.info('OsTokenRedeemer updateVaultState multicall confirmed. Tx Hash: %s', tx_hash)
 
 
 async def redeem_positions(

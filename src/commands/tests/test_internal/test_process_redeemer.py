@@ -4,7 +4,7 @@ from typing import Iterator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from eth_typing import BlockNumber, ChecksumAddress, HexStr
+from eth_typing import BlockNumber, ChecksumAddress
 from hexbytes import HexBytes
 from sw_utils.tests import faker
 from web3 import Web3
@@ -518,16 +518,15 @@ class TestUpdateVaultsState:
         exit_request = MagicMock()
         exit_request.vault = VAULT_1
         exit_request.position_ticket = 1234
+        params = make_harvest_params()
         with _mock_update_vaults_state(
             meta_vaults_map={VAULT_1: MagicMock()},
-            harvest_params={VAULT_2: make_harvest_params()},
+            harvest_params={VAULT_2: params},
             update_state_exception=ClaimDelayNotPassedException(exit_request),
         ) as mocks:
             await update_vaults_state(vaults=[VAULT_1, VAULT_2], block_number=BlockNumber(100))
         mocks['update_state'].assert_awaited_once()
-        mocks['multicall'].tx_aggregate.assert_awaited_once_with(
-            [(VAULT_2, ENCODED_UPDATE_STATE_CALL)]
-        )
+        mocks['redeemer'].update_vaults_state.assert_awaited_once_with({VAULT_2: params})
 
     @pytest.mark.parametrize(
         'has_params, expected_multicall_calls',
@@ -542,11 +541,9 @@ class TestUpdateVaultsState:
         with _mock_update_vaults_state(harvest_params={VAULT_1: params}) as mocks:
             await update_vaults_state(vaults=[VAULT_1], block_number=BlockNumber(100))
 
-        assert mocks['multicall'].tx_aggregate.await_count == expected_multicall_calls
+        assert mocks['redeemer'].update_vaults_state.await_count == expected_multicall_calls
         if has_params:
-            mocks['multicall'].tx_aggregate.assert_awaited_once_with(
-                [(VAULT_1, ENCODED_UPDATE_STATE_CALL)]
-            )
+            mocks['redeemer'].update_vaults_state.assert_awaited_once_with({VAULT_1: params})
 
     async def test_multicall_tx_failure_raises(self) -> None:
         """A failed multicall receipt aborts the round."""
@@ -554,13 +551,15 @@ class TestUpdateVaultsState:
             harvest_params={VAULT_1: make_harvest_params()},
             multicall_tx_status=0,
         ):
-            with pytest.raises(RuntimeError, match='Update State multicall tx failed'):
+            with pytest.raises(
+                RuntimeError, match='OsTokenRedeemer updateVaultState multicall tx failed'
+            ):
                 await update_vaults_state(vaults=[VAULT_1], block_number=BlockNumber(100))
 
     async def test_mix_of_meta_and_regular_vaults(self) -> None:
         """Meta vault is harvested via meta_vault_tree_update_state; regular vaults are
-        batched into a single multicall. Harvest params are fetched only for the
-        regular vaults."""
+        batched into a single multicall on the OsTokenRedeemer. Harvest params are
+        fetched only for the regular vaults."""
         params = make_harvest_params()
         meta_vaults_map = {VAULT_1: MagicMock()}
         with _mock_update_vaults_state(
@@ -574,9 +573,7 @@ class TestUpdateVaultsState:
             mocks['update_state'].await_args.kwargs['root_meta_vault'] is meta_vaults_map[VAULT_1]
         )
         mocks['harvest_params'].assert_awaited_once_with([VAULT_2], BlockNumber(100))
-        mocks['multicall'].tx_aggregate.assert_awaited_once_with(
-            [(VAULT_2, ENCODED_UPDATE_STATE_CALL)]
-        )
+        mocks['redeemer'].update_vaults_state.assert_awaited_once_with({VAULT_2: params})
 
 
 class TestRedeemMetaVaultSubVaults:
@@ -987,9 +984,6 @@ def _mock_submit_redeem_position(
         }
 
 
-ENCODED_UPDATE_STATE_CALL = HexStr('0xdeadbeef')
-
-
 @contextmanager
 def _mock_update_vaults_state(
     needs_update: bool = True,
@@ -1004,7 +998,8 @@ def _mock_update_vaults_state(
     in this map are treated as meta vaults by update_vaults_state. ``harvest_params``
     is the dict returned by get_multiple_harvest_params; a None value for a vault
     skips it from the multicall (production behavior). ``update_state_exception``
-    makes meta_vault_tree_update_state raise.
+    makes meta_vault_tree_update_state raise. ``multicall_tx_status`` controls the
+    receipt status of the OsTokenRedeemer.update_vaults_state batched tx.
     """
     meta_vaults_map = {} if meta_vaults_map is None else meta_vaults_map
     harvest_params = {} if harvest_params is None else harvest_params
@@ -1014,11 +1009,10 @@ def _mock_update_vaults_state(
     else:
         update_state_mock = AsyncMock()
 
-    def vault_factory(addr: ChecksumAddress) -> MagicMock:
-        mock_vault = MagicMock()
-        mock_vault.contract_address = addr
-        mock_vault.get_update_state_call = MagicMock(return_value=ENCODED_UPDATE_STATE_CALL)
-        return mock_vault
+    mock_client = AsyncMock()
+    mock_client.eth.wait_for_transaction_receipt = AsyncMock(
+        return_value={'status': multicall_tx_status}
+    )
 
     with (
         patch(
@@ -1034,32 +1028,18 @@ def _mock_update_vaults_state(
             f'{MODULE}.get_multiple_harvest_params',
             new=AsyncMock(return_value=harvest_params),
         ) as mock_harvest_params,
-        patch(f'{MODULE}.VaultContract', side_effect=vault_factory) as mock_vault_cls,
-        _mock_multicall_tx(tx_status=multicall_tx_status) as multicall_mocks,
-    ):
-        yield {
-            'graph_get_vaults': mock_graph,
-            'update_state': update_state_mock,
-            'harvest_params': mock_harvest_params,
-            'multicall': multicall_mocks['mock_multicall'],
-            'vault_cls': mock_vault_cls,
-        }
-
-
-@contextmanager
-def _mock_multicall_tx(tx_status: int = 1) -> Iterator[dict[str, MagicMock]]:
-    """Mock multicall_contract.tx_aggregate with a fake tx hash + receipt status."""
-    mock_client = AsyncMock()
-    mock_client.eth.wait_for_transaction_receipt = AsyncMock(return_value={'status': tx_status})
-
-    with (
-        patch(f'{MODULE}.multicall_contract') as mock_multicall,
+        patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
         patch(f'{MODULE}.execution_client', new=mock_client),
         patch(f'{MODULE}.settings') as mock_settings,
     ):
         mock_settings.execution_transaction_timeout = 120
-        mock_multicall.tx_aggregate = AsyncMock(return_value='0x' + '11' * 32)
-        yield {'mock_multicall': mock_multicall}
+        mock_redeemer.update_vaults_state = AsyncMock(return_value='0x' + '11' * 32)
+        yield {
+            'graph_get_vaults': mock_graph,
+            'update_state': update_state_mock,
+            'harvest_params': mock_harvest_params,
+            'redeemer': mock_redeemer,
+        }
 
 
 @contextmanager
