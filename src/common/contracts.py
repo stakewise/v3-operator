@@ -619,7 +619,7 @@ class OsTokenRedeemerContract(ContractWrapper):
             )
         return Web3.to_hex(tx_hash), tx_receipt['blockNumber']
 
-    async def update_vaults_state(
+    async def batch_update_vault_state(
         self, vault_to_harvest_params: dict[ChecksumAddress, HarvestParams]
     ) -> HexStr:
         """Batch ``updateVaultState`` calls into a single multicall on this contract."""

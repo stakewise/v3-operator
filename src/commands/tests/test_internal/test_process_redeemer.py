@@ -526,7 +526,7 @@ class TestUpdateVaultsState:
         ) as mocks:
             await update_vaults_state(vaults=[VAULT_1, VAULT_2], block_number=BlockNumber(100))
         mocks['update_state'].assert_awaited_once()
-        mocks['redeemer'].update_vaults_state.assert_awaited_once_with({VAULT_2: params})
+        mocks['redeemer'].batch_update_vault_state.assert_awaited_once_with({VAULT_2: params})
 
     @pytest.mark.parametrize(
         'has_params, expected_multicall_calls',
@@ -541,9 +541,9 @@ class TestUpdateVaultsState:
         with _mock_update_vaults_state(harvest_params={VAULT_1: params}) as mocks:
             await update_vaults_state(vaults=[VAULT_1], block_number=BlockNumber(100))
 
-        assert mocks['redeemer'].update_vaults_state.await_count == expected_multicall_calls
+        assert mocks['redeemer'].batch_update_vault_state.await_count == expected_multicall_calls
         if has_params:
-            mocks['redeemer'].update_vaults_state.assert_awaited_once_with({VAULT_1: params})
+            mocks['redeemer'].batch_update_vault_state.assert_awaited_once_with({VAULT_1: params})
 
     async def test_multicall_tx_failure_raises(self) -> None:
         """A failed multicall receipt aborts the round."""
@@ -573,7 +573,7 @@ class TestUpdateVaultsState:
             mocks['update_state'].await_args.kwargs['root_meta_vault'] is meta_vaults_map[VAULT_1]
         )
         mocks['harvest_params'].assert_awaited_once_with([VAULT_2], BlockNumber(100))
-        mocks['redeemer'].update_vaults_state.assert_awaited_once_with({VAULT_2: params})
+        mocks['redeemer'].batch_update_vault_state.assert_awaited_once_with({VAULT_2: params})
 
 
 class TestRedeemMetaVaultSubVaults:
@@ -999,7 +999,7 @@ def _mock_update_vaults_state(
     is the dict returned by get_multiple_harvest_params; a None value for a vault
     skips it from the multicall (production behavior). ``update_state_exception``
     makes meta_vault_tree_update_state raise. ``multicall_tx_status`` controls the
-    receipt status of the OsTokenRedeemer.update_vaults_state batched tx.
+    receipt status of the OsTokenRedeemer.batch_update_vault_state batched tx.
     """
     meta_vaults_map = {} if meta_vaults_map is None else meta_vaults_map
     harvest_params = {} if harvest_params is None else harvest_params
@@ -1033,7 +1033,7 @@ def _mock_update_vaults_state(
         patch(f'{MODULE}.settings') as mock_settings,
     ):
         mock_settings.execution_transaction_timeout = 120
-        mock_redeemer.update_vaults_state = AsyncMock(return_value='0x' + '11' * 32)
+        mock_redeemer.batch_update_vault_state = AsyncMock(return_value='0x' + '11' * 32)
         yield {
             'graph_get_vaults': mock_graph,
             'update_state': update_state_mock,

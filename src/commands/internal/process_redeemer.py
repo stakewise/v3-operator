@@ -27,7 +27,6 @@ from src.common.execution import (
 )
 from src.common.harvest import get_multiple_harvest_params
 from src.common.logging import LOG_LEVELS, setup_logging
-from src.common.typings import HarvestParams
 from src.common.utils import log_verbose
 from src.common.wallet import wallet
 from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
@@ -214,17 +213,14 @@ async def _redeem_os_token_positions(
 ) -> None:
     """Perform the OsToken redemption flow for a single iteration.
 
-    Returns early without raising when there is nothing to redeem; the caller
-    is responsible for processing the exit queue regardless of the outcome.
+    Returns early when there is nothing to redeem; the caller still processes
+    the exit queue regardless.
     """
     if not await check_gas_price():
         return
 
-    # Re-fetch block number after exit queue processing
-    # to ensure we read the latest on-chain state
     block_number = await execution_client.eth.block_number
 
-    # Check queued shares
     queued_shares = await os_token_redeemer_contract.queued_shares(block_number)
     os_token_converter = await create_os_token_converter(block_number)
     queued_assets = os_token_converter.to_assets(queued_shares)
@@ -251,28 +247,22 @@ async def _redeem_os_token_positions(
         settings.network_config.VAULT_BALANCE_SYMBOL,
     )
 
-    # Fetch ALL positions from IPFS (needed for correct merkle tree)
+    # Fetch ALL positions from IPFS so the merkle tree matches the on-chain root.
     all_positions = await fetch_positions_from_ipfs(block_number)
     if not all_positions:
         logger.info('No positions found. Skipping to next interval.')
         return
 
-    # Calculate redeemable shares
     os_token_positions = await calculate_redeemable_shares(all_positions, prev_nonce, block_number)
     if not os_token_positions:
         logger.info('No redeemable positions found. Skipping to next interval.')
         return
 
-    # Bring every involved vault up to date on-chain so subsequent reads
-    # and redemption transactions run against fresh state — no harvest_params
-    # plumbing through redeemOsTokenPositions.
+    # Refresh vault state on-chain so subsequent reads see fresh state without
+    # threading harvest_params through every call.
     vaults = list({position.vault for position in os_token_positions})
     await update_vaults_state(vaults=vaults, block_number=block_number)
 
-    # Redeem each position end-to-end in a single loop. Withdrawable assets
-    # are fetched once per vault and cached; meta vaults short on assets trigger
-    # sub-vault redemption inline; one redeemOsTokenPositions tx is submitted per
-    # position.
     await redeem_positions(
         all_positions=all_positions,
         os_token_positions=os_token_positions,
@@ -324,19 +314,16 @@ async def update_vaults_state(
     vaults: list[ChecksumAddress],
     block_number: BlockNumber,
 ) -> None:
-    """Bring every vault in ``vaults`` up to date on-chain.
+    """Bring every vault up to date on-chain.
 
-    Meta vaults that need a state update are harvested via process_meta_vault_tree.
-    Regular vaults with pending updates are batched into a single ``multicall`` on
-    the OsTokenRedeemer contract submitting ``updateVaultState`` for each, so the
-    transaction is attributed to the redeemer on Etherscan. After this call,
-    ``get_withdrawable_assets`` reflects fresh state, so subsequent redemption
-    decisions can be made without threading harvest_params through every read.
+    Meta vaults are harvested via meta_vault_tree_update_state. Regular vaults
+    are batched into a single OsTokenRedeemer multicall.
     """
     regular_vaults: list[ChecksumAddress] = []
     meta_vaults_map = await graph_get_vaults(
         is_meta_vault=True,
     )
+
     for vault in vaults:
         if vault not in meta_vaults_map:
             regular_vaults.append(vault)
@@ -349,10 +336,6 @@ async def update_vaults_state(
         if not root_meta_vault.sub_vaults:
             continue
 
-        # Update state for the meta vault tree only — skip the deposit-to-sub-vaults
-        # step that process_meta_vault_tree would otherwise perform. Pushing the meta
-        # vault's withdrawable assets back into sub-vaults here would force a follow-up
-        # redeemSubVaultsAssets to pull them right back up before redemption.
         try:
             await meta_vault_tree_update_state(
                 root_meta_vault=root_meta_vault,
@@ -371,7 +354,8 @@ async def update_vaults_state(
     if not regular_vaults:
         return
 
-    vault_to_harvest_params: dict[ChecksumAddress, HarvestParams] = {
+    # Harvest regular vaults
+    vault_to_harvest_params = {
         vault: harvest_params
         for vault, harvest_params in (
             await get_multiple_harvest_params(regular_vaults, block_number)
@@ -381,7 +365,7 @@ async def update_vaults_state(
     if not vault_to_harvest_params:
         return
 
-    tx_hash = await os_token_redeemer_contract.update_vaults_state(vault_to_harvest_params)
+    tx_hash = await os_token_redeemer_contract.batch_update_vault_state(vault_to_harvest_params)
     logger.info(
         'Waiting for OsTokenRedeemer updateVaultState multicall tx %s confirmation', tx_hash
     )
@@ -402,17 +386,10 @@ async def redeem_positions(
     converter: OsTokenConverter,
     tree_nonce: int,
 ) -> None:
-    """Walk redeemable positions in IPFS order and redeem each one in turn.
+    """Redeem positions one by one until queued shares are exhausted.
 
-    Per position:
-    - Fetch the vault's withdrawable assets (cached per vault and decremented
-      after each successful redemption).
-    - For meta vaults short on withdrawable, redeem sub-vaults and refetch.
-    - Cap shares by both remaining queued shares and withdrawable assets.
-    - Submit a redeemOsTokenPositions transaction for the single position.
-
-    Stops once queued shares are exhausted, or aborts the round if a single
-    position's redemption transaction fails.
+    For meta vaults short on withdrawable assets, redeem sub-vaults inline
+    before submitting. Aborts the round if a single redemption tx fails.
     """
     remaining_shares = queued_shares
     vault_to_withdrawable: dict[ChecksumAddress, Wei] = {}
@@ -490,16 +467,11 @@ async def _redeem_meta_vault_sub_vaults(
     vault_address: ChecksumAddress,
     assets: Wei,
 ) -> BlockNumber | None:
-    """Redeem from sub-vaults to bring a meta vault's withdrawable assets up to ``assets``.
+    """Redeem from sub-vaults bottom-up so deepest nested meta vaults go first.
 
-    Builds a bottom-up redeem order so deepest nested meta vaults are redeemed first,
-    then submits one redeemSubVaultsAssets transaction per entry. Failures abort the
-    sequence; the caller refetches withdrawable to discover whatever progress was made.
-
-    Returns the block number of the last successful redeemSubVaultsAssets receipt, or
-    ``None`` if no transaction succeeded. The caller uses this as a sync barrier so
-    subsequent withdrawable reads cannot land on a fallback endpoint that has not
-    yet seen the redemptions.
+    Returns the last successful receipt's block number, used by the caller as a
+    sync barrier against fallback endpoints lagging behind. Returns ``None`` if
+    no transaction succeeded.
     """
     try:
         redeem_order = await _build_meta_vault_redeem_order(vault_address, assets)
@@ -567,10 +539,8 @@ async def _submit_redeem_position(
 ) -> BlockNumber | None:
     """Submit one redeemOsTokenPositions transaction for a single position.
 
-    Returns the receipt's block number on a confirmed successful transaction,
-    ``None`` otherwise. The caller uses the returned block as a sync barrier so
-    that subsequent reads (e.g. withdrawable balances for the next position)
-    cannot land on a fallback endpoint that has not yet seen the redemption.
+    Returns the receipt block on success (used as a sync barrier against
+    fallback endpoints lagging behind), ``None`` otherwise.
     """
     multiproof = _build_multi_proof(
         tree_nonce=tree_nonce,
