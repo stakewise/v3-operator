@@ -31,7 +31,6 @@ from src.common.utils import log_verbose
 from src.common.wallet import wallet
 from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
-from src.meta_vault.exceptions import ClaimDelayNotPassedException
 from src.meta_vault.graph import graph_get_vaults
 from src.meta_vault.service import is_meta_vault, is_meta_vault_state_update_required
 from src.meta_vault.tasks import meta_vault_tree_update_state
@@ -340,13 +339,6 @@ async def update_vaults_state(
             await meta_vault_tree_update_state(
                 root_meta_vault=root_meta_vault,
                 meta_vaults_map=meta_vaults_map,
-            )
-        except ClaimDelayNotPassedException as e:
-            logger.error(
-                'Cannot update meta vault %s state because claim delay for exit request '
-                'with position ticket %s has not passed yet',
-                vault,
-                e.exit_request.position_ticket,
             )
         except Exception as e:
             raise RuntimeError(f'Failed to update meta vault tree state for vault {vault}') from e

@@ -25,7 +25,6 @@ from src.commands.internal.process_redeemer import (
     update_vaults_state,
 )
 from src.common.typings import HarvestParams
-from src.meta_vault.exceptions import ClaimDelayNotPassedException
 from src.meta_vault.typings import SubVaultRedemption
 from src.redemptions.os_token_converter import OsTokenConverter
 from src.redemptions.typings import OsTokenPosition
@@ -509,24 +508,6 @@ class TestUpdateVaultsState:
         ):
             with pytest.raises(RuntimeError, match='Failed to update meta vault tree state'):
                 await update_vaults_state(vaults=[VAULT_1], block_number=BlockNumber(100))
-
-    async def test_meta_vault_claim_delay_logged_and_continues(self) -> None:
-        """ClaimDelayNotPassedException is caught, logged, and does not abort the round.
-
-        Regular vaults batched alongside the meta vault are still processed.
-        """
-        exit_request = MagicMock()
-        exit_request.vault = VAULT_1
-        exit_request.position_ticket = 1234
-        params = make_harvest_params()
-        with _mock_update_vaults_state(
-            meta_vaults_map={VAULT_1: MagicMock()},
-            harvest_params={VAULT_2: params},
-            update_state_exception=ClaimDelayNotPassedException(exit_request),
-        ) as mocks:
-            await update_vaults_state(vaults=[VAULT_1, VAULT_2], block_number=BlockNumber(100))
-        mocks['update_state'].assert_awaited_once()
-        mocks['redeemer'].batch_update_vault_state.assert_awaited_once_with({VAULT_2: params})
 
     @pytest.mark.parametrize(
         'has_params, expected_multicall_calls',
