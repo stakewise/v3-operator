@@ -2,6 +2,7 @@ import asyncio
 import logging
 import sys
 from dataclasses import replace
+from itertools import batched
 from pathlib import Path
 
 import click
@@ -30,7 +31,7 @@ from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import log_verbose
 from src.common.wallet import wallet
 from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
-from src.config.settings import settings
+from src.config.settings import MULTICALL_CHUNK_SIZE, settings
 from src.meta_vault.graph import graph_get_vaults
 from src.meta_vault.service import is_meta_vault, is_meta_vault_state_update_required
 from src.meta_vault.tasks import meta_vault_tree_update_state
@@ -358,18 +359,19 @@ async def update_vaults_state(
     if not vault_to_harvest_params:
         return
 
-    tx_hash = await os_token_redeemer_contract.batch_update_vault_state(vault_to_harvest_params)
-    logger.info(
-        'Waiting for OsTokenRedeemer updateVaultState multicall tx %s confirmation', tx_hash
-    )
-    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
-        HexBytes(Web3.to_bytes(hexstr=tx_hash)), timeout=settings.execution_transaction_timeout
-    )
-    if not tx_receipt['status']:
-        raise RuntimeError(
-            f'OsTokenRedeemer updateVaultState multicall tx failed. Tx Hash: {tx_hash}'
+    for chunk_items in batched(vault_to_harvest_params.items(), MULTICALL_CHUNK_SIZE):
+        tx_hash = await os_token_redeemer_contract.batch_update_vault_state(dict(chunk_items))
+        logger.info(
+            'Waiting for OsTokenRedeemer updateVaultState multicall tx %s confirmation', tx_hash
         )
-    logger.info('OsTokenRedeemer updateVaultState multicall confirmed. Tx Hash: %s', tx_hash)
+        tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
+            HexBytes(Web3.to_bytes(hexstr=tx_hash)), timeout=settings.execution_transaction_timeout
+        )
+        if not tx_receipt['status']:
+            raise RuntimeError(
+                f'OsTokenRedeemer updateVaultState multicall tx failed. Tx Hash: {tx_hash}'
+            )
+        logger.info('OsTokenRedeemer updateVaultState multicall confirmed. Tx Hash: %s', tx_hash)
 
 
 async def redeem_positions(
