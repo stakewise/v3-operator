@@ -321,6 +321,7 @@ async def update_vaults_state(
     regular_vaults: list[ChecksumAddress] = []
     meta_vaults_map = await graph_get_vaults(
         is_meta_vault=True,
+        block_number=block_number,
     )
 
     for vault in vaults:

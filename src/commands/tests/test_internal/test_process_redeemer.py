@@ -486,7 +486,9 @@ class TestUpdateVaultsState:
 
         assert mocks['update_state'].await_count == expected_calls
         if needs_update:
-            mocks['graph_get_vaults'].assert_awaited_once_with(is_meta_vault=True)
+            mocks['graph_get_vaults'].assert_awaited_once_with(
+                is_meta_vault=True, block_number=BlockNumber(100)
+            )
             assert mocks['update_state'].await_args.kwargs['root_meta_vault'] is root_meta_vault
             assert mocks['update_state'].await_args.kwargs['meta_vaults_map'] is meta_vaults_map
 
