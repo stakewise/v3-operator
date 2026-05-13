@@ -28,43 +28,47 @@ async def get_redemption_assets(chain_head: ChainHead) -> Wei:
     Get redemption assets for operator's vault.
     For Gno networks return value in GNO-Wei.
     """
-    post_distribute = await get_redemption_reservations(chain_head)
-    return post_distribute[settings.vault]
+    vault_to_redemption_assets = await get_vault_to_redemption_assets_distributed(chain_head)
+    return vault_to_redemption_assets[settings.vault]
 
 
-async def get_redemption_reservations(
+async def get_vault_to_redemption_assets_distributed(
     chain_head: ChainHead,
 ) -> defaultdict[ChecksumAddress, Wei]:
     """
-    Get per-vault redemption reservations after distributing meta vault assets
-    to sub-vaults. Contains only non-meta vaults.
+    Get per-vault redemption assets after distributing meta vault assets
+    across their entire sub-vault tree. Contains leaf vaults, root meta vaults,
+    and all intermediary meta sub-vaults.
 
     For Gno networks values are in GNO-Wei.
     """
-    # The contract increments nonce during setRedeemablePositions,
-    # but uses nonce - 1 for leaf hash computation during redemption.
     nonce = await os_token_redeemer_contract.nonce(chain_head.block_number)
     if nonce == 0:
-        logger.info('Zero nonce for redemption. Skipping redemption assets.')
+        logger.debug('Zero nonce for redemption. Skipping redemption assets.')
         return defaultdict(lambda: Wei(0))
 
     protocol_config = await get_protocol_config()
 
-    pre_distribute = await get_vault_to_redemption_assets(
+    # The contract increments the nonce at the end of setRedeemablePositions,
+    # so use the previous nonce for leaf hash computation.
+    vault_to_redemption_assets = await get_vault_to_redemption_assets_direct(
         chain_head=chain_head, tree_nonce=nonce - 1, protocol_config=protocol_config
     )
     return await distribute_meta_vault_redemption_assets(
-        vault_to_redemption_assets=pre_distribute,
+        vault_to_redemption_assets=vault_to_redemption_assets,
         block_number=chain_head.block_number,
     )
 
 
-async def get_vault_to_redemption_assets(
+async def get_vault_to_redemption_assets_direct(
     chain_head: ChainHead, tree_nonce: int, protocol_config: ProtocolConfig
 ) -> defaultdict[ChecksumAddress, Wei]:
     """
-    Get redemption assets per vault.
-    For Gno networks return value in GNO-Wei.
+    Get redemption assets per vault, based only on assets directly assigned
+    to each vault in the IPFS redeemable positions file. Meta vault assets are
+    not yet distributed across their sub-vault tree.
+
+    For Gno networks return value is in GNO-Wei.
     """
     ticket = await os_token_redeemer_contract.get_exit_queue_cumulative_tickets(
         block_number=chain_head.block_number

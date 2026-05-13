@@ -20,7 +20,7 @@ from src.config.settings import (
     VALIDATORS_FUNDING_BATCH_SIZE,
     settings,
 )
-from src.redemptions.tasks import get_redemption_reservations
+from src.redemptions.tasks import get_redemption_assets
 from src.validators.consensus import fetch_compounding_validators_balances
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import EmptyRelayerResponseException, FundingException
@@ -267,9 +267,8 @@ async def get_vault_assets(harvest_params: HarvestParams | None, chain_head: Cha
 
     # Reserve operator's vault redemption assets so that withdrawable assets are spent
     # on redemptions first, then on validator registrations / fundings.
-    post_distribute = await get_redemption_reservations(chain_head)
-    reservation = post_distribute[settings.vault]
-    vault_assets = Wei(max(0, vault_assets - reservation))
+    redemption_assets = await get_redemption_assets(chain_head)
+    vault_assets = Wei(max(0, vault_assets - redemption_assets))
 
     if settings.network in GNO_NETWORKS:
         # apply GNO -> mGNO exchange rate

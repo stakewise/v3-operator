@@ -30,7 +30,7 @@ from src.meta_vault.graph import (
     graph_get_vaults,
 )
 from src.meta_vault.typings import ContractCall, SubVaultExitRequest, Vault
-from src.redemptions.tasks import get_redemption_reservations
+from src.redemptions.tasks import get_vault_to_redemption_assets_distributed
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ class ProcessMetaVaultTask(BaseTask):
             return
 
         chain_head = await get_chain_latest_head()
-        meta_vault_reservations = await get_redemption_reservations(chain_head)
+        vault_to_redemption_assets = await get_vault_to_redemption_assets_distributed(chain_head)
 
         for vault in self.vaults:
             # Refresh the meta vaults map to include updates
@@ -67,7 +67,7 @@ class ProcessMetaVaultTask(BaseTask):
                 await process_meta_vault_tree(
                     vault=vault,
                     meta_vaults_map=meta_vaults_map,
-                    meta_vault_reservations=meta_vault_reservations,
+                    vault_to_redemption_assets=vault_to_redemption_assets,
                 )
             except Exception:
                 logger.exception('Failed to process meta vault tree for vault %s', vault)
@@ -76,7 +76,7 @@ class ProcessMetaVaultTask(BaseTask):
 async def process_meta_vault_tree(
     vault: ChecksumAddress,
     meta_vaults_map: dict[ChecksumAddress, Vault],
-    meta_vault_reservations: defaultdict[ChecksumAddress, Wei],
+    vault_to_redemption_assets: defaultdict[ChecksumAddress, Wei],
 ) -> None:
     """
     Process a single meta vault tree: update state and deposit to sub vaults.
@@ -116,7 +116,7 @@ async def process_meta_vault_tree(
     for meta_vault_address in reversed(meta_vault_addresses):
         await process_deposit_to_sub_vaults(
             meta_vault_address=meta_vault_address,
-            redemption_reservation=meta_vault_reservations[meta_vault_address],
+            redemption_assets=vault_to_redemption_assets[meta_vault_address],
         )
 
 
@@ -404,7 +404,7 @@ async def is_meta_vault_rewards_nonce_outdated(
 
 async def process_deposit_to_sub_vaults(
     meta_vault_address: ChecksumAddress,
-    redemption_reservation: Wei = Wei(0),
+    redemption_assets: Wei = Wei(0),
 ) -> None:
     meta_vault_contract = MetaVaultContract(
         address=meta_vault_address,
@@ -412,7 +412,7 @@ async def process_deposit_to_sub_vaults(
     withdrawable_assets = await meta_vault_contract.withdrawable_assets()
 
     # Reserve redemption assets so they are not pushed down to sub vaults.
-    withdrawable_assets = Wei(max(0, withdrawable_assets - redemption_reservation))
+    withdrawable_assets = Wei(max(0, withdrawable_assets - redemption_assets))
 
     if settings.network in GNO_NETWORKS:
         withdrawable_assets = convert_to_mgno(withdrawable_assets)
