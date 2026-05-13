@@ -9,6 +9,7 @@ from web3 import Web3
 from web3.types import BlockNumber, Gwei, Wei
 
 from src.common.clients import execution_client
+from src.common.consensus import get_chain_latest_head
 from src.common.contracts import VaultContract, validators_registry_contract
 from src.common.execution import check_gas_price
 from src.common.harvest import get_harvest_params
@@ -46,13 +47,14 @@ class ValidatorRegistrationSubtask:
         self.keystore = keystore
         self.relayer = relayer
 
-    async def process(self, chain_head: ChainHead) -> None:
+    async def process(self) -> None:
         if self.keystore:
             await update_unused_validator_keys_metric(
                 keystore=self.keystore,
             )
         harvest_params = await get_harvest_params(settings.vault)
 
+        chain_head = await get_chain_latest_head()
         vault_assets = await get_vault_assets(harvest_params=harvest_params, chain_head=chain_head)
         vault_assets = Gwei(max(0, vault_assets - settings.vault_min_balance_gwei))
 
