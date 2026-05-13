@@ -445,3 +445,5 @@ LOG_DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
 LOG_WHITELISTED_DOMAINS = decouple_config(
     'LOG_WHITELISTED_DOMAINS', cast=Csv(), default='stakewise.io,localhost'
 )
+
+MULTICALL_CHUNK_SIZE: int = decouple_config('MULTICALL_CHUNK_SIZE', default=20, cast=int)
