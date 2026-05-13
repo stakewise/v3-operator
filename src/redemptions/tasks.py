@@ -28,26 +28,35 @@ async def get_redemption_assets(chain_head: ChainHead) -> Wei:
     Get redemption assets for operator's vault.
     For Gno networks return value in GNO-Wei.
     """
+    post_distribute = await get_redemption_reservations(chain_head)
+    return post_distribute[settings.vault]
+
+
+async def get_redemption_reservations(
+    chain_head: ChainHead,
+) -> defaultdict[ChecksumAddress, Wei]:
+    """
+    Get per-vault redemption reservations after distributing meta vault assets
+    to sub-vaults. Contains only non-meta vaults.
+
+    For Gno networks values are in GNO-Wei.
+    """
     # The contract increments nonce during setRedeemablePositions,
     # but uses nonce - 1 for leaf hash computation during redemption.
     nonce = await os_token_redeemer_contract.nonce(chain_head.block_number)
     if nonce == 0:
         logger.info('Zero nonce for redemption. Skipping redemption assets.')
-        return Wei(0)
+        return defaultdict(lambda: Wei(0))
 
     protocol_config = await get_protocol_config()
 
-    # Aggregate redemption assets per vault
-    vault_to_redemption_assets = await get_vault_to_redemption_assets(
+    pre_distribute = await get_vault_to_redemption_assets(
         chain_head=chain_head, tree_nonce=nonce - 1, protocol_config=protocol_config
     )
-    # Distribute redemption assets from meta vaults to their underlying vaults
-    vault_to_redemption_assets = await distribute_meta_vault_redemption_assets(
-        vault_to_redemption_assets=vault_to_redemption_assets,
+    return await distribute_meta_vault_redemption_assets(
+        vault_to_redemption_assets=pre_distribute,
         block_number=chain_head.block_number,
     )
-    # Filter by operator's vault
-    return vault_to_redemption_assets[settings.vault]
 
 
 async def get_vault_to_redemption_assets(
