@@ -44,7 +44,7 @@ async def get_vault_to_redemption_assets_distributed(
     """
     nonce = await os_token_redeemer_contract.nonce(chain_head.block_number)
     if nonce == 0:
-        logger.debug('Zero nonce for redemption. Skipping redemption assets.')
+        logger.info('Zero nonce for redemption. Skipping redemption assets.')
         return defaultdict(lambda: Wei(0))
 
     protocol_config = await get_protocol_config()
