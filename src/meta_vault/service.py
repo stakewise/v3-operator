@@ -1,5 +1,4 @@
-from collections import defaultdict
-from queue import Queue
+from collections import defaultdict, deque
 
 from eth_typing import BlockNumber, ChecksumAddress
 from sw_utils import is_meta_vault_upgraded_to_release, memoize
@@ -33,12 +32,10 @@ async def distribute_meta_vault_redemption_assets(
         lambda: Wei(0)
     )
 
-    queue: Queue[tuple[ChecksumAddress, Wei]] = Queue()
-    for vault, assets in vault_to_redemption_assets.items():
-        queue.put((vault, assets))
+    queue: deque[tuple[ChecksumAddress, Wei]] = deque(vault_to_redemption_assets.items())
 
-    while not queue.empty():
-        vault, assets = queue.get()
+    while queue:
+        vault, assets = queue.popleft()
         final_vault_to_redemption_assets[vault] = Wei(
             final_vault_to_redemption_assets[vault] + assets
         )
@@ -50,7 +47,7 @@ async def distribute_meta_vault_redemption_assets(
             block_number=block_number,
         )
         for sub_vault_redemption in sub_vaults_redemptions:
-            queue.put((sub_vault_redemption.vault, sub_vault_redemption.assets))
+            queue.append((sub_vault_redemption.vault, sub_vault_redemption.assets))
 
     return final_vault_to_redemption_assets
 
