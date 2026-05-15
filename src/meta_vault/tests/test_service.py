@@ -70,6 +70,7 @@ class TestDistributeMetaVaultRedemptionAssets:
             result = await distribute_meta_vault_redemption_assets(assets)
             assert dict(result) == {
                 vaults['vault1']: 100,
+                vaults['meta_vault']: 300,
                 vaults['sub_vault1']: 120,
                 vaults['sub_vault2']: 180,
             }
@@ -121,6 +122,8 @@ class TestDistributeMetaVaultRedemptionAssets:
         ):
             result = await distribute_meta_vault_redemption_assets(assets)
             assert dict(result) == {
+                vaults['meta_vault']: 500,
+                vaults['nested_meta_vault']: 300,
                 vaults['vault2']: 200,
                 vaults['sub_vault1']: 100,
                 vaults['sub_vault2']: 200,
@@ -159,6 +162,7 @@ class TestDistributeMetaVaultRedemptionAssets:
             result = await distribute_meta_vault_redemption_assets(assets)
             assert dict(result) == {
                 vaults['vault1']: 50,
+                vaults['meta_vault']: 150,
                 vaults['vault2']: 75,
                 vaults['sub_vault1']: 60,
                 vaults['sub_vault2']: 90,

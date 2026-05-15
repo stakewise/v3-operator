@@ -1,5 +1,4 @@
-from collections import defaultdict
-from typing import cast
+from collections import defaultdict, deque
 
 from eth_typing import BlockNumber, ChecksumAddress
 from sw_utils import is_meta_vault_upgraded_to_release, memoize
@@ -13,10 +12,11 @@ from src.common.contracts import (
     VaultContract,
 )
 from src.config.settings import settings
+from src.meta_vault.typings import SubVaultRedemption
 
 
 async def distribute_meta_vault_redemption_assets(
-    vault_to_redemption_assets: defaultdict[ChecksumAddress, Wei],
+    vault_to_redemption_assets: dict[ChecksumAddress, Wei],
     block_number: BlockNumber | None = None,
 ) -> defaultdict[ChecksumAddress, Wei]:
     """
@@ -24,62 +24,53 @@ async def distribute_meta_vault_redemption_assets(
     vault_to_redemption_assets: A mapping of vault addresses to their respective redemption assets,
     which may include meta vaults.
 
-    Distribute redemption assets from meta vaults to their underlying sub-vaults.
+    Distribute redemption assets from meta vaults across their entire sub-vault tree.
     Returns a mapping of vault addresses to their respective redemption assets,
-    ensuring all assets are assigned to non-meta vaults.
+    including leaf vaults, root meta vaults, and all intermediary meta sub-vaults.
     """
-    final_vault_to_redemption_assets: defaultdict[ChecksumAddress, int] = defaultdict(lambda: 0)
+    final_vault_to_redemption_assets: defaultdict[ChecksumAddress, Wei] = defaultdict(
+        lambda: Wei(0)
+    )
 
-    for vault, assets in vault_to_redemption_assets.items():
-        if await is_meta_vault(vault):
-            sub_vaults_redemptions = await get_meta_vault_redemption_assets(
-                meta_vault_address=vault,
-                assets_to_redeem=assets,
-                block_number=block_number,
-            )
-            for sub_vault, sub_assets in sub_vaults_redemptions.items():
-                final_vault_to_redemption_assets[sub_vault] += sub_assets
-        else:
-            final_vault_to_redemption_assets[vault] += assets
+    queue: deque[tuple[ChecksumAddress, Wei]] = deque(vault_to_redemption_assets.items())
 
-    return cast(defaultdict[ChecksumAddress, Wei], final_vault_to_redemption_assets)
+    while queue:
+        vault, assets = queue.popleft()
+        final_vault_to_redemption_assets[vault] = Wei(
+            final_vault_to_redemption_assets[vault] + assets
+        )
+        if not await is_meta_vault(vault):
+            continue
+        sub_vaults_redemptions = await get_sub_vaults_redemptions(
+            meta_vault_address=vault,
+            assets_to_redeem=assets,
+            block_number=block_number,
+        )
+        for sub_vault_redemption in sub_vaults_redemptions:
+            queue.append((sub_vault_redemption.vault, sub_vault_redemption.assets))
+
+    return final_vault_to_redemption_assets
 
 
-async def get_meta_vault_redemption_assets(
+async def get_sub_vaults_redemptions(
     meta_vault_address: ChecksumAddress,
     assets_to_redeem: Wei,
     block_number: BlockNumber | None = None,
-) -> defaultdict[ChecksumAddress, Wei]:
+) -> list[SubVaultRedemption]:
     """
-    This function distributes the specified assets to redeem from the meta vault
-    among its underlying sub-vaults. It handles both regular and nested meta vaults.
-    Finally every asset should be assigned to a non-meta vault.
+    Distribute the specified assets to redeem from the meta vault across its
+    direct sub-vaults only. Does not recurse into nested meta vaults.
 
-    Returns a mapping of vault addresses to their respective redemption assets.
+    Returns a list of SubVaultRedemption entries, one per direct sub-vault.
     """
-    vault_to_redemption_assets: defaultdict[ChecksumAddress, int] = defaultdict(lambda: 0)
     meta_vault_contract = MetaVaultContract(meta_vault_address)
-
     sub_vaults_registry_address = await meta_vault_contract.sub_vaults_registry()
     sub_vaults_registry_contract = SubVaultsRegistryContract(sub_vaults_registry_address)
 
     sub_vaults_redemptions = await sub_vaults_registry_contract.calculate_sub_vaults_redemptions(
         assets_to_redeem, block_number=block_number
     )
-
-    for sub_vault_redemption in sub_vaults_redemptions:
-        if sub_vault_redemption.assets > 0 and await is_meta_vault(sub_vault_redemption.vault):
-            sub_vault_assets = await get_meta_vault_redemption_assets(
-                meta_vault_address=sub_vault_redemption.vault,
-                assets_to_redeem=sub_vault_redemption.assets,
-                block_number=block_number,
-            )
-            for vault, assets in sub_vault_assets.items():
-                vault_to_redemption_assets[vault] += assets
-        else:
-            vault_to_redemption_assets[sub_vault_redemption.vault] += sub_vault_redemption.assets
-
-    return cast(defaultdict[ChecksumAddress, Wei], vault_to_redemption_assets)
+    return sub_vaults_redemptions
 
 
 @memoize
