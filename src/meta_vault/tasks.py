@@ -93,14 +93,14 @@ async def process_meta_vault_tree(
         )
         return
 
-    # Deposit to sub vaults for the entire meta vault tree (top-down order)
-    meta_vault_addresses = get_meta_vault_addresses_bottom_up(
-        root_meta_vault=root_meta_vault,
-        meta_vaults_map=meta_vaults_map,
-    )
-    # Reverse to get top-down order: root deposits first, then nested meta vaults
-    for meta_vault_address in reversed(meta_vault_addresses):
-        await process_deposit_to_sub_vaults(meta_vault_address=meta_vault_address)
+    # # Deposit to sub vaults for the entire meta vault tree (top-down order)
+    # meta_vault_addresses = get_meta_vault_addresses_bottom_up(
+    #     root_meta_vault=root_meta_vault,
+    #     meta_vaults_map=meta_vaults_map,
+    # )
+    # # Reverse to get top-down order: root deposits first, then nested meta vaults
+    # for meta_vault_address in reversed(meta_vault_addresses):
+    #     await process_deposit_to_sub_vaults(meta_vault_address=meta_vault_address)
 
 
 async def meta_vault_tree_update_state(
@@ -175,7 +175,8 @@ async def meta_vault_update_state(
     )
     logger.info('Transaction steps: \n%s', '\n'.join(tx_steps))
 
-    tx_hash = await multicall_contract.tx_aggregate(calls)
+    tx_hash = await multicall_contract.aggregate(calls)
+    return
 
     logger.info('Waiting for transaction %s confirmation', tx_hash)
     tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
