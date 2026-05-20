@@ -356,7 +356,10 @@ async def redeem_positions(
         assets_to_redeem = converter.to_assets(shares_to_redeem)
 
         if await is_meta_vault(position.vault):
-            continue
+            raise RuntimeError(
+                f'Unexpected meta vault position for {position.vault}; '
+                'redeemable positions should not include meta vaults.'
+            )
 
         if position.vault not in vault_to_withdrawable:
             vault_to_withdrawable[position.vault] = await get_withdrawable_assets(

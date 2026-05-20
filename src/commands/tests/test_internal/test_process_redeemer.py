@@ -205,19 +205,20 @@ class TestRedeemPositions:
         assert submitted.leaf_shares == Wei(1000)
         assert submitted.shares_to_redeem == Wei(200)
 
-    async def test_meta_vault_position_skipped(self) -> None:
-        """Positions on meta vaults are skipped entirely — no submit, no fetch."""
+    async def test_meta_vault_position_raises(self) -> None:
+        """A meta-vault position is unexpected and must surface as a RuntimeError."""
         pos = make_position(unprocessed_shares=500)
         get_withdrawable = AsyncMock(return_value=Wei(10000))
 
         with _mock_redeem_positions(withdrawable=get_withdrawable, is_meta_vault=True) as mocks:
-            await redeem_positions(
-                all_positions=[pos],
-                os_token_positions=[pos],
-                queued_shares=10000,
-                converter=make_converter(100, 100),
-                tree_nonce=5,
-            )
+            with pytest.raises(RuntimeError, match='Unexpected meta vault position'):
+                await redeem_positions(
+                    all_positions=[pos],
+                    os_token_positions=[pos],
+                    queued_shares=10000,
+                    converter=make_converter(100, 100),
+                    tree_nonce=5,
+                )
 
         mocks['submit_mock'].assert_not_called()
         get_withdrawable.assert_not_called()

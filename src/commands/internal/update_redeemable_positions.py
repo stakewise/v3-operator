@@ -251,7 +251,7 @@ async def process(
     finalized_block = await execution_client.eth.get_block('finalized')
     block_number = finalized_block['number']
     logger.info('Fetching allocators from the subgraph...')
-    allocators = await graph_get_allocators(block_number)
+    allocators = await graph_get_allocators(block_number, exclude_meta_vaults=True)
     logger.info('Fetched %s allocators from the subgraph', len(allocators))
 
     # filter boost proxy positions
