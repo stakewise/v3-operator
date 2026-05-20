@@ -28,7 +28,7 @@ from src.config.settings import (
     EVENTS_CONCURRENCY_LIMIT,
     settings,
 )
-from src.meta_vault.typings import SubVaultExitRequest, SubVaultRedemption
+from src.meta_vault.typings import SubVaultExitRequest
 from src.redemptions.typings import RedeemablePositions
 from src.validators.typings import V2ValidatorEventData
 from src.withdrawals.typings import WithdrawalEvent
@@ -462,24 +462,8 @@ class MetaVaultEncoder(BaseEncoder):
         )
 
 
-class V4MetaVaultContract(ContractWrapper):
-    """V4 refers to contracts release version, not to be confused with vault versioning"""
-
-    abi_path = 'abi/IV4EthMetaVault.json'
-
-    async def is_state_update_required(self, block_number: BlockNumber | None = None) -> bool:
-        return await self.contract.functions.isStateUpdateRequired().call(
-            block_identifier=block_number
-        )
-
-
 class SubVaultsRegistryContract(ContractWrapper):
     abi_path = 'abi/ISubVaultsRegistry.json'
-
-    async def is_state_update_required(self, block_number: BlockNumber | None = None) -> bool:
-        return await self.contract.functions.isStateUpdateRequired().call(
-            block_identifier=block_number
-        )
 
     async def get_last_rewards_nonce_updated_event(
         self, from_block: BlockNumber, to_block: BlockNumber
@@ -498,20 +482,6 @@ class SubVaultsRegistryContract(ContractWrapper):
         tx_function = self.contract.functions.depositToSubVaults()
         tx_hash = await transaction_gas_wrapper(tx_function)
         return Web3.to_hex(tx_hash)
-
-    async def calculate_sub_vaults_redemptions(
-        self, assets_to_redeem: Wei, block_number: BlockNumber | None = None
-    ) -> list[SubVaultRedemption]:
-        res = await self.contract.functions.calculateSubVaultsRedemptions(assets_to_redeem).call(
-            block_identifier=block_number
-        )
-        return [
-            SubVaultRedemption(
-                vault=Web3.to_checksum_address(entry[0]),
-                assets=Wei(entry[1]),
-            )
-            for entry in res
-        ]
 
 
 class SubVaultsRegistryEncoder(BaseEncoder):
@@ -604,20 +574,6 @@ class OsTokenRedeemerContract(ContractWrapper):
         tx_function = self.contract.functions.processExitQueue()
         tx_hash = await transaction_gas_wrapper(tx_function)
         return Web3.to_hex(tx_hash)
-
-    async def redeem_sub_vaults_assets(
-        self, vault_address: ChecksumAddress, assets_to_redeem: Wei
-    ) -> tuple[HexStr, BlockNumber]:
-        tx_function = self.contract.functions.redeemSubVaultsAssets(vault_address, assets_to_redeem)
-        tx_hash = await transaction_gas_wrapper(tx_function)
-        tx_receipt = await self.execution_client.eth.wait_for_transaction_receipt(
-            tx_hash, timeout=settings.execution_transaction_timeout
-        )
-        if not tx_receipt['status']:
-            raise RuntimeError(
-                f'redeemSubVaultsAssets transaction failed. Tx Hash: {Web3.to_hex(tx_hash)}'
-            )
-        return Web3.to_hex(tx_hash), tx_receipt['blockNumber']
 
     async def batch_update_vault_state(
         self, vault_to_harvest_params: dict[ChecksumAddress, HarvestParams]
