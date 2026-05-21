@@ -22,7 +22,9 @@ jobs:
           python-version: 3.12.12
 
       - name: Install Poetry
-        run: pipx install poetry==1.8.3
+        uses: snok/install-poetry@76e04a911780d5b312d89783f7b1cd627778900a # v1
+        with:
+          version: "1.8.3"
 
       - name: Check project version matches tag name
         run: |
@@ -162,7 +164,14 @@ jobs:
           python-version: ${{ matrix.PYTHON_VERSION }}
 
       - name: Install Poetry
-        run: pipx install poetry==1.8.3
+        uses: snok/install-poetry@76e04a911780d5b312d89783f7b1cd627778900a # v1
+        with:
+          version: "1.8.3"
+
+      - name: Fix Poetry PATH (Windows)
+        if: matrix.OS == 'windows-latest'
+        run: echo "$env:APPDATA\Python\Scripts" | Out-File -FilePath $env:GITHUB_PATH -Append
+        shell: pwsh
 
       - name: Install dependencies
         run: poetry install --with build --without dev --no-interaction --no-root
