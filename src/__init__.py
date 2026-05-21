@@ -1,6 +1,5 @@
-from pathlib import Path
-
 import tomllib
+from pathlib import Path
 
 
 def _get_project_meta() -> dict:
