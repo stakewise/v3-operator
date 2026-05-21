@@ -22,9 +22,7 @@ jobs:
           python-version: 3.12.12
 
       - name: Install Poetry
-        uses: snok/install-poetry@76e04a911780d5b312d89783f7b1cd627778900a # v1
-        with:
-          version: "1.8.3"
+        run: pipx install poetry==1.8.3
 
       - name: Check project version matches tag name
         run: |
@@ -149,14 +147,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y build-essential curl libpq-dev postgresql-client
-        if: matrix.os == 'ubuntu-24.04-arm' || matrix.os == 'ubuntu-22.04-arm'
+        if: matrix.OS == 'ubuntu-24.04-arm' || matrix.OS == 'ubuntu-22.04-arm'
 
       - name: Install build dependencies for MacOS
         run: |
           brew install libpq
           brew link --force libpq
           brew install openssl@3.0
-        if: matrix.os == 'macos-14'
+        if: matrix.OS == 'macos-14'
 
       - name: Set up python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
@@ -164,9 +162,7 @@ jobs:
           python-version: ${{ matrix.PYTHON_VERSION }}
 
       - name: Install Poetry
-        uses: snok/install-poetry@76e04a911780d5b312d89783f7b1cd627778900a # v1
-        with:
-          version: "1.8.3"
+        run: pipx install poetry==1.8.3
 
       - name: Install dependencies
         run: poetry install --with build --without dev --no-interaction --no-root
