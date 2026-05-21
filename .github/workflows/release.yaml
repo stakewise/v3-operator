@@ -145,7 +145,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
-      - name: Install build dependencies for Linux
+      - name: Install build dependencies for Linux arm
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y build-essential curl libpq-dev postgresql-client
@@ -175,7 +175,9 @@ jobs:
 
       - name: Install Rust toolchain (Windows)
         if: matrix.OS == 'windows-latest'
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+        with:
+          toolchain: stable
 
       - name: Install dependencies
         run: poetry install --with build --without dev --no-interaction --no-root
