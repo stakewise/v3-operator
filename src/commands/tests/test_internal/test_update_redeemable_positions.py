@@ -388,55 +388,43 @@ class TestUpdateOsTokenPositions:
         runner: CliRunner,
     ):
         # hardcoded to check merkle root
-        address_1 = '0x2242b8ab71521f6abEE4B4D83195E70AcB08727a'
-        address_2 = '0x24c8DBBC3d1C35C4159787b1f7a62bea1A814242'
-        vault_1 = '0xEd735de172272C03CA6F60c1d90D83D9CFB46D22'
-        vault_2 = '0xe8Ea1025b49D2B51C536cFBc0833F021ba4c6903'
+        address_1 = Web3.to_checksum_address('0x2242b8ab71521f6abEE4B4D83195E70AcB08727a')
+        address_2 = Web3.to_checksum_address('0x24c8DBBC3d1C35C4159787b1f7a62bea1A814242')
+        vault_1 = Web3.to_checksum_address('0xEd735de172272C03CA6F60c1d90D83D9CFB46D22')
+        vault_2 = Web3.to_checksum_address('0xe8Ea1025b49D2B51C536cFBc0833F021ba4c6903')
         allocators = [
-            {
-                'vault': {
-                    'id': vault_1.lower(),
-                    'osTokenConfig': {'id': '2'},
-                },
-                'id': address_1.lower(),
-                'address': address_1,
-                'mintedOsTokenShares': Web3.to_wei(10, 'ether'),
-                'ltv': '0.5',
-            },
-            {
-                'vault': {
-                    'id': vault_2.lower(),
-                    'osTokenConfig': {'id': '2'},
-                },
-                'id': address_2.lower(),
-                'address': address_2,
-                'mintedOsTokenShares': Web3.to_wei(12, 'ether'),
-                'ltv': '0.5',
-            },
+            Allocator(
+                address=address_1,
+                vault_os_token_positions=[
+                    VaultOsTokenPosition(
+                        address=vault_1, minted_shares=Web3.to_wei(10, 'ether'), ltv=0.5
+                    ),
+                ],
+            ),
+            Allocator(
+                address=address_2,
+                vault_os_token_positions=[
+                    VaultOsTokenPosition(
+                        address=vault_2, minted_shares=Web3.to_wei(12, 'ether'), ltv=0.5
+                    ),
+                ],
+            ),
         ]
         leverage_positions = [
-            {
-                'user': address_1,
-                'vault': {
-                    'id': vault_1.lower(),
-                },
-                'proxy': faker.eth_address(),
-                'osTokenShares': Web3.to_wei(1, 'ether'),
-                'exitingOsTokenShares': Web3.to_wei(0.1, 'ether'),
-                'assets': Web3.to_wei(0.1, 'ether'),
-                'exitingAssets': Web3.to_wei(0.05, 'ether'),
-            },
+            LeverageStrategyPosition(
+                user=address_1,
+                vault=vault_1,
+                proxy=Web3.to_checksum_address(faker.eth_address()),
+                os_token_shares=Web3.to_wei(1, 'ether'),
+                exiting_os_token_shares=Web3.to_wei(0.1, 'ether'),
+                assets=Web3.to_wei(0.1, 'ether'),
+                exiting_assets=Web3.to_wei(0.05, 'ether'),
+            ),
         ]
-        os_token_holders = [
-            {
-                'id': address_1.lower(),
-                'balance': Web3.to_wei(3, 'ether'),
-            },
-            {
-                'id': address_2.lower(),
-                'balance': Web3.to_wei(12, 'ether'),
-            },
-        ]
+        os_token_holders = {
+            address_1: Web3.to_wei(3, 'ether'),
+            address_2: Web3.to_wei(12, 'ether'),
+        }
         mock_protocol_data = [
             {
                 'id': 'stakewise',
@@ -508,10 +496,7 @@ class TestUpdateOsTokenPositions:
             patch_os_token_contract_address(os_token_contract_address),
             patch_os_token_converter(os_token_converter),
             patch_api_client(mock_protocol_data),
-            patch(
-                'src.redemptions.graph.graph_client.fetch_pages',
-                side_effect=[allocators, leverage_positions, os_token_holders],
-            ),
+            patch_graph_calls(allocators, leverage_positions, os_token_holders),
             patch_ipfs_client() as mock_upload_json,
             patch_startup_check(),
         ):
@@ -533,22 +518,20 @@ class TestUpdateOsTokenPositions:
         runner: CliRunner,
     ):
         # hardcoded to check merkle root
-        address_1 = '0x2242b8ab71521f6abEE4B4D83195E70AcB08727a'
-        vault_1 = '0xEd735de172272C03CA6F60c1d90D83D9CFB46D22'
+        address_1 = Web3.to_checksum_address('0x2242b8ab71521f6abEE4B4D83195E70AcB08727a')
+        vault_1 = Web3.to_checksum_address('0xEd735de172272C03CA6F60c1d90D83D9CFB46D22')
         allocators = [
-            {
-                'vault': {
-                    'id': vault_1.lower(),
-                    'osTokenConfig': {'id': '2'},
-                },
-                'id': address_1.lower(),
-                'address': address_1,
-                'mintedOsTokenShares': Web3.to_wei(10, 'ether'),
-                'ltv': '0.5',
-            },
+            Allocator(
+                address=address_1,
+                vault_os_token_positions=[
+                    VaultOsTokenPosition(
+                        address=vault_1, minted_shares=Web3.to_wei(10, 'ether'), ltv=0.5
+                    ),
+                ],
+            ),
         ]
-        leverage_positions = []
-        os_token_holders = []
+        leverage_positions: list[LeverageStrategyPosition] = []
+        os_token_holders: dict[ChecksumAddress, Wei] = {}
         mock_protocol_data = []
         os_token_converter = OsTokenConverter(110, 100)
         args = [
@@ -568,10 +551,7 @@ class TestUpdateOsTokenPositions:
             patch_os_token_contract_address(os_token_contract_address),
             patch_os_token_converter(os_token_converter),
             patch_api_client(mock_protocol_data),
-            patch(
-                'src.redemptions.graph.graph_client.fetch_pages',
-                side_effect=[allocators, leverage_positions, os_token_holders],
-            ),
+            patch_graph_calls(allocators, leverage_positions, os_token_holders),
             patch_ipfs_client() as mock_upload_json,
             patch_startup_check(),
         ):
@@ -593,22 +573,20 @@ class TestUpdateOsTokenPositions:
         runner: CliRunner,
     ):
         # hardcoded to check merkle root
-        address_1 = '0x2242b8ab71521f6abEE4B4D83195E70AcB08727a'
-        vault_1 = '0xEd735de172272C03CA6F60c1d90D83D9CFB46D22'
+        address_1 = Web3.to_checksum_address('0x2242b8ab71521f6abEE4B4D83195E70AcB08727a')
+        vault_1 = Web3.to_checksum_address('0xEd735de172272C03CA6F60c1d90D83D9CFB46D22')
         allocators = [
-            {
-                'vault': {
-                    'id': vault_1.lower(),
-                    'osTokenConfig': {'id': '2'},
-                },
-                'id': address_1.lower(),
-                'address': address_1,
-                'mintedOsTokenShares': Web3.to_wei(5, 'ether'),
-                'ltv': '0.5',
-            },
+            Allocator(
+                address=address_1,
+                vault_os_token_positions=[
+                    VaultOsTokenPosition(
+                        address=vault_1, minted_shares=Web3.to_wei(5, 'ether'), ltv=0.5
+                    ),
+                ],
+            ),
         ]
-        leverage_positions = []
-        os_token_holders = []
+        leverage_positions: list[LeverageStrategyPosition] = []
+        os_token_holders: dict[ChecksumAddress, Wei] = {}
         mock_protocol_data = []
         os_token_converter = OsTokenConverter(110, 100)
         args = [
@@ -630,10 +608,7 @@ class TestUpdateOsTokenPositions:
             patch_os_token_contract_address(os_token_contract_address),
             patch_os_token_converter(os_token_converter),
             patch_api_client(mock_protocol_data),
-            patch(
-                'src.redemptions.graph.graph_client.fetch_pages',
-                side_effect=[allocators, leverage_positions, os_token_holders],
-            ),
+            patch_graph_calls(allocators, leverage_positions, os_token_holders),
             patch_ipfs_client() as mock_upload_json,
             patch_startup_check(),
         ):
@@ -649,27 +624,20 @@ class TestUpdateOsTokenPositions:
         runner: CliRunner,
     ):
         # hardcoded to check merkle root
-        address_1 = '0x2242b8ab71521f6abEE4B4D83195E70AcB08727a'
-        vault_1 = '0xEd735de172272C03CA6F60c1d90D83D9CFB46D22'
+        address_1 = Web3.to_checksum_address('0x2242b8ab71521f6abEE4B4D83195E70AcB08727a')
+        vault_1 = Web3.to_checksum_address('0xEd735de172272C03CA6F60c1d90D83D9CFB46D22')
         allocators = [
-            {
-                'vault': {
-                    'id': vault_1.lower(),
-                    'osTokenConfig': {'id': '2'},
-                },
-                'id': address_1.lower(),
-                'address': address_1,
-                'mintedOsTokenShares': Web3.to_wei(10, 'ether'),
-                'ltv': '0.5',
-            },
+            Allocator(
+                address=address_1,
+                vault_os_token_positions=[
+                    VaultOsTokenPosition(
+                        address=vault_1, minted_shares=Web3.to_wei(10, 'ether'), ltv=0.5
+                    ),
+                ],
+            ),
         ]
-        leverage_positions = []
-        os_token_holders = [
-            {
-                'id': address_1.lower(),
-                'balance': Web3.to_wei(7, 'ether'),
-            },
-        ]
+        leverage_positions: list[LeverageStrategyPosition] = []
+        os_token_holders = {address_1: Web3.to_wei(7, 'ether')}
         mock_protocol_data = []
         os_token_converter = OsTokenConverter(110, 100)
         args = [
@@ -691,16 +659,28 @@ class TestUpdateOsTokenPositions:
             patch_os_token_contract_address(os_token_contract_address),
             patch_os_token_converter(os_token_converter),
             patch_api_client(mock_protocol_data),
-            patch(
-                'src.redemptions.graph.graph_client.fetch_pages',
-                side_effect=[allocators, leverage_positions, os_token_holders],
-            ),
+            patch_graph_calls(allocators, leverage_positions, os_token_holders),
             patch_ipfs_client() as mock_upload_json,
             patch_startup_check(),
         ):
             result = runner.invoke(update_redeemable_positions, args, input='\n')
             assert result.exit_code == 0
             mock_upload_json.assert_not_called()
+
+
+@contextlib.contextmanager
+def patch_graph_calls(
+    allocators: list[Allocator],
+    leverage_positions: list[LeverageStrategyPosition],
+    os_token_holders: dict[ChecksumAddress, Wei],
+):
+    target = 'src.commands.internal.update_redeemable_positions'
+    with (
+        patch(f'{target}.graph_get_redeemable_allocators', return_value=allocators),
+        patch(f'{target}.graph_get_leverage_positions', return_value=leverage_positions),
+        patch(f'{target}.graph_get_os_token_holders', return_value=os_token_holders),
+    ):
+        yield
 
 
 @contextlib.contextmanager
