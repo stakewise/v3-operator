@@ -16,45 +16,33 @@ from src.redemptions.typings import (
 logger = logging.getLogger(__name__)
 
 
-async def graph_get_allocators(
-    block_number: BlockNumber,
-    exclude_meta_vaults: bool = False,
-) -> list[Allocator]:
+async def graph_get_allocators(block_number: BlockNumber) -> list[Allocator]:
     """
-    Fetch allocators at the given block. First fetches vaults excluding those
-    with osTokenConfig.id == '1' (legacy), then fetches allocators per vault.
-
-    When ``exclude_meta_vaults`` is True, meta vaults are excluded from the
-    vaults query.
+    Fetch allocators at the given block. First fetches vaults eligible for
+    redemption (excluding legacy and meta vaults), then fetches allocators
+    per vault.
     """
-    vaults = await graph_get_redemption_vaults(
-        block_number, exclude_meta_vaults=exclude_meta_vaults
-    )
-    return await graph_get_allocators_from_vaults(vaults, block_number)
+    vaults = await graph_get_redeemable_vaults(block_number)
+    return await graph_get_redeemable_allocators_from_vaults(vaults, block_number)
 
 
-async def graph_get_redemption_vaults(
-    block_number: BlockNumber,
-    exclude_meta_vaults: bool = False,
-) -> list[ChecksumAddress]:
+async def graph_get_redeemable_vaults(block_number: BlockNumber) -> list[ChecksumAddress]:
     """
     Fetch vaults eligible for redemption at the given block, excluding legacy
-    vaults (osTokenConfig.id == '1'). When ``exclude_meta_vaults`` is True,
-    meta vaults are also excluded.
+    vaults (osTokenConfig.id == '1') and meta vaults.
     """
-    meta_vault_filter = ', isMetaVault: false' if exclude_meta_vaults else ''
     query = gql(
-        f"""
-        query vaultsQuery($block: Int, $first: Int, $lastID: String) {{
+        """
+        query vaultsQuery($block: Int, $first: Int, $lastID: String) {
           vaults(
-            block: {{number: $block}},
-            where: {{id_gt: $lastID, osTokenConfig_not: "1"{meta_vault_filter}}},
+            block: {number: $block},
+            where: {id_gt: $lastID, osTokenConfig_not: "1", isMetaVault: false},
             orderBy: id,
             first: $first
-          ) {{
+          ) {
             id
-          }}
-        }}
+          }
+        }
         """
     )
     params = {'block': block_number}
@@ -62,7 +50,7 @@ async def graph_get_redemption_vaults(
     return [Web3.to_checksum_address(item['id']) for item in response]
 
 
-async def graph_get_allocators_from_vaults(
+async def graph_get_redeemable_allocators_from_vaults(
     vaults: list[ChecksumAddress],
     block_number: BlockNumber,
 ) -> list[Allocator]:
@@ -100,7 +88,10 @@ async def graph_get_allocators_from_vaults(
             'vault': vault.lower(),
         }
         logger.debug(
-            'graph_get_allocators_from_vaults: querying vault %s (%d/%d)', vault, index, total
+            'graph_get_redeemable_allocators_from_vaults: querying vault %s (%d/%d)',
+            vault,
+            index,
+            total,
         )
         response = await graph_client.fetch_pages(query, params=params, cursor_pagination=True)
         for item in response:

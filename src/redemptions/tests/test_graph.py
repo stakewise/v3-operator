@@ -7,9 +7,9 @@ from web3 import Web3
 from web3.types import Wei
 
 from src.redemptions.graph import (
-    graph_get_allocators_from_vaults,
     graph_get_leverage_positions,
     graph_get_os_token_holders,
+    graph_get_redeemable_allocators_from_vaults,
 )
 from src.redemptions.typings import (
     Allocator,
@@ -19,7 +19,7 @@ from src.redemptions.typings import (
 
 
 @pytest.mark.usefixtures('fake_settings')
-async def test_graph_get_allocators_from_vaults():
+async def test_graph_get_redeemable_allocators_from_vaults():
     address_1 = faker.eth_address().lower()
     address_2 = faker.eth_address().lower()
     vault_1 = Web3.to_checksum_address(faker.eth_address())
@@ -37,7 +37,9 @@ async def test_graph_get_allocators_from_vaults():
         'src.redemptions.graph.graph_client.fetch_pages',
         side_effect=[vault_1_response, vault_2_response],
     ):
-        result = await graph_get_allocators_from_vaults([vault_1, vault_2], BlockNumber(123))
+        result = await graph_get_redeemable_allocators_from_vaults(
+            [vault_1, vault_2], BlockNumber(123)
+        )
 
     by_address = {a.address: a for a in result}
     assert by_address[Web3.to_checksum_address(address_1)] == Allocator(
