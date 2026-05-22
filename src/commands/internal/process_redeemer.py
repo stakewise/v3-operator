@@ -16,11 +16,7 @@ from web3.exceptions import Web3Exception
 from web3.types import Gwei, Wei
 
 from src.common.clients import close_clients, execution_client, setup_clients
-from src.common.contracts import (
-    MetaVaultContract,
-    SubVaultsRegistryContract,
-    os_token_redeemer_contract,
-)
+from src.common.contracts import os_token_redeemer_contract
 from src.common.execution import (
     check_gas_price,
     transaction_gas_wrapper,
@@ -32,10 +28,7 @@ from src.common.utils import log_verbose
 from src.common.wallet import wallet
 from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import MULTICALL_CHUNK_SIZE, settings
-from src.meta_vault.graph import graph_get_vaults
-from src.meta_vault.service import is_meta_vault, is_meta_vault_state_update_required
-from src.meta_vault.tasks import meta_vault_tree_update_state
-from src.meta_vault.typings import SubVaultRedemption
+from src.meta_vault.service import is_meta_vault
 from src.redemptions.os_token_converter import (
     OsTokenConverter,
     create_os_token_converter,
@@ -84,13 +77,6 @@ DEFAULT_MIN_QUEUED_ASSETS_GWEI = Web3.from_wei(DEFAULT_MIN_QUEUED_ASSETS, 'gwei'
     ' when connecting to execution nodes.',
 )
 @click.option(
-    '--graph-endpoint',
-    type=str,
-    envvar='GRAPH_ENDPOINT',
-    # default is endpoint from network config
-    help='API endpoint for graph node.',
-)
-@click.option(
     '--interval',
     type=int,
     default=DEFAULT_INTERVAL,
@@ -137,7 +123,6 @@ def process_redeemer(
     execution_endpoints: str,
     execution_jwt_secret: str | None,
     network: str,
-    graph_endpoint: str | None,
     verbose: bool,
     log_level: str,
     interval: int,
@@ -151,7 +136,6 @@ def process_redeemer(
         vault_dir=Path.home() / '.stakewise',
         execution_endpoints=execution_endpoints,
         execution_jwt_secret=execution_jwt_secret,
-        graph_endpoint=graph_endpoint,
         verbose=verbose,
         network=network,
         wallet_file=wallet_file,
@@ -310,36 +294,15 @@ async def update_vaults_state(
     vaults: list[ChecksumAddress],
     block_number: BlockNumber,
 ) -> None:
-    """Bring every vault up to date on-chain.
+    """Bring every regular vault up to date on-chain via the OsTokenRedeemer multicall.
 
-    Meta vaults are harvested via meta_vault_tree_update_state. Regular vaults
-    are batched into a single OsTokenRedeemer multicall.
+    Meta vaults are intentionally skipped; this command does not harvest them.
     """
     regular_vaults: list[ChecksumAddress] = []
-    meta_vaults_map = await graph_get_vaults(
-        is_meta_vault=True,
-        block_number=block_number,
-    )
-
     for vault in vaults:
-        if vault not in meta_vaults_map:
-            regular_vaults.append(vault)
+        if await is_meta_vault(vault):
             continue
-
-        if not await is_meta_vault_state_update_required(vault):
-            continue
-
-        root_meta_vault = meta_vaults_map[vault]
-        if not root_meta_vault.sub_vaults:
-            continue
-
-        try:
-            await meta_vault_tree_update_state(
-                root_meta_vault=root_meta_vault,
-                meta_vaults_map=meta_vaults_map,
-            )
-        except Exception as e:
-            raise RuntimeError(f'Failed to update meta vault tree state for vault {vault}') from e
+        regular_vaults.append(vault)
 
     if not regular_vaults:
         return
@@ -379,8 +342,8 @@ async def redeem_positions(
 ) -> None:
     """Redeem positions one by one until queued shares are exhausted.
 
-    For meta vaults short on withdrawable assets, redeem sub-vaults inline
-    before submitting. Aborts the round if a single redemption tx fails.
+    Meta-vault positions are skipped entirely. Aborts the round if a single
+    redemption tx fails.
     """
     remaining_shares = queued_shares
     vault_to_withdrawable: dict[ChecksumAddress, Wei] = {}
@@ -392,20 +355,17 @@ async def redeem_positions(
         shares_to_redeem = Wei(min(position.unprocessed_shares, remaining_shares))
         assets_to_redeem = converter.to_assets(shares_to_redeem)
 
+        if await is_meta_vault(position.vault):
+            raise RuntimeError(
+                f'Unexpected meta vault position for {position.vault}; '
+                'redeemable positions should not include meta vaults.'
+            )
+
         if position.vault not in vault_to_withdrawable:
             vault_to_withdrawable[position.vault] = await get_withdrawable_assets(
                 position.vault, harvest_params=None
             )
         withdrawable = vault_to_withdrawable[position.vault]
-
-        if withdrawable < assets_to_redeem and await is_meta_vault(position.vault):
-            last_receipt_block = await _redeem_meta_vault_sub_vaults(
-                vault_address=position.vault, assets=assets_to_redeem
-            )
-            if last_receipt_block is not None:
-                await wait_for_execution_endpoints_synced(last_receipt_block)
-            withdrawable = await get_withdrawable_assets(position.vault, harvest_params=None)
-            vault_to_withdrawable[position.vault] = withdrawable
 
         if withdrawable < assets_to_redeem:
             shares_to_redeem = converter.to_shares(withdrawable)
@@ -452,75 +412,6 @@ async def _startup_check() -> None:
         raise RuntimeError(
             f'The Position Manager role must be assigned to the address {wallet.account.address}.'
         )
-
-
-async def _redeem_meta_vault_sub_vaults(
-    vault_address: ChecksumAddress,
-    assets: Wei,
-) -> BlockNumber | None:
-    """Redeem from sub-vaults bottom-up so deepest nested meta vaults go first.
-
-    Returns the last successful receipt's block number, used by the caller as a
-    sync barrier against fallback endpoints lagging behind. Returns ``None`` if
-    no transaction succeeded.
-    """
-    try:
-        redeem_order = await _build_meta_vault_redeem_order(vault_address, assets)
-    except Exception:
-        logger.exception(
-            'Failed to build meta-vault redeem order for vault %s. '
-            'Proceeding with current withdrawable assets.',
-            vault_address,
-        )
-        return None
-
-    last_receipt_block: BlockNumber | None = None
-    for redeem_entry in redeem_order:
-        try:
-            tx_hash, receipt_block = await os_token_redeemer_contract.redeem_sub_vaults_assets(
-                redeem_entry.vault, redeem_entry.assets
-            )
-            logger.info(
-                'redeemSubVaultsAssets confirmed for vault %s. Tx Hash: %s',
-                redeem_entry.vault,
-                tx_hash,
-            )
-            last_receipt_block = receipt_block
-        except (Web3Exception, RuntimeError, ValueError):
-            logger.exception(
-                'redeemSubVaultsAssets failed for vault %s. '
-                'Proceeding with current withdrawable assets.',
-                redeem_entry.vault,
-            )
-            return last_receipt_block
-
-    return last_receipt_block
-
-
-async def _build_meta_vault_redeem_order(
-    vault: ChecksumAddress,
-    assets: Wei,
-) -> list[SubVaultRedemption]:
-    """Build bottom-up order of meta vault redemptions for nested meta vaults.
-
-    For MetaVault A with sub-vault B (also a meta vault) with sub-vaults C, D:
-    returns [(B, assets_B), (A, assets_A)] so B is redeemed first.
-    """
-    order: list[SubVaultRedemption] = []
-
-    meta_vault_contract = MetaVaultContract(vault)
-    registry_address = await meta_vault_contract.sub_vaults_registry()
-    registry = SubVaultsRegistryContract(registry_address)
-
-    redemptions = await registry.calculate_sub_vaults_redemptions(assets)
-
-    for redemption in redemptions:
-        if redemption.assets > 0 and await is_meta_vault(redemption.vault):
-            nested_order = await _build_meta_vault_redeem_order(redemption.vault, redemption.assets)
-            order.extend(nested_order)
-
-    order.append(SubVaultRedemption(vault=vault, assets=assets))
-    return order
 
 
 async def _submit_redeem_position(

@@ -16,34 +16,41 @@ from src.redemptions.typings import (
 logger = logging.getLogger(__name__)
 
 
-async def graph_get_allocators(block_number: BlockNumber) -> list[Allocator]:
+async def graph_get_allocators(
+    block_number: BlockNumber,
+    exclude_meta_vaults: bool = False,
+) -> list[Allocator]:
     """
     Fetch allocators at the given block and return them as a list of Allocator objects.
     Filter records to include only those with mintedOsTokenShares > 0.
+
+    When ``exclude_meta_vaults`` is True, allocators whose vault is a meta vault
+    are excluded at the subgraph level.
     """
+    vault_filter = ', vault_: { isMetaVault: false }' if exclude_meta_vaults else ''
     query = gql(
-        """
-        query getAllocators($block: Int, $first: Int, $lastID: String){
+        f"""
+        query getAllocators($block: Int, $first: Int, $lastID: String){{
           allocators(
-           block: {number: $block},
-            where: {
-                id_gt: $lastID
-            },
+           block: {{number: $block}},
+            where: {{
+                id_gt: $lastID{vault_filter}
+            }},
             orderBy: id
             first: $first
-          ){
-          vault {
+          ){{
+          vault {{
             id
-            osTokenConfig {
+            osTokenConfig {{
               id
-            }
-          }
+            }}
+          }}
           id
           address
           mintedOsTokenShares
           ltv
-          }
-        }
+          }}
+        }}
         """
     )
     params = {

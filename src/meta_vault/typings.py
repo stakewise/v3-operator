@@ -110,9 +110,3 @@ class ContractCall:
     address: ChecksumAddress
     data: HexStr
     description: str
-
-
-@dataclass
-class SubVaultRedemption:
-    vault: ChecksumAddress
-    assets: Wei
