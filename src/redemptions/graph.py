@@ -21,51 +21,92 @@ async def graph_get_allocators(
     exclude_meta_vaults: bool = False,
 ) -> list[Allocator]:
     """
-    Fetch allocators at the given block and return them as a list of Allocator objects.
-    Filter records to include only those with mintedOsTokenShares > 0.
+    Fetch allocators at the given block. First fetches vaults excluding those
+    with osTokenConfig.id == '1' (legacy), then fetches allocators per vault.
 
-    When ``exclude_meta_vaults`` is True, allocators whose vault is a meta vault
-    are excluded at the subgraph level.
+    When ``exclude_meta_vaults`` is True, meta vaults are excluded from the
+    vaults query.
     """
-    vault_filter = ', vault_: { isMetaVault: false }' if exclude_meta_vaults else ''
+    vaults = await graph_get_redemption_vaults(
+        block_number, exclude_meta_vaults=exclude_meta_vaults
+    )
+    return await graph_get_allocators_from_vaults(vaults, block_number)
+
+
+async def graph_get_redemption_vaults(
+    block_number: BlockNumber,
+    exclude_meta_vaults: bool = False,
+) -> list[ChecksumAddress]:
+    """
+    Fetch vaults eligible for redemption at the given block, excluding legacy
+    vaults (osTokenConfig.id == '1'). When ``exclude_meta_vaults`` is True,
+    meta vaults are also excluded.
+    """
+    meta_vault_filter = ', isMetaVault: false' if exclude_meta_vaults else ''
     query = gql(
         f"""
-        query getAllocators($block: Int, $first: Int, $lastID: String){{
-          allocators(
-           block: {{number: $block}},
-            where: {{
-                id_gt: $lastID{vault_filter}
-            }},
-            orderBy: id
+        query vaultsQuery($block: Int, $first: Int, $lastID: String) {{
+          vaults(
+            block: {{number: $block}},
+            where: {{id_gt: $lastID, osTokenConfig_not: "1"{meta_vault_filter}}},
+            orderBy: id,
             first: $first
-          ){{
-          vault {{
+          ) {{
             id
-            osTokenConfig {{
-              id
-            }}
-          }}
-          id
-          address
-          mintedOsTokenShares
-          ltv
           }}
         }}
         """
     )
-    params = {
-        'block': block_number,
-    }
+    params = {'block': block_number}
     response = await graph_client.fetch_pages(query, params=params, cursor_pagination=True)
+    return [Web3.to_checksum_address(item['id']) for item in response]
+
+
+async def graph_get_allocators_from_vaults(
+    vaults: list[ChecksumAddress],
+    block_number: BlockNumber,
+) -> list[Allocator]:
+    """
+    Fetch allocators at the given block for each vault in ``vaults`` and
+    return them as a list of Allocator objects. Filters records to include
+    only those with mintedOsTokenShares > 0.
+    """
+    query = gql(
+        """
+        query getAllocators($block: Int, $first: Int, $lastID: String, $vault: String){
+          allocators(
+            block: {number: $block},
+            where: {
+                id_gt: $lastID,
+                vault: $vault,
+                mintedOsTokenShares_gt: 0
+            },
+            orderBy: id
+            first: $first
+          ){
+            id
+            address
+            mintedOsTokenShares
+            ltv
+          }
+        }
+        """
+    )
     positions_by_allocator: defaultdict[str, list[VaultOsTokenPosition]] = defaultdict(list)
-    for item in response:
-        # filter legacy vaults. ID can be checksum address, skip cast to int
-        if item['vault']['osTokenConfig']['id'] == '1':
-            continue
-        if int(item['mintedOsTokenShares']) > 0:
+    total = len(vaults)
+    for index, vault in enumerate(vaults, start=1):
+        params = {
+            'block': block_number,
+            'vault': vault.lower(),
+        }
+        logger.debug(
+            'graph_get_allocators_from_vaults: querying vault %s (%d/%d)', vault, index, total
+        )
+        response = await graph_client.fetch_pages(query, params=params, cursor_pagination=True)
+        for item in response:
             positions_by_allocator[item['address']].append(
                 VaultOsTokenPosition(
-                    address=Web3.to_checksum_address(item['vault']['id']),
+                    address=vault,
                     minted_shares=Wei(int(item['mintedOsTokenShares'])),
                     ltv=float(item['ltv']),
                 )
