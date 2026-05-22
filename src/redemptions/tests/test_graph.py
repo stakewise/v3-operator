@@ -6,8 +6,16 @@ from sw_utils.tests import faker
 from web3 import Web3
 from web3.types import Wei
 
-from src.redemptions.graph import graph_get_allocators_from_vaults
-from src.redemptions.typings import Allocator, VaultOsTokenPosition
+from src.redemptions.graph import (
+    graph_get_allocators_from_vaults,
+    graph_get_leverage_positions,
+    graph_get_os_token_holders,
+)
+from src.redemptions.typings import (
+    Allocator,
+    LeverageStrategyPosition,
+    VaultOsTokenPosition,
+)
 
 
 @pytest.mark.usefixtures('fake_settings')
@@ -45,3 +53,54 @@ async def test_graph_get_allocators_from_vaults():
             VaultOsTokenPosition(address=vault_1, minted_shares=Wei(1000), ltv=0.7),
         ],
     )
+
+
+@pytest.mark.usefixtures('fake_settings')
+async def test_graph_get_leverage_positions():
+    user = faker.eth_address().lower()
+    vault = faker.eth_address().lower()
+    proxy = faker.eth_address().lower()
+
+    response = [
+        {
+            'user': user,
+            'vault': {'id': vault},
+            'proxy': proxy,
+            'osTokenShares': '1000',
+            'exitingOsTokenShares': '100',
+            'assets': '50',
+            'exitingAssets': '25',
+        },
+    ]
+    with patch('src.redemptions.graph.graph_client.fetch_pages', return_value=response):
+        result = await graph_get_leverage_positions(BlockNumber(123))
+
+    assert result == [
+        LeverageStrategyPosition(
+            user=Web3.to_checksum_address(user),
+            vault=Web3.to_checksum_address(vault),
+            proxy=Web3.to_checksum_address(proxy),
+            os_token_shares=Wei(1000),
+            exiting_os_token_shares=Wei(100),
+            assets=Wei(50),
+            exiting_assets=Wei(25),
+        )
+    ]
+
+
+@pytest.mark.usefixtures('fake_settings')
+async def test_graph_get_os_token_holders():
+    address_1 = faker.eth_address().lower()
+    address_2 = faker.eth_address().lower()
+
+    response = [
+        {'id': address_1, 'balance': '500'},
+        {'id': address_2, 'balance': '1000'},
+    ]
+    with patch('src.redemptions.graph.graph_client.fetch_pages', return_value=response):
+        result = await graph_get_os_token_holders(BlockNumber(123))
+
+    assert result == {
+        Web3.to_checksum_address(address_1): Wei(500),
+        Web3.to_checksum_address(address_2): Wei(1000),
+    }
