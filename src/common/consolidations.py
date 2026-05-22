@@ -39,6 +39,9 @@ async def get_pending_consolidations(
 
     execution_consolidations = await get_execution_consolidations(chain_head.block_number)
     for cons in execution_consolidations:
+        if cons['source_address'] != settings.vault:
+            continue
+
         source_pubkey = cons['source_pubkey']
         target_pubkey = cons['target_pubkey']
 
