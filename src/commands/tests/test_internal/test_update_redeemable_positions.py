@@ -676,7 +676,7 @@ def patch_graph_calls(
 ):
     target = 'src.commands.internal.update_redeemable_positions'
     with (
-        patch(f'{target}.graph_get_allocators', return_value=allocators),
+        patch(f'{target}.graph_get_redeemable_allocators', return_value=allocators),
         patch(f'{target}.graph_get_leverage_positions', return_value=leverage_positions),
         patch(f'{target}.graph_get_os_token_holders', return_value=os_token_holders),
     ):

@@ -16,7 +16,7 @@ from src.redemptions.typings import (
 logger = logging.getLogger(__name__)
 
 
-async def graph_get_allocators(block_number: BlockNumber) -> list[Allocator]:
+async def graph_get_redeemable_allocators(block_number: BlockNumber) -> list[Allocator]:
     """
     Fetch allocators at the given block. First fetches vaults eligible for
     redemption (excluding legacy and meta vaults), then fetches allocators
