@@ -12,7 +12,6 @@ from src.common.clients import ipfs_fetch_client
 from src.common.contracts import multicall_contract, os_token_redeemer_contract
 from src.common.protocol_config import get_protocol_config
 from src.config.settings import settings
-from src.meta_vault.service import distribute_meta_vault_redemption_assets
 from src.redemptions.os_token_converter import create_os_token_converter
 from src.redemptions.typings import OsTokenPosition
 
@@ -28,24 +27,10 @@ async def get_redemption_assets(chain_head: ChainHead) -> Wei:
     Get redemption assets for operator's vault.
     For Gno networks return value in GNO-Wei.
     """
-    vault_to_redemption_assets = await get_vault_to_redemption_assets_distributed(chain_head)
-    return vault_to_redemption_assets[settings.vault]
-
-
-async def get_vault_to_redemption_assets_distributed(
-    chain_head: ChainHead,
-) -> defaultdict[ChecksumAddress, Wei]:
-    """
-    Get per-vault redemption assets after distributing meta vault assets
-    across their entire sub-vault tree. Contains leaf vaults, root meta vaults,
-    and all intermediary meta sub-vaults.
-
-    For Gno networks values are in GNO-Wei.
-    """
     nonce = await os_token_redeemer_contract.nonce(chain_head.block_number)
     if nonce == 0:
         logger.info('Zero nonce for redemption. Skipping redemption assets.')
-        return defaultdict(lambda: Wei(0))
+        return Wei(0)
 
     protocol_config = await get_protocol_config()
 
@@ -54,10 +39,7 @@ async def get_vault_to_redemption_assets_distributed(
     vault_to_redemption_assets = await get_vault_to_redemption_assets_direct(
         chain_head=chain_head, tree_nonce=nonce - 1, protocol_config=protocol_config
     )
-    return await distribute_meta_vault_redemption_assets(
-        vault_to_redemption_assets=vault_to_redemption_assets,
-        block_number=chain_head.block_number,
-    )
+    return vault_to_redemption_assets[settings.vault]
 
 
 async def get_vault_to_redemption_assets_direct(
