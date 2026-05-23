@@ -1,7 +1,8 @@
-from eth_typing import HexStr
+from eth_typing import ChecksumAddress, HexStr
 from sw_utils.tests import faker
+from web3.types import Wei
 
-from src.redemptions.typings import RedeemablePositions
+from src.redemptions.typings import OsTokenPosition, RedeemablePositions
 
 
 def create_redeemable_positions(
@@ -14,3 +15,19 @@ def create_redeemable_positions(
         ipfs_hash = faker.ipfs_hash()
 
     return RedeemablePositions(merkle_root=merkle_root, ipfs_hash=ipfs_hash)
+
+
+def make_position(
+    vault: ChecksumAddress | None = None,
+    owner: ChecksumAddress | None = None,
+    leaf_shares: int = 1000,
+    unprocessed_shares: int = 500,
+    shares_to_redeem: int = 0,
+) -> OsTokenPosition:
+    return OsTokenPosition(
+        vault=vault if vault is not None else faker.eth_address(),
+        owner=owner if owner is not None else faker.eth_address(),
+        leaf_shares=Wei(leaf_shares),
+        unprocessed_shares=Wei(unprocessed_shares),
+        shares_to_redeem=Wei(shares_to_redeem),
+    )

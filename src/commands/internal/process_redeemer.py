@@ -33,11 +33,7 @@ from src.redemptions.os_token_converter import (
     OsTokenConverter,
     create_os_token_converter,
 )
-from src.redemptions.tasks import (
-    batch_size,
-    get_processed_shares_batch,
-    iter_os_token_positions,
-)
+from src.redemptions.tasks import calculate_redeemable_shares, fetch_positions_from_ipfs
 from src.redemptions.typings import OsTokenPosition
 from src.validators.execution import get_withdrawable_assets
 
@@ -250,44 +246,6 @@ async def _redeem_os_token_positions(
         converter=os_token_converter,
         tree_nonce=prev_nonce,
     )
-
-
-async def fetch_positions_from_ipfs(block_number: BlockNumber) -> list[OsTokenPosition]:
-    positions: list[OsTokenPosition] = []
-    async for position in iter_os_token_positions(block_number=block_number):
-        positions.append(position)
-    return positions
-
-
-async def calculate_redeemable_shares(
-    all_positions: list[OsTokenPosition],
-    nonce: int,
-    block_number: BlockNumber,
-) -> list[OsTokenPosition]:
-    """Query processed shares and return positions with available_shares > 0."""
-    redeemable: list[OsTokenPosition] = []
-
-    for i in range(0, len(all_positions), batch_size):
-        batch = all_positions[i : i + batch_size]
-        processed_shares_batch = await get_processed_shares_batch(
-            os_token_positions_batch=batch,
-            nonce=nonce,
-            block_number=block_number,
-        )
-        for position, processed_shares in zip(batch, processed_shares_batch):
-            unprocessed_shares = position.leaf_shares - processed_shares
-            if unprocessed_shares <= 0:
-                continue
-            redeemable.append(
-                OsTokenPosition(
-                    owner=position.owner,
-                    vault=position.vault,
-                    leaf_shares=position.leaf_shares,
-                    unprocessed_shares=Wei(unprocessed_shares),
-                )
-            )
-
-    return redeemable
 
 
 async def update_vaults_state(

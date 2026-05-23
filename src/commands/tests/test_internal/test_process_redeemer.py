@@ -16,8 +16,6 @@ from src.commands.internal.process_redeemer import (
     _process_exit_queue,
     _startup_check,
     _submit_redeem_position,
-    calculate_redeemable_shares,
-    fetch_positions_from_ipfs,
     process,
     redeem_positions,
     update_vaults_state,
@@ -295,72 +293,6 @@ class TestSubmitRedeemPosition:
                     all_positions=[position],
                     tree_nonce=5,
                 )
-
-
-class TestFetchPositionsFromIpfs:
-    async def test_empty_positions(self) -> None:
-        async def empty_gen(block_number: BlockNumber | None = None):  # type: ignore[misc]
-            return
-            yield  # noqa: unreachable
-
-        with patch(f'{MODULE}.iter_os_token_positions', side_effect=empty_gen):
-            result = await fetch_positions_from_ipfs(block_number=BlockNumber(100))
-        assert result == []
-
-    async def test_returns_all_positions(self) -> None:
-        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, leaf_shares=1000)
-        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, leaf_shares=2000)
-
-        async def gen(block_number: BlockNumber | None = None):  # type: ignore[misc]
-            yield pos1
-            yield pos2
-
-        with patch(f'{MODULE}.iter_os_token_positions', side_effect=gen):
-            result = await fetch_positions_from_ipfs(block_number=BlockNumber(100))
-        assert len(result) == 2
-        assert result[0] is pos1
-        assert result[1] is pos2
-
-
-class TestCalculateRedeemableShares:
-    async def test_all_shares_processed(self) -> None:
-        pos = make_position(leaf_shares=1000)
-        with patch(
-            f'{MODULE}.get_processed_shares_batch',
-            new=AsyncMock(return_value=[Wei(1000)]),
-        ):
-            result = await calculate_redeemable_shares(
-                [pos], nonce=5, block_number=BlockNumber(100)
-            )
-        assert result == []
-
-    async def test_partial_processed_shares(self) -> None:
-        pos = make_position(leaf_shares=1000)
-        with patch(
-            f'{MODULE}.get_processed_shares_batch',
-            new=AsyncMock(return_value=[Wei(300)]),
-        ):
-            result = await calculate_redeemable_shares(
-                [pos], nonce=5, block_number=BlockNumber(100)
-            )
-        assert len(result) == 1
-        assert result[0].unprocessed_shares == Wei(700)
-        assert result[0].leaf_shares == Wei(1000)
-
-    async def test_multiple_positions_mixed(self) -> None:
-        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, leaf_shares=1000)
-        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, leaf_shares=2000)
-
-        with patch(
-            f'{MODULE}.get_processed_shares_batch',
-            new=AsyncMock(return_value=[Wei(1000), Wei(500)]),
-        ):
-            result = await calculate_redeemable_shares(
-                [pos1, pos2], nonce=5, block_number=BlockNumber(100)
-            )
-        assert len(result) == 1
-        assert result[0].owner == OWNER_2
-        assert result[0].unprocessed_shares == Wei(1500)
 
 
 class TestUpdateVaultsState:
