@@ -92,26 +92,18 @@ async def aggregate_redemption_assets_by_vaults(
     # Convert total redemption assets to shares
     total_redemption_shares = os_token_converter.to_shares(total_redemption_assets)
 
-    vault_to_unprocessed_shares: defaultdict[ChecksumAddress, Wei] = defaultdict(lambda: Wei(0))
-
-    # Iterate through redeemable positions until total redemption shares are exhausted
     positions = await fetch_positions_from_ipfs(block_number=block_number)
-    redeemable_positions = await calculate_redeemable_shares(
-        positions, nonce=tree_nonce, block_number=block_number
+    cut_off_positions = await cut_off_redeemable_positions(
+        positions,
+        nonce=tree_nonce,
+        total_redemption_shares=total_redemption_shares,
+        block_number=block_number,
     )
-    for position in redeemable_positions:
-        # Skip rounding errors
-        if position.unprocessed_shares <= 1:
-            continue
 
-        # Aggregate unprocessed shares by vault
-        unprocessed_shares = min(position.unprocessed_shares, total_redemption_shares)
-        vault_to_unprocessed_shares[position.vault] += unprocessed_shares  # type: ignore
-
-        total_redemption_shares -= unprocessed_shares  # type: ignore
-
-        if total_redemption_shares <= 0:
-            break
+    # Aggregate unprocessed shares by vault
+    vault_to_unprocessed_shares: defaultdict[ChecksumAddress, Wei] = defaultdict(lambda: Wei(0))
+    for position in cut_off_positions:
+        vault_to_unprocessed_shares[position.vault] += position.unprocessed_shares  # type: ignore
 
     # Convert shares to assets per vault
     return defaultdict(
@@ -151,13 +143,21 @@ async def fetch_positions_from_ipfs(
     ]
 
 
-async def calculate_redeemable_shares(
+async def cut_off_redeemable_positions(
     all_positions: list[OsTokenPosition],
     nonce: int,
+    total_redemption_shares: Wei,
     block_number: BlockNumber | None = None,
 ) -> list[OsTokenPosition]:
-    """Query processed shares and return positions with available_shares > 0."""
+    """
+    Fill positions with their unprocessed shares until the cumulative total reaches
+    total_redemption_shares, then stop. The last included position's unprocessed_shares
+    is capped so the cumulative total does not exceed total_redemption_shares.
+    Fully processed positions (no remaining unprocessed shares) are omitted from
+    the returned list.
+    """
     redeemable: list[OsTokenPosition] = []
+    remaining_shares = total_redemption_shares
 
     for i in range(0, len(all_positions), batch_size):
         batch = all_positions[i : i + batch_size]
@@ -168,8 +168,11 @@ async def calculate_redeemable_shares(
         )
         for position, processed_shares in zip(batch, processed_shares_batch):
             unprocessed_shares = position.leaf_shares - processed_shares
-            if unprocessed_shares <= 0:
+            # Skip fully processed positions; tolerate 1 wei rounding error.
+            if unprocessed_shares <= 1:
                 continue
+
+            unprocessed_shares = min(unprocessed_shares, remaining_shares)
             redeemable.append(
                 OsTokenPosition(
                     owner=position.owner,
@@ -178,6 +181,9 @@ async def calculate_redeemable_shares(
                     unprocessed_shares=Wei(unprocessed_shares),
                 )
             )
+            remaining_shares -= unprocessed_shares  # type: ignore
+            if remaining_shares <= 0:
+                return redeemable
 
     return redeemable
 
