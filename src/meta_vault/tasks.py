@@ -58,10 +58,7 @@ class ProcessMetaVaultTask(BaseTask):
                 is_meta_vault=True,
             )
             try:
-                await process_meta_vault_tree(
-                    vault=vault,
-                    meta_vaults_map=meta_vaults_map,
-                )
+                await process_meta_vault_tree(vault=vault, meta_vaults_map=meta_vaults_map)
             except Exception:
                 logger.exception('Failed to process meta vault tree for vault %s', vault)
 
@@ -106,9 +103,7 @@ async def process_meta_vault_tree(
     )
     # Reverse to get top-down order: root deposits first, then nested meta vaults
     for meta_vault_address in reversed(meta_vault_addresses):
-        await process_deposit_to_sub_vaults(
-            meta_vault_address=meta_vault_address,
-        )
+        await process_deposit_to_sub_vaults(meta_vault_address=meta_vault_address)
 
 
 async def meta_vault_tree_update_state(
@@ -393,9 +388,7 @@ async def is_meta_vault_rewards_nonce_outdated(
     return meta_vault_event is None
 
 
-async def process_deposit_to_sub_vaults(
-    meta_vault_address: ChecksumAddress,
-) -> None:
+async def process_deposit_to_sub_vaults(meta_vault_address: ChecksumAddress) -> None:
     meta_vault_contract = MetaVaultContract(
         address=meta_vault_address,
     )
