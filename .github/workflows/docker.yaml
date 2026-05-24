@@ -53,6 +53,7 @@ jobs:
           outputs: type=image,"name=europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator,stakewiselabs/v3-operator",push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=${{ matrix.platform }}
           cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
+          no-cache-filters: production
       - name: Export digest
         run: |
           mkdir -p /tmp/digests
