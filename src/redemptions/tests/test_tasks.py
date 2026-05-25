@@ -19,7 +19,7 @@ from src.redemptions.os_token_converter import (
 from src.redemptions.tasks import (
     aggregate_redemption_assets_by_vaults,
     batch_size,
-    calculate_redeemable_shares,
+    cut_off_redeemable_positions,
     ipfs_fetch_client,
     os_token_redeemer_contract,
 )
@@ -32,15 +32,15 @@ OWNER_1 = Web3.to_checksum_address('0x' + '33' * 20)
 OWNER_2 = Web3.to_checksum_address('0x' + '44' * 20)
 
 
-class TestCalculateRedeemableShares:
+class TestCutOffRedeemablePositions:
     async def test_all_shares_processed(self) -> None:
         pos = make_position(leaf_shares=1000)
         with patch(
             'src.redemptions.tasks.get_processed_shares_batch',
             new=AsyncMock(return_value=[Wei(1000)]),
         ):
-            result = await calculate_redeemable_shares(
-                [pos], nonce=5, block_number=BlockNumber(100)
+            result = await cut_off_redeemable_positions(
+                [pos], nonce=5, total_redemption_shares=Wei(10**18), block_number=BlockNumber(100)
             )
         assert result == []
 
@@ -50,8 +50,8 @@ class TestCalculateRedeemableShares:
             'src.redemptions.tasks.get_processed_shares_batch',
             new=AsyncMock(return_value=[Wei(300)]),
         ):
-            result = await calculate_redeemable_shares(
-                [pos], nonce=5, block_number=BlockNumber(100)
+            result = await cut_off_redeemable_positions(
+                [pos], nonce=5, total_redemption_shares=Wei(10**18), block_number=BlockNumber(100)
             )
         assert len(result) == 1
         assert result[0].unprocessed_shares == Wei(700)
@@ -65,12 +65,71 @@ class TestCalculateRedeemableShares:
             'src.redemptions.tasks.get_processed_shares_batch',
             new=AsyncMock(return_value=[Wei(1000), Wei(500)]),
         ):
-            result = await calculate_redeemable_shares(
-                [pos1, pos2], nonce=5, block_number=BlockNumber(100)
+            result = await cut_off_redeemable_positions(
+                [pos1, pos2],
+                nonce=5,
+                total_redemption_shares=Wei(10**18),
+                block_number=BlockNumber(100),
             )
         assert len(result) == 1
         assert result[0].owner == OWNER_2
         assert result[0].unprocessed_shares == Wei(1500)
+
+    async def test_cap_trims_last_position(self) -> None:
+        pos = make_position(leaf_shares=1000)
+        with patch(
+            'src.redemptions.tasks.get_processed_shares_batch',
+            new=AsyncMock(return_value=[Wei(0)]),
+        ):
+            result = await cut_off_redeemable_positions(
+                [pos], nonce=5, total_redemption_shares=Wei(400), block_number=BlockNumber(100)
+            )
+        assert len(result) == 1
+        assert result[0].unprocessed_shares == Wei(400)
+
+    async def test_two_batches(self) -> None:
+        # batch_size=20: first batch has 20 positions, second has 5
+        first_batch = [make_position(leaf_shares=1000) for _ in range(batch_size)]
+        second_batch = [make_position(leaf_shares=2000) for _ in range(5)]
+        positions = first_batch + second_batch
+
+        # First batch: first 10 fully processed, last 10 unprocessed
+        first_batch_processed = [Wei(1000)] * 10 + [Wei(0)] * 10
+        # Second batch: all unprocessed
+        second_batch_processed = [Wei(0)] * 5
+
+        with patch(
+            'src.redemptions.tasks.get_processed_shares_batch',
+            side_effect=[first_batch_processed, second_batch_processed],
+        ):
+            result = await cut_off_redeemable_positions(
+                positions,
+                nonce=5,
+                total_redemption_shares=Wei(10**18),
+                block_number=BlockNumber(100),
+            )
+
+        assert len(result) == 15
+        assert all(p.unprocessed_shares == Wei(1000) for p in result[:10])
+        assert all(p.unprocessed_shares == Wei(2000) for p in result[10:])
+
+    async def test_cap_stops_after_first_position(self) -> None:
+        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, leaf_shares=1000)
+        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, leaf_shares=2000)
+
+        with patch(
+            'src.redemptions.tasks.get_processed_shares_batch',
+            new=AsyncMock(return_value=[Wei(0), Wei(0)]),
+        ):
+            result = await cut_off_redeemable_positions(
+                [pos1, pos2],
+                nonce=5,
+                total_redemption_shares=Wei(1000),
+                block_number=BlockNumber(100),
+            )
+        assert len(result) == 1
+        assert result[0].owner == OWNER_1
+        assert result[0].unprocessed_shares == Wei(1000)
 
 
 class TestAggregateRedemptionAssetsByVaults:
