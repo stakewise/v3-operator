@@ -207,12 +207,16 @@ def process_network_validator_event(
 
 
 async def get_withdrawable_assets(
-    vault: ChecksumAddress, harvest_params: HarvestParams | None
+    vault: ChecksumAddress,
+    harvest_params: HarvestParams | None,
+    block_number: BlockNumber | None = None,
 ) -> Wei:
     """Fetches vault's available assets for staking."""
     vault_contract = VaultContract(vault)
     if harvest_params is None:
-        return await vault_contract.functions.withdrawableAssets().call()
+        return await vault_contract.functions.withdrawableAssets().call(
+            block_identifier=block_number
+        )
 
     calls = [
         (vault_contract.contract_address, vault_contract.get_update_state_call(harvest_params))
@@ -220,7 +224,7 @@ async def get_withdrawable_assets(
     withdrawable_assets_call = vault_contract.encode_abi(fn_name='withdrawableAssets', args=[])
     calls.append((vault_contract.contract_address, withdrawable_assets_call))
 
-    _, multicall = await multicall_contract.aggregate(calls)
+    _, multicall = await multicall_contract.aggregate(calls, block_number=block_number)
     return Wei(Web3.to_int(multicall[-1]))
 
 

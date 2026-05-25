@@ -265,7 +265,9 @@ async def register_new_validators(
 
 
 async def get_vault_assets(harvest_params: HarvestParams | None, chain_head: ChainHead) -> Gwei:
-    vault_assets = await get_withdrawable_assets(settings.vault, harvest_params=harvest_params)
+    vault_assets = await get_withdrawable_assets(
+        settings.vault, harvest_params=harvest_params, block_number=chain_head.block_number
+    )
 
     # Reserve operator's vault redemption assets so that withdrawable assets are spent
     # on redemptions first, then on validator registrations / fundings.
