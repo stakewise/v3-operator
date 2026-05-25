@@ -53,6 +53,8 @@ RUN poetry install --only main
 # `production` image used for runtime
 FROM python-base as production
 
+COPY --from=builder-base /usr/lib/ /usr/lib/
+
 # Update all packages and add home folder for nobody user
 RUN apt-get update && apt-get upgrade -y; \
     rm -rf /var/lib/apt/lists/* && \
@@ -66,7 +68,6 @@ USER nobody
 # Copy dependencies from build container
 WORKDIR /app
 COPY --from=builder-base $PYSETUP_PATH $PYSETUP_PATH
-COPY --from=builder-base /usr/lib/ /usr/lib/
 
 # Copy source code
 COPY . ./
