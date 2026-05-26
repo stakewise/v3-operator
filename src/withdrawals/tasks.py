@@ -27,7 +27,7 @@ from src.config.settings import (
     WITHDRAWALS_INTERVAL,
     settings,
 )
-from src.redemptions.tasks import get_redemption_assets, update_processed_shares_cache
+from src.redemptions.tasks import get_redemption_assets
 from src.validators.consensus import fetch_consensus_validators
 from src.validators.database import VaultValidatorCrud
 from src.validators.exceptions import EmptyRelayerResponseException
@@ -109,7 +109,6 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
             chain_head=chain_head,
             consensus_validators=active_validators,
         )
-        await update_processed_shares_cache()
         redemption_assets = await get_redemption_assets(chain_head=chain_head)
 
         queued_assets = await get_queued_assets(

@@ -50,32 +50,6 @@ class ProcessedSharesCache(metaclass=Singleton):
         return not events
 
 
-async def update_processed_shares_cache() -> None:
-    """Validate and update the processed shares cache to the current finalized block."""
-    finalized_block = await execution_client.eth.get_block('finalized')
-    block_number = BlockNumber(finalized_block['number'])
-
-    cache = ProcessedSharesCache()
-    if cache.checkpoint_block == block_number:
-        return
-
-    nonce = await os_token_redeemer_contract.nonce(block_number)
-    if nonce == 0:
-        cache.nonce = nonce
-        cache.checkpoint_block = block_number
-        return
-
-    if not await cache.is_valid_on(nonce, block_number):
-        cache.nonce = nonce
-        cache.data.clear()
-        positions = await fetch_positions_from_ipfs(block_number=block_number)
-        async for position, processed_shares in aioitertools.zip(
-            positions, iter_processed_shares(positions, nonce, block_number)
-        ):
-            cache.data[Web3.to_hex(position.leaf_hash(nonce - 1))] = processed_shares
-    cache.checkpoint_block = block_number
-
-
 async def get_redemption_assets(chain_head: ChainHead) -> Wei:
     """
     Get redemption assets for operator's vault.
@@ -86,6 +60,7 @@ async def get_redemption_assets(chain_head: ChainHead) -> Wei:
         logger.info('Zero nonce for redemption. Skipping redemption assets.')
         return Wei(0)
 
+    await update_processed_shares_cache()
     protocol_config = await get_protocol_config()
     vault_to_redemption_assets = await get_vault_to_redemption_assets_direct(
         chain_head=chain_head, nonce=nonce, protocol_config=protocol_config
@@ -166,34 +141,6 @@ async def aggregate_redemption_assets_by_vaults(
     )
 
 
-async def fetch_positions_from_ipfs(
-    block_number: BlockNumber,
-) -> list[OsTokenPosition]:
-    redeemable_positions = await os_token_redeemer_contract.redeemable_positions(
-        block_number=block_number
-    )
-
-    # Check whether redeemable positions are available
-    if not redeemable_positions.ipfs_hash:
-        return []
-    if redeemable_positions.merkle_root == ZERO_MERKLE_ROOT:
-        return []
-    # Fetch redeemable positions data from IPFS
-    data = cast(list[dict], await ipfs_fetch_client.fetch_json(redeemable_positions.ipfs_hash))
-
-    # data structure example:
-    # [{"owner:" 0x01, "leaf_shares": 100000, "vault": 0x02}, ...]
-
-    return [
-        OsTokenPosition(
-            owner=Web3.to_checksum_address(item['owner']),
-            vault=Web3.to_checksum_address(item['vault']),
-            leaf_shares=Wei(int(item['leaf_shares'])),
-        )
-        for item in data
-    ]
-
-
 async def cut_off_redeemable_positions(
     all_positions: list[OsTokenPosition],
     nonce: int,
@@ -267,3 +214,58 @@ async def iter_processed_shares(
         )
         for res in rpc_results:
             yield Wei(Web3.to_int(res))
+
+
+async def update_processed_shares_cache() -> None:
+    """Validate and update the processed shares cache to the current finalized block."""
+    finalized_block = await execution_client.eth.get_block('finalized')
+    block_number = BlockNumber(finalized_block['number'])
+
+    cache = ProcessedSharesCache()
+    if cache.checkpoint_block == block_number:
+        return
+
+    nonce = await os_token_redeemer_contract.nonce(block_number)
+    if nonce == 0:
+        cache.nonce = nonce
+        cache.checkpoint_block = block_number
+        return
+
+    if not await cache.is_valid_on(nonce, block_number):
+        cache.nonce = nonce
+        cache.data.clear()
+        positions = await fetch_positions_from_ipfs(block_number=block_number)
+        async for position, processed_shares in aioitertools.zip(
+            positions, iter_processed_shares(positions, nonce, block_number)
+        ):
+            leaf_hash = Web3.to_hex(position.leaf_hash(nonce - 1))
+            cache.data[leaf_hash] = processed_shares
+    cache.checkpoint_block = block_number
+
+
+async def fetch_positions_from_ipfs(
+    block_number: BlockNumber,
+) -> list[OsTokenPosition]:
+    redeemable_positions = await os_token_redeemer_contract.redeemable_positions(
+        block_number=block_number
+    )
+
+    # Check whether redeemable positions are available
+    if not redeemable_positions.ipfs_hash:
+        return []
+    if redeemable_positions.merkle_root == ZERO_MERKLE_ROOT:
+        return []
+    # Fetch redeemable positions data from IPFS
+    data = cast(list[dict], await ipfs_fetch_client.fetch_json(redeemable_positions.ipfs_hash))
+
+    # data structure example:
+    # [{"owner:" 0x01, "leaf_shares": 100000, "vault": 0x02}, ...]
+
+    return [
+        OsTokenPosition(
+            owner=Web3.to_checksum_address(item['owner']),
+            vault=Web3.to_checksum_address(item['vault']),
+            leaf_shares=Wei(int(item['leaf_shares'])),
+        )
+        for item in data
+    ]
