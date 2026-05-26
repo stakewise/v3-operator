@@ -1379,20 +1379,20 @@ test = ["coverage", "hypothesis (>=6.22.0,<6.108.7)", "pytest (>=7.0.0)", "pytes
 
 [[package]]
 name = "eth-hash"
-version = "0.7.1"
+version = "0.8.0"
 description = "eth-hash: The Ethereum hashing function, keccak256, sometimes (erroneously) called sha3"
 optional = false
-python-versions = "<4,>=3.8"
+python-versions = "<4,>=3.10"
 files = [
-    {file = "eth_hash-0.7.1-py3-none-any.whl", hash = "sha256:0fb1add2adf99ef28883fd6228eb447ef519ea72933535ad1a0b28c6f65f868a"},
-    {file = "eth_hash-0.7.1.tar.gz", hash = "sha256:d2411a403a0b0a62e8247b4117932d900ffb4c8c64b15f92620547ca5ce46be5"},
+    {file = "eth_hash-0.8.0-py3-none-any.whl", hash = "sha256:523718a51b369ab89866b929a5c93c52978cd866ea309192ad980dd8271f9fac"},
+    {file = "eth_hash-0.8.0.tar.gz", hash = "sha256:b009752b620da2e9c7668014849d1f5fadbe4f138603f1871cc5d4ca706896b1"},
 ]
 
 [package.dependencies]
 pycryptodome = {version = ">=3.6.6,<4", optional = true, markers = "extra == \"pycryptodome\""}
 
 [package.extras]
-dev = ["build (>=0.9.0)", "bump_my_version (>=0.19.0)", "ipython", "mypy (==1.10.0)", "pre-commit (>=3.4.0)", "pytest (>=7.0.0)", "pytest-xdist (>=2.4.0)", "sphinx (>=6.0.0)", "sphinx-autobuild (>=2021.3.14)", "sphinx_rtd_theme (>=1.0.0)", "towncrier (>=24,<25)", "tox (>=4.0.0)", "twine", "wheel"]
+dev = ["build (>=0.9.0)", "bump_my_version (>=0.19.0)", "ipython", "mypy (==1.18.2)", "pre-commit (>=3.4.0)", "pytest (>=7.0.0)", "pytest-xdist (>=2.4.0)", "sphinx (>=6.0.0)", "sphinx-autobuild (>=2021.3.14)", "sphinx_rtd_theme (>=1.0.0)", "towncrier (>=24,<25)", "tox (>=4.0.0)", "twine", "wheel (>=0.38.1)"]
 docs = ["sphinx (>=6.0.0)", "sphinx-autobuild (>=2021.3.14)", "sphinx_rtd_theme (>=1.0.0)", "towncrier (>=24,<25)"]
 pycryptodome = ["pycryptodome (>=3.6.6,<4)"]
 pysha3 = ["pysha3 (>=1.0.0,<2.0.0)", "safe-pysha3 (>=1.0.0)"]
@@ -2374,26 +2374,6 @@ files = [
     {file = "multidict-6.7.1-py3-none-any.whl", hash = "sha256:55d97cc6dae627efa6a6e548885712d4864b81110ac76fa4e534c03819fa4a56"},
     {file = "multidict-6.7.1.tar.gz", hash = "sha256:ec6652a1bee61c53a3e5776b6049172c53b6aaba34f18c9ad04f82712bac623d"},
 ]
-
-[[package]]
-name = "multiproof"
-version = "v0.1.10"
-description = "A Python library to generate merkle trees and merkle proofs."
-optional = false
-python-versions = "^3.10"
-files = []
-develop = false
-
-[package.dependencies]
-eth-abi = "^5.0.1"
-eth-hash = {version = "^0.7.0", extras = ["pycryptodome"]}
-eth-utils = ">=5.1.0"
-
-[package.source]
-type = "git"
-url = "https://github.com/stakewise/multiproof.git"
-reference = "v0.1.10"
-resolved_reference = "c5378e44877c5442a486a8f4006f16961e42662b"
 
 [[package]]
 name = "mypy"
@@ -3781,24 +3761,24 @@ files = [
 
 [[package]]
 name = "ssz"
-version = "0.5.2"
+version = "0.5.0"
 description = "ssz: Python implementation of the Simple Serialization encoding and decoding"
 optional = false
 python-versions = "<4,>=3.8"
 files = [
-    {file = "ssz-0.5.2-py3-none-any.whl", hash = "sha256:089df4e02d03f74cbac7675c83afe15295bea3ff07a4d158ac5dec8e21386c28"},
-    {file = "ssz-0.5.2.tar.gz", hash = "sha256:ab0bab2bc391610f2e49083cc74fb01974e044d9389f31f65344f17a4476cd53"},
+    {file = "ssz-0.5.0-py3-none-any.whl", hash = "sha256:111dec40bee7cb7c3d52fe621a2247d5420ab999ffc0cbecb470782c28b56414"},
+    {file = "ssz-0.5.0.tar.gz", hash = "sha256:5e0fe0483c5c9bdf3ea0fa957986b48ca34c784af57e39257863dd3743e20861"},
 ]
 
 [package.dependencies]
 eth-utils = ">=2"
 lru-dict = ">=1.1.6"
-pyrsistent = ">=0.16.0"
+pyrsistent = ">=0.16.0,<0.17"
 
 [package.extras]
-dev = ["build (>=0.9.0)", "bump_my_version (>=0.19.0)", "hypothesis (>=6.22.0,<6.108.7)", "ipython", "pre-commit (>=3.4.0)", "pytest (>=7.0.0)", "pytest-xdist (>=2.4.0)", "ruamel.yaml (>=0.17.0)", "sphinx (>=6.0.0)", "sphinx-autobuild (>=2021.3.14)", "sphinx_rtd_theme (>=1.0.0)", "towncrier (>=24,<25)", "tox (>=4.0.0)", "twine", "wheel"]
-docs = ["sphinx (>=6.0.0)", "sphinx-autobuild (>=2021.3.14)", "sphinx_rtd_theme (>=1.0.0)", "towncrier (>=24,<25)"]
-test = ["hypothesis (>=6.22.0,<6.108.7)", "pytest (>=7.0.0)", "pytest-xdist (>=2.4.0)"]
+dev = ["build (>=0.9.0)", "bumpversion (>=0.5.3)", "hypothesis (==4.54.0)", "ipython", "pre-commit (>=3.4.0)", "pytest (>=7.0.0)", "pytest-xdist (>=2.4.0)", "ruamel.yaml (>=0.17.0)", "sphinx (>=6.0.0)", "sphinx-rtd-theme (>=1.0.0)", "towncrier (>=21,<22)", "tox (>=4.0.0)", "twine", "wheel"]
+docs = ["sphinx (>=6.0.0)", "sphinx-rtd-theme (>=1.0.0)", "towncrier (>=21,<22)"]
+test = ["hypothesis (==4.54.0)", "pytest (>=7.0.0)", "pytest-xdist (>=2.4.0)"]
 yaml = ["ruamel.yaml (>=0.17.0)"]
 
 [[package]]
@@ -3842,7 +3822,7 @@ test = ["py-ecc (==6.0.0)", "pytest (>=6.2.5)", "pytest-benchmark (>=3.2.3)"]
 
 [[package]]
 name = "sw-utils"
-version = "v0.13.0"
+version = "v0.12.12"
 description = "StakeWise Python utils"
 optional = false
 python-versions = "^3.12"
@@ -3854,16 +3834,16 @@ gql = {version = "==3.5.3", extras = ["aiohttp"]}
 ipfshttpclient = "^0.8.0a2"
 py-ecc = "^8.0.0"
 pyjwt = "==2.12.1"
-ssz = "==0.5.2"
+ssz = "==0.5.0"
 sw-milagro-bls-binding = "==1.9.0"
 tenacity = "==8.2.3"
-web3 = "==7.14.1"
+web3 = "==7.13.0"
 
 [package.source]
 type = "git"
 url = "https://github.com/stakewise/sw-utils.git"
-reference = "v0.13.0"
-resolved_reference = "c04775aa956592a5d02499efc1e4455b4f2f4983"
+reference = "v0.12.12"
+resolved_reference = "4ab2a597bcf892df9c382cd994ceb1921ea2c269"
 
 [[package]]
 name = "tenacity"
@@ -3878,62 +3858,6 @@ files = [
 
 [package.extras]
 doc = ["reno", "sphinx", "tornado (>=4.5)"]
-
-[[package]]
-name = "tomli"
-version = "2.4.1"
-description = "A lil' TOML parser"
-optional = false
-python-versions = ">=3.8"
-files = [
-    {file = "tomli-2.4.1-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:f8f0fc26ec2cc2b965b7a3b87cd19c5c6b8c5e5f436b984e85f486d652285c30"},
-    {file = "tomli-2.4.1-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:4ab97e64ccda8756376892c53a72bd1f964e519c77236368527f758fbc36a53a"},
-    {file = "tomli-2.4.1-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:96481a5786729fd470164b47cdb3e0e58062a496f455ee41b4403be77cb5a076"},
-    {file = "tomli-2.4.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:5a881ab208c0baf688221f8cecc5401bd291d67e38a1ac884d6736cbcd8247e9"},
-    {file = "tomli-2.4.1-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:47149d5bd38761ac8be13a84864bf0b7b70bc051806bc3669ab1cbc56216b23c"},
-    {file = "tomli-2.4.1-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:ec9bfaf3ad2df51ace80688143a6a4ebc09a248f6ff781a9945e51937008fcbc"},
-    {file = "tomli-2.4.1-cp311-cp311-win32.whl", hash = "sha256:ff2983983d34813c1aeb0fa89091e76c3a22889ee83ab27c5eeb45100560c049"},
-    {file = "tomli-2.4.1-cp311-cp311-win_amd64.whl", hash = "sha256:5ee18d9ebdb417e384b58fe414e8d6af9f4e7a0ae761519fb50f721de398dd4e"},
-    {file = "tomli-2.4.1-cp311-cp311-win_arm64.whl", hash = "sha256:c2541745709bad0264b7d4705ad453b76ccd191e64aa6f0fc66b69a293a45ece"},
-    {file = "tomli-2.4.1-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:c742f741d58a28940ce01d58f0ab2ea3ced8b12402f162f4d534dfe18ba1cd6a"},
-    {file = "tomli-2.4.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:7f86fd587c4ed9dd76f318225e7d9b29cfc5a9d43de44e5754db8d1128487085"},
-    {file = "tomli-2.4.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:ff18e6a727ee0ab0388507b89d1bc6a22b138d1e2fa56d1ad494586d61d2eae9"},
-    {file = "tomli-2.4.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:136443dbd7e1dee43c68ac2694fde36b2849865fa258d39bf822c10e8068eac5"},
-    {file = "tomli-2.4.1-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:5e262d41726bc187e69af7825504c933b6794dc3fbd5945e41a79bb14c31f585"},
-    {file = "tomli-2.4.1-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:5cb41aa38891e073ee49d55fbc7839cfdb2bc0e600add13874d048c94aadddd1"},
-    {file = "tomli-2.4.1-cp312-cp312-win32.whl", hash = "sha256:da25dc3563bff5965356133435b757a795a17b17d01dbc0f42fb32447ddfd917"},
-    {file = "tomli-2.4.1-cp312-cp312-win_amd64.whl", hash = "sha256:52c8ef851d9a240f11a88c003eacb03c31fc1c9c4ec64a99a0f922b93874fda9"},
-    {file = "tomli-2.4.1-cp312-cp312-win_arm64.whl", hash = "sha256:f758f1b9299d059cc3f6546ae2af89670cb1c4d48ea29c3cacc4fe7de3058257"},
-    {file = "tomli-2.4.1-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:36d2bd2ad5fb9eaddba5226aa02c8ec3fa4f192631e347b3ed28186d43be6b54"},
-    {file = "tomli-2.4.1-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:eb0dc4e38e6a1fd579e5d50369aa2e10acfc9cace504579b2faabb478e76941a"},
-    {file = "tomli-2.4.1-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:c7f2c7f2b9ca6bdeef8f0fa897f8e05085923eb091721675170254cbc5b02897"},
-    {file = "tomli-2.4.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:f3c6818a1a86dd6dca7ddcaaf76947d5ba31aecc28cb1b67009a5877c9a64f3f"},
-    {file = "tomli-2.4.1-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:d312ef37c91508b0ab2cee7da26ec0b3ed2f03ce12bd87a588d771ae15dcf82d"},
-    {file = "tomli-2.4.1-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:51529d40e3ca50046d7606fa99ce3956a617f9b36380da3b7f0dd3dd28e68cb5"},
-    {file = "tomli-2.4.1-cp313-cp313-win32.whl", hash = "sha256:2190f2e9dd7508d2a90ded5ed369255980a1bcdd58e52f7fe24b8162bf9fedbd"},
-    {file = "tomli-2.4.1-cp313-cp313-win_amd64.whl", hash = "sha256:8d65a2fbf9d2f8352685bc1364177ee3923d6baf5e7f43ea4959d7d8bc326a36"},
-    {file = "tomli-2.4.1-cp313-cp313-win_arm64.whl", hash = "sha256:4b605484e43cdc43f0954ddae319fb75f04cc10dd80d830540060ee7cd0243cd"},
-    {file = "tomli-2.4.1-cp314-cp314-macosx_10_15_x86_64.whl", hash = "sha256:fd0409a3653af6c147209d267a0e4243f0ae46b011aa978b1080359fddc9b6cf"},
-    {file = "tomli-2.4.1-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:a120733b01c45e9a0c34aeef92bf0cf1d56cfe81ed9d47d562f9ed591a9828ac"},
-    {file = "tomli-2.4.1-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:559db847dc486944896521f68d8190be1c9e719fced785720d2216fe7022b662"},
-    {file = "tomli-2.4.1-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:01f520d4f53ef97964a240a035ec2a869fe1a37dde002b57ebc4417a27ccd853"},
-    {file = "tomli-2.4.1-cp314-cp314-musllinux_1_2_aarch64.whl", hash = "sha256:7f94b27a62cfad8496c8d2513e1a222dd446f095fca8987fceef261225538a15"},
-    {file = "tomli-2.4.1-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:ede3e6487c5ef5d28634ba3f31f989030ad6af71edfb0055cbbd14189ff240ba"},
-    {file = "tomli-2.4.1-cp314-cp314-win32.whl", hash = "sha256:3d48a93ee1c9b79c04bb38772ee1b64dcf18ff43085896ea460ca8dec96f35f6"},
-    {file = "tomli-2.4.1-cp314-cp314-win_amd64.whl", hash = "sha256:88dceee75c2c63af144e456745e10101eb67361050196b0b6af5d717254dddf7"},
-    {file = "tomli-2.4.1-cp314-cp314-win_arm64.whl", hash = "sha256:b8c198f8c1805dc42708689ed6864951fd2494f924149d3e4bce7710f8eb5232"},
-    {file = "tomli-2.4.1-cp314-cp314t-macosx_10_15_x86_64.whl", hash = "sha256:d4d8fe59808a54658fcc0160ecfb1b30f9089906c50b23bcb4c69eddc19ec2b4"},
-    {file = "tomli-2.4.1-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:7008df2e7655c495dd12d2a4ad038ff878d4ca4b81fccaf82b714e07eae4402c"},
-    {file = "tomli-2.4.1-cp314-cp314t-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:1d8591993e228b0c930c4bb0db464bdad97b3289fb981255d6c9a41aedc84b2d"},
-    {file = "tomli-2.4.1-cp314-cp314t-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:734e20b57ba95624ecf1841e72b53f6e186355e216e5412de414e3c51e5e3c41"},
-    {file = "tomli-2.4.1-cp314-cp314t-musllinux_1_2_aarch64.whl", hash = "sha256:8a650c2dbafa08d42e51ba0b62740dae4ecb9338eefa093aa5c78ceb546fcd5c"},
-    {file = "tomli-2.4.1-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:504aa796fe0569bb43171066009ead363de03675276d2d121ac1a4572397870f"},
-    {file = "tomli-2.4.1-cp314-cp314t-win32.whl", hash = "sha256:b1d22e6e9387bf4739fbe23bfa80e93f6b0373a7f1b96c6227c32bef95a4d7a8"},
-    {file = "tomli-2.4.1-cp314-cp314t-win_amd64.whl", hash = "sha256:2c1c351919aca02858f740c6d33adea0c5deea37f9ecca1cc1ef9e884a619d26"},
-    {file = "tomli-2.4.1-cp314-cp314t-win_arm64.whl", hash = "sha256:eab21f45c7f66c13f2a9e0e1535309cee140182a9cdae1e041d02e47291e8396"},
-    {file = "tomli-2.4.1-py3-none-any.whl", hash = "sha256:0d85819802132122da43cb86656f8d1f8c6587d54ae7dcaf30e90533028b49fe"},
-    {file = "tomli-2.4.1.tar.gz", hash = "sha256:7c7e1a961a0b2f2472c1ac5b69affa0ae1132c39adcb67aba98568702b9cc23f"},
-]
 
 [[package]]
 name = "tomlkit"
@@ -4105,13 +4029,13 @@ python-discovery = ">=1"
 
 [[package]]
 name = "web3"
-version = "7.14.1"
+version = "7.13.0"
 description = "web3: A Python library for interacting with Ethereum"
 optional = false
 python-versions = "<4,>=3.8"
 files = [
-    {file = "web3-7.14.1-py3-none-any.whl", hash = "sha256:bec367ba44261f874662aed9b5e138aa7bb907700a30a7580b2264534e88ce12"},
-    {file = "web3-7.14.1.tar.gz", hash = "sha256:856dc8517f362aefa75fdc298d975894055565dc866f21279f27fe060b7fb2c3"},
+    {file = "web3-7.13.0-py3-none-any.whl", hash = "sha256:4da7e953300577b7dadbaf430e5fd4479b127b1ad4910234b230fdcb8a49f735"},
+    {file = "web3-7.13.0.tar.gz", hash = "sha256:281795e0f5d404c1374e1771f6710bb43e0c975f3141366eb1680763edfb4806"},
 ]
 
 [package.dependencies]
@@ -4131,10 +4055,10 @@ typing-extensions = ">=4.0.1"
 websockets = ">=10.0.0,<16.0.0"
 
 [package.extras]
-dev = ["build (>=0.9.0)", "bump_my_version (>=0.19.0)", "eth-tester[py-evm] (>=0.13.0b1,<0.14.0b1)", "flaky (>=3.7.0)", "hypothesis (>=3.31.2)", "ipython", "mypy (==1.10.0)", "pre-commit (>=3.4.0)", "py-geth (>=6.4.0)", "pytest (>=7.0.0)", "pytest-asyncio (>=0.18.1,<0.23)", "pytest-mock (>=1.10)", "pytest-xdist (>=2.4.0)", "setuptools (>=38.6.0)", "sphinx (>=6.0.0)", "sphinx-autobuild (>=2021.3.14)", "sphinx_rtd_theme (>=1.0.0)", "towncrier (>=24,<25)", "tox (>=4.0.0)", "tqdm (>4.32)", "twine (>=1.13)", "wheel"]
+dev = ["build (>=0.9.0)", "bump_my_version (>=0.19.0)", "eth-tester[py-evm] (>=0.13.0b1,<0.14.0b1)", "flaky (>=3.7.0)", "hypothesis (>=3.31.2)", "ipython", "mypy (==1.10.0)", "pre-commit (>=3.4.0)", "py-geth (>=5.1.0)", "pytest (>=7.0.0)", "pytest-asyncio (>=0.18.1,<0.23)", "pytest-mock (>=1.10)", "pytest-xdist (>=2.4.0)", "setuptools (>=38.6.0)", "sphinx (>=6.0.0)", "sphinx-autobuild (>=2021.3.14)", "sphinx_rtd_theme (>=1.0.0)", "towncrier (>=24,<25)", "tox (>=4.0.0)", "tqdm (>4.32)", "twine (>=1.13)", "wheel"]
 docs = ["sphinx (>=6.0.0)", "sphinx-autobuild (>=2021.3.14)", "sphinx_rtd_theme (>=1.0.0)", "towncrier (>=24,<25)"]
-test = ["eth-tester[py-evm] (>=0.13.0b1,<0.14.0b1)", "flaky (>=3.7.0)", "hypothesis (>=3.31.2)", "mypy (==1.10.0)", "pre-commit (>=3.4.0)", "py-geth (>=6.4.0)", "pytest (>=7.0.0)", "pytest-asyncio (>=0.18.1,<0.23)", "pytest-mock (>=1.10)", "pytest-xdist (>=2.4.0)", "tox (>=4.0.0)"]
-tester = ["eth-tester[py-evm] (>=0.13.0b1,<0.14.0b1)", "py-geth (>=6.4.0)"]
+test = ["eth-tester[py-evm] (>=0.13.0b1,<0.14.0b1)", "flaky (>=3.7.0)", "hypothesis (>=3.31.2)", "mypy (==1.10.0)", "pre-commit (>=3.4.0)", "py-geth (>=5.1.0)", "pytest (>=7.0.0)", "pytest-asyncio (>=0.18.1,<0.23)", "pytest-mock (>=1.10)", "pytest-xdist (>=2.4.0)", "tox (>=4.0.0)"]
+tester = ["eth-tester[py-evm] (>=0.13.0b1,<0.14.0b1)", "py-geth (>=5.1.0)"]
 
 [[package]]
 name = "websockets"
@@ -4378,4 +4302,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12,<3.13"
-content-hash = "84cd9fe55af849b45cf94bd8e64e3ea95eca8487956eb270930b96f22e1f7b06"
+content-hash = "115da908a8be6e0832d817651249ad904605daba64139b96febafcda23dd046f"
