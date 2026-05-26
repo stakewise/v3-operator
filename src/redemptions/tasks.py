@@ -8,18 +8,79 @@ from sw_utils.typings import ChainHead, ProtocolConfig
 from web3 import Web3
 from web3.types import Wei
 
-from src.common.clients import ipfs_fetch_client
-from src.common.contracts import multicall_contract, os_token_redeemer_contract
+from src.common.clients import execution_client, ipfs_fetch_client
+from src.common.contracts import os_token_redeemer_contract
 from src.common.protocol_config import get_protocol_config
+from src.common.typings import Singleton
 from src.config.settings import settings
 from src.redemptions.os_token_converter import create_os_token_converter
 from src.redemptions.typings import OsTokenPosition
 
 logger = logging.getLogger(__name__)
 
-
 batch_size = 20
 ZERO_MERKLE_ROOT = HexStr('0x' + '0' * 64)
+
+
+class ProcessedSharesCache(metaclass=Singleton):
+    def __init__(self) -> None:
+        self.nonce: int | None = None
+        self.checkpoint_block: BlockNumber | None = None
+        self.data: dict[HexStr, Wei] = {}
+
+    async def is_valid_on(self, nonce: int, block_number: BlockNumber) -> bool:
+        if self.nonce != nonce:
+            return False
+        if self.checkpoint_block == block_number:
+            return True
+        if self.checkpoint_block is not None and self.checkpoint_block > block_number:
+            # Probably logic error if cache checkpoint block is in the future compared
+            # to the given block number
+            return False
+        from_block = (
+            BlockNumber(self.checkpoint_block + 1)
+            if self.checkpoint_block is not None
+            else settings.network_config.OS_TOKEN_REDEEMER_GENESIS_BLOCK
+        )
+        events = await os_token_redeemer_contract.get_os_token_positions_redeemed_events(
+            from_block=from_block, to_block=block_number
+        )
+        return not events
+
+
+async def update_processed_shares_cache() -> None:
+    """Validate and update the processed shares cache to the current finalized block."""
+    finalized_block = await execution_client.eth.get_block('finalized')
+    block_number = BlockNumber(finalized_block['number'])
+
+    cache = ProcessedSharesCache()
+    if cache.checkpoint_block == block_number:
+        return
+
+    nonce = await os_token_redeemer_contract.nonce(block_number)
+    if nonce == 0:
+        cache.nonce = nonce
+        cache.checkpoint_block = block_number
+        return
+
+    if not await cache.is_valid_on(nonce, block_number):
+        cache.nonce = nonce
+        cache.data.clear()
+        positions = await fetch_positions_from_ipfs(block_number=block_number)
+        for i in range(0, len(positions), batch_size):
+            batch = positions[i : i + batch_size]
+            calls = [
+                os_token_redeemer_contract.encode_abi(
+                    'leafToProcessedShares', [p.leaf_hash(nonce - 1)]
+                )
+                for p in batch
+            ]
+            rpc_results = await os_token_redeemer_contract.contract.functions.multicall(calls).call(
+                block_identifier=block_number
+            )
+            for position, res in zip(batch, rpc_results):
+                cache.data[Web3.to_hex(position.leaf_hash(nonce - 1))] = Wei(Web3.to_int(res))
+    cache.checkpoint_block = block_number
 
 
 async def get_redemption_assets(chain_head: ChainHead) -> Wei:
@@ -33,17 +94,14 @@ async def get_redemption_assets(chain_head: ChainHead) -> Wei:
         return Wei(0)
 
     protocol_config = await get_protocol_config()
-
-    # The contract increments the nonce at the end of setRedeemablePositions,
-    # so use the previous nonce for leaf hash computation.
     vault_to_redemption_assets = await get_vault_to_redemption_assets_direct(
-        chain_head=chain_head, tree_nonce=nonce - 1, protocol_config=protocol_config
+        chain_head=chain_head, nonce=nonce, protocol_config=protocol_config
     )
     return vault_to_redemption_assets[settings.vault]
 
 
 async def get_vault_to_redemption_assets_direct(
-    chain_head: ChainHead, tree_nonce: int, protocol_config: ProtocolConfig
+    chain_head: ChainHead, nonce: int, protocol_config: ProtocolConfig
 ) -> defaultdict[ChecksumAddress, Wei]:
     """
     Get redemption assets per vault, based only on assets directly assigned
@@ -67,7 +125,7 @@ async def get_vault_to_redemption_assets_direct(
 
     vault_to_redemption_assets = await aggregate_redemption_assets_by_vaults(
         total_redemption_assets,
-        tree_nonce=tree_nonce,
+        nonce=nonce,
         os_token_converter=os_token_converter,
         block_number=chain_head.block_number,
     )
@@ -76,9 +134,9 @@ async def get_vault_to_redemption_assets_direct(
 
 async def aggregate_redemption_assets_by_vaults(
     total_redemption_assets: Wei,
-    tree_nonce: int,
+    nonce: int,
     os_token_converter: OsTokenConverter,
-    block_number: BlockNumber | None = None,
+    block_number: BlockNumber,
 ) -> defaultdict[ChecksumAddress, Wei]:
     """
     Iterate through redeemable positions until the total redemption assets are exhausted.
@@ -95,7 +153,7 @@ async def aggregate_redemption_assets_by_vaults(
     positions = await fetch_positions_from_ipfs(block_number=block_number)
     cut_off_positions = await cut_off_redeemable_positions(
         positions,
-        nonce=tree_nonce,
+        nonce=nonce,
         total_redemption_shares=total_redemption_shares,
         block_number=block_number,
     )
@@ -116,7 +174,7 @@ async def aggregate_redemption_assets_by_vaults(
 
 
 async def fetch_positions_from_ipfs(
-    block_number: BlockNumber | None = None,
+    block_number: BlockNumber,
 ) -> list[OsTokenPosition]:
     redeemable_positions = await os_token_redeemer_contract.redeemable_positions(
         block_number=block_number
@@ -147,7 +205,7 @@ async def cut_off_redeemable_positions(
     all_positions: list[OsTokenPosition],
     nonce: int,
     total_redemption_shares: Wei,
-    block_number: BlockNumber | None = None,
+    block_number: BlockNumber,
 ) -> list[OsTokenPosition]:
     """
     Fill positions with their unprocessed shares until the cumulative total reaches
@@ -161,7 +219,7 @@ async def cut_off_redeemable_positions(
 
     for i in range(0, len(all_positions), batch_size):
         batch = all_positions[i : i + batch_size]
-        processed_shares_batch = await get_processed_shares_batch(
+        processed_shares_batch = await cached_get_processed_shares_batch(
             os_token_positions_batch=batch,
             nonce=nonce,
             block_number=block_number,
@@ -188,20 +246,29 @@ async def cut_off_redeemable_positions(
     return redeemable
 
 
-async def get_processed_shares_batch(
+async def cached_get_processed_shares_batch(
     os_token_positions_batch: list[OsTokenPosition],
     nonce: int,
-    block_number: BlockNumber | None = None,
+    block_number: BlockNumber,
 ) -> list[Wei]:
-    calls: list[tuple[ChecksumAddress, HexStr]] = []
+    cache = ProcessedSharesCache()
 
-    for os_token_position in os_token_positions_batch:
-        leaf_hash = os_token_position.leaf_hash(nonce)
-        call_data = os_token_redeemer_contract.encode_abi(
-            fn_name='leafToProcessedShares',
-            args=[leaf_hash],
+    if cache.is_valid_on(nonce, block_number):
+        cached = [
+            cache.data.get(Web3.to_hex(position.leaf_hash(nonce - 1)))
+            for position in os_token_positions_batch
+        ]
+        if all(v is not None for v in cached):
+            return cast(list[Wei], cached)
+
+    calls = [
+        os_token_redeemer_contract.encode_abi(
+            'leafToProcessedShares', [position.leaf_hash(nonce - 1)]
         )
-        calls.append((os_token_redeemer_contract.contract_address, call_data))
+        for position in os_token_positions_batch
+    ]
+    rpc_results = await os_token_redeemer_contract.contract.functions.multicall(calls).call(
+        block_identifier=block_number
+    )
 
-    _, results = await multicall_contract.aggregate(calls, block_number=block_number)
-    return [Wei(Web3.to_int(res)) for res in results]
+    return [Wei(Web3.to_int(res)) for res in rpc_results]

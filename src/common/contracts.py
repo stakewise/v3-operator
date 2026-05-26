@@ -570,6 +570,15 @@ class OsTokenRedeemerContract(ContractWrapper):
             block_identifier=block_number
         )
 
+    async def get_os_token_positions_redeemed_events(
+        self, from_block: BlockNumber, to_block: BlockNumber
+    ) -> list[EventData]:
+        return await self._get_events(
+            event=self.contract.events.OsTokenPositionsRedeemed,  # type: ignore
+            from_block=from_block,
+            to_block=to_block,
+        )
+
     async def process_exit_queue(self) -> HexStr:
         tx_function = self.contract.functions.processExitQueue()
         tx_hash = await transaction_gas_wrapper(tx_function)
