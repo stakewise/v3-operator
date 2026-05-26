@@ -16,8 +16,6 @@ from src.commands.internal.process_redeemer import (
     _process_exit_queue,
     _startup_check,
     _submit_redeem_position,
-    calculate_redeemable_shares,
-    fetch_positions_from_ipfs,
     process,
     redeem_positions,
     update_vaults_state,
@@ -81,7 +79,6 @@ class TestRedeemPositions:
             await redeem_positions(
                 all_positions=[],
                 os_token_positions=[],
-                queued_shares=10000,
                 converter=make_converter(),
                 tree_nonce=5,
             )
@@ -94,7 +91,6 @@ class TestRedeemPositions:
             await redeem_positions(
                 all_positions=[position],
                 os_token_positions=[position],
-                queued_shares=10000,
                 converter=make_converter(),
                 tree_nonce=5,
             )
@@ -109,7 +105,6 @@ class TestRedeemPositions:
             await redeem_positions(
                 all_positions=[position],
                 os_token_positions=[position],
-                queued_shares=10000,
                 converter=make_converter(100, 100),
                 tree_nonce=5,
             )
@@ -124,27 +119,11 @@ class TestRedeemPositions:
             await redeem_positions(
                 all_positions=[position],
                 os_token_positions=[position],
-                queued_shares=10000,
                 converter=make_converter(100, 100),
                 tree_nonce=5,
             )
 
         mocks['submit_mock'].assert_not_called()
-
-    async def test_queued_shares_limits_redemption(self) -> None:
-        position = make_position(unprocessed_shares=500)
-
-        with _mock_redeem_positions(withdrawable=Wei(10000)) as mocks:
-            await redeem_positions(
-                all_positions=[position],
-                os_token_positions=[position],
-                queued_shares=200,
-                converter=make_converter(),
-                tree_nonce=5,
-            )
-
-        assert mocks['submit_mock'].await_count == 1
-        assert _submitted_position(mocks).shares_to_redeem == Wei(200)
 
     async def test_multiple_positions_share_vault_cache(self) -> None:
         """Withdrawable is fetched once per vault, decremented after each redemption."""
@@ -156,7 +135,6 @@ class TestRedeemPositions:
             await redeem_positions(
                 all_positions=[pos1, pos2],
                 os_token_positions=[pos1, pos2],
-                queued_shares=10000,
                 converter=make_converter(100, 100),
                 tree_nonce=5,
             )
@@ -171,23 +149,6 @@ class TestRedeemPositions:
         assert first_position.owner == OWNER_1 and first_position.shares_to_redeem == Wei(500)
         assert second_position.owner == OWNER_2 and second_position.shares_to_redeem == Wei(200)
 
-    async def test_stops_across_vaults_when_queued_shares_exhausted(self) -> None:
-        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, unprocessed_shares=500)
-        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, unprocessed_shares=800)
-
-        with _mock_redeem_positions(withdrawable=Wei(10000)) as mocks:
-            await redeem_positions(
-                all_positions=[pos1, pos2],
-                os_token_positions=[pos1, pos2],
-                queued_shares=500,
-                converter=make_converter(100, 100),
-                tree_nonce=5,
-            )
-
-        # Only the first position's vault is redeemed
-        assert mocks['submit_mock'].await_count == 1
-        assert _submitted_position(mocks).vault == VAULT_1
-
     async def test_preserves_original_leaf_shares_in_call(self) -> None:
         pos = make_position(leaf_shares=1000, unprocessed_shares=500)
 
@@ -195,15 +156,13 @@ class TestRedeemPositions:
             await redeem_positions(
                 all_positions=[pos],
                 os_token_positions=[pos],
-                queued_shares=200,
                 converter=make_converter(),
                 tree_nonce=5,
             )
 
         submitted = _submitted_position(mocks)
-        # leafShares preserved, sharesToRedeem capped by queued_shares
         assert submitted.leaf_shares == Wei(1000)
-        assert submitted.shares_to_redeem == Wei(200)
+        assert submitted.shares_to_redeem == Wei(500)
 
     async def test_meta_vault_position_raises(self) -> None:
         """A meta-vault position is unexpected and must surface as a RuntimeError."""
@@ -215,7 +174,6 @@ class TestRedeemPositions:
                 await redeem_positions(
                     all_positions=[pos],
                     os_token_positions=[pos],
-                    queued_shares=10000,
                     converter=make_converter(100, 100),
                     tree_nonce=5,
                 )
@@ -235,7 +193,6 @@ class TestRedeemPositions:
             await redeem_positions(
                 all_positions=[pos1, pos2],
                 os_token_positions=[pos1, pos2],
-                queued_shares=10000,
                 converter=make_converter(100, 100),
                 tree_nonce=5,
             )
@@ -295,72 +252,6 @@ class TestSubmitRedeemPosition:
                     all_positions=[position],
                     tree_nonce=5,
                 )
-
-
-class TestFetchPositionsFromIpfs:
-    async def test_empty_positions(self) -> None:
-        async def empty_gen(block_number: BlockNumber | None = None):  # type: ignore[misc]
-            return
-            yield  # noqa: unreachable
-
-        with patch(f'{MODULE}.iter_os_token_positions', side_effect=empty_gen):
-            result = await fetch_positions_from_ipfs(block_number=BlockNumber(100))
-        assert result == []
-
-    async def test_returns_all_positions(self) -> None:
-        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, leaf_shares=1000)
-        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, leaf_shares=2000)
-
-        async def gen(block_number: BlockNumber | None = None):  # type: ignore[misc]
-            yield pos1
-            yield pos2
-
-        with patch(f'{MODULE}.iter_os_token_positions', side_effect=gen):
-            result = await fetch_positions_from_ipfs(block_number=BlockNumber(100))
-        assert len(result) == 2
-        assert result[0] is pos1
-        assert result[1] is pos2
-
-
-class TestCalculateRedeemableShares:
-    async def test_all_shares_processed(self) -> None:
-        pos = make_position(leaf_shares=1000)
-        with patch(
-            f'{MODULE}.get_processed_shares_batch',
-            new=AsyncMock(return_value=[Wei(1000)]),
-        ):
-            result = await calculate_redeemable_shares(
-                [pos], nonce=5, block_number=BlockNumber(100)
-            )
-        assert result == []
-
-    async def test_partial_processed_shares(self) -> None:
-        pos = make_position(leaf_shares=1000)
-        with patch(
-            f'{MODULE}.get_processed_shares_batch',
-            new=AsyncMock(return_value=[Wei(300)]),
-        ):
-            result = await calculate_redeemable_shares(
-                [pos], nonce=5, block_number=BlockNumber(100)
-            )
-        assert len(result) == 1
-        assert result[0].unprocessed_shares == Wei(700)
-        assert result[0].leaf_shares == Wei(1000)
-
-    async def test_multiple_positions_mixed(self) -> None:
-        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, leaf_shares=1000)
-        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, leaf_shares=2000)
-
-        with patch(
-            f'{MODULE}.get_processed_shares_batch',
-            new=AsyncMock(return_value=[Wei(1000), Wei(500)]),
-        ):
-            result = await calculate_redeemable_shares(
-                [pos1, pos2], nonce=5, block_number=BlockNumber(100)
-            )
-        assert len(result) == 1
-        assert result[0].owner == OWNER_2
-        assert result[0].unprocessed_shares == Wei(1500)
 
 
 class TestUpdateVaultsState:
@@ -502,11 +393,11 @@ class TestProcess:
         mocks['mock_redeem'].assert_not_called()
 
     async def test_no_eligible_positions(self) -> None:
-        """IPFS returns positions but calculate_redeemable_shares filters them all out."""
+        """IPFS returns positions but cut_off_redeemable_positions filters them all out."""
         pos = make_position(leaf_shares=1000)
         with (
             _mock_process(positions=[pos]) as mocks,
-            patch(f'{MODULE}.calculate_redeemable_shares', new=AsyncMock(return_value=[])),
+            patch(f'{MODULE}.cut_off_redeemable_positions', new=AsyncMock(return_value=[])),
         ):
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
             mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
@@ -537,8 +428,6 @@ class TestProcess:
         redeem_call = mocks['mock_redeem'].await_args
         # tree_nonce must use prev_nonce = nonce - 1 (off-by-one is critical)
         assert redeem_call.kwargs['tree_nonce'] == 4
-        # queued_shares is forwarded as raw shares, not converted to assets
-        assert redeem_call.kwargs['queued_shares'] == 1000
 
 
 # --- Helpers ---
@@ -693,7 +582,7 @@ def _mock_process(
             new=AsyncMock(return_value=positions),
         ),
         patch(
-            f'{MODULE}.calculate_redeemable_shares',
+            f'{MODULE}.cut_off_redeemable_positions',
             new=AsyncMock(return_value=positions),
         ),
         patch(

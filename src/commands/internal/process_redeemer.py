@@ -34,9 +34,8 @@ from src.redemptions.os_token_converter import (
     create_os_token_converter,
 )
 from src.redemptions.tasks import (
-    batch_size,
-    get_processed_shares_batch,
-    iter_os_token_positions,
+    cut_off_redeemable_positions,
+    fetch_positions_from_ipfs,
 )
 from src.redemptions.typings import OsTokenPosition
 from src.validators.execution import get_withdrawable_assets
@@ -233,7 +232,12 @@ async def _redeem_os_token_positions(
         logger.info('No positions found. Skipping to next interval.')
         return
 
-    os_token_positions = await calculate_redeemable_shares(all_positions, prev_nonce, block_number)
+    os_token_positions = await cut_off_redeemable_positions(
+        all_positions,
+        nonce=prev_nonce,
+        total_redemption_shares=Wei(queued_shares),
+        block_number=block_number,
+    )
     if not os_token_positions:
         logger.info('No redeemable positions found. Skipping to next interval.')
         return
@@ -246,48 +250,9 @@ async def _redeem_os_token_positions(
     await redeem_positions(
         all_positions=all_positions,
         os_token_positions=os_token_positions,
-        queued_shares=queued_shares,
         converter=os_token_converter,
         tree_nonce=prev_nonce,
     )
-
-
-async def fetch_positions_from_ipfs(block_number: BlockNumber) -> list[OsTokenPosition]:
-    positions: list[OsTokenPosition] = []
-    async for position in iter_os_token_positions(block_number=block_number):
-        positions.append(position)
-    return positions
-
-
-async def calculate_redeemable_shares(
-    all_positions: list[OsTokenPosition],
-    nonce: int,
-    block_number: BlockNumber,
-) -> list[OsTokenPosition]:
-    """Query processed shares and return positions with available_shares > 0."""
-    redeemable: list[OsTokenPosition] = []
-
-    for i in range(0, len(all_positions), batch_size):
-        batch = all_positions[i : i + batch_size]
-        processed_shares_batch = await get_processed_shares_batch(
-            os_token_positions_batch=batch,
-            nonce=nonce,
-            block_number=block_number,
-        )
-        for position, processed_shares in zip(batch, processed_shares_batch):
-            unprocessed_shares = position.leaf_shares - processed_shares
-            if unprocessed_shares <= 0:
-                continue
-            redeemable.append(
-                OsTokenPosition(
-                    owner=position.owner,
-                    vault=position.vault,
-                    leaf_shares=position.leaf_shares,
-                    unprocessed_shares=Wei(unprocessed_shares),
-                )
-            )
-
-    return redeemable
 
 
 async def update_vaults_state(
@@ -336,23 +301,18 @@ async def update_vaults_state(
 async def redeem_positions(
     all_positions: list[OsTokenPosition],
     os_token_positions: list[OsTokenPosition],
-    queued_shares: int,
     converter: OsTokenConverter,
     tree_nonce: int,
 ) -> None:
-    """Redeem positions one by one until queued shares are exhausted.
+    """Redeem the pre-capped positions one by one.
 
     Meta-vault positions are skipped entirely. Aborts the round if a single
     redemption tx fails.
     """
-    remaining_shares = queued_shares
     vault_to_withdrawable: dict[ChecksumAddress, Wei] = {}
 
     for position in os_token_positions:
-        if remaining_shares <= 0:
-            break
-
-        shares_to_redeem = Wei(min(position.unprocessed_shares, remaining_shares))
+        shares_to_redeem = Wei(position.unprocessed_shares)
         assets_to_redeem = converter.to_assets(shares_to_redeem)
 
         if await is_meta_vault(position.vault):
@@ -386,7 +346,6 @@ async def redeem_positions(
         await wait_for_execution_endpoints_synced(receipt_block)
 
         vault_to_withdrawable[position.vault] = Wei(withdrawable - assets_to_redeem)
-        remaining_shares -= shares_to_redeem
 
 
 async def _process_exit_queue(block_number: BlockNumber) -> None:

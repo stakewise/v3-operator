@@ -3,12 +3,13 @@ from itertools import batched
 from typing import Sequence, cast
 
 from eth_typing import HexStr
-from sw_utils import IpfsFetchClient, convert_to_mgno
+from sw_utils import ChainHead, IpfsFetchClient, convert_to_mgno
 from sw_utils.networks import GNO_NETWORKS
 from web3 import Web3
-from web3.types import BlockNumber, Gwei
+from web3.types import BlockNumber, Gwei, Wei
 
 from src.common.clients import execution_client
+from src.common.consensus import get_chain_latest_head
 from src.common.contracts import VaultContract, validators_registry_contract
 from src.common.execution import check_gas_price
 from src.common.harvest import get_harvest_params
@@ -20,6 +21,7 @@ from src.config.settings import (
     VALIDATORS_FUNDING_BATCH_SIZE,
     settings,
 )
+from src.redemptions.tasks import get_redemption_assets
 from src.validators.consensus import fetch_compounding_validators_balances
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import EmptyRelayerResponseException, FundingException
@@ -52,7 +54,8 @@ class ValidatorRegistrationSubtask:
             )
         harvest_params = await get_harvest_params(settings.vault)
 
-        vault_assets = await get_vault_assets(harvest_params=harvest_params)
+        chain_head = await get_chain_latest_head()
+        vault_assets = await get_vault_assets(harvest_params=harvest_params, chain_head=chain_head)
         vault_assets = Gwei(max(0, vault_assets - settings.vault_min_balance_gwei))
 
         if vault_assets < settings.min_deposit_amount_gwei:
@@ -261,8 +264,16 @@ async def register_new_validators(
     return tx_hash
 
 
-async def get_vault_assets(harvest_params: HarvestParams | None) -> Gwei:
-    vault_assets = await get_withdrawable_assets(settings.vault, harvest_params=harvest_params)
+async def get_vault_assets(harvest_params: HarvestParams | None, chain_head: ChainHead) -> Gwei:
+    vault_assets = await get_withdrawable_assets(
+        settings.vault, harvest_params=harvest_params, block_number=chain_head.block_number
+    )
+
+    # Reserve operator's vault redemption assets so that withdrawable assets are spent
+    # on redemptions first, then on validator registrations / fundings.
+    redemption_assets = await get_redemption_assets(chain_head)
+    vault_assets = Wei(max(0, vault_assets - redemption_assets))
+
     if settings.network in GNO_NETWORKS:
         # apply GNO -> mGNO exchange rate
         vault_assets = convert_to_mgno(vault_assets)

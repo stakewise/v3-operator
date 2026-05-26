@@ -2,10 +2,12 @@ from contextlib import contextmanager
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from eth_typing import HexStr
+from eth_typing import BlockNumber, HexStr
 from sw_utils import ValidatorStatus
 from sw_utils.tests import faker
-from web3.types import Gwei
+from sw_utils.typings import ChainHead
+from web3 import Web3
+from web3.types import Gwei, Wei
 
 from src.common.tests.utils import ether_to_gwei
 from src.common.typings import ValidatorType
@@ -16,6 +18,7 @@ from src.validators.tasks import (
     ValidatorRegistrationSubtask,
     _get_deposits_amounts,
     _get_funding_amounts,
+    get_vault_assets,
 )
 from src.validators.typings import VaultValidator
 
@@ -581,3 +584,69 @@ class TestProcessFunding:
         assert batch_2 == {pub_key_1: ether_to_gwei(32)}
         # 100 - 30 - 31 - 32 = 7
         assert result == ether_to_gwei(7)
+
+
+def _make_chain_head() -> ChainHead:
+    return ChainHead(epoch=1, slot=32, block_number=BlockNumber(100), execution_ts=0)
+
+
+@pytest.mark.usefixtures('fake_settings')
+class TestGetVaultAssets:
+    async def test_no_redemption_assets(self):
+        withdrawable = Web3.to_wei(100, 'ether')
+        with self.mock_assets(withdrawable_assets=Wei(withdrawable)):
+            result = await get_vault_assets(harvest_params=None, chain_head=_make_chain_head())
+        assert result == ether_to_gwei(100)
+
+    async def test_redemption_assets_reduce_vault_assets(self):
+        withdrawable = Web3.to_wei(100, 'ether')
+        redemption = Web3.to_wei(30, 'ether')
+        with self.mock_assets(
+            withdrawable_assets=Wei(withdrawable), redemption_assets=Wei(redemption)
+        ):
+            result = await get_vault_assets(harvest_params=None, chain_head=_make_chain_head())
+        assert result == ether_to_gwei(70)
+
+    async def test_over_reservation_clamped_to_zero(self):
+        withdrawable = Web3.to_wei(10, 'ether')
+        redemption = Web3.to_wei(50, 'ether')
+        with self.mock_assets(
+            withdrawable_assets=Wei(withdrawable), redemption_assets=Wei(redemption)
+        ):
+            result = await get_vault_assets(harvest_params=None, chain_head=_make_chain_head())
+        assert result == Gwei(0)
+
+    async def test_gnosis_conversion_applied_after_subtraction(self):
+        withdrawable = Web3.to_wei(100, 'ether')
+        redemption = Web3.to_wei(40, 'ether')
+        # convert_to_mgno doubles the value (mock a 2x rate for simplicity)
+        with (
+            self.mock_assets(
+                withdrawable_assets=Wei(withdrawable), redemption_assets=Wei(redemption)
+            ),
+            patch('src.validators.tasks.settings') as mock_settings,
+            patch(
+                'src.validators.tasks.convert_to_mgno',
+                side_effect=lambda x: Wei(x * 2),
+            ),
+        ):
+            mock_settings.network = 'gnosis'
+            mock_settings.vault = settings.vault
+            result = await get_vault_assets(harvest_params=None, chain_head=_make_chain_head())
+        # 100 - 40 = 60 ETH → converted → 120 ETH → in Gwei
+        assert result == ether_to_gwei(120)
+
+    @staticmethod
+    @contextmanager
+    def mock_assets(withdrawable_assets: Wei, redemption_assets: Wei = Wei(0)):
+        with (
+            patch(
+                'src.validators.tasks.get_withdrawable_assets',
+                new=AsyncMock(return_value=withdrawable_assets),
+            ),
+            patch(
+                'src.validators.tasks.get_redemption_assets',
+                new=AsyncMock(return_value=redemption_assets),
+            ),
+        ):
+            yield
