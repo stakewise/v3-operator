@@ -3,6 +3,7 @@ from collections import defaultdict
 from collections.abc import AsyncIterator
 from typing import cast
 
+import aioitertools
 from eth_typing import BlockNumber, ChecksumAddress, HexStr
 from sw_utils import OsTokenConverter
 from sw_utils.typings import ChainHead, ProtocolConfig
@@ -68,9 +69,9 @@ async def update_processed_shares_cache() -> None:
         cache.nonce = nonce
         cache.data.clear()
         positions = await fetch_positions_from_ipfs(block_number=block_number)
-        position_iter = iter(positions)
-        async for processed_shares in iter_processed_shares(positions, nonce, block_number):
-            position = next(position_iter)
+        async for position, processed_shares in aioitertools.zip(
+            positions, iter_processed_shares(positions, nonce, block_number)
+        ):
             cache.data[Web3.to_hex(position.leaf_hash(nonce - 1))] = processed_shares
     cache.checkpoint_block = block_number
 
@@ -208,10 +209,10 @@ async def cut_off_redeemable_positions(
     """
     redeemable: list[OsTokenPosition] = []
     remaining_shares = total_redemption_shares
-    position_iter = iter(all_positions)
 
-    async for processed_shares in cached_iter_processed_shares(all_positions, nonce, block_number):
-        position = next(position_iter)
+    async for position, processed_shares in aioitertools.zip(
+        all_positions, cached_iter_processed_shares(all_positions, nonce, block_number)
+    ):
         unprocessed_shares = position.leaf_shares - processed_shares
         # Skip fully processed positions; tolerate 1 wei rounding error.
         if unprocessed_shares <= 1:
@@ -242,7 +243,7 @@ async def cached_iter_processed_shares(
     if await cache.is_valid_on(nonce, block_number):
         for position in positions:
             leaf_hash = Web3.to_hex(position.leaf_hash(nonce - 1))
-            yield cast(Wei, cache.data[leaf_hash])
+            yield cache.data[leaf_hash]
         return
     async for shares in iter_processed_shares(positions, nonce, block_number):
         yield shares
@@ -253,6 +254,8 @@ async def iter_processed_shares(
     nonce: int,
     block_number: BlockNumber,
 ) -> AsyncIterator[Wei]:
+    """Fetch processed shares via batched multicalls, yielding one value per position.
+    The generator flattens batch results so callers see a flat stream aligned with positions."""
     for i in range(0, len(positions), batch_size):
         batch = positions[i : i + batch_size]
         calls = [
