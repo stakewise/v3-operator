@@ -1,5 +1,6 @@
 import logging
 from collections import defaultdict
+from collections.abc import AsyncIterator
 from typing import cast
 
 from eth_typing import BlockNumber, ChecksumAddress, HexStr
@@ -67,19 +68,10 @@ async def update_processed_shares_cache() -> None:
         cache.nonce = nonce
         cache.data.clear()
         positions = await fetch_positions_from_ipfs(block_number=block_number)
-        for i in range(0, len(positions), batch_size):
-            batch = positions[i : i + batch_size]
-            calls = [
-                os_token_redeemer_contract.encode_abi(
-                    'leafToProcessedShares', [p.leaf_hash(nonce - 1)]
-                )
-                for p in batch
-            ]
-            rpc_results = await os_token_redeemer_contract.contract.functions.multicall(calls).call(
-                block_identifier=block_number
-            )
-            for position, res in zip(batch, rpc_results):
-                cache.data[Web3.to_hex(position.leaf_hash(nonce - 1))] = Wei(Web3.to_int(res))
+        position_iter = iter(positions)
+        async for processed_shares in iter_processed_shares(positions, nonce, block_number):
+            position = next(position_iter)
+            cache.data[Web3.to_hex(position.leaf_hash(nonce - 1))] = processed_shares
     cache.checkpoint_block = block_number
 
 
@@ -216,59 +208,59 @@ async def cut_off_redeemable_positions(
     """
     redeemable: list[OsTokenPosition] = []
     remaining_shares = total_redemption_shares
+    position_iter = iter(all_positions)
 
-    for i in range(0, len(all_positions), batch_size):
-        batch = all_positions[i : i + batch_size]
-        processed_shares_batch = await cached_get_processed_shares_batch(
-            os_token_positions_batch=batch,
-            nonce=nonce,
-            block_number=block_number,
-        )
-        for position, processed_shares in zip(batch, processed_shares_batch):
-            unprocessed_shares = position.leaf_shares - processed_shares
-            # Skip fully processed positions; tolerate 1 wei rounding error.
-            if unprocessed_shares <= 1:
-                continue
+    async for processed_shares in cached_iter_processed_shares(all_positions, nonce, block_number):
+        position = next(position_iter)
+        unprocessed_shares = position.leaf_shares - processed_shares
+        # Skip fully processed positions; tolerate 1 wei rounding error.
+        if unprocessed_shares <= 1:
+            continue
 
-            unprocessed_shares = min(unprocessed_shares, remaining_shares)
-            redeemable.append(
-                OsTokenPosition(
-                    owner=position.owner,
-                    vault=position.vault,
-                    leaf_shares=position.leaf_shares,
-                    unprocessed_shares=Wei(unprocessed_shares),
-                )
+        unprocessed_shares = min(unprocessed_shares, remaining_shares)
+        redeemable.append(
+            OsTokenPosition(
+                owner=position.owner,
+                vault=position.vault,
+                leaf_shares=position.leaf_shares,
+                unprocessed_shares=Wei(unprocessed_shares),
             )
-            remaining_shares -= unprocessed_shares  # type: ignore
-            if remaining_shares <= 0:
-                return redeemable
+        )
+        remaining_shares -= unprocessed_shares  # type: ignore
+        if remaining_shares <= 0:
+            return redeemable
 
     return redeemable
 
 
-async def cached_get_processed_shares_batch(
-    os_token_positions_batch: list[OsTokenPosition],
+async def cached_iter_processed_shares(
+    positions: list[OsTokenPosition],
     nonce: int,
     block_number: BlockNumber,
-) -> list[Wei]:
+) -> AsyncIterator[Wei]:
     cache = ProcessedSharesCache()
+    if await cache.is_valid_on(nonce, block_number):
+        for position in positions:
+            leaf_hash = Web3.to_hex(position.leaf_hash(nonce - 1))
+            yield cast(Wei, cache.data[leaf_hash])
+        return
+    async for shares in iter_processed_shares(positions, nonce, block_number):
+        yield shares
 
-    if cache.is_valid_on(nonce, block_number):
-        cached = [
-            cache.data.get(Web3.to_hex(position.leaf_hash(nonce - 1)))
-            for position in os_token_positions_batch
+
+async def iter_processed_shares(
+    positions: list[OsTokenPosition],
+    nonce: int,
+    block_number: BlockNumber,
+) -> AsyncIterator[Wei]:
+    for i in range(0, len(positions), batch_size):
+        batch = positions[i : i + batch_size]
+        calls = [
+            os_token_redeemer_contract.encode_abi('leafToProcessedShares', [p.leaf_hash(nonce - 1)])
+            for p in batch
         ]
-        if all(v is not None for v in cached):
-            return cast(list[Wei], cached)
-
-    calls = [
-        os_token_redeemer_contract.encode_abi(
-            'leafToProcessedShares', [position.leaf_hash(nonce - 1)]
+        rpc_results = await os_token_redeemer_contract.contract.functions.multicall(calls).call(
+            block_identifier=block_number
         )
-        for position in os_token_positions_batch
-    ]
-    rpc_results = await os_token_redeemer_contract.contract.functions.multicall(calls).call(
-        block_identifier=block_number
-    )
-
-    return [Wei(Web3.to_int(res)) for res in rpc_results]
+        for res in rpc_results:
+            yield Wei(Web3.to_int(res))
