@@ -62,18 +62,20 @@ async def _update_processed_shares_cache() -> None:
     nonce = await os_token_redeemer_contract.nonce(block_number)
     if nonce == 0:
         cache.nonce = nonce
+        cache.data = {}
         cache.checkpoint_block = block_number
         return
 
     if not await cache.is_valid_on(nonce, block_number):
-        cache.nonce = nonce
-        cache.data.clear()
         positions = await fetch_positions_from_ipfs(block_number=block_number)
+        data: dict[HexStr, Wei] = {}
         async for position, processed_shares in aioitertools.zip(
             positions, iter_processed_shares(positions, nonce, block_number)
         ):
             leaf_hash = Web3.to_hex(position.leaf_hash(nonce - 1))
-            cache.data[leaf_hash] = processed_shares
+            data[leaf_hash] = processed_shares
+        cache.nonce = nonce
+        cache.data = data
     cache.checkpoint_block = block_number
 
 
