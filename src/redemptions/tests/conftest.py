@@ -1,7 +1,7 @@
 import pytest
 
 from src.common.typings import Singleton
-from src.redemptions.cache import ProcessedSharesCache
+from src.redemptions.fetch_positions import ProcessedSharesCache
 
 
 @pytest.fixture(autouse=True)

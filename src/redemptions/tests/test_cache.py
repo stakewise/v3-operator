@@ -5,7 +5,10 @@ from web3 import Web3
 from web3.types import Wei
 
 from src.config.settings import settings
-from src.redemptions.cache import ProcessedSharesCache, update_processed_shares_cache
+from src.redemptions.fetch_positions import (
+    ProcessedSharesCache,
+    update_processed_shares_cache,
+)
 from src.redemptions.tests.factories import make_position
 
 
@@ -32,7 +35,7 @@ class TestProcessedSharesCacheIsValidOn:
         cache.nonce = 5
         cache.checkpoint_block = BlockNumber(90)
         with patch(
-            'src.redemptions.cache.os_token_redeemer_contract'
+            'src.redemptions.fetch_positions.os_token_redeemer_contract'
             '.get_os_token_positions_redeemed_events',
             new=AsyncMock(return_value=[]),
         ):
@@ -44,7 +47,7 @@ class TestProcessedSharesCacheIsValidOn:
         cache.nonce = 5
         cache.checkpoint_block = BlockNumber(90)
         with patch(
-            'src.redemptions.cache.os_token_redeemer_contract'
+            'src.redemptions.fetch_positions.os_token_redeemer_contract'
             '.get_os_token_positions_redeemed_events',
             new=AsyncMock(return_value=[object()]),
         ):
@@ -57,7 +60,7 @@ class TestProcessedSharesCacheIsValidOn:
         cache.checkpoint_block = None
         mock_events = AsyncMock(return_value=[])
         with patch(
-            'src.redemptions.cache.os_token_redeemer_contract'
+            'src.redemptions.fetch_positions.os_token_redeemer_contract'
             '.get_os_token_positions_redeemed_events',
             new=mock_events,
         ):
@@ -72,7 +75,7 @@ class TestProcessedSharesCacheIsValidOn:
         cache.checkpoint_block = BlockNumber(50)
         mock_events = AsyncMock(return_value=[])
         with patch(
-            'src.redemptions.cache.os_token_redeemer_contract'
+            'src.redemptions.fetch_positions.os_token_redeemer_contract'
             '.get_os_token_positions_redeemed_events',
             new=mock_events,
         ):
@@ -82,7 +85,7 @@ class TestProcessedSharesCacheIsValidOn:
         assert call_kwargs['to_block'] == BlockNumber(100)
 
 
-MODULE = 'src.redemptions.cache'
+MODULE = 'src.redemptions.fetch_positions'
 
 
 class TestUpdateProcessedSharesCache:
@@ -154,9 +157,11 @@ class TestUpdateProcessedSharesCache:
             f'{MODULE}.os_token_redeemer_contract.get_os_token_positions_redeemed_events',
             new=AsyncMock(return_value=[object()]),
         ), patch(
-            'src.redemptions.tasks.fetch_positions_from_ipfs', new=AsyncMock(return_value=[pos])
+            'src.redemptions.fetch_positions.fetch_positions_from_ipfs',
+            new=AsyncMock(return_value=[pos]),
         ), patch(
-            'src.redemptions.tasks.iter_processed_shares', new=lambda *a, **kw: _iter_shares()
+            'src.redemptions.fetch_positions.iter_processed_shares',
+            new=lambda *a, **kw: _iter_shares(),
         ):
             await update_processed_shares_cache()
 

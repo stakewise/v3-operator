@@ -13,19 +13,21 @@ from web3 import Web3
 from web3.types import Wei
 
 from src.common.tests.utils import parse_wei
-from src.redemptions.cache import ProcessedSharesCache
+from src.redemptions.fetch_positions import (
+    ProcessedSharesCache,
+    batch_size,
+    cached_iter_processed_shares,
+    ipfs_fetch_client,
+    iter_processed_shares,
+    os_token_redeemer_contract,
+)
 from src.redemptions.os_token_converter import (
     create_os_token_converter,
     os_token_vault_controller_contract,
 )
 from src.redemptions.tasks import (
     aggregate_redemption_assets_by_vaults,
-    batch_size,
-    cached_iter_processed_shares,
     cut_off_redeemable_positions,
-    ipfs_fetch_client,
-    iter_processed_shares,
-    os_token_redeemer_contract,
 )
 from src.redemptions.tests.factories import create_redeemable_positions, make_position
 from src.redemptions.typings import RedeemablePositions
@@ -342,7 +344,7 @@ class TestAggregateRedemptionAssetsByVaults:
         ), mock.patch.object(
             ipfs_fetch_client, 'fetch_json', return_value=redeemable_positions_ipfs_data
         ), mock.patch(
-            'src.redemptions.tasks.iter_processed_shares',
+            'src.redemptions.fetch_positions.iter_processed_shares',
             new=make_async_gen(processed_shares),
         ):
             yield
@@ -436,7 +438,7 @@ class TestCachedIterProcessedShares:
 
         with mock.patch.object(
             cache, 'is_valid_on', mock.AsyncMock(return_value=False)
-        ), mock.patch('src.redemptions.tasks.iter_processed_shares', new=_fake_iter):
+        ), mock.patch('src.redemptions.fetch_positions.iter_processed_shares', new=_fake_iter):
             results = [
                 v async for v in cached_iter_processed_shares(positions, nonce, block_number)
             ]

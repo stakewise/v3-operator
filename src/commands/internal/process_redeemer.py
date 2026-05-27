@@ -29,15 +29,15 @@ from src.common.wallet import wallet
 from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import MULTICALL_CHUNK_SIZE, settings
 from src.meta_vault.service import is_meta_vault
-from src.redemptions.cache import update_processed_shares_cache
+from src.redemptions.fetch_positions import (
+    fetch_positions_from_ipfs,
+    update_processed_shares_cache,
+)
 from src.redemptions.os_token_converter import (
     OsTokenConverter,
     create_os_token_converter,
 )
-from src.redemptions.tasks import (
-    cut_off_redeemable_positions,
-    fetch_positions_from_ipfs,
-)
+from src.redemptions.tasks import cut_off_redeemable_positions
 from src.redemptions.typings import OsTokenPosition
 from src.validators.execution import get_withdrawable_assets
 
