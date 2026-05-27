@@ -584,6 +584,14 @@ class OsTokenRedeemerContract(ContractWrapper):
         tx_hash = await transaction_gas_wrapper(tx_function)
         return Web3.to_hex(tx_hash)
 
+    async def multicall_leaf_to_processed_shares(
+        self, positions: list, nonce: int, block_number: BlockNumber
+    ) -> list[bytes]:
+        calls = [
+            self.encode_abi('leafToProcessedShares', [p.leaf_hash(nonce - 1)]) for p in positions
+        ]
+        return await self.contract.functions.multicall(calls).call(block_identifier=block_number)
+
     async def batch_update_vault_state(
         self, vault_to_harvest_params: dict[ChecksumAddress, HarvestParams]
     ) -> HexStr:

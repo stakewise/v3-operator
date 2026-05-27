@@ -39,7 +39,7 @@ class TestBuildMultiProof:
     def test_single_position(self) -> None:
         position = make_position(leaf_shares=1000, unprocessed_shares=500)
         result = _build_multi_proof(
-            tree_nonce=5,
+            nonce=5,
             all_positions=[position],
             positions_to_redeem=[position],
         )
@@ -52,7 +52,7 @@ class TestBuildMultiProof:
         )
 
         result = _build_multi_proof(
-            tree_nonce=5,
+            nonce=5,
             all_positions=[pos1, pos2],
             positions_to_redeem=[pos1],
         )
@@ -66,7 +66,7 @@ class TestBuildMultiProof:
         )
 
         result = _build_multi_proof(
-            tree_nonce=5,
+            nonce=5,
             all_positions=[pos1, pos2],
             positions_to_redeem=[pos1, pos2],
         )
@@ -80,7 +80,7 @@ class TestRedeemPositions:
                 all_positions=[],
                 os_token_positions=[],
                 converter=make_converter(),
-                tree_nonce=5,
+                nonce=5,
             )
         mocks['submit_mock'].assert_not_called()
 
@@ -92,7 +92,7 @@ class TestRedeemPositions:
                 all_positions=[position],
                 os_token_positions=[position],
                 converter=make_converter(),
-                tree_nonce=5,
+                nonce=5,
             )
 
         assert mocks['submit_mock'].await_count == 1
@@ -106,7 +106,7 @@ class TestRedeemPositions:
                 all_positions=[position],
                 os_token_positions=[position],
                 converter=make_converter(100, 100),
-                tree_nonce=5,
+                nonce=5,
             )
 
         assert mocks['submit_mock'].await_count == 1
@@ -120,7 +120,7 @@ class TestRedeemPositions:
                 all_positions=[position],
                 os_token_positions=[position],
                 converter=make_converter(100, 100),
-                tree_nonce=5,
+                nonce=5,
             )
 
         mocks['submit_mock'].assert_not_called()
@@ -136,7 +136,7 @@ class TestRedeemPositions:
                 all_positions=[pos1, pos2],
                 os_token_positions=[pos1, pos2],
                 converter=make_converter(100, 100),
-                tree_nonce=5,
+                nonce=5,
             )
 
         # Two redemption transactions (one per position)
@@ -157,7 +157,7 @@ class TestRedeemPositions:
                 all_positions=[pos],
                 os_token_positions=[pos],
                 converter=make_converter(),
-                tree_nonce=5,
+                nonce=5,
             )
 
         submitted = _submitted_position(mocks)
@@ -175,7 +175,7 @@ class TestRedeemPositions:
                     all_positions=[pos],
                     os_token_positions=[pos],
                     converter=make_converter(100, 100),
-                    tree_nonce=5,
+                    nonce=5,
                 )
 
         mocks['submit_mock'].assert_not_called()
@@ -194,7 +194,7 @@ class TestRedeemPositions:
                 all_positions=[pos1, pos2],
                 os_token_positions=[pos1, pos2],
                 converter=make_converter(100, 100),
-                tree_nonce=5,
+                nonce=5,
             )
 
         # Only the first position is attempted; loop aborted
@@ -211,7 +211,7 @@ class TestSubmitRedeemPosition:
             result = await _submit_redeem_position(
                 position=position,
                 all_positions=[position],
-                tree_nonce=5,
+                nonce=5,
             )
         assert result == BlockNumber(456)
         mocks['transaction_gas_wrapper'].assert_awaited_once()
@@ -224,7 +224,7 @@ class TestSubmitRedeemPosition:
             result = await _submit_redeem_position(
                 position=position,
                 all_positions=[position],
-                tree_nonce=5,
+                nonce=5,
             )
         assert result is None
 
@@ -236,7 +236,7 @@ class TestSubmitRedeemPosition:
             result = await _submit_redeem_position(
                 position=position,
                 all_positions=[position],
-                tree_nonce=5,
+                nonce=5,
             )
         assert result is None
         # Receipt is never awaited when the build step raised
@@ -250,7 +250,7 @@ class TestSubmitRedeemPosition:
                 await _submit_redeem_position(
                     position=position,
                     all_positions=[position],
-                    tree_nonce=5,
+                    nonce=5,
                 )
 
 
@@ -426,8 +426,8 @@ class TestProcess:
         assert update_call.kwargs['vaults'] == [VAULT_1]
 
         redeem_call = mocks['mock_redeem'].await_args
-        # tree_nonce must use prev_nonce = nonce - 1 (off-by-one is critical)
-        assert redeem_call.kwargs['tree_nonce'] == 4
+        # nonce is passed directly; _build_multi_proof uses nonce - 1 internally
+        assert redeem_call.kwargs['nonce'] == 5
 
 
 # --- Helpers ---
@@ -584,6 +584,10 @@ def _mock_process(
         patch(
             f'{MODULE}.cut_off_redeemable_positions',
             new=AsyncMock(return_value=positions),
+        ),
+        patch(
+            f'{MODULE}.update_processed_shares_cache',
+            new=AsyncMock(),
         ),
         patch(
             f'{MODULE}.update_vaults_state',
