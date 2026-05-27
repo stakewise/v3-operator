@@ -1,7 +1,8 @@
-import aioitertools
+import asyncio
 from collections.abc import AsyncIterator
 from typing import cast
 
+import aioitertools
 from eth_typing import BlockNumber, HexStr
 from web3 import Web3
 from web3.types import Wei
@@ -14,6 +15,8 @@ from src.redemptions.typings import OsTokenPosition
 
 batch_size = 20
 ZERO_MERKLE_ROOT = HexStr('0x' + '0' * 64)
+
+_update_cache_lock = asyncio.Lock()
 
 
 class ProcessedSharesCache(metaclass=Singleton):
@@ -44,6 +47,11 @@ class ProcessedSharesCache(metaclass=Singleton):
 
 async def update_processed_shares_cache() -> None:
     """Validate and update the processed shares cache to the current finalized block."""
+    async with _update_cache_lock:
+        await _update_processed_shares_cache()
+
+
+async def _update_processed_shares_cache() -> None:
     finalized_block = await execution_client.eth.get_block('finalized')
     block_number = BlockNumber(finalized_block['number'])
 
