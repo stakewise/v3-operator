@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 from itertools import batched
 
 from eth_typing import HexStr
@@ -29,31 +30,32 @@ async def fetch_compounding_validators_balances() -> dict[HexStr, Gwei]:
     if not vault_public_keys:
         return {}
 
+    # Initialize balances for every validator
+    # including those that are not present in CL yet, but have pending deposits.
+    validators_balances = defaultdict(lambda: Gwei(0), {key: Gwei(0) for key in vault_public_keys})
+
+    # Fetch consensus validators
     consensus_block = await consensus_client.get_block('head')
     slot = consensus_block['data']['message']['slot']
     consensus_validators = await fetch_consensus_validators(list(vault_public_keys), slot=slot)
 
-    validators_balances = {}
-    validators_statuses = {}
+    # Filter compounding and remove exiting/withdrawn validators,
+    # as they are not eligible for funding
     for validator in consensus_validators:
-        validators_statuses[validator.public_key] = validator.status
         if validator.is_compounding and validator.status not in EXITING_STATUSES:
             validators_balances[validator.public_key] = validator.balance
+        else:
+            validators_balances.pop(validator.public_key, None)
 
+    # Add balances from pending deposits that are not yet reflected in the consensus node
     all_pending_deposits = await consensus_client.get_pending_deposits(slot)
     for deposit in all_pending_deposits:
         public_key, amount = deposit['pubkey'], int(deposit['amount'])
-        if public_key not in vault_public_keys:
+        if public_key not in validators_balances:
             continue
         if not deposit['withdrawal_credentials'].startswith('0x02'):
             continue
-        if public_key in validators_statuses:
-            if validators_statuses[public_key] in EXITING_STATUSES:
-                continue
-        if validators_balances.get(public_key):
-            validators_balances[public_key] = Gwei(validators_balances[public_key] + amount)
-        else:
-            validators_balances[public_key] = Gwei(amount)
+        validators_balances[public_key] = Gwei(validators_balances[public_key] + amount)
 
     return validators_balances
 
