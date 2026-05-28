@@ -434,7 +434,7 @@ class TestProcessFunding:
         }
         assert result == Gwei(0)
 
-    async def test_fetch_compounding_skips_non_compounding_pending_deposit(
+    async def test_fetch_funding_skips_non_compounding_pending_deposit(
         self, vault_validator_crud, compounding_creds
     ):
         """Pending deposit with non-0x02 withdrawal credentials is not added to the balance."""
@@ -474,7 +474,7 @@ class TestProcessFunding:
             self.patch_get_latest_vault_v2_validator_public_keys(),
             patch('src.validators.consensus.consensus_client', mock_consensus),
             self.patch_is_funding_interval_passed(True),
-            self.patch_fund_compounding_validators(HexStr('0xabc')) as mock_fund,
+            self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
         ):
             vault_assets = ether_to_gwei(24)
             result = await self.subtask.process_funding(
@@ -488,7 +488,7 @@ class TestProcessFunding:
         }
         assert result == Gwei(0)
 
-    async def test_fetch_compounding_skips_pending_deposit_for_exiting_validator(
+    async def test_fetch_funding_skips_pending_deposit_for_exiting_validator(
         self, vault_validator_crud, compounding_creds
     ):
         """Pending deposit for an exiting validator is not added back into the balances."""
@@ -541,7 +541,7 @@ class TestProcessFunding:
             self.patch_get_latest_vault_v2_validator_public_keys(),
             patch('src.validators.consensus.consensus_client', mock_consensus),
             self.patch_is_funding_interval_passed(True),
-            self.patch_fund_compounding_validators(HexStr('0xabc')) as mock_fund,
+            self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
         ):
             vault_assets = ether_to_gwei(40)
             result = await self.subtask.process_funding(
@@ -556,7 +556,7 @@ class TestProcessFunding:
         }
         assert result == ether_to_gwei(16)
 
-    async def test_fetch_compounding_pending_deposit_for_new_validator(
+    async def test_fetch_funding_pending_deposit_for_new_validator(
         self, vault_validator_crud, compounding_creds
     ):
         """Pending deposit for a validator not yet on the beacon chain creates its balance."""
@@ -583,7 +583,7 @@ class TestProcessFunding:
             self.patch_get_latest_vault_v2_validator_public_keys(),
             patch('src.validators.consensus.consensus_client', mock_consensus),
             self.patch_is_funding_interval_passed(True),
-            self.patch_fund_compounding_validators(HexStr('0xabc')) as mock_fund,
+            self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
         ):
             vault_assets = ether_to_gwei(32)
             result = await self.subtask.process_funding(
@@ -597,7 +597,7 @@ class TestProcessFunding:
         }
         assert result == Gwei(0)
 
-    async def test_fetch_compounding_excludes_non_compounding(
+    async def test_fetch_funding_excludes_non_compounding(
         self, vault_validator_crud, compounding_creds
     ):
         """Non-compounding (0x01) validator is excluded even when vault has excess assets."""
