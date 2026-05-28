@@ -33,18 +33,27 @@ async def fetch_compounding_validators_balances() -> dict[HexStr, Gwei]:
     slot = consensus_block['data']['message']['slot']
     consensus_validators = await fetch_consensus_validators(list(vault_public_keys), slot=slot)
 
-    validators_balances = {
-        v.public_key: v.balance
-        for v in consensus_validators
-        if v.is_compounding and v.status not in EXITING_STATUSES
-    }
+    validators_balances = {}
+    validators_statuses = {}
+    for v in consensus_validators:
+        validators_statuses[v.public_key] = v.status
+        if v.is_compounding and v.status not in EXITING_STATUSES:
+            validators_balances[v.public_key] = v.balance
 
     all_pending_deposits = await consensus_client.get_pending_deposits(slot)
     for deposit in all_pending_deposits:
         public_key, amount = deposit['pubkey'], int(deposit['amount'])
-        if public_key not in validators_balances:
+        if public_key not in vault_public_keys:
             continue
-        validators_balances[public_key] = Gwei(validators_balances[public_key] + amount)
+        if not deposit['withdrawal_credentials'].startswith('0x02'):
+            continue
+        if public_key in validators_statuses:
+            if validators_statuses[public_key] in EXITING_STATUSES:
+                continue
+        if validators_balances.get(public_key):
+            validators_balances[public_key] = Gwei(validators_balances[public_key] + amount)
+        else:
+            validators_balances[public_key] = Gwei(amount)
 
     return validators_balances
 
