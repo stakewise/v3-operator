@@ -55,6 +55,7 @@ class TestGetEncryptedExitSignatureShards:
             fork=fork,
         )
 
+    @pytest.mark.usefixtures('fake_settings')
     @pytest.mark.parametrize(
         ['_mocked_oracle_committee'],
         [
