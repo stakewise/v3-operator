@@ -26,7 +26,7 @@ from src.redemptions.os_token_converter import (
 )
 from src.redemptions.tasks import (
     aggregate_redemption_assets_by_vaults,
-    cut_off_redeemable_positions,
+    cut_off_positions,
 )
 from src.redemptions.tests.factories import create_redeemable_positions, make_position
 from src.redemptions.typings import RedeemablePositions
@@ -49,12 +49,12 @@ OWNER_2 = Web3.to_checksum_address('0x' + '44' * 20)
 class TestCutOffRedeemablePositions:
     async def test_all_shares_processed(self) -> None:
         pos = make_position(leaf_shares=1000, unprocessed_shares=0)
-        result = await cut_off_redeemable_positions([pos], total_redemption_shares=Wei(10**18))
+        result = await cut_off_positions([pos], total_redemption_shares=Wei(10**18))
         assert result == []
 
     async def test_partial_processed_shares(self) -> None:
         pos = make_position(leaf_shares=1000, unprocessed_shares=700)
-        result = await cut_off_redeemable_positions([pos], total_redemption_shares=Wei(10**18))
+        result = await cut_off_positions([pos], total_redemption_shares=Wei(10**18))
         assert len(result) == 1
         assert result[0].unprocessed_shares == Wei(700)
         assert result[0].leaf_shares == Wei(1000)
@@ -65,16 +65,14 @@ class TestCutOffRedeemablePositions:
             vault=VAULT_2, owner=OWNER_2, leaf_shares=2000, unprocessed_shares=1500
         )
 
-        result = await cut_off_redeemable_positions(
-            [pos1, pos2], total_redemption_shares=Wei(10**18)
-        )
+        result = await cut_off_positions([pos1, pos2], total_redemption_shares=Wei(10**18))
         assert len(result) == 1
         assert result[0].owner == OWNER_2
         assert result[0].unprocessed_shares == Wei(1500)
 
     async def test_cap_trims_last_position(self) -> None:
         pos = make_position(leaf_shares=1000, unprocessed_shares=1000)
-        result = await cut_off_redeemable_positions([pos], total_redemption_shares=Wei(400))
+        result = await cut_off_positions([pos], total_redemption_shares=Wei(400))
         assert len(result) == 1
         assert result[0].unprocessed_shares == Wei(400)
 
@@ -86,7 +84,7 @@ class TestCutOffRedeemablePositions:
             vault=VAULT_2, owner=OWNER_2, leaf_shares=2000, unprocessed_shares=2000
         )
 
-        result = await cut_off_redeemable_positions([pos1, pos2], total_redemption_shares=Wei(1000))
+        result = await cut_off_positions([pos1, pos2], total_redemption_shares=Wei(1000))
         assert len(result) == 1
         assert result[0].owner == OWNER_1
         assert result[0].unprocessed_shares == Wei(1000)

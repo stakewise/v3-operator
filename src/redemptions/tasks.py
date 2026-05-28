@@ -88,14 +88,14 @@ async def aggregate_redemption_assets_by_vaults(
     total_redemption_shares = os_token_converter.to_shares(total_redemption_assets)
 
     positions = await fetch_positions_with_processed_shares(nonce=nonce, block_number=block_number)
-    cut_off_positions = await cut_off_redeemable_positions(
+    positions = await cut_off_positions(
         positions,
         total_redemption_shares=total_redemption_shares,
     )
 
     # Aggregate unprocessed shares by vault
     vault_to_unprocessed_shares: defaultdict[ChecksumAddress, Wei] = defaultdict(lambda: Wei(0))
-    for position in cut_off_positions:
+    for position in positions:
         vault_to_unprocessed_shares[position.vault] += position.unprocessed_shares  # type: ignore
 
     # Convert shares to assets per vault
@@ -108,7 +108,7 @@ async def aggregate_redemption_assets_by_vaults(
     )
 
 
-async def cut_off_redeemable_positions(
+async def cut_off_positions(
     positions: list[OsTokenPosition],
     total_redemption_shares: Wei,
 ) -> list[OsTokenPosition]:

@@ -38,7 +38,7 @@ from src.redemptions.os_token_converter import (
     OsTokenConverter,
     create_os_token_converter,
 )
-from src.redemptions.tasks import cut_off_redeemable_positions
+from src.redemptions.tasks import cut_off_positions
 from src.redemptions.typings import OsTokenPosition
 from src.validators.execution import get_withdrawable_assets
 
@@ -237,7 +237,7 @@ async def _redeem_os_token_positions(
     positions_with_processed_shares = await fetch_positions_with_processed_shares(
         nonce=nonce, block_number=block_number
     )
-    os_token_positions = await cut_off_redeemable_positions(
+    os_token_positions = await cut_off_positions(
         positions_with_processed_shares,
         total_redemption_shares=Wei(queued_shares),
     )
