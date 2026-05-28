@@ -35,10 +35,10 @@ async def fetch_compounding_validators_balances() -> dict[HexStr, Gwei]:
 
     validators_balances = {}
     validators_statuses = {}
-    for v in consensus_validators:
-        validators_statuses[v.public_key] = v.status
-        if v.is_compounding and v.status not in EXITING_STATUSES:
-            validators_balances[v.public_key] = v.balance
+    for validator in consensus_validators:
+        validators_statuses[validator.public_key] = validator.status
+        if validator.is_compounding and validator.status not in EXITING_STATUSES:
+            validators_balances[validator.public_key] = validator.balance
 
     all_pending_deposits = await consensus_client.get_pending_deposits(slot)
     for deposit in all_pending_deposits:
