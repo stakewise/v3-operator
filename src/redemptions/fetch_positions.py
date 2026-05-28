@@ -19,6 +19,12 @@ ZERO_MERKLE_ROOT = HexStr('0x' + '0' * 64)
 _update_cache_lock = asyncio.Lock()
 
 
+class IpfsPositionsCache(metaclass=Singleton):
+    def __init__(self) -> None:
+        self.ipfs_hash: str | None = None
+        self.data: list[OsTokenPosition] = []
+
+
 class ProcessedSharesCache(metaclass=Singleton):
     def __init__(self) -> None:
         self.nonce: int | None = None
@@ -110,6 +116,27 @@ async def iter_processed_shares(
             yield Wei(Web3.to_int(res))
 
 
+async def fetch_positions_with_processed_shares(
+    nonce: int,
+    block_number: BlockNumber,
+) -> list[OsTokenPosition]:
+    """Fetch positions from IPFS (cached) and enrich each with its unprocessed_shares."""
+    positions = await fetch_positions_from_ipfs(block_number=block_number)
+    enriched: list[OsTokenPosition] = []
+    async for position, processed_shares in aioitertools.zip(
+        positions, cached_iter_processed_shares(positions, nonce, block_number)
+    ):
+        enriched.append(
+            OsTokenPosition(
+                owner=position.owner,
+                vault=position.vault,
+                leaf_shares=position.leaf_shares,
+                unprocessed_shares=Wei(position.leaf_shares - processed_shares),
+            )
+        )
+    return enriched
+
+
 async def fetch_positions_from_ipfs(
     block_number: BlockNumber,
 ) -> list[OsTokenPosition]:
@@ -122,13 +149,18 @@ async def fetch_positions_from_ipfs(
         return []
     if redeemable_positions.merkle_root == ZERO_MERKLE_ROOT:
         return []
+
+    cache = IpfsPositionsCache()
+    if cache.ipfs_hash == redeemable_positions.ipfs_hash:
+        return cache.data
+
     # Fetch redeemable positions data from IPFS
     data = cast(list[dict], await ipfs_fetch_client.fetch_json(redeemable_positions.ipfs_hash))
 
     # data structure example:
     # [{"owner:" 0x01, "leaf_shares": 100000, "vault": 0x02}, ...]
 
-    return [
+    positions = [
         OsTokenPosition(
             owner=Web3.to_checksum_address(item['owner']),
             vault=Web3.to_checksum_address(item['vault']),
@@ -136,3 +168,6 @@ async def fetch_positions_from_ipfs(
         )
         for item in data
     ]
+    cache.ipfs_hash = redeemable_positions.ipfs_hash
+    cache.data = positions
+    return positions

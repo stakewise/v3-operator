@@ -1,7 +1,6 @@
 import logging
 from collections import defaultdict
 
-import aioitertools
 from eth_typing import BlockNumber, ChecksumAddress
 from sw_utils import OsTokenConverter
 from sw_utils.typings import ChainHead, ProtocolConfig
@@ -11,8 +10,7 @@ from src.common.contracts import os_token_redeemer_contract
 from src.common.protocol_config import get_protocol_config
 from src.config.settings import settings
 from src.redemptions.fetch_positions import (
-    cached_iter_processed_shares,
-    fetch_positions_from_ipfs,
+    fetch_positions_with_processed_shares,
     update_processed_shares_cache,
 )
 from src.redemptions.os_token_converter import create_os_token_converter
@@ -89,12 +87,10 @@ async def aggregate_redemption_assets_by_vaults(
     # Convert total redemption assets to shares
     total_redemption_shares = os_token_converter.to_shares(total_redemption_assets)
 
-    positions = await fetch_positions_from_ipfs(block_number=block_number)
+    positions = await fetch_positions_with_processed_shares(nonce=nonce, block_number=block_number)
     cut_off_positions = await cut_off_redeemable_positions(
         positions,
-        nonce=nonce,
         total_redemption_shares=total_redemption_shares,
-        block_number=block_number,
     )
 
     # Aggregate unprocessed shares by vault
@@ -113,36 +109,31 @@ async def aggregate_redemption_assets_by_vaults(
 
 
 async def cut_off_redeemable_positions(
-    all_positions: list[OsTokenPosition],
-    nonce: int,
+    positions: list[OsTokenPosition],
     total_redemption_shares: Wei,
-    block_number: BlockNumber,
 ) -> list[OsTokenPosition]:
     """
-    Fill positions with their unprocessed shares until the cumulative total reaches
-    total_redemption_shares, then stop. The last included position's unprocessed_shares
-    is capped so the cumulative total does not exceed total_redemption_shares.
-    Fully processed positions (no remaining unprocessed shares) are omitted from
-    the returned list.
+    Iterate pre-enriched positions (unprocessed_shares already set) until the cumulative
+    total reaches total_redemption_shares, then stop. The last included position's
+    unprocessed_shares is capped so the cumulative total does not exceed
+    total_redemption_shares. Fully processed positions are omitted.
     """
     redeemable: list[OsTokenPosition] = []
     remaining_shares = total_redemption_shares
 
-    async for position, processed_shares in aioitertools.zip(
-        all_positions, cached_iter_processed_shares(all_positions, nonce, block_number)
-    ):
-        unprocessed_shares = position.leaf_shares - processed_shares
+    for position in positions:
+        unprocessed_shares = position.unprocessed_shares
         # Skip fully processed positions; tolerate 1 wei rounding error.
         if unprocessed_shares <= 1:
             continue
 
-        unprocessed_shares = min(unprocessed_shares, remaining_shares)
+        unprocessed_shares = Wei(min(unprocessed_shares, remaining_shares))
         redeemable.append(
             OsTokenPosition(
                 owner=position.owner,
                 vault=position.vault,
                 leaf_shares=position.leaf_shares,
-                unprocessed_shares=Wei(unprocessed_shares),
+                unprocessed_shares=unprocessed_shares,
             )
         )
         remaining_shares -= unprocessed_shares  # type: ignore

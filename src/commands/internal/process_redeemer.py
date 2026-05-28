@@ -31,6 +31,7 @@ from src.config.settings import MULTICALL_CHUNK_SIZE, settings
 from src.meta_vault.service import is_meta_vault
 from src.redemptions.fetch_positions import (
     fetch_positions_from_ipfs,
+    fetch_positions_with_processed_shares,
     update_processed_shares_cache,
 )
 from src.redemptions.os_token_converter import (
@@ -233,11 +234,12 @@ async def _redeem_os_token_positions(
         logger.info('No positions found. Skipping to next interval.')
         return
 
+    positions_with_processed_shares = await fetch_positions_with_processed_shares(
+        nonce=nonce, block_number=block_number
+    )
     os_token_positions = await cut_off_redeemable_positions(
-        all_positions,
-        nonce=nonce,
+        positions_with_processed_shares,
         total_redemption_shares=Wei(queued_shares),
-        block_number=block_number,
     )
     if not os_token_positions:
         logger.info('No redeemable positions found. Skipping to next interval.')

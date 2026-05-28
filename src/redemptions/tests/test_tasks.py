@@ -4,7 +4,6 @@ from contextlib import contextmanager
 from decimal import Decimal
 from typing import Any
 from unittest import mock
-from unittest.mock import patch
 
 import pytest
 from eth_typing import BlockNumber, HexStr
@@ -49,67 +48,48 @@ OWNER_2 = Web3.to_checksum_address('0x' + '44' * 20)
 
 class TestCutOffRedeemablePositions:
     async def test_all_shares_processed(self) -> None:
-        pos = make_position(leaf_shares=1000)
-        with patch_cached_processed_shares([1000]):
-            result = await cut_off_redeemable_positions(
-                [pos], nonce=5, total_redemption_shares=Wei(10**18), block_number=BlockNumber(100)
-            )
+        pos = make_position(leaf_shares=1000, unprocessed_shares=0)
+        result = await cut_off_redeemable_positions([pos], total_redemption_shares=Wei(10**18))
         assert result == []
 
     async def test_partial_processed_shares(self) -> None:
-        pos = make_position(leaf_shares=1000)
-        with patch_cached_processed_shares([300]):
-            result = await cut_off_redeemable_positions(
-                [pos], nonce=5, total_redemption_shares=Wei(10**18), block_number=BlockNumber(100)
-            )
+        pos = make_position(leaf_shares=1000, unprocessed_shares=700)
+        result = await cut_off_redeemable_positions([pos], total_redemption_shares=Wei(10**18))
         assert len(result) == 1
         assert result[0].unprocessed_shares == Wei(700)
         assert result[0].leaf_shares == Wei(1000)
 
     async def test_multiple_positions_mixed(self) -> None:
-        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, leaf_shares=1000)
-        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, leaf_shares=2000)
+        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, leaf_shares=1000, unprocessed_shares=0)
+        pos2 = make_position(
+            vault=VAULT_2, owner=OWNER_2, leaf_shares=2000, unprocessed_shares=1500
+        )
 
-        with patch_cached_processed_shares([1000, 500]):
-            result = await cut_off_redeemable_positions(
-                [pos1, pos2],
-                nonce=5,
-                total_redemption_shares=Wei(10**18),
-                block_number=BlockNumber(100),
-            )
+        result = await cut_off_redeemable_positions(
+            [pos1, pos2], total_redemption_shares=Wei(10**18)
+        )
         assert len(result) == 1
         assert result[0].owner == OWNER_2
         assert result[0].unprocessed_shares == Wei(1500)
 
     async def test_cap_trims_last_position(self) -> None:
-        pos = make_position(leaf_shares=1000)
-        with patch_cached_processed_shares([0]):
-            result = await cut_off_redeemable_positions(
-                [pos], nonce=5, total_redemption_shares=Wei(400), block_number=BlockNumber(100)
-            )
+        pos = make_position(leaf_shares=1000, unprocessed_shares=1000)
+        result = await cut_off_redeemable_positions([pos], total_redemption_shares=Wei(400))
         assert len(result) == 1
         assert result[0].unprocessed_shares == Wei(400)
 
     async def test_cap_stops_after_first_position(self) -> None:
-        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, leaf_shares=1000)
-        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, leaf_shares=2000)
+        pos1 = make_position(
+            vault=VAULT_1, owner=OWNER_1, leaf_shares=1000, unprocessed_shares=1000
+        )
+        pos2 = make_position(
+            vault=VAULT_2, owner=OWNER_2, leaf_shares=2000, unprocessed_shares=2000
+        )
 
-        with patch_cached_processed_shares([0, 0]):
-            result = await cut_off_redeemable_positions(
-                [pos1, pos2],
-                nonce=5,
-                total_redemption_shares=Wei(1000),
-                block_number=BlockNumber(100),
-            )
+        result = await cut_off_redeemable_positions([pos1, pos2], total_redemption_shares=Wei(1000))
         assert len(result) == 1
         assert result[0].owner == OWNER_1
         assert result[0].unprocessed_shares == Wei(1000)
-
-
-@contextmanager
-def patch_cached_processed_shares(values: list[int]):
-    with patch('src.redemptions.tasks.cached_iter_processed_shares', new=make_async_gen(values)):
-        yield
 
 
 class TestAggregateRedemptionAssetsByVaults:
@@ -381,7 +361,8 @@ class TestIterProcessedShares:
         second_batch = [make_position(leaf_shares=2000) for _ in range(5)]
         positions = first_batch + second_batch
 
-        batch1_processed = [1000] * 10 + [0] * 10
+        half = batch_size // 2
+        batch1_processed = [1000] * half + [0] * (batch_size - half)
         batch2_processed = [0] * 5
 
         multicall_mock = self._mock_multicall(batch1_processed, batch2_processed)
