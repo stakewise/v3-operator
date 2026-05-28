@@ -13,7 +13,7 @@ from src.common.typings import Singleton
 from src.config.settings import settings
 from src.redemptions.typings import OsTokenPosition
 
-batch_size = 20
+batch_size = 1000
 ZERO_MERKLE_ROOT = HexStr('0x' + '0' * 64)
 
 _update_cache_lock = asyncio.Lock()
