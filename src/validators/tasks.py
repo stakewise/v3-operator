@@ -20,14 +20,17 @@ from src.config.settings import (
     VALIDATORS_FUNDING_BATCH_SIZE,
     settings,
 )
-from src.validators.consensus import fetch_compounding_validators_balances
+from src.validators.consensus import fetch_funding_validators_balances
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import EmptyRelayerResponseException, FundingException
 from src.validators.execution import get_withdrawable_assets
 from src.validators.keystores.base import BaseKeystore
 from src.validators.metrics import update_unused_validator_keys_metric
 from src.validators.oracles import poll_validation_approval
-from src.validators.register_validators import fund_validators, register_validators
+from src.validators.register_validators import (
+    tx_fund_validators,
+    tx_register_validators,
+)
 from src.validators.relayer import RelayerClient
 from src.validators.typings import NetworkValidator, Validator
 from src.validators.utils import get_validators_for_registration
@@ -99,9 +102,9 @@ class ValidatorRegistrationSubtask:
         Returns the remaining vault assets if funding is successful.
         Raises FundingException on failure.
         """
-        compounding_validators_balances = await fetch_compounding_validators_balances()
+        validators_balances = await fetch_funding_validators_balances()
         funding_amounts = _get_funding_amounts(
-            compounding_validators_balances=compounding_validators_balances,
+            validators_balances=validators_balances,
             vault_assets=vault_assets,
         )
 
@@ -115,7 +118,7 @@ class ValidatorRegistrationSubtask:
             list(funding_amounts.items()), VALIDATORS_FUNDING_BATCH_SIZE
         ):
             try:
-                tx_hash = await fund_compounding_validators(
+                tx_hash = await fund_validators_chunk(
                     validator_fundings=validator_fundings_chunk,
                     harvest_params=harvest_params,
                     relayer=self.relayer,
@@ -132,13 +135,15 @@ class ValidatorRegistrationSubtask:
         return vault_assets
 
 
-async def fund_compounding_validators(
+async def fund_validators_chunk(
     validator_fundings: Sequence[tuple[HexStr, Gwei]],
     harvest_params: HarvestParams | None,
     relayer: RelayerClient | None = None,
 ) -> HexStr | None:
     """
-    Funds vault compounding validators with the specified amount.
+    Funds vault validators with the specified amount.
+    Makes single transaction for a chunk of validators.
+    Returns transaction hash if funding is successful, None otherwise.
     """
     logger.info('Started funding of %d validator(s)', len(validator_fundings))
     validators_manager_signature = HexStr('0x')
@@ -165,7 +170,7 @@ async def fund_compounding_validators(
         )
         pub_keys.append(public_key)
 
-    tx_hash = await fund_validators(
+    tx_hash = await tx_fund_validators(
         harvest_params=harvest_params,
         validators=validators,
         validators_manager_signature=validators_manager_signature,
@@ -244,7 +249,7 @@ async def register_new_validators(
         validators_registry_root=validators_registry_root,
         validators_manager_signature=validators_manager_signature,
     )
-    tx_hash = await register_validators(
+    tx_hash = await tx_register_validators(
         approval=oracles_approval,
         validators=validators,
         harvest_params=harvest_params,
@@ -318,12 +323,12 @@ def _get_deposits_amounts(vault_assets: Gwei, validator_type: ValidatorType) -> 
 
 
 def _get_funding_amounts(
-    compounding_validators_balances: dict[HexStr, Gwei], vault_assets: Gwei
+    validators_balances: dict[HexStr, Gwei], vault_assets: Gwei
 ) -> dict[HexStr, Gwei]:
     result = {}
     # Order validators by balance descending to fund those with the highest balance first
     for public_key, balance in sorted(
-        compounding_validators_balances.items(), key=lambda item: item[1], reverse=True
+        validators_balances.items(), key=lambda item: item[1], reverse=True
     ):
         # Fund as much as possible to reach max balance
         remaining_capacity = settings.max_validator_balance_gwei - balance
