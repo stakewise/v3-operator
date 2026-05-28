@@ -48,22 +48,20 @@ OWNER_2 = Web3.to_checksum_address('0x' + '44' * 20)
 
 class TestCutOffRedeemablePositions:
     async def test_all_shares_processed(self) -> None:
-        pos = make_position(leaf_shares=1000, unprocessed_shares=0)
+        pos = make_position(leaf_shares=1000, processed_shares=1000)
         result = await cut_off_positions([pos], total_redemption_shares=Wei(10**18))
         assert result == []
 
     async def test_partial_processed_shares(self) -> None:
-        pos = make_position(leaf_shares=1000, unprocessed_shares=700)
+        pos = make_position(leaf_shares=1000, processed_shares=300)
         result = await cut_off_positions([pos], total_redemption_shares=Wei(10**18))
         assert len(result) == 1
         assert result[0].unprocessed_shares == Wei(700)
         assert result[0].leaf_shares == Wei(1000)
 
     async def test_multiple_positions_mixed(self) -> None:
-        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, leaf_shares=1000, unprocessed_shares=0)
-        pos2 = make_position(
-            vault=VAULT_2, owner=OWNER_2, leaf_shares=2000, unprocessed_shares=1500
-        )
+        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, leaf_shares=1000, processed_shares=1000)
+        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, leaf_shares=2000, processed_shares=500)
 
         result = await cut_off_positions([pos1, pos2], total_redemption_shares=Wei(10**18))
         assert len(result) == 1
@@ -71,18 +69,14 @@ class TestCutOffRedeemablePositions:
         assert result[0].unprocessed_shares == Wei(1500)
 
     async def test_cap_trims_last_position(self) -> None:
-        pos = make_position(leaf_shares=1000, unprocessed_shares=1000)
+        pos = make_position(leaf_shares=1000, processed_shares=0)
         result = await cut_off_positions([pos], total_redemption_shares=Wei(400))
         assert len(result) == 1
         assert result[0].unprocessed_shares == Wei(400)
 
     async def test_cap_stops_after_first_position(self) -> None:
-        pos1 = make_position(
-            vault=VAULT_1, owner=OWNER_1, leaf_shares=1000, unprocessed_shares=1000
-        )
-        pos2 = make_position(
-            vault=VAULT_2, owner=OWNER_2, leaf_shares=2000, unprocessed_shares=2000
-        )
+        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, leaf_shares=1000, processed_shares=0)
+        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, leaf_shares=2000, processed_shares=0)
 
         result = await cut_off_positions([pos1, pos2], total_redemption_shares=Wei(1000))
         assert len(result) == 1

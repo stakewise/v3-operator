@@ -127,16 +127,16 @@ async def cut_off_positions(
         if unprocessed_shares <= 1:
             continue
 
-        unprocessed_shares = Wei(min(unprocessed_shares, remaining_shares))
+        capped_unprocessed = Wei(min(unprocessed_shares, remaining_shares))
         redeemable.append(
             OsTokenPosition(
                 owner=position.owner,
                 vault=position.vault,
                 leaf_shares=position.leaf_shares,
-                unprocessed_shares=unprocessed_shares,
+                processed_shares=Wei(position.leaf_shares - capped_unprocessed),
             )
         )
-        remaining_shares -= unprocessed_shares  # type: ignore
+        remaining_shares -= capped_unprocessed  # type: ignore
         if remaining_shares <= 0:
             return redeemable
 

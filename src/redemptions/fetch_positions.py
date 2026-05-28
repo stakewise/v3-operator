@@ -131,7 +131,7 @@ async def fetch_positions_with_processed_shares(
                 owner=position.owner,
                 vault=position.vault,
                 leaf_shares=position.leaf_shares,
-                unprocessed_shares=Wei(position.leaf_shares - processed_shares),
+                processed_shares=processed_shares,
             )
         )
     return enriched
@@ -140,6 +140,10 @@ async def fetch_positions_with_processed_shares(
 async def fetch_positions_from_ipfs(
     block_number: BlockNumber,
 ) -> list[OsTokenPosition]:
+    """
+    Fetch redeemable positions from IPFS for the given block.
+    Results are cached by IPFS hash.
+    """
     redeemable_positions = await os_token_redeemer_contract.redeemable_positions(
         block_number=block_number
     )

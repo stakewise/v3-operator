@@ -37,7 +37,7 @@ OWNER_2 = Web3.to_checksum_address('0x' + '44' * 20)
 
 class TestBuildMultiProof:
     def test_single_position(self) -> None:
-        position = make_position(leaf_shares=1000, unprocessed_shares=500)
+        position = make_position(leaf_shares=1000, processed_shares=500)
         result = _build_multi_proof(
             nonce=5,
             all_positions=[position],
@@ -46,10 +46,8 @@ class TestBuildMultiProof:
         assert len(result.leaves) == 1
 
     def test_partial_redeem(self) -> None:
-        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, leaf_shares=1000, unprocessed_shares=500)
-        pos2 = make_position(
-            vault=VAULT_2, owner=OWNER_2, leaf_shares=2000, unprocessed_shares=1000
-        )
+        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, leaf_shares=1000, processed_shares=500)
+        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, leaf_shares=2000, processed_shares=1000)
 
         result = _build_multi_proof(
             nonce=5,
@@ -60,10 +58,8 @@ class TestBuildMultiProof:
         assert len(result.proof) > 0
 
     def test_all_positions_redeemed(self) -> None:
-        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, leaf_shares=1000, unprocessed_shares=500)
-        pos2 = make_position(
-            vault=VAULT_2, owner=OWNER_2, leaf_shares=2000, unprocessed_shares=1000
-        )
+        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, leaf_shares=1000, processed_shares=500)
+        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, leaf_shares=2000, processed_shares=1000)
 
         result = _build_multi_proof(
             nonce=5,
@@ -85,7 +81,7 @@ class TestRedeemPositions:
         mocks['submit_mock'].assert_not_called()
 
     async def test_single_position_sufficient_assets(self) -> None:
-        position = make_position(unprocessed_shares=500)
+        position = make_position(processed_shares=500)
 
         with _mock_redeem_positions(withdrawable=Wei(1000)) as mocks:
             await redeem_positions(
@@ -99,7 +95,7 @@ class TestRedeemPositions:
         assert _submitted_position(mocks).shares_to_redeem == Wei(500)
 
     async def test_single_position_insufficient_assets_partial_fill(self) -> None:
-        position = make_position(unprocessed_shares=500)
+        position = make_position(processed_shares=500)
 
         with _mock_redeem_positions(withdrawable=Wei(100)) as mocks:
             await redeem_positions(
@@ -113,7 +109,7 @@ class TestRedeemPositions:
         assert _submitted_position(mocks).shares_to_redeem == Wei(100)
 
     async def test_single_position_zero_withdrawable_skipped(self) -> None:
-        position = make_position(unprocessed_shares=500)
+        position = make_position(processed_shares=500)
 
         with _mock_redeem_positions(withdrawable=Wei(0)) as mocks:
             await redeem_positions(
@@ -127,8 +123,8 @@ class TestRedeemPositions:
 
     async def test_multiple_positions_share_vault_cache(self) -> None:
         """Withdrawable is fetched once per vault, decremented after each redemption."""
-        pos1 = make_position(owner=OWNER_1, unprocessed_shares=500)
-        pos2 = make_position(owner=OWNER_2, unprocessed_shares=1000)
+        pos1 = make_position(owner=OWNER_1, processed_shares=500)
+        pos2 = make_position(owner=OWNER_2, processed_shares=0)
 
         get_withdrawable = AsyncMock(return_value=Wei(700))
         with _mock_redeem_positions(withdrawable=get_withdrawable) as mocks:
@@ -150,7 +146,7 @@ class TestRedeemPositions:
         assert second_position.owner == OWNER_2 and second_position.shares_to_redeem == Wei(200)
 
     async def test_preserves_original_leaf_shares_in_call(self) -> None:
-        pos = make_position(leaf_shares=1000, unprocessed_shares=500)
+        pos = make_position(leaf_shares=1000, processed_shares=500)
 
         with _mock_redeem_positions(withdrawable=Wei(10000)) as mocks:
             await redeem_positions(
@@ -166,7 +162,7 @@ class TestRedeemPositions:
 
     async def test_meta_vault_position_raises(self) -> None:
         """A meta-vault position is unexpected and must surface as a RuntimeError."""
-        pos = make_position(unprocessed_shares=500)
+        pos = make_position(processed_shares=500)
         get_withdrawable = AsyncMock(return_value=Wei(10000))
 
         with _mock_redeem_positions(withdrawable=get_withdrawable, is_meta_vault=True) as mocks:
@@ -183,8 +179,8 @@ class TestRedeemPositions:
 
     async def test_submit_failure_aborts_iteration(self) -> None:
         """A failed submission aborts the loop; subsequent positions are not attempted."""
-        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, unprocessed_shares=500)
-        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, unprocessed_shares=500)
+        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, processed_shares=500)
+        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, processed_shares=500)
 
         with _mock_redeem_positions(
             withdrawable=Wei(10000),
@@ -393,11 +389,11 @@ class TestProcess:
         mocks['mock_redeem'].assert_not_called()
 
     async def test_no_eligible_positions(self) -> None:
-        """IPFS returns positions but cut_off_redeemable_positions filters them all out."""
+        """IPFS returns positions but cut_off_positions filters them all out."""
         pos = make_position(leaf_shares=1000)
         with (
             _mock_process(positions=[pos]) as mocks,
-            patch(f'{MODULE}.cut_off_redeemable_positions', new=AsyncMock(return_value=[])),
+            patch(f'{MODULE}.cut_off_positions', new=AsyncMock(return_value=[])),
         ):
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
             mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
@@ -406,7 +402,7 @@ class TestProcess:
         mocks['mock_redeem'].assert_not_called()
 
     async def test_successful_redemption(self) -> None:
-        positions = [make_position(leaf_shares=1000, unprocessed_shares=500, shares_to_redeem=500)]
+        positions = [make_position(leaf_shares=1000, processed_shares=500, shares_to_redeem=500)]
 
         with _mock_process(positions=positions) as mocks:
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
@@ -582,7 +578,11 @@ def _mock_process(
             new=AsyncMock(return_value=positions),
         ),
         patch(
-            f'{MODULE}.cut_off_redeemable_positions',
+            f'{MODULE}.fetch_positions_with_processed_shares',
+            new=AsyncMock(return_value=positions),
+        ),
+        patch(
+            f'{MODULE}.cut_off_positions',
             new=AsyncMock(return_value=positions),
         ),
         patch(
@@ -615,16 +615,16 @@ def make_position(
     vault: ChecksumAddress = VAULT_1,
     owner: ChecksumAddress = OWNER_1,
     leaf_shares: int = 1000,
-    unprocessed_shares: int = 500,
+    processed_shares: int = 500,
     shares_to_redeem: int = 0,
 ) -> OsTokenPosition:
-    """Build a test position. ``unprocessed_shares`` defaults to a non-zero value so
+    """Build a test position. ``processed_shares`` defaults to half of ``leaf_shares`` so
     redemption-loop tests don't silently no-op when a caller forgets to set it."""
     return OsTokenPosition(
         vault=vault,
         owner=owner,
         leaf_shares=Wei(leaf_shares),
-        unprocessed_shares=Wei(unprocessed_shares),
+        processed_shares=Wei(processed_shares),
         shares_to_redeem=Wei(shares_to_redeem),
     )
 
