@@ -70,7 +70,7 @@ class OsTokenPosition:
 
     @property
     def unprocessed_shares(self) -> Wei:
-        return Wei(self.leaf_shares - self.processed_shares)
+        return Wei(max(0, self.leaf_shares - self.processed_shares))
 
     def as_dict(self) -> dict:
         return {

@@ -122,6 +122,9 @@ async def assign_shares_to_redeem(
     - Each position's shares_to_redeem is set to min(unprocessed_shares, remaining_budget).
     - Iteration stops as soon as the cumulative shares_to_redeem reaches total_redemption_shares.
     """
+    if total_redemption_shares <= 0:
+        return []
+
     redeemable: list[OsTokenPosition] = []
     remaining_shares = total_redemption_shares
 
