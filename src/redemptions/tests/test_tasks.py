@@ -13,11 +13,8 @@ from web3.types import Wei
 
 from src.common.tests.utils import parse_wei
 from src.redemptions.fetch_positions import (
-    ProcessedSharesCache,
     batch_size,
-    cached_iter_processed_shares,
     ipfs_fetch_client,
-    iter_processed_shares,
     os_token_redeemer_contract,
 )
 from src.redemptions.os_token_converter import (
@@ -320,100 +317,3 @@ class TestAggregateRedemptionAssetsByVaults:
             new=make_async_gen(processed_shares),
         ):
             yield
-
-
-def encode_wei(value: int) -> bytes:
-    return value.to_bytes(32, 'big')
-
-
-class TestIterProcessedShares:
-    async def test_empty_positions(self):
-        results = [
-            v async for v in iter_processed_shares([], nonce=1, block_number=BlockNumber(10))
-        ]
-        assert results == []
-
-    async def test_single_batch(self):
-        positions = [make_position(leaf_shares=w) for w in [100, 200, 300]]
-        with mock.patch.object(
-            os_token_redeemer_contract,
-            'multicall_leaf_to_processed_shares',
-            new=self._mock_multicall([50, 200, 0]),
-        ):
-            results = [
-                v
-                async for v in iter_processed_shares(
-                    positions, nonce=3, block_number=BlockNumber(10)
-                )
-            ]
-        assert results == [Wei(50), Wei(200), Wei(0)]
-
-    async def test_two_batches(self):
-        first_batch = [make_position(leaf_shares=1000) for _ in range(batch_size)]
-        second_batch = [make_position(leaf_shares=2000) for _ in range(5)]
-        positions = first_batch + second_batch
-
-        half = batch_size // 2
-        batch1_processed = [1000] * half + [0] * (batch_size - half)
-        batch2_processed = [0] * 5
-
-        multicall_mock = self._mock_multicall(batch1_processed, batch2_processed)
-        with mock.patch.object(
-            os_token_redeemer_contract, 'multicall_leaf_to_processed_shares', new=multicall_mock
-        ):
-            results = [
-                v
-                async for v in iter_processed_shares(
-                    positions, nonce=5, block_number=BlockNumber(10)
-                )
-            ]
-
-        assert len(results) == batch_size + 5
-        assert results[:batch_size] == [Wei(v) for v in batch1_processed]
-        assert results[batch_size:] == [Wei(v) for v in batch2_processed]
-        assert multicall_mock.call_count == 2
-
-    def _mock_multicall(self, *batch_results: list[int]):
-        return mock.AsyncMock(
-            side_effect=[[encode_wei(v) for v in batch] for batch in batch_results]
-        )
-
-
-class TestCachedIterProcessedShares:
-    async def test_cache_hit(self):
-        positions = [make_position(leaf_shares=w) for w in [100, 200]]
-        nonce = 5
-        block_number = BlockNumber(10)
-
-        cache = ProcessedSharesCache()
-        cache.nonce = nonce
-        cache.checkpoint_block = block_number
-        cache.data = {
-            Web3.to_hex(p.leaf_hash(nonce - 1)): Wei(p.leaf_shares - 10) for p in positions
-        }
-
-        with mock.patch.object(cache, 'is_valid_on', mock.AsyncMock(return_value=True)):
-            results = [
-                v async for v in cached_iter_processed_shares(positions, nonce, block_number)
-            ]
-
-        assert results == [Wei(90), Wei(190)]
-
-    async def test_cache_miss_delegates_to_iter(self):
-        positions = [make_position(leaf_shares=1000)]
-        nonce = 5
-        block_number = BlockNumber(10)
-
-        cache = ProcessedSharesCache()
-
-        async def _fake_iter(*_):
-            yield Wei(999)
-
-        with mock.patch.object(
-            cache, 'is_valid_on', mock.AsyncMock(return_value=False)
-        ), mock.patch('src.redemptions.fetch_positions.iter_processed_shares', new=_fake_iter):
-            results = [
-                v async for v in cached_iter_processed_shares(positions, nonce, block_number)
-            ]
-
-        assert results == [Wei(999)]

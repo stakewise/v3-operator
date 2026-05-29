@@ -1,6 +1,7 @@
 import asyncio
-from collections.abc import AsyncIterator
-from typing import cast
+import functools
+from collections.abc import AsyncIterator, Callable
+from typing import Any, cast
 
 import aioitertools
 from eth_typing import BlockNumber, HexStr
@@ -16,7 +17,16 @@ from src.redemptions.typings import OsTokenPosition
 batch_size = 1000
 ZERO_MERKLE_ROOT = HexStr('0x' + '0' * 64)
 
-_update_cache_lock = asyncio.Lock()
+
+def with_lock(func: Callable[..., Any]) -> Callable[..., Any]:
+    lock = asyncio.Lock()
+
+    @functools.wraps(func)
+    async def wrapper(*args: Any, **kwargs: Any) -> Any:
+        async with lock:
+            return await func(*args, **kwargs)
+
+    return wrapper
 
 
 class IpfsPositionsCache(metaclass=Singleton):
@@ -51,13 +61,9 @@ class ProcessedSharesCache(metaclass=Singleton):
         return not events
 
 
+@with_lock
 async def update_processed_shares_cache() -> None:
     """Validate and update the processed shares cache to the current finalized block."""
-    async with _update_cache_lock:
-        await _update_processed_shares_cache()
-
-
-async def _update_processed_shares_cache() -> None:
     finalized_block = await execution_client.eth.get_block('finalized')
     block_number = BlockNumber(finalized_block['number'])
 
@@ -120,7 +126,7 @@ async def fetch_positions_with_processed_shares(
     nonce: int,
     block_number: BlockNumber,
 ) -> list[OsTokenPosition]:
-    """Fetch positions from IPFS (cached) and enrich each with its unprocessed_shares."""
+    """Fetch positions from IPFS (cached) and enrich each with its processed_shares."""
     positions = await fetch_positions_from_ipfs(block_number=block_number)
     enriched: list[OsTokenPosition] = []
     async for position, processed_shares in aioitertools.zip(
@@ -137,6 +143,7 @@ async def fetch_positions_with_processed_shares(
     return enriched
 
 
+@with_lock
 async def fetch_positions_from_ipfs(
     block_number: BlockNumber,
 ) -> list[OsTokenPosition]:
