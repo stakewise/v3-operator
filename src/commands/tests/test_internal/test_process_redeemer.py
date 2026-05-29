@@ -145,6 +145,23 @@ class TestRedeemPositions:
         assert first_position.owner == OWNER_1 and first_position.shares_to_redeem == Wei(500)
         assert second_position.owner == OWNER_2 and second_position.shares_to_redeem == Wei(200)
 
+    async def test_pre_capped_shares_to_redeem_submitted_not_unprocessed(self) -> None:
+        """assign_shares_to_redeem may cap shares_to_redeem below unprocessed_shares.
+        redeem_positions must submit the pre-capped value, not re-derive from unprocessed_shares."""
+        # unprocessed_shares = 1000, but budget was exhausted mid-position
+        pos = make_position(leaf_shares=1000, processed_shares=0, shares_to_redeem=400)
+
+        with _mock_redeem_positions(withdrawable=Wei(10000)) as mocks:
+            await redeem_positions(
+                all_positions=[pos],
+                os_token_positions=[pos],
+                converter=make_converter(),
+                nonce=5,
+            )
+
+        submitted = _submitted_position(mocks)
+        assert submitted.shares_to_redeem == Wei(400)
+
     async def test_preserves_original_leaf_shares_in_call(self) -> None:
         pos = make_position(leaf_shares=1000, processed_shares=500)
 
@@ -389,11 +406,11 @@ class TestProcess:
         mocks['mock_redeem'].assert_not_called()
 
     async def test_no_eligible_positions(self) -> None:
-        """IPFS returns positions but cut_off_positions filters them all out."""
+        """IPFS returns positions but assign_shares_to_redeem filters them all out."""
         pos = make_position(leaf_shares=1000)
         with (
             _mock_process(positions=[pos]) as mocks,
-            patch(f'{MODULE}.cut_off_positions', new=AsyncMock(return_value=[])),
+            patch(f'{MODULE}.assign_shares_to_redeem', new=AsyncMock(return_value=[])),
         ):
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
             mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
@@ -582,7 +599,7 @@ def _mock_process(
             new=AsyncMock(return_value=positions),
         ),
         patch(
-            f'{MODULE}.cut_off_positions',
+            f'{MODULE}.assign_shares_to_redeem',
             new=AsyncMock(return_value=positions),
         ),
         patch(
@@ -616,16 +633,27 @@ def make_position(
     owner: ChecksumAddress = OWNER_1,
     leaf_shares: int = 1000,
     processed_shares: int = 500,
-    shares_to_redeem: int = 0,
+    shares_to_redeem: int | None = None,
 ) -> OsTokenPosition:
-    """Build a test position. ``processed_shares`` defaults to half of ``leaf_shares`` so
-    redemption-loop tests don't silently no-op when a caller forgets to set it."""
+    """Build a test position.
+
+    ``processed_shares`` defaults to half of ``leaf_shares`` so redemption-loop
+    tests don't silently no-op when a caller forgets to set it.
+
+    ``shares_to_redeem`` defaults to ``leaf_shares - processed_shares``
+    (i.e. unprocessed shares), mirroring what ``assign_shares_to_redeem`` would set
+    before handing positions to ``redeem_positions``.  Pass an explicit value
+    when testing the partial-fill or zero-withdrawable edge cases.
+    """
+    effective_shares_to_redeem = (
+        shares_to_redeem if shares_to_redeem is not None else leaf_shares - processed_shares
+    )
     return OsTokenPosition(
         vault=vault,
         owner=owner,
         leaf_shares=Wei(leaf_shares),
         processed_shares=Wei(processed_shares),
-        shares_to_redeem=Wei(shares_to_redeem),
+        shares_to_redeem=Wei(effective_shares_to_redeem),
     )
 
 

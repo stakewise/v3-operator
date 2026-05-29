@@ -38,7 +38,7 @@ from src.redemptions.os_token_converter import (
     OsTokenConverter,
     create_os_token_converter,
 )
-from src.redemptions.tasks import cut_off_positions
+from src.redemptions.tasks import assign_shares_to_redeem
 from src.redemptions.typings import OsTokenPosition
 from src.validators.execution import get_withdrawable_assets
 
@@ -237,7 +237,7 @@ async def _redeem_os_token_positions(
     positions_with_processed_shares = await fetch_positions_with_processed_shares(
         nonce=nonce, block_number=block_number
     )
-    os_token_positions = await cut_off_positions(
+    os_token_positions = await assign_shares_to_redeem(
         positions_with_processed_shares,
         total_redemption_shares=Wei(queued_shares),
     )
@@ -307,7 +307,8 @@ async def redeem_positions(
     converter: OsTokenConverter,
     nonce: int,
 ) -> None:
-    """Redeem the pre-capped positions one by one.
+    """Redeem positions one by one. Each position's shares_to_redeem is already set by
+    assign_shares_to_redeem; this function further caps it by the vault's withdrawable assets.
 
     Meta-vault positions are skipped entirely. Aborts the round if a single
     redemption tx fails.
@@ -315,7 +316,7 @@ async def redeem_positions(
     vault_to_withdrawable: dict[ChecksumAddress, Wei] = {}
 
     for position in os_token_positions:
-        shares_to_redeem = Wei(position.unprocessed_shares)
+        shares_to_redeem = position.shares_to_redeem
         assets_to_redeem = converter.to_assets(shares_to_redeem)
 
         if await is_meta_vault(position.vault):

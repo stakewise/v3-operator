@@ -1,5 +1,6 @@
 import logging
 from collections import defaultdict
+from dataclasses import replace
 
 from eth_typing import BlockNumber, ChecksumAddress
 from sw_utils import OsTokenConverter
@@ -77,46 +78,49 @@ async def aggregate_redemption_assets_by_vaults(
 ) -> defaultdict[ChecksumAddress, Wei]:
     """
     Iterate through redeemable positions until the total redemption assets are exhausted.
-    Aggregate unprocessed assets by vaults.
+    Aggregate shares_to_redeem by vault and convert to assets.
 
     :param total_redemption_assets: The total amount of assets available for redemption.
     For Gno networks total_redemption_assets is in GNO-Wei.
 
-    :return: A mapping of vault addresses to their corresponding unprocessed assets.
+    :return: A mapping of vault addresses to their corresponding assets to redeem.
     """
     # Convert total redemption assets to shares
     total_redemption_shares = os_token_converter.to_shares(total_redemption_assets)
 
     positions = await fetch_positions_with_processed_shares(nonce=nonce, block_number=block_number)
-    positions = await cut_off_positions(
+    positions = await assign_shares_to_redeem(
         positions,
         total_redemption_shares=total_redemption_shares,
     )
 
-    # Aggregate unprocessed shares by vault
-    vault_to_unprocessed_shares: defaultdict[ChecksumAddress, Wei] = defaultdict(lambda: Wei(0))
+    # Aggregate shares_to_redeem by vault
+    vault_to_shares_to_redeem: defaultdict[ChecksumAddress, Wei] = defaultdict(lambda: Wei(0))
     for position in positions:
-        vault_to_unprocessed_shares[position.vault] += position.unprocessed_shares  # type: ignore
+        vault_to_shares_to_redeem[position.vault] += position.shares_to_redeem  # type: ignore
 
     # Convert shares to assets per vault
     return defaultdict(
         lambda: Wei(0),
         {
             vault: os_token_converter.to_assets(shares)
-            for vault, shares in vault_to_unprocessed_shares.items()
+            for vault, shares in vault_to_shares_to_redeem.items()
         },
     )
 
 
-async def cut_off_positions(
+async def assign_shares_to_redeem(
     positions: list[OsTokenPosition],
     total_redemption_shares: Wei,
 ) -> list[OsTokenPosition]:
     """
-    Iterate pre-enriched positions (unprocessed_shares already set) until the cumulative
-    total reaches total_redemption_shares, then stop. The last included position's
-    unprocessed_shares is capped so the cumulative total does not exceed
-    total_redemption_shares. Fully processed positions are omitted.
+    Iterate pre-enriched positions (processed_shares already set from on-chain) and set
+    shares_to_redeem on each, stopping once the budget is exhausted.
+
+    Rules:
+    - Fully processed positions (unprocessed_shares <= 1) are skipped.
+    - Each position's shares_to_redeem is set to min(unprocessed_shares, remaining_budget).
+    - Iteration stops as soon as the cumulative shares_to_redeem reaches total_redemption_shares.
     """
     redeemable: list[OsTokenPosition] = []
     remaining_shares = total_redemption_shares
@@ -128,14 +132,7 @@ async def cut_off_positions(
             continue
 
         capped_unprocessed = Wei(min(unprocessed_shares, remaining_shares))
-        redeemable.append(
-            OsTokenPosition(
-                owner=position.owner,
-                vault=position.vault,
-                leaf_shares=position.leaf_shares,
-                processed_shares=Wei(position.leaf_shares - capped_unprocessed),
-            )
-        )
+        redeemable.append(replace(position, shares_to_redeem=capped_unprocessed))
         remaining_shares -= capped_unprocessed  # type: ignore
         if remaining_shares <= 0:
             return redeemable

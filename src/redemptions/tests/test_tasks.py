@@ -23,7 +23,7 @@ from src.redemptions.os_token_converter import (
 )
 from src.redemptions.tasks import (
     aggregate_redemption_assets_by_vaults,
-    cut_off_positions,
+    assign_shares_to_redeem,
 )
 from src.redemptions.tests.factories import create_redeemable_positions, make_position
 from src.redemptions.typings import RedeemablePositions
@@ -43,42 +43,50 @@ OWNER_1 = Web3.to_checksum_address('0x' + '33' * 20)
 OWNER_2 = Web3.to_checksum_address('0x' + '44' * 20)
 
 
-class TestCutOffRedeemablePositions:
+class TestAssignSharesToRedeem:
     async def test_all_shares_processed(self) -> None:
         pos = make_position(leaf_shares=1000, processed_shares=1000)
-        result = await cut_off_positions([pos], total_redemption_shares=Wei(10**18))
+        result = await assign_shares_to_redeem([pos], total_redemption_shares=Wei(10**18))
         assert result == []
 
     async def test_partial_processed_shares(self) -> None:
         pos = make_position(leaf_shares=1000, processed_shares=300)
-        result = await cut_off_positions([pos], total_redemption_shares=Wei(10**18))
+        result = await assign_shares_to_redeem([pos], total_redemption_shares=Wei(10**18))
         assert len(result) == 1
+        assert result[0].processed_shares == Wei(300)
         assert result[0].unprocessed_shares == Wei(700)
+        assert result[0].shares_to_redeem == Wei(700)
         assert result[0].leaf_shares == Wei(1000)
 
     async def test_multiple_positions_mixed(self) -> None:
         pos1 = make_position(vault=VAULT_1, owner=OWNER_1, leaf_shares=1000, processed_shares=1000)
         pos2 = make_position(vault=VAULT_2, owner=OWNER_2, leaf_shares=2000, processed_shares=500)
 
-        result = await cut_off_positions([pos1, pos2], total_redemption_shares=Wei(10**18))
+        result = await assign_shares_to_redeem([pos1, pos2], total_redemption_shares=Wei(10**18))
         assert len(result) == 1
         assert result[0].owner == OWNER_2
+        assert result[0].processed_shares == Wei(500)
         assert result[0].unprocessed_shares == Wei(1500)
+        assert result[0].shares_to_redeem == Wei(1500)
 
     async def test_cap_trims_last_position(self) -> None:
         pos = make_position(leaf_shares=1000, processed_shares=0)
-        result = await cut_off_positions([pos], total_redemption_shares=Wei(400))
+        result = await assign_shares_to_redeem([pos], total_redemption_shares=Wei(400))
         assert len(result) == 1
-        assert result[0].unprocessed_shares == Wei(400)
+        assert result[0].processed_shares == Wei(0)
+        assert result[0].unprocessed_shares == Wei(1000)
+        assert result[0].shares_to_redeem == Wei(400)
 
     async def test_cap_stops_after_first_position(self) -> None:
         pos1 = make_position(vault=VAULT_1, owner=OWNER_1, leaf_shares=1000, processed_shares=0)
         pos2 = make_position(vault=VAULT_2, owner=OWNER_2, leaf_shares=2000, processed_shares=0)
 
-        result = await cut_off_positions([pos1, pos2], total_redemption_shares=Wei(1000))
+        result = await assign_shares_to_redeem([pos1, pos2], total_redemption_shares=Wei(1000))
         assert len(result) == 1
         assert result[0].owner == OWNER_1
+        assert result[0].processed_shares == Wei(0)
         assert result[0].unprocessed_shares == Wei(1000)
+        assert result[0].shares_to_redeem == Wei(1000)
 
 
 class TestAggregateRedemptionAssetsByVaults:
