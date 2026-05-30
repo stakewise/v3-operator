@@ -119,7 +119,7 @@ async def iter_processed_shares(
             batch, nonce, block_number
         )
         for res in rpc_results:
-            yield Wei(Web3.to_int(res))
+            yield res
 
 
 async def fetch_positions_with_processed_shares(

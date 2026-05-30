@@ -29,7 +29,7 @@ from src.config.settings import (
     settings,
 )
 from src.meta_vault.typings import SubVaultExitRequest
-from src.redemptions.typings import RedeemablePositions
+from src.redemptions.typings import OsTokenPosition, RedeemablePositions
 from src.validators.typings import V2ValidatorEventData
 from src.withdrawals.typings import WithdrawalEvent
 
@@ -585,12 +585,13 @@ class OsTokenRedeemerContract(ContractWrapper):
         return Web3.to_hex(tx_hash)
 
     async def multicall_leaf_to_processed_shares(
-        self, positions: list, nonce: int, block_number: BlockNumber
-    ) -> list[bytes]:
+        self, positions: list[OsTokenPosition], nonce: int, block_number: BlockNumber
+    ) -> list[Wei]:
         calls = [
             self.encode_abi('leafToProcessedShares', [p.leaf_hash(nonce - 1)]) for p in positions
         ]
-        return await self.contract.functions.multicall(calls).call(block_identifier=block_number)
+        results = await self.contract.functions.multicall(calls).call(block_identifier=block_number)
+        return [Wei(Web3.to_int(res)) for res in results]
 
     async def batch_update_vault_state(
         self, vault_to_harvest_params: dict[ChecksumAddress, HarvestParams]
