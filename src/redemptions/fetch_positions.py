@@ -91,6 +91,27 @@ async def update_processed_shares_cache() -> None:
     cache.checkpoint_block = block_number
 
 
+async def fetch_positions_with_processed_shares(
+    nonce: int,
+    block_number: BlockNumber,
+) -> list[OsTokenPosition]:
+    """Fetch positions from IPFS (cached) and enrich each with its processed_shares."""
+    positions = await fetch_positions_from_ipfs(block_number=block_number)
+    enriched: list[OsTokenPosition] = []
+    async for position, processed_shares in aioitertools.zip(
+        positions, cached_iter_processed_shares(positions, nonce, block_number)
+    ):
+        enriched.append(
+            OsTokenPosition(
+                owner=position.owner,
+                vault=position.vault,
+                leaf_shares=position.leaf_shares,
+                processed_shares=processed_shares,
+            )
+        )
+    return enriched
+
+
 async def cached_iter_processed_shares(
     positions: list[OsTokenPosition],
     nonce: int,
@@ -120,27 +141,6 @@ async def iter_processed_shares(
         )
         for res in rpc_results:
             yield res
-
-
-async def fetch_positions_with_processed_shares(
-    nonce: int,
-    block_number: BlockNumber,
-) -> list[OsTokenPosition]:
-    """Fetch positions from IPFS (cached) and enrich each with its processed_shares."""
-    positions = await fetch_positions_from_ipfs(block_number=block_number)
-    enriched: list[OsTokenPosition] = []
-    async for position, processed_shares in aioitertools.zip(
-        positions, cached_iter_processed_shares(positions, nonce, block_number)
-    ):
-        enriched.append(
-            OsTokenPosition(
-                owner=position.owner,
-                vault=position.vault,
-                leaf_shares=position.leaf_shares,
-                processed_shares=processed_shares,
-            )
-        )
-    return enriched
 
 
 @with_lock
