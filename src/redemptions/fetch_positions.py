@@ -62,10 +62,14 @@ class ProcessedSharesCache(metaclass=Singleton):
 
 
 @with_lock
-async def update_processed_shares_cache() -> None:
-    """Validate and update the processed shares cache to the current finalized block."""
-    finalized_block = await execution_client.eth.get_block('finalized')
-    block_number = BlockNumber(finalized_block['number'])
+async def update_processed_shares_cache(block_number: BlockNumber | None = None) -> None:
+    """
+    Update the processed shares cache to the given block, 
+    defaulting to the finalized block.
+    """
+    if block_number is None:
+        finalized_block = await execution_client.eth.get_block('finalized')
+        block_number = BlockNumber(finalized_block['number'])
 
     cache = ProcessedSharesCache()
     if cache.checkpoint_block == block_number:
