@@ -118,6 +118,8 @@ async def cached_iter_processed_shares(
     block_number: BlockNumber,
 ) -> AsyncIterator[Wei]:
     cache = ProcessedSharesCache()
+    # Cache was last populated at a finalized block;
+    # verify it's still valid at the current (possibly newer) block
     if await cache.is_valid_on(nonce, block_number):
         for position in positions:
             leaf_hash = Web3.to_hex(position.leaf_hash(nonce - 1))
