@@ -226,10 +226,10 @@ async def _redeem_os_token_positions(
     )
 
     # Update the processed shares cache up to the finalized block
-    await update_processed_shares_cache()
+    await update_processed_shares_cache(block_number)
 
     # Fetch ALL positions from IPFS so the merkle tree matches the on-chain root.
-    all_positions = await fetch_positions_from_ipfs(block_number)
+    all_positions = await fetch_positions_from_ipfs(nonce, block_number)
     if not all_positions:
         logger.info('No positions found. Skipping to next interval.')
         return

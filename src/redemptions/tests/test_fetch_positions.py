@@ -3,7 +3,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from eth_typing import BlockNumber
-from sw_utils.tests import faker
 from web3 import Web3
 from web3.types import Wei
 
@@ -23,6 +22,7 @@ from src.redemptions.tests.factories import create_redeemable_positions, make_po
 
 MODULE = 'src.redemptions.fetch_positions'
 BLOCK = BlockNumber(100)
+NONCE = 5
 
 
 class TestProcessedSharesCacheIsValidOn:
@@ -184,7 +184,7 @@ class TestFetchPositionsFromIpfs:
             f'{MODULE}.os_token_redeemer_contract.redeemable_positions',
             new=AsyncMock(return_value=redeemable),
         ):
-            result = await fetch_positions_from_ipfs(block_number=BLOCK)
+            result = await fetch_positions_from_ipfs(nonce=NONCE, block_number=BLOCK)
         assert result == []
 
     async def test_zero_merkle_root_returns_empty(self):
@@ -193,24 +193,25 @@ class TestFetchPositionsFromIpfs:
             f'{MODULE}.os_token_redeemer_contract.redeemable_positions',
             new=AsyncMock(return_value=redeemable),
         ):
-            result = await fetch_positions_from_ipfs(block_number=BLOCK)
+            result = await fetch_positions_from_ipfs(nonce=NONCE, block_number=BLOCK)
         assert result == []
 
-    async def test_cache_hit_returns_cached_data_without_ipfs_fetch(self):
-        redeemable = create_redeemable_positions()
+    async def test_cache_hit_returns_cached_data_without_any_rpc(self):
         cache = IpfsPositionsCache()
         cached_positions = [make_position()]
-        cache.ipfs_hash = redeemable.ipfs_hash
+        cache.nonce = NONCE
         cache.data = cached_positions
 
+        mock_redeemable = AsyncMock()
         mock_ipfs = AsyncMock()
         with patch(
             f'{MODULE}.os_token_redeemer_contract.redeemable_positions',
-            new=AsyncMock(return_value=redeemable),
+            new=mock_redeemable,
         ), patch(f'{MODULE}.ipfs_fetch_client.fetch_json', new=mock_ipfs):
-            result = await fetch_positions_from_ipfs(block_number=BLOCK)
+            result = await fetch_positions_from_ipfs(nonce=NONCE, block_number=BLOCK)
 
         assert result is cached_positions
+        mock_redeemable.assert_not_called()
         mock_ipfs.assert_not_called()
 
     async def test_cache_miss_fetches_ipfs_and_updates_cache(self):
@@ -224,7 +225,7 @@ class TestFetchPositionsFromIpfs:
             f'{MODULE}.ipfs_fetch_client.fetch_json',
             new=AsyncMock(return_value=[pos.as_dict()]),
         ):
-            result = await fetch_positions_from_ipfs(block_number=BLOCK)
+            result = await fetch_positions_from_ipfs(nonce=NONCE, block_number=BLOCK)
 
         assert len(result) == 1
         assert result[0].owner == pos.owner
@@ -233,7 +234,7 @@ class TestFetchPositionsFromIpfs:
         assert result[0].processed_shares == Wei(0)
 
         cache = IpfsPositionsCache()
-        assert cache.ipfs_hash == redeemable.ipfs_hash
+        assert cache.nonce == NONCE
         assert cache.data == result
 
     async def test_multiple_positions_parsed(self):
@@ -247,34 +248,30 @@ class TestFetchPositionsFromIpfs:
             f'{MODULE}.ipfs_fetch_client.fetch_json',
             new=AsyncMock(return_value=[p.as_dict() for p in positions]),
         ):
-            result = await fetch_positions_from_ipfs(block_number=BLOCK)
+            result = await fetch_positions_from_ipfs(nonce=NONCE, block_number=BLOCK)
 
         assert len(result) == 3
         assert [p.leaf_shares for p in result] == [Wei(100), Wei(200), Wei(300)]
 
-    async def test_different_ipfs_hash_refetches_and_updates_cache(self):
-        old_hash = faker.ipfs_hash()
+    async def test_different_nonce_refetches_and_updates_cache(self):
         cache = IpfsPositionsCache()
-        cache.ipfs_hash = old_hash
+        cache.nonce = NONCE - 1
         cache.data = []
-
-        redeemable = create_redeemable_positions()
-        assert redeemable.ipfs_hash != old_hash
 
         pos = make_position(leaf_shares=777, processed_shares=0)
 
         with patch(
             f'{MODULE}.os_token_redeemer_contract.redeemable_positions',
-            new=AsyncMock(return_value=redeemable),
+            new=AsyncMock(return_value=create_redeemable_positions()),
         ), patch(
             f'{MODULE}.ipfs_fetch_client.fetch_json',
             new=AsyncMock(return_value=[pos.as_dict()]),
         ):
-            result = await fetch_positions_from_ipfs(block_number=BLOCK)
+            result = await fetch_positions_from_ipfs(nonce=NONCE, block_number=BLOCK)
 
         assert len(result) == 1
         assert result[0].leaf_shares == pos.leaf_shares
-        assert cache.ipfs_hash == redeemable.ipfs_hash
+        assert cache.nonce == NONCE
 
     @pytest.mark.parametrize('block', [BlockNumber(1), BlockNumber(999)])
     async def test_block_number_forwarded_to_contract(self, block):
@@ -283,13 +280,9 @@ class TestFetchPositionsFromIpfs:
             f'{MODULE}.os_token_redeemer_contract.redeemable_positions',
             new=mock_redeemable,
         ):
-            await fetch_positions_from_ipfs(block_number=block)
+            await fetch_positions_from_ipfs(nonce=NONCE, block_number=block)
 
         mock_redeemable.assert_called_once_with(block_number=block)
-
-
-def encode_wei(value: int) -> bytes:
-    return value.to_bytes(32, 'big')
 
 
 class TestIterProcessedShares:
@@ -340,9 +333,7 @@ class TestIterProcessedShares:
         assert multicall_mock.call_count == 2
 
     def _mock_multicall(self, *batch_results: list[int]):
-        return mock.AsyncMock(
-            side_effect=[[encode_wei(v) for v in batch] for batch in batch_results]
-        )
+        return mock.AsyncMock(side_effect=[[Wei(v) for v in batch] for batch in batch_results])
 
 
 class TestCachedIterProcessedShares:
