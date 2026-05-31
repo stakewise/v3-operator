@@ -99,6 +99,11 @@ async def wait_for_execution_endpoints_synced(target_block: BlockNumber) -> None
         await asyncio.sleep(EXECUTION_ENDPOINT_SYNC_POLL_INTERVAL)
 
 
+async def get_finalized_block_number() -> BlockNumber:
+    finalized_block = await execution_client.eth.get_block('finalized')
+    return BlockNumber(finalized_block['number'])
+
+
 def build_gas_manager() -> GasManager:
     min_effective_priority_fee_per_gas = settings.network_config.MIN_EFFECTIVE_PRIORITY_FEE_PER_GAS
     return GasManager(

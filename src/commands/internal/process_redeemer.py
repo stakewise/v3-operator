@@ -19,6 +19,7 @@ from src.common.clients import close_clients, execution_client, setup_clients
 from src.common.contracts import os_token_redeemer_contract
 from src.common.execution import (
     check_gas_price,
+    get_finalized_block_number,
     transaction_gas_wrapper,
     wait_for_execution_endpoints_synced,
 )
@@ -30,8 +31,9 @@ from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import MULTICALL_CHUNK_SIZE, settings
 from src.meta_vault.service import is_meta_vault
 from src.redemptions.fetch_positions import (
-    fetch_positions_from_ipfs,
+    cached_fetch_positions_from_ipfs,
     fetch_positions_with_processed_shares,
+    update_positions_cache,
     update_processed_shares_cache,
 )
 from src.redemptions.os_token_converter import (
@@ -225,11 +227,13 @@ async def _redeem_os_token_positions(
         settings.network_config.VAULT_BALANCE_SYMBOL,
     )
 
-    # Update the processed shares cache up to the finalized block
-    await update_processed_shares_cache(block_number)
+    # Update both caches at the finalized block
+    finalized_block_number = await get_finalized_block_number()
+    await update_positions_cache(finalized_block_number)
+    await update_processed_shares_cache(finalized_block_number)
 
     # Fetch ALL positions from IPFS so the merkle tree matches the on-chain root.
-    all_positions = await fetch_positions_from_ipfs(nonce, block_number)
+    all_positions = await cached_fetch_positions_from_ipfs(nonce, block_number)
     if not all_positions:
         logger.info('No positions found. Skipping to next interval.')
         return

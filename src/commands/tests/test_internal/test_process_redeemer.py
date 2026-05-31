@@ -590,8 +590,10 @@ def _mock_process(
             new=AsyncMock(return_value=make_converter()),
         ),
         patch(f'{MODULE}.settings') as mock_settings,
+        patch(f'{MODULE}.get_finalized_block_number', new=AsyncMock(return_value=BlockNumber(100))),
+        patch(f'{MODULE}.update_positions_cache', new=AsyncMock()),
         patch(
-            f'{MODULE}.fetch_positions_from_ipfs',
+            f'{MODULE}.cached_fetch_positions_from_ipfs',
             new=AsyncMock(return_value=positions),
         ),
         patch(

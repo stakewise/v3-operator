@@ -8,7 +8,7 @@ from eth_typing import BlockNumber, HexStr
 from web3 import Web3
 from web3.types import Wei
 
-from src.common.clients import execution_client, ipfs_fetch_client
+from src.common.clients import ipfs_fetch_client
 from src.common.contracts import os_token_redeemer_contract
 from src.common.typings import Singleton
 from src.config.settings import settings
@@ -32,7 +32,11 @@ def with_lock(func: Callable[..., Any]) -> Callable[..., Any]:
 class IpfsPositionsCache(metaclass=Singleton):
     def __init__(self) -> None:
         self.nonce: int | None = None
+        self.checkpoint_block: BlockNumber | None = None
         self.data: list[OsTokenPosition] = []
+
+    def is_valid_for(self, nonce: int) -> bool:
+        return self.nonce == nonce
 
 
 class ProcessedSharesCache(metaclass=Singleton):
@@ -62,19 +66,28 @@ class ProcessedSharesCache(metaclass=Singleton):
 
 
 @with_lock
-async def update_processed_shares_cache(block_number: BlockNumber | None = None) -> None:
-    """
-    Update the processed shares cache to the given block (capped at finalized),
-    defaulting to the finalized block.
-    """
-    finalized_block = await execution_client.eth.get_block('finalized')
-    finalized_block_number = BlockNumber(finalized_block['number'])
-    block_number = (
-        min(block_number, finalized_block_number)
-        if block_number is not None
-        else finalized_block_number
-    )
+async def update_positions_cache(block_number: BlockNumber) -> None:
+    """Update the IPFS positions cache to the given finalized block."""
+    cache = IpfsPositionsCache()
+    if cache.checkpoint_block == block_number:
+        return
 
+    nonce = await os_token_redeemer_contract.nonce(block_number)
+    if nonce == 0:
+        cache.nonce = nonce
+        cache.data = []
+        cache.checkpoint_block = block_number
+        return
+
+    if not cache.is_valid_for(nonce):
+        cache.data = await fetch_positions_from_ipfs(block_number=block_number)
+        cache.nonce = nonce
+    cache.checkpoint_block = block_number
+
+
+@with_lock
+async def update_processed_shares_cache(block_number: BlockNumber) -> None:
+    """Update the processed shares cache to the given finalized block."""
     cache = ProcessedSharesCache()
     if cache.checkpoint_block == block_number:
         return
@@ -87,7 +100,7 @@ async def update_processed_shares_cache(block_number: BlockNumber | None = None)
         return
 
     if not await cache.is_valid_on(nonce, block_number):
-        positions = await fetch_positions_from_ipfs(nonce=nonce, block_number=block_number)
+        positions = await cached_fetch_positions_from_ipfs(nonce=nonce, block_number=block_number)
         data: dict[HexStr, Wei] = {}
         async for position, processed_shares in aioitertools.zip(
             positions, iter_processed_shares(positions, nonce, block_number)
@@ -104,7 +117,7 @@ async def fetch_positions_with_processed_shares(
     block_number: BlockNumber,
 ) -> list[OsTokenPosition]:
     """Fetch positions from IPFS (cached) and enrich each with its processed_shares."""
-    positions = await fetch_positions_from_ipfs(nonce=nonce, block_number=block_number)
+    positions = await cached_fetch_positions_from_ipfs(nonce=nonce, block_number=block_number)
     enriched: list[OsTokenPosition] = []
     async for position, processed_shares in aioitertools.zip(
         positions, cached_iter_processed_shares(positions, nonce, block_number)
@@ -153,24 +166,25 @@ async def iter_processed_shares(
             yield res
 
 
-@with_lock
-async def fetch_positions_from_ipfs(
+async def cached_fetch_positions_from_ipfs(
     nonce: int,
     block_number: BlockNumber,
 ) -> list[OsTokenPosition]:
-    """
-    Fetch redeemable positions from IPFS for the given nonce.
-    Results are cached by nonce — IPFS data only changes when nonce changes.
-    """
+    """Return cached positions if still valid for the given nonce and block, otherwise fetch."""
     cache = IpfsPositionsCache()
-    if cache.nonce == nonce:
+    if cache.is_valid_for(nonce):
         return cache.data
+    return await fetch_positions_from_ipfs(block_number=block_number)
 
+
+async def fetch_positions_from_ipfs(
+    block_number: BlockNumber,
+) -> list[OsTokenPosition]:
+    """Fetch redeemable positions from IPFS. No caching."""
     redeemable_positions = await os_token_redeemer_contract.redeemable_positions(
         block_number=block_number
     )
 
-    # Check whether redeemable positions are available
     if not redeemable_positions.ipfs_hash:
         return []
     if redeemable_positions.merkle_root == ZERO_MERKLE_ROOT:
@@ -182,7 +196,7 @@ async def fetch_positions_from_ipfs(
     # data structure example:
     # [{"owner:" 0x01, "leaf_shares": 100000, "vault": 0x02}, ...]
 
-    positions = [
+    return [
         OsTokenPosition(
             owner=Web3.to_checksum_address(item['owner']),
             vault=Web3.to_checksum_address(item['vault']),
@@ -190,6 +204,3 @@ async def fetch_positions_from_ipfs(
         )
         for item in data
     ]
-    cache.nonce = nonce
-    cache.data = positions
-    return positions

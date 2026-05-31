@@ -8,10 +8,12 @@ from sw_utils.typings import ChainHead, ProtocolConfig
 from web3.types import Wei
 
 from src.common.contracts import os_token_redeemer_contract
+from src.common.execution import get_finalized_block_number
 from src.common.protocol_config import get_protocol_config
 from src.config.settings import settings
 from src.redemptions.fetch_positions import (
     fetch_positions_with_processed_shares,
+    update_positions_cache,
     update_processed_shares_cache,
 )
 from src.redemptions.os_token_converter import create_os_token_converter
@@ -30,7 +32,11 @@ async def get_redemption_assets(chain_head: ChainHead) -> Wei:
         logger.info('Zero nonce for redemption. Skipping redemption assets.')
         return Wei(0)
 
-    await update_processed_shares_cache()
+    # Update osToken positions caches
+    finalized_block_number = await get_finalized_block_number()
+    await update_positions_cache(finalized_block_number)
+    await update_processed_shares_cache(finalized_block_number)
+
     protocol_config = await get_protocol_config()
     vault_to_redemption_assets = await get_vault_to_redemption_assets_direct(
         chain_head=chain_head, nonce=nonce, protocol_config=protocol_config
