@@ -11,14 +11,13 @@ from web3.types import Wei
 from src.common.clients import ipfs_fetch_client
 from src.common.contracts import multicall_contract, os_token_redeemer_contract
 from src.common.protocol_config import get_protocol_config
-from src.config.settings import settings
+from src.config.settings import MULTICALL_CHUNK_SIZE, settings
 from src.redemptions.os_token_converter import create_os_token_converter
 from src.redemptions.typings import OsTokenPosition
 
 logger = logging.getLogger(__name__)
 
 
-batch_size = 20
 ZERO_MERKLE_ROOT = HexStr('0x' + '0' * 64)
 
 
@@ -159,8 +158,8 @@ async def cut_off_redeemable_positions(
     redeemable: list[OsTokenPosition] = []
     remaining_shares = total_redemption_shares
 
-    for i in range(0, len(all_positions), batch_size):
-        batch = all_positions[i : i + batch_size]
+    for i in range(0, len(all_positions), MULTICALL_CHUNK_SIZE):
+        batch = all_positions[i : i + MULTICALL_CHUNK_SIZE]
         processed_shares_batch = await get_processed_shares_batch(
             os_token_positions_batch=batch,
             nonce=nonce,

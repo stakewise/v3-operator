@@ -12,13 +12,13 @@ from web3 import Web3
 from web3.types import Wei
 
 from src.common.tests.utils import parse_wei
+from src.config.settings import MULTICALL_CHUNK_SIZE
 from src.redemptions.os_token_converter import (
     create_os_token_converter,
     os_token_vault_controller_contract,
 )
 from src.redemptions.tasks import (
     aggregate_redemption_assets_by_vaults,
-    batch_size,
     cut_off_redeemable_positions,
     ipfs_fetch_client,
     os_token_redeemer_contract,
@@ -88,8 +88,8 @@ class TestCutOffRedeemablePositions:
         assert result[0].unprocessed_shares == Wei(400)
 
     async def test_two_batches(self) -> None:
-        # batch_size=20: first batch has 20 positions, second has 5
-        first_batch = [make_position(leaf_shares=1000) for _ in range(batch_size)]
+        # MULTICALL_CHUNK_SIZE=20: first batch has 20 positions, second has 5
+        first_batch = [make_position(leaf_shares=1000) for _ in range(MULTICALL_CHUNK_SIZE)]
         second_batch = [make_position(leaf_shares=2000) for _ in range(5)]
         positions = first_batch + second_batch
 
@@ -276,7 +276,7 @@ class TestAggregateRedemptionAssetsByVaults:
         redemption_shares_vault_1 = 0
         redemption_shares_vault_2 = 0
 
-        redemption_users_count_per_vault = int(1.5 * batch_size)
+        redemption_users_count_per_vault = int(1.5 * MULTICALL_CHUNK_SIZE)
         processed_shares_max_index = 50
 
         # Create 50 users per vault
@@ -313,7 +313,7 @@ class TestAggregateRedemptionAssetsByVaults:
         total_redemption_shares = redemption_shares_vault_1 + redemption_shares_vault_2
         total_redemption_assets = total_redemption_shares * Decimal('1.1')
 
-        processed_shares_batches = list(itertools.batched(processed_shares, batch_size))
+        processed_shares_batches = list(itertools.batched(processed_shares, MULTICALL_CHUNK_SIZE))
 
         with self.patch(
             redeemable_positions_ipfs_data=redeemable_positions_ipfs_data,
