@@ -446,4 +446,6 @@ LOG_WHITELISTED_DOMAINS = decouple_config(
     'LOG_WHITELISTED_DOMAINS', cast=Csv(), default='stakewise.io,localhost'
 )
 
-MULTICALL_CHUNK_SIZE: int = decouple_config('MULTICALL_CHUNK_SIZE', default=1000, cast=int)
+OS_TOKEN_REDEEMER_CHUNK_SIZE: int = decouple_config(
+    'OS_TOKEN_REDEEMER_CHUNK_SIZE', default=1000, cast=int
+)
