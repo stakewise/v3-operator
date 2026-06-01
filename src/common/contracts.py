@@ -219,6 +219,11 @@ class VaultContract(ContractWrapper, VaultStateMixin):
     async def mev_escrow(self) -> ChecksumAddress:
         return await self.contract.functions.mevEscrow().call()
 
+    async def is_state_update_required(self, block_number: BlockNumber | None = None) -> bool:
+        return await self.contract.functions.isStateUpdateRequired().call(
+            block_identifier=block_number
+        )
+
     async def version(self) -> int:
         return await self.contract.functions.version().call()
 
@@ -574,34 +579,6 @@ class OsTokenRedeemerContract(ContractWrapper):
         tx_function = self.contract.functions.processExitQueue()
         tx_hash = await transaction_gas_wrapper(tx_function)
         return Web3.to_hex(tx_hash)
-
-    async def batch_update_vault_state(
-        self, vault_to_harvest_params: dict[ChecksumAddress, HarvestParams]
-    ) -> HexStr:
-        """Batch ``updateVaultState`` calls into a single multicall on this contract."""
-        calls = [
-            self._encode_update_vault_state(vault, harvest_params)
-            for vault, harvest_params in vault_to_harvest_params.items()
-        ]
-        tx_function = self.contract.functions.multicall(calls)
-        tx_hash = await transaction_gas_wrapper(tx_function)
-        return Web3.to_hex(tx_hash)
-
-    def _encode_update_vault_state(
-        self, vault: ChecksumAddress, harvest_params: HarvestParams
-    ) -> HexStr:
-        return self.encode_abi(
-            'updateVaultState',
-            [
-                vault,
-                (
-                    harvest_params.rewards_root,
-                    harvest_params.reward,
-                    harvest_params.unlocked_mev_reward,
-                    harvest_params.proof,
-                ),
-            ],
-        )
 
 
 class ValidatorsCheckerContract(ContractWrapper):
