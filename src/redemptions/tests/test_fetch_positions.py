@@ -6,12 +6,11 @@ from eth_typing import BlockNumber
 from web3 import Web3
 from web3.types import Wei
 
-from src.config.settings import settings
+from src.config.settings import EXECUTION_BATCH_SIZE, settings
 from src.redemptions.fetch_positions import (
     ZERO_MERKLE_ROOT,
     IpfsPositionsCache,
     ProcessedSharesCache,
-    batch_size,
     cached_fetch_positions_from_ipfs,
     cached_iter_processed_shares,
     fetch_positions_from_ipfs,
@@ -347,12 +346,12 @@ class TestIterProcessedShares:
         assert results == [Wei(50), Wei(200), Wei(0)]
 
     async def test_two_batches(self):
-        first_batch = [make_position(leaf_shares=1000) for _ in range(batch_size)]
+        first_batch = [make_position(leaf_shares=1000) for _ in range(EXECUTION_BATCH_SIZE)]
         second_batch = [make_position(leaf_shares=2000) for _ in range(5)]
         positions = first_batch + second_batch
 
-        half = batch_size // 2
-        batch1_processed = [1000] * half + [0] * (batch_size - half)
+        half = EXECUTION_BATCH_SIZE // 2
+        batch1_processed = [1000] * half + [0] * (EXECUTION_BATCH_SIZE - half)
         batch2_processed = [0] * 5
 
         multicall_mock = self._mock_multicall(batch1_processed, batch2_processed)
@@ -366,9 +365,9 @@ class TestIterProcessedShares:
                 )
             ]
 
-        assert len(results) == batch_size + 5
-        assert results[:batch_size] == [Wei(v) for v in batch1_processed]
-        assert results[batch_size:] == [Wei(v) for v in batch2_processed]
+        assert len(results) == EXECUTION_BATCH_SIZE + 5
+        assert results[:EXECUTION_BATCH_SIZE] == [Wei(v) for v in batch1_processed]
+        assert results[EXECUTION_BATCH_SIZE:] == [Wei(v) for v in batch2_processed]
         assert multicall_mock.call_count == 2
 
     def _mock_multicall(self, *batch_results: list[int]):

@@ -12,8 +12,8 @@ from web3 import Web3
 from web3.types import Wei
 
 from src.common.tests.utils import parse_wei
+from src.config.settings import EXECUTION_BATCH_SIZE
 from src.redemptions.fetch_positions import (
-    batch_size,
     ipfs_fetch_client,
     os_token_redeemer_contract,
 )
@@ -235,7 +235,7 @@ class TestAggregateRedemptionAssetsByVaults:
         redemption_shares_vault_1 = 0
         redemption_shares_vault_2 = 0
 
-        redemption_users_count_per_vault = int(1.5 * batch_size)
+        redemption_users_count_per_vault = int(1.5 * EXECUTION_BATCH_SIZE)
         processed_shares_max_index = 50
 
         # Create 50 users per vault
