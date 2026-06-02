@@ -17,12 +17,14 @@ from src.redemptions.typings import OsTokenPosition
 ZERO_MERKLE_ROOT = HexStr('0x' + '0' * 64)
 
 
-def with_lock(func: Callable[..., Any]) -> Callable[..., Any]:
-    lock = asyncio.Lock()
+# Shared lock guarding both caches so updates and validity reads don't race.
+_cache_lock = asyncio.Lock()
 
+
+def with_lock(func: Callable[..., Any]) -> Callable[..., Any]:
     @functools.wraps(func)
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        async with lock:
+        async with _cache_lock:
             return await func(*args, **kwargs)
 
     return wrapper
@@ -139,11 +141,20 @@ async def cached_iter_processed_shares(
 ) -> AsyncIterator[Wei]:
     cache = ProcessedSharesCache()
     # Cache was last populated at a finalized block;
-    # verify it's still valid at the current (possibly newer) block
-    if await cache.is_valid_on(nonce, block_number):
-        for position in positions:
-            leaf_hash = Web3.to_hex(position.leaf_hash(nonce - 1))
-            yield cache.data[leaf_hash]
+    # verify it's still valid at the current (possibly newer) block.
+    # Hold the shared lock while checking validity and snapshotting the cached
+    # values so a concurrent cache update can't change them mid-read.
+    cached_shares: list[Wei] = []
+    async with _cache_lock:
+        cache_is_valid = await cache.is_valid_on(nonce, block_number)
+        if cache_is_valid:
+            for position in positions:
+                leaf_hash = Web3.to_hex(position.leaf_hash(nonce - 1))
+                cached_shares.append(cache.data[leaf_hash])
+
+    if cache_is_valid:
+        for shares in cached_shares:
+            yield shares
         return
     async for shares in iter_processed_shares(positions, nonce, block_number):
         yield shares
