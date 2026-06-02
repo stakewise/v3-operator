@@ -19,6 +19,7 @@ from src.common.clients import close_clients, execution_client, setup_clients
 from src.common.contracts import os_token_redeemer_contract
 from src.common.execution import (
     check_gas_price,
+    get_finalized_block_number,
     transaction_gas_wrapper,
     wait_for_execution_endpoints_synced,
 )
@@ -29,14 +30,17 @@ from src.common.wallet import wallet
 from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import MULTICALL_CHUNK_SIZE, settings
 from src.meta_vault.service import is_meta_vault
+from src.redemptions.fetch_positions import (
+    cached_fetch_positions_from_ipfs,
+    fetch_positions_with_processed_shares,
+    update_positions_cache,
+    update_processed_shares_cache,
+)
 from src.redemptions.os_token_converter import (
     OsTokenConverter,
     create_os_token_converter,
 )
-from src.redemptions.tasks import (
-    cut_off_redeemable_positions,
-    fetch_positions_from_ipfs,
-)
+from src.redemptions.tasks import assign_shares_to_redeem
 from src.redemptions.typings import OsTokenPosition
 from src.validators.execution import get_withdrawable_assets
 
@@ -211,13 +215,10 @@ async def _redeem_os_token_positions(
         )
         return
 
-    # The Merkle root was calculated before the nonce was incremented
-    # in setRedeemablePositions, so we use the previous nonce for Merkle proofs.
     nonce = await os_token_redeemer_contract.nonce(block_number)
     if nonce == 0:
         logger.info('Zero nonce for redemption. Skipping to next interval.')
         return
-    prev_nonce = nonce - 1
 
     logger.info(
         'Process queued shares for Redemption: %s (~%s %s)',
@@ -226,17 +227,23 @@ async def _redeem_os_token_positions(
         settings.network_config.VAULT_BALANCE_SYMBOL,
     )
 
+    # Update both caches at the finalized block
+    finalized_block_number = await get_finalized_block_number()
+    await update_positions_cache(finalized_block_number)
+    await update_processed_shares_cache(finalized_block_number)
+
     # Fetch ALL positions from IPFS so the merkle tree matches the on-chain root.
-    all_positions = await fetch_positions_from_ipfs(block_number)
+    all_positions = await cached_fetch_positions_from_ipfs(nonce, block_number)
     if not all_positions:
         logger.info('No positions found. Skipping to next interval.')
         return
 
-    os_token_positions = await cut_off_redeemable_positions(
-        all_positions,
-        nonce=prev_nonce,
+    positions_with_processed_shares = await fetch_positions_with_processed_shares(
+        nonce=nonce, block_number=block_number
+    )
+    os_token_positions = await assign_shares_to_redeem(
+        positions_with_processed_shares,
         total_redemption_shares=Wei(queued_shares),
-        block_number=block_number,
     )
     if not os_token_positions:
         logger.info('No redeemable positions found. Skipping to next interval.')
@@ -251,7 +258,7 @@ async def _redeem_os_token_positions(
         all_positions=all_positions,
         os_token_positions=os_token_positions,
         converter=os_token_converter,
-        tree_nonce=prev_nonce,
+        nonce=nonce,
     )
 
 
@@ -302,9 +309,10 @@ async def redeem_positions(
     all_positions: list[OsTokenPosition],
     os_token_positions: list[OsTokenPosition],
     converter: OsTokenConverter,
-    tree_nonce: int,
+    nonce: int,
 ) -> None:
-    """Redeem the pre-capped positions one by one.
+    """Redeem positions one by one. Each position's shares_to_redeem is already set by
+    assign_shares_to_redeem; this function further caps it by the vault's withdrawable assets.
 
     Meta-vault positions are skipped entirely. Aborts the round if a single
     redemption tx fails.
@@ -312,7 +320,7 @@ async def redeem_positions(
     vault_to_withdrawable: dict[ChecksumAddress, Wei] = {}
 
     for position in os_token_positions:
-        shares_to_redeem = Wei(position.unprocessed_shares)
+        shares_to_redeem = position.shares_to_redeem
         assets_to_redeem = converter.to_assets(shares_to_redeem)
 
         if await is_meta_vault(position.vault):
@@ -338,7 +346,7 @@ async def redeem_positions(
         receipt_block = await _submit_redeem_position(
             position=position_to_redeem,
             all_positions=all_positions,
-            tree_nonce=tree_nonce,
+            nonce=nonce,
         )
         if receipt_block is None:
             return
@@ -376,7 +384,7 @@ async def _startup_check() -> None:
 async def _submit_redeem_position(
     position: OsTokenPosition,
     all_positions: list[OsTokenPosition],
-    tree_nonce: int,
+    nonce: int,
 ) -> BlockNumber | None:
     """Submit one redeemOsTokenPositions transaction for a single position.
 
@@ -384,7 +392,7 @@ async def _submit_redeem_position(
     fallback endpoints lagging behind), ``None`` otherwise.
     """
     multiproof = _build_multi_proof(
-        tree_nonce=tree_nonce,
+        nonce=nonce,
         all_positions=all_positions,
         positions_to_redeem=[position],
     )
@@ -434,15 +442,15 @@ async def _submit_redeem_position(
 
 
 def _build_multi_proof(
-    tree_nonce: int,
+    nonce: int,
     all_positions: list[OsTokenPosition],
     positions_to_redeem: list[OsTokenPosition],
 ) -> MultiProof[tuple[int, ChecksumAddress, Wei, ChecksumAddress]]:
     """Build a merkle multiproof from all positions, proving the positions to redeem."""
-    all_leaves = [p.merkle_leaf(tree_nonce) for p in all_positions]
+    all_leaves = [p.merkle_leaf(nonce - 1) for p in all_positions]
     tree = StandardMerkleTree.of(
         all_leaves,
         ['uint256', 'address', 'uint256', 'address'],
     )
-    redeem_leaves = [p.merkle_leaf(tree_nonce) for p in positions_to_redeem]
+    redeem_leaves = [p.merkle_leaf(nonce - 1) for p in positions_to_redeem]
     return tree.get_multi_proof(redeem_leaves)

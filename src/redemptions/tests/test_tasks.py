@@ -1,9 +1,9 @@
-import itertools
 import random
+from collections.abc import AsyncIterator
 from contextlib import contextmanager
 from decimal import Decimal
+from typing import Any
 from unittest import mock
-from unittest.mock import AsyncMock, patch
 
 import pytest
 from eth_typing import BlockNumber, HexStr
@@ -12,19 +12,30 @@ from web3 import Web3
 from web3.types import Wei
 
 from src.common.tests.utils import parse_wei
+from src.config.settings import EXECUTION_BATCH_SIZE
+from src.redemptions.fetch_positions import (
+    ipfs_fetch_client,
+    os_token_redeemer_contract,
+)
 from src.redemptions.os_token_converter import (
     create_os_token_converter,
     os_token_vault_controller_contract,
 )
 from src.redemptions.tasks import (
     aggregate_redemption_assets_by_vaults,
-    batch_size,
-    cut_off_redeemable_positions,
-    ipfs_fetch_client,
-    os_token_redeemer_contract,
+    assign_shares_to_redeem,
 )
 from src.redemptions.tests.factories import create_redeemable_positions, make_position
 from src.redemptions.typings import RedeemablePositions
+
+
+def make_async_gen(values: list[int]) -> Any:
+    async def _gen(*args: Any, **kwargs: Any) -> AsyncIterator[Wei]:
+        for v in values:
+            yield Wei(v)
+
+    return _gen
+
 
 VAULT_1 = Web3.to_checksum_address('0x' + '11' * 20)
 VAULT_2 = Web3.to_checksum_address('0x' + '22' * 20)
@@ -32,104 +43,50 @@ OWNER_1 = Web3.to_checksum_address('0x' + '33' * 20)
 OWNER_2 = Web3.to_checksum_address('0x' + '44' * 20)
 
 
-class TestCutOffRedeemablePositions:
+class TestAssignSharesToRedeem:
     async def test_all_shares_processed(self) -> None:
-        pos = make_position(leaf_shares=1000)
-        with patch(
-            'src.redemptions.tasks.get_processed_shares_batch',
-            new=AsyncMock(return_value=[Wei(1000)]),
-        ):
-            result = await cut_off_redeemable_positions(
-                [pos], nonce=5, total_redemption_shares=Wei(10**18), block_number=BlockNumber(100)
-            )
+        pos = make_position(leaf_shares=1000, processed_shares=1000)
+        result = await assign_shares_to_redeem([pos], total_redemption_shares=Wei(10**18))
         assert result == []
 
     async def test_partial_processed_shares(self) -> None:
-        pos = make_position(leaf_shares=1000)
-        with patch(
-            'src.redemptions.tasks.get_processed_shares_batch',
-            new=AsyncMock(return_value=[Wei(300)]),
-        ):
-            result = await cut_off_redeemable_positions(
-                [pos], nonce=5, total_redemption_shares=Wei(10**18), block_number=BlockNumber(100)
-            )
+        pos = make_position(leaf_shares=1000, processed_shares=300)
+        result = await assign_shares_to_redeem([pos], total_redemption_shares=Wei(10**18))
         assert len(result) == 1
+        assert result[0].processed_shares == Wei(300)
         assert result[0].unprocessed_shares == Wei(700)
+        assert result[0].shares_to_redeem == Wei(700)
         assert result[0].leaf_shares == Wei(1000)
 
     async def test_multiple_positions_mixed(self) -> None:
-        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, leaf_shares=1000)
-        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, leaf_shares=2000)
+        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, leaf_shares=1000, processed_shares=1000)
+        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, leaf_shares=2000, processed_shares=500)
 
-        with patch(
-            'src.redemptions.tasks.get_processed_shares_batch',
-            new=AsyncMock(return_value=[Wei(1000), Wei(500)]),
-        ):
-            result = await cut_off_redeemable_positions(
-                [pos1, pos2],
-                nonce=5,
-                total_redemption_shares=Wei(10**18),
-                block_number=BlockNumber(100),
-            )
+        result = await assign_shares_to_redeem([pos1, pos2], total_redemption_shares=Wei(10**18))
         assert len(result) == 1
         assert result[0].owner == OWNER_2
+        assert result[0].processed_shares == Wei(500)
         assert result[0].unprocessed_shares == Wei(1500)
+        assert result[0].shares_to_redeem == Wei(1500)
 
     async def test_cap_trims_last_position(self) -> None:
-        pos = make_position(leaf_shares=1000)
-        with patch(
-            'src.redemptions.tasks.get_processed_shares_batch',
-            new=AsyncMock(return_value=[Wei(0)]),
-        ):
-            result = await cut_off_redeemable_positions(
-                [pos], nonce=5, total_redemption_shares=Wei(400), block_number=BlockNumber(100)
-            )
+        pos = make_position(leaf_shares=1000, processed_shares=0)
+        result = await assign_shares_to_redeem([pos], total_redemption_shares=Wei(400))
         assert len(result) == 1
-        assert result[0].unprocessed_shares == Wei(400)
-
-    async def test_two_batches(self) -> None:
-        # batch_size=20: first batch has 20 positions, second has 5
-        first_batch = [make_position(leaf_shares=1000) for _ in range(batch_size)]
-        second_batch = [make_position(leaf_shares=2000) for _ in range(5)]
-        positions = first_batch + second_batch
-
-        # First batch: first 10 fully processed, last 10 unprocessed
-        first_batch_processed = [Wei(1000)] * 10 + [Wei(0)] * 10
-        # Second batch: all unprocessed
-        second_batch_processed = [Wei(0)] * 5
-
-        with patch(
-            'src.redemptions.tasks.get_processed_shares_batch',
-            side_effect=[first_batch_processed, second_batch_processed],
-        ):
-            result = await cut_off_redeemable_positions(
-                positions,
-                nonce=5,
-                total_redemption_shares=Wei(10**18),
-                block_number=BlockNumber(100),
-            )
-
-        assert len(result) == 15
-        assert all(p.unprocessed_shares == Wei(1000) for p in result[:10])
-        assert all(p.unprocessed_shares == Wei(2000) for p in result[10:])
+        assert result[0].processed_shares == Wei(0)
+        assert result[0].unprocessed_shares == Wei(1000)
+        assert result[0].shares_to_redeem == Wei(400)
 
     async def test_cap_stops_after_first_position(self) -> None:
-        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, leaf_shares=1000)
-        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, leaf_shares=2000)
+        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, leaf_shares=1000, processed_shares=0)
+        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, leaf_shares=2000, processed_shares=0)
 
-        with patch(
-            'src.redemptions.tasks.get_processed_shares_batch',
-            new=AsyncMock(return_value=[Wei(0), Wei(0)]),
-        ):
-            result = await cut_off_redeemable_positions(
-                [pos1, pos2],
-                nonce=5,
-                total_redemption_shares=Wei(1000),
-                block_number=BlockNumber(100),
-            )
+        result = await assign_shares_to_redeem([pos1, pos2], total_redemption_shares=Wei(1000))
         assert len(result) == 1
         assert result[0].owner == OWNER_1
+        assert result[0].processed_shares == Wei(0)
         assert result[0].unprocessed_shares == Wei(1000)
+        assert result[0].shares_to_redeem == Wei(1000)
 
 
 class TestAggregateRedemptionAssetsByVaults:
@@ -141,8 +98,9 @@ class TestAggregateRedemptionAssetsByVaults:
             os_token_converter = await create_os_token_converter()
             redemption_assets_by_vaults = await aggregate_redemption_assets_by_vaults(
                 total_redemption_assets,
-                tree_nonce=0,
+                nonce=0,
                 os_token_converter=os_token_converter,
+                block_number=BlockNumber(0),
             )
             assert redemption_assets_by_vaults == {}
 
@@ -177,13 +135,14 @@ class TestAggregateRedemptionAssetsByVaults:
 
         with self.patch(
             redeemable_positions_ipfs_data=redeemable_positions_ipfs_data,
-            processed_shares_batch=processed_shares_batch,
+            processed_shares=processed_shares_batch,
         ):
             os_token_converter = await create_os_token_converter()
             redemption_assets_by_vaults = await aggregate_redemption_assets_by_vaults(
                 total_redemption_assets,
-                tree_nonce=0,
+                nonce=0,
                 os_token_converter=os_token_converter,
+                block_number=BlockNumber(0),
             )
             assert len(redemption_assets_by_vaults) <= 1  # length can be 0 if no assets to redeem
             assert redemption_assets_by_vaults[vault_1] == expected_redeemed_assets
@@ -246,13 +205,14 @@ class TestAggregateRedemptionAssetsByVaults:
 
         with self.patch(
             redeemable_positions_ipfs_data=redeemable_positions_ipfs_data,
-            processed_shares_batch=processed_shares_batch,
+            processed_shares=processed_shares_batch,
         ):
             os_token_converter = await create_os_token_converter()
             redemption_assets_by_vaults = await aggregate_redemption_assets_by_vaults(
                 total_redemption_assets,
-                tree_nonce=0,
+                nonce=0,
                 os_token_converter=os_token_converter,
+                block_number=BlockNumber(0),
             )
             # length can be less than 2 if no assets to redeem
             assert len(redemption_assets_by_vaults) <= 2
@@ -267,7 +227,6 @@ class TestAggregateRedemptionAssetsByVaults:
     async def test_2_vaults_many_users(self):
         """
         The case of two vaults with many users.
-        Check aggregation by vault and batching.
         """
         vault_1 = faker.eth_address()
         vault_2 = faker.eth_address()
@@ -276,7 +235,7 @@ class TestAggregateRedemptionAssetsByVaults:
         redemption_shares_vault_1 = 0
         redemption_shares_vault_2 = 0
 
-        redemption_users_count_per_vault = int(1.5 * batch_size)
+        redemption_users_count_per_vault = int(1.5 * EXECUTION_BATCH_SIZE)
         processed_shares_max_index = 50
 
         # Create 50 users per vault
@@ -313,17 +272,16 @@ class TestAggregateRedemptionAssetsByVaults:
         total_redemption_shares = redemption_shares_vault_1 + redemption_shares_vault_2
         total_redemption_assets = total_redemption_shares * Decimal('1.1')
 
-        processed_shares_batches = list(itertools.batched(processed_shares, batch_size))
-
         with self.patch(
             redeemable_positions_ipfs_data=redeemable_positions_ipfs_data,
-            processed_shares_batches=processed_shares_batches,
+            processed_shares=processed_shares,
         ):
             os_token_converter = await create_os_token_converter()
             redemption_assets_by_vaults = await aggregate_redemption_assets_by_vaults(
                 total_redemption_assets,
-                tree_nonce=0,
+                nonce=0,
                 os_token_converter=os_token_converter,
+                block_number=BlockNumber(0),
             )
             assert len(redemption_assets_by_vaults) == 2
             assert redemption_assets_by_vaults[vault_1] == redemption_shares_vault_1 * Decimal(
@@ -339,8 +297,7 @@ class TestAggregateRedemptionAssetsByVaults:
         os_token_assets_to_shares_ratio: Decimal = Decimal('1.1'),
         redeemable_positions: RedeemablePositions | None = None,
         redeemable_positions_ipfs_data: list[dict] | None = None,
-        processed_shares_batch: list[int] | None = None,
-        processed_shares_batches: list[list[int]] | None = None,
+        processed_shares: list[int] | None = None,
     ):
         if redeemable_positions is None:
             redeemable_positions = create_redeemable_positions()
@@ -350,11 +307,8 @@ class TestAggregateRedemptionAssetsByVaults:
 
         redeemable_positions_ipfs_data = redeemable_positions_ipfs_data or []
 
-        if processed_shares_batch is None:
-            processed_shares_batch = [0] * len(redeemable_positions_ipfs_data)
-
-        if processed_shares_batches is None:
-            processed_shares_batches = [processed_shares_batch]
+        if processed_shares is None:
+            processed_shares = [0] * len(redeemable_positions_ipfs_data)
 
         with mock.patch.object(
             os_token_redeemer_contract, 'redeemable_positions', return_value=redeemable_positions
@@ -367,10 +321,7 @@ class TestAggregateRedemptionAssetsByVaults:
         ), mock.patch.object(
             ipfs_fetch_client, 'fetch_json', return_value=redeemable_positions_ipfs_data
         ), mock.patch(
-            'src.redemptions.tasks.get_processed_shares_batch', side_effect=processed_shares_batches
+            'src.redemptions.fetch_positions.iter_processed_shares',
+            new=make_async_gen(processed_shares),
         ):
             yield
-
-    def get_processed_shares_batch(self, redeemable_positions_batch, nonce) -> list[int]:
-        """A placeholder for the patched method."""
-        return [0] * len(redeemable_positions_batch)

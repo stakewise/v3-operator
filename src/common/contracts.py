@@ -29,7 +29,7 @@ from src.config.settings import (
     settings,
 )
 from src.meta_vault.typings import SubVaultExitRequest
-from src.redemptions.typings import RedeemablePositions
+from src.redemptions.typings import OsTokenPosition, RedeemablePositions
 from src.validators.typings import V2ValidatorEventData
 from src.withdrawals.typings import WithdrawalEvent
 
@@ -570,10 +570,28 @@ class OsTokenRedeemerContract(ContractWrapper):
             block_identifier=block_number
         )
 
+    async def get_os_token_positions_redeemed_events(
+        self, from_block: BlockNumber, to_block: BlockNumber
+    ) -> list[EventData]:
+        return await self._get_events(
+            event=self.contract.events.OsTokenPositionsRedeemed,  # type: ignore
+            from_block=from_block,
+            to_block=to_block,
+        )
+
     async def process_exit_queue(self) -> HexStr:
         tx_function = self.contract.functions.processExitQueue()
         tx_hash = await transaction_gas_wrapper(tx_function)
         return Web3.to_hex(tx_hash)
+
+    async def multicall_leaf_to_processed_shares(
+        self, positions: list[OsTokenPosition], nonce: int, block_number: BlockNumber
+    ) -> list[Wei]:
+        calls = [
+            self.encode_abi('leafToProcessedShares', [p.leaf_hash(nonce - 1)]) for p in positions
+        ]
+        results = await self.contract.functions.multicall(calls).call(block_identifier=block_number)
+        return [Wei(Web3.to_int(res)) for res in results]
 
     async def batch_update_vault_state(
         self, vault_to_harvest_params: dict[ChecksumAddress, HarvestParams]
