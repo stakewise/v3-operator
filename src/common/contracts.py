@@ -230,8 +230,12 @@ class VaultContract(ContractWrapper, VaultStateMixin):
     async def validators_manager(self) -> ChecksumAddress:
         return await self.contract.functions.validatorsManager().call()
 
-    async def get_exit_queue_index(self, position_ticket: int) -> int:
-        return await self.contract.functions.getExitQueueIndex(position_ticket).call()
+    async def get_exit_queue_index(
+        self, position_ticket: int, block_number: BlockNumber | None = None
+    ) -> int:
+        return await self.contract.functions.getExitQueueIndex(position_ticket).call(
+            block_identifier=block_number
+        )
 
     async def get_validator_withdrawal_submitted_events(
         self,

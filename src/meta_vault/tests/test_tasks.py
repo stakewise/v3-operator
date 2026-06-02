@@ -121,7 +121,9 @@ class GraphMock:
     def __init__(self, vaults: list[Vault]):
         self._vaults = {vault.address: vault for vault in vaults}
 
-    async def graph_get_vaults(self, vaults: list[ChecksumAddress]) -> dict[ChecksumAddress, Vault]:
+    async def graph_get_vaults(
+        self, vaults: list[ChecksumAddress], block_number: int | None = None
+    ) -> dict[ChecksumAddress, Vault]:
         """
         Simulate fetching vaults from the graph
         """

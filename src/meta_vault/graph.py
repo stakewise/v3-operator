@@ -1,7 +1,7 @@
 import logging
 from collections import defaultdict
 
-from eth_typing import ChecksumAddress
+from eth_typing import BlockNumber, ChecksumAddress
 from gql import gql
 from web3 import Web3
 
@@ -15,9 +15,12 @@ logger = logging.getLogger(__name__)
 async def graph_get_vaults(
     vaults: list[ChecksumAddress] | None = None,
     is_meta_vault: bool | None = None,
+    block_number: BlockNumber | None = None,
 ) -> dict[ChecksumAddress, Vault]:
     """
-    Returns mapping from vault address to Vault object
+    Returns mapping from vault address to Vault object.
+
+    When ``block_number`` is provided, the query is pinned to that block.
     """
     where_conditions: list[str] = ['id_gt: $lastID']
     params: dict = {}
@@ -33,14 +36,22 @@ async def graph_get_vaults(
         where_conditions.append('isMetaVault: $isMetaVault')
         params['isMetaVault'] = is_meta_vault
 
+    block_clause = ''
+    if block_number is not None:
+        block_clause = 'block: {number: $block},'
+        params['block'] = int(block_number)
+
     where_conditions_str = ', '.join(where_conditions)
     where_clause = f'where: {{ {where_conditions_str} }}'
 
     query = f"""
-        query VaultQuery($first: Int, $lastID: String, $vaults: [String], $isMetaVault: Boolean) {{
+        query VaultQuery(
+            $first: Int, $lastID: String, $vaults: [String], $isMetaVault: Boolean, $block: Int
+        ) {{
             vaults(
                 first: $first,
                 orderBy: id,
+                {block_clause}
                 {where_clause}
             ) {{
                 id
@@ -72,19 +83,29 @@ async def graph_get_vaults(
 
 async def graph_get_exit_requests_for_meta_vault(
     meta_vault: ChecksumAddress,
+    block_number: BlockNumber | None = None,
 ) -> dict[ChecksumAddress, list[ExitRequest]]:
     """
     Returns mapping from sub-vault address to list of ExitRequest objects.
     Skips claimed exit requests.
+
+    When ``block_number`` is provided, the query is pinned to that block.
     """
+    block_clause = ''
+    params: dict = {'owner': meta_vault.lower()}
+    if block_number is not None:
+        block_clause = 'block: {number: $block},'
+        params['block'] = int(block_number)
+
     query = gql(
-        """
-        query exitRequestQuery($owner: String, $first: Int, $lastID: String) {
+        f"""
+        query exitRequestQuery($owner: String, $first: Int, $lastID: String, $block: Int) {{
           exitRequests(
-            where: { owner: $owner, isClaimed: false, id_gt: $lastID },
+            {block_clause}
+            where: {{ owner: $owner, isClaimed: false, id_gt: $lastID }},
             orderBy: id,
             first: $first
-          ) {
+          ) {{
             id
             positionTicket
             timestamp
@@ -95,14 +116,13 @@ async def graph_get_exit_requests_for_meta_vault(
             isClaimable
             exitedAssets
             totalAssets
-            vault {
+            vault {{
               id
-            }
-          }
-        }
+            }}
+          }}
+        }}
         """
     )
-    params = {'owner': meta_vault.lower()}
     response = await graph_client.fetch_pages(query, params=params, cursor_pagination=True)
     result = defaultdict(list)
 

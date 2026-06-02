@@ -191,17 +191,20 @@ async def meta_vault_update_state(
 
 async def _get_meta_vault_update_state_calls(
     meta_vault: Vault,
+    block_number: BlockNumber | None = None,
 ) -> list[ContractCall]:
     """
     Get state update calls for a single meta vault and its sub vaults.
     Skips meta vaults among sub vaults.
     Each call is a tuple of (vault_address, call_data, description).
+    Pass ``block_number`` to pin all reads to a historical block and reproduce past calls.
     """
     logger.info('Getting state update calls for meta vault %s', meta_vault.address)
 
     # Get sub vaults
     sub_vaults = await graph_get_vaults(
         vaults=meta_vault.sub_vaults,
+        block_number=block_number,
     )
     sub_vaults_to_harvest: list[ChecksumAddress] = []
     calls: list[ContractCall] = []
@@ -241,7 +244,8 @@ async def _get_meta_vault_update_state_calls(
 
     # Collect claimable exit requests for the sub vaults
     sub_vault_exit_requests = await get_claimable_sub_vault_exit_requests(
-        meta_vault_contract=meta_vault_contract
+        meta_vault_contract=meta_vault_contract,
+        block_number=block_number,
     )
     meta_vault_encoder = meta_vault_contract.encoder()
 
@@ -281,6 +285,7 @@ async def _get_meta_vault_update_state_calls(
 
 async def get_claimable_sub_vault_exit_requests(
     meta_vault_contract: MetaVaultContract,
+    block_number: BlockNumber | None = None,
 ) -> list[SubVaultExitRequest]:
     """
     Get claimable exit requests for the given sub vaults.
@@ -288,6 +293,7 @@ async def get_claimable_sub_vault_exit_requests(
     meta_vault_address = meta_vault_contract.contract_address
     vault_to_exit_requests = await graph_get_exit_requests_for_meta_vault(
         meta_vault=meta_vault_address,
+        block_number=block_number,
     )
     exit_requests: list[ExitRequest] = flatten_exit_requests(vault_to_exit_requests)
     ensure_claim_delay_passed(exit_requests)
@@ -296,7 +302,10 @@ async def get_claimable_sub_vault_exit_requests(
         SubVaultExitRequest.from_exit_request(exit_request) for exit_request in exit_requests
     ]
 
-    await fix_exit_queue_indexes(sub_vault_exit_requests=sub_vault_exit_requests)
+    await fix_exit_queue_indexes(
+        sub_vault_exit_requests=sub_vault_exit_requests,
+        block_number=block_number,
+    )
     return [r for r in sub_vault_exit_requests if r.has_exit_queue_index]
 
 
@@ -323,7 +332,10 @@ def ensure_claim_delay_passed(exit_requests: list[ExitRequest]) -> None:
             raise ClaimDelayNotPassedException(exit_request)
 
 
-async def fix_exit_queue_indexes(sub_vault_exit_requests: list[SubVaultExitRequest]) -> None:
+async def fix_exit_queue_indexes(
+    sub_vault_exit_requests: list[SubVaultExitRequest],
+    block_number: BlockNumber | None = None,
+) -> None:
     """
     The exit queue index is updated by the Subgraph when sufficient funds are available
     to fulfill an exit request.
@@ -338,7 +350,8 @@ async def fix_exit_queue_indexes(sub_vault_exit_requests: list[SubVaultExitReque
             continue
         sub_vault_contract = VaultContract(sub_vault_exit_request.vault)
         exit_queue_index = await sub_vault_contract.get_exit_queue_index(
-            sub_vault_exit_request.position_ticket
+            sub_vault_exit_request.position_ticket,
+            block_number=block_number,
         )
         if exit_queue_index == -1:
             continue
