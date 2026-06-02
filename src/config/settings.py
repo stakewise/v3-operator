@@ -429,8 +429,10 @@ VALIDATORS_FUNDING_BATCH_SIZE = decouple_config(
     'VALIDATORS_FUNDING_BATCH_SIZE', cast=int, default=10
 )
 
-# Batch size for read-only multicalls (e.g. fetching on-chain state in bulk)
-EXECUTION_BATCH_SIZE: int = decouple_config('EXECUTION_BATCH_SIZE', cast=int, default=1000)
+# Batch size for OsTokenRedeemer read-only multicalls (e.g. fetching processed shares in bulk)
+OS_TOKEN_REDEEMER_CHUNK_SIZE: int = decouple_config(
+    'OS_TOKEN_REDEEMER_CHUNK_SIZE', cast=int, default=1000
+)
 
 # Minimum amount of rewards to process reward splitter
 FEE_SPLITTER_MIN_ASSETS: int = decouple_config(
@@ -448,5 +450,3 @@ LOG_DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
 LOG_WHITELISTED_DOMAINS = decouple_config(
     'LOG_WHITELISTED_DOMAINS', cast=Csv(), default='stakewise.io,localhost'
 )
-
-MULTICALL_CHUNK_SIZE: int = decouple_config('MULTICALL_CHUNK_SIZE', default=20, cast=int)

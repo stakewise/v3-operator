@@ -11,7 +11,7 @@ from web3.types import Wei
 from src.common.clients import ipfs_fetch_client
 from src.common.contracts import os_token_redeemer_contract
 from src.common.typings import Singleton
-from src.config.settings import EXECUTION_BATCH_SIZE, settings
+from src.config.settings import OS_TOKEN_REDEEMER_CHUNK_SIZE, settings
 from src.redemptions.typings import OsTokenPosition
 
 ZERO_MERKLE_ROOT = HexStr('0x' + '0' * 64)
@@ -156,8 +156,8 @@ async def iter_processed_shares(
 ) -> AsyncIterator[Wei]:
     """Fetch processed shares via batched multicalls, yielding one value per position.
     The generator flattens batch results so callers see a flat stream aligned with positions."""
-    for i in range(0, len(positions), EXECUTION_BATCH_SIZE):
-        batch = positions[i : i + EXECUTION_BATCH_SIZE]
+    for i in range(0, len(positions), OS_TOKEN_REDEEMER_CHUNK_SIZE):
+        batch = positions[i : i + OS_TOKEN_REDEEMER_CHUNK_SIZE]
         rpc_results = await os_token_redeemer_contract.multicall_leaf_to_processed_shares(
             batch, nonce, block_number
         )
