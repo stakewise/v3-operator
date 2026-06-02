@@ -54,9 +54,11 @@ async def claim_reward_splitters(
         return
 
     logger.info('Fetching fee splitters')
+
+    harvest_params = await get_harvest_params() if update_vault_state else None
+
     all_succeeded = True
     for vault in vaults:
-        harvest_params = await get_harvest_params() if update_vault_state else None
         try:
             succeeded = await claim_reward_splitters_for_vault(
                 vault=vault,
@@ -110,7 +112,7 @@ async def claim_reward_splitters_for_vault(
     calls: dict[ChecksumAddress, list[HexStr]] = {}
     for reward_splitter in reward_splitters:
         logger.info(
-            'Processing fee splitter %s ',
+            'Processing fee splitter %s',
             reward_splitter.address,
         )
         exit_requests = splitter_to_exit_requests.get(reward_splitter.address, [])  # nosec
