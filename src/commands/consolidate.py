@@ -332,7 +332,11 @@ async def process(
     except ConsolidationError as e:
         raise click.ClickException(str(e))
     if not target_source:
-        raise click.ClickException(f'Validators in vault {settings.vault} can\'t be consolidated')
+        raise click.ClickException(
+            f'No validators in vault {settings.vault} can be consolidated automatically. '
+            'To consolidate specific 0x02 validators, provide the --source-public-keys '
+            'and --target-public-key options.'
+        )
 
     for target_validator, source_validator in target_source:
         if source_validator.index == target_validator.index:
