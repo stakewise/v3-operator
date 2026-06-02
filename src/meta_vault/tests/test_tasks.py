@@ -3,8 +3,14 @@ from unittest import mock
 
 import pytest
 from eth_typing import ChecksumAddress
+from sw_utils.tests import faker
 
-from src.meta_vault.tasks import meta_vault_tree_update_state, multicall_contract
+from src.config.settings import settings
+from src.meta_vault.tasks import (
+    ProcessMetaVaultTask,
+    meta_vault_tree_update_state,
+    multicall_contract,
+)
 from src.meta_vault.tests.factories import create_vault
 from src.meta_vault.typings import Vault
 
@@ -115,6 +121,31 @@ class TestMetaVaultTreeUpdateStateCalls:
                 'blockNumber': 123,
             }
             yield tx_aggregate_mock
+
+
+@pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
+class TestProcessMetaVaultFeeSplitterClaim:
+    async def test_claims_when_flag_enabled(self):
+        settings.claim_fee_splitter = True
+        with self._patch() as claim_mock:
+            await ProcessMetaVaultTask([faker.eth_address()]).process_block(mock.MagicMock())
+
+        claim_mock.assert_awaited_once()
+        assert claim_mock.call_args.kwargs['update_vault_state'] is False
+
+    async def test_skips_when_flag_disabled(self):
+        settings.claim_fee_splitter = False
+        with self._patch() as claim_mock:
+            await ProcessMetaVaultTask([faker.eth_address()]).process_block(mock.MagicMock())
+
+        claim_mock.assert_not_called()
+
+    @contextmanager
+    def _patch(self):
+        with mock.patch('src.meta_vault.tasks.check_gas_price', return_value=True), mock.patch(
+            'src.meta_vault.tasks.graph_get_vaults', return_value={}
+        ), mock.patch('src.meta_vault.tasks.claim_reward_splitters') as claim_mock:
+            yield claim_mock
 
 
 class GraphMock:
