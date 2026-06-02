@@ -6,7 +6,7 @@ from sw_utils import GNO_NETWORKS, InterruptHandler, convert_to_mgno
 from web3 import Web3
 from web3.types import BlockNumber
 
-from src.common.clients import execution_client
+from src.common.clients import execution_client, graph_client
 from src.common.contracts import MetaVaultContract, VaultContract, multicall_contract
 from src.common.execution import check_gas_price
 from src.common.graph import wait_for_graph_node_sync
@@ -46,11 +46,19 @@ class ProcessMetaVaultTask(BaseTask):
             # Refresh the meta vaults map to include updates
             # made by previous meta vault transactions
             logger.info('Fetching meta vaults')
+            # Pin all reads to the graph node's last synced block so that subgraph
+            # data and on-chain reads stay consistent while processing the tree.
+            block_number = await graph_client.get_last_synced_block()
             meta_vaults_map = await graph_get_vaults(
                 is_meta_vault=True,
+                block_number=block_number,
             )
             try:
-                await process_meta_vault_tree(vault=vault, meta_vaults_map=meta_vaults_map)
+                await process_meta_vault_tree(
+                    vault=vault,
+                    meta_vaults_map=meta_vaults_map,
+                    block_number=block_number,
+                )
             except Exception:
                 logger.exception('Failed to process meta vault tree for vault %s', vault)
 
@@ -58,9 +66,11 @@ class ProcessMetaVaultTask(BaseTask):
 async def process_meta_vault_tree(
     vault: ChecksumAddress,
     meta_vaults_map: dict[ChecksumAddress, Vault],
+    block_number: BlockNumber | None = None,
 ) -> None:
     """
     Process a single meta vault tree: update state and deposit to sub vaults.
+    Pass ``block_number`` to pin all state reads to a historical block.
     """
     logger.info('Processing meta vault: %s', vault)
 
@@ -78,6 +88,7 @@ async def process_meta_vault_tree(
         await meta_vault_tree_update_state(
             root_meta_vault=root_meta_vault,
             meta_vaults_map=meta_vaults_map,
+            block_number=block_number,
         )
     except ClaimDelayNotPassedException as e:
         logger.error(
@@ -101,6 +112,7 @@ async def process_meta_vault_tree(
 async def meta_vault_tree_update_state(
     root_meta_vault: Vault,
     meta_vaults_map: dict[ChecksumAddress, Vault],
+    block_number: BlockNumber | None = None,
 ) -> None:
     """
     Traverse the meta vault tree in bottom-up order and update the state for each meta vault.
@@ -115,6 +127,7 @@ async def meta_vault_tree_update_state(
     for meta_vault_address in meta_vault_addresses:
         await meta_vault_update_state(
             meta_vault=meta_vaults_map[meta_vault_address],
+            block_number=block_number,
         )
 
 
@@ -142,6 +155,7 @@ def get_meta_vault_addresses_bottom_up(
 
 async def meta_vault_update_state(
     meta_vault: Vault,
+    block_number: BlockNumber | None = None,
 ) -> None:
     """
     Update the state for the root meta vault.
@@ -149,6 +163,7 @@ async def meta_vault_update_state(
     """
     calls_with_description = await _get_meta_vault_update_state_calls(
         meta_vault=meta_vault,
+        block_number=block_number,
     )
 
     calls: list[tuple[ChecksumAddress, HexStr]] = []
