@@ -12,7 +12,6 @@ from src.common.harvest import get_harvest_params
 from src.common.tasks import BaseTask
 from src.common.typings import ExitRequest, HarvestParams
 from src.common.wallet import wallet
-from src.config.networks import ZERO_CHECKSUM_ADDRESS
 from src.config.settings import FEE_SPLITTER_INTERVAL, FEE_SPLITTER_MIN_ASSETS, settings
 from src.reward_splitter.graph import (
     graph_get_claimable_exit_requests,
@@ -139,7 +138,7 @@ async def _get_reward_splitter_calls(
     """
     # ABI encoded calls without contract address
     reward_splitter_calls: list[HexStr] = []
-    reward_splitter_encoder = _get_reward_splitter_encoder()
+    reward_splitter_encoder = RewardSplitterEncoder()
 
     reward_splitter_assets = await _get_reward_splitter_assets(reward_splitter)
 
@@ -190,14 +189,3 @@ async def _get_reward_splitter_calls(
 
 async def _get_reward_splitter_assets(reward_splitter: RewardSplitter) -> Wei:
     return Wei(sum(sh.earned_vault_assets for sh in reward_splitter.shareholders))
-
-
-def _get_reward_splitter_encoder() -> RewardSplitterEncoder:
-    # Reward splitter contract is used to encode abi calls.
-    # Not for sending transactions.
-    # It's okay to put zero address here.
-    reward_splitter_contract = RewardSplitterContract(
-        address=ZERO_CHECKSUM_ADDRESS,
-        execution_client=execution_client,
-    )
-    return reward_splitter_contract.encoder()
