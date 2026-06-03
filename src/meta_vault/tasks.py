@@ -2,7 +2,13 @@ import logging
 
 from eth_typing import ChecksumAddress, HexStr
 from hexbytes import HexBytes
-from sw_utils import GNO_NETWORKS, InterruptHandler, convert_to_mgno
+from sw_utils import (
+    GNO_NETWORKS,
+    InterruptHandler,
+    convert_to_mgno,
+    is_meta_vault_upgraded_to_release,
+)
+from sw_utils.networks import ContractReleaseVersion
 from web3 import Web3
 
 from src.common.clients import execution_client
@@ -48,6 +54,18 @@ class ProcessMetaVaultTask(BaseTask):
             meta_vaults_map = await graph_get_vaults(
                 is_meta_vault=True,
             )
+            root_meta_vault = meta_vaults_map.get(vault)
+            if root_meta_vault is not None and is_meta_vault_upgraded_to_release(
+                network=settings.network,
+                vault_address=vault,
+                vault_version=root_meta_vault.version,
+                release_version=ContractReleaseVersion.V5,
+            ):
+                logger.warning(
+                    'Meta vault %s is upgraded to contracts release v5, skipping processing',
+                    vault,
+                )
+                continue
             try:
                 await process_meta_vault_tree(vault=vault, meta_vaults_map=meta_vaults_map)
             except Exception:
