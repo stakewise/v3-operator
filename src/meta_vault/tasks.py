@@ -112,8 +112,12 @@ async def meta_vault_tree_update_state(
 
     # Update each meta vault in bottom-up order
     for meta_vault_address in meta_vault_addresses:
+        meta_vault = meta_vaults_map[meta_vault_address]
+        if not meta_vault.can_harvest:
+            logger.info('Meta vault %s is not harvestable, skipping', meta_vault.address)
+            continue
         await meta_vault_update_state(
-            meta_vault=meta_vaults_map[meta_vault_address],
+            meta_vault=meta_vault,
         )
 
 
@@ -258,14 +262,13 @@ async def _get_meta_vault_update_state_calls(
         logger.info('No sub vault exit requests to claim for meta vault %s', meta_vault.address)
 
     # Update meta vault itself
-    if meta_vault.can_harvest:
-        calls.append(
-            ContractCall(
-                address=meta_vault.address,
-                data=meta_vault_encoder.update_state(meta_vault.harvest_params),
-                description=f'Update state for meta vault {meta_vault.address}',
-            ),
-        )
+    calls.append(
+        ContractCall(
+            address=meta_vault.address,
+            data=meta_vault_encoder.update_state(meta_vault.harvest_params),
+            description=f'Update state for meta vault {meta_vault.address}',
+        ),
+    )
     return calls
 
 
