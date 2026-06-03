@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass, fields
 from datetime import timedelta
 
 from ens.constants import EMPTY_ADDR_HEX
@@ -17,13 +17,20 @@ RATED_NETWORKS = [MAINNET]
 ZERO_CHECKSUM_ADDRESS = Web3.to_checksum_address(EMPTY_ADDR_HEX)  # noqa: E501
 
 
+def _load_base_kwargs(network: str) -> dict:
+    # Shallow per-field copy. `dataclasses.asdict` would recurse and convert
+    # nested dataclasses (e.g. `ContractRelease` inside `CONTRACTS_RELEASES`)
+    # into plain dicts, breaking attribute access on them.
+    base = BASE_NETWORKS[network]
+    return {f.name: getattr(base, f.name) for f in fields(base)}
+
+
 @dataclass
 # pylint: disable-next=too-many-instance-attributes
 class NetworkConfig(BaseNetworkConfig):
     WALLET_BALANCE_SYMBOL: str
     VAULT_BALANCE_SYMBOL: str
     DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS: ChecksumAddress
-    VALIDATORS_CHECKER_CONTRACT_ADDRESS: ChecksumAddress
     CONSOLIDATION_CONTRACT_ADDRESS: ChecksumAddress
     WITHDRAWAL_CONTRACT_ADDRESS: ChecksumAddress
     WALLET_MIN_BALANCE: Wei
@@ -77,14 +84,11 @@ class NodeConfig:
 
 NETWORKS: dict[str, NetworkConfig] = {
     MAINNET: NetworkConfig(
-        **asdict(BASE_NETWORKS[MAINNET]),
+        **_load_base_kwargs(MAINNET),
         WALLET_BALANCE_SYMBOL='ETH',
         VAULT_BALANCE_SYMBOL='ETH',
         DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x75AB6DdCe07556639333d3Df1eaa684F5735223e'
-        ),
-        VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xA89629B41477560d49dd56ef1a59BD214362aCDC'
         ),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
@@ -127,14 +131,11 @@ NETWORKS: dict[str, NetworkConfig] = {
         ),
     ),
     HOODI: NetworkConfig(
-        **asdict(BASE_NETWORKS[HOODI]),
+        **_load_base_kwargs(HOODI),
         WALLET_BALANCE_SYMBOL='HoodiETH',
         VAULT_BALANCE_SYMBOL='HoodiETH',
         DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x93a3f880E07B27dacA6Ef2d3C23E77DBd6294487'
-        ),
-        VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xA89629B41477560d49dd56ef1a59BD214362aCDC'
         ),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'
@@ -175,14 +176,11 @@ NETWORKS: dict[str, NetworkConfig] = {
         ),
     ),
     GNOSIS: NetworkConfig(
-        **asdict(BASE_NETWORKS[GNOSIS]),
+        **_load_base_kwargs(GNOSIS),
         WALLET_BALANCE_SYMBOL='xDAI',
         VAULT_BALANCE_SYMBOL='GNO',
         DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x58e16621B5c0786D6667D2d54E28A20940269E16'
-        ),
-        VALIDATORS_CHECKER_CONTRACT_ADDRESS=Web3.to_checksum_address(
-            '0xA89629B41477560d49dd56ef1a59BD214362aCDC'
         ),
         CONSOLIDATION_CONTRACT_ADDRESS=Web3.to_checksum_address(
             '0x0000BBdDc7CE488642fb579F8B00f3a590007251'

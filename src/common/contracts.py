@@ -532,6 +532,8 @@ class ValidatorsCheckerContract(ContractWrapper):
             [
                 params.vault,
                 params.withdrawing_assets,
+                # redemptionAssets: redemptions are a v5 feature, not used on this branch
+                0,
                 params.exit_queue_cumulative_ticket,
             ],
         )
