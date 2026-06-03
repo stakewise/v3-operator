@@ -114,7 +114,9 @@ async def meta_vault_tree_update_state(
     for meta_vault_address in meta_vault_addresses:
         meta_vault = meta_vaults_map[meta_vault_address]
         if not meta_vault.can_harvest:
-            logger.info('Meta vault %s is not harvestable, skipping', meta_vault.address)
+            logger.info(
+                'Meta vault %s is not harvestable, skipping state update', meta_vault.address
+            )
             continue
         await meta_vault_update_state(
             meta_vault=meta_vault,
