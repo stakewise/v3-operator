@@ -3211,20 +3211,17 @@ setuptools = ">=42.0.0"
 
 [[package]]
 name = "pyjwt"
-version = "2.12.1"
+version = "2.13.0"
 description = "JSON Web Token implementation in Python"
 optional = false
 python-versions = ">=3.9"
 files = [
-    {file = "pyjwt-2.12.1-py3-none-any.whl", hash = "sha256:28ca37c070cad8ba8cd9790cd940535d40274d22f80ab87f3ac6a713e6e8454c"},
-    {file = "pyjwt-2.12.1.tar.gz", hash = "sha256:c74a7a2adf861c04d002db713dd85f84beb242228e671280bf709d765b03672b"},
+    {file = "pyjwt-2.13.0-py3-none-any.whl", hash = "sha256:66adcc2aff09b3f1bbd95fc1e1577df8ac8723c978552fd43304c8a290ac5728"},
+    {file = "pyjwt-2.13.0.tar.gz", hash = "sha256:41571c89ca91598c79e8ef18a2d07367d4810fbbd6f637794879baf1b7703423"},
 ]
 
 [package.extras]
 crypto = ["cryptography (>=3.4.0)"]
-dev = ["coverage[toml] (==7.10.7)", "cryptography (>=3.4.0)", "pre-commit", "pytest (>=8.4.2,<9.0.0)", "sphinx", "sphinx-rtd-theme", "zope.interface"]
-docs = ["sphinx", "sphinx-rtd-theme", "zope.interface"]
-tests = ["coverage[toml] (==7.10.7)", "pytest (>=8.4.2,<9.0.0)"]
 
 [[package]]
 name = "pylint"
@@ -3822,7 +3819,7 @@ test = ["py-ecc (==6.0.0)", "pytest (>=6.2.5)", "pytest-benchmark (>=3.2.3)"]
 
 [[package]]
 name = "sw-utils"
-version = "v0.13.0"
+version = "v0.13.1"
 description = "StakeWise Python utils"
 optional = false
 python-versions = "^3.12"
@@ -3833,7 +3830,7 @@ develop = false
 gql = {version = "==3.5.3", extras = ["aiohttp"]}
 ipfshttpclient = "^0.8.0a2"
 py-ecc = "^8.0.0"
-pyjwt = "==2.12.1"
+pyjwt = "==2.13.0"
 ssz = "==0.5.2"
 sw-milagro-bls-binding = "==1.9.0"
 tenacity = "==8.2.3"
@@ -3842,8 +3839,8 @@ web3 = "==7.14.1"
 [package.source]
 type = "git"
 url = "https://github.com/stakewise/sw-utils.git"
-reference = "v0.13.0"
-resolved_reference = "c04775aa956592a5d02499efc1e4455b4f2f4983"
+reference = "v0.13.1"
+resolved_reference = "4c79b406288a7e15d21fb694de5a08c448537386"
 
 [[package]]
 name = "tenacity"
@@ -4302,4 +4299,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12,<3.13"
-content-hash = "ccb59bfe5b35368c1140e542459a97ef4b32b604e41b9afea81995d57444764f"
+content-hash = "d1f9dc207cf5e8d49d7173561d08aadeb59d09f85cf34029166132336e25f533"
