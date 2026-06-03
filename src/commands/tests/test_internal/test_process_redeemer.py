@@ -18,9 +18,7 @@ from src.commands.internal.process_redeemer import (
     _submit_redeem_position,
     process,
     redeem_positions,
-    update_vaults_state,
 )
-from src.common.typings import HarvestParams
 from src.redemptions.os_token_converter import OsTokenConverter
 from src.redemptions.typings import OsTokenPosition
 
@@ -77,6 +75,7 @@ class TestRedeemPositions:
                 os_token_positions=[],
                 converter=make_converter(),
                 nonce=5,
+                block_number=BlockNumber(100),
             )
         mocks['submit_mock'].assert_not_called()
 
@@ -89,6 +88,7 @@ class TestRedeemPositions:
                 os_token_positions=[position],
                 converter=make_converter(),
                 nonce=5,
+                block_number=BlockNumber(100),
             )
 
         assert mocks['submit_mock'].await_count == 1
@@ -103,6 +103,7 @@ class TestRedeemPositions:
                 os_token_positions=[position],
                 converter=make_converter(100, 100),
                 nonce=5,
+                block_number=BlockNumber(100),
             )
 
         assert mocks['submit_mock'].await_count == 1
@@ -117,6 +118,7 @@ class TestRedeemPositions:
                 os_token_positions=[position],
                 converter=make_converter(100, 100),
                 nonce=5,
+                block_number=BlockNumber(100),
             )
 
         mocks['submit_mock'].assert_not_called()
@@ -133,6 +135,7 @@ class TestRedeemPositions:
                 os_token_positions=[pos1, pos2],
                 converter=make_converter(100, 100),
                 nonce=5,
+                block_number=BlockNumber(100),
             )
 
         # Two redemption transactions (one per position)
@@ -157,6 +160,7 @@ class TestRedeemPositions:
                 os_token_positions=[pos],
                 converter=make_converter(),
                 nonce=5,
+                block_number=BlockNumber(100),
             )
 
         submitted = _submitted_position(mocks)
@@ -171,6 +175,7 @@ class TestRedeemPositions:
                 os_token_positions=[pos],
                 converter=make_converter(),
                 nonce=5,
+                block_number=BlockNumber(100),
             )
 
         submitted = _submitted_position(mocks)
@@ -189,10 +194,30 @@ class TestRedeemPositions:
                     os_token_positions=[pos],
                     converter=make_converter(100, 100),
                     nonce=5,
+                    block_number=BlockNumber(100),
                 )
 
         mocks['submit_mock'].assert_not_called()
         get_withdrawable.assert_not_called()
+
+    async def test_unharvested_vault_skipped(self) -> None:
+        """A vault that requires a state update is skipped without redeeming."""
+        pos = make_position(processed_shares=500)
+
+        with _mock_redeem_positions(
+            withdrawable=Wei(10000),
+            state_update_required=True,
+        ) as mocks:
+            await redeem_positions(
+                all_positions=[pos],
+                os_token_positions=[pos],
+                converter=make_converter(100, 100),
+                nonce=5,
+                block_number=BlockNumber(100),
+            )
+
+        mocks['get_withdrawable'].assert_not_called()
+        mocks['submit_mock'].assert_not_called()
 
     async def test_submit_failure_aborts_iteration(self) -> None:
         """A failed submission aborts the loop; subsequent positions are not attempted."""
@@ -208,6 +233,7 @@ class TestRedeemPositions:
                 os_token_positions=[pos1, pos2],
                 converter=make_converter(100, 100),
                 nonce=5,
+                block_number=BlockNumber(100),
             )
 
         # Only the first position is attempted; loop aborted
@@ -265,55 +291,6 @@ class TestSubmitRedeemPosition:
                     all_positions=[position],
                     nonce=5,
                 )
-
-
-class TestUpdateVaultsState:
-    async def test_no_vaults(self) -> None:
-        with _mock_update_vaults_state() as mocks:
-            await update_vaults_state(vaults=[], block_number=BlockNumber(100))
-        mocks['harvest_params'].assert_not_called()
-        mocks['redeemer'].batch_update_vault_state.assert_not_called()
-
-    async def test_meta_vault_excluded_from_multicall(self) -> None:
-        """A meta vault in the input list is filtered out — not harvested by this command."""
-        with _mock_update_vaults_state(
-            is_meta_vault_addresses={VAULT_1},
-            harvest_params={VAULT_2: make_harvest_params()},
-        ) as mocks:
-            await update_vaults_state(vaults=[VAULT_1, VAULT_2], block_number=BlockNumber(100))
-
-        mocks['harvest_params'].assert_awaited_once_with([VAULT_2], BlockNumber(100))
-        mocks['redeemer'].batch_update_vault_state.assert_awaited_once_with(
-            {VAULT_2: make_harvest_params()}
-        )
-
-    @pytest.mark.parametrize(
-        'has_params, expected_multicall_calls',
-        [(True, 1), (False, 0)],
-        ids=['with_params', 'no_params'],
-    )
-    async def test_regular_vault_multicall_gated_by_harvest_params(
-        self, has_params: bool, expected_multicall_calls: int
-    ) -> None:
-        """A None entry in get_multiple_harvest_params skips that vault from the multicall."""
-        params: HarvestParams | None = make_harvest_params() if has_params else None
-        with _mock_update_vaults_state(harvest_params={VAULT_1: params}) as mocks:
-            await update_vaults_state(vaults=[VAULT_1], block_number=BlockNumber(100))
-
-        assert mocks['redeemer'].batch_update_vault_state.await_count == expected_multicall_calls
-        if has_params:
-            mocks['redeemer'].batch_update_vault_state.assert_awaited_once_with({VAULT_1: params})
-
-    async def test_multicall_tx_failure_raises(self) -> None:
-        """A failed multicall receipt aborts the round."""
-        with _mock_update_vaults_state(
-            harvest_params={VAULT_1: make_harvest_params()},
-            multicall_tx_status=0,
-        ):
-            with pytest.raises(
-                RuntimeError, match='OsTokenRedeemer updateVaultState multicall tx failed'
-            ):
-                await update_vaults_state(vaults=[VAULT_1], block_number=BlockNumber(100))
 
 
 class TestProcessExitQueue:
@@ -384,7 +361,6 @@ class TestProcess:
         ):
             await process(block_number=BlockNumber(100), min_queued_assets=Gwei(0))
         mocks['mock_redeemer'].queued_shares.assert_not_called()
-        mocks['mock_update_state'].assert_not_called()
         mocks['mock_redeem'].assert_not_called()
 
     async def test_zero_nonce_skipped(self) -> None:
@@ -393,16 +369,14 @@ class TestProcess:
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
             mocks['mock_redeemer'].nonce = AsyncMock(return_value=0)
             await process(block_number=BlockNumber(100), min_queued_assets=Gwei(0))
-        mocks['mock_update_state'].assert_not_called()
         mocks['mock_redeem'].assert_not_called()
 
     async def test_no_positions_from_ipfs(self) -> None:
-        """Empty IPFS positions: skip update_vaults_state and redeem_positions."""
+        """Empty IPFS positions: skip redeem_positions."""
         with _mock_process(positions=[]) as mocks:
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
             mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
             await process(block_number=BlockNumber(100), min_queued_assets=Gwei(0))
-        mocks['mock_update_state'].assert_not_called()
         mocks['mock_redeem'].assert_not_called()
 
     async def test_no_eligible_positions(self) -> None:
@@ -415,7 +389,6 @@ class TestProcess:
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
             mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
             await process(block_number=BlockNumber(100), min_queued_assets=Gwei(0))
-        mocks['mock_update_state'].assert_not_called()
         mocks['mock_redeem'].assert_not_called()
 
     async def test_successful_redemption(self) -> None:
@@ -425,19 +398,9 @@ class TestProcess:
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
             mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
 
-            # Verify update_vaults_state runs before redeem_positions
-            manager = MagicMock()
-            manager.attach_mock(mocks['mock_update_state'], 'update_state')
-            manager.attach_mock(mocks['mock_redeem'], 'redeem')
-
             await process(block_number=BlockNumber(100), min_queued_assets=Gwei(0))
 
-        assert [c[0] for c in manager.mock_calls] == ['update_state', 'redeem']
-
-        update_call = mocks['mock_update_state'].await_args
-        # Unique vault list derived from os_token_positions
-        assert update_call.kwargs['vaults'] == [VAULT_1]
-
+        mocks['mock_redeem'].assert_awaited_once()
         redeem_call = mocks['mock_redeem'].await_args
         # nonce is passed directly; _build_multi_proof uses nonce - 1 internally
         assert redeem_call.kwargs['nonce'] == 5
@@ -450,14 +413,17 @@ class TestProcess:
 def _mock_redeem_positions(
     withdrawable: Wei | AsyncMock | None = None,
     is_meta_vault: bool = False,
+    state_update_required: bool = False,
     submit_results: list[BlockNumber | None] | None = None,
 ) -> Iterator[dict[str, MagicMock]]:
     """Mock setup for redeem_positions tests.
 
     ``withdrawable`` may be a constant Wei value (returned on every call) or an
     AsyncMock for fine-grained control (e.g. ``side_effect=[...]`` for sequenced returns).
-    ``submit_results`` controls per-call return values of _submit_redeem_position;
-    a ``None`` entry models a failed submission that should abort the round.
+    ``state_update_required`` drives VaultContract.is_state_update_required, which gates
+    the unharvested-vault skip. ``submit_results`` controls per-call return values of
+    _submit_redeem_position; a ``None`` entry models a failed submission that should
+    abort the round.
     """
     if isinstance(withdrawable, AsyncMock):
         get_withdrawable = withdrawable
@@ -471,9 +437,13 @@ def _mock_redeem_positions(
     else:
         submit_mock = AsyncMock(return_value=BlockNumber(123))
 
+    vault_contract = MagicMock()
+    vault_contract.is_state_update_required = AsyncMock(return_value=state_update_required)
+
     with (
         patch(f'{MODULE}.get_withdrawable_assets', new=get_withdrawable),
         patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=is_meta_vault)),
+        patch(f'{MODULE}.VaultContract', return_value=vault_contract),
         patch(f'{MODULE}._submit_redeem_position', new=submit_mock),
         patch(
             f'{MODULE}.wait_for_execution_endpoints_synced',
@@ -483,6 +453,7 @@ def _mock_redeem_positions(
         yield {
             'submit_mock': submit_mock,
             'wait_synced_mock': wait_synced_mock,
+            'get_withdrawable': get_withdrawable,
         }
 
 
@@ -528,49 +499,6 @@ def _mock_submit_redeem_position(
 
 
 @contextmanager
-def _mock_update_vaults_state(
-    harvest_params: dict[ChecksumAddress, HarvestParams | None] | None = None,
-    is_meta_vault_addresses: set[ChecksumAddress] | None = None,
-    multicall_tx_status: int = 1,
-) -> Iterator[dict[str, MagicMock]]:
-    """Mock setup for update_vaults_state tests.
-
-    ``is_meta_vault_addresses`` lists addresses that should be treated as meta vaults
-    (and therefore filtered out). ``harvest_params`` is the dict returned by
-    get_multiple_harvest_params; a None value for a vault skips it from the
-    multicall (production behavior). ``multicall_tx_status`` controls the receipt
-    status of the OsTokenRedeemer.batch_update_vault_state batched tx.
-    """
-    harvest_params = {} if harvest_params is None else harvest_params
-    meta_addresses = is_meta_vault_addresses or set()
-
-    mock_client = AsyncMock()
-    mock_client.eth.wait_for_transaction_receipt = AsyncMock(
-        return_value={'status': multicall_tx_status}
-    )
-
-    async def is_meta_vault_side_effect(addr: ChecksumAddress) -> bool:
-        return addr in meta_addresses
-
-    with (
-        patch(f'{MODULE}.is_meta_vault', side_effect=is_meta_vault_side_effect),
-        patch(
-            f'{MODULE}.get_multiple_harvest_params',
-            new=AsyncMock(return_value=harvest_params),
-        ) as mock_harvest_params,
-        patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
-        patch(f'{MODULE}.execution_client', new=mock_client),
-        patch(f'{MODULE}.settings') as mock_settings,
-    ):
-        mock_settings.execution_transaction_timeout = 120
-        mock_redeemer.batch_update_vault_state = AsyncMock(return_value='0x' + '11' * 32)
-        yield {
-            'harvest_params': mock_harvest_params,
-            'redeemer': mock_redeemer,
-        }
-
-
-@contextmanager
 def _mock_process(
     positions: list[OsTokenPosition] | None = None,
 ) -> Iterator[dict[str, MagicMock]]:
@@ -609,10 +537,6 @@ def _mock_process(
             new=AsyncMock(),
         ),
         patch(
-            f'{MODULE}.update_vaults_state',
-            new=AsyncMock(),
-        ) as mock_update_state,
-        patch(
             f'{MODULE}.redeem_positions',
             new=AsyncMock(),
         ) as mock_redeem,
@@ -622,7 +546,6 @@ def _mock_process(
         yield {
             'mock_redeemer': mock_redeemer,
             'mock_redeem': mock_redeem,
-            'mock_update_state': mock_update_state,
         }
 
 
@@ -656,13 +579,4 @@ def make_position(
         leaf_shares=Wei(leaf_shares),
         processed_shares=Wei(processed_shares),
         shares_to_redeem=Wei(effective_shares_to_redeem),
-    )
-
-
-def make_harvest_params() -> HarvestParams:
-    return HarvestParams(
-        rewards_root=HexBytes(b'\x01' * 32),
-        reward=Wei(100),
-        unlocked_mev_reward=Wei(50),
-        proof=[HexBytes(b'\x02' * 32)],
     )

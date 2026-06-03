@@ -2,12 +2,10 @@ import asyncio
 import logging
 import sys
 from dataclasses import replace
-from itertools import batched
 from pathlib import Path
 
 import click
 from eth_typing import BlockNumber, ChecksumAddress
-from hexbytes import HexBytes
 from multiproof import StandardMerkleTree
 from multiproof.standard import MultiProof
 from sw_utils import InterruptHandler
@@ -16,19 +14,18 @@ from web3.exceptions import Web3Exception
 from web3.types import Gwei, Wei
 
 from src.common.clients import close_clients, execution_client, setup_clients
-from src.common.contracts import os_token_redeemer_contract
+from src.common.contracts import VaultContract, os_token_redeemer_contract
 from src.common.execution import (
     check_gas_price,
     get_finalized_block_number,
     transaction_gas_wrapper,
     wait_for_execution_endpoints_synced,
 )
-from src.common.harvest import get_multiple_harvest_params
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import log_verbose
 from src.common.wallet import wallet
 from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
-from src.config.settings import MULTICALL_CHUNK_SIZE, settings
+from src.config.settings import settings
 from src.meta_vault.service import is_meta_vault
 from src.redemptions.fetch_positions import (
     cached_fetch_positions_from_ipfs,
@@ -249,60 +246,13 @@ async def _redeem_os_token_positions(
         logger.info('No redeemable positions found. Skipping to next interval.')
         return
 
-    # Refresh vault state on-chain so subsequent reads see fresh state without
-    # threading harvest_params through every call.
-    vaults = list({position.vault for position in os_token_positions})
-    await update_vaults_state(vaults=vaults, block_number=block_number)
-
     await redeem_positions(
         all_positions=all_positions,
         os_token_positions=os_token_positions,
         converter=os_token_converter,
         nonce=nonce,
+        block_number=block_number,
     )
-
-
-async def update_vaults_state(
-    vaults: list[ChecksumAddress],
-    block_number: BlockNumber,
-) -> None:
-    """Bring every regular vault up to date on-chain via the OsTokenRedeemer multicall.
-
-    Meta vaults are intentionally skipped; this command does not harvest them.
-    """
-    regular_vaults: list[ChecksumAddress] = []
-    for vault in vaults:
-        if await is_meta_vault(vault):
-            continue
-        regular_vaults.append(vault)
-
-    if not regular_vaults:
-        return
-
-    # Harvest regular vaults
-    vault_to_harvest_params = {
-        vault: harvest_params
-        for vault, harvest_params in (
-            await get_multiple_harvest_params(regular_vaults, block_number)
-        ).items()
-        if harvest_params is not None
-    }
-    if not vault_to_harvest_params:
-        return
-
-    for chunk_items in batched(vault_to_harvest_params.items(), MULTICALL_CHUNK_SIZE):
-        tx_hash = await os_token_redeemer_contract.batch_update_vault_state(dict(chunk_items))
-        logger.info(
-            'Waiting for OsTokenRedeemer updateVaultState multicall tx %s confirmation', tx_hash
-        )
-        tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
-            HexBytes(Web3.to_bytes(hexstr=tx_hash)), timeout=settings.execution_transaction_timeout
-        )
-        if not tx_receipt['status']:
-            raise RuntimeError(
-                f'OsTokenRedeemer updateVaultState multicall tx failed. Tx Hash: {tx_hash}'
-            )
-        logger.info('OsTokenRedeemer updateVaultState multicall confirmed. Tx Hash: %s', tx_hash)
 
 
 async def redeem_positions(
@@ -310,14 +260,17 @@ async def redeem_positions(
     os_token_positions: list[OsTokenPosition],
     converter: OsTokenConverter,
     nonce: int,
+    block_number: BlockNumber,
 ) -> None:
     """Redeem positions one by one. Each position's shares_to_redeem is already set by
     assign_shares_to_redeem; this function further caps it by the vault's withdrawable assets.
 
-    Meta-vault positions are skipped entirely. Aborts the round if a single
-    redemption tx fails.
+    Meta-vault positions are skipped entirely. Vaults whose on-chain state is
+    stale (unharvested) are skipped, since their withdrawable assets would be
+    outdated. Aborts the round if a single redemption tx fails.
     """
     vault_to_withdrawable: dict[ChecksumAddress, Wei] = {}
+    unharvested_vaults: set[ChecksumAddress] = set()
 
     for position in os_token_positions:
         shares_to_redeem = position.shares_to_redeem
@@ -329,7 +282,14 @@ async def redeem_positions(
                 'redeemable positions should not include meta vaults.'
             )
 
+        if position.vault in unharvested_vaults:
+            continue
+
         if position.vault not in vault_to_withdrawable:
+            if await VaultContract(position.vault).is_state_update_required(block_number):
+                logger.info('Skipping unharvested vault %s', position.vault)
+                unharvested_vaults.add(position.vault)
+                continue
             vault_to_withdrawable[position.vault] = await get_withdrawable_assets(
                 position.vault, harvest_params=None
             )
