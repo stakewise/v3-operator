@@ -62,7 +62,10 @@ class ProcessMetaVaultTask(BaseTask):
                 is_meta_vault=True,
             )
             root_meta_vault = meta_vaults_map.get(vault)
-            if root_meta_vault is None or not is_meta_vault_upgraded_to_release(
+            if root_meta_vault is None:
+                logger.error('Meta vault %s not found in subgraph', vault)
+                continue
+            if not is_meta_vault_upgraded_to_release(
                 network=settings.network,
                 vault_address=vault,
                 vault_version=root_meta_vault.version,
@@ -74,27 +77,24 @@ class ProcessMetaVaultTask(BaseTask):
                 )
                 continue
             try:
-                await process_meta_vault_tree(vault=vault, meta_vaults_map=meta_vaults_map)
+                await process_meta_vault_tree(
+                    root_meta_vault=root_meta_vault, meta_vaults_map=meta_vaults_map
+                )
             except Exception:
                 logger.exception('Failed to process meta vault tree for vault %s', vault)
 
 
 async def process_meta_vault_tree(
-    vault: ChecksumAddress,
+    root_meta_vault: Vault,
     meta_vaults_map: dict[ChecksumAddress, Vault],
 ) -> None:
     """
     Process a single meta vault tree: update state and deposit to sub vaults.
     """
-    logger.info('Processing meta vault: %s', vault)
-
-    root_meta_vault = meta_vaults_map.get(vault)
-    if not root_meta_vault:
-        logger.error('Meta vault %s not found in subgraph', vault)
-        return
+    logger.info('Processing meta vault: %s', root_meta_vault.address)
 
     if not root_meta_vault.sub_vaults:
-        logger.info('Meta vault %s has no sub vaults. Skipping.', vault)
+        logger.info('Meta vault %s has no sub vaults. Skipping.', root_meta_vault.address)
         return
 
     # Update the state for the entire meta vault tree
