@@ -108,9 +108,6 @@ class TestMetaVaultTreeUpdateStateCalls:
             return_value=True,
         ), mock.patch(
             'src.meta_vault.tasks.get_claimable_sub_vault_exit_requests', return_value=[]
-        ), mock.patch(
-            'src.meta_vault.tasks.is_meta_vault_rewards_nonce_outdated',
-            return_value=False,
         ), mock.patch.object(
             multicall_contract, 'tx_aggregate', return_value='0x123'
         ) as tx_aggregate_mock, mock.patch(
