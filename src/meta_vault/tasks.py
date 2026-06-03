@@ -4,15 +4,9 @@ from eth_typing import ChecksumAddress, HexStr
 from hexbytes import HexBytes
 from sw_utils import GNO_NETWORKS, InterruptHandler, convert_to_mgno
 from web3 import Web3
-from web3.types import BlockNumber
 
 from src.common.clients import execution_client
-from src.common.contracts import (
-    MetaVaultContract,
-    VaultContract,
-    keeper_contract,
-    multicall_contract,
-)
+from src.common.contracts import MetaVaultContract, VaultContract, multicall_contract
 from src.common.execution import check_gas_price
 from src.common.graph import wait_for_graph_node_sync
 from src.common.tasks import BaseTask
@@ -118,8 +112,14 @@ async def meta_vault_tree_update_state(
 
     # Update each meta vault in bottom-up order
     for meta_vault_address in meta_vault_addresses:
+        meta_vault = meta_vaults_map[meta_vault_address]
+        if not meta_vault.can_harvest:
+            logger.info(
+                'Meta vault %s is not harvestable, skipping state update', meta_vault.address
+            )
+            continue
         await meta_vault_update_state(
-            meta_vault=meta_vaults_map[meta_vault_address],
+            meta_vault=meta_vault,
         )
 
 
@@ -263,19 +263,14 @@ async def _get_meta_vault_update_state_calls(
     else:
         logger.info('No sub vault exit requests to claim for meta vault %s', meta_vault.address)
 
-    # Update meta vault state
-    is_rewards_nonce_outdated = await is_meta_vault_rewards_nonce_outdated(
-        meta_vault_contract=meta_vault_contract,
+    # Update meta vault itself
+    calls.append(
+        ContractCall(
+            address=meta_vault.address,
+            data=meta_vault_encoder.update_state(meta_vault.harvest_params),
+            description=f'Update state for meta vault {meta_vault.address}',
+        ),
     )
-
-    if sub_vaults_to_harvest or is_rewards_nonce_outdated:
-        calls.append(
-            ContractCall(
-                address=meta_vault.address,
-                data=meta_vault_encoder.update_state(meta_vault.harvest_params),
-                description=f'Update state for meta vault {meta_vault.address}',
-            ),
-        )
     return calls
 
 
@@ -348,35 +343,6 @@ async def fix_exit_queue_indexes(sub_vault_exit_requests: list[SubVaultExitReque
             sub_vault_exit_request.position_ticket,
         )
         sub_vault_exit_request.exit_queue_index = exit_queue_index
-
-
-async def is_meta_vault_rewards_nonce_outdated(
-    meta_vault_contract: MetaVaultContract,
-) -> bool:
-    """
-    Check if the meta vault rewards nonce is outdated compared to the keeper contract.
-    We can't read the rewards nonce from meta vault directly
-    because it is stored in private attribute.
-    Solution: compare events.
-    """
-    current_block = await execution_client.eth.get_block_number()
-
-    # Find the last rewards updated event in the Keeper contract
-    keeper_event = await keeper_contract.get_last_rewards_updated_event(
-        from_block=settings.network_config.KEEPER_GENESIS_BLOCK, to_block=current_block
-    )
-    if keeper_event is None:
-        logger.info('No RewardsUpdated event found in the Keeper contract')
-        return False
-
-    # Find the last rewards nonce updated event in the meta vault contract
-    # since the last Keeper vote
-    meta_vault_event = await meta_vault_contract.get_last_rewards_nonce_updated_event(
-        from_block=BlockNumber(keeper_event['blockNumber'] + 1), to_block=current_block
-    )
-
-    # If no meta vault event is found, the rewards nonce is outdated
-    return meta_vault_event is None
 
 
 async def process_deposit_to_sub_vaults(meta_vault_address: ChecksumAddress) -> None:

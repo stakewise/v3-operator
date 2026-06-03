@@ -3,7 +3,7 @@ import itertools
 import json
 from functools import cached_property
 from pathlib import Path
-from typing import Callable, cast
+from typing import Callable
 
 from eth_typing import HexStr
 from web3 import AsyncWeb3, Web3
@@ -313,15 +313,6 @@ class KeeperContract(ContractWrapper):
         )
         return voting_info
 
-    async def get_last_rewards_updated_event(
-        self, from_block: BlockNumber, to_block: BlockNumber
-    ) -> EventData | None:
-        return await self._get_last_event(
-            cast(type[AsyncContractEvent], self.contract.events.RewardsUpdated),
-            from_block=from_block,
-            to_block=to_block,
-        )
-
     async def get_exit_signatures_updated_event(
         self,
         vault: ChecksumAddress,
@@ -408,19 +399,6 @@ class MetaVaultContract(ContractWrapper):
 
     def encoder(self) -> 'MetaVaultEncoder':
         return MetaVaultEncoder(self)
-
-    async def get_last_rewards_nonce_updated_event(
-        self, from_block: BlockNumber, to_block: BlockNumber
-    ) -> EventData | None:
-        """
-        Returns the latest RewardsNonceUpdated event data from the contract.
-        """
-        event = await self._get_last_event(
-            event=cast(type[AsyncContractEvent], self.contract.events.RewardsNonceUpdated),
-            from_block=from_block,
-            to_block=to_block,
-        )
-        return event
 
 
 class MetaVaultEncoder:
