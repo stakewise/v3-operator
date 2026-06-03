@@ -44,6 +44,7 @@ async def graph_get_vaults(
                 {where_clause}
             ) {{
                 id
+                version
                 isMetaVault
                 subVaults {{
                   subVault {{

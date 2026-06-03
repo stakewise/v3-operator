@@ -11,9 +11,11 @@ def create_vault(
     is_meta_vault: bool = False,
     sub_vaults_count: int = 0,
     can_harvest: bool = True,
+    version: int = 1,
 ) -> Vault:
     return Vault(
         address=address or faker.eth_address(),
+        version=version,
         can_harvest=can_harvest,
         rewards_root=HexBytes(b'\x00' * 32),
         proof_reward=Wei(0),
