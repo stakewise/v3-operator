@@ -1,5 +1,6 @@
 import asyncio
 import os
+import sys
 from pathlib import Path
 
 import click
@@ -160,8 +161,11 @@ def upload_keypairs(
     try:
         asyncio.run(_setup_clients_and_upload_keypairs(ctx.obj['db_url'], encrypt_key))
         click.echo('Successfully uploaded keypairs to the database.')
+    except click.ClickException:
+        raise
     except Exception as e:
         log_verbose(e)
+        sys.exit(1)
 
 
 async def _setup_clients_and_upload_keypairs(db_url: str, encrypt_key: str) -> None:
