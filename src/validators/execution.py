@@ -8,45 +8,24 @@ from web3.exceptions import ContractLogicError
 from web3.types import Wei
 
 from src.common.clients import execution_client
-from src.common.contracts import (
-    VaultContract,
-    multicall_contract,
-    validators_registry_contract,
-)
+from src.common.contracts import VaultContract, multicall_contract
 from src.common.execution import build_gas_manager, transaction_gas_wrapper
 from src.common.typings import HarvestParams, OraclesApproval
 from src.common.utils import format_error
 from src.config.settings import settings
-from src.validators.event_processors import get_validators_start_index
 from src.validators.signing.common import encode_tx_validator_list
 from src.validators.typings import Validator
 
 logger = logging.getLogger(__name__)
 
 
-# pylint: disable=too-many-arguments,too-many-locals
 async def tx_register_validators(
     approval: OraclesApproval,
     validators: Sequence[Validator],
     harvest_params: HarvestParams | None,
     validators_registry_root: HexStr,
-    validator_index: int,
     validators_manager_signature: HexStr,
 ) -> HexStr | None:
-    # Check that validators registry root has not changed
-    registry_root = await validators_registry_contract.get_registry_root()
-
-    if registry_root != validators_registry_root:
-        logger.info('Validators registry root has changed. Retrying...')
-        return None
-
-    # Check that validator index has not changed
-    current_validator_index = await get_validators_start_index()
-
-    if current_validator_index != validator_index:
-        logger.info('Validator index has changed. Retrying...')
-        return None
-
     # Get update state call if harvest params are provided
     vault_contract = VaultContract(settings.vault)
     if harvest_params is not None:
