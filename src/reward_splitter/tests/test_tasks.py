@@ -6,11 +6,11 @@ from sw_utils.tests import faker
 from web3 import Web3
 from web3.types import Wei
 
+from src.common.contracts import RewardSplitterEncoder
 from src.common.typings import ExitRequest, HarvestParams
 from src.config.networks import ZERO_CHECKSUM_ADDRESS
 from src.reward_splitter.tasks import (
     _get_reward_splitter_calls,
-    _get_reward_splitter_encoder,
     claim_reward_splitters,
     claim_reward_splitters_for_vault,
 )
@@ -24,7 +24,7 @@ class TestGetRewardSplitterCalls:
         reward_splitter = create_reward_splitter(
             shareholders_earned_assets=[Wei(Web3.to_wei('1', 'ether'))]
         )
-        encoder = _get_reward_splitter_encoder()
+        encoder = RewardSplitterEncoder()
         update_state_selector = encoder.update_vault_state(_harvest_params())[:10]
 
         calls = await _get_reward_splitter_calls(
@@ -41,7 +41,7 @@ class TestGetRewardSplitterCalls:
         reward_splitter = create_reward_splitter(
             shareholders_earned_assets=[Wei(Web3.to_wei('1', 'ether'))]
         )
-        encoder = _get_reward_splitter_encoder()
+        encoder = RewardSplitterEncoder()
         harvest_params = _harvest_params()
 
         calls = await _get_reward_splitter_calls(
@@ -55,7 +55,7 @@ class TestGetRewardSplitterCalls:
     async def test_below_min_assets_only_claims_exit_requests(self):
         # Earned below FEE_SPLITTER_MIN_ASSETS: no exit queue entry, but exited assets claimed.
         reward_splitter = create_reward_splitter(shareholders_earned_assets=[Wei(1)])
-        encoder = _get_reward_splitter_encoder()
+        encoder = RewardSplitterEncoder()
         exit_request = _claimable_exit_request()
 
         calls = await _get_reward_splitter_calls(
