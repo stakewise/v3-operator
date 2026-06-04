@@ -23,14 +23,14 @@ from src.config.settings import (
 from src.validators.consensus import fetch_funding_validators_balances
 from src.validators.database import NetworkValidatorCrud
 from src.validators.exceptions import EmptyRelayerResponseException, FundingException
-from src.validators.execution import get_withdrawable_assets
-from src.validators.keystores.base import BaseKeystore
-from src.validators.metrics import update_unused_validator_keys_metric
-from src.validators.oracles import poll_validation_approval
-from src.validators.register_validators import (
+from src.validators.execution import (
+    get_withdrawable_assets,
     tx_fund_validators,
     tx_register_validators,
 )
+from src.validators.keystores.base import BaseKeystore
+from src.validators.metrics import update_unused_validator_keys_metric
+from src.validators.oracles import poll_validation_approval
 from src.validators.relayer import RelayerClient
 from src.validators.typings import NetworkValidator, Validator
 from src.validators.utils import get_validators_for_registration

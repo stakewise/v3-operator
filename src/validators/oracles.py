@@ -29,8 +29,8 @@ from src.config.settings import (
     ORACLES_VALIDATORS_TIMEOUT,
     settings,
 )
+from src.validators.event_processors import get_validators_start_index
 from src.validators.exceptions import RegistryRootChangedError
-from src.validators.execution import get_validators_start_index
 from src.validators.keystores.base import BaseKeystore
 from src.validators.signing.common import get_encrypted_exit_signature_shards
 from src.validators.typings import ApprovalRequest, ConsolidationRequest, Validator
