@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 # pylint: disable=too-many-arguments,too-many-locals
-async def register_validators(
+async def tx_register_validators(
     approval: OraclesApproval,
     validators: Sequence[Validator],
     harvest_params: HarvestParams | None,
@@ -111,7 +111,7 @@ async def register_validators(
     return tx_hash
 
 
-async def fund_validators(
+async def tx_fund_validators(
     validators: list[Validator],
     validators_manager_signature: HexStr,
     harvest_params: HarvestParams | None,
@@ -155,7 +155,7 @@ async def fund_validators(
     return tx_hash
 
 
-async def submit_consolidate_validators(
+async def tx_consolidate_validators(
     validators: bytes,
     oracle_signatures: bytes | None,
     tx_fee: Wei,
