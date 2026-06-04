@@ -12,6 +12,7 @@ from src.common.typings import ExitRequest, HarvestParams
 # pylint: disable-next=too-many-instance-attributes
 class Vault:
     address: ChecksumAddress
+    version: int
 
     # harvest params
     can_harvest: bool
@@ -73,6 +74,7 @@ class Vault:
 
         return Vault(
             address=vault_address,
+            version=int(vault_item['version']),
             is_meta_vault=is_meta_vault,
             sub_vaults=sub_vaults,
             can_harvest=can_harvest,

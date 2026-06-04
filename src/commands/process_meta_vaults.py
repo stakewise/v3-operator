@@ -183,6 +183,8 @@ def process_meta_vaults(
     )
     try:
         asyncio.run(main(vault_addresses))
+    except click.ClickException:
+        raise
     except Exception as e:
         log_verbose(e)
         sys.exit(1)

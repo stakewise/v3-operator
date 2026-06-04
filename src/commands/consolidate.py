@@ -266,6 +266,8 @@ def consolidate(
                 no_confirm=no_confirm,
             )
         )
+    except click.ClickException:
+        raise
     except Exception as e:
         log_verbose(e)
         sys.exit(1)

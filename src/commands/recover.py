@@ -140,6 +140,8 @@ def recover(
                 operator_config=operator_config,
             )
         )
+    except click.ClickException:
+        raise
     except Exception as e:
         log_verbose(e)
         sys.exit(1)
