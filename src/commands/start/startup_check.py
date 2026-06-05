@@ -88,7 +88,7 @@ async def startup_checks() -> None:
     await check_vault_version()
 
     if settings.enable_metrics:
-        logger.info('Checking metrics server...')
+        logger.info('Checking whether metrics port is available...')
         check_metrics_port()
 
     if (
