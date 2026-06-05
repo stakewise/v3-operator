@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 from itertools import batched
 from typing import Sequence, cast
 
@@ -112,8 +113,12 @@ class ValidatorRegistrationSubtask:
         if not funding_amounts:
             return vault_assets
 
-        if not await _is_funding_interval_passed():
-            raise FundingException('Funding interval has not passed yet')
+        interval_remaining = await _get_funding_interval_remaining()
+        if interval_remaining > 0:
+            raise FundingException(
+                f'Funding interval of {timedelta(seconds=settings.min_deposit_delay)} '
+                f'has not passed yet, wait {timedelta(seconds=interval_remaining)} more'
+            )
 
         for validator_fundings_chunk in batched(
             list(funding_amounts.items()), VALIDATORS_FUNDING_BATCH_SIZE
@@ -386,13 +391,21 @@ def _get_funding_amounts(
     return result
 
 
-async def _is_funding_interval_passed() -> bool:
+async def _get_funding_interval_remaining() -> int:
     """
-    Check if the required interval has passed since the last funding event.
+    Return the number of seconds remaining until the funding interval expires.
+    Returns 0 if the interval has already passed since the last funding event.
     Mitigate gas griefing attack
     """
     blocks_delay = settings.min_deposit_delay // settings.network_config.SECONDS_PER_BLOCK
-    to_block = await execution_client.eth.get_block_number()
+    latest_block = await execution_client.eth.get_block('latest')
+    to_block = latest_block['number']
     from_block = BlockNumber(to_block - blocks_delay)
     funding_events = await VaultContract(settings.vault).get_funding_events(from_block, to_block)
-    return len(funding_events) == 0
+    if not funding_events:
+        return 0
+
+    last_funding_block = max(event.block_number for event in funding_events)
+    last_funding_timestamp = (await execution_client.eth.get_block(last_funding_block))['timestamp']
+    remaining = last_funding_timestamp + settings.min_deposit_delay - latest_block['timestamp']
+    return max(0, remaining)

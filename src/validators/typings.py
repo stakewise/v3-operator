@@ -87,6 +87,7 @@ class ConsensusValidator:
 class V2ValidatorEventData:
     public_key: HexStr
     amount: Wei
+    block_number: BlockNumber
 
 
 @dataclass
