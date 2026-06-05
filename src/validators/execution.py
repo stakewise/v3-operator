@@ -4,7 +4,7 @@ from typing import Sequence
 from eth_typing import HexStr
 from sw_utils.typings import Bytes32
 from web3 import Web3
-from web3.exceptions import ContractLogicError
+from web3.exceptions import ContractCustomError, ContractLogicError
 from web3.types import Wei
 
 from src.common.clients import execution_client
@@ -120,6 +120,14 @@ async def tx_fund_validators(
     try:
         tx_function = vault_contract.functions.multicall(calls)
         tx = await transaction_gas_wrapper(tx_function)
+    except ContractCustomError as e:
+        # web3 >= 7 carries the raw revert payload in e.data; decode it against
+        # the vault ABI to surface the exact error instead of a bare class name.
+        reason = vault_contract.decode_custom_error(e.data) or e.data
+        logger.error('Failed to fund validator(s): execution reverted with %s', reason)
+        if settings.verbose:
+            logger.exception(e)
+        return None
     except Exception as e:
         logger.error('Failed to fund validator(s): %s', format_error(e))
         if settings.verbose:

@@ -5,7 +5,9 @@ from functools import cached_property
 from pathlib import Path
 from typing import Callable
 
+from eth_abi import abi as eth_abi
 from eth_typing import HexStr
+from eth_utils import function_abi_to_4byte_selector
 from web3 import AsyncWeb3, Web3
 from web3.contract import AsyncContract
 from web3.contract.async_contract import (
@@ -35,6 +37,22 @@ from src.withdrawals.typings import WithdrawalEvent
 SOLIDITY_UINT256_MAX = 2**256 - 1
 
 
+def _load_shared_error_abi() -> list[dict]:
+    """
+    Loads custom errors from StakeWise v3-core's ``Errors`` library
+    (``contracts/libraries/Errors.sol``). They are reverted from a linked
+    library, so their selectors are absent from every vault ABI and must be
+    tracked separately to decode reverts such as ``InvalidValidators`` raised by
+    ``fundValidators``. Keep ``abi/Errors.json`` in sync with ``Errors.sol``.
+    """
+    path = Path(__file__).parent / 'abi' / 'Errors.json'
+    with open(path, encoding='utf-8') as f:
+        return json.load(f)
+
+
+SHARED_ERROR_ABI = _load_shared_error_abi()
+
+
 class ContractWrapper:
     abi_path: str = ''
     settings_key: str = ''
@@ -50,11 +68,14 @@ class ContractWrapper:
         return self.address or getattr(settings.network_config, self.settings_key)
 
     @cached_property
-    def contract(self) -> AsyncContract:
+    def abi(self) -> list:
         current_dir = Path(__file__).parent
         with open(current_dir / self.abi_path, encoding='utf-8') as f:
-            abi = json.load(f)
-        return self.execution_client.eth.contract(abi=abi, address=self.contract_address)
+            return json.load(f)
+
+    @cached_property
+    def contract(self) -> AsyncContract:
+        return self.execution_client.eth.contract(abi=self.abi, address=self.contract_address)
 
     @property
     def functions(self) -> AsyncContractFunctions:
@@ -66,6 +87,49 @@ class ContractWrapper:
 
     def encode_abi(self, fn_name: str, args: list | None = None) -> HexStr:
         return self.contract.encode_abi(fn_name, args=args)
+
+    @cached_property
+    def _error_abi_by_selector(self) -> dict[bytes, dict]:
+        """
+        Maps a 4-byte error selector to its ABI entry. Includes the shared
+        StakeWise ``Errors`` library entries (absent from the vault ABI); the
+        contract's own ABI takes precedence on the unlikely selector collision.
+        """
+        return {
+            function_abi_to_4byte_selector(item): item
+            for item in (*SHARED_ERROR_ABI, *self.abi)
+            if item.get('type') == 'error'
+        }
+
+    def decode_custom_error(self, data: str | dict | None) -> str | None:
+        """
+        Decodes a custom error revert payload (4-byte selector followed by
+        ABI-encoded args) into a human-readable ``ErrorName(arg1, arg2)``
+        string, or ``None`` if the selector is not recognized.
+
+        ``data`` is the raw revert hex carried by ``ContractCustomError.data``
+        (web3 >= 7 surfaces it).
+        """
+        if not isinstance(data, str):
+            return None
+        try:
+            error_bytes = Web3.to_bytes(hexstr=HexStr(data))
+        except (ValueError, TypeError):
+            return None
+        if len(error_bytes) < 4:
+            return None
+
+        selector, encoded_args = error_bytes[:4], error_bytes[4:]
+        error_abi = self._error_abi_by_selector.get(selector)
+        if error_abi is None:
+            return None
+
+        arg_types = [inp['type'] for inp in error_abi.get('inputs', [])]
+        try:
+            decoded_args = eth_abi.decode(arg_types, encoded_args) if arg_types else ()
+        except Exception:  # pylint: disable=broad-except
+            return f'{error_abi['name']}(<undecodable args>)'
+        return f'{error_abi['name']}({', '.join(str(arg) for arg in decoded_args)})'
 
     async def _get_last_event(
         self,

@@ -1,0 +1,287 @@
+[
+  {
+    "type": "error",
+    "name": "AccessDenied",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidShares",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidAssets",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ZeroAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "CapacityExceeded",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidCapacity",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidSecurityDeposit",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidFeeRecipient",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidFeePercent",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotHarvested",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotCollateralized",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Collateralized",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidProof",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "LowLtv",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidPosition",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidHealthFactor",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidReceivedAssets",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidTokenMeta",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "UpgradeFailed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidValidators",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "DeadlineExpired",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PermitInvalidSigner",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidValidatorsRegistryRoot",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidVault",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "AlreadyAdded",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "AlreadyRemoved",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidOracles",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotEnoughSignatures",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidOracle",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TooEarlyUpdate",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidAvgRewardPerSecond",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidRewardsRoot",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "HarvestFailed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "LiquidationDisabled",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidLiqThresholdPercent",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidLiqBonusPercent",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidLtvPercent",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidCheckpointIndex",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidCheckpointValue",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "MaxOraclesExceeded",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ExitRequestNotProcessed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ValueNotChanged",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "FlashLoanFailed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "CannotTopUpV1Validators",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidSignatures",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "EmptySubVaults",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "EjectingVaultNotFound",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "EjectingVault",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "RepeatedEjectingVault",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "UnclaimedAssets",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidCurator",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "RewardsNonceIsHigher",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidRedeemablePositions",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidDelay",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidTicket",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "LowBalance",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidMinBalancePercent",
+    "inputs": []
+  }
+]
