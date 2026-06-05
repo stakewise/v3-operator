@@ -33,8 +33,8 @@ from src.config.networks import AVAILABLE_NETWORKS, GNOSIS, MAINNET, NETWORKS
 from src.config.settings import DEFAULT_MAX_CONSOLIDATION_REQUEST_FEE_GWEI, settings
 from src.validators.consolidation_manager import ConsolidationManager
 from src.validators.exceptions import ConsolidationError
+from src.validators.execution import tx_consolidate_validators
 from src.validators.oracles import poll_consolidation_signature
-from src.validators.register_validators import tx_consolidate_validators
 from src.validators.relayer import RelayerClient
 from src.validators.typings import ConsolidationKeys
 

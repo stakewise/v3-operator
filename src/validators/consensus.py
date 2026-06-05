@@ -10,7 +10,7 @@ from web3.types import Gwei
 from src.common.clients import consensus_client
 from src.config.settings import settings
 from src.validators.database import VaultValidatorCrud
-from src.validators.execution import get_latest_vault_v2_validator_public_keys
+from src.validators.event_processors import get_latest_vault_v2_validator_public_keys
 from src.validators.typings import ConsensusValidator
 
 EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES

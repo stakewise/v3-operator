@@ -14,7 +14,7 @@ from src.common.execution import check_gas_price
 from src.common.harvest import get_harvest_params
 from src.common.metrics import metrics
 from src.common.protocol_config import get_protocol_config
-from src.common.typings import HarvestParams, ValidatorType
+from src.common.typings import HarvestParams, OraclesApproval, ValidatorType
 from src.config.settings import (
     MIN_ACTIVATION_BALANCE_GWEI,
     VALIDATORS_FUNDING_BATCH_SIZE,
@@ -22,15 +22,16 @@ from src.config.settings import (
 )
 from src.validators.consensus import fetch_funding_validators_balances
 from src.validators.database import NetworkValidatorCrud
+from src.validators.event_processors import get_validators_start_index
 from src.validators.exceptions import EmptyRelayerResponseException, FundingException
-from src.validators.execution import get_withdrawable_assets
-from src.validators.keystores.base import BaseKeystore
-from src.validators.metrics import update_unused_validator_keys_metric
-from src.validators.oracles import poll_validation_approval
-from src.validators.register_validators import (
+from src.validators.execution import (
+    get_withdrawable_assets,
     tx_fund_validators,
     tx_register_validators,
 )
+from src.validators.keystores.base import BaseKeystore
+from src.validators.metrics import update_unused_validator_keys_metric
+from src.validators.oracles import poll_validation_approval
 from src.validators.relayer import RelayerClient
 from src.validators.typings import NetworkValidator, Validator
 from src.validators.utils import get_validators_for_registration
@@ -249,7 +250,7 @@ async def register_new_validators(
         validators_registry_root=validators_registry_root,
         validators_manager_signature=validators_manager_signature,
     )
-    tx_hash = await tx_register_validators(
+    tx_hash = await validate_index_and_register_validators(
         approval=oracles_approval,
         validators=validators,
         harvest_params=harvest_params,
@@ -264,6 +265,39 @@ async def register_new_validators(
         metrics.last_registration_block.labels(network=settings.network).set(tx_data['blockNumber'])
 
     return tx_hash
+
+
+# pylint: disable-next=too-many-arguments
+async def validate_index_and_register_validators(
+    approval: OraclesApproval,
+    validators: Sequence[Validator],
+    harvest_params: HarvestParams | None,
+    validators_registry_root: HexStr,
+    validator_index: int,
+    validators_manager_signature: HexStr,
+) -> HexStr | None:
+    """Runs pre-tx validations and submits the registration transaction."""
+    # Check that validators registry root has not changed
+    registry_root = await validators_registry_contract.get_registry_root()
+
+    if registry_root != validators_registry_root:
+        logger.info('Validators registry root has changed. Retrying...')
+        return None
+
+    # Check that validator index has not changed
+    current_validator_index = await get_validators_start_index()
+
+    if current_validator_index != validator_index:
+        logger.info('Validator index has changed. Retrying...')
+        return None
+
+    return await tx_register_validators(
+        approval=approval,
+        validators=validators,
+        harvest_params=harvest_params,
+        validators_registry_root=validators_registry_root,
+        validators_manager_signature=validators_manager_signature,
+    )
 
 
 async def get_vault_assets(harvest_params: HarvestParams | None) -> Gwei:
