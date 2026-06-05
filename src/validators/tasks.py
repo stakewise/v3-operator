@@ -146,7 +146,6 @@ async def fund_validators_chunk(
     Makes single transaction for a chunk of validators.
     Returns transaction hash if funding is successful, None otherwise.
     """
-    logger.info('Started funding of %d validator(s)', len(validator_fundings))
     validators_manager_signature = HexStr('0x')
     if settings.relayer_endpoint:
         # fetch validators and signature from relayer
@@ -170,6 +169,17 @@ async def fund_validators_chunk(
             )
         )
         pub_keys.append(public_key)
+
+    # Log which validators are being funded and with how much
+    vault_balance_symbol = settings.network_config.VAULT_BALANCE_SYMBOL
+    logger.info('Funding %d validator(s):', len(validators))
+    for validator in validators:
+        logger.info(
+            '  %s — %s %s',
+            validator.public_key,
+            Web3.from_wei(Web3.to_wei(validator.amount, 'gwei'), 'ether'),
+            vault_balance_symbol,
+        )
 
     tx_hash = await tx_fund_validators(
         harvest_params=harvest_params,
