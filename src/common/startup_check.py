@@ -413,10 +413,9 @@ async def check_operator_version() -> None:
         latest_version = data['tag_name']
         if Version(src.__version__) < Version(latest_version):
             logger.warning(
-                'A newer operator version %s is available (current version is %s). '
-                'Please consider upgrading: %s',
+                'A newer Operator version is available: %s. '
+                'Upgrading to the latest release is recommended: %s',
                 latest_version,
-                src.__version__,
                 RELEASES_URL,
             )
     except (InvalidVersion, KeyError, TypeError) as e:
