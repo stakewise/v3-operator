@@ -10,7 +10,7 @@ from web3.types import Gwei
 from src.common.clients import consensus_client
 from src.config.settings import settings
 from src.validators.database import VaultValidatorCrud
-from src.validators.execution import get_latest_vault_v2_validator_public_keys
+from src.validators.event_processors import get_latest_vault_v2_validator_public_keys
 from src.validators.typings import ConsensusValidator
 
 EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
@@ -18,13 +18,13 @@ EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
 logger = logging.getLogger(__name__)
 
 
-async def fetch_compounding_validators_balances() -> dict[HexStr, Gwei]:
+async def fetch_funding_validators_balances() -> dict[HexStr, Gwei]:
     """
-    Retrieves the actual balances of compounding validators in the vault.
-    Also includes balances from pending deposits
+    Retrieves the consensus balances of vault validators eligible for funding.
+    Includes balances from pending deposits
     that have not yet been processed by the consensus node.
     """
-    vault_public_keys = {key.public_key for key in VaultValidatorCrud().get_vault_validators()}
+    vault_public_keys = {v.public_key for v in VaultValidatorCrud().get_vault_validators()}
     non_finalized_public_keys = await get_latest_vault_v2_validator_public_keys(settings.vault)
     vault_public_keys.update(non_finalized_public_keys)
     if not vault_public_keys:

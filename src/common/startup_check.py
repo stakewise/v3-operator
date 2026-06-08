@@ -10,6 +10,7 @@ import psutil
 from aiohttp import ClientSession, ClientTimeout
 from click import ClickException
 from eth_typing import BlockNumber
+from packaging.version import InvalidVersion, Version
 from sw_utils import (
     ChainHead,
     InterruptHandler,
@@ -22,6 +23,7 @@ from sw_utils.graph.client import GraphClient as SWGraphClient
 from web3 import Web3
 from web3.exceptions import BadFunctionCallOutput
 
+import src
 from src.common.clients import OPERATOR_USER_AGENT
 from src.common.clients import execution_client as default_execution_client
 from src.common.contracts import (
@@ -45,6 +47,11 @@ from src.validators.relayer import RelayerClient
 logger = logging.getLogger(__name__)
 
 IPFS_HASH_EXAMPLE = 'QmawUdo17Fvo7xa6ARCUSMV1eoVwPtVuzx8L8Crj2xozWm'
+
+# Used to remind the operator about newer stable releases on startup.
+# The `latest` endpoint always resolves to the most recent non-prerelease release.
+LATEST_RELEASE_URL = 'https://github.com/stakewise/v3-operator/releases/latest'
+RELEASES_URL = 'https://github.com/stakewise/v3-operator/releases'
 
 
 def validate_settings() -> None:
@@ -384,6 +391,37 @@ async def check_vault_version() -> None:
     vault_version = await vault_contract.version()
     if not is_vault_upgraded_to_pectra(settings.network, settings.vault, vault_version):
         raise RuntimeError(f'Please upgrade Vault {settings.vault} to the latest version.')
+
+
+async def check_operator_version() -> None:
+    """
+    Reminds the operator to upgrade when a newer stable release is available.
+
+    This check is best-effort: any failure to reach GitHub (network issues,
+    rate limiting, unexpected response) is logged as a warning and never aborts
+    startup.
+    """
+    try:
+        async with ClientSession(
+            timeout=ClientTimeout(30),
+            headers={'Accept': 'application/json'},
+        ) as session:
+            async with session.get(LATEST_RELEASE_URL) as response:
+                response.raise_for_status()
+                data = await response.json(content_type=None)
+
+        latest_version = data['tag_name']
+        if Version(src.__version__) < Version(latest_version):
+            logger.warning(
+                'A newer Operator version is available: %s. '
+                'Upgrading to the latest release is recommended: %s',
+                latest_version,
+                RELEASES_URL,
+            )
+    except (InvalidVersion, KeyError, TypeError) as e:
+        logger.warning('Failed to parse the latest operator version: %s', format_error(e))
+    except Exception as e:
+        logger.warning('Failed to check for newer operator version: %s', format_error(e))
 
 
 async def check_events_logs() -> None:

@@ -12,20 +12,18 @@ from sw_utils.networks import ContractReleaseVersion
 from web3 import Web3
 
 from src.common.clients import execution_client
-from src.common.contracts import (
-    MetaVaultContract,
-    MetaVaultEncoder,
-    SubVaultsRegistryContract,
-    SubVaultsRegistryEncoder,
-    VaultContract,
-    VaultEncoder,
-    multicall_contract,
-)
+from src.common.contracts import VaultContract, VaultEncoder, multicall_contract
 from src.common.execution import check_gas_price
 from src.common.graph import wait_for_graph_node_sync
 from src.common.tasks import BaseTask
 from src.common.typings import ExitRequest
 from src.config.settings import settings
+from src.meta_vault.contracts import (
+    MetaVaultContract,
+    MetaVaultEncoder,
+    SubVaultsRegistryContract,
+    SubVaultsRegistryEncoder,
+)
 from src.meta_vault.exceptions import ClaimDelayNotPassedException
 from src.meta_vault.graph import (
     graph_get_exit_requests_for_meta_vault,
