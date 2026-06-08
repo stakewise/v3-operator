@@ -1,6 +1,7 @@
 import asyncio
 import itertools
 import json
+import sys
 from functools import cached_property
 from pathlib import Path
 from typing import Callable
@@ -28,7 +29,6 @@ from src.config.settings import (
     EVENTS_CONCURRENCY_LIMIT,
     settings,
 )
-from src.meta_vault.typings import SubVaultExitRequest
 from src.validators.typings import V2ValidatorEventData
 from src.withdrawals.typings import WithdrawalEvent
 
@@ -51,10 +51,9 @@ class ContractWrapper:
 
     @cached_property
     def contract(self) -> AsyncContract:
-        current_dir = Path(__file__).parent
-        with open(current_dir / self.abi_path, encoding='utf-8') as f:
-            abi = json.load(f)
-        return self.execution_client.eth.contract(abi=abi, address=self.contract_address)
+        return self.execution_client.eth.contract(
+            abi=self._load_abi(self.abi_path), address=self.contract_address
+        )
 
     @property
     def functions(self) -> AsyncContractFunctions:
@@ -116,6 +115,16 @@ class ContractWrapper:
                 events.extend(range_events)
             from_block = BlockNumber(from_block + blocks_range + 1)
         return events
+
+    def _load_abi(self, abi_path: str) -> dict:
+        # get subclass file path
+        file = sys.modules[self.__class__.__module__].__file__
+        if not file:
+            raise RuntimeError("Can't get abi file path")
+        # load abi
+        current_dir = Path(file).parent
+        with (current_dir / abi_path).open(encoding='utf-8') as f:
+            return json.load(f)
 
 
 class VaultStateMixin:
@@ -385,78 +394,6 @@ class RewardSplitterEncoder(BaseEncoder):
         return self.contract.encode_abi(
             fn_name='claimExitedAssetsOnBehalf',
             args=[position_ticket, timestamp, exit_queue_index],
-        )
-
-
-class MetaVaultContract(ContractWrapper):
-    abi_path = 'abi/IEthMetaVault.json'
-
-    def __init__(
-        self, address: ChecksumAddress | None = None, execution_client: AsyncWeb3 | None = None
-    ):
-        super().__init__(address, execution_client)
-        self._sub_vaults_registry: ChecksumAddress | None = None
-
-    async def sub_vaults_registry(self) -> ChecksumAddress:
-        if self._sub_vaults_registry is None:
-            self._sub_vaults_registry = await self.contract.functions.subVaultsRegistry().call()
-        return self._sub_vaults_registry
-
-    async def withdrawable_assets(self) -> Wei:
-        return await self.contract.functions.withdrawableAssets().call()
-
-    async def get_exit_queue_index(self, position_ticket: int) -> int:
-        return await self.contract.functions.getExitQueueIndex(position_ticket).call()
-
-
-class MetaVaultEncoder(BaseEncoder):
-    """Helper class to encode MetaVault contract ABI calls."""
-
-    contract_class = MetaVaultContract
-
-    def update_state(self, harvest_params: HarvestParams) -> HexStr:
-        return self.contract.encode_abi(
-            fn_name='updateState',
-            args=[
-                (
-                    harvest_params.rewards_root,
-                    harvest_params.reward,
-                    harvest_params.unlocked_mev_reward,
-                    harvest_params.proof,
-                ),
-            ],
-        )
-
-
-class SubVaultsRegistryContract(ContractWrapper):
-    abi_path = 'abi/ISubVaultsRegistry.json'
-
-    async def deposit_to_sub_vaults(self) -> HexStr:
-        tx_function = self.contract.functions.depositToSubVaults()
-        tx_hash = await transaction_gas_wrapper(tx_function)
-        return Web3.to_hex(tx_hash)
-
-
-class SubVaultsRegistryEncoder(BaseEncoder):
-    """Helper class to encode SubVaultsRegistry contract ABI calls."""
-
-    contract_class = SubVaultsRegistryContract
-
-    def claim_sub_vaults_exited_assets(
-        self, sub_vault_exit_requests: list[SubVaultExitRequest]
-    ) -> HexStr:
-        exit_requests_arg: list[tuple] = []
-
-        for request in sub_vault_exit_requests:
-            exit_requests_arg.append(
-                (
-                    request.exit_queue_index,
-                    request.vault,
-                    request.timestamp,
-                )
-            )
-        return self.contract.encode_abi(
-            fn_name='claimSubVaultsExitedAssets', args=[exit_requests_arg]
         )
 
 
