@@ -76,17 +76,29 @@ class TestGetRewardSplitterCalls:
 
 @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
 class TestClaimRewardSplittersForVault:
-    async def test_returns_none_when_no_splitters(self):
+    async def test_skips_submitting_when_no_splitters(self):
+        # No fee splitters for the vault: the routine must return before fetching exit
+        # requests or building/submitting any transactions.
         with mock.patch(
             'src.reward_splitter.tasks.graph_get_reward_splitters', return_value=[]
-        ), mock.patch('src.reward_splitter.tasks.wallet', new=mock.MagicMock()):
-            succeeded = await claim_reward_splitters_for_vault(
+        ), mock.patch(
+            'src.reward_splitter.tasks.graph_get_claimable_exit_requests'
+        ) as exit_requests_mock, mock.patch(
+            'src.reward_splitter.tasks.transaction_gas_wrapper'
+        ) as gas_wrapper_mock, mock.patch(
+            'src.reward_splitter.tasks.wait_for_graph_node_sync'
+        ) as graph_sync_mock, mock.patch(
+            'src.reward_splitter.tasks.wallet', new=mock.MagicMock()
+        ):
+            await claim_reward_splitters_for_vault(
                 vault=ZERO_CHECKSUM_ADDRESS,
                 block_number=Web3.to_int(1),
                 harvest_params=None,
             )
 
-        assert succeeded is None
+        exit_requests_mock.assert_not_called()
+        gas_wrapper_mock.assert_not_called()
+        graph_sync_mock.assert_not_called()
 
     async def test_waits_for_graph_sync_after_submitting(self):
         # After submitting the claim txs the graph node must be synced past the tx block,
