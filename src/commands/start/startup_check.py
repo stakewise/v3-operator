@@ -11,6 +11,7 @@ from src.common.startup_check import (
     check_execution_nodes_network,
     check_ipfs_endpoints,
     check_metrics_port,
+    check_operator_version,
     check_relayer_endpoint,
     check_validators_manager,
     check_vault_address,
@@ -34,6 +35,9 @@ logger = logging.getLogger(__name__)
 # pylint: disable-next=too-many-statements
 async def startup_checks() -> None:
     validate_settings()
+
+    logger.info('Checking for newer operator version...')
+    await check_operator_version()
 
     logger.info('Checking connection to database...')
     db_client.create_db_dir()
