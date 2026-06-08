@@ -404,7 +404,7 @@ async def check_operator_version() -> None:
     try:
         async with ClientSession(
             timeout=ClientTimeout(30),
-            headers={'Accept': 'application/json', 'User-Agent': OPERATOR_USER_AGENT},
+            headers={'Accept': 'application/json'},
         ) as session:
             async with session.get(LATEST_RELEASE_URL) as response:
                 response.raise_for_status()
