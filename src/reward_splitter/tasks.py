@@ -46,6 +46,12 @@ async def claim_reward_splitters(
     updateVaultState call (e.g. for meta vaults whose state was already refreshed
     by the meta vault tree update).
     """
+    if update_vault_state and len(vaults) > 1:
+        # get_harvest_params always reads settings.vault internally, so a single
+        # fetch cannot be reused across multiple vaults when updating their state.
+        logger.error('Updating vault state is not supported when claiming for multiple vaults')
+        return
+
     block = await execution_client.eth.get_block('finalized')
 
     app_state = AppState()
@@ -67,7 +73,7 @@ async def claim_reward_splitters(
         except Exception:
             logger.exception('Failed to claim fee splitters for vault %s', vault)
             succeeded = False
-        all_succeeded = all_succeeded and succeeded
+        all_succeeded &= succeeded
 
     # Advance the interval marker only when no vault was blocked by gas price,
     # so a skipped claim is retried on the next loop instead of waiting a full interval.
