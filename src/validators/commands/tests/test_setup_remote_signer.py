@@ -6,8 +6,8 @@ from click.testing import CliRunner
 from eth_typing import HexAddress
 
 from src.commands.create_keys import create_keys
-from src.commands.setup_remote_signer import setup_remote_signer
 from src.config.settings import settings
+from src.validators.commands.setup_remote_signer import setup_remote_signer
 
 
 class TestOperatorRemoteSignerSetup:
