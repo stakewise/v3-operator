@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from unittest import mock
 
 import pytest
@@ -75,32 +76,7 @@ class TestGetRewardSplitterCalls:
 
 @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
 class TestClaimRewardSplittersForVault:
-    async def test_returns_false_and_skips_send_on_high_gas(self):
-        reward_splitter = create_reward_splitter(vault=ZERO_CHECKSUM_ADDRESS)
-
-        with mock.patch(
-            'src.reward_splitter.tasks.graph_get_reward_splitters',
-            return_value=[reward_splitter],
-        ), mock.patch(
-            'src.reward_splitter.tasks.graph_get_claimable_exit_requests',
-            return_value={},
-        ), mock.patch(
-            'src.reward_splitter.tasks.check_gas_price', return_value=False
-        ), mock.patch(
-            'src.reward_splitter.tasks.transaction_gas_wrapper'
-        ) as tx_wrapper_mock, mock.patch(
-            'src.reward_splitter.tasks.wallet', new=mock.MagicMock()
-        ):
-            succeeded = await claim_reward_splitters_for_vault(
-                vault=ZERO_CHECKSUM_ADDRESS,
-                block_number=Web3.to_int(1),
-                harvest_params=None,
-            )
-
-        assert succeeded is False
-        tx_wrapper_mock.assert_not_called()
-
-    async def test_returns_true_when_no_splitters(self):
+    async def test_returns_none_when_no_splitters(self):
         with mock.patch(
             'src.reward_splitter.tasks.graph_get_reward_splitters', return_value=[]
         ), mock.patch('src.reward_splitter.tasks.wallet', new=mock.MagicMock()):
@@ -110,30 +86,86 @@ class TestClaimRewardSplittersForVault:
                 harvest_params=None,
             )
 
-        assert succeeded is True
+        assert succeeded is None
+
+    async def test_waits_for_graph_sync_after_submitting(self):
+        # After submitting the claim txs the graph node must be synced past the tx block,
+        # so a later run does not rebuild the same calls against stale subgraph state.
+        reward_splitter = create_reward_splitter(
+            shareholders_earned_assets=[Wei(Web3.to_wei('1', 'ether'))]
+        )
+        tx_block = Web3.to_int(123)
+
+        with mock.patch(
+            'src.reward_splitter.tasks.graph_get_reward_splitters',
+            return_value=[reward_splitter],
+        ), mock.patch(
+            'src.reward_splitter.tasks.graph_get_claimable_exit_requests',
+            return_value={},
+        ), mock.patch(
+            'src.reward_splitter.tasks.transaction_gas_wrapper',
+            return_value=HexBytes(b'\x12' * 32),
+        ), mock.patch(
+            'src.reward_splitter.tasks.RewardSplitterContract', new=mock.MagicMock()
+        ), mock.patch(
+            'src.reward_splitter.tasks.execution_client'
+        ) as execution_client_mock, mock.patch(
+            'src.reward_splitter.tasks.wait_for_graph_node_sync'
+        ) as graph_sync_mock, mock.patch(
+            'src.reward_splitter.tasks.wallet', new=mock.MagicMock()
+        ):
+            execution_client_mock.eth.wait_for_transaction_receipt = mock.AsyncMock(
+                return_value={'status': 1, 'blockNumber': tx_block}
+            )
+            await claim_reward_splitters_for_vault(
+                vault=ZERO_CHECKSUM_ADDRESS,
+                block_number=Web3.to_int(1),
+                harvest_params=None,
+            )
+
+        graph_sync_mock.assert_awaited_once_with(tx_block)
 
 
 @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
 class TestClaimRewardSplitters:
-    async def test_advances_marker_only_when_all_succeeded(self):
+    async def test_advances_marker_when_no_gas_block(self):
         vaults = [faker.eth_address(), faker.eth_address()]
 
         with self._patch(per_vault_result=True) as (app_state, _):
             await claim_reward_splitters(vaults=vaults, update_vault_state=False)
             assert app_state.reward_splitter_block == 100
 
-        with self._patch(per_vault_result=False) as (app_state, _):
+    async def test_holds_marker_on_gas_block(self):
+        # Gas is now checked once for the whole routine: if the price is too high
+        # the function returns early without touching the marker or calling per-vault logic.
+        vaults = [faker.eth_address(), faker.eth_address()]
+
+        with self._patch(check_gas_price=False) as (app_state, claim_mock):
             await claim_reward_splitters(vaults=vaults, update_vault_state=False)
             assert app_state.reward_splitter_block is None
+            claim_mock.assert_not_called()
+
+    async def test_exception_in_vault_does_not_hold_marker(self):
+        # A transient per-vault error must not pin the shared marker, otherwise the whole
+        # routine would re-run for every vault each block instead of once per interval.
+        vaults = [faker.eth_address(), faker.eth_address()]
+
+        with self._patch(side_effect=[Exception('boom'), True]) as (app_state, _):
+            await claim_reward_splitters(vaults=vaults, update_vault_state=False)
+            assert app_state.reward_splitter_block == 100
 
     async def test_skips_when_interval_not_passed(self):
         with self._patch(per_vault_result=True, interval_passed=False) as (_, claim_mock):
             await claim_reward_splitters(vaults=[faker.eth_address()], update_vault_state=False)
             claim_mock.assert_not_called()
 
-    def _patch(self, per_vault_result: bool, interval_passed: bool = True):
-        from contextlib import contextmanager
-
+    def _patch(
+        self,
+        per_vault_result: bool = True,
+        interval_passed: bool = True,
+        side_effect: list | None = None,
+        check_gas_price: bool = True,
+    ):
         @contextmanager
         def ctx():
             app_state = mock.MagicMock()
@@ -147,8 +179,12 @@ class TestClaimRewardSplitters:
                 'src.reward_splitter.tasks._check_reward_splitter_block',
                 return_value=interval_passed,
             ), mock.patch(
+                'src.reward_splitter.tasks.check_gas_price',
+                return_value=check_gas_price,
+            ), mock.patch(
                 'src.reward_splitter.tasks.claim_reward_splitters_for_vault',
                 return_value=per_vault_result,
+                side_effect=side_effect,
             ) as claim_mock:
                 execution_client_mock.eth.get_block = mock.AsyncMock(return_value=block)
                 yield app_state, claim_mock

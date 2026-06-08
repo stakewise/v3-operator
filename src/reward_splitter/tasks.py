@@ -8,6 +8,7 @@ from src.common.app_state import AppState
 from src.common.clients import execution_client
 from src.common.contracts import RewardSplitterContract, RewardSplitterEncoder
 from src.common.execution import check_gas_price, transaction_gas_wrapper
+from src.common.graph import wait_for_graph_node_sync
 from src.common.harvest import get_harvest_params
 from src.common.tasks import BaseTask
 from src.common.typings import ExitRequest, HarvestParams
@@ -58,27 +59,26 @@ async def claim_reward_splitters(
     if not await _check_reward_splitter_block(app_state, block['number']):
         return
 
+    # check current gas prices
+    if not await check_gas_price():
+        return
+
     logger.info('Fetching fee splitters')
 
     harvest_params = await get_harvest_params() if update_vault_state else None
 
-    all_succeeded = True
     for vault in vaults:
         try:
-            succeeded = await claim_reward_splitters_for_vault(
+            await claim_reward_splitters_for_vault(
                 vault=vault,
                 block_number=block['number'],
                 harvest_params=harvest_params,
             )
         except Exception:
             logger.exception('Failed to claim fee splitters for vault %s', vault)
-            succeeded = False
-        all_succeeded &= succeeded
+            continue
 
-    # Advance the interval marker only when no vault was blocked by gas price,
-    # so a skipped claim is retried on the next loop instead of waiting a full interval.
-    if all_succeeded:
-        app_state.reward_splitter_block = block['number']
+    app_state.reward_splitter_block = block['number']
 
 
 # pylint: disable-next=too-many-locals
@@ -86,7 +86,7 @@ async def claim_reward_splitters_for_vault(
     vault: ChecksumAddress,
     block_number: BlockNumber,
     harvest_params: HarvestParams | None,
-) -> bool:
+) -> None:
     """
     Claim fee splitter rewards on behalf of shareholders for a single vault.
 
@@ -94,9 +94,6 @@ async def claim_reward_splitters_for_vault(
     builds the enterExitQueueOnBehalf and claimExitedAssetsOnBehalf multicalls, and
     submits them. Pass harvest_params=None to skip the splitter-side updateVaultState
     call.
-
-    Returns False if the transactions were skipped because the gas price is too high,
-    True otherwise.
     """
     reward_splitters = await graph_get_reward_splitters(
         block_number=block_number, claimer=wallet.account.address, vault=vault
@@ -108,7 +105,7 @@ async def claim_reward_splitters_for_vault(
             vault,
             wallet.address,
         )
-        return True
+        return
 
     splitter_to_exit_requests = await graph_get_claimable_exit_requests(
         block_number=block_number, receivers=[rs.address for rs in reward_splitters]
@@ -134,13 +131,10 @@ async def claim_reward_splitters_for_vault(
         calls[reward_splitter.address] = reward_splitter_calls
 
     if not calls:
-        return True
-
-    # check current gas prices
-    if not await check_gas_price():
-        return False
+        return
 
     logger.info('Processing fee splitter calls')
+    last_confirmed_block = block_number
     for address, address_calls in calls.items():
         contract = RewardSplitterContract(
             address=address,
@@ -159,9 +153,11 @@ async def claim_reward_splitters_for_vault(
                 f'Failed to confirm fee splitter tx: {tx_hash}',
             )
         logger.info('Transaction %s confirmed', tx_hash)
+        last_confirmed_block = tx_receipt['blockNumber']
+
+    await wait_for_graph_node_sync(last_confirmed_block)
 
     logger.info('All fee splitter calls processed')
-    return True
 
 
 async def _check_reward_splitter_block(app_state: AppState, block_number: BlockNumber) -> bool:
