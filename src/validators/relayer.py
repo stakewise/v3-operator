@@ -11,7 +11,7 @@ from web3.types import Gwei
 
 from src.common.clients import OPERATOR_USER_AGENT
 from src.config.settings import settings
-from src.validators.execution import get_validators_start_index
+from src.validators.event_processors import get_validators_start_index
 from src.validators.typings import (
     ExitSignatureShards,
     RelayerInfoResponse,

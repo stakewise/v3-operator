@@ -24,7 +24,7 @@ from src.validators.database import (
     NetworkValidatorCrud,
     VaultValidatorCrud,
 )
-from src.validators.execution import scan_validators_events
+from src.validators.event_processors import scan_validators_events
 from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
 from src.validators.relayer import RelayerClient

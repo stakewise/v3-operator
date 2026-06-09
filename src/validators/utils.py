@@ -10,7 +10,7 @@ from web3.types import Gwei
 from src.common.typings import ValidatorType
 from src.config.settings import settings
 from src.validators.database import NetworkValidatorCrud
-from src.validators.execution import get_latest_network_validator_public_keys
+from src.validators.event_processors import get_latest_network_validator_public_keys
 from src.validators.keystores.base import BaseKeystore
 from src.validators.typings import Validator
 

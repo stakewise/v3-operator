@@ -4,6 +4,10 @@ from tempfile import TemporaryDirectory
 from typing import Callable, Generator
 from unittest import mock
 
+# aioresponses (<=0.7.8) builds ClientResponse without the `stream_writer`
+# argument that aiohttp >=3.14 requires as a keyword-only parameter. Patch the
+# class it instantiates to supply a default so mocked responses keep working.
+import aioresponses.core  # noqa: E402  pylint: disable=wrong-import-position
 import ecies
 import pytest
 from _pytest.fixtures import SubRequest
@@ -16,7 +20,6 @@ from sw_utils.typings import Oracle, ProtocolConfig
 
 from src.commands.create_keys import create_keys
 from src.commands.create_wallet import create_wallet
-from src.commands.setup_remote_signer import setup_remote_signer
 from src.common.clients import (
     ExecutionClient,
     execution_client,
@@ -27,6 +30,7 @@ from src.common.credentials import CredentialManager
 from src.config.config import OperatorConfig
 from src.config.networks import HOODI, NETWORKS
 from src.config.settings import settings
+from src.validators.commands.setup_remote_signer import setup_remote_signer
 from src.validators.keystores.remote import RemoteSignerKeystore
 from src.validators.keystores.tests.test_fixtures.hashi_vault import (
     hashi_vault_url,
@@ -38,6 +42,15 @@ from src.validators.keystores.tests.test_fixtures.remote_signer import (
 )
 from src.validators.signing.tests.oracle_functions import OracleCommittee
 from src.validators.typings import BLSPrivkey
+
+
+class _CompatClientResponse(aioresponses.core.ClientResponse):
+    def __init__(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        kwargs.setdefault('stream_writer', mock.Mock(output_size=0))
+        super().__init__(*args, **kwargs)
+
+
+aioresponses.core.ClientResponse = _CompatClientResponse
 
 
 @pytest.fixture
