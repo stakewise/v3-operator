@@ -8,7 +8,6 @@ from src.common.app_state import AppState
 from src.common.clients import execution_client
 from src.common.contracts import RewardSplitterContract, RewardSplitterEncoder
 from src.common.execution import check_gas_price, transaction_gas_wrapper
-from src.common.graph import wait_for_graph_node_sync
 from src.common.harvest import get_harvest_params
 from src.common.tasks import BaseTask
 from src.common.typings import ExitRequest, HarvestParams
@@ -134,7 +133,6 @@ async def claim_reward_splitters_for_vault(
         return
 
     logger.info('Processing fee splitter calls')
-    last_confirmed_block = block_number
     for address, address_calls in calls.items():
         contract = RewardSplitterContract(
             address=address,
@@ -153,9 +151,6 @@ async def claim_reward_splitters_for_vault(
                 f'Failed to confirm fee splitter tx: {tx_hash}',
             )
         logger.info('Transaction %s confirmed', tx_hash)
-        last_confirmed_block = tx_receipt['blockNumber']
-
-    await wait_for_graph_node_sync(last_confirmed_block)
 
     logger.info('All fee splitter calls processed')
 
