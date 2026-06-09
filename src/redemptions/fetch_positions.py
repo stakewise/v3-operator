@@ -9,9 +9,9 @@ from web3 import Web3
 from web3.types import Wei
 
 from src.common.clients import ipfs_fetch_client
-from src.common.contracts import os_token_redeemer_contract
 from src.common.typings import Singleton
 from src.config.settings import OS_TOKEN_REDEEMER_CHUNK_SIZE, settings
+from src.redemptions.contracts import os_token_redeemer_contract
 from src.redemptions.typings import OsTokenPosition
 
 ZERO_MERKLE_ROOT = HexStr('0x' + '0' * 64)

@@ -7,6 +7,7 @@ from web3 import Web3
 from web3.types import Wei
 
 from src.config.settings import OS_TOKEN_REDEEMER_CHUNK_SIZE, settings
+from src.redemptions.contracts import os_token_redeemer_contract
 from src.redemptions.fetch_positions import (
     ZERO_MERKLE_ROOT,
     IpfsPositionsCache,
@@ -15,7 +16,6 @@ from src.redemptions.fetch_positions import (
     cached_iter_processed_shares,
     fetch_positions_from_ipfs,
     iter_processed_shares,
-    os_token_redeemer_contract,
     update_positions_cache,
     update_processed_shares_cache,
 )

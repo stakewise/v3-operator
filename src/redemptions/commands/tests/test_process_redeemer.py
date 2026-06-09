@@ -11,7 +11,7 @@ from web3 import Web3
 from web3.exceptions import Web3Exception
 from web3.types import Gwei, Wei
 
-from src.commands.internal.process_redeemer import (
+from src.redemptions.commands.process_redeemer import (
     _build_multi_proof,
     _process_exit_queue,
     _startup_check,
@@ -22,7 +22,7 @@ from src.commands.internal.process_redeemer import (
 from src.redemptions.os_token_converter import OsTokenConverter
 from src.redemptions.typings import OsTokenPosition
 
-MODULE = 'src.commands.internal.process_redeemer'
+MODULE = 'src.redemptions.commands.process_redeemer'
 
 VAULT_1 = Web3.to_checksum_address('0x' + '11' * 20)
 VAULT_2 = Web3.to_checksum_address('0x' + '22' * 20)
