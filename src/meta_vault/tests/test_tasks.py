@@ -5,7 +5,7 @@ import pytest
 from eth_typing import ChecksumAddress
 from sw_utils.tests import faker
 
-from src.common.contracts import MetaVaultContract
+from src.meta_vault.contracts import MetaVaultContract
 from src.meta_vault.tasks import meta_vault_tree_update_state, multicall_contract
 from src.meta_vault.tests.factories import create_vault
 from src.meta_vault.typings import Vault
@@ -104,9 +104,6 @@ class TestMetaVaultTreeUpdateStateCalls:
             return_value=True,
         ), mock.patch(
             'src.meta_vault.tasks.get_claimable_sub_vault_exit_requests', return_value=[]
-        ), mock.patch(
-            'src.meta_vault.tasks.is_meta_vault_rewards_nonce_outdated',
-            return_value=False,
         ), mock.patch.object(
             multicall_contract, 'tx_aggregate', return_value='0x123'
         ) as tx_aggregate_mock, mock.patch(

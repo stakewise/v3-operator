@@ -1,209 +1,141 @@
 import logging
-import struct
-from multiprocessing import Pool
-from typing import Set
+from typing import Sequence
 
 from eth_typing import BlockNumber, ChecksumAddress, HexStr
-from sw_utils import EventProcessor, EventScanner, is_valid_deposit_data_signature
+from sw_utils.typings import Bytes32
 from web3 import Web3
-from web3.types import EventData, Wei
+from web3.exceptions import ContractLogicError
+from web3.types import Wei
 
-from src.common.app_state import AppState
-from src.common.clients import execution_non_retry_client
-from src.common.contracts import (
-    ValidatorsRegistryContract,
-    VaultContract,
-    multicall_contract,
-    validators_registry_contract,
-)
-from src.common.typings import HarvestParams
+from src.common.clients import execution_client
+from src.common.contracts import VaultContract, multicall_contract
+from src.common.execution import build_gas_manager, transaction_gas_wrapper
+from src.common.typings import HarvestParams, OraclesApproval
+from src.common.utils import format_error
 from src.config.settings import settings
-from src.validators.database import (
-    CheckpointCrud,
-    NetworkValidatorCrud,
-    VaultValidatorCrud,
-)
-from src.validators.typings import NetworkValidator, VaultValidator
+from src.validators.signing.common import encode_tx_validator_list
+from src.validators.typings import Validator
 
 logger = logging.getLogger(__name__)
 
 
-class NetworkValidatorsProcessor(EventProcessor):
-    contract_event = 'DepositEvent'
-
-    def __init__(self) -> None:
-        self.contract = ValidatorsRegistryContract(
-            execution_client=execution_non_retry_client
-        ).contract
-
-    async def get_from_block(self) -> BlockNumber:
-        app_state = AppState()
-        if app_state.network_validators_block is not None:
-            return BlockNumber(app_state.network_validators_block + 1)
-        last_validator = NetworkValidatorCrud().get_last_network_validator()
-        if not last_validator:
-            return settings.network_config.VALIDATORS_REGISTRY_GENESIS_BLOCK
-
-        return BlockNumber(last_validator.block_number + 1)
-
-    # pylint: disable-next=unused-argument
-    async def process_events(self, events: list[EventData], to_block: BlockNumber) -> None:
-        validators = process_network_validator_events(events)
-        NetworkValidatorCrud().save_network_validators(validators)
-        AppState().network_validators_block = to_block
-
-
-class NetworkValidatorsStartupProcessor(NetworkValidatorsProcessor):
-    """Use multiprocessing event processor"""
-
-    # pylint: disable-next=unused-argument
-    async def process_events(self, events: list[EventData], to_block: BlockNumber) -> None:
-        validators = process_network_validator_events_multiprocessing(events)
-        NetworkValidatorCrud().save_network_validators(validators)
-        AppState().network_validators_block = to_block
-
-
-def process_network_validator_events_multiprocessing(
-    events: list[EventData],
-) -> list[NetworkValidator]:
-    """
-    Processes `ValidatorsRegistry` registration events
-    and returns the list of valid validators.
-    Use multiprocessing to speed up operator startup.
-    """
-    with Pool(processes=settings.concurrency) as pool:
-        results = [
-            pool.apply_async(
-                process_network_validator_event,
-                [event, settings.network_config.GENESIS_FORK_VERSION],
-            )
-            for event in events
-        ]
-        for result in results:
-            result.wait()
-        validators = [result.get() for result in results]
-        return [val for val in validators if val]
-
-
-def process_network_validator_events(events: list[EventData]) -> list[NetworkValidator]:
-    """
-    Processes `ValidatorsRegistry` registration events
-    and returns the list of valid validators.
-    Multiprocessing version works slowly on small blocks ranges.
-    """
-    result: list[NetworkValidator] = []
-    for event in events:
-        validator = process_network_validator_event(
-            event, settings.network_config.GENESIS_FORK_VERSION
-        )
-        if not validator:
-            continue
-
-        result.append(validator)
-
-    return result
-
-
-class VaultValidatorsProcessor(EventProcessor):
-    contract_event = 'ValidatorRegistered'
-    vault_address: ChecksumAddress
-
-    def __init__(self, vault_address: ChecksumAddress) -> None:
-        self.vault_address = vault_address
-        self.contract = VaultContract(
-            address=vault_address, execution_client=execution_non_retry_client
-        ).contract
-
-    async def get_from_block(self) -> BlockNumber:
-        checkpoint = CheckpointCrud().get_validators_checkpoint()
-        if not checkpoint:
-            return settings.network_config.KEEPER_GENESIS_BLOCK
-
-        return BlockNumber(checkpoint + 1)
-
-    # pylint: disable-next=unused-argument
-    async def process_events(self, events: list[EventData], to_block: BlockNumber) -> None:
-        validators = [
-            VaultValidator(
-                public_key=Web3.to_hex(event['args']['publicKey']),
-                block_number=BlockNumber(event['blockNumber']),
-            )
-            for event in events
-        ]
-        VaultValidatorCrud().save_vault_validators(validators)
-
-
-class VaultV2ValidatorsProcessor(VaultValidatorsProcessor):
-    contract_event = 'V2ValidatorRegistered'
-
-    async def get_from_block(self) -> BlockNumber:
-        checkpoint = CheckpointCrud().get_validators_checkpoint()
-        if not checkpoint:
-            return settings.network_config.KEEPER_GENESIS_BLOCK
-
-        return BlockNumber(checkpoint + 1)
-
-
-async def get_validators_start_index() -> int:
-    latest_public_keys = await get_latest_network_validator_public_keys()
-    validators_start_index = NetworkValidatorCrud().get_next_validator_index(
-        list(latest_public_keys)
-    )
-    return validators_start_index
-
-
-async def get_latest_network_validator_public_keys() -> Set[HexStr]:
-    """Fetches the latest network validator public keys."""
-    last_validator = NetworkValidatorCrud().get_last_network_validator()
-    if last_validator:
-        from_block = BlockNumber(last_validator.block_number + 1)
+async def tx_register_validators(
+    approval: OraclesApproval,
+    validators: Sequence[Validator],
+    harvest_params: HarvestParams | None,
+    validators_registry_root: HexStr,
+    validators_manager_signature: HexStr,
+) -> HexStr | None:
+    # Get update state call if harvest params are provided
+    vault_contract = VaultContract(settings.vault)
+    if harvest_params is not None:
+        calls = [vault_contract.get_update_state_call(harvest_params)]
     else:
-        from_block = settings.network_config.VALIDATORS_REGISTRY_GENESIS_BLOCK
+        calls = []
 
-    new_events = await validators_registry_contract.events.DepositEvent.get_logs(
-        from_block=from_block
+    # Build keeper approval params
+    tx_validators = [
+        Web3.to_bytes(tx_validator)
+        for tx_validator in encode_tx_validator_list(
+            validators=validators,
+        )
+    ]
+    keeper_approval_params = (
+        Bytes32(Web3.to_bytes(hexstr=validators_registry_root)),
+        approval.deadline,
+        b''.join(tx_validators),
+        approval.signatures,
+        approval.ipfs_hash,
     )
-    new_public_keys: Set[HexStr] = set()
-    for event in new_events:
-        validator = process_network_validator_event(
-            event, settings.network_config.GENESIS_FORK_VERSION
+
+    # add validators registration call
+    calls.append(
+        vault_contract.encode_abi(
+            fn_name='registerValidators',
+            args=[keeper_approval_params, Web3.to_bytes(hexstr=validators_manager_signature)],
         )
-        if validator:
-            new_public_keys.add(validator.public_key)
+    )
 
-    return new_public_keys
-
-
-async def get_latest_vault_v2_validator_public_keys(vault_address: ChecksumAddress) -> Set[HexStr]:
-    """Fetches the latest vault v2 validator public keys registered after finalized block"""
-    block_number = CheckpointCrud().get_validators_checkpoint()
-    if block_number:
-        from_block = BlockNumber(block_number + 1)
-    else:
-        from_block = settings.network_config.KEEPER_GENESIS_BLOCK
-    vault_contract = VaultContract(vault_address)
-    events = await vault_contract.events.V2ValidatorRegistered.get_logs(from_block=from_block)
-    return {Web3.to_hex(event['args']['publicKey']) for event in events}
-
-
-def process_network_validator_event(
-    event: EventData, fork_version: bytes
-) -> NetworkValidator | None:
-    """
-    Processes validator deposit event
-    and returns its public key if the deposit is valid.
-    """
-    public_key = event['args']['pubkey']
-    withdrawal_creds = event['args']['withdrawal_credentials']
-    amount = struct.unpack('<Q', event['args']['amount'])[0]
-    signature = event['args']['signature']
-    if is_valid_deposit_data_signature(
-        public_key, withdrawal_creds, signature, amount, fork_version
-    ):
-        return NetworkValidator(
-            public_key=Web3.to_hex(public_key), block_number=BlockNumber(event['blockNumber'])
+    # Simulate transaction
+    logger.info('Submitting registration transaction')
+    try:
+        await vault_contract.functions.multicall(calls).estimate_gas()
+    except (ValueError, ContractLogicError) as e:
+        logger.error(
+            'Failed to register validator(s): %s. '
+            'Most likely registry root has changed during validators registration. Retrying...',
+            format_error(e),
         )
-    return None
+        if settings.verbose:
+            logger.exception(e)
+        return None
+
+    # Send transaction
+    try:
+        gas_manager = build_gas_manager()
+        tx_params = await gas_manager.get_high_priority_tx_params()
+        tx = await vault_contract.functions.multicall(calls).transact(tx_params)
+    except Exception as e:
+        logger.error('Failed to register validator(s): %s', format_error(e))
+        if settings.verbose:
+            logger.exception(e)
+        return None
+
+    # Wait for transaction confirmation
+    tx_hash = Web3.to_hex(tx)
+    logger.info('Waiting for transaction %s confirmation', tx_hash)
+    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
+        tx, timeout=settings.execution_transaction_timeout
+    )
+    if not tx_receipt['status']:
+        logger.error('Registration transaction failed')
+        return None
+
+    return tx_hash
+
+
+async def tx_fund_validators(
+    validators: list[Validator],
+    validators_manager_signature: HexStr,
+    harvest_params: HarvestParams | None,
+) -> HexStr | None:
+    tx_validators = [
+        Web3.to_bytes(tx_validator)
+        for tx_validator in encode_tx_validator_list(
+            validators=validators,
+        )
+    ]
+    calls = []
+    vault_contract = VaultContract(settings.vault)
+    if harvest_params is not None:
+        # add update state calls before validator funding
+        calls.append(vault_contract.get_update_state_call(harvest_params))
+    fund_validators_call = vault_contract.encode_abi(
+        fn_name='fundValidators',
+        args=[b''.join(tx_validators), Web3.to_bytes(hexstr=validators_manager_signature)],
+    )
+    calls.append(fund_validators_call)
+
+    logger.info('Submitting fund validators transaction')
+    try:
+        tx_function = vault_contract.functions.multicall(calls)
+        tx = await transaction_gas_wrapper(tx_function)
+    except Exception as e:
+        logger.error('Failed to fund validator(s): %s', format_error(e))
+        if settings.verbose:
+            logger.exception(e)
+        return None
+
+    tx_hash = Web3.to_hex(tx)
+    logger.info('Waiting for transaction %s confirmation', tx_hash)
+    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
+        tx, timeout=settings.execution_transaction_timeout
+    )
+    if not tx_receipt['status']:
+        logger.error('Funding transaction failed')
+        return None
+
+    return tx_hash
 
 
 async def get_withdrawable_assets(
@@ -228,22 +160,35 @@ async def get_withdrawable_assets(
     return Wei(Web3.to_int(multicall[-1]))
 
 
-async def scan_validators_events(block_number: BlockNumber, is_startup: bool) -> None:
-    """Scans new vault and network validators for the given block number."""
-    network_validators_processor: NetworkValidatorsStartupProcessor | NetworkValidatorsProcessor
-    if is_startup:
-        network_validators_processor = NetworkValidatorsStartupProcessor()
-    else:
-        network_validators_processor = NetworkValidatorsProcessor()
+async def tx_consolidate_validators(
+    validators: bytes,
+    oracle_signatures: bytes | None,
+    tx_fee: Wei,
+    validators_manager_signature: HexStr,
+) -> HexStr | None:
+    """Sends consolidate validators transaction to vault contract"""
+    logger.info('Submitting consolidate validators transaction')
+    vault_contract = VaultContract(settings.vault)
 
-    network_validators_scanner = EventScanner(network_validators_processor)
-    await network_validators_scanner.process_new_events(block_number)
-    vault_validators_processor = VaultValidatorsProcessor(settings.vault)
-    vault_validators_scanner = EventScanner(vault_validators_processor)
-    await vault_validators_scanner.process_new_events(block_number)
+    if oracle_signatures is None:
+        oracle_signatures = b''
 
-    vault_v2_validators_processor = VaultV2ValidatorsProcessor(settings.vault)
-    vault_v2_validators_scanner = EventScanner(vault_v2_validators_processor)
-    await vault_v2_validators_scanner.process_new_events(block_number)
+    try:
+        tx_function = vault_contract.functions.consolidateValidators(
+            validators,
+            Web3.to_bytes(hexstr=validators_manager_signature),
+            oracle_signatures,
+        )
+        tx = await transaction_gas_wrapper(tx_function, tx_params={'value': tx_fee})
+    except Exception as e:
+        logger.info('Failed to submit consolidate validators transaction: %s', format_error(e))
+        return None
 
-    CheckpointCrud().update_validators_checkpoint(block_number=block_number)
+    logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
+    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
+        tx, timeout=settings.execution_transaction_timeout
+    )
+    if not tx_receipt['status']:
+        logger.info('Consolidate validators transaction failed')
+        return None
+    return Web3.to_hex(tx)

@@ -33,8 +33,8 @@ from src.config.networks import AVAILABLE_NETWORKS, GNOSIS, MAINNET, NETWORKS
 from src.config.settings import DEFAULT_MAX_CONSOLIDATION_REQUEST_FEE_GWEI, settings
 from src.validators.consolidation_manager import ConsolidationManager
 from src.validators.exceptions import ConsolidationError
+from src.validators.execution import tx_consolidate_validators
 from src.validators.oracles import poll_consolidation_signature
-from src.validators.register_validators import submit_consolidate_validators
 from src.validators.relayer import RelayerClient
 from src.validators.typings import ConsolidationKeys
 
@@ -266,6 +266,8 @@ def consolidate(
                 no_confirm=no_confirm,
             )
         )
+    except click.ClickException:
+        raise
     except Exception as e:
         log_verbose(e)
         sys.exit(1)
@@ -332,7 +334,11 @@ async def process(
     except ConsolidationError as e:
         raise click.ClickException(str(e))
     if not target_source:
-        raise click.ClickException(f'Validators in vault {settings.vault} can\'t be consolidated')
+        raise click.ClickException(
+            f'No validators in vault {settings.vault} can be consolidated automatically. '
+            'To consolidate specific 0x02 validators, provide the --source-public-keys '
+            'and --target-public-key options.'
+        )
 
     for target_validator, source_validator in target_source:
         if source_validator.index == target_validator.index:
@@ -393,7 +399,7 @@ async def process(
         target_source_public_keys
     )
 
-    tx_hash = await submit_consolidate_validators(
+    tx_hash = await tx_consolidate_validators(
         validators=encoded_validators,
         oracle_signatures=oracle_signatures,
         tx_fee=Wei(consolidation_request_fee * consolidations_count),
