@@ -8,7 +8,7 @@ from web3.exceptions import ContractCustomError, ContractLogicError
 from web3.types import Wei
 
 from src.common.clients import execution_client
-from src.common.contracts import VaultContract, decode_custom_error, multicall_contract
+from src.common.contracts import VaultContract, multicall_contract
 from src.common.execution import build_gas_manager, transaction_gas_wrapper
 from src.common.typings import HarvestParams, OraclesApproval
 from src.common.utils import format_error
@@ -121,7 +121,7 @@ async def tx_fund_validators(
         tx_function = vault_contract.functions.multicall(calls)
         tx = await transaction_gas_wrapper(tx_function)
     except ContractCustomError as e:
-        reason = decode_custom_error(vault_contract.error_abi, str(e.data)) or e.data
+        reason = vault_contract.decode_custom_error(str(e.data)) or e.data
         logger.error('Failed to fund validator(s): execution reverted with %s', reason)
         if settings.verbose:
             logger.exception(e)

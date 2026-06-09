@@ -1,7 +1,7 @@
 from eth_abi import abi as eth_abi
 from eth_utils import function_signature_to_4byte_selector
 
-from src.common.contracts import VaultContract, decode_custom_error
+from src.common.contracts import VaultContract
 from src.config.networks import ZERO_CHECKSUM_ADDRESS
 
 
@@ -12,28 +12,26 @@ def _encode_error(signature: str, arg_types: list[str], args: list) -> str:
 
 
 class TestDecodeCustomError:
-    error_abi = VaultContract(address=ZERO_CHECKSUM_ADDRESS).error_abi
+    contract = VaultContract(address=ZERO_CHECKSUM_ADDRESS)
 
     def test_abi_error_without_args(self) -> None:
         data = _encode_error('AccessDenied()', [], [])
-        assert decode_custom_error(self.error_abi, data) == 'AccessDenied()'
+        assert self.contract.decode_custom_error(data) == 'AccessDenied()'
 
     def test_abi_error_with_args(self) -> None:
         data = _encode_error('InsufficientBalance(uint256,uint256)', ['uint256', 'uint256'], [3, 7])
-        assert (
-            decode_custom_error(self.error_abi, data) == 'InsufficientBalance(balance=3, needed=7)'
-        )
+        assert self.contract.decode_custom_error(data) == 'InsufficientBalance(balance=3, needed=7)'
 
     def test_stakewise_library_error(self) -> None:
         # InvalidValidators is reverted from the Errors library and is absent
         # from the vault ABI, so it is resolved via the merged error ABI.
         data = _encode_error('InvalidValidators()', [], [])
-        assert decode_custom_error(self.error_abi, data) == 'InvalidValidators()'
+        assert self.contract.decode_custom_error(data) == 'InvalidValidators()'
 
     def test_unknown_selector_returns_none(self) -> None:
-        assert decode_custom_error(self.error_abi, '0xdeadbeef') is None
+        assert self.contract.decode_custom_error('0xdeadbeef') is None
 
     def test_invalid_inputs_return_none(self) -> None:
-        assert decode_custom_error(self.error_abi, str(None)) is None
-        assert decode_custom_error(self.error_abi, '0x1234') is None
-        assert decode_custom_error(self.error_abi, 'not-hex') is None
+        assert self.contract.decode_custom_error(str(None)) is None
+        assert self.contract.decode_custom_error('0x1234') is None
+        assert self.contract.decode_custom_error('not-hex') is None
