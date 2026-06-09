@@ -6,8 +6,12 @@ from pathlib import Path
 from typing import Callable
 
 from eth_abi import abi as eth_abi
-from eth_typing import HexStr
-from eth_utils import function_abi_to_4byte_selector
+from eth_typing import ABI, HexStr
+from eth_utils import (
+    abi_to_signature,
+    filter_abi_by_type,
+    function_signature_to_4byte_selector,
+)
 from web3 import AsyncWeb3, Web3
 from web3.contract import AsyncContract
 from web3.contract.async_contract import (
@@ -37,7 +41,7 @@ from src.withdrawals.typings import WithdrawalEvent
 SOLIDITY_UINT256_MAX = 2**256 - 1
 
 
-def _load_shared_error_abi() -> list[dict]:
+def _load_shared_error_abi() -> ABI:
     """
     Loads custom errors from StakeWise v3-core's ``Errors`` library
     (``contracts/libraries/Errors.sol``). They are reverted from a linked
@@ -50,7 +54,46 @@ def _load_shared_error_abi() -> list[dict]:
         return json.load(f)
 
 
-SHARED_ERROR_ABI = _load_shared_error_abi()
+SHARED_ERROR_ABI: ABI = _load_shared_error_abi()
+
+
+def decode_custom_error(contract_abi: ABI, data: str) -> str | None:
+    """
+    Decode a custom error revert from its hex ``data`` using ``contract_abi``,
+    returning a human-readable ``ErrorName(name=value, ...)`` string, or ``None``
+    if no error in the ABI matches the selector.
+
+    This is a backport of web3.py's ``decode_custom_error`` (ethereum/web3.py
+    #3821, not released yet). web3 only auto-decodes custom errors on ``eth_call``
+    and against the contract's own ABI, so we call this explicitly on the
+    transact path and pass a merged ABI (see ``ContractWrapper.error_abi``).
+    Replace with ``from web3._utils.error_formatters_utils import
+    decode_custom_error`` once web3 ships it.
+    """
+    hex_data = data[2:] if data.startswith('0x') else data
+    if len(hex_data) < 8:
+        return None
+
+    error_selector = hex_data[:8]
+    for error_abi in filter_abi_by_type('error', contract_abi):
+        selector = function_signature_to_4byte_selector(abi_to_signature(error_abi)).hex()
+        if selector != error_selector:
+            continue
+
+        inputs = error_abi.get('inputs', [])
+        if not inputs:
+            return f'{error_abi["name"]}()'
+        try:
+            decoded = eth_abi.decode([inp['type'] for inp in inputs], bytes.fromhex(hex_data[8:]))
+        except Exception:  # pylint: disable=broad-except
+            return f'{error_abi["name"]}()'
+        params = ', '.join(
+            f'{inp["name"]}={value!r}' if inp.get('name') else repr(value)
+            for inp, value in zip(inputs, decoded)
+        )
+        return f'{error_abi["name"]}({params})'
+
+    return None
 
 
 class ContractWrapper:
@@ -89,47 +132,13 @@ class ContractWrapper:
         return self.contract.encode_abi(fn_name, args=args)
 
     @cached_property
-    def _error_abi_by_selector(self) -> dict[bytes, dict]:
+    def error_abi(self) -> ABI:
         """
-        Maps a 4-byte error selector to its ABI entry. Includes the shared
-        StakeWise ``Errors`` library entries (absent from the vault ABI); the
-        contract's own ABI takes precedence on the unlikely selector collision.
+        Contract ABI merged with the shared StakeWise ``Errors`` library entries,
+        which are reverted from a linked library and absent from the contract
+        ABI. Pass this to ``decode_custom_error`` to resolve those reverts.
         """
-        return {
-            function_abi_to_4byte_selector(item): item
-            for item in (*SHARED_ERROR_ABI, *self.abi)
-            if item.get('type') == 'error'
-        }
-
-    def decode_custom_error(self, data: str | dict | None) -> str | None:
-        """
-        Decodes a custom error revert payload (4-byte selector followed by
-        ABI-encoded args) into a human-readable ``ErrorName(arg1, arg2)``
-        string, or ``None`` if the selector is not recognized.
-
-        ``data`` is the raw revert hex carried by ``ContractCustomError.data``
-        (web3 >= 7 surfaces it).
-        """
-        if not isinstance(data, str):
-            return None
-        try:
-            error_bytes = Web3.to_bytes(hexstr=HexStr(data))
-        except (ValueError, TypeError):
-            return None
-        if len(error_bytes) < 4:
-            return None
-
-        selector, encoded_args = error_bytes[:4], error_bytes[4:]
-        error_abi = self._error_abi_by_selector.get(selector)
-        if error_abi is None:
-            return None
-
-        arg_types = [inp['type'] for inp in error_abi.get('inputs', [])]
-        try:
-            decoded_args = eth_abi.decode(arg_types, encoded_args) if arg_types else ()
-        except Exception:  # pylint: disable=broad-except
-            return f'{error_abi['name']}(<undecodable args>)'
-        return f'{error_abi['name']}({', '.join(str(arg) for arg in decoded_args)})'
+        return [*self.abi, *SHARED_ERROR_ABI]
 
     async def _get_last_event(
         self,
