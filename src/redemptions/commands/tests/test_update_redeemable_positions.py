@@ -8,14 +8,14 @@ from sw_utils.tests import faker
 from web3 import Web3
 from web3.types import ChecksumAddress, Wei
 
-from src.commands.internal.update_redeemable_positions import (
+from src.config.networks import MAINNET, NETWORKS
+from src.config.settings import settings
+from src.redemptions.commands.update_redeemable_positions import (
     _reduce_boosted_amount,
     calculate_boost_os_token_shares,
     create_os_token_positions,
     update_redeemable_positions,
 )
-from src.config.networks import MAINNET, NETWORKS
-from src.config.settings import settings
 from src.redemptions.typings import (
     Allocator,
     LeverageStrategyPosition,
@@ -674,7 +674,7 @@ def patch_graph_calls(
     leverage_positions: list[LeverageStrategyPosition],
     os_token_holders: dict[ChecksumAddress, Wei],
 ):
-    target = 'src.commands.internal.update_redeemable_positions'
+    target = 'src.redemptions.commands.update_redeemable_positions'
     with (
         patch(f'{target}.graph_get_redeemable_allocators', return_value=allocators),
         patch(f'{target}.graph_get_leverage_positions', return_value=leverage_positions),
@@ -686,7 +686,7 @@ def patch_graph_calls(
 @contextlib.contextmanager
 def patch_latest_block(block_number):
     with patch(
-        'src.commands.internal.update_redeemable_positions.execution_client', new=AsyncMock()
+        'src.redemptions.commands.update_redeemable_positions.execution_client', new=AsyncMock()
     ) as execution_client_mock:
         execution_client_mock.eth.get_block_number.return_value = block_number
         yield
@@ -695,7 +695,7 @@ def patch_latest_block(block_number):
 @contextlib.contextmanager
 def patch_os_token_converter(os_token_converter: OsTokenConverter):
     with patch(
-        'src.commands.internal.update_redeemable_positions.create_os_token_converter',
+        'src.redemptions.commands.update_redeemable_positions.create_os_token_converter',
         return_value=os_token_converter,
     ):
         yield
@@ -709,7 +709,7 @@ def patch_get_arb_balance(balance):
         return (0, [encoded] * len(data))
 
     with patch(
-        'src.commands.internal.update_redeemable_positions.MulticallContract.aggregate',
+        'src.redemptions.commands.update_redeemable_positions.MulticallContract.aggregate',
         side_effect=mock_aggregate,
     ):
         yield
@@ -738,7 +738,7 @@ def patch_os_token_contract_address(address: ChecksumAddress):
 @contextlib.contextmanager
 def patch_os_token_redeemer_contract_nonce(nonce):
     with patch(
-        'src.commands.internal.update_redeemable_positions.os_token_redeemer_contract.nonce',
+        'src.redemptions.commands.update_redeemable_positions.os_token_redeemer_contract.nonce',
         return_value=nonce,
     ):
         yield
@@ -757,7 +757,7 @@ def patch_ipfs_client():
     mock_ipfs_client.upload_json = mock_upload_json
     mock_build = MagicMock(return_value=mock_ipfs_client)
     with patch(
-        'src.commands.internal.update_redeemable_positions.build_ipfs_upload_clients', mock_build
+        'src.redemptions.commands.update_redeemable_positions.build_ipfs_upload_clients', mock_build
     ):
         yield mock_upload_json
 
@@ -765,7 +765,7 @@ def patch_ipfs_client():
 @contextlib.contextmanager
 def patch_startup_check():
     with patch(
-        'src.commands.internal.update_redeemable_positions._startup_check',
+        'src.redemptions.commands.update_redeemable_positions._startup_check',
         new=AsyncMock(),
     ):
         yield

@@ -8,10 +8,6 @@ import src
 from src.commands.create_keys import create_keys
 from src.commands.create_wallet import create_wallet
 from src.commands.init import init
-from src.commands.internal.process_redeemer import process_redeemer
-from src.commands.internal.update_redeemable_positions import (
-    update_redeemable_positions,
-)
 from src.commands.recover import recover
 from src.commands.start.hashi_vault import start_hashi_vault
 from src.commands.start.local import start_local
@@ -23,6 +19,10 @@ from src.meta_vault.commands.process_meta_vaults import process_meta_vaults
 from src.nodewise.commands.node_install import node_install
 from src.nodewise.commands.node_start import node_start
 from src.nodewise.commands.node_status import node_status_command as node_status
+from src.redemptions.commands.process_redeemer import process_redeemer
+from src.redemptions.commands.update_redeemable_positions import (
+    update_redeemable_positions,
+)
 from src.remote_db.commands import remote_db_group
 from src.validators.commands.consolidate import consolidate
 from src.validators.commands.exit_validators import exit_validators

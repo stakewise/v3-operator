@@ -14,7 +14,7 @@ from web3.exceptions import Web3Exception
 from web3.types import Gwei, Wei
 
 from src.common.clients import close_clients, execution_client, setup_clients
-from src.common.contracts import VaultContract, os_token_redeemer_contract
+from src.common.contracts import VaultContract
 from src.common.execution import (
     check_gas_price,
     get_finalized_block_number,
@@ -27,6 +27,7 @@ from src.common.wallet import wallet
 from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
 from src.meta_vault.service import is_meta_vault
+from src.redemptions.contracts import os_token_redeemer_contract
 from src.redemptions.fetch_positions import (
     cached_fetch_positions_from_ipfs,
     fetch_positions_with_processed_shares,

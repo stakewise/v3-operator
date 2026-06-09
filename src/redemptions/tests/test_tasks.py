@@ -13,10 +13,8 @@ from web3.types import Wei
 
 from src.common.tests.utils import parse_wei
 from src.config.settings import OS_TOKEN_REDEEMER_CHUNK_SIZE
-from src.redemptions.fetch_positions import (
-    ipfs_fetch_client,
-    os_token_redeemer_contract,
-)
+from src.redemptions.contracts import os_token_redeemer_contract
+from src.redemptions.fetch_positions import ipfs_fetch_client
 from src.redemptions.os_token_converter import (
     create_os_token_converter,
     os_token_vault_controller_contract,
