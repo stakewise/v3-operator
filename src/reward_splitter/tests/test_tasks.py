@@ -86,8 +86,6 @@ class TestClaimRewardSplittersForVault:
         ) as exit_requests_mock, mock.patch(
             'src.reward_splitter.tasks.transaction_gas_wrapper'
         ) as gas_wrapper_mock, mock.patch(
-            'src.reward_splitter.tasks.wait_for_graph_node_sync'
-        ) as graph_sync_mock, mock.patch(
             'src.reward_splitter.tasks.wallet', new=mock.MagicMock()
         ):
             await claim_reward_splitters_for_vault(
@@ -98,15 +96,12 @@ class TestClaimRewardSplittersForVault:
 
         exit_requests_mock.assert_not_called()
         gas_wrapper_mock.assert_not_called()
-        graph_sync_mock.assert_not_called()
 
-    async def test_waits_for_graph_sync_after_submitting(self):
-        # After submitting the claim txs the graph node must be synced past the tx block,
-        # so a later run does not rebuild the same calls against stale subgraph state.
+    async def test_submits_claim_transaction(self):
+        # After building the calls the claim tx must be submitted and its receipt awaited.
         reward_splitter = create_reward_splitter(
             shareholders_earned_assets=[Wei(Web3.to_wei('1', 'ether'))]
         )
-        tx_block = Web3.to_int(123)
 
         with mock.patch(
             'src.reward_splitter.tasks.graph_get_reward_splitters',
@@ -117,17 +112,15 @@ class TestClaimRewardSplittersForVault:
         ), mock.patch(
             'src.reward_splitter.tasks.transaction_gas_wrapper',
             return_value=HexBytes(b'\x12' * 32),
-        ), mock.patch(
+        ) as gas_wrapper_mock, mock.patch(
             'src.reward_splitter.tasks.RewardSplitterContract', new=mock.MagicMock()
         ), mock.patch(
             'src.reward_splitter.tasks.execution_client'
         ) as execution_client_mock, mock.patch(
-            'src.reward_splitter.tasks.wait_for_graph_node_sync'
-        ) as graph_sync_mock, mock.patch(
             'src.reward_splitter.tasks.wallet', new=mock.MagicMock()
         ):
             execution_client_mock.eth.wait_for_transaction_receipt = mock.AsyncMock(
-                return_value={'status': 1, 'blockNumber': tx_block}
+                return_value={'status': 1, 'blockNumber': Web3.to_int(123)}
             )
             await claim_reward_splitters_for_vault(
                 vault=ZERO_CHECKSUM_ADDRESS,
@@ -135,7 +128,8 @@ class TestClaimRewardSplittersForVault:
                 harvest_params=None,
             )
 
-        graph_sync_mock.assert_awaited_once_with(tx_block)
+        gas_wrapper_mock.assert_called_once()
+        execution_client_mock.eth.wait_for_transaction_receipt.assert_awaited_once()
 
 
 @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
