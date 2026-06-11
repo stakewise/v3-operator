@@ -109,6 +109,13 @@ DEFAULT_MIN_QUEUED_ASSETS_GWEI = Web3.from_wei(DEFAULT_MIN_QUEUED_ASSETS, 'gwei'
     is_flag=True,
 )
 @click.option(
+    '--dry-run',
+    help='Simulate redeemOsTokenPositions calls without submitting transactions. '
+    'Default is false.',
+    envvar='DRY_RUN',
+    is_flag=True,
+)
+@click.option(
     '--network',
     help='The network of the meta vaults.',
     prompt='Enter the network name',
@@ -125,6 +132,7 @@ def process_redeemer(
     execution_jwt_secret: str | None,
     network: str,
     verbose: bool,
+    dry_run: bool,
     log_level: str,
     interval: int,
     min_queued_assets_gwei: int,
@@ -148,6 +156,7 @@ def process_redeemer(
             main(
                 interval=interval,
                 min_queued_assets=Gwei(min_queued_assets_gwei),
+                dry_run=dry_run,
             )
         )
     except Exception as e:
@@ -158,10 +167,13 @@ def process_redeemer(
 async def main(
     interval: int,
     min_queued_assets: Gwei,
+    dry_run: bool = False,
 ) -> None:
     setup_logging()
     await setup_clients()
     await _startup_check()
+    if dry_run:
+        logger.info('Dry run enabled: redeemOsTokenPositions calls will be simulated only.')
     try:
         with InterruptHandler() as interrupt_handler:
             while not interrupt_handler.exit:
@@ -169,6 +181,7 @@ async def main(
                 await process(
                     block_number=block_number,
                     min_queued_assets=min_queued_assets,
+                    dry_run=dry_run,
                 )
                 await interrupt_handler.sleep(interval)
 
@@ -179,18 +192,23 @@ async def main(
 async def process(
     block_number: BlockNumber,
     min_queued_assets: Gwei,
+    dry_run: bool = False,
 ) -> None:
     try:
-        await _redeem_os_token_positions(min_queued_assets=min_queued_assets)
+        await _redeem_os_token_positions(min_queued_assets=min_queued_assets, dry_run=dry_run)
     finally:
-        # Re-fetch block number after redemption processing
-        # to ensure we read the latest on-chain state.
-        block_number = await execution_client.eth.block_number
-        await _process_exit_queue(block_number)
+        if dry_run:
+            logger.info('Dry run: skipping processExitQueue.')
+        else:
+            # Re-fetch block number after redemption processing
+            # to ensure we read the latest on-chain state.
+            block_number = await execution_client.eth.block_number
+            await _process_exit_queue(block_number)
 
 
 async def _redeem_os_token_positions(
     min_queued_assets: Gwei,
+    dry_run: bool = False,
 ) -> None:
     """Perform the OsToken redemption flow for a single iteration.
 
@@ -253,15 +271,18 @@ async def _redeem_os_token_positions(
         converter=os_token_converter,
         nonce=nonce,
         block_number=block_number,
+        dry_run=dry_run,
     )
 
 
+# pylint: disable-next=too-many-arguments
 async def redeem_positions(
     all_positions: list[OsTokenPosition],
     os_token_positions: list[OsTokenPosition],
     converter: OsTokenConverter,
     nonce: int,
     block_number: BlockNumber,
+    dry_run: bool = False,
 ) -> None:
     """Redeem positions one by one. Each position's shares_to_redeem is already set by
     assign_shares_to_redeem; this function further caps it by the vault's withdrawable assets.
@@ -278,10 +299,12 @@ async def redeem_positions(
         assets_to_redeem = converter.to_assets(shares_to_redeem)
 
         if await is_meta_vault(position.vault):
-            raise RuntimeError(
-                f'Unexpected meta vault position for {position.vault}; '
-                'redeemable positions should not include meta vaults.'
+            logger.warning(
+                'Unexpected meta vault position for %s; '
+                'redeemable positions should not include meta vaults.',
+                position.vault,
             )
+            continue
 
         if position.vault in unharvested_vaults:
             continue
@@ -304,15 +327,14 @@ async def redeem_positions(
             continue
 
         position_to_redeem = replace(position, shares_to_redeem=shares_to_redeem)
-        receipt_block = await _submit_redeem_position(
+        redeemed = await _submit_redeem_position(
             position=position_to_redeem,
             all_positions=all_positions,
             nonce=nonce,
+            dry_run=dry_run,
         )
-        if receipt_block is None:
+        if not redeemed:
             return
-
-        await wait_for_execution_endpoints_synced(receipt_block)
 
         vault_to_withdrawable[position.vault] = Wei(withdrawable - assets_to_redeem)
 
@@ -346,11 +368,12 @@ async def _submit_redeem_position(
     position: OsTokenPosition,
     all_positions: list[OsTokenPosition],
     nonce: int,
-) -> BlockNumber | None:
+    dry_run: bool = False,
+) -> bool:
     """Submit one redeemOsTokenPositions transaction for a single position.
 
-    Returns the receipt block on success (used as a sync barrier against
-    fallback endpoints lagging behind), ``None`` otherwise.
+    Returns ``True`` on success, ``False`` otherwise. When ``dry_run`` is set,
+    the call is simulated via ``.call()`` instead of being submitted.
     """
     multiproof = _build_multi_proof(
         nonce=nonce,
@@ -360,10 +383,30 @@ async def _submit_redeem_position(
     positions_arg = [
         (position.vault, position.owner, position.leaf_shares, position.shares_to_redeem)
     ]
-    try:
-        tx_function = os_token_redeemer_contract.contract.functions.redeemOsTokenPositions(
-            positions_arg, multiproof.proof, multiproof.proof_flags
+    tx_function = os_token_redeemer_contract.contract.functions.redeemOsTokenPositions(
+        positions_arg, multiproof.proof, multiproof.proof_flags
+    )
+
+    if dry_run:
+        try:
+            await tx_function.call()
+        except (Web3Exception, RuntimeError, ValueError) as e:
+            logger.error(
+                'Dry run: failed to simulate redeem position (vault %s, owner %s): %r',
+                position.vault,
+                position.owner,
+                e,
+            )
+            return False
+        logger.info(
+            'Dry run: simulated redeeming %s shares for position (vault %s, owner %s) successfully',
+            position.shares_to_redeem,
+            position.vault,
+            position.owner,
         )
+        return True
+
+    try:
         tx = await transaction_gas_wrapper(tx_function=tx_function)
     except (Web3Exception, RuntimeError, ValueError):
         logger.exception(
@@ -371,7 +414,7 @@ async def _submit_redeem_position(
             position.vault,
             position.owner,
         )
-        return None
+        return False
 
     tx_hash = Web3.to_hex(tx)
     logger.info(
@@ -390,7 +433,7 @@ async def _submit_redeem_position(
             position.owner,
             tx_hash,
         )
-        return None
+        return False
 
     logger.info(
         'Redeemed %s shares for position (vault %s, owner %s). Tx Hash: %s',
@@ -399,7 +442,9 @@ async def _submit_redeem_position(
         position.owner,
         tx_hash,
     )
-    return tx_receipt['blockNumber']
+    # Barrier against fallback endpoints lagging behind the receipt block.
+    await wait_for_execution_endpoints_synced(tx_receipt['blockNumber'])
+    return True
 
 
 def _build_multi_proof(
