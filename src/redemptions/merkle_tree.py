@@ -9,15 +9,10 @@ LEAF_TYPES = ['uint256', 'address', 'uint256', 'address']
 
 
 class PositionsMerkleTree:
-    """Merkle tree built from all OsToken positions for a given redemption nonce.
-
-    Building the tree from ALL positions makes its root match the on-chain
-    redemption root. Multiproofs for the subset of positions being redeemed are
-    generated via :meth:`get_multi_proof`.
-    """
-
     def __init__(self, all_positions: list[OsTokenPosition], nonce: int):
         self.nonce = nonce
+        # Leaves use `nonce - 1`: setting the positions root increments the
+        # on-chain nonce, leaving it one ahead of the nonce baked into the leaves.
         self._tree = StandardMerkleTree.of(
             [p.merkle_leaf(nonce - 1) for p in all_positions],
             LEAF_TYPES,
