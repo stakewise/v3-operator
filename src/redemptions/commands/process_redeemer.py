@@ -8,17 +8,11 @@ import click
 from eth_typing import BlockNumber, ChecksumAddress
 from sw_utils import InterruptHandler
 from web3 import Web3
-from web3.exceptions import Web3Exception
 from web3.types import Gwei, Wei
 
 from src.common.clients import close_clients, execution_client, setup_clients
 from src.common.contracts import VaultContract
-from src.common.execution import (
-    check_gas_price,
-    get_finalized_block_number,
-    transaction_gas_wrapper,
-    wait_for_execution_endpoints_synced,
-)
+from src.common.execution import check_gas_price, get_finalized_block_number
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.utils import log_verbose
 from src.common.wallet import wallet
@@ -26,6 +20,11 @@ from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
 from src.meta_vault.service import is_meta_vault
 from src.redemptions.contracts import os_token_redeemer_contract
+from src.redemptions.execution import (
+    simulate_redeem_position,
+    tx_process_exit_queue,
+    tx_redeem_position,
+)
 from src.redemptions.fetch_positions import (
     cached_fetch_positions_from_ipfs,
     fetch_positions_with_processed_shares,
@@ -202,7 +201,9 @@ async def process(
             # Re-fetch block number after redemption processing
             # to ensure we read the latest on-chain state.
             block_number = await execution_client.eth.block_number
-            await _process_exit_queue(block_number)
+            if await os_token_redeemer_contract.can_process_exit_queue(block_number):
+                logger.info('Exit queue can be processed. Calling processExitQueue...')
+                await tx_process_exit_queue()
 
 
 async def _redeem_os_token_positions(
@@ -324,32 +325,17 @@ async def redeem_positions(
             continue
 
         position_to_redeem = replace(position, shares_to_redeem=shares_to_redeem)
-        redeemed = await _submit_redeem_position(
-            position=position_to_redeem,
-            tree=tree,
-            dry_run=dry_run,
-        )
-        if not redeemed:
+
+        # Always simulate first to catch reverts before broadcasting a real tx.
+        if not await simulate_redeem_position(position=position_to_redeem, tree=tree):
             return
 
+        # In dry-run mode we stop at simulation; otherwise submit the real tx.
+        if not dry_run:
+            if not await tx_redeem_position(position=position_to_redeem, tree=tree):
+                return
+
         vault_to_withdrawable[position.vault] = Wei(withdrawable - assets_to_redeem)
-
-
-async def _process_exit_queue(block_number: BlockNumber) -> None:
-    """Call processExitQueue() on the redeemer contract if canProcessExitQueue."""
-    can_process_exit_queue = await os_token_redeemer_contract.can_process_exit_queue(block_number)
-    if not can_process_exit_queue:
-        return
-    logger.info('Exit queue can be processed. Calling processExitQueue...')
-    tx_hash = await os_token_redeemer_contract.process_exit_queue()
-    logger.info('Waiting for processExitQueue transaction %s confirmation', tx_hash)
-    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
-        tx_hash, timeout=settings.execution_transaction_timeout
-    )
-    if not tx_receipt['status']:
-        logger.error('processExitQueue transaction failed. Tx Hash: %s', tx_hash)
-    else:
-        logger.info('processExitQueue confirmed. Tx Hash: %s', tx_hash)
 
 
 async def _startup_check() -> None:
@@ -358,81 +344,3 @@ async def _startup_check() -> None:
         raise RuntimeError(
             f'The Position Manager role must be assigned to the address {wallet.account.address}.'
         )
-
-
-async def _submit_redeem_position(
-    position: OsTokenPosition,
-    tree: PositionsMerkleTree,
-    dry_run: bool = False,
-) -> bool:
-    """Submit one redeemOsTokenPositions transaction for a single position.
-
-    Returns ``True`` on success, ``False`` otherwise. When ``dry_run`` is set,
-    the call is simulated via ``.call()`` instead of being submitted.
-    """
-    multiproof = tree.get_multi_proof([position])
-    positions_arg = [
-        (position.vault, position.owner, position.leaf_shares, position.shares_to_redeem)
-    ]
-    tx_function = os_token_redeemer_contract.contract.functions.redeemOsTokenPositions(
-        positions_arg, multiproof.proof, multiproof.proof_flags
-    )
-
-    if dry_run:
-        try:
-            await tx_function.call()
-        except (Web3Exception, RuntimeError, ValueError) as e:
-            logger.error(
-                'Dry run: failed to simulate redeem position (vault %s, owner %s): %r',
-                position.vault,
-                position.owner,
-                e,
-            )
-            return False
-        logger.info(
-            'Dry run: simulated redeeming %s shares for position (vault %s, owner %s) successfully',
-            position.shares_to_redeem,
-            position.vault,
-            position.owner,
-        )
-        return True
-
-    try:
-        tx = await transaction_gas_wrapper(tx_function=tx_function)
-    except (Web3Exception, RuntimeError, ValueError):
-        logger.exception(
-            'Failed to redeem position (vault %s, owner %s)',
-            position.vault,
-            position.owner,
-        )
-        return False
-
-    tx_hash = Web3.to_hex(tx)
-    logger.info(
-        'Waiting for redeemOsTokenPositions tx %s (vault %s, owner %s) confirmation',
-        tx_hash,
-        position.vault,
-        position.owner,
-    )
-    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
-        tx, timeout=settings.execution_transaction_timeout
-    )
-    if not tx_receipt['status']:
-        logger.error(
-            'Failed to redeem position (vault %s, owner %s). Tx Hash: %s',
-            position.vault,
-            position.owner,
-            tx_hash,
-        )
-        return False
-
-    logger.info(
-        'Redeemed %s shares for position (vault %s, owner %s). Tx Hash: %s',
-        position.shares_to_redeem,
-        position.vault,
-        position.owner,
-        tx_hash,
-    )
-    # Barrier against fallback endpoints lagging behind the receipt block.
-    await wait_for_execution_endpoints_synced(tx_receipt['blockNumber'])
-    return True
