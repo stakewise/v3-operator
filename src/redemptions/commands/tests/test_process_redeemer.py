@@ -182,20 +182,19 @@ class TestRedeemPositions:
         assert submitted.leaf_shares == Wei(1000)
         assert submitted.shares_to_redeem == Wei(500)
 
-    async def test_meta_vault_position_raises(self) -> None:
-        """A meta-vault position is unexpected and must surface as a RuntimeError."""
+    async def test_meta_vault_position_skipped(self) -> None:
+        """A meta-vault position is unexpected and must be skipped without redeeming."""
         pos = make_position(processed_shares=500)
         get_withdrawable = AsyncMock(return_value=Wei(10000))
 
         with _mock_redeem_positions(withdrawable=get_withdrawable, is_meta_vault=True) as mocks:
-            with pytest.raises(RuntimeError, match='Unexpected meta vault position'):
-                await redeem_positions(
-                    all_positions=[pos],
-                    os_token_positions=[pos],
-                    converter=make_converter(100, 100),
-                    nonce=5,
-                    block_number=BlockNumber(100),
-                )
+            await redeem_positions(
+                all_positions=[pos],
+                os_token_positions=[pos],
+                converter=make_converter(100, 100),
+                nonce=5,
+                block_number=BlockNumber(100),
+            )
 
         mocks['submit_mock'].assert_not_called()
         get_withdrawable.assert_not_called()
@@ -226,7 +225,7 @@ class TestRedeemPositions:
 
         with _mock_redeem_positions(
             withdrawable=Wei(10000),
-            submit_results=[None, BlockNumber(123)],
+            submit_results=[False, True],
         ) as mocks:
             await redeem_positions(
                 all_positions=[pos1, pos2],
@@ -244,7 +243,7 @@ class TestRedeemPositions:
 
 
 class TestSubmitRedeemPosition:
-    async def test_success_returns_receipt_block(self) -> None:
+    async def test_success_returns_true(self) -> None:
         position = make_position(leaf_shares=1000, shares_to_redeem=500)
         with _mock_submit_redeem_position(tx_status=1) as mocks:
             result = await _submit_redeem_position(
@@ -252,24 +251,27 @@ class TestSubmitRedeemPosition:
                 all_positions=[position],
                 nonce=5,
             )
-        assert result == BlockNumber(456)
+        assert result is True
         mocks['transaction_gas_wrapper'].assert_awaited_once()
         mocks['client'].eth.wait_for_transaction_receipt.assert_awaited_once()
+        mocks['wait_for_execution_endpoints_synced'].assert_awaited_once_with(BlockNumber(456))
 
-    async def test_tx_status_zero_returns_none(self) -> None:
-        """A reverted on-chain tx returns None without raising."""
+    async def test_tx_status_zero_returns_false(self) -> None:
+        """A reverted on-chain tx returns False without raising."""
         position = make_position(leaf_shares=1000, shares_to_redeem=500)
-        with _mock_submit_redeem_position(tx_status=0):
+        with _mock_submit_redeem_position(tx_status=0) as mocks:
             result = await _submit_redeem_position(
                 position=position,
                 all_positions=[position],
                 nonce=5,
             )
-        assert result is None
+        assert result is False
+        # No sync barrier when the tx reverted
+        mocks['wait_for_execution_endpoints_synced'].assert_not_awaited()
 
     @pytest.mark.parametrize('exc_class', [Web3Exception, RuntimeError, ValueError])
-    async def test_tx_build_failure_returns_none(self, exc_class: type[Exception]) -> None:
-        """Each caught exception during tx build/send returns None."""
+    async def test_tx_build_failure_returns_false(self, exc_class: type[Exception]) -> None:
+        """Each caught exception during tx build/send returns False."""
         position = make_position(leaf_shares=1000, shares_to_redeem=500)
         with _mock_submit_redeem_position(send_exception=exc_class('boom')) as mocks:
             result = await _submit_redeem_position(
@@ -277,7 +279,7 @@ class TestSubmitRedeemPosition:
                 all_positions=[position],
                 nonce=5,
             )
-        assert result is None
+        assert result is False
         # Receipt is never awaited when the build step raised
         mocks['client'].eth.wait_for_transaction_receipt.assert_not_awaited()
 
@@ -414,7 +416,7 @@ def _mock_redeem_positions(
     withdrawable: Wei | AsyncMock | None = None,
     is_meta_vault: bool = False,
     state_update_required: bool = False,
-    submit_results: list[BlockNumber | None] | None = None,
+    submit_results: list[bool] | None = None,
 ) -> Iterator[dict[str, MagicMock]]:
     """Mock setup for redeem_positions tests.
 
@@ -422,7 +424,7 @@ def _mock_redeem_positions(
     AsyncMock for fine-grained control (e.g. ``side_effect=[...]`` for sequenced returns).
     ``state_update_required`` drives VaultContract.is_state_update_required, which gates
     the unharvested-vault skip. ``submit_results`` controls per-call return values of
-    _submit_redeem_position; a ``None`` entry models a failed submission that should
+    _submit_redeem_position; a ``False`` entry models a failed submission that should
     abort the round.
     """
     if isinstance(withdrawable, AsyncMock):
@@ -435,7 +437,7 @@ def _mock_redeem_positions(
     if submit_results is not None:
         submit_mock = AsyncMock(side_effect=submit_results)
     else:
-        submit_mock = AsyncMock(return_value=BlockNumber(123))
+        submit_mock = AsyncMock(return_value=True)
 
     vault_contract = MagicMock()
     vault_contract.is_state_update_required = AsyncMock(return_value=state_update_required)
@@ -483,10 +485,12 @@ def _mock_submit_redeem_position(
     else:
         gas_wrapper = AsyncMock(return_value=tx)
 
+    synced_mock = AsyncMock()
     with (
         patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
         patch(f'{MODULE}.transaction_gas_wrapper', new=gas_wrapper),
         patch(f'{MODULE}.execution_client', new=mock_client),
+        patch(f'{MODULE}.wait_for_execution_endpoints_synced', new=synced_mock),
         patch(f'{MODULE}.settings') as mock_settings,
     ):
         mock_settings.execution_transaction_timeout = 120
@@ -495,6 +499,7 @@ def _mock_submit_redeem_position(
             'redeemer': mock_redeemer,
             'transaction_gas_wrapper': gas_wrapper,
             'client': mock_client,
+            'wait_for_execution_endpoints_synced': synced_mock,
         }
 
 
