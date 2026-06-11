@@ -12,13 +12,13 @@ from web3.exceptions import Web3Exception
 from web3.types import Gwei, Wei
 
 from src.redemptions.commands.process_redeemer import (
-    _build_multi_proof,
     _process_exit_queue,
     _startup_check,
     _submit_redeem_position,
     process,
     redeem_positions,
 )
+from src.redemptions.merkle_tree import PositionsMerkleTree
 from src.redemptions.os_token_converter import OsTokenConverter
 from src.redemptions.typings import OsTokenPosition
 
@@ -30,51 +30,13 @@ OWNER_1 = Web3.to_checksum_address('0x' + '33' * 20)
 OWNER_2 = Web3.to_checksum_address('0x' + '44' * 20)
 
 
-# --- Pure function tests (no mocks) ---
-
-
-class TestBuildMultiProof:
-    def test_single_position(self) -> None:
-        position = make_position(leaf_shares=1000, processed_shares=500)
-        result = _build_multi_proof(
-            nonce=5,
-            all_positions=[position],
-            positions_to_redeem=[position],
-        )
-        assert len(result.leaves) == 1
-
-    def test_partial_redeem(self) -> None:
-        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, leaf_shares=1000, processed_shares=500)
-        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, leaf_shares=2000, processed_shares=1000)
-
-        result = _build_multi_proof(
-            nonce=5,
-            all_positions=[pos1, pos2],
-            positions_to_redeem=[pos1],
-        )
-        assert len(result.leaves) == 1
-        assert len(result.proof) > 0
-
-    def test_all_positions_redeemed(self) -> None:
-        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, leaf_shares=1000, processed_shares=500)
-        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, leaf_shares=2000, processed_shares=1000)
-
-        result = _build_multi_proof(
-            nonce=5,
-            all_positions=[pos1, pos2],
-            positions_to_redeem=[pos1, pos2],
-        )
-        assert len(result.leaves) == 2
-
-
 class TestRedeemPositions:
     async def test_empty_positions(self) -> None:
         with _mock_redeem_positions() as mocks:
             await redeem_positions(
-                all_positions=[],
+                tree=make_tree(),
                 os_token_positions=[],
                 converter=make_converter(),
-                nonce=5,
                 block_number=BlockNumber(100),
             )
         mocks['submit_mock'].assert_not_called()
@@ -84,10 +46,9 @@ class TestRedeemPositions:
 
         with _mock_redeem_positions(withdrawable=Wei(1000)) as mocks:
             await redeem_positions(
-                all_positions=[position],
+                tree=make_tree([position]),
                 os_token_positions=[position],
                 converter=make_converter(),
-                nonce=5,
                 block_number=BlockNumber(100),
             )
 
@@ -99,10 +60,9 @@ class TestRedeemPositions:
 
         with _mock_redeem_positions(withdrawable=Wei(100)) as mocks:
             await redeem_positions(
-                all_positions=[position],
+                tree=make_tree([position]),
                 os_token_positions=[position],
                 converter=make_converter(100, 100),
-                nonce=5,
                 block_number=BlockNumber(100),
             )
 
@@ -114,10 +74,9 @@ class TestRedeemPositions:
 
         with _mock_redeem_positions(withdrawable=Wei(0)) as mocks:
             await redeem_positions(
-                all_positions=[position],
+                tree=make_tree([position]),
                 os_token_positions=[position],
                 converter=make_converter(100, 100),
-                nonce=5,
                 block_number=BlockNumber(100),
             )
 
@@ -131,10 +90,9 @@ class TestRedeemPositions:
         get_withdrawable = AsyncMock(return_value=Wei(700))
         with _mock_redeem_positions(withdrawable=get_withdrawable) as mocks:
             await redeem_positions(
-                all_positions=[pos1, pos2],
+                tree=make_tree([pos1, pos2]),
                 os_token_positions=[pos1, pos2],
                 converter=make_converter(100, 100),
-                nonce=5,
                 block_number=BlockNumber(100),
             )
 
@@ -156,10 +114,9 @@ class TestRedeemPositions:
 
         with _mock_redeem_positions(withdrawable=Wei(10000)) as mocks:
             await redeem_positions(
-                all_positions=[pos],
+                tree=make_tree([pos]),
                 os_token_positions=[pos],
                 converter=make_converter(),
-                nonce=5,
                 block_number=BlockNumber(100),
             )
 
@@ -171,10 +128,9 @@ class TestRedeemPositions:
 
         with _mock_redeem_positions(withdrawable=Wei(10000)) as mocks:
             await redeem_positions(
-                all_positions=[pos],
+                tree=make_tree([pos]),
                 os_token_positions=[pos],
                 converter=make_converter(),
-                nonce=5,
                 block_number=BlockNumber(100),
             )
 
@@ -189,10 +145,9 @@ class TestRedeemPositions:
 
         with _mock_redeem_positions(withdrawable=get_withdrawable, is_meta_vault=True) as mocks:
             await redeem_positions(
-                all_positions=[pos],
+                tree=make_tree([pos]),
                 os_token_positions=[pos],
                 converter=make_converter(100, 100),
-                nonce=5,
                 block_number=BlockNumber(100),
             )
 
@@ -208,10 +163,9 @@ class TestRedeemPositions:
             state_update_required=True,
         ) as mocks:
             await redeem_positions(
-                all_positions=[pos],
+                tree=make_tree([pos]),
                 os_token_positions=[pos],
                 converter=make_converter(100, 100),
-                nonce=5,
                 block_number=BlockNumber(100),
             )
 
@@ -228,10 +182,9 @@ class TestRedeemPositions:
             submit_results=[False, True],
         ) as mocks:
             await redeem_positions(
-                all_positions=[pos1, pos2],
+                tree=make_tree([pos1, pos2]),
                 os_token_positions=[pos1, pos2],
                 converter=make_converter(100, 100),
-                nonce=5,
                 block_number=BlockNumber(100),
             )
 
@@ -248,8 +201,7 @@ class TestSubmitRedeemPosition:
         with _mock_submit_redeem_position(tx_status=1) as mocks:
             result = await _submit_redeem_position(
                 position=position,
-                all_positions=[position],
-                nonce=5,
+                tree=make_tree([position]),
             )
         assert result is True
         mocks['transaction_gas_wrapper'].assert_awaited_once()
@@ -262,8 +214,7 @@ class TestSubmitRedeemPosition:
         with _mock_submit_redeem_position(tx_status=0) as mocks:
             result = await _submit_redeem_position(
                 position=position,
-                all_positions=[position],
-                nonce=5,
+                tree=make_tree([position]),
             )
         assert result is False
         # No sync barrier when the tx reverted
@@ -276,8 +227,7 @@ class TestSubmitRedeemPosition:
         with _mock_submit_redeem_position(send_exception=exc_class('boom')) as mocks:
             result = await _submit_redeem_position(
                 position=position,
-                all_positions=[position],
-                nonce=5,
+                tree=make_tree([position]),
             )
         assert result is False
         # Receipt is never awaited when the build step raised
@@ -290,8 +240,7 @@ class TestSubmitRedeemPosition:
             with pytest.raises(KeyError):
                 await _submit_redeem_position(
                     position=position,
-                    all_positions=[position],
-                    nonce=5,
+                    tree=make_tree([position]),
                 )
 
 
@@ -404,8 +353,8 @@ class TestProcess:
 
         mocks['mock_redeem'].assert_awaited_once()
         redeem_call = mocks['mock_redeem'].await_args
-        # nonce is passed directly; _build_multi_proof uses nonce - 1 internally
-        assert redeem_call.kwargs['nonce'] == 5
+        # The merkle tree is built from the fetched nonce; leaves use nonce - 1 internally
+        assert redeem_call.kwargs['tree'].nonce == 5
 
 
 # --- Helpers ---
@@ -556,6 +505,14 @@ def _mock_process(
 
 def make_converter(total_assets: int = 110, total_shares: int = 100) -> OsTokenConverter:
     return OsTokenConverter(Wei(total_assets), Wei(total_shares))
+
+
+def make_tree(
+    positions: list[OsTokenPosition] | None = None, nonce: int = 5
+) -> PositionsMerkleTree:
+    """Build a positions merkle tree. Defaults to a single position so callers that
+    only need a valid tree (e.g. when _submit_redeem_position is mocked) can omit it."""
+    return PositionsMerkleTree(positions or [make_position()], nonce)
 
 
 def make_position(
