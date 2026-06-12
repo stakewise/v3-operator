@@ -140,7 +140,7 @@ async def tx_fund_validators(
 
 async def get_withdrawable_assets(
     vault: ChecksumAddress,
-    harvest_params: HarvestParams | None,
+    harvest_params: HarvestParams | None = None,
     block_number: BlockNumber | None = None,
 ) -> Wei:
     """Fetches vault's available assets for staking."""
