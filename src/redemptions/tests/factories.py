@@ -28,6 +28,7 @@ def make_position(
         vault=vault if vault is not None else faker.eth_address(),
         owner=owner if owner is not None else faker.eth_address(),
         leaf_shares=Wei(leaf_shares),
+        index=0,
         processed_shares=Wei(processed_shares),
         shares_to_redeem=Wei(shares_to_redeem),
     )
