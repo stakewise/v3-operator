@@ -287,7 +287,8 @@ async def redeem_positions(
 
     Meta-vault positions are skipped entirely. Vaults whose on-chain state is
     stale (unharvested) are skipped, since their withdrawable assets would be
-    outdated. Aborts the round if a single redemption tx fails.
+    outdated. A position that fails to simulate or submit is skipped, so the
+    remaining positions are still processed.
     """
     vault_to_withdrawable: dict[ChecksumAddress, Wei] = {}
     unharvested_vaults: set[ChecksumAddress] = set()
@@ -328,12 +329,12 @@ async def redeem_positions(
 
         # Always simulate first to catch reverts before broadcasting a real tx.
         if not await simulate_redeem_position(position=position_to_redeem, tree=tree):
-            return
+            continue
 
         # In dry-run mode we stop at simulation; otherwise submit the real tx.
         if not dry_run:
             if not await tx_redeem_position(position=position_to_redeem, tree=tree):
-                return
+                continue
 
         vault_to_withdrawable[position.vault] = Wei(withdrawable - assets_to_redeem)
 
