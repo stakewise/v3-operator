@@ -168,8 +168,8 @@ class TestRedeemPositions:
         mocks['get_withdrawable'].assert_not_called()
         mocks['submit_mock'].assert_not_called()
 
-    async def test_submit_failure_aborts_iteration(self) -> None:
-        """A failed submission aborts the loop; subsequent positions are not attempted."""
+    async def test_submit_failure_skips_position(self) -> None:
+        """A failed submission skips that position; subsequent positions are still attempted."""
         pos1 = make_position(vault=VAULT_1, owner=OWNER_1, processed_shares=500)
         pos2 = make_position(vault=VAULT_2, owner=OWNER_2, processed_shares=500)
 
@@ -184,8 +184,8 @@ class TestRedeemPositions:
                 block_number=BlockNumber(100),
             )
 
-        # Only the first position is attempted; loop aborted
-        assert mocks['submit_mock'].await_count == 1
+        # The first position fails but the round continues to the second
+        assert mocks['submit_mock'].await_count == 2
 
 
 # --- Async function tests (with mocks) ---
