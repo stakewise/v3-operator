@@ -175,8 +175,11 @@ logger = logging.getLogger(__name__)
     help='The block number where the vault was created. Used to optimize fetching vault events.',
 )
 @click.command(
-    help='Performs a vault validators consolidation from 0x01 validators to 0x02 validator. '
-    'Switches a validator from 0x01 to 0x02 if the source and target keys are identical.'
+    help='Consolidates vault validators into 0x02 validators. '
+    'When no public keys are provided, automatically picks 0x01 validators '
+    'and consolidates them (a 0x01 validator with no separate target is '
+    'switched to 0x02). To consolidate 0x02 validators, or to choose specific validators, '
+    'pass explicit --source-public-keys and --target-public-key options.'
 )
 # pylint: disable-next=too-many-arguments,too-many-locals
 def consolidate(
