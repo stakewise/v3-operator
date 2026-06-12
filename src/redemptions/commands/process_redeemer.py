@@ -6,8 +6,6 @@ from pathlib import Path
 
 import click
 from eth_typing import BlockNumber, ChecksumAddress
-from multiproof import StandardMerkleTree
-from multiproof.standard import MultiProof
 from sw_utils import InterruptHandler
 from web3 import Web3
 from web3.exceptions import Web3Exception
@@ -34,6 +32,7 @@ from src.redemptions.fetch_positions import (
     update_positions_cache,
     update_processed_shares_cache,
 )
+from src.redemptions.merkle_tree import PositionsMerkleTree
 from src.redemptions.os_token_converter import (
     OsTokenConverter,
     create_os_token_converter,
@@ -265,22 +264,20 @@ async def _redeem_os_token_positions(
         logger.info('No redeemable positions found. Skipping to next interval.')
         return
 
+    tree = PositionsMerkleTree(all_positions, nonce)
     await redeem_positions(
-        all_positions=all_positions,
+        tree=tree,
         os_token_positions=os_token_positions,
         converter=os_token_converter,
-        nonce=nonce,
         block_number=block_number,
         dry_run=dry_run,
     )
 
 
-# pylint: disable-next=too-many-arguments
 async def redeem_positions(
-    all_positions: list[OsTokenPosition],
+    tree: PositionsMerkleTree,
     os_token_positions: list[OsTokenPosition],
     converter: OsTokenConverter,
-    nonce: int,
     block_number: BlockNumber,
     dry_run: bool = False,
 ) -> None:
@@ -329,8 +326,7 @@ async def redeem_positions(
         position_to_redeem = replace(position, shares_to_redeem=shares_to_redeem)
         redeemed = await _submit_redeem_position(
             position=position_to_redeem,
-            all_positions=all_positions,
-            nonce=nonce,
+            tree=tree,
             dry_run=dry_run,
         )
         if not redeemed:
@@ -366,8 +362,7 @@ async def _startup_check() -> None:
 
 async def _submit_redeem_position(
     position: OsTokenPosition,
-    all_positions: list[OsTokenPosition],
-    nonce: int,
+    tree: PositionsMerkleTree,
     dry_run: bool = False,
 ) -> bool:
     """Submit one redeemOsTokenPositions transaction for a single position.
@@ -375,11 +370,7 @@ async def _submit_redeem_position(
     Returns ``True`` on success, ``False`` otherwise. When ``dry_run`` is set,
     the call is simulated via ``.call()`` instead of being submitted.
     """
-    multiproof = _build_multi_proof(
-        nonce=nonce,
-        all_positions=all_positions,
-        positions_to_redeem=[position],
-    )
+    multiproof = tree.get_multi_proof([position])
     positions_arg = [
         (position.vault, position.owner, position.leaf_shares, position.shares_to_redeem)
     ]
@@ -445,18 +436,3 @@ async def _submit_redeem_position(
     # Barrier against fallback endpoints lagging behind the receipt block.
     await wait_for_execution_endpoints_synced(tx_receipt['blockNumber'])
     return True
-
-
-def _build_multi_proof(
-    nonce: int,
-    all_positions: list[OsTokenPosition],
-    positions_to_redeem: list[OsTokenPosition],
-) -> MultiProof[tuple[int, ChecksumAddress, Wei, ChecksumAddress]]:
-    """Build a merkle multiproof from all positions, proving the positions to redeem."""
-    all_leaves = [p.merkle_leaf(nonce - 1) for p in all_positions]
-    tree = StandardMerkleTree.of(
-        all_leaves,
-        ['uint256', 'address', 'uint256', 'address'],
-    )
-    redeem_leaves = [p.merkle_leaf(nonce - 1) for p in positions_to_redeem]
-    return tree.get_multi_proof(redeem_leaves)
