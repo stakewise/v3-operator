@@ -9,7 +9,8 @@ from web3.types import Wei
 
 from src.common.clients import execution_client
 from src.common.contracts import VaultContract, multicall_contract
-from src.common.execution import build_gas_manager, transaction_gas_wrapper
+from src.common.execution import transaction_gas_wrapper
+from src.common.transaction import tx_manager
 from src.common.typings import HarvestParams, OraclesApproval
 from src.common.utils import format_error
 from src.config.settings import settings
@@ -70,11 +71,11 @@ async def tx_register_validators(
             logger.exception(e)
         return None
 
-    # Send transaction
+    # Send transaction. Re-use the lowest unconfirmed nonce and bump-and-replace any
+    # pending transaction instead of spending a new nonce (which would queue behind a
+    # stuck tx and land later with stale calldata).
     try:
-        gas_manager = build_gas_manager()
-        tx_params = await gas_manager.get_high_priority_tx_params()
-        tx = await vault_contract.functions.multicall(calls).transact(tx_params)
+        tx = await tx_manager.transact(vault_contract.functions.multicall(calls))
     except Exception as e:
         logger.error('Failed to register validator(s): %s', format_error(e))
         if settings.verbose:
