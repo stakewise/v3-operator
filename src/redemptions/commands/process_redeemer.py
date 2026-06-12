@@ -12,8 +12,16 @@ from web3.types import Gwei, Wei
 
 from src.common.clients import close_clients, execution_client, setup_clients
 from src.common.contracts import VaultContract
-from src.common.execution import check_gas_price, get_finalized_block_number
+from src.common.execution import (
+    check_gas_price,
+    check_wallet_balance,
+    get_finalized_block_number,
+)
 from src.common.logging import LOG_LEVELS, setup_logging
+from src.common.startup_check import (
+    check_execution_nodes_network,
+    wait_for_execution_node,
+)
 from src.common.utils import log_verbose
 from src.common.wallet import wallet
 from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
@@ -339,8 +347,18 @@ async def redeem_positions(
 
 
 async def _startup_check() -> None:
+    logger.info('Checking connection to execution nodes...')
+    await wait_for_execution_node()
+
+    logger.info('Checking execution nodes network...')
+    await check_execution_nodes_network()
+
+    logger.info('Checking Position Manager role...')
     positions_manager = await os_token_redeemer_contract.positions_manager()
     if positions_manager != wallet.account.address:
         raise RuntimeError(
             f'The Position Manager role must be assigned to the address {wallet.account.address}.'
         )
+
+    logger.info('Checking wallet balance %s...', wallet.address)
+    await check_wallet_balance()
