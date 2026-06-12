@@ -32,6 +32,7 @@ from src.redemptions.execution import (
     simulate_redeem_position,
     tx_process_exit_queue,
     tx_redeem_position,
+    update_vaults_state,
 )
 from src.redemptions.fetch_positions import (
     cached_fetch_positions_from_ipfs,
@@ -273,6 +274,15 @@ async def _redeem_os_token_positions(
         logger.info('No redeemable positions found. Skipping to next interval.')
         return
 
+    if not dry_run:
+        # Bring vaults up to date on-chain so withdrawable assets and position LTV
+        # are computed from fresh state rather than skipping unharvested vaults.
+        vaults = list({position.vault for position in os_token_positions})
+        await update_vaults_state(vaults=vaults)
+
+        # Re-fetch the block number so the freshly-updated state is visible downstream.
+        block_number = await execution_client.eth.block_number
+
     tree = PositionsMerkleTree(all_positions, nonce)
     await redeem_positions(
         tree=tree,
@@ -323,7 +333,7 @@ async def redeem_positions(
                 unharvested_vaults.add(position.vault)
                 continue
             vault_to_withdrawable[position.vault] = await get_withdrawable_assets(
-                position.vault, harvest_params=None
+                position.vault, block_number=block_number
             )
         withdrawable = vault_to_withdrawable[position.vault]
 

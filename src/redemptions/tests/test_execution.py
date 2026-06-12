@@ -13,6 +13,7 @@ from src.redemptions.execution import (
     simulate_redeem_position,
     tx_process_exit_queue,
     tx_redeem_position,
+    update_vaults_state,
 )
 from src.redemptions.merkle_tree import PositionsMerkleTree
 from src.redemptions.typings import OsTokenPosition
@@ -20,6 +21,7 @@ from src.redemptions.typings import OsTokenPosition
 MODULE = 'src.redemptions.execution'
 
 VAULT_1 = Web3.to_checksum_address('0x' + '11' * 20)
+VAULT_2 = Web3.to_checksum_address('0x' + '22' * 20)
 OWNER_1 = Web3.to_checksum_address('0x' + '33' * 20)
 
 
@@ -111,7 +113,84 @@ class TestTxProcessExitQueue:
             mock_redeemer.process_exit_queue.assert_called_once()
 
 
+class TestUpdateVaultsState:
+    async def test_submits_multicall_for_harvestable_vaults(self) -> None:
+        with _mock_update_vaults_state() as mocks:
+            await update_vaults_state(vaults=[VAULT_1, VAULT_2])
+        mocks['tx_aggregate'].assert_awaited_once()
+        await_args = mocks['tx_aggregate'].await_args
+        assert await_args is not None
+        # One updateState call per harvestable vault.
+        assert len(await_args.args[0]) == 2
+
+    async def test_skips_meta_vaults(self) -> None:
+        with _mock_update_vaults_state(is_meta_vault=True) as mocks:
+            await update_vaults_state(vaults=[VAULT_1])
+        mocks['tx_aggregate'].assert_not_awaited()
+
+    async def test_skips_when_not_harvestable(self) -> None:
+        """can_harvest returns no harvest params, so there is nothing to update."""
+        with _mock_update_vaults_state(harvest_params=None) as mocks:
+            await update_vaults_state(vaults=[VAULT_1])
+        mocks['tx_aggregate'].assert_not_awaited()
+
+    async def test_batches_calls_into_chunks(self) -> None:
+        """Calls are split into MULTICALL_CHUNK_SIZE-sized transactions."""
+        with _mock_update_vaults_state(chunk_size=1) as mocks:
+            await update_vaults_state(vaults=[VAULT_1, VAULT_2])
+        # Two vaults, chunk size 1 → one multicall transaction per vault.
+        assert mocks['tx_aggregate'].await_count == 2
+        for call in mocks['tx_aggregate'].await_args_list:
+            assert len(call.args[0]) == 1
+
+    async def test_raises_on_failed_receipt(self) -> None:
+        with _mock_update_vaults_state(tx_status=0):
+            with pytest.raises(RuntimeError, match='updateState multicall tx failed'):
+                await update_vaults_state(vaults=[VAULT_1])
+
+
 # --- Helpers ---
+
+
+@contextmanager
+def _mock_update_vaults_state(
+    is_meta_vault: bool = False,
+    harvest_params: object = object(),
+    tx_status: int = 1,
+    chunk_size: int | None = None,
+) -> Iterator[dict[str, AsyncMock]]:
+    """Mock setup for update_vaults_state tests. VaultContract, harvest params,
+    the multicall contract and the execution client are all stubbed so only the
+    orchestration logic is exercised. ``harvest_params=None`` models a vault that
+    can_harvest filtered out. ``chunk_size`` overrides MULTICALL_CHUNK_SIZE."""
+    vault_contract = MagicMock()
+    vault_contract.contract_address = VAULT_1
+    vault_contract.get_update_state_call = MagicMock(return_value='0xdeadbeef')
+
+    tx_aggregate = AsyncMock(return_value='0x' + 'ab' * 32)
+    mock_multicall = MagicMock()
+    mock_multicall.tx_aggregate = tx_aggregate
+
+    mock_client = MagicMock()
+    mock_client.eth.wait_for_transaction_receipt = AsyncMock(return_value={'status': tx_status})
+
+    def harvest_params_for(vaults: list, _block: BlockNumber | None = None) -> dict:
+        return {vault: harvest_params for vault in vaults}
+
+    with (
+        patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=is_meta_vault)),
+        patch(f'{MODULE}.VaultContract', return_value=vault_contract),
+        patch(
+            f'{MODULE}.get_multiple_harvest_params',
+            new=AsyncMock(side_effect=harvest_params_for),
+        ),
+        patch(f'{MODULE}.multicall_contract', new=mock_multicall),
+        patch(f'{MODULE}.execution_client', new=mock_client),
+        patch(f'{MODULE}.MULTICALL_CHUNK_SIZE', new=chunk_size if chunk_size is not None else 20),
+        patch(f'{MODULE}.settings') as mock_settings,
+    ):
+        mock_settings.execution_transaction_timeout = 60
+        yield {'tx_aggregate': tx_aggregate}
 
 
 @contextmanager

@@ -392,6 +392,10 @@ def _mock_process(
             f'{MODULE}.redeem_positions',
             new=AsyncMock(),
         ) as mock_redeem,
+        patch(
+            f'{MODULE}.update_vaults_state',
+            new=AsyncMock(),
+        ) as mock_update_state,
         patch(f'{MODULE}.execution_client', new=mock_client),
     ):
         mock_settings.network_config.VAULT_BALANCE_SYMBOL = 'ETH'
@@ -399,6 +403,7 @@ def _mock_process(
         yield {
             'mock_redeemer': mock_redeemer,
             'mock_redeem': mock_redeem,
+            'mock_update_state': mock_update_state,
         }
 
 
