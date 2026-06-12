@@ -5,16 +5,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from eth_typing import BlockNumber, ChecksumAddress
-from hexbytes import HexBytes
 from sw_utils.tests import faker
 from web3 import Web3
-from web3.exceptions import Web3Exception
 from web3.types import Gwei, Wei
 
 from src.redemptions.commands.process_redeemer import (
-    _process_exit_queue,
     _startup_check,
-    _submit_redeem_position,
     process,
     redeem_positions,
 )
@@ -195,78 +191,6 @@ class TestRedeemPositions:
 # --- Async function tests (with mocks) ---
 
 
-class TestSubmitRedeemPosition:
-    async def test_success_returns_true(self) -> None:
-        position = make_position(leaf_shares=1000, shares_to_redeem=500)
-        with _mock_submit_redeem_position(tx_status=1) as mocks:
-            result = await _submit_redeem_position(
-                position=position,
-                tree=make_tree([position]),
-            )
-        assert result is True
-        mocks['transaction_gas_wrapper'].assert_awaited_once()
-        mocks['client'].eth.wait_for_transaction_receipt.assert_awaited_once()
-        mocks['wait_for_execution_endpoints_synced'].assert_awaited_once_with(BlockNumber(456))
-
-    async def test_tx_status_zero_returns_false(self) -> None:
-        """A reverted on-chain tx returns False without raising."""
-        position = make_position(leaf_shares=1000, shares_to_redeem=500)
-        with _mock_submit_redeem_position(tx_status=0) as mocks:
-            result = await _submit_redeem_position(
-                position=position,
-                tree=make_tree([position]),
-            )
-        assert result is False
-        # No sync barrier when the tx reverted
-        mocks['wait_for_execution_endpoints_synced'].assert_not_awaited()
-
-    @pytest.mark.parametrize('exc_class', [Web3Exception, RuntimeError, ValueError])
-    async def test_tx_build_failure_returns_false(self, exc_class: type[Exception]) -> None:
-        """Each caught exception during tx build/send returns False."""
-        position = make_position(leaf_shares=1000, shares_to_redeem=500)
-        with _mock_submit_redeem_position(send_exception=exc_class('boom')) as mocks:
-            result = await _submit_redeem_position(
-                position=position,
-                tree=make_tree([position]),
-            )
-        assert result is False
-        # Receipt is never awaited when the build step raised
-        mocks['client'].eth.wait_for_transaction_receipt.assert_not_awaited()
-
-    async def test_unexpected_exception_propagates(self) -> None:
-        """Exceptions outside the (Web3Exception, RuntimeError, ValueError) catch list propagate."""
-        position = make_position(leaf_shares=1000, shares_to_redeem=500)
-        with _mock_submit_redeem_position(send_exception=KeyError('boom')):
-            with pytest.raises(KeyError):
-                await _submit_redeem_position(
-                    position=position,
-                    tree=make_tree([position]),
-                )
-
-
-class TestProcessExitQueue:
-    async def test_cannot_process(self) -> None:
-        with patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer:
-            mock_redeemer.can_process_exit_queue = AsyncMock(return_value=False)
-            await _process_exit_queue(BlockNumber(100))
-            mock_redeemer.process_exit_queue.assert_not_called()
-
-    @pytest.mark.parametrize('tx_status', [1, 0])
-    async def test_process_exit_queue(self, tx_status: int) -> None:
-        mock_client = AsyncMock()
-        mock_client.eth.wait_for_transaction_receipt = AsyncMock(return_value={'status': tx_status})
-        with (
-            patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
-            patch(f'{MODULE}.execution_client', new=mock_client),
-            patch(f'{MODULE}.settings') as mock_settings,
-        ):
-            mock_settings.execution_transaction_timeout = 120
-            mock_redeemer.can_process_exit_queue = AsyncMock(return_value=True)
-            mock_redeemer.process_exit_queue = AsyncMock(return_value='0xabc')
-            await _process_exit_queue(BlockNumber(100))
-            mock_redeemer.process_exit_queue.assert_called_once()
-
-
 class TestStartupCheck:
     async def test_authorized(self) -> None:
         wallet_address = faker.eth_address()
@@ -373,8 +297,8 @@ def _mock_redeem_positions(
     AsyncMock for fine-grained control (e.g. ``side_effect=[...]`` for sequenced returns).
     ``state_update_required`` drives VaultContract.is_state_update_required, which gates
     the unharvested-vault skip. ``submit_results`` controls per-call return values of
-    _submit_redeem_position; a ``False`` entry models a failed submission that should
-    abort the round.
+    tx_redeem_position; a ``False`` entry models a failed submission that should
+    abort the round. Simulation always succeeds; each live position is simulated first.
     """
     if isinstance(withdrawable, AsyncMock):
         get_withdrawable = withdrawable
@@ -388,6 +312,8 @@ def _mock_redeem_positions(
     else:
         submit_mock = AsyncMock(return_value=True)
 
+    simulate_mock = AsyncMock(return_value=True)
+
     vault_contract = MagicMock()
     vault_contract.is_state_update_required = AsyncMock(return_value=state_update_required)
 
@@ -395,61 +321,19 @@ def _mock_redeem_positions(
         patch(f'{MODULE}.get_withdrawable_assets', new=get_withdrawable),
         patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=is_meta_vault)),
         patch(f'{MODULE}.VaultContract', return_value=vault_contract),
-        patch(f'{MODULE}._submit_redeem_position', new=submit_mock),
-        patch(
-            f'{MODULE}.wait_for_execution_endpoints_synced',
-            new=AsyncMock(),
-        ) as wait_synced_mock,
+        patch(f'{MODULE}.simulate_redeem_position', new=simulate_mock),
+        patch(f'{MODULE}.tx_redeem_position', new=submit_mock),
     ):
         yield {
             'submit_mock': submit_mock,
-            'wait_synced_mock': wait_synced_mock,
+            'simulate_mock': simulate_mock,
             'get_withdrawable': get_withdrawable,
         }
 
 
 def _submitted_position(mocks: dict[str, MagicMock], index: int = 0) -> OsTokenPosition:
-    """Return the position passed to the Nth _submit_redeem_position call."""
+    """Return the position passed to the Nth tx_redeem_position call."""
     return mocks['submit_mock'].call_args_list[index].kwargs['position']
-
-
-@contextmanager
-def _mock_submit_redeem_position(
-    tx_status: int = 1,
-    send_exception: BaseException | None = None,
-) -> Iterator[dict[str, MagicMock]]:
-    """Mock setup for _submit_redeem_position tests.
-
-    ``send_exception`` makes ``transaction_gas_wrapper`` raise; otherwise it returns
-    a fake tx that resolves to a receipt with the given ``tx_status``.
-    """
-    tx = HexBytes(b'\xab' * 32)
-    mock_client = AsyncMock()
-    mock_client.eth.wait_for_transaction_receipt = AsyncMock(
-        return_value={'status': tx_status, 'blockNumber': BlockNumber(456)},
-    )
-
-    if send_exception is not None:
-        gas_wrapper = AsyncMock(side_effect=send_exception)
-    else:
-        gas_wrapper = AsyncMock(return_value=tx)
-
-    synced_mock = AsyncMock()
-    with (
-        patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
-        patch(f'{MODULE}.transaction_gas_wrapper', new=gas_wrapper),
-        patch(f'{MODULE}.execution_client', new=mock_client),
-        patch(f'{MODULE}.wait_for_execution_endpoints_synced', new=synced_mock),
-        patch(f'{MODULE}.settings') as mock_settings,
-    ):
-        mock_settings.execution_transaction_timeout = 120
-        mock_redeemer.contract.functions.redeemOsTokenPositions = MagicMock()
-        yield {
-            'redeemer': mock_redeemer,
-            'transaction_gas_wrapper': gas_wrapper,
-            'client': mock_client,
-            'wait_for_execution_endpoints_synced': synced_mock,
-        }
 
 
 @contextmanager
@@ -465,7 +349,7 @@ def _mock_process(
 
     with (
         patch(f'{MODULE}.check_gas_price', new=AsyncMock(return_value=True)),
-        patch(f'{MODULE}._process_exit_queue', new=AsyncMock()),
+        patch(f'{MODULE}.tx_process_exit_queue', new=AsyncMock()),
         patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
         patch(
             f'{MODULE}.create_os_token_converter',
@@ -497,6 +381,7 @@ def _mock_process(
         patch(f'{MODULE}.execution_client', new=mock_client),
     ):
         mock_settings.network_config.VAULT_BALANCE_SYMBOL = 'ETH'
+        mock_redeemer.can_process_exit_queue = AsyncMock(return_value=False)
         yield {
             'mock_redeemer': mock_redeemer,
             'mock_redeem': mock_redeem,
@@ -511,7 +396,7 @@ def make_tree(
     positions: list[OsTokenPosition] | None = None, nonce: int = 5
 ) -> PositionsMerkleTree:
     """Build a positions merkle tree. Defaults to a single position so callers that
-    only need a valid tree (e.g. when _submit_redeem_position is mocked) can omit it."""
+    only need a valid tree (e.g. when tx_redeem_position is mocked) can omit it."""
     return PositionsMerkleTree(positions or [make_position()], nonce)
 
 
