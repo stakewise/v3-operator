@@ -197,6 +197,7 @@ class TestStartupCheck:
         mock_wallet = MagicMock()
         mock_wallet.account.address = wallet_address
         with (
+            _mock_startup_checks(),
             patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
             patch(f'{MODULE}.wallet', new=mock_wallet),
         ):
@@ -207,6 +208,7 @@ class TestStartupCheck:
         mock_wallet = MagicMock()
         mock_wallet.account.address = faker.eth_address()
         with (
+            _mock_startup_checks(),
             patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
             patch(f'{MODULE}.wallet', new=mock_wallet),
         ):
@@ -282,6 +284,18 @@ class TestProcess:
 
 
 # --- Helpers ---
+
+
+@contextmanager
+def _mock_startup_checks() -> Iterator[None]:
+    """Patch the execution-node, network and wallet-balance checks run by _startup_check,
+    leaving the Position Manager role check under test."""
+    with (
+        patch(f'{MODULE}.wait_for_execution_node', new=AsyncMock()),
+        patch(f'{MODULE}.check_execution_nodes_network', new=AsyncMock()),
+        patch(f'{MODULE}.check_wallet_balance', new=AsyncMock()),
+    ):
+        yield
 
 
 @contextmanager
