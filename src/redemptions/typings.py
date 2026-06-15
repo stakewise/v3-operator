@@ -65,6 +65,8 @@ class OsTokenPosition:
     owner: ChecksumAddress
     vault: ChecksumAddress
     leaf_shares: Wei
+    # Zero-based index of the position in the IPFS positions file. Used for logging only.
+    index: int = 0
     processed_shares: Wei = Wei(0)
     shares_to_redeem: Wei = Wei(0)
 

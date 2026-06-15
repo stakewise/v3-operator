@@ -199,6 +199,7 @@ def make_position(
         vault=vault,
         owner=owner,
         leaf_shares=Wei(leaf_shares),
+        index=0,
         processed_shares=Wei(processed_shares),
         shares_to_redeem=Wei(effective_shares_to_redeem),
     )

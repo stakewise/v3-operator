@@ -245,7 +245,7 @@ async def _redeem_os_token_positions(
         return
 
     logger.info(
-        'Process queued shares for Redemption: %s (~%s %s)',
+        'Process queued shares for redemption: %s (~%s %s)',
         queued_shares,
         Web3.from_wei(queued_assets, 'ether'),
         settings.network_config.VAULT_BALANCE_SYMBOL,
@@ -302,6 +302,7 @@ async def redeem_positions(
     unharvested_vaults: set[ChecksumAddress] = set()
 
     for position in os_token_positions:
+        logger.info('Processing position index=%d', position.index)
         shares_to_redeem = position.shares_to_redeem
         assets_to_redeem = converter.to_assets(shares_to_redeem)
 

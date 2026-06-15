@@ -128,6 +128,7 @@ async def fetch_positions_with_processed_shares(
                 owner=position.owner,
                 vault=position.vault,
                 leaf_shares=position.leaf_shares,
+                index=position.index,
                 processed_shares=processed_shares,
             )
         )
@@ -211,6 +212,7 @@ async def fetch_positions_from_ipfs(
             owner=Web3.to_checksum_address(item['owner']),
             vault=Web3.to_checksum_address(item['vault']),
             leaf_shares=Wei(int(item['leaf_shares'])),
+            index=index,
         )
-        for item in data
+        for index, item in enumerate(data)
     ]
