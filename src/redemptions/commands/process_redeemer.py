@@ -263,9 +263,11 @@ async def _redeem_os_token_positions(
         logger.info('No positions found. Skipping to next interval.')
         return
 
+    logger.info('Fetching positions and processed shares')
     positions_with_processed_shares = await fetch_positions_with_processed_shares(
         nonce=nonce, block_number=block_number
     )
+    logger.info('Assigning shares to redeem')
     os_token_positions = await assign_shares_to_redeem(
         positions_with_processed_shares,
         total_redemption_shares=Wei(queued_shares),

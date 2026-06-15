@@ -34,6 +34,7 @@ async def update_vaults_state(
     position LTV) read accurate values without threading harvest_params through
     every call.
     """
+    logger.info('Processing vault state updates')
     regular_vaults: list[ChecksumAddress] = []
     for vault in vaults:
         if await is_meta_vault(vault):
@@ -113,7 +114,7 @@ async def simulate_redeem_position(
             e,
         )
         return False
-    logger.info(
+    logger.debug(
         'Simulated redeeming %s shares for position (vault %s, owner %s) successfully',
         position.shares_to_redeem,
         position.vault,
