@@ -57,6 +57,13 @@ async def update_vaults_state(
     if not calls:
         return
 
+    update_vaults = [address for address, _ in calls]
+    logger.info(
+        'Updating state for %d vaults: %s',
+        len(update_vaults),
+        ', '.join(update_vaults),
+    )
+
     for chunk in batched(calls, MULTICALL_CHUNK_SIZE):
         await tx_update_vaults_state(list(chunk))
 
