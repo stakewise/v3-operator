@@ -3806,20 +3806,25 @@ files = [
 
 [[package]]
 name = "sw-milagro-bls-binding"
-version = "1.9.0"
+version = "1.9.1"
 description = ""
 optional = false
 python-versions = ">=3.7"
-files = [
-    {file = "sw_milagro_bls_binding-1.9.0.tar.gz", hash = "sha256:333fc1ae9aba8cfa93d1a793e590835a70e1075d2ca197e6fb9e5881a15cd7bd"},
-]
+files = []
+develop = false
 
 [package.extras]
 test = ["py-ecc (==6.0.0)", "pytest (>=6.2.5)", "pytest-benchmark (>=3.2.3)"]
 
+[package.source]
+type = "git"
+url = "https://github.com/stakewise/milagro_bls_binding.git"
+reference = "v1.9.1"
+resolved_reference = "682bb34587398e5500fde72709425f57d402399f"
+
 [[package]]
 name = "sw-utils"
-version = "v0.13.1"
+version = "v0.13.2"
 description = "StakeWise Python utils"
 optional = false
 python-versions = "^3.12"
@@ -3832,15 +3837,15 @@ ipfshttpclient = "^0.8.0a2"
 py-ecc = "^8.0.0"
 pyjwt = "==2.13.0"
 ssz = "==0.5.2"
-sw-milagro-bls-binding = "==1.9.0"
+sw-milagro-bls-binding = {git = "https://github.com/stakewise/milagro_bls_binding.git", tag = "v1.9.1"}
 tenacity = "==8.2.3"
 web3 = "==7.14.1"
 
 [package.source]
 type = "git"
 url = "https://github.com/stakewise/sw-utils.git"
-reference = "v0.13.1"
-resolved_reference = "4c79b406288a7e15d21fb694de5a08c448537386"
+reference = "v0.13.2"
+resolved_reference = "dff6c6bff7aea375ee32acdcdbac6b8b42ceb29f"
 
 [[package]]
 name = "tenacity"
@@ -4299,4 +4304,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12,<3.13"
-content-hash = "5342b6cbd591adf46f4a2c9257a6b7244428734465b4a8b1e4b07b41a5a9a506"
+content-hash = "60a02688f89f185809b9c7a18e286bdfcbecae430fa53184cda9c8242dd67207"
