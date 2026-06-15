@@ -124,7 +124,10 @@ jobs:
         run: poetry install --no-interaction --no-root
 
       - name: Export requirements
-        run: poetry export -f requirements.txt --without-hashes > audit_requirements.txt
+        # Drop git-sourced deps: pip-audit only checks PyPI and skips them anyway, and
+        # keeping them causes resolution conflicts (e.g. milagro pinned by commit here but
+        # by tag in sw-utils' metadata).
+        run: poetry export -f requirements.txt --without-hashes | grep -v "git+" > audit_requirements.txt
 
       # Run audit
       - uses: pypa/gh-action-pip-audit@3ac8fed01c7b32ab70210f182e557d4cb8c45fec # v1.0.7
