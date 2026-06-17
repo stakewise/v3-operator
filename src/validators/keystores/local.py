@@ -107,7 +107,7 @@ class LocalKeystore(BaseKeystore):
             fork=fork,
         )
 
-        return bls.Sign(private_key, message)
+        return BLSSignature(bls.Sign(private_key, message))
 
     @property
     def public_keys(self) -> list[HexStr]:
