@@ -126,6 +126,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: docker-merge
     steps:
+      # Needed so the committed .trivyignore is on disk for the scanner below.
+      - name: Checkout code
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
       - id: commit-hash
         uses: prompt/actions-commit-hash@01d19a83c242e1851c9aa6cf9625092ecd095d09 # v2
 
@@ -138,5 +142,6 @@ jobs:
           vuln-type: "os,library"
           severity: "CRITICAL,HIGH"
           ignore-unfixed: true
+          trivyignores: ".trivyignore"
         env:
           TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db

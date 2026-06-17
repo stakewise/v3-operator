@@ -110,5 +110,9 @@ logger = logging.getLogger(__name__)
 
 
 async def metrics_server() -> None:
-    logger.info('Starting metrics server')
+    logger.info(
+        'Starting metrics server at http://%s:%d',
+        settings.metrics_host,
+        settings.metrics_port,
+    )
     start_http_server(settings.metrics_port, settings.metrics_host)

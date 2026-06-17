@@ -30,6 +30,7 @@ from src.meta_vault.graph import (
     graph_get_vaults,
 )
 from src.meta_vault.typings import ContractCall, SubVaultExitRequest, Vault
+from src.reward_splitter.tasks import claim_reward_splitters
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +81,12 @@ class ProcessMetaVaultTask(BaseTask):
                 )
             except Exception:
                 logger.exception('Failed to process meta vault tree for vault %s', vault)
+
+        # Claim fee splitter rewards on behalf of the shareholders.
+        # The meta vault state was already refreshed by the tree update above,
+        # so the splitter-side updateVaultState call is skipped.
+        if settings.claim_fee_splitter:
+            await claim_reward_splitters(vaults=self.vaults, update_vault_state=False)
 
 
 async def process_meta_vault_tree(

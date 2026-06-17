@@ -24,87 +24,135 @@ logger = logging.getLogger(__name__)
 
 class SplitRewardTask(BaseTask):
 
-    # pylint: disable-next=too-many-locals
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         """
         Processes reward splitters for the vault specified in settings.
 
-        This function performs the following steps:
-        - Retrieves reward splitters associated with the vault from Subgraph.
-        - Retrieves claimable exit requests for the reward splitters.
-        - Calls reward splitter contracts and waits for transactions confirmations.
+        Retrieves the reward splitters and their claimable exit requests from the
+        Subgraph, then submits the claim calls on behalf of the shareholders.
         """
-        block = await execution_client.eth.get_block('finalized')
+        await claim_reward_splitters(vaults=[settings.vault], update_vault_state=True)
 
-        app_state = AppState()
-        if not await _check_reward_splitter_block(app_state, block['number']):
-            return
 
-        logger.info('Fetching fee splitters')
-        reward_splitters = await graph_get_reward_splitters(
-            block_number=block['number'], claimer=wallet.account.address, vault=settings.vault
-        )
+async def claim_reward_splitters(
+    vaults: list[ChecksumAddress],
+    update_vault_state: bool,
+) -> None:
+    """
+    Claim fee splitter rewards on behalf of shareholders for the given vaults.
 
-        if not reward_splitters:
-            logger.warning(
-                'No fee splitters found for provided vault with the claimer %s',
-                wallet.address,
-            )
-            return
-        splitter_to_exit_requests = await graph_get_claimable_exit_requests(
-            block_number=block['number'], receivers=[rs.address for rs in reward_splitters]
-        )
+    Interval-gated via AppState.reward_splitter_block so it runs roughly once per
+    FEE_SPLITTER_INTERVAL. Set update_vault_state=False to skip the splitter-side
+    updateVaultState call (e.g. for meta vaults whose state was already refreshed
+    by the meta vault tree update).
+    """
+    if update_vault_state and len(vaults) > 1:
+        # harvest_params are fetched once for settings.vault below, so a single
+        # fetch cannot be reused across multiple vaults when updating their state.
+        logger.error('Updating vault state is not supported when claiming for multiple vaults')
+        return
 
-        calls: dict[ChecksumAddress, list[HexStr]] = {}
-        for reward_splitter in reward_splitters:
-            logger.info(
-                'Processing fee splitter %s ',
-                reward_splitter.address,
-            )
-            harvest_params = await get_harvest_params(settings.vault)
-            exit_requests = splitter_to_exit_requests.get(reward_splitter.address, [])  # nosec
+    block = await execution_client.eth.get_block('finalized')
 
-            reward_splitter_calls = await _get_reward_splitter_calls(
-                reward_splitter=reward_splitter,
+    app_state = AppState()
+    if not await _check_reward_splitter_block(app_state, block['number']):
+        return
+
+    # check current gas prices
+    if not await check_gas_price():
+        return
+
+    logger.info('Fetching fee splitters')
+
+    harvest_params = await get_harvest_params(settings.vault) if update_vault_state else None
+
+    for vault in vaults:
+        try:
+            await claim_reward_splitters_for_vault(
+                vault=vault,
+                block_number=block['number'],
                 harvest_params=harvest_params,
-                exit_requests=exit_requests,
             )
-            if not reward_splitter_calls:
-                logger.info('No calls to process for fee splitter %s', reward_splitter.address)
-                continue
+        except Exception:
+            logger.exception('Failed to claim fee splitters for vault %s', vault)
+            continue
 
-            calls[reward_splitter.address] = reward_splitter_calls
+    app_state.reward_splitter_block = block['number']
 
-        if not calls:
-            app_state.reward_splitter_block = block['number']
-            return
 
-        # check current gas prices
-        if not await check_gas_price():
-            return
+# pylint: disable-next=too-many-locals
+async def claim_reward_splitters_for_vault(
+    vault: ChecksumAddress,
+    block_number: BlockNumber,
+    harvest_params: HarvestParams | None,
+) -> None:
+    """
+    Claim fee splitter rewards on behalf of shareholders for a single vault.
 
-        logger.info('Processing fee splitter calls')
-        for address, address_calls in calls.items():
-            contract = RewardSplitterContract(
-                address=address,
-                execution_client=execution_client,
+    Fetches the fee splitters where the operator wallet is the configured claimer,
+    builds the enterExitQueueOnBehalf and claimExitedAssetsOnBehalf multicalls, and
+    submits them. Pass harvest_params=None to skip the splitter-side updateVaultState
+    call.
+    """
+    reward_splitters = await graph_get_reward_splitters(
+        block_number=block_number, claimer=wallet.account.address, vault=vault
+    )
+
+    if not reward_splitters:
+        logger.warning(
+            'No fee splitters found for vault %s with the claimer %s',
+            vault,
+            wallet.address,
+        )
+        return
+
+    splitter_to_exit_requests = await graph_get_claimable_exit_requests(
+        block_number=block_number, receivers=[rs.address for rs in reward_splitters]
+    )
+
+    calls: dict[ChecksumAddress, list[HexStr]] = {}
+    for reward_splitter in reward_splitters:
+        logger.info(
+            'Processing fee splitter %s',
+            reward_splitter.address,
+        )
+        exit_requests = splitter_to_exit_requests.get(reward_splitter.address, [])  # nosec
+
+        reward_splitter_calls = await _get_reward_splitter_calls(
+            reward_splitter=reward_splitter,
+            harvest_params=harvest_params,
+            exit_requests=exit_requests,
+        )
+        if not reward_splitter_calls:
+            logger.info('No calls to process for fee splitter %s', reward_splitter.address)
+            continue
+
+        calls[reward_splitter.address] = reward_splitter_calls
+
+    if not calls:
+        return
+
+    logger.info('Processing fee splitter calls')
+    for address, address_calls in calls.items():
+        contract = RewardSplitterContract(
+            address=address,
+            execution_client=execution_client,
+        )
+        tx_function = contract.functions.multicall(address_calls)
+        tx = await transaction_gas_wrapper(tx_function)
+        tx_hash = Web3.to_hex(tx)
+        logger.info('Waiting for transaction %s confirmation', tx_hash)
+
+        tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
+            tx, timeout=settings.execution_transaction_timeout
+        )
+        if not tx_receipt['status']:
+            raise RuntimeError(
+                f'Failed to confirm fee splitter tx: {tx_hash}',
             )
-            tx_function = contract.functions.multicall(address_calls)
-            tx = await transaction_gas_wrapper(tx_function)
-            tx_hash = Web3.to_hex(tx)
-            logger.info('Waiting for transaction %s confirmation', tx_hash)
+        logger.info('Transaction %s confirmed', tx_hash)
 
-            tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
-                tx, timeout=settings.execution_transaction_timeout
-            )
-            if not tx_receipt['status']:
-                raise RuntimeError(
-                    f'Failed to confirm fee splitter tx: {tx_hash}',
-                )
-            logger.info('Transaction %s confirmed', tx_hash)
-
-        app_state.reward_splitter_block = block['number']
-        logger.info('All fee splitter calls processed')
+    logger.info('All fee splitter calls processed')
 
 
 async def _check_reward_splitter_block(app_state: AppState, block_number: BlockNumber) -> bool:
