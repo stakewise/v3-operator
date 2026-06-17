@@ -2,10 +2,12 @@ from contextlib import contextmanager
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from eth_typing import HexStr
+from eth_typing import BlockNumber, HexStr
 from sw_utils import ValidatorStatus
 from sw_utils.tests import faker
-from web3.types import Gwei
+from sw_utils.typings import ChainHead
+from web3 import Web3
+from web3.types import Gwei, Wei
 
 from src.common.tests.utils import ether_to_gwei
 from src.common.typings import ValidatorType
@@ -16,6 +18,7 @@ from src.validators.tasks import (
     ValidatorRegistrationSubtask,
     _get_deposits_amounts,
     _get_funding_amounts,
+    get_vault_assets,
 )
 from src.validators.typings import VaultValidator
 
@@ -134,9 +137,9 @@ class TestProcessFunding:
 
     @staticmethod
     @contextmanager
-    def patch_compounding_validators_balances(return_value):
+    def patch_funding_validators_balances(return_value):
         with patch(
-            'src.validators.tasks.fetch_compounding_validators_balances',
+            'src.validators.tasks.fetch_funding_validators_balances',
             new_callable=AsyncMock,
             return_value=return_value,
         ):
@@ -154,9 +157,9 @@ class TestProcessFunding:
 
     @staticmethod
     @contextmanager
-    def patch_fund_compounding_validators(return_value):
+    def patch_fund_validators_chunk(return_value):
         with patch(
-            'src.validators.tasks.fund_compounding_validators',
+            'src.validators.tasks.fund_validators_chunk',
             new_callable=AsyncMock,
             return_value=return_value,
         ) as mock_fund:
@@ -179,12 +182,12 @@ class TestProcessFunding:
             yield
 
     @pytest.mark.usefixtures('fake_settings')
-    async def test_no_compounding_validators(self):
-        """Returns vault_assets unchanged when no compounding validators exist."""
+    async def test_no_funding_validators(self):
+        """Returns vault_assets unchanged when no funding validators exist."""
         vault_assets = ether_to_gwei(100)
         with (
-            self.patch_compounding_validators_balances({}),
-            self.patch_fund_compounding_validators(None) as mock_fund,
+            self.patch_funding_validators_balances({}),
+            self.patch_fund_validators_chunk(None) as mock_fund,
         ):
             result = await self.subtask.process_funding(
                 vault_assets=vault_assets, harvest_params=None
@@ -198,10 +201,8 @@ class TestProcessFunding:
         vault_assets = ether_to_gwei(100)
         pub_key = faker.validator_public_key()
         with (
-            self.patch_compounding_validators_balances(
-                {pub_key: settings.max_validator_balance_gwei}
-            ),
-            self.patch_fund_compounding_validators(None) as mock_fund,
+            self.patch_funding_validators_balances({pub_key: settings.max_validator_balance_gwei}),
+            self.patch_fund_validators_chunk(None) as mock_fund,
         ):
             result = await self.subtask.process_funding(
                 vault_assets=vault_assets, harvest_params=None
@@ -215,9 +216,9 @@ class TestProcessFunding:
         vault_assets = ether_to_gwei(100)
         pub_key = faker.validator_public_key()
         with (
-            self.patch_compounding_validators_balances({pub_key: ether_to_gwei(32)}),
+            self.patch_funding_validators_balances({pub_key: ether_to_gwei(32)}),
             self.patch_is_funding_interval_passed(False),
-            self.patch_fund_compounding_validators(None) as mock_fund,
+            self.patch_fund_validators_chunk(None) as mock_fund,
         ):
             with pytest.raises(FundingException, match='Funding interval has not passed yet'):
                 await self.subtask.process_funding(vault_assets=vault_assets, harvest_params=None)
@@ -231,9 +232,9 @@ class TestProcessFunding:
         tx_hash = HexStr('0xabc')
 
         with (
-            self.patch_compounding_validators_balances({pub_key: ether_to_gwei(32)}),
+            self.patch_funding_validators_balances({pub_key: ether_to_gwei(32)}),
             self.patch_is_funding_interval_passed(True),
-            self.patch_fund_compounding_validators(tx_hash) as mock_fund,
+            self.patch_fund_validators_chunk(tx_hash) as mock_fund,
         ):
             result = await self.subtask.process_funding(
                 vault_assets=vault_assets, harvest_params=None
@@ -246,14 +247,14 @@ class TestProcessFunding:
 
     @pytest.mark.usefixtures('fake_settings')
     async def test_funding_tx_failed(self):
-        """Raises FundingException when fund_compounding_validators returns None."""
+        """Raises FundingException when fund_validators_chunk returns None."""
         vault_assets = ether_to_gwei(100)
         pub_key = faker.validator_public_key()
 
         with (
-            self.patch_compounding_validators_balances({pub_key: ether_to_gwei(32)}),
+            self.patch_funding_validators_balances({pub_key: ether_to_gwei(32)}),
             self.patch_is_funding_interval_passed(True),
-            self.patch_fund_compounding_validators(None),
+            self.patch_fund_validators_chunk(None),
         ):
             with pytest.raises(FundingException, match='Funding transaction failed'):
                 await self.subtask.process_funding(vault_assets=vault_assets, harvest_params=None)
@@ -268,14 +269,14 @@ class TestProcessFunding:
 
         with (
             self.patch_settings(max_validator_balance_gwei=ether_to_gwei(64)),
-            self.patch_compounding_validators_balances(
+            self.patch_funding_validators_balances(
                 {
                     pub_key_1: ether_to_gwei(32),
                     pub_key_2: ether_to_gwei(33),
                 }
             ),
             self.patch_is_funding_interval_passed(True),
-            self.patch_fund_compounding_validators(tx_hash) as mock_fund,
+            self.patch_fund_validators_chunk(tx_hash) as mock_fund,
         ):
             result = await self.subtask.process_funding(
                 vault_assets=vault_assets, harvest_params=None
@@ -299,10 +300,10 @@ class TestProcessFunding:
         'active_balance, exiting_balance',
         [(40, 32), (32, 40)],
     )
-    async def test_fetch_compounding_filters_exiting_validators(
+    async def test_fetch_funding_filters_exiting_validators(
         self, vault_validator_crud, compounding_creds, active_balance, exiting_balance
     ):
-        """fetch_compounding_validators_balances excludes exiting/exited validators."""
+        """fetch_funding_validators_balances excludes exiting/exited validators."""
         pub_key_active = faker.validator_public_key()
         pub_key_exiting = faker.validator_public_key()
 
@@ -345,7 +346,7 @@ class TestProcessFunding:
             self.patch_get_latest_vault_v2_validator_public_keys(),
             patch('src.validators.consensus.consensus_client', mock_consensus),
             self.patch_is_funding_interval_passed(True),
-            self.patch_fund_compounding_validators(HexStr('0xabc')) as mock_fund,
+            self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
         ):
 
             vault_assets = ether_to_gwei(100)
@@ -360,7 +361,7 @@ class TestProcessFunding:
         }
         assert result == Gwei(0)
 
-    async def test_fetch_compounding_includes_pending_deposits(
+    async def test_fetch_funding_includes_pending_deposits(
         self, vault_validator_crud, compounding_creds
     ):
         """Pending deposits reduce remaining capacity, causing overflow to second validator."""
@@ -408,7 +409,11 @@ class TestProcessFunding:
         mock_consensus.get_block.return_value = {'data': {'message': {'slot': '100'}}}
         mock_consensus.get_validators_by_ids.return_value = {'data': consensus_validators_data}
         mock_consensus.get_pending_deposits.return_value = [
-            {'pubkey': pub_key_1, 'amount': str(pending_amount)},
+            {
+                'pubkey': pub_key_1,
+                'amount': str(pending_amount),
+                'withdrawal_credentials': compounding_creds,
+            },
         ]
 
         with (
@@ -416,7 +421,7 @@ class TestProcessFunding:
             self.patch_get_latest_vault_v2_validator_public_keys(),
             patch('src.validators.consensus.consensus_client', mock_consensus),
             self.patch_is_funding_interval_passed(True),
-            self.patch_fund_compounding_validators(HexStr('0xabc')) as mock_fund,
+            self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
         ):
             vault_assets = ether_to_gwei(30)
             result = await self.subtask.process_funding(
@@ -432,7 +437,170 @@ class TestProcessFunding:
         }
         assert result == Gwei(0)
 
-    async def test_fetch_compounding_excludes_non_compounding(
+    async def test_fetch_funding_skips_non_compounding_pending_deposit(
+        self, vault_validator_crud, compounding_creds
+    ):
+        """Pending deposit with non-0x02 withdrawal credentials is not added to the balance."""
+        pub_key = faker.validator_public_key()
+        non_compounding_creds = '0x01' + compounding_creds[4:]
+
+        vault_validator_crud.save_vault_validators(
+            [VaultValidator(public_key=pub_key, block_number=1)]
+        )
+
+        consensus_validators_data = [
+            {
+                'index': '1',
+                'balance': str(ether_to_gwei(40)),
+                'validator': {
+                    'pubkey': pub_key[2:],
+                    'withdrawal_credentials': compounding_creds,
+                    'activation_epoch': '0',
+                },
+                'status': ValidatorStatus.ACTIVE_ONGOING.value,
+            },
+        ]
+
+        mock_consensus = AsyncMock()
+        mock_consensus.get_block.return_value = {'data': {'message': {'slot': '100'}}}
+        mock_consensus.get_validators_by_ids.return_value = {'data': consensus_validators_data}
+        mock_consensus.get_pending_deposits.return_value = [
+            {
+                'pubkey': pub_key,
+                'amount': str(ether_to_gwei(10)),
+                'withdrawal_credentials': non_compounding_creds,
+            },
+        ]
+
+        with (
+            self.patch_settings(max_validator_balance_gwei=ether_to_gwei(64)),
+            self.patch_get_latest_vault_v2_validator_public_keys(),
+            patch('src.validators.consensus.consensus_client', mock_consensus),
+            self.patch_is_funding_interval_passed(True),
+            self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
+        ):
+            vault_assets = ether_to_gwei(24)
+            result = await self.subtask.process_funding(
+                vault_assets=vault_assets, harvest_params=None
+            )
+
+        mock_fund.assert_called_once()
+        # Deposit skipped, so balance stays 40 → capacity = 64 - 40 = 24
+        assert dict(mock_fund.call_args[1]['validator_fundings']) == {
+            pub_key: ether_to_gwei(24),
+        }
+        assert result == Gwei(0)
+
+    async def test_fetch_funding_skips_pending_deposit_for_exiting_validator(
+        self, vault_validator_crud, compounding_creds
+    ):
+        """Pending deposit for an exiting validator is not added back into the balances."""
+        pub_key_active = faker.validator_public_key()
+        pub_key_exiting = faker.validator_public_key()
+
+        vault_validator_crud.save_vault_validators(
+            [
+                VaultValidator(public_key=pub_key_active, block_number=1),
+                VaultValidator(public_key=pub_key_exiting, block_number=2),
+            ]
+        )
+
+        consensus_validators_data = [
+            {
+                'index': '1',
+                'balance': str(ether_to_gwei(40)),
+                'validator': {
+                    'pubkey': pub_key_active[2:],
+                    'withdrawal_credentials': compounding_creds,
+                    'activation_epoch': '0',
+                },
+                'status': ValidatorStatus.ACTIVE_ONGOING.value,
+            },
+            {
+                'index': '2',
+                'balance': str(ether_to_gwei(32)),
+                'validator': {
+                    'pubkey': pub_key_exiting[2:],
+                    'withdrawal_credentials': compounding_creds,
+                    'activation_epoch': '0',
+                },
+                'status': ValidatorStatus.ACTIVE_EXITING.value,
+            },
+        ]
+
+        mock_consensus = AsyncMock()
+        mock_consensus.get_block.return_value = {'data': {'message': {'slot': '100'}}}
+        mock_consensus.get_validators_by_ids.return_value = {'data': consensus_validators_data}
+        mock_consensus.get_pending_deposits.return_value = [
+            {
+                'pubkey': pub_key_exiting,
+                'amount': str(ether_to_gwei(10)),
+                'withdrawal_credentials': compounding_creds,
+            },
+        ]
+
+        with (
+            self.patch_settings(max_validator_balance_gwei=ether_to_gwei(64)),
+            self.patch_get_latest_vault_v2_validator_public_keys(),
+            patch('src.validators.consensus.consensus_client', mock_consensus),
+            self.patch_is_funding_interval_passed(True),
+            self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
+        ):
+            vault_assets = ether_to_gwei(40)
+            result = await self.subtask.process_funding(
+                vault_assets=vault_assets, harvest_params=None
+            )
+
+        mock_fund.assert_called_once()
+        # Exiting validator and its pending deposit are excluded, so only the active
+        # validator is funded (capacity = 64 - 40 = 24) and the remaining 16 stays unspent.
+        assert dict(mock_fund.call_args[1]['validator_fundings']) == {
+            pub_key_active: ether_to_gwei(24),
+        }
+        assert result == ether_to_gwei(16)
+
+    async def test_fetch_funding_pending_deposit_for_new_validator(
+        self, vault_validator_crud, compounding_creds
+    ):
+        """Pending deposit for a validator not yet on the beacon chain creates its balance."""
+        pub_key = faker.validator_public_key()
+
+        vault_validator_crud.save_vault_validators(
+            [VaultValidator(public_key=pub_key, block_number=1)]
+        )
+
+        mock_consensus = AsyncMock()
+        mock_consensus.get_block.return_value = {'data': {'message': {'slot': '100'}}}
+        # Validator is not present in the consensus state yet
+        mock_consensus.get_validators_by_ids.return_value = {'data': []}
+        mock_consensus.get_pending_deposits.return_value = [
+            {
+                'pubkey': pub_key,
+                'amount': str(ether_to_gwei(32)),
+                'withdrawal_credentials': compounding_creds,
+            },
+        ]
+
+        with (
+            self.patch_settings(max_validator_balance_gwei=ether_to_gwei(64)),
+            self.patch_get_latest_vault_v2_validator_public_keys(),
+            patch('src.validators.consensus.consensus_client', mock_consensus),
+            self.patch_is_funding_interval_passed(True),
+            self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
+        ):
+            vault_assets = ether_to_gwei(32)
+            result = await self.subtask.process_funding(
+                vault_assets=vault_assets, harvest_params=None
+            )
+
+        mock_fund.assert_called_once()
+        # Balance comes solely from the pending deposit → capacity = 64 - 32 = 32
+        assert dict(mock_fund.call_args[1]['validator_fundings']) == {
+            pub_key: ether_to_gwei(32),
+        }
+        assert result == Gwei(0)
+
+    async def test_fetch_funding_excludes_non_compounding(
         self, vault_validator_crud, compounding_creds
     ):
         """Non-compounding (0x01) validator is excluded even when vault has excess assets."""
@@ -484,7 +652,7 @@ class TestProcessFunding:
             self.patch_get_latest_vault_v2_validator_public_keys(),
             patch('src.validators.consensus.consensus_client', mock_consensus),
             self.patch_is_funding_interval_passed(True),
-            self.patch_fund_compounding_validators(HexStr('0xabc')) as mock_fund,
+            self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
         ):
             vault_assets = ether_to_gwei(40)
             result = await self.subtask.process_funding(
@@ -500,8 +668,8 @@ class TestProcessFunding:
         assert result == ether_to_gwei(16)
 
     @pytest.mark.usefixtures('vault_validator_crud')
-    async def test_fetch_compounding_includes_non_finalized_keys(self, compounding_creds):
-        """fetch_compounding_validators_balances includes non-finalized V2 validator keys."""
+    async def test_fetch_funding_includes_non_finalized_keys(self, compounding_creds):
+        """fetch_funding_validators_balances includes non-finalized V2 validator keys."""
         pub_key = faker.validator_public_key()
 
         # No vault validators in DB — key comes from non-finalized V2 events
@@ -527,7 +695,7 @@ class TestProcessFunding:
             self.patch_get_latest_vault_v2_validator_public_keys({pub_key}),
             patch('src.validators.consensus.consensus_client', mock_consensus),
             self.patch_is_funding_interval_passed(True),
-            self.patch_fund_compounding_validators(HexStr('0xabc')) as mock_fund,
+            self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
         ):
 
             vault_assets = ether_to_gwei(100)
@@ -551,7 +719,7 @@ class TestProcessFunding:
 
         with (
             self.patch_settings(max_validator_balance_gwei=ether_to_gwei(64)),
-            self.patch_compounding_validators_balances(
+            self.patch_funding_validators_balances(
                 {
                     pub_key_1: ether_to_gwei(32),
                     pub_key_2: ether_to_gwei(33),
@@ -559,7 +727,7 @@ class TestProcessFunding:
                 }
             ),
             self.patch_is_funding_interval_passed(True),
-            self.patch_fund_compounding_validators(tx_hash) as mock_fund,
+            self.patch_fund_validators_chunk(tx_hash) as mock_fund,
             patch('src.validators.tasks.VALIDATORS_FUNDING_BATCH_SIZE', 2),
         ):
             vault_assets = ether_to_gwei(100)
@@ -581,3 +749,69 @@ class TestProcessFunding:
         assert batch_2 == {pub_key_1: ether_to_gwei(32)}
         # 100 - 30 - 31 - 32 = 7
         assert result == ether_to_gwei(7)
+
+
+def _make_chain_head() -> ChainHead:
+    return ChainHead(epoch=1, slot=32, block_number=BlockNumber(100), execution_ts=0)
+
+
+@pytest.mark.usefixtures('fake_settings')
+class TestGetVaultAssets:
+    async def test_no_redemption_assets(self):
+        withdrawable = Web3.to_wei(100, 'ether')
+        with self.mock_assets(withdrawable_assets=Wei(withdrawable)):
+            result = await get_vault_assets(harvest_params=None, chain_head=_make_chain_head())
+        assert result == ether_to_gwei(100)
+
+    async def test_redemption_assets_reduce_vault_assets(self):
+        withdrawable = Web3.to_wei(100, 'ether')
+        redemption = Web3.to_wei(30, 'ether')
+        with self.mock_assets(
+            withdrawable_assets=Wei(withdrawable), redemption_assets=Wei(redemption)
+        ):
+            result = await get_vault_assets(harvest_params=None, chain_head=_make_chain_head())
+        assert result == ether_to_gwei(70)
+
+    async def test_over_reservation_clamped_to_zero(self):
+        withdrawable = Web3.to_wei(10, 'ether')
+        redemption = Web3.to_wei(50, 'ether')
+        with self.mock_assets(
+            withdrawable_assets=Wei(withdrawable), redemption_assets=Wei(redemption)
+        ):
+            result = await get_vault_assets(harvest_params=None, chain_head=_make_chain_head())
+        assert result == Gwei(0)
+
+    async def test_gnosis_conversion_applied_after_subtraction(self):
+        withdrawable = Web3.to_wei(100, 'ether')
+        redemption = Web3.to_wei(40, 'ether')
+        # convert_to_mgno doubles the value (mock a 2x rate for simplicity)
+        with (
+            self.mock_assets(
+                withdrawable_assets=Wei(withdrawable), redemption_assets=Wei(redemption)
+            ),
+            patch('src.validators.tasks.settings') as mock_settings,
+            patch(
+                'src.validators.tasks.convert_to_mgno',
+                side_effect=lambda x: Wei(x * 2),
+            ),
+        ):
+            mock_settings.network = 'gnosis'
+            mock_settings.vault = settings.vault
+            result = await get_vault_assets(harvest_params=None, chain_head=_make_chain_head())
+        # 100 - 40 = 60 ETH → converted → 120 ETH → in Gwei
+        assert result == ether_to_gwei(120)
+
+    @staticmethod
+    @contextmanager
+    def mock_assets(withdrawable_assets: Wei, redemption_assets: Wei = Wei(0)):
+        with (
+            patch(
+                'src.validators.tasks.get_withdrawable_assets',
+                new=AsyncMock(return_value=withdrawable_assets),
+            ),
+            patch(
+                'src.validators.tasks.get_redemption_assets',
+                new=AsyncMock(return_value=redemption_assets),
+            ),
+        ):
+            yield

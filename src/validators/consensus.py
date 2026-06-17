@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 from itertools import batched
 
 from eth_typing import HexStr
@@ -9,7 +10,7 @@ from web3.types import Gwei
 from src.common.clients import consensus_client
 from src.config.settings import settings
 from src.validators.database import VaultValidatorCrud
-from src.validators.execution import get_latest_vault_v2_validator_public_keys
+from src.validators.event_processors import get_latest_vault_v2_validator_public_keys
 from src.validators.typings import ConsensusValidator
 
 EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
@@ -17,32 +18,42 @@ EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
 logger = logging.getLogger(__name__)
 
 
-async def fetch_compounding_validators_balances() -> dict[HexStr, Gwei]:
+async def fetch_funding_validators_balances() -> dict[HexStr, Gwei]:
     """
-    Retrieves the actual balances of compounding validators in the vault.
-    Also includes balances from pending deposits
+    Retrieves the consensus balances of vault validators eligible for funding.
+    Includes balances from pending deposits
     that have not yet been processed by the consensus node.
     """
-    vault_public_keys = {key.public_key for key in VaultValidatorCrud().get_vault_validators()}
+    vault_public_keys = {v.public_key for v in VaultValidatorCrud().get_vault_validators()}
     non_finalized_public_keys = await get_latest_vault_v2_validator_public_keys(settings.vault)
     vault_public_keys.update(non_finalized_public_keys)
     if not vault_public_keys:
         return {}
 
+    # Initialize balances for every validator
+    # including those that are not present in CL yet, but have pending deposits.
+    validators_balances = defaultdict(lambda: Gwei(0), {key: Gwei(0) for key in vault_public_keys})
+
+    # Fetch consensus validators
     consensus_block = await consensus_client.get_block('head')
     slot = consensus_block['data']['message']['slot']
     consensus_validators = await fetch_consensus_validators(list(vault_public_keys), slot=slot)
 
-    validators_balances = {
-        v.public_key: v.balance
-        for v in consensus_validators
-        if v.is_compounding and v.status not in EXITING_STATUSES
-    }
+    # Filter compounding and remove exiting/withdrawn validators,
+    # as they are not eligible for funding
+    for validator in consensus_validators:
+        if validator.is_compounding and validator.status not in EXITING_STATUSES:
+            validators_balances[validator.public_key] = validator.balance
+        else:
+            validators_balances.pop(validator.public_key, None)
 
+    # Add balances from pending deposits that are not yet reflected in the consensus node
     all_pending_deposits = await consensus_client.get_pending_deposits(slot)
     for deposit in all_pending_deposits:
         public_key, amount = deposit['pubkey'], int(deposit['amount'])
         if public_key not in validators_balances:
+            continue
+        if not deposit['withdrawal_credentials'].startswith('0x02'):
             continue
         validators_balances[public_key] = Gwei(validators_balances[public_key] + amount)
 

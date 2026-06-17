@@ -20,11 +20,7 @@ from src.common.clients import (
     get_execution_client,
     setup_clients,
 )
-from src.common.contracts import (
-    Erc20Contract,
-    MulticallContract,
-    os_token_redeemer_contract,
-)
+from src.common.contracts import Erc20Contract, MulticallContract
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.startup_check import (
     check_execution_nodes_network,
@@ -42,10 +38,11 @@ from src.redemptions.api_client import (
     RABBY_API_SOURCE,
     APIClient,
 )
+from src.redemptions.contracts import os_token_redeemer_contract
 from src.redemptions.graph import (
-    graph_get_allocators,
     graph_get_leverage_positions,
     graph_get_os_token_holders,
+    graph_get_redeemable_allocators,
 )
 from src.redemptions.os_token_converter import create_os_token_converter
 from src.redemptions.typings import (
@@ -251,7 +248,7 @@ async def process(
     finalized_block = await execution_client.eth.get_block('finalized')
     block_number = finalized_block['number']
     logger.info('Fetching allocators from the subgraph...')
-    allocators = await graph_get_allocators(block_number)
+    allocators = await graph_get_redeemable_allocators(block_number)
     logger.info('Fetched %s allocators from the subgraph', len(allocators))
 
     # filter boost proxy positions

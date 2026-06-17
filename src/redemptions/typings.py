@@ -65,8 +65,14 @@ class OsTokenPosition:
     owner: ChecksumAddress
     vault: ChecksumAddress
     leaf_shares: Wei
-    unprocessed_shares: Wei = Wei(0)
+    # Zero-based index of the position in the IPFS positions file. Used for logging only.
+    index: int = 0
+    processed_shares: Wei = Wei(0)
     shares_to_redeem: Wei = Wei(0)
+
+    @property
+    def unprocessed_shares(self) -> Wei:
+        return Wei(max(0, self.leaf_shares - self.processed_shares))
 
     def as_dict(self) -> dict:
         return {

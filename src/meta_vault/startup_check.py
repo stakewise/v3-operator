@@ -6,6 +6,7 @@ from eth_typing import ChecksumAddress
 from src.common.execution import check_wallet_balance
 from src.common.startup_check import (
     check_execution_nodes_network,
+    check_operator_version,
     wait_for_execution_node,
     wait_for_graph_node_sync_to_chain_head,
 )
@@ -16,6 +17,9 @@ logger = logging.getLogger(__name__)
 
 
 async def startup_checks(meta_vault_addresses: list[ChecksumAddress]) -> None:
+    logger.info('Checking for newer operator version...')
+    await check_operator_version()
+
     logger.info('Checking connection to execution nodes...')
     await wait_for_execution_node()
 

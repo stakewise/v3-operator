@@ -39,6 +39,9 @@ async def get_pending_partial_withdrawals(
 
     execution_withdrawals = await get_execution_partial_withdrawals(chain_head.block_number)
     for withdrawal in execution_withdrawals:
+        if withdrawal['source_address'] != settings.vault:
+            continue
+
         public_key = withdrawal['public_key']
         if public_key not in public_key_to_index:
             continue

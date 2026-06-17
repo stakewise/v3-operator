@@ -429,6 +429,11 @@ VALIDATORS_FUNDING_BATCH_SIZE = decouple_config(
     'VALIDATORS_FUNDING_BATCH_SIZE', cast=int, default=10
 )
 
+# Batch size for OsTokenRedeemer read-only multicalls (e.g. fetching processed shares in bulk)
+OS_TOKEN_REDEEMER_CHUNK_SIZE: int = decouple_config(
+    'OS_TOKEN_REDEEMER_CHUNK_SIZE', cast=int, default=1000
+)
+
 # Minimum amount of rewards to process reward splitter
 FEE_SPLITTER_MIN_ASSETS: int = decouple_config(
     'FEE_SPLITTER_MIN_ASSETS', default=Web3.to_wei('0.001', 'ether'), cast=int

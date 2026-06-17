@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass, fields
 from datetime import timedelta
 
 from ens.constants import EMPTY_ADDR_HEX
@@ -15,6 +15,14 @@ AVAILABLE_NETWORKS = [MAINNET, HOODI, GNOSIS]
 RATED_NETWORKS = [MAINNET]
 
 ZERO_CHECKSUM_ADDRESS = Web3.to_checksum_address(EMPTY_ADDR_HEX)  # noqa: E501
+
+
+def _load_base_kwargs(network: str) -> dict:
+    # Shallow per-field copy. `dataclasses.asdict` would recurse and convert
+    # nested dataclasses (e.g. `ContractRelease` inside `CONTRACTS_RELEASES`)
+    # into plain dicts, breaking attribute access on them.
+    base = BASE_NETWORKS[network]
+    return {f.name: getattr(base, f.name) for f in fields(base)}
 
 
 @dataclass
@@ -33,6 +41,7 @@ class NetworkConfig(BaseNetworkConfig):
     STAKEWISE_GRAPH_ENDPOINT: str
     RATED_API_URL: str
     CONFIG_UPDATE_EVENT_BLOCK: BlockNumber
+    OS_TOKEN_REDEEMER_GENESIS_BLOCK: BlockNumber
     MAX_FEE_PER_GAS_GWEI: Gwei
     MAX_VALIDATOR_BALANCE_GWEI: Gwei
     SHARD_COMMITTEE_PERIOD: int
@@ -79,7 +88,7 @@ class NodeConfig:
 
 NETWORKS: dict[str, NetworkConfig] = {
     MAINNET: NetworkConfig(
-        **asdict(BASE_NETWORKS[MAINNET]),
+        **_load_base_kwargs(MAINNET),
         WALLET_BALANCE_SYMBOL='ETH',
         VAULT_BALANCE_SYMBOL='ETH',
         OS_TOKEN_BALANCE_SYMBOL='osETH',
@@ -105,6 +114,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         ),
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(21471524),
+        OS_TOKEN_REDEEMER_GENESIS_BLOCK=BlockNumber(24923158),
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
         MAX_VALIDATOR_BALANCE_GWEI=Gwei(int(Web3.from_wei(Web3.to_wei(1945, 'ether'), 'gwei'))),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
@@ -133,7 +143,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         ),
     ),
     HOODI: NetworkConfig(
-        **asdict(BASE_NETWORKS[HOODI]),
+        **_load_base_kwargs(HOODI),
         WALLET_BALANCE_SYMBOL='HoodiETH',
         VAULT_BALANCE_SYMBOL='HoodiETH',
         OS_TOKEN_BALANCE_SYMBOL='osETH',
@@ -155,6 +165,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         STAKEWISE_GRAPH_ENDPOINT='https://graphs.stakewise.io/hoodi/subgraphs/name/stakewise/prod',
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(94090),
+        OS_TOKEN_REDEEMER_GENESIS_BLOCK=BlockNumber(2657589),
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
         MAX_VALIDATOR_BALANCE_GWEI=Gwei(int(Web3.from_wei(Web3.to_wei(1945, 'ether'), 'gwei'))),
         SHARD_COMMITTEE_PERIOD=256,  # epochs
@@ -183,7 +194,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         ),
     ),
     GNOSIS: NetworkConfig(
-        **asdict(BASE_NETWORKS[GNOSIS]),
+        **_load_base_kwargs(GNOSIS),
         WALLET_BALANCE_SYMBOL='xDAI',
         VAULT_BALANCE_SYMBOL='GNO',
         OS_TOKEN_BALANCE_SYMBOL='osGNO',
@@ -207,6 +218,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         ),
         RATED_API_URL='https://api.rated.network',
         CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(37640206),
+        OS_TOKEN_REDEEMER_GENESIS_BLOCK=BlockNumber(45773287),
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
         MAX_VALIDATOR_BALANCE_GWEI=Gwei(int(Web3.from_wei(Web3.to_wei(1800, 'ether'), 'gwei'))),
         SHARD_COMMITTEE_PERIOD=256,  # epochs

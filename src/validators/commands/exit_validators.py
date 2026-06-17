@@ -195,6 +195,8 @@ def exit_validators(
                 )
             else:
                 raise e
+    except click.ClickException:
+        raise
     except Exception as e:
         log_verbose(e)
         sys.exit(1)

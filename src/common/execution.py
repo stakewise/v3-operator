@@ -2,6 +2,7 @@ import asyncio
 import logging
 from urllib.parse import urlparse
 
+from eth_typing import BlockNumber
 from hexbytes import HexBytes
 from sw_utils import GasManager, InterruptHandler
 from web3 import Web3
@@ -18,6 +19,8 @@ from src.config.settings import ATTEMPTS_WITH_DEFAULT_GAS, settings
 logger = logging.getLogger(__name__)
 
 ALCHEMY_DOMAIN = '.alchemy.com'
+
+EXECUTION_ENDPOINT_SYNC_POLL_INTERVAL = 0.1
 
 
 class WalletTask(BaseTask):
@@ -86,6 +89,19 @@ async def check_gas_price(high_priority: bool = False) -> bool:
         return True
 
     return await gas_manager.check_gas_price(high_priority)
+
+
+async def wait_for_execution_endpoints_synced(target_block: BlockNumber) -> None:
+    while True:
+        current_block = await execution_client.eth.block_number
+        if current_block >= target_block:
+            return
+        await asyncio.sleep(EXECUTION_ENDPOINT_SYNC_POLL_INTERVAL)
+
+
+async def get_finalized_block_number() -> BlockNumber:
+    finalized_block = await execution_client.eth.get_block('finalized')
+    return BlockNumber(finalized_block['number'])
 
 
 def build_gas_manager() -> GasManager:
