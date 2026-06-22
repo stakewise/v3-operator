@@ -410,6 +410,9 @@ EVENTS_CONCURRENCY_CHUNK: int = decouple_config(
 )
 EVENTS_CONCURRENCY_LIMIT: int = decouple_config('EVENTS_CONCURRENCY_LIMIT', default=10, cast=int)
 
+# Maximum number of updateState calls batched into a single multicall transaction.
+MULTICALL_CHUNK_SIZE: int = decouple_config('MULTICALL_CHUNK_SIZE', default=20, cast=int)
+
 # Backoff retries
 DEFAULT_RETRY_TIME = 60
 
