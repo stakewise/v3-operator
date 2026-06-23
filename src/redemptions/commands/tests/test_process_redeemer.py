@@ -168,6 +168,21 @@ class TestRedeemPositions:
         mocks['get_withdrawable'].assert_not_called()
         mocks['submit_mock'].assert_not_called()
 
+    async def test_ltv_exceeded_position_skipped(self) -> None:
+        """A position where loan > user_assets (LTV > 1) is skipped without redeeming."""
+        pos = make_position(processed_shares=500)
+
+        with _mock_redeem_positions(withdrawable=Wei(10000), ltv_exceeded=True) as mocks:
+            await redeem_positions(
+                tree=make_tree([pos]),
+                os_token_positions=[pos],
+                converter=make_converter(100, 100),
+                block_number=BlockNumber(100),
+            )
+
+        mocks['submit_mock'].assert_not_called()
+        mocks['get_withdrawable'].assert_not_called()
+
     async def test_submit_failure_skips_position(self) -> None:
         """A failed submission skips that position; subsequent positions are still attempted."""
         pos1 = make_position(vault=VAULT_1, owner=OWNER_1, processed_shares=500)
@@ -304,6 +319,7 @@ def _mock_redeem_positions(
     is_meta_vault: bool = False,
     state_update_required: bool = False,
     submit_results: list[bool] | None = None,
+    ltv_exceeded: bool = False,
 ) -> Iterator[dict[str, MagicMock]]:
     """Mock setup for redeem_positions tests.
 
@@ -313,6 +329,8 @@ def _mock_redeem_positions(
     the unharvested-vault skip. ``submit_results`` controls per-call return values of
     tx_redeem_position; a ``False`` entry models a failed submission that should
     abort the round. Simulation always succeeds; each live position is simulated first.
+    ``ltv_exceeded`` simulates a position where the user's minted osToken loan exceeds
+    their vault assets (LTV > 1), causing the position to be skipped.
     """
     if isinstance(withdrawable, AsyncMock):
         get_withdrawable = withdrawable
@@ -335,6 +353,10 @@ def _mock_redeem_positions(
         patch(f'{MODULE}.get_withdrawable_assets', new=get_withdrawable),
         patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=is_meta_vault)),
         patch(f'{MODULE}.VaultContract', return_value=vault_contract),
+        patch(
+            f'{MODULE}.is_position_ltv_exceeded',
+            new=AsyncMock(return_value=ltv_exceeded),
+        ),
         patch(f'{MODULE}.simulate_redeem_position', new=simulate_mock),
         patch(f'{MODULE}.tx_redeem_position', new=submit_mock),
     ):

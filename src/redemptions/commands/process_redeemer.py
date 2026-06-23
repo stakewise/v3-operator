@@ -45,7 +45,7 @@ from src.redemptions.os_token_converter import (
     OsTokenConverter,
     create_os_token_converter,
 )
-from src.redemptions.tasks import assign_shares_to_redeem
+from src.redemptions.tasks import assign_shares_to_redeem, is_position_ltv_exceeded
 from src.redemptions.typings import OsTokenPosition
 from src.validators.execution import get_withdrawable_assets
 
@@ -327,6 +327,10 @@ async def redeem_positions(
             continue
 
         if position.vault in unharvested_vaults:
+            continue
+
+        if await is_position_ltv_exceeded(position, converter, block_number):
+            logger.info('Skipping position index=%d: LTV > 1', position.index)
             continue
 
         if position.vault not in vault_to_withdrawable:

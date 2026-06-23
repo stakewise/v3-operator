@@ -232,6 +232,25 @@ class VaultContract(ContractWrapper, VaultStateMixin):
             block_identifier=block_number
         )
 
+    async def get_os_token_position(
+        self, owner: ChecksumAddress, block_number: BlockNumber | None = None
+    ) -> Wei:
+        return Wei(
+            await self.contract.functions.osTokenPositions(owner).call(
+                block_identifier=block_number
+            )
+        )
+
+    async def get_user_assets(
+        self, owner: ChecksumAddress, block_number: BlockNumber | None = None
+    ) -> Wei:
+        shares = await self.contract.functions.getShares(owner).call(block_identifier=block_number)
+        return Wei(
+            await self.contract.functions.convertToAssets(shares).call(
+                block_identifier=block_number
+            )
+        )
+
     async def version(self) -> int:
         return await self.contract.functions.version().call()
 
