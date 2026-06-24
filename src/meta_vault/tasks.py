@@ -1,7 +1,6 @@
 import logging
 
 from eth_typing import ChecksumAddress, HexStr
-from hexbytes import HexBytes
 from sw_utils import (
     GNO_NETWORKS,
     InterruptHandler,
@@ -11,7 +10,6 @@ from sw_utils import (
 from sw_utils.networks import ContractReleaseVersion
 from web3 import Web3
 
-from src.common.clients import execution_client
 from src.common.contracts import VaultContract, VaultEncoder, multicall_contract
 from src.common.execution import check_gas_price
 from src.common.graph import wait_for_graph_node_sync
@@ -205,16 +203,11 @@ async def meta_vault_update_state(
     )
     logger.info('Transaction steps: \n%s', '\n'.join(tx_steps))
 
-    tx_hash = await multicall_contract.tx_aggregate(calls)
+    tx_receipt = await multicall_contract.tx_aggregate(calls)
+    if tx_receipt is None:
+        raise RuntimeError('Failed to confirm meta vault state update tx')
 
-    logger.info('Waiting for transaction %s confirmation', tx_hash)
-    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
-        HexBytes(Web3.to_bytes(hexstr=tx_hash)), timeout=settings.execution_transaction_timeout
-    )
-    if not tx_receipt['status']:
-        raise RuntimeError(
-            f'Failed to confirm tx: {tx_hash}',
-        )
+    tx_hash = Web3.to_hex(tx_receipt['transactionHash'])
     logger.info('Transaction %s confirmed', tx_hash)
     await wait_for_graph_node_sync(tx_receipt['blockNumber'])
 
@@ -398,15 +391,10 @@ async def process_deposit_to_sub_vaults(meta_vault_address: ChecksumAddress) -> 
     logger.info('Depositing to sub vaults for meta vault %s', meta_vault_address)
     sub_vaults_registry_address = await meta_vault_contract.sub_vaults_registry()
     sub_vaults_registry_contract = SubVaultsRegistryContract(sub_vaults_registry_address)
-    tx_hash = await sub_vaults_registry_contract.deposit_to_sub_vaults()
+    tx_receipt = await sub_vaults_registry_contract.deposit_to_sub_vaults()
+    if tx_receipt is None:
+        raise RuntimeError('Failed to confirm deposit to sub vaults tx')
 
-    logger.info('Waiting for transaction %s confirmation', tx_hash)
-    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
-        HexBytes(Web3.to_bytes(hexstr=tx_hash)), timeout=settings.execution_transaction_timeout
-    )
-    if not tx_receipt['status']:
-        raise RuntimeError(
-            f'Failed to confirm tx: {tx_hash}',
-        )
+    tx_hash = Web3.to_hex(tx_receipt['transactionHash'])
     logger.info('Transaction %s confirmed', tx_hash)
     await wait_for_graph_node_sync(tx_receipt['blockNumber'])
