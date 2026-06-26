@@ -8,9 +8,102 @@ from web3 import Web3
 from web3.exceptions import TimeExhausted
 from web3.types import Wei
 
-from src.common.transaction import REPLACEMENT_GAS_BUMP, TransactionManager
+from src.common.transaction import REPLACEMENT_GAS_BUMP, Fees, TransactionManager
 
 GWEI = Web3.to_wei(1, 'gwei')
+
+
+@pytest.mark.usefixtures('fake_settings')
+class TestFees:
+    def test_bump_returns_new_capped_instance(self):
+        fees = Fees(
+            fee_per_gas=Web3.to_wei(4, 'gwei'),
+            priority_fee_per_gas=Web3.to_wei(2, 'gwei'),
+            max_fee_per_gas=Web3.to_wei(10, 'gwei'),
+        )
+
+        bumped = fees.bump()
+
+        # the original instance is left untouched
+        assert fees.fee_per_gas == Web3.to_wei(4, 'gwei')
+        assert fees.priority_fee_per_gas == Web3.to_wei(2, 'gwei')
+        # bump returns a new instance with both fees raised by 12.5%
+        assert bumped is not fees
+        assert bumped.fee_per_gas == Web3.to_wei(4.5, 'gwei')
+        assert bumped.priority_fee_per_gas == Web3.to_wei(2.25, 'gwei')
+
+    def test_bump_caps_at_max_fee_per_gas(self):
+        cap = Web3.to_wei(10, 'gwei')
+        fees = Fees(fee_per_gas=cap, priority_fee_per_gas=cap, max_fee_per_gas=cap)
+
+        bumped = fees.bump()
+
+        # already at the ceiling - the bump cannot raise either fee
+        assert bumped.fee_per_gas == cap
+        assert bumped.priority_fee_per_gas == cap
+
+    def test_replaces_true_when_both_fees_rise_enough(self):
+        cap = Web3.to_wei(1000, 'gwei')
+        prev = Fees(
+            fee_per_gas=Web3.to_wei(10, 'gwei'),
+            priority_fee_per_gas=Web3.to_wei(5, 'gwei'),
+            max_fee_per_gas=cap,
+        )
+        # both fees exactly at the +10% threshold
+        new = Fees(
+            fee_per_gas=Web3.to_wei(11, 'gwei'),
+            priority_fee_per_gas=Web3.to_wei(5.5, 'gwei'),
+            max_fee_per_gas=cap,
+        )
+
+        assert new.replaces(prev) is True
+
+    def test_replaces_false_when_fee_rise_too_small(self):
+        cap = Web3.to_wei(1000, 'gwei')
+        prev = Fees(
+            fee_per_gas=Web3.to_wei(10, 'gwei'),
+            priority_fee_per_gas=Web3.to_wei(5, 'gwei'),
+            max_fee_per_gas=cap,
+        )
+        # maxFeePerGas rises only 9%, below the +10% threshold
+        new = Fees(
+            fee_per_gas=Web3.to_wei(10.9, 'gwei'),
+            priority_fee_per_gas=Web3.to_wei(5.5, 'gwei'),
+            max_fee_per_gas=cap,
+        )
+
+        assert new.replaces(prev) is False
+
+    def test_replaces_false_when_priority_rise_too_small(self):
+        cap = Web3.to_wei(1000, 'gwei')
+        prev = Fees(
+            fee_per_gas=Web3.to_wei(10, 'gwei'),
+            priority_fee_per_gas=Web3.to_wei(5, 'gwei'),
+            max_fee_per_gas=cap,
+        )
+        # maxFeePerGas clears the threshold but maxPriorityFeePerGas rises only 8%
+        new = Fees(
+            fee_per_gas=Web3.to_wei(11, 'gwei'),
+            priority_fee_per_gas=Web3.to_wei(5.4, 'gwei'),
+            max_fee_per_gas=cap,
+        )
+
+        assert new.replaces(prev) is False
+
+    def test_from_tx_params_then_to_tx_params_round_trips(self):
+        # below the ceiling, so capping does not alter the values
+        params = {'maxFeePerGas': Wei(2 * GWEI), 'maxPriorityFeePerGas': Wei(GWEI)}
+
+        assert Fees.from_tx_params(params).to_tx_params() == params
+
+    def test_to_tx_params_then_from_tx_params_round_trips(self):
+        cap = Web3.to_wei(1000, 'gwei')
+        fees = Fees(fee_per_gas=2 * GWEI, priority_fee_per_gas=GWEI, max_fee_per_gas=cap)
+
+        restored = Fees.from_tx_params(fees.to_tx_params(), max_fee_per_gas=cap)
+
+        assert restored.fee_per_gas == fees.fee_per_gas
+        assert restored.priority_fee_per_gas == fees.priority_fee_per_gas
 
 
 @pytest.mark.usefixtures('fake_settings')

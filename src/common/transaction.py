@@ -50,10 +50,18 @@ class Fees:
             max_fee_per_gas=max_fee_per_gas,
         )
 
-    def bump(self) -> None:
-        self.fee_per_gas = self._bump(self.fee_per_gas)
-        self.priority_fee_per_gas = self._bump(self.priority_fee_per_gas)
-        self._cap()
+    def to_tx_params(self) -> TxParams:
+        return {
+            'maxFeePerGas': Wei(self.fee_per_gas),
+            'maxPriorityFeePerGas': Wei(self.priority_fee_per_gas),
+        }
+
+    def bump(self) -> 'Fees':
+        return Fees(
+            fee_per_gas=self._bump(self.fee_per_gas),
+            priority_fee_per_gas=self._bump(self.priority_fee_per_gas),
+            max_fee_per_gas=self.max_fee_per_gas,
+        )
 
     def max_with(self, other: 'Fees') -> 'Fees':
         return Fees(
@@ -69,13 +77,6 @@ class Fees:
         return self.fee_per_gas >= ceil(
             prev.fee_per_gas * MIN_REPLACEMENT_RATIO
         ) and self.priority_fee_per_gas >= ceil(prev.priority_fee_per_gas * MIN_REPLACEMENT_RATIO)
-
-    @property
-    def tx_params(self) -> TxParams:
-        return {
-            'maxFeePerGas': Wei(self.fee_per_gas),
-            'maxPriorityFeePerGas': Wei(self.priority_fee_per_gas),
-        }
 
     def _cap(self) -> None:
         # never exceed the configured ceiling
@@ -185,9 +186,7 @@ class TransactionManager:
         if prev is not None:
             # a transaction we sent for this nonce is still pending - bump from its fees
             prev_fees = Fees.from_tx_params(prev)
-            bumped_prev = Fees.from_tx_params(prev)
-            bumped_prev.bump()
-            fees = fees.max_with(bumped_prev)
+            fees = fees.max_with(prev_fees.bump())
             if not fees.replaces(prev_fees):
                 # the bump got clamped to the max_fee_per_gas ceiling and no longer clears
                 # the node's replacement threshold, so it would reject it as underpriced.
@@ -201,7 +200,7 @@ class TransactionManager:
                 )
                 return None
 
-        params: TxParams = {**tx_params, 'nonce': nonce, **fees.tx_params}
+        params: TxParams = {**tx_params, 'nonce': nonce, **fees.to_tx_params()}
         tx_hash = await tx_function.transact(params)
         self._nonce_to_tx_params[nonce] = params
         return tx_hash
