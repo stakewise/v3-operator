@@ -90,6 +90,25 @@ class TestTransactionManager:
         assert params['nonce'] == 5
         assert params['maxFeePerGas'] == GWEI
 
+    async def test_pending_at_fee_ceiling_skips_replacement(self):
+        # HOODI max_fee_per_gas ceiling (10 gwei)
+        cap = Web3.to_wei(10, 'gwei')
+        manager = TransactionManager()
+
+        # first submission lands at the fee ceiling and records it for nonce 5
+        transact1 = mock.AsyncMock(return_value=HexBytes('0x01'))
+        with _patch(latest_nonce=5, pending_nonce=5, gas_manager=_gas_manager(cap, cap)):
+            await manager.transact(_tx_function(transact1), high_priority=True)
+
+        # second submission sees the pending tx still at the ceiling - it cannot bump,
+        # so it must not broadcast a doomed replacement
+        transact2 = mock.AsyncMock(return_value=HexBytes('0x02'))
+        with _patch(latest_nonce=5, pending_nonce=6, gas_manager=_gas_manager(cap, cap)):
+            receipt = await manager.transact(_tx_function(transact2))
+
+        assert receipt is None
+        transact2.assert_not_awaited()
+
     async def test_reverted_receipt_returns_none(self):
         transact = mock.AsyncMock(return_value=HexBytes('0x01'))
         with _patch(

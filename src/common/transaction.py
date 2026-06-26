@@ -98,8 +98,7 @@ class TransactionManager:
     Trade-off: while a transaction is being mined the lock blocks other tasks, so no
     two tasks can collide on a nonce. On a receipt timeout the lock is released with
     the transaction still pending, so a different task may replace it on its next run.
-    That is harmless - nothing can be mined past the stuck nonce anyway, and every
-    replacement bumps the fee (capped at `max_fee_per_gas`), so it converges.
+    That is harmless.
     """
 
     def __init__(self) -> None:
@@ -155,6 +154,9 @@ class TransactionManager:
                 # default gas was not accepted - escalate to high priority fees
                 tx_hash = await self._submit_high_priority(tx_function, tx_params, latest_nonce)
 
+        if tx_hash is None:
+            # nothing was broadcast (the pending tx is pinned at the fee ceiling)
+            return None
         return await self._wait_for_receipt(tx_hash)
 
     async def _submit_high_priority(
@@ -162,7 +164,7 @@ class TransactionManager:
         tx_function: AsyncContractFunction,
         tx_params: TxParams,
         nonce: Nonce,
-    ) -> HexBytes:
+    ) -> HexBytes | None:
         gas_params = await build_gas_manager().get_high_priority_tx_params()
         fees = Fees.from_tx_params(gas_params)
 
@@ -170,8 +172,21 @@ class TransactionManager:
         if prev is not None:
             # a transaction we sent for this nonce is still pending - bump from its fees
             prev_fees = Fees.from_tx_params(prev)
+            prev_fee_per_gas = prev_fees.fee_per_gas
             prev_fees.bump()
             fees = fees.max_with(prev_fees)
+            if fees.fee_per_gas <= prev_fee_per_gas:
+                # already at the max_fee_per_gas ceiling - the bump is a no-op, so the node
+                # would reject the replacement as underpriced. Leave the pending tx in place;
+                # it will mine once the base fee drops.
+                logger.warning(
+                    'Pending transaction at nonce %d is at the max_fee_per_gas_gwei ceiling '
+                    '(%s gwei); cannot bump fees to replace it. Waiting for it to mine or for '
+                    'the base fee to drop. Consider raising max_fee_per_gas_gwei.',
+                    nonce,
+                    settings.max_fee_per_gas_gwei,
+                )
+                return None
 
         params: TxParams = {**tx_params, 'nonce': nonce, **fees.tx_params}
         tx_hash = await tx_function.transact(params)
