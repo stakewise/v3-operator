@@ -109,6 +109,31 @@ class TestTransactionManager:
         assert receipt is None
         transact2.assert_not_awaited()
 
+    async def test_pending_near_fee_ceiling_skips_replacement(self):
+        # pending tx sits just below the ceiling: the 12.5% bump clamps to the 10 gwei
+        # ceiling, which is < the 10% rise the node requires, so it cannot be replaced
+        near_ceiling = Web3.to_wei(9.5, 'gwei')
+        manager = TransactionManager()
+
+        transact1 = mock.AsyncMock(return_value=HexBytes('0x01'))
+        with _patch(
+            latest_nonce=5,
+            pending_nonce=5,
+            gas_manager=_gas_manager(near_ceiling, near_ceiling),
+        ):
+            await manager.transact(_tx_function(transact1), high_priority=True)
+
+        transact2 = mock.AsyncMock(return_value=HexBytes('0x02'))
+        with _patch(
+            latest_nonce=5,
+            pending_nonce=6,
+            gas_manager=_gas_manager(near_ceiling, near_ceiling),
+        ):
+            receipt = await manager.transact(_tx_function(transact2))
+
+        assert receipt is None
+        transact2.assert_not_awaited()
+
     async def test_reverted_receipt_returns_none(self):
         transact = mock.AsyncMock(return_value=HexBytes('0x01'))
         with _patch(

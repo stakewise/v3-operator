@@ -16,9 +16,14 @@ from src.config.settings import ATTEMPTS_WITH_DEFAULT_GAS, settings
 
 logger = logging.getLogger(__name__)
 
-# geth requires both `maxFeePerGas` and `maxPriorityFeePerGas` to increase by at
+# the node requires both `maxFeePerGas` and `maxPriorityFeePerGas` to increase by at
 # least 10% to replace a pending transaction. Use a bit more for headroom.
 REPLACEMENT_GAS_BUMP = 1.125
+
+# Minimum ratio the node enforces for a replacement: both fees must rise by at least
+# its price bump (10% by default). A bump clamped to the ceiling below this ratio
+# would be rejected as underpriced.
+MIN_REPLACEMENT_RATIO = 1.1
 
 
 class Fees:
@@ -56,6 +61,14 @@ class Fees:
             priority_fee_per_gas=max(self.priority_fee_per_gas, other.priority_fee_per_gas),
             max_fee_per_gas=self.max_fee_per_gas,
         )
+
+    def replaces(self, prev: 'Fees') -> bool:
+        # the node accepts a replacement only when BOTH fees rise by at least its price
+        # bump. Near the ceiling the bump clamps below that, making replacement
+        # impossible even though the capped fee is still above the previous one.
+        return self.fee_per_gas >= ceil(
+            prev.fee_per_gas * MIN_REPLACEMENT_RATIO
+        ) and self.priority_fee_per_gas >= ceil(prev.priority_fee_per_gas * MIN_REPLACEMENT_RATIO)
 
     @property
     def tx_params(self) -> TxParams:
@@ -172,17 +185,17 @@ class TransactionManager:
         if prev is not None:
             # a transaction we sent for this nonce is still pending - bump from its fees
             prev_fees = Fees.from_tx_params(prev)
-            prev_fee_per_gas = prev_fees.fee_per_gas
-            prev_fees.bump()
-            fees = fees.max_with(prev_fees)
-            if fees.fee_per_gas <= prev_fee_per_gas:
-                # already at the max_fee_per_gas ceiling - the bump is a no-op, so the node
-                # would reject the replacement as underpriced. Leave the pending tx in place;
-                # it will mine once the base fee drops.
+            bumped_prev = Fees.from_tx_params(prev)
+            bumped_prev.bump()
+            fees = fees.max_with(bumped_prev)
+            if not fees.replaces(prev_fees):
+                # the bump got clamped to the max_fee_per_gas ceiling and no longer clears
+                # the node's replacement threshold, so it would reject it as underpriced.
+                # Leave the pending tx in place; it will mine once the base fee drops.
                 logger.warning(
-                    'Pending transaction at nonce %d is at the max_fee_per_gas_gwei ceiling '
-                    '(%s gwei); cannot bump fees to replace it. Waiting for it to mine or for '
-                    'the base fee to drop. Consider raising max_fee_per_gas_gwei.',
+                    'Pending transaction at nonce %d is at or near the max_fee_per_gas_gwei '
+                    'ceiling (%s gwei); cannot bump fees enough to replace it. Waiting for it '
+                    'to mine or for the base fee to drop. Consider raising max_fee_per_gas_gwei.',
                     nonce,
                     settings.max_fee_per_gas_gwei,
                 )
