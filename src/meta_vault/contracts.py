@@ -1,9 +1,9 @@
 from eth_typing import HexStr
-from web3 import AsyncWeb3, Web3
-from web3.types import ChecksumAddress, Wei
+from web3 import AsyncWeb3
+from web3.types import ChecksumAddress, TxReceipt, Wei
 
 from src.common.contracts import BaseEncoder, ContractWrapper
-from src.common.execution import transaction_gas_wrapper
+from src.common.transaction import tx_manager
 from src.common.typings import HarvestParams
 from src.meta_vault.typings import SubVaultExitRequest
 
@@ -51,10 +51,9 @@ class MetaVaultEncoder(BaseEncoder):
 class SubVaultsRegistryContract(ContractWrapper):
     abi_path = 'abi/ISubVaultsRegistry.json'
 
-    async def deposit_to_sub_vaults(self) -> HexStr:
+    async def deposit_to_sub_vaults(self) -> TxReceipt | None:
         tx_function = self.contract.functions.depositToSubVaults()
-        tx_hash = await transaction_gas_wrapper(tx_function)
-        return Web3.to_hex(tx_hash)
+        return await tx_manager.transact(tx_function)
 
 
 class SubVaultsRegistryEncoder(BaseEncoder):
