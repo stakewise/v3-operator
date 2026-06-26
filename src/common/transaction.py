@@ -49,12 +49,6 @@ class Fees:
         self.priority_fee_per_gas = self._bump(self.priority_fee_per_gas)
         self._cap()
 
-    def _cap(self) -> None:
-        # never exceed the configured ceiling
-        self.fee_per_gas = min(self.fee_per_gas, self.max_fee_per_gas)
-        # maxPriorityFeePerGas must never exceed maxFeePerGas
-        self.priority_fee_per_gas = min(self.priority_fee_per_gas, self.fee_per_gas)
-
     def max_with(self, other: 'Fees') -> 'Fees':
         return Fees(
             fee_per_gas=max(self.fee_per_gas, other.fee_per_gas),
@@ -62,11 +56,18 @@ class Fees:
             max_fee_per_gas=self.max_fee_per_gas,
         )
 
+    @property
     def tx_params(self) -> TxParams:
         return {
             'maxFeePerGas': Wei(self.fee_per_gas),
             'maxPriorityFeePerGas': Wei(self.priority_fee_per_gas),
         }
+
+    def _cap(self) -> None:
+        # never exceed the configured ceiling
+        self.fee_per_gas = min(self.fee_per_gas, self.max_fee_per_gas)
+        # maxPriorityFeePerGas must never exceed maxFeePerGas
+        self.priority_fee_per_gas = min(self.priority_fee_per_gas, self.fee_per_gas)
 
     @staticmethod
     def _bump(value: int) -> int:
@@ -123,6 +124,8 @@ class TransactionManager:
         high_priority: bool,
     ) -> TxReceipt | None:
         address = wallet.address
+        # Since nonces are 0-indexed, that tx count equals the nonce
+        # of the next transaction to be mined.
         latest_nonce = await execution_client.eth.get_transaction_count(address, 'latest')
         pending_nonce = await execution_client.eth.get_transaction_count(address, 'pending')
 
@@ -165,7 +168,7 @@ class TransactionManager:
             prev_fees.bump()
             fees = fees.max_with(prev_fees)
 
-        params: TxParams = {**tx_params, 'nonce': nonce, **fees.tx_params()}
+        params: TxParams = {**tx_params, 'nonce': nonce, **fees.tx_params}
         tx_hash = await tx_function.transact(params)
         self._nonce_to_tx_params[nonce] = params
         return tx_hash
