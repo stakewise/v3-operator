@@ -5,6 +5,7 @@ from math import ceil
 from hexbytes import HexBytes
 from web3 import Web3
 from web3.contract.async_contract import AsyncContractFunction
+from web3.exceptions import TimeExhausted
 from web3.types import Nonce, TxParams, TxReceipt, Wei
 
 from src.common.clients import execution_client
@@ -111,10 +112,14 @@ class TransactionManager:
         tx_function: AsyncContractFunction,
         tx_params: TxParams | None = None,
         high_priority: bool = False,
+        estimate_gas: bool = False,
     ) -> TxReceipt | None:
+        params: TxParams = dict(tx_params or {})  # type: ignore[assignment]
         # serialize submit + receipt wait so only one wallet tx is in flight at a time
         async with self._lock:
-            params: TxParams = dict(tx_params or {})  # type: ignore[assignment]
+            if estimate_gas:
+                # simulate the transaction before submitting it
+                await tx_function.estimate_gas(params)
             return await self._transact(tx_function, params, high_priority)
 
     async def _transact(
@@ -196,9 +201,16 @@ class TransactionManager:
     @staticmethod
     async def _wait_for_receipt(tx_hash: HexBytes) -> TxReceipt | None:
         logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx_hash))
-        tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
-            tx_hash, timeout=settings.execution_transaction_timeout
-        )
+        try:
+            tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
+                tx_hash, timeout=settings.execution_transaction_timeout
+            )
+        except TimeExhausted:
+            logger.info(
+                'Transaction %s is still pending, will replace it on the next run',
+                Web3.to_hex(tx_hash),
+            )
+            return None
         if not tx_receipt['status']:
             return None
         return tx_receipt

@@ -55,10 +55,14 @@ async def tx_register_validators(
         )
     )
 
-    # Simulate transaction
+    # Simulate (estimate_gas) and send transaction with high-priority fees.
     logger.info('Submitting registration transaction')
     try:
-        await vault_contract.functions.multicall(calls).estimate_gas()
+        tx_receipt = await tx_manager.transact(
+            vault_contract.functions.multicall(calls),
+            high_priority=True,
+            estimate_gas=True,
+        )
     except (ValueError, ContractLogicError) as e:
         logger.error(
             'Failed to register validator(s): %s. '
@@ -68,12 +72,6 @@ async def tx_register_validators(
         if settings.verbose:
             logger.exception(e)
         return None
-
-    # Send transaction with high-priority fees.
-    try:
-        tx_receipt = await tx_manager.transact(
-            vault_contract.functions.multicall(calls), high_priority=True
-        )
     except Exception as e:
         logger.error('Failed to register validator(s): %s', format_error(e))
         if settings.verbose:
