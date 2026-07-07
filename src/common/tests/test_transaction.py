@@ -311,11 +311,15 @@ class TestTransactionManager:
 @pytest.mark.parametrize(
     'message',
     [
-        'FeeTooLow',
+        # Nethermind (mainnet full pool / Gnosis min-priority)
         'FeeTooLowToCompete',
+        'FeeTooLow, EffectivePriorityFeePerGas too low 0 < 1, BaseFee: 1221551',
         'ReplacementNotAllowed',
+        # Geth / Reth / Besu
         'transaction underpriced',
         'replacement transaction underpriced',
+        # Erigon
+        'INTERNAL_ERROR: could not replace existing tx',
     ],
 )
 def test_is_fee_too_low_error_matches_fee_rejections(message):

@@ -263,14 +263,16 @@ def _skip_default_gas() -> bool:
 
 # Node rejection messages (lowercased substrings) that a fee bump can clear. The
 # node returns these as a Web3RPCError with the generic code -32000, so match on the
-# message rather than the code. Nethermind: `FeeTooLow`, `FeeTooLowToCompete`,
-# `ReplacementNotAllowed`; Geth/Besu: `transaction underpriced`, `replacement
-# transaction underpriced`, `fee too low`.
+# message rather than the code. Messages observed across execution clients:
+#   Nethermind:      `FeeTooLow`, `FeeTooLowToCompete`, `ReplacementNotAllowed`
+#   Geth/Reth/Besu:  `transaction underpriced`, `replacement transaction underpriced`
+#   Erigon:          `could not replace existing tx`
 _FEE_TOO_LOW_MESSAGES = (
     'feetoolow',
     'fee too low',
     'underpriced',
     'replacementnotallowed',
+    'could not replace',
 )
 
 
