@@ -5,10 +5,15 @@ from unittest import mock
 import pytest
 from hexbytes import HexBytes
 from web3 import Web3
-from web3.exceptions import TimeExhausted
+from web3.exceptions import TimeExhausted, Web3RPCError
 from web3.types import Wei
 
-from src.common.transaction import REPLACEMENT_GAS_BUMP, Fees, TransactionManager
+from src.common.transaction import (
+    REPLACEMENT_GAS_BUMP,
+    Fees,
+    TransactionManager,
+    _is_fee_too_low_error,
+)
 
 GWEI = Web3.to_wei(1, 'gwei')
 
@@ -133,7 +138,7 @@ class TestTransactionManager:
         assert 'maxPriorityFeePerGas' not in params
 
     async def test_default_gas_escalates_on_fee_too_low(self):
-        fee_too_low = ValueError({'code': -32010})
+        fee_too_low = _rpc_error('FeeTooLowToCompete')
         # every default-gas attempt is rejected, the final escalation succeeds
         transact = mock.AsyncMock(
             side_effect=[fee_too_low, fee_too_low, fee_too_low, HexBytes('0x02')]
@@ -170,6 +175,38 @@ class TestTransactionManager:
         assert params['nonce'] == 5  # same nonce, not 6
         assert params['maxFeePerGas'] == ceil(GWEI * REPLACEMENT_GAS_BUMP)
         assert params['maxPriorityFeePerGas'] == ceil((GWEI // 2) * REPLACEMENT_GAS_BUMP)
+
+    async def test_high_priority_records_fees_and_bumps_after_underpriced_rejection(self):
+        # after a restart there is no in-memory record, so the freshly built fees may
+        # not clear the stuck tx's replacement threshold and the node rejects them.
+        manager = TransactionManager()
+
+        rejected = mock.AsyncMock(side_effect=_rpc_error('ReplacementNotAllowed'))
+        with _patch(latest_nonce=5, pending_nonce=6, gas_manager=_gas_manager(GWEI, GWEI // 2)):
+            receipt = await manager.transact(_tx_function(rejected), high_priority=True)
+
+        # the rejection is swallowed and the attempted fees are recorded for nonce 5
+        assert receipt is None
+        rejected.assert_awaited_once()
+
+        # next run bumps from the recorded fees instead of resubmitting the same ones
+        accepted = mock.AsyncMock(return_value=HexBytes('0x02'))
+        with _patch(latest_nonce=5, pending_nonce=6, gas_manager=_gas_manager(GWEI, GWEI // 2)):
+            receipt = await manager.transact(_tx_function(accepted), high_priority=True)
+
+        assert receipt is not None
+        params = accepted.call_args.args[0]
+        assert params['nonce'] == 5
+        assert params['maxFeePerGas'] == ceil(GWEI * REPLACEMENT_GAS_BUMP)
+        assert params['maxPriorityFeePerGas'] == ceil((GWEI // 2) * REPLACEMENT_GAS_BUMP)
+
+    async def test_high_priority_reraises_non_fee_rpc_error(self):
+        # a rejection unrelated to fees (e.g. a revert) must not be swallowed
+        reverted = mock.AsyncMock(side_effect=_rpc_error('execution reverted', code=3))
+        with _patch(latest_nonce=5, pending_nonce=5, gas_manager=_gas_manager(GWEI, GWEI // 2)):
+            manager = TransactionManager()
+            with pytest.raises(Web3RPCError):
+                await manager.transact(_tx_function(reverted), high_priority=True)
 
     async def test_pending_skips_default_gas(self):
         # even without high_priority, a pending tx forces the high-priority path
@@ -269,6 +306,34 @@ class TestTransactionManager:
         params = transact.call_args.args[0]
         assert params['maxFeePerGas'] == cap
         assert params['maxPriorityFeePerGas'] <= params['maxFeePerGas']
+
+
+@pytest.mark.parametrize(
+    'message',
+    [
+        'FeeTooLow',
+        'FeeTooLowToCompete',
+        'ReplacementNotAllowed',
+        'transaction underpriced',
+        'replacement transaction underpriced',
+    ],
+)
+def test_is_fee_too_low_error_matches_fee_rejections(message):
+    assert _is_fee_too_low_error(_rpc_error(message)) is True
+
+
+@pytest.mark.parametrize(
+    'message',
+    ['execution reverted', 'nonce too low', 'insufficient funds for gas', 'AlreadyKnown'],
+)
+def test_is_fee_too_low_error_ignores_other_rejections(message):
+    assert _is_fee_too_low_error(_rpc_error(message)) is False
+
+
+def _rpc_error(message: str, code: int = -32000) -> Web3RPCError:
+    # mirrors what web3 7.x raises: args[0] is repr(error), the dict is in rpc_response
+    error = {'code': code, 'message': message}
+    return Web3RPCError(repr(error), rpc_response={'jsonrpc': '2.0', 'error': error, 'id': 1})
 
 
 def _gas_manager(max_fee: int, priority_fee: int) -> mock.Mock:

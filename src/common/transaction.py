@@ -5,7 +5,7 @@ from math import ceil
 from hexbytes import HexBytes
 from web3 import Web3
 from web3.contract.async_contract import AsyncContractFunction
-from web3.exceptions import TimeExhausted
+from web3.exceptions import TimeExhausted, Web3RPCError
 from web3.types import Nonce, TxParams, TxReceipt, Wei
 
 from src.common.clients import execution_client
@@ -201,7 +201,20 @@ class TransactionManager:
                 return None
 
         params: TxParams = {**tx_params, 'nonce': nonce, **fees.to_tx_params()}
-        tx_hash = await tx_function.transact(params)
+        try:
+            tx_hash = await tx_function.transact(params)
+        except Web3RPCError as e:
+            if not _is_fee_too_low_error(e):
+                raise
+            # This happens when we have no record to bump from (e.g. after a restart)
+            logger.warning(
+                'Transaction at nonce %d rejected as underpriced (%s); recorded its '
+                'fees and will bump them on the next run.',
+                nonce,
+                _rpc_error_message(e),
+            )
+            self._nonce_to_tx_params[nonce] = params
+            return None
         self._nonce_to_tx_params[nonce] = params
         return tx_hash
 
@@ -217,7 +230,7 @@ class TransactionManager:
         for i in range(ATTEMPTS_WITH_DEFAULT_GAS):
             try:
                 return await tx_function.transact(params)
-            except ValueError as e:
+            except Web3RPCError as e:
                 if not _is_fee_too_low_error(e):
                     raise
                 if i < ATTEMPTS_WITH_DEFAULT_GAS - 1:  # skip the last sleep
@@ -248,11 +261,32 @@ def _skip_default_gas() -> bool:
     return settings.network == HOODI and is_alchemy_used()
 
 
-def _is_fee_too_low_error(e: ValueError) -> bool:
-    code = None
-    if e.args and isinstance(e.args[0], dict):
-        code = e.args[0].get('code')
-    return code == -32010
+# Node rejection messages (lowercased substrings) that a fee bump can clear. The
+# node returns these as a Web3RPCError with the generic code -32000, so match on the
+# message rather than the code. Nethermind: `FeeTooLow`, `FeeTooLowToCompete`,
+# `ReplacementNotAllowed`; Geth/Besu: `transaction underpriced`, `replacement
+# transaction underpriced`, `fee too low`.
+_FEE_TOO_LOW_MESSAGES = (
+    'feetoolow',
+    'fee too low',
+    'underpriced',
+    'replacementnotallowed',
+)
+
+
+def _rpc_error_message(e: Web3RPCError) -> str:
+    rpc_response = getattr(e, 'rpc_response', None)
+    if isinstance(rpc_response, dict) and isinstance(rpc_response.get('error'), dict):
+        message = rpc_response['error'].get('message')
+        if message is not None:
+            return str(message)
+    # fall back to the exception's own string (args[0] is repr(error) in web3 7.x)
+    return str(e)
+
+
+def _is_fee_too_low_error(e: Web3RPCError) -> bool:
+    message = _rpc_error_message(e).lower()
+    return any(token in message for token in _FEE_TOO_LOW_MESSAGES)
 
 
 tx_manager = TransactionManager()
