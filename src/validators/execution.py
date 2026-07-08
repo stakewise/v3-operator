@@ -7,9 +7,8 @@ from web3 import Web3
 from web3.exceptions import ContractLogicError
 from web3.types import Wei
 
-from src.common.clients import execution_client
 from src.common.contracts import VaultContract, multicall_contract
-from src.common.execution import build_gas_manager, transaction_gas_wrapper
+from src.common.transaction import tx_manager
 from src.common.typings import HarvestParams, OraclesApproval
 from src.common.utils import format_error
 from src.config.settings import settings
@@ -56,10 +55,14 @@ async def tx_register_validators(
         )
     )
 
-    # Simulate transaction
+    # Simulate (estimate_gas) and send transaction with high-priority fees.
     logger.info('Submitting registration transaction')
     try:
-        await vault_contract.functions.multicall(calls).estimate_gas()
+        tx_receipt = await tx_manager.transact(
+            vault_contract.functions.multicall(calls),
+            high_priority=True,
+            estimate_gas=True,
+        )
     except (ValueError, ContractLogicError) as e:
         logger.error(
             'Failed to register validator(s): %s. '
@@ -69,29 +72,17 @@ async def tx_register_validators(
         if settings.verbose:
             logger.exception(e)
         return None
-
-    # Send transaction
-    try:
-        gas_manager = build_gas_manager()
-        tx_params = await gas_manager.get_high_priority_tx_params()
-        tx = await vault_contract.functions.multicall(calls).transact(tx_params)
     except Exception as e:
         logger.error('Failed to register validator(s): %s', format_error(e))
         if settings.verbose:
             logger.exception(e)
         return None
 
-    # Wait for transaction confirmation
-    tx_hash = Web3.to_hex(tx)
-    logger.info('Waiting for transaction %s confirmation', tx_hash)
-    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
-        tx, timeout=settings.execution_transaction_timeout
-    )
-    if not tx_receipt['status']:
+    if tx_receipt is None:
         logger.error('Registration transaction failed')
         return None
 
-    return tx_hash
+    return Web3.to_hex(tx_receipt['transactionHash'])
 
 
 async def tx_fund_validators(
@@ -119,23 +110,18 @@ async def tx_fund_validators(
     logger.info('Submitting fund validators transaction')
     try:
         tx_function = vault_contract.functions.multicall(calls)
-        tx = await transaction_gas_wrapper(tx_function)
+        tx_receipt = await tx_manager.transact(tx_function)
     except Exception as e:
         logger.error('Failed to fund validator(s): %s', format_error(e))
         if settings.verbose:
             logger.exception(e)
         return None
 
-    tx_hash = Web3.to_hex(tx)
-    logger.info('Waiting for transaction %s confirmation', tx_hash)
-    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
-        tx, timeout=settings.execution_transaction_timeout
-    )
-    if not tx_receipt['status']:
+    if tx_receipt is None:
         logger.error('Funding transaction failed')
         return None
 
-    return tx_hash
+    return Web3.to_hex(tx_receipt['transactionHash'])
 
 
 async def get_withdrawable_assets(harvest_params: HarvestParams | None) -> Wei:
@@ -173,16 +159,12 @@ async def tx_consolidate_validators(
             Web3.to_bytes(hexstr=validators_manager_signature),
             oracle_signatures,
         )
-        tx = await transaction_gas_wrapper(tx_function, tx_params={'value': tx_fee})
+        tx_receipt = await tx_manager.transact(tx_function, tx_params={'value': tx_fee})
     except Exception as e:
         logger.info('Failed to submit consolidate validators transaction: %s', format_error(e))
         return None
 
-    logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
-    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
-        tx, timeout=settings.execution_transaction_timeout
-    )
-    if not tx_receipt['status']:
+    if tx_receipt is None:
         logger.info('Consolidate validators transaction failed')
         return None
-    return Web3.to_hex(tx)
+    return Web3.to_hex(tx_receipt['transactionHash'])

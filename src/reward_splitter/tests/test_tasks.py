@@ -84,8 +84,8 @@ class TestClaimRewardSplittersForVault:
         ), mock.patch(
             'src.reward_splitter.tasks.graph_get_claimable_exit_requests'
         ) as exit_requests_mock, mock.patch(
-            'src.reward_splitter.tasks.transaction_gas_wrapper'
-        ) as gas_wrapper_mock, mock.patch(
+            'src.reward_splitter.tasks.tx_manager'
+        ) as tx_manager_mock, mock.patch(
             'src.reward_splitter.tasks.wallet', new=mock.MagicMock()
         ):
             await claim_reward_splitters_for_vault(
@@ -95,7 +95,7 @@ class TestClaimRewardSplittersForVault:
             )
 
         exit_requests_mock.assert_not_called()
-        gas_wrapper_mock.assert_not_called()
+        tx_manager_mock.transact.assert_not_called()
 
     async def test_submits_claim_transaction(self):
         # After building the calls the claim tx must be submitted and its receipt awaited.
@@ -110,17 +110,18 @@ class TestClaimRewardSplittersForVault:
             'src.reward_splitter.tasks.graph_get_claimable_exit_requests',
             return_value={},
         ), mock.patch(
-            'src.reward_splitter.tasks.transaction_gas_wrapper',
-            return_value=HexBytes(b'\x12' * 32),
-        ) as gas_wrapper_mock, mock.patch(
+            'src.reward_splitter.tasks.tx_manager'
+        ) as tx_manager_mock, mock.patch(
             'src.reward_splitter.tasks.RewardSplitterContract', new=mock.MagicMock()
         ), mock.patch(
-            'src.reward_splitter.tasks.execution_client'
-        ) as execution_client_mock, mock.patch(
             'src.reward_splitter.tasks.wallet', new=mock.MagicMock()
         ):
-            execution_client_mock.eth.wait_for_transaction_receipt = mock.AsyncMock(
-                return_value={'status': 1, 'blockNumber': Web3.to_int(123)}
+            tx_manager_mock.transact = mock.AsyncMock(
+                return_value={
+                    'status': 1,
+                    'transactionHash': HexBytes(b'\x12' * 32),
+                    'blockNumber': Web3.to_int(123),
+                }
             )
             await claim_reward_splitters_for_vault(
                 vault=ZERO_CHECKSUM_ADDRESS,
@@ -128,8 +129,7 @@ class TestClaimRewardSplittersForVault:
                 harvest_params=None,
             )
 
-        gas_wrapper_mock.assert_called_once()
-        execution_client_mock.eth.wait_for_transaction_receipt.assert_awaited_once()
+        tx_manager_mock.transact.assert_awaited_once()
 
 
 @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')

@@ -3,6 +3,7 @@ from unittest import mock
 
 import pytest
 from eth_typing import ChecksumAddress
+from hexbytes import HexBytes
 from sw_utils.tests import faker
 
 from src.config.settings import settings
@@ -109,14 +110,14 @@ class TestMetaVaultTreeUpdateStateCalls:
         ), mock.patch(
             'src.meta_vault.tasks.get_claimable_sub_vault_exit_requests', return_value=[]
         ), mock.patch.object(
-            multicall_contract, 'tx_aggregate', return_value='0x123'
-        ) as tx_aggregate_mock, mock.patch(
-            'src.meta_vault.tasks.execution_client', new=mock.AsyncMock()
-        ) as execution_client_mock:
-            execution_client_mock.eth.wait_for_transaction_receipt.return_value = {
+            multicall_contract,
+            'tx_aggregate',
+            return_value={
                 'status': 1,
+                'transactionHash': HexBytes(b'\x12' * 32),
                 'blockNumber': 123,
-            }
+            },
+        ) as tx_aggregate_mock:
             yield tx_aggregate_mock
 
 

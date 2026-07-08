@@ -14,10 +14,10 @@ from web3.contract.async_contract import (
     AsyncContractEvents,
     AsyncContractFunctions,
 )
-from web3.types import BlockNumber, ChecksumAddress, EventData, Wei
+from web3.types import BlockNumber, ChecksumAddress, EventData, TxReceipt, Wei
 
 from src.common.clients import execution_client as default_execution_client
-from src.common.execution import transaction_gas_wrapper
+from src.common.transaction import tx_manager
 from src.common.typings import (
     ExitQueueMissingAssetsParams,
     HarvestParams,
@@ -411,10 +411,9 @@ class MulticallContract(ContractWrapper):
     async def tx_aggregate(
         self,
         data: list[tuple[ChecksumAddress, HexStr]],
-    ) -> HexStr:
+    ) -> TxReceipt | None:
         tx_function = self.contract.functions.aggregate(data)
-        tx_hash = await transaction_gas_wrapper(tx_function)
-        return Web3.to_hex(tx_hash)
+        return await tx_manager.transact(tx_function)
 
 
 class ValidatorsCheckerContract(ContractWrapper):
