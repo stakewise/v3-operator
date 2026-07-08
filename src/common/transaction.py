@@ -161,10 +161,8 @@ class TransactionManager:
         elif high_priority or _skip_default_gas():
             tx_hash = await self._submit_high_priority(tx_function, tx_params, latest_nonce)
         else:
-            default_tx_hash = await self._submit_default_gas(tx_function, tx_params, latest_nonce)
-            if default_tx_hash is not None:
-                tx_hash = default_tx_hash
-            else:
+            tx_hash = await self._submit_default_gas(tx_function, tx_params, latest_nonce)
+            if tx_hash is None:
                 # default gas was not accepted - escalate to high priority fees
                 tx_hash = await self._submit_high_priority(tx_function, tx_params, latest_nonce)
 
