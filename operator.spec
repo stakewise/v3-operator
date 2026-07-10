@@ -1,13 +1,21 @@
 # -*- mode: python ; coding: utf-8 -*-
+from pathlib import Path
+
 from PyInstaller.utils.hooks import collect_data_files, copy_metadata
 from sys import platform
 
 datas = [
-    ('src/common/abi/*', 'src/common/abi/'),
     ('src/common/word_lists/*', 'src/common/word_lists/'),
     ('./pyproject.toml', '.'),
     ('./GIT_SHA', '.'),
 ]
+
+# Contract wrappers load their ABI relative to their own module (see
+# ContractWrapper._load_abi), so every module that ships an `abi/` directory
+# must be bundled. Collect them all automatically to avoid missing new modules.
+for abi_dir in sorted(Path('src').rglob('abi')):
+    if abi_dir.is_dir():
+        datas.append((abi_dir.as_posix(), abi_dir.as_posix()))
 
 datas += collect_data_files('certifi')
 datas += collect_data_files('coincurve')

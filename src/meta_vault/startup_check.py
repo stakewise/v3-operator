@@ -29,7 +29,7 @@ async def startup_checks(meta_vault_addresses: list[ChecksumAddress]) -> None:
     logger.info('Checking execution nodes network...')
     await check_execution_nodes_network()
 
-    logger.info('Checking graph nodes...')
+    logger.info('Checking graph nodes %s...', settings.graph_endpoint)
     await wait_for_graph_node_sync_to_chain_head()
 
     logger.info('Checking meta vault addresses %s...', ', '.join(meta_vault_addresses))
