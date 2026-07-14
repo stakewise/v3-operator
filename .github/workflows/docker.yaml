@@ -54,6 +54,23 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.platform }}
           cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
           no-cache-filters: production
+      - name: Load image locally for smoke test
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: .
+          load: true
+          tags: operator-smoke-test:ci
+          cache-from: type=gha,scope=${{ matrix.platform }}
+      - name: Smoke test Docker image
+        # Run the `init` command inside the container to verify it starts and the
+        # CLI is wired up correctly. `--no-verify` skips interactive mnemonic checks.
+        run: |
+          docker run --rm \
+            -e VAULT=0x0000000000000000000000000000000000000000 \
+            -e NETWORK=mainnet \
+            -e DATA_DIR=/tmp/stakewise \
+            operator-smoke-test:ci \
+            src/main.py init --language english --no-verify
       - name: Export digest
         run: |
           mkdir -p /tmp/digests
