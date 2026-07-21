@@ -21,7 +21,7 @@ async def submit_harvest_transaction(harvest_params: HarvestParams) -> HexStr | 
     try:
         tx_function = multicall_contract.functions.aggregate(calls)
         tx_receipt = await tx_manager.transact(tx_function)
-    except (ValueError, ContractLogicError) as e:
+    except ContractLogicError as e:
         logger.error('Failed to harvest: %s', format_error(e))
         if settings.verbose:
             logger.exception(e)

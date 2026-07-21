@@ -63,7 +63,7 @@ async def tx_register_validators(
             high_priority=True,
             estimate_gas=True,
         )
-    except (ValueError, ContractLogicError) as e:
+    except ContractLogicError as e:
         logger.error(
             'Failed to register validator(s): %s. '
             'Most likely registry root has changed during validators registration. Retrying...',
