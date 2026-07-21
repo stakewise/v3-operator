@@ -2,7 +2,7 @@ import logging
 
 from eth_typing import HexStr
 from web3 import Web3
-from web3.exceptions import ContractLogicError
+from web3.exceptions import Web3Exception
 
 from src.common.contracts import VaultContract
 from src.common.transaction import tx_manager
@@ -25,7 +25,7 @@ async def submit_harvest_transaction(harvest_params: HarvestParams) -> HexStr | 
             )
         )
         tx_receipt = await tx_manager.transact(tx_function)
-    except ContractLogicError as e:
+    except Web3Exception as e:
         logger.error('Failed to harvest: %s', format_error(e))
         if settings.verbose:
             logger.exception(e)
