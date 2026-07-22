@@ -1,5 +1,4 @@
 import logging
-from urllib.parse import urlparse
 
 from sw_utils import GasManager, InterruptHandler
 from web3 import Web3
@@ -9,12 +8,9 @@ from src.common.clients import execution_client
 from src.common.metrics import metrics
 from src.common.tasks import BaseTask
 from src.common.wallet import wallet
-from src.config.networks import HOODI
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
-
-ALCHEMY_DOMAIN = '.alchemy.com'
 
 
 class WalletTask(BaseTask):
@@ -48,10 +44,6 @@ async def get_wallet_balance() -> Wei:
 
 async def check_gas_price(high_priority: bool = False) -> bool:
     gas_manager = build_gas_manager()
-    # Alchemy does not support eth_maxPriorityFeePerGas for Hoodi, skip
-    if settings.network == HOODI and is_alchemy_used():
-        return True
-
     return await gas_manager.check_gas_price(high_priority)
 
 
@@ -64,14 +56,6 @@ def build_gas_manager() -> GasManager:
         priority_fee_percentile=settings.priority_fee_percentile,
         min_effective_priority_fee_per_gas=min_effective_priority_fee_per_gas,
     )
-
-
-def is_alchemy_used() -> bool:
-    for endpoint in settings.execution_endpoints:
-        domain = urlparse(endpoint).netloc
-        if domain.lower().endswith(ALCHEMY_DOMAIN):
-            return True
-    return False
 
 
 def fake_exponential(factor: int, numerator: int, denominator: int) -> int:
