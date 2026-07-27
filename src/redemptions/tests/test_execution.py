@@ -34,8 +34,7 @@ class TestTxRedeemPosition:
                 tree=make_tree([position]),
             )
         assert result is True
-        mocks['transaction_gas_wrapper'].assert_awaited_once()
-        mocks['client'].eth.wait_for_transaction_receipt.assert_awaited_once()
+        mocks['tx_manager'].transact.assert_awaited_once()
         mocks['wait_for_execution_endpoints_synced'].assert_awaited_once_with(BlockNumber(456))
 
     async def test_tx_status_zero_returns_false(self) -> None:
@@ -60,8 +59,8 @@ class TestTxRedeemPosition:
                 tree=make_tree([position]),
             )
         assert result is False
-        # Receipt is never awaited when the build step raised
-        mocks['client'].eth.wait_for_transaction_receipt.assert_not_awaited()
+        # No sync barrier when the tx build/send step raised
+        mocks['wait_for_execution_endpoints_synced'].assert_not_awaited()
 
     async def test_unexpected_exception_propagates(self) -> None:
         """Exceptions outside the (Web3Exception, RuntimeError, ValueError) catch list propagate."""
@@ -100,17 +99,19 @@ class TestSimulateRedeemPosition:
 class TestTxProcessExitQueue:
     @pytest.mark.parametrize('tx_status', [1, 0])
     async def test_process_exit_queue(self, tx_status: int) -> None:
-        mock_client = AsyncMock()
-        mock_client.eth.wait_for_transaction_receipt = AsyncMock(return_value={'status': tx_status})
+        """Calls processExitQueue() and submits it via tx_manager, regardless of
+        whether the tx confirms (``tx_status=1``) or fails (``tx_status=0``,
+        represented as ``tx_manager.transact`` returning ``None``)."""
+        tx_receipt = {'status': 1, 'transactionHash': HexBytes(b'\xab' * 32)} if tx_status else None
+        mock_tx_manager = MagicMock()
+        mock_tx_manager.transact = AsyncMock(return_value=tx_receipt)
         with (
             patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
-            patch(f'{MODULE}.execution_client', new=mock_client),
-            patch(f'{MODULE}.settings') as mock_settings,
+            patch(f'{MODULE}.tx_manager', new=mock_tx_manager),
         ):
-            mock_settings.execution_transaction_timeout = 120
-            mock_redeemer.process_exit_queue = AsyncMock(return_value='0xabc')
             await tx_process_exit_queue()
-            mock_redeemer.process_exit_queue.assert_called_once()
+            mock_redeemer.contract.functions.processExitQueue.assert_called_once()
+            mock_tx_manager.transact.assert_awaited_once()
 
 
 class TestUpdateVaultsState:
@@ -159,20 +160,19 @@ def _mock_update_vaults_state(
     tx_status: int = 1,
     chunk_size: int | None = None,
 ) -> Iterator[dict[str, AsyncMock]]:
-    """Mock setup for update_vaults_state tests. VaultContract, harvest params,
-    the multicall contract and the execution client are all stubbed so only the
-    orchestration logic is exercised. ``harvest_params=None`` models a vault that
-    can_harvest filtered out. ``chunk_size`` overrides MULTICALL_CHUNK_SIZE."""
+    """Mock setup for update_vaults_state tests. VaultContract, harvest params and
+    the multicall contract are all stubbed so only the orchestration logic is
+    exercised. ``harvest_params=None`` models a vault that can_harvest filtered
+    out. ``tx_status=0`` models a failed multicall tx, i.e. ``tx_aggregate``
+    returning no receipt. ``chunk_size`` overrides MULTICALL_CHUNK_SIZE."""
     vault_contract = MagicMock()
     vault_contract.contract_address = VAULT_1
     vault_contract.get_update_state_call = MagicMock(return_value='0xdeadbeef')
 
-    tx_aggregate = AsyncMock(return_value='0x' + 'ab' * 32)
+    tx_receipt = {'status': 1, 'transactionHash': HexBytes(b'\xab' * 32)} if tx_status else None
+    tx_aggregate = AsyncMock(return_value=tx_receipt)
     mock_multicall = MagicMock()
     mock_multicall.tx_aggregate = tx_aggregate
-
-    mock_client = MagicMock()
-    mock_client.eth.wait_for_transaction_receipt = AsyncMock(return_value={'status': tx_status})
 
     def harvest_params_for(vaults: list, _block: BlockNumber | None = None) -> dict:
         return {vault: harvest_params for vault in vaults}
@@ -185,11 +185,8 @@ def _mock_update_vaults_state(
             new=AsyncMock(side_effect=harvest_params_for),
         ),
         patch(f'{MODULE}.multicall_contract', new=mock_multicall),
-        patch(f'{MODULE}.execution_client', new=mock_client),
         patch(f'{MODULE}.MULTICALL_CHUNK_SIZE', new=chunk_size if chunk_size is not None else 20),
-        patch(f'{MODULE}.settings') as mock_settings,
     ):
-        mock_settings.execution_transaction_timeout = 60
         yield {'tx_aggregate': tx_aggregate}
 
 
@@ -200,34 +197,36 @@ def _mock_tx_redeem_position(
 ) -> Iterator[dict[str, MagicMock]]:
     """Mock setup for tx_redeem_position tests.
 
-    ``send_exception`` makes ``transaction_gas_wrapper`` raise; otherwise it returns
-    a fake tx that resolves to a receipt with the given ``tx_status``.
+    ``send_exception`` makes ``tx_manager.transact`` raise; otherwise it returns a
+    receipt with the given ``tx_status``, or ``None`` when ``tx_status`` is 0
+    (mirrors ``TransactionManager`` returning no receipt for a reverted tx).
     """
-    tx = HexBytes(b'\xab' * 32)
-    mock_client = AsyncMock()
-    mock_client.eth.wait_for_transaction_receipt = AsyncMock(
-        return_value={'status': tx_status, 'blockNumber': BlockNumber(456)},
+    tx_receipt = (
+        {
+            'status': tx_status,
+            'blockNumber': BlockNumber(456),
+            'transactionHash': HexBytes(b'\xab' * 32),
+        }
+        if tx_status
+        else None
     )
 
+    mock_tx_manager = MagicMock()
     if send_exception is not None:
-        gas_wrapper = AsyncMock(side_effect=send_exception)
+        mock_tx_manager.transact = AsyncMock(side_effect=send_exception)
     else:
-        gas_wrapper = AsyncMock(return_value=tx)
+        mock_tx_manager.transact = AsyncMock(return_value=tx_receipt)
 
     synced_mock = AsyncMock()
     with (
         patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
-        patch(f'{MODULE}.transaction_gas_wrapper', new=gas_wrapper),
-        patch(f'{MODULE}.execution_client', new=mock_client),
+        patch(f'{MODULE}.tx_manager', new=mock_tx_manager),
         patch(f'{MODULE}.wait_for_execution_endpoints_synced', new=synced_mock),
-        patch(f'{MODULE}.settings') as mock_settings,
     ):
-        mock_settings.execution_transaction_timeout = 120
         mock_redeemer.contract.functions.redeemOsTokenPositions = MagicMock()
         yield {
             'redeemer': mock_redeemer,
-            'transaction_gas_wrapper': gas_wrapper,
-            'client': mock_client,
+            'tx_manager': mock_tx_manager,
             'wait_for_execution_endpoints_synced': synced_mock,
         }
 
