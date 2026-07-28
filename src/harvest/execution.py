@@ -27,8 +27,6 @@ async def submit_harvest_transaction(harvest_params: HarvestParams) -> HexStr | 
     except ContractCustomError as e:
         reason = vault_contract.decode_custom_error(str(e.data)) or e.data
         logger.error('Failed to harvest: execution reverted with %s', reason)
-        if settings.verbose:
-            logger.exception(e)
         return None
 
     if tx_receipt is None:

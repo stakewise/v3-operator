@@ -31,8 +31,6 @@ async def submit_exit_signatures(
     except ContractCustomError as e:
         reason = keeper_contract.decode_custom_error(str(e.data)) or e.data
         logger.error('Failed to update exit signatures: execution reverted with %s', reason)
-        if settings.verbose:
-            logger.exception(e)
         return None
     except Exception as e:
         logger.error('Failed to update exit signatures: %s', format_error(e))

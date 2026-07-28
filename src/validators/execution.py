@@ -69,8 +69,6 @@ async def tx_register_validators(
             'Most likely registry root has changed during validators registration. Retrying...',
             vault_contract.decode_custom_error(str(e.data)) or e.data,
         )
-        if settings.verbose:
-            logger.exception(e)
         return None
     except Exception as e:
         logger.error('Failed to register validator(s): %s', format_error(e))
@@ -114,8 +112,6 @@ async def tx_fund_validators(
     except ContractCustomError as e:
         reason = vault_contract.decode_custom_error(str(e.data)) or e.data
         logger.error('Failed to fund validator(s): execution reverted with %s', reason)
-        if settings.verbose:
-            logger.exception(e)
         return None
     except Exception as e:
         logger.error('Failed to fund validator(s): %s', format_error(e))
