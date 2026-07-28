@@ -2,12 +2,11 @@ import logging
 
 from eth_typing import HexStr
 from web3 import Web3
-from web3.exceptions import Web3Exception
+from web3.exceptions import ContractCustomError
 
 from src.common.contracts import VaultContract
 from src.common.transaction import tx_manager
 from src.common.typings import HarvestParams
-from src.common.utils import format_error
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -25,8 +24,9 @@ async def submit_harvest_transaction(harvest_params: HarvestParams) -> HexStr | 
             )
         )
         tx_receipt = await tx_manager.transact(tx_function)
-    except Web3Exception as e:
-        logger.error('Failed to harvest: %s', format_error(e))
+    except ContractCustomError as e:
+        reason = vault_contract.decode_custom_error(str(e.data)) or e.data
+        logger.error('Failed to harvest: execution reverted with %s', reason)
         if settings.verbose:
             logger.exception(e)
         return None
