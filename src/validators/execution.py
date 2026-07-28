@@ -4,7 +4,7 @@ from typing import Sequence
 from eth_typing import HexStr
 from sw_utils.typings import Bytes32
 from web3 import Web3
-from web3.exceptions import ContractCustomError, ContractLogicError
+from web3.exceptions import ContractCustomError
 from web3.types import Wei
 
 from src.common.contracts import VaultContract, multicall_contract
@@ -63,11 +63,11 @@ async def tx_register_validators(
             high_priority=True,
             estimate_gas=True,
         )
-    except ContractLogicError as e:
+    except ContractCustomError as e:
         logger.error(
-            'Failed to register validator(s): %s. '
+            'Failed to register validator(s): execution reverted with %s. '
             'Most likely registry root has changed during validators registration. Retrying...',
-            format_error(e),
+            vault_contract.decode_custom_error(str(e.data)) or e.data,
         )
         if settings.verbose:
             logger.exception(e)
