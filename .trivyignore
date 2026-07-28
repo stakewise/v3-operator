@@ -1,0 +1,5 @@
+# pyo3 0.16.6 via milagro_bls_binding Cargo.lock.
+# GHSA-36hh-v3qg-5jq4 (out-of-bounds read in nth/nth_back) was introduced
+# in pyo3 0.24.0; 0.16.6 predates the vulnerable code. Trivy flags it only
+# because the advisory range is "< 0.29.0" with no lower bound.
+GHSA-36hh-v3qg-5jq4

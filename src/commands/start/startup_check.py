@@ -11,6 +11,7 @@ from src.common.startup_check import (
     check_execution_nodes_network,
     check_ipfs_endpoints,
     check_metrics_port,
+    check_operator_version,
     check_relayer_endpoint,
     check_validators_manager,
     check_vault_address,
@@ -34,6 +35,9 @@ logger = logging.getLogger(__name__)
 # pylint: disable-next=too-many-statements
 async def startup_checks() -> None:
     validate_settings()
+
+    logger.info('Checking for newer operator version...')
+    await check_operator_version()
 
     logger.info('Checking connection to database...')
     db_client.create_db_dir()
@@ -62,7 +66,7 @@ async def startup_checks() -> None:
     await wait_execution_catch_up_consensus(chain_state)
 
     if settings.claim_fee_splitter:
-        logger.info('Checking graph nodes...')
+        logger.info('Checking graph nodes %s...', settings.graph_endpoint)
         await wait_for_graph_node_sync_to_chain_head()
 
     logger.info('Checking oracles config...')
@@ -88,7 +92,7 @@ async def startup_checks() -> None:
     await check_vault_version()
 
     if settings.enable_metrics:
-        logger.info('Checking metrics server...')
+        logger.info('Checking whether metrics port is available...')
         check_metrics_port()
 
     if (

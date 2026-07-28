@@ -4,9 +4,8 @@ from eth_typing import HexStr
 from web3 import Web3
 from web3.types import Gwei, Wei
 
-from src.common.clients import execution_client
 from src.common.contracts import VaultContract
-from src.common.execution import transaction_gas_wrapper
+from src.common.transaction import tx_manager
 from src.common.utils import format_error
 from src.config.settings import settings
 
@@ -26,19 +25,15 @@ async def submit_withdraw_validators(
             _encode_withdrawals(withdrawals),
             Web3.to_bytes(hexstr=validators_manager_signature),
         )
-        tx = await transaction_gas_wrapper(tx_function, tx_params={'value': tx_fee})
+        tx_receipt = await tx_manager.transact(tx_function, tx_params={'value': tx_fee})
     except Exception as e:
         logger.info('Failed to withdraw from validators: %s', format_error(e))
         return None
 
-    logger.info('Waiting for transaction %s confirmation', Web3.to_hex(tx))
-    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
-        tx, timeout=settings.execution_transaction_timeout
-    )
-    if not tx_receipt['status']:
+    if tx_receipt is None:
         logger.info('Withdraw validators transaction failed')
         return None
-    return Web3.to_hex(tx)
+    return Web3.to_hex(tx_receipt['transactionHash'])
 
 
 def _encode_withdrawals(withdrawals: dict[HexStr, Gwei]) -> bytes:

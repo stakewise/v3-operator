@@ -21,6 +21,7 @@ from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
+# Set an explicit user agent so Operator requests are easy to spot in EL/CL node logs
 OPERATOR_USER_AGENT = f'StakeWise Operator {src.__version__}'
 
 

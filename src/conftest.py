@@ -20,7 +20,6 @@ from sw_utils.typings import Oracle, ProtocolConfig
 
 from src.commands.create_keys import create_keys
 from src.commands.create_wallet import create_wallet
-from src.commands.setup_remote_signer import setup_remote_signer
 from src.common.clients import (
     ExecutionClient,
     execution_client,
@@ -31,6 +30,7 @@ from src.common.credentials import CredentialManager
 from src.config.config import OperatorConfig
 from src.config.networks import HOODI, NETWORKS
 from src.config.settings import settings
+from src.validators.commands.setup_remote_signer import setup_remote_signer
 from src.validators.keystores.remote import RemoteSignerKeystore
 from src.validators.keystores.tests.test_fixtures.hashi_vault import (
     hashi_vault_url,

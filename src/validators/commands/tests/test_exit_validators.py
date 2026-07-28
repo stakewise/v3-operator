@@ -6,8 +6,8 @@ import pytest
 from click.testing import CliRunner
 from sw_utils import ValidatorStatus
 
-from src.commands.exit_validators import exit_validators
 from src.common.tests.factories import create_chain_head
+from src.validators.commands.exit_validators import exit_validators
 from src.validators.tests.factories import create_consensus_validator
 
 DEFAULT_ACTIVATION_EPOCH = 10000
@@ -17,7 +17,7 @@ WITHDRAWAL_REQUEST_FEE = 2
 @pytest.fixture
 def _patch_check_vault_version() -> Generator:
     with mock.patch(
-        'src.commands.exit_validators.check_vault_version',
+        'src.validators.commands.exit_validators.check_vault_version',
         return_value=None,
     ):
         yield
@@ -26,7 +26,7 @@ def _patch_check_vault_version() -> Generator:
 @pytest.fixture
 def _patch_check_validators_manager() -> Generator:
     with mock.patch(
-        'src.commands.exit_validators.check_validators_manager',
+        'src.validators.commands.exit_validators.check_validators_manager',
         return_value=None,
     ):
         yield
@@ -35,7 +35,7 @@ def _patch_check_validators_manager() -> Generator:
 @pytest.fixture
 def _patch_get_withdrawal_request_fee() -> Generator:
     with mock.patch(
-        'src.commands.exit_validators.get_withdrawal_request_fee',
+        'src.validators.commands.exit_validators.get_withdrawal_request_fee',
         return_value=WITHDRAWAL_REQUEST_FEE,
     ):
         yield
@@ -44,7 +44,7 @@ def _patch_get_withdrawal_request_fee() -> Generator:
 @pytest.fixture
 def _patch_submit_withdraw_validators() -> Generator:
     with mock.patch(
-        'src.commands.exit_validators.submit_withdraw_validators',
+        'src.validators.commands.exit_validators.submit_withdraw_validators',
         return_value=None,
     ):
         yield
@@ -53,7 +53,7 @@ def _patch_submit_withdraw_validators() -> Generator:
 @pytest.fixture
 def _patch_get_chain_justified_head() -> Generator:
     with mock.patch(
-        'src.commands.exit_validators.get_chain_justified_head',
+        'src.validators.commands.exit_validators.get_chain_justified_head',
         return_value=create_chain_head(epoch=DEFAULT_ACTIVATION_EPOCH),
     ):
         yield
@@ -94,15 +94,15 @@ class TestValidatorsExit:
         public_keys = [val.public_key for val in consensus_validators]
         with (
             mock.patch(
-                'src.commands.exit_validators.VaultContract.get_registered_validators_public_keys',
+                'src.validators.commands.exit_validators.VaultContract.get_registered_validators_public_keys',
                 return_value=public_keys,
             ),
             mock.patch(
-                'src.commands.exit_validators.fetch_consensus_validators',
+                'src.validators.commands.exit_validators.fetch_consensus_validators',
                 return_value=consensus_validators,
             ),
             mock.patch(
-                'src.commands.exit_validators.submit_withdraw_validators',
+                'src.validators.commands.exit_validators.submit_withdraw_validators',
                 return_value='0x12345',  # tx hash
             ) as submit_withdraw_validators,
         ):
@@ -145,15 +145,15 @@ class TestValidatorsExit:
 
         with (
             mock.patch(
-                'src.commands.exit_validators.VaultContract.get_registered_validators_public_keys',
+                'src.validators.commands.exit_validators.VaultContract.get_registered_validators_public_keys',
                 return_value=public_keys,
             ),
             mock.patch(
-                'src.commands.exit_validators.fetch_consensus_validators',
+                'src.validators.commands.exit_validators.fetch_consensus_validators',
                 return_value=consensus_validators,
             ),
             mock.patch(
-                'src.commands.exit_validators.submit_withdraw_validators',
+                'src.validators.commands.exit_validators.submit_withdraw_validators',
                 return_value='0x12345',  # tx hash
             ) as submit_withdraw_validators,
         ):
@@ -197,15 +197,15 @@ class TestValidatorsExit:
         ]
         with (
             mock.patch(
-                'src.commands.exit_validators.VaultContract.get_registered_validators_public_keys',
+                'src.validators.commands.exit_validators.VaultContract.get_registered_validators_public_keys',
                 return_value=[validator.public_key for validator in consensus_validators],
             ),
             mock.patch(
-                'src.commands.exit_validators.fetch_consensus_validators',
+                'src.validators.commands.exit_validators.fetch_consensus_validators',
                 return_value=consensus_validators,
             ),
             mock.patch(
-                'src.commands.exit_validators.submit_withdraw_validators',
+                'src.validators.commands.exit_validators.submit_withdraw_validators',
                 return_value=None,
             ) as submit_withdraw_validators,
         ):
