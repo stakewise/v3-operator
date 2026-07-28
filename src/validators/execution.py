@@ -166,6 +166,13 @@ async def tx_consolidate_validators(
             oracle_signatures,
         )
         tx_receipt = await tx_manager.transact(tx_function, tx_params={'value': tx_fee})
+    except ContractCustomError as e:
+        reason = vault_contract.decode_custom_error(str(e.data)) or e.data
+        logger.info(
+            'Failed to submit consolidate validators transaction: execution reverted with %s',
+            reason,
+        )
+        return None
     except Exception as e:
         logger.info('Failed to submit consolidate validators transaction: %s', format_error(e))
         return None

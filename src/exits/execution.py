@@ -2,6 +2,7 @@ import logging
 
 from eth_typing import ChecksumAddress, HexStr
 from web3 import Web3
+from web3.exceptions import ContractCustomError
 
 from src.common.contracts import keeper_contract
 from src.common.transaction import tx_manager
@@ -27,6 +28,12 @@ async def submit_exit_signatures(
         )
         tx_receipt = await tx_manager.transact(tx_function)
 
+    except ContractCustomError as e:
+        reason = keeper_contract.decode_custom_error(str(e.data)) or e.data
+        logger.error('Failed to update exit signatures: execution reverted with %s', reason)
+        if settings.verbose:
+            logger.exception(e)
+        return None
     except Exception as e:
         logger.error('Failed to update exit signatures: %s', format_error(e))
 

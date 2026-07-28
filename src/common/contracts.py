@@ -374,7 +374,7 @@ class ValidatorsRegistryContract(ContractWrapper):
         return Web3.to_hex(deposit_root)
 
 
-class KeeperContract(ContractWrapper):
+class KeeperContract(ContractWrapper, ErrorMixin):
     abi_path = 'abi/IKeeper.json'
     settings_key = 'KEEPER_CONTRACT_ADDRESS'
 
@@ -433,7 +433,7 @@ class KeeperContract(ContractWrapper):
         )
 
 
-class RewardSplitterContract(ContractWrapper):
+class RewardSplitterContract(ContractWrapper, ErrorMixin):
     abi_path = 'abi/IRewardSplitter.json'
 
 
