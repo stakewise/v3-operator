@@ -12,6 +12,7 @@ from eth_utils import (
     abi_to_signature,
     filter_abi_by_type,
     function_signature_to_4byte_selector,
+    remove_0x_prefix,
 )
 from web3 import AsyncWeb3, Web3
 from web3.contract import AsyncContract
@@ -175,7 +176,7 @@ class ErrorMixin:
         ``eth_call`` and against the contract's own ABI, so we call this
         explicitly on the transact path and against the merged ``error_abi``.
         """
-        hex_data = data[2:] if data.startswith('0x') else data
+        hex_data = remove_0x_prefix(HexStr(data.lower()))
         if len(hex_data) < 8:
             return None
 
