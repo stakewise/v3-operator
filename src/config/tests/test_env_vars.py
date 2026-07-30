@@ -11,7 +11,7 @@ class TestEnvVars:
 
         undocumented = [var.name for var in get_env_vars() if not var.description]
         assert not undocumented, (
-            f'Environment variables without a description: {", ".join(undocumented)}. '
+            f'Environment variables without a description: {', '.join(undocumented)}. '
             f'Pass group= and description= to decouple_config so that they show up '
             f'in the env-vars command.'
         )
@@ -20,7 +20,7 @@ class TestEnvVars:
         runner.invoke(env_vars, [])
 
         ungrouped = [var.name for var in get_env_vars() if var.group == 'Other']
-        assert not ungrouped, f'Environment variables without a group: {", ".join(ungrouped)}'
+        assert not ungrouped, f'Environment variables without a group: {', '.join(ungrouped)}'
 
     def test_text_output(self, runner: CliRunner) -> None:
         result = runner.invoke(env_vars, [])

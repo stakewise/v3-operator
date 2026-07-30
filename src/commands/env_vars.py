@@ -53,7 +53,7 @@ def _print_text(variables: list[EnvVar]) -> None:
     for group, group_vars in _grouped(variables):
         click.secho(f'\n{group}', bold=True)
         for var in group_vars:
-            click.echo(f'  {click.style(var.name, fg="green")} ({var.type_name})')
+            click.echo(f'  {click.style(var.name, fg='green')} ({var.type_name})')
             if var.description:
                 click.echo(f'    {var.description}')
             click.echo(f'    Default: {var.formatted_default}')
