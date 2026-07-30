@@ -713,9 +713,47 @@ async def test_get_withdrawals(data_dir):
         pending_deposits={'0x1': ether_to_gwei(1800)},
     )
     # only the plain validator ('0x2') is exited; '0x1' with the huge pending
-    # deposit is left untouched, and queued_assets accounting only ever
-    # subtracts the validator's current CL balance, not balance + pending deposits
+    # deposit sorts last and is left untouched
     expected = {'0x2': ether_to_gwei(0)}
+    assert result == expected
+
+    # queued_assets accounting subtracts a validator's real CL balance, not
+    # balance + pending deposits: if the pending deposit were wrongly counted
+    # as already-recovered assets, exiting '0x1' would look sufficient and
+    # '0x2' would never be exited
+    chain_head = create_chain_head(epoch=500)
+    queued_assets = ether_to_gwei(12)
+    consensus_validators = [
+        create_consensus_validator(
+            public_key='0x1',
+            balance=ether_to_gwei(10),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=90,
+            index=1,
+        ),
+        create_consensus_validator(
+            public_key='0x2',
+            balance=ether_to_gwei(50),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=85,
+            index=2,
+            is_compounding=False,
+        ),
+    ]
+    result = await _get_withdrawals(
+        chain_head=chain_head,
+        queued_assets=queued_assets,
+        consensus_validators=consensus_validators,
+        pending_partial_withdrawals=[],
+        validator_min_active_epochs=10,
+        oracle_exit_indexes=set(),
+        consolidation_target_indexes=set(),
+        pending_deposits={'0x1': ether_to_gwei(5)},
+    )
+    # '0x1' sorts first (10 + 5 = 15 ETH effective, versus '0x2' at 50 ETH), but only
+    # its real 10 ETH balance is subtracted from queued_assets, leaving 2 ETH still
+    # needed and forcing '0x2' to be exited too
+    expected = {'0x1': ether_to_gwei(0), '0x2': ether_to_gwei(0)}
     assert result == expected
 
     # zero queued assets
