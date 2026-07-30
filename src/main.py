@@ -7,6 +7,7 @@ import click
 import src
 from src.commands.create_keys import create_keys
 from src.commands.create_wallet import create_wallet
+from src.commands.env_vars import env_vars
 from src.commands.init import init
 from src.commands.recover import recover
 from src.commands.start.hashi_vault import start_hashi_vault
@@ -54,6 +55,7 @@ cli.add_command(submit_rated_network)
 cli.add_command(node_install)
 cli.add_command(node_start)
 cli.add_command(node_status)
+cli.add_command(env_vars)
 
 
 if __name__ == '__main__':
