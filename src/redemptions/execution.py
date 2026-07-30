@@ -2,19 +2,15 @@ import logging
 from itertools import batched
 
 from eth_typing import ChecksumAddress, HexStr
-from hexbytes import HexBytes
 from web3 import Web3
 from web3.contract.async_contract import AsyncContractFunction
 from web3.exceptions import Web3Exception
 
-from src.common.clients import execution_client
 from src.common.contracts import VaultContract, multicall_contract
-from src.common.execution import (
-    transaction_gas_wrapper,
-    wait_for_execution_endpoints_synced,
-)
+from src.common.execution import wait_for_execution_endpoints_synced
 from src.common.harvest import get_multiple_harvest_params
-from src.config.settings import MULTICALL_CHUNK_SIZE, settings
+from src.common.transaction import tx_manager
+from src.config.settings import MULTICALL_CHUNK_SIZE
 from src.meta_vault.service import is_meta_vault
 from src.redemptions.contracts import os_token_redeemer_contract
 from src.redemptions.merkle_tree import PositionsMerkleTree
@@ -71,27 +67,26 @@ async def update_vaults_state(
 
 async def tx_update_vaults_state(calls: list[tuple[ChecksumAddress, HexStr]]) -> None:
     """Submit a single updateState multicall and wait for its receipt."""
-    tx_hash = await multicall_contract.tx_aggregate(calls)
-    logger.info('Waiting for updateState multicall tx %s confirmation', tx_hash)
-    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
-        HexBytes(Web3.to_bytes(hexstr=tx_hash)), timeout=settings.execution_transaction_timeout
-    )
-    if not tx_receipt['status']:
-        raise RuntimeError(f'updateState multicall tx failed. Tx Hash: {tx_hash}')
+
+    tx_receipt = await multicall_contract.tx_aggregate(calls)
+    if tx_receipt is None:
+        raise RuntimeError('updateState multicall tx failed.')
+
+    tx_hash = Web3.to_hex(tx_receipt['transactionHash'])
     logger.info('updateState multicall confirmed. Tx Hash: %s', tx_hash)
 
 
 async def tx_process_exit_queue() -> None:
     """Call processExitQueue() on the redeemer contract."""
-    tx_hash = await os_token_redeemer_contract.process_exit_queue()
-    logger.info('Waiting for processExitQueue transaction %s confirmation', tx_hash)
-    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
-        tx_hash, timeout=settings.execution_transaction_timeout
-    )
-    if not tx_receipt['status']:
-        logger.error('processExitQueue transaction failed. Tx Hash: %s', tx_hash)
-    else:
-        logger.info('processExitQueue confirmed. Tx Hash: %s', tx_hash)
+    tx_function = os_token_redeemer_contract.contract.functions.processExitQueue()
+    tx_receipt = await tx_manager.transact(tx_function)
+
+    if tx_receipt is None:
+        logger.error('processExitQueue transaction failed.')
+        return
+
+    tx_hash = Web3.to_hex(tx_receipt['transactionHash'])
+    logger.info('processExitQueue confirmed. Tx Hash: %s', tx_hash)
 
 
 async def simulate_redeem_position(
@@ -134,7 +129,7 @@ async def tx_redeem_position(
     tx_function = _build_redeem_tx_function(position, tree)
 
     try:
-        tx = await transaction_gas_wrapper(tx_function=tx_function)
+        tx_receipt = await tx_manager.transact(tx_function)
     except (Web3Exception, RuntimeError, ValueError):
         logger.exception(
             'Failed to redeem position (vault %s, owner %s)',
@@ -143,25 +138,15 @@ async def tx_redeem_position(
         )
         return False
 
-    tx_hash = Web3.to_hex(tx)
-    logger.info(
-        'Waiting for redeemOsTokenPositions tx %s (vault %s, owner %s) confirmation',
-        tx_hash,
-        position.vault,
-        position.owner,
-    )
-    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
-        tx, timeout=settings.execution_transaction_timeout
-    )
-    if not tx_receipt['status']:
+    if tx_receipt is None:
         logger.error(
-            'Failed to redeem position (vault %s, owner %s). Tx Hash: %s',
+            'Failed to redeem position (vault %s, owner %s).',
             position.vault,
             position.owner,
-            tx_hash,
         )
         return False
 
+    tx_hash = Web3.to_hex(tx_receipt['transactionHash'])
     logger.info(
         'Redeemed %s shares for position (vault %s, owner %s). Tx Hash: %s',
         position.shares_to_redeem,

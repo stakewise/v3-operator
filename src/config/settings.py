@@ -334,7 +334,7 @@ class Settings(metaclass=Singleton):
         self.concurrency = concurrency
         self.execution_timeout = decouple_config('EXECUTION_TIMEOUT', default=30, cast=int)
         self.execution_transaction_timeout = decouple_config(
-            'EXECUTION_TRANSACTION_TIMEOUT', default=300, cast=int
+            'EXECUTION_TRANSACTION_TIMEOUT', default=60, cast=int
         )
         self.execution_retry_timeout = decouple_config(
             'EXECUTION_RETRY_TIMEOUT', default=60, cast=int
