@@ -280,7 +280,9 @@ async def _redeem_os_token_positions(
         # Bring vaults up to date on-chain so withdrawable assets and position LTV
         # are computed from fresh state rather than skipping unharvested vaults.
         vaults = list({position.vault for position in os_token_positions})
-        await update_vaults_state(vaults=vaults)
+        if not await update_vaults_state(vaults=vaults):
+            logger.error('Some vaults were left with stale state. Skipping to next interval.')
+            return
 
         # Re-fetch the block number so the freshly-updated state is visible downstream.
         block_number = await execution_client.eth.block_number

@@ -297,6 +297,21 @@ class TestProcess:
         # The merkle tree is built from the fetched nonce; leaves use nonce - 1 internally
         assert redeem_call.kwargs['tree'].nonce == 5
 
+    async def test_stale_vault_state_skips_redemption(self) -> None:
+        """A failed vault state update leaves stale withdrawable assets and LTVs,
+        so the redemption pass is skipped until the next interval."""
+        positions = [make_position(leaf_shares=1000, processed_shares=500, shares_to_redeem=500)]
+
+        with _mock_process(positions=positions) as mocks:
+            mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
+            mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
+            mocks['mock_update_state'].return_value = False
+
+            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(0))
+
+        mocks['mock_update_state'].assert_awaited_once()
+        mocks['mock_redeem'].assert_not_awaited()
+
 
 # --- Helpers ---
 
@@ -416,7 +431,7 @@ def _mock_process(
         ) as mock_redeem,
         patch(
             f'{MODULE}.update_vaults_state',
-            new=AsyncMock(),
+            new=AsyncMock(return_value=True),
         ) as mock_update_state,
         patch(f'{MODULE}.execution_client', new=mock_client),
     ):
