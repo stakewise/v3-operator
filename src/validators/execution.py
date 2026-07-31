@@ -7,7 +7,7 @@ from web3 import Web3
 from web3.exceptions import ContractCustomError
 from web3.types import Wei
 
-from src.common.contracts import VaultContract, multicall_contract
+from src.common.contracts import VaultContract
 from src.common.transaction import tx_manager
 from src.common.typings import HarvestParams, OraclesApproval
 from src.common.utils import format_error
@@ -133,13 +133,17 @@ async def get_withdrawable_assets(harvest_params: HarvestParams | None) -> Wei:
         return await vault_contract.functions.withdrawableAssets().call()
 
     calls = [
-        (vault_contract.contract_address, vault_contract.get_update_state_call(harvest_params))
+        vault_contract.get_update_state_call(harvest_params),
+        vault_contract.encode_abi(fn_name='withdrawableAssets', args=[]),
     ]
-    withdrawable_assets_call = vault_contract.encode_abi(fn_name='withdrawableAssets', args=[])
-    calls.append((vault_contract.contract_address, withdrawable_assets_call))
+    try:
+        multicall_response = await vault_contract.functions.multicall(calls).call()
+    except ContractCustomError as e:
+        reason = vault_contract.decode_custom_error(str(e.data)) or e.data
+        logger.error('Failed to fetch withdrawable assets: execution reverted with %s', reason)
+        raise
 
-    _, multicall = await multicall_contract.aggregate(calls)
-    return Wei(Web3.to_int(multicall[-1]))
+    return Wei(Web3.to_int(multicall_response[-1]))
 
 
 async def tx_consolidate_validators(
