@@ -56,9 +56,11 @@ def test_get_deposits_amounts():
     assert _get_deposits_amounts(settings.max_validator_balance_gwei, ValidatorType.V2) == [
         settings.max_validator_balance_gwei,
     ]
-    assert _get_deposits_amounts(ether_to_gwei(2048), ValidatorType.V2) == [
+    assert _get_deposits_amounts(
+        settings.max_validator_balance_gwei + ether_to_gwei(103), ValidatorType.V2
+    ) == [
         settings.max_validator_balance_gwei,
-        ether_to_gwei(2048) - settings.max_validator_balance_gwei,
+        ether_to_gwei(103),
     ]
 
     assert (
@@ -69,14 +71,18 @@ def test_get_deposits_amounts():
         _get_deposits_amounts(ether_to_gwei(2081), ValidatorType.V1)
         == [MIN_ACTIVATION_BALANCE_GWEI] * 65
     )
-    assert _get_deposits_amounts(ether_to_gwei(2050), ValidatorType.V2) == [
+    assert _get_deposits_amounts(
+        settings.max_validator_balance_gwei + ether_to_gwei(105), ValidatorType.V2
+    ) == [
         settings.max_validator_balance_gwei,
-        ether_to_gwei(2050) - settings.max_validator_balance_gwei,
+        ether_to_gwei(105),
     ]
 
-    assert _get_deposits_amounts(ether_to_gwei(2081), ValidatorType.V2) == [
+    assert _get_deposits_amounts(
+        settings.max_validator_balance_gwei + ether_to_gwei(136), ValidatorType.V2
+    ) == [
         settings.max_validator_balance_gwei,
-        ether_to_gwei(2081) - settings.max_validator_balance_gwei,
+        ether_to_gwei(136),
     ]
     assert (
         _get_deposits_amounts(ether_to_gwei(4096), ValidatorType.V1)
@@ -99,17 +105,21 @@ def test_get_funding_amounts(data_dir):
     data = _get_funding_amounts({public_key_1: ether_to_gwei(32)}, vault_assets=ether_to_gwei(100))
     assert data == {public_key_1: ether_to_gwei(100)}
 
+    max_balance = settings.max_validator_balance_gwei
+    capacity_2 = Gwei(max_balance - ether_to_gwei(33))
+
     data = _get_funding_amounts(
         {public_key_1: ether_to_gwei(32), public_key_2: ether_to_gwei(33)},
-        vault_assets=ether_to_gwei(2100),
+        vault_assets=Gwei(capacity_2 + ether_to_gwei(188)),
     )
     assert data == {
-        public_key_2: ether_to_gwei(1912),
+        public_key_2: capacity_2,
         public_key_1: ether_to_gwei(188),
     }
 
+    near_max_balance_1 = Gwei(max_balance - ether_to_gwei(11))
     data = _get_funding_amounts(
-        {public_key_1: ether_to_gwei(1934), public_key_2: ether_to_gwei(32)},
+        {public_key_1: near_max_balance_1, public_key_2: ether_to_gwei(32)},
         vault_assets=ether_to_gwei(11.5),
     )
     assert data == {
@@ -118,10 +128,10 @@ def test_get_funding_amounts(data_dir):
 
     data = _get_funding_amounts(
         {public_key_1: ether_to_gwei(32), public_key_2: ether_to_gwei(33)},
-        vault_assets=ether_to_gwei(2100.5),
+        vault_assets=Gwei(capacity_2 + ether_to_gwei(188.5)),
     )
     assert data == {
-        public_key_2: ether_to_gwei(1912),
+        public_key_2: capacity_2,
         public_key_1: ether_to_gwei(188.5),
     }
 
