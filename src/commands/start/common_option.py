@@ -235,9 +235,9 @@ start_common_options = [
         f'Vault assets above that amount go to the next validator. '
         f'Default is {NETWORKS[MAINNET].MAX_VALIDATOR_BALANCE_GWEI} Gwei for Ethereum, '
         f'{NETWORKS[GNOSIS].MAX_VALIDATOR_BALANCE_GWEI} Gwei for Gnosis. '
-        f'A higher value means fewer validators to operate, '
-        f'but more stake stuck in the deposit queue if a validator is exited by mistake. '
-        f'Adjust it to the expected size of your vault: '
+        f'A higher value means fewer validators to operate. '
+        f'It also means a bigger drop in the vault APR when a validator exits. '
+        f'Adjust the value to the expected size of your vault: '
         f'raise it for larger vaults, lower it for smaller ones.',
         callback=validate_max_validator_balance_gwei,
     ),
