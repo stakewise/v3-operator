@@ -4,7 +4,7 @@ from typing import Sequence
 from eth_typing import BlockNumber, ChecksumAddress, HexStr
 from sw_utils.typings import Bytes32
 from web3 import Web3
-from web3.exceptions import ContractLogicError
+from web3.exceptions import ContractCustomError
 from web3.types import Wei
 
 from src.common.contracts import VaultContract, multicall_contract
@@ -63,14 +63,12 @@ async def tx_register_validators(
             high_priority=True,
             estimate_gas=True,
         )
-    except ContractLogicError as e:
+    except ContractCustomError as e:
         logger.error(
-            'Failed to register validator(s): %s. '
+            'Failed to register validator(s): execution reverted with %s. '
             'Most likely registry root has changed during validators registration. Retrying...',
-            format_error(e),
+            vault_contract.decode_custom_error(str(e.data)) or e.data,
         )
-        if settings.verbose:
-            logger.exception(e)
         return None
     except Exception as e:
         logger.error('Failed to register validator(s): %s', format_error(e))
@@ -111,6 +109,10 @@ async def tx_fund_validators(
     try:
         tx_function = vault_contract.functions.multicall(calls)
         tx_receipt = await tx_manager.transact(tx_function)
+    except ContractCustomError as e:
+        reason = vault_contract.decode_custom_error(str(e.data)) or e.data
+        logger.error('Failed to fund validator(s): execution reverted with %s', reason)
+        return None
     except Exception as e:
         logger.error('Failed to fund validator(s): %s', format_error(e))
         if settings.verbose:
@@ -166,6 +168,13 @@ async def tx_consolidate_validators(
             oracle_signatures,
         )
         tx_receipt = await tx_manager.transact(tx_function, tx_params={'value': tx_fee})
+    except ContractCustomError as e:
+        reason = vault_contract.decode_custom_error(str(e.data)) or e.data
+        logger.info(
+            'Failed to submit consolidate validators transaction: execution reverted with %s',
+            reason,
+        )
+        return None
     except Exception as e:
         logger.info('Failed to submit consolidate validators transaction: %s', format_error(e))
         return None

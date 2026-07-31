@@ -2,6 +2,7 @@ import logging
 
 from eth_typing import HexStr
 from web3 import Web3
+from web3.exceptions import ContractCustomError
 from web3.types import Gwei, Wei
 
 from src.common.contracts import VaultContract
@@ -26,6 +27,10 @@ async def submit_withdraw_validators(
             Web3.to_bytes(hexstr=validators_manager_signature),
         )
         tx_receipt = await tx_manager.transact(tx_function, tx_params={'value': tx_fee})
+    except ContractCustomError as e:
+        reason = vault_contract.decode_custom_error(str(e.data)) or e.data
+        logger.info('Failed to withdraw from validators: execution reverted with %s', reason)
+        return None
     except Exception as e:
         logger.info('Failed to withdraw from validators: %s', format_error(e))
         return None

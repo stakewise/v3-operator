@@ -11,7 +11,6 @@ from web3.types import Gwei, Wei
 
 from src.common.tests.utils import ether_to_gwei
 from src.common.typings import ValidatorType
-from src.config.networks import HOODI
 from src.config.settings import MIN_ACTIVATION_BALANCE_GWEI, settings
 from src.validators.exceptions import FundingException
 from src.validators.tasks import (
@@ -23,110 +22,156 @@ from src.validators.tasks import (
 from src.validators.typings import VaultValidator
 
 
+@contextmanager
+def patch_max_validator_balance(value: Gwei):
+    """Pins max validator balance, so tests do not depend on the network default."""
+    with patch.object(settings, 'max_validator_balance_gwei', value):
+        yield
+
+
 @pytest.mark.usefixtures('fake_settings')
-def test_get_deposits_amounts():
-    assert _get_deposits_amounts(0, ValidatorType.V1) == []
-    assert _get_deposits_amounts(0, ValidatorType.V2) == []
+class TestGetDepositsAmounts:
+    """Tests for _get_deposits_amounts"""
 
-    assert _get_deposits_amounts(ether_to_gwei(32), ValidatorType.V1) == [
-        MIN_ACTIVATION_BALANCE_GWEI
-    ]
-    assert _get_deposits_amounts(ether_to_gwei(32), ValidatorType.V2) == [
-        MIN_ACTIVATION_BALANCE_GWEI
-    ]
+    def test_no_assets(self):
+        """No deposits when vault assets are below the min activation balance."""
+        assert _get_deposits_amounts(0, ValidatorType.V1) == []
+        assert _get_deposits_amounts(0, ValidatorType.V2) == []
 
-    assert _get_deposits_amounts(ether_to_gwei(33), ValidatorType.V1) == [
-        MIN_ACTIVATION_BALANCE_GWEI,
-    ]
-    assert _get_deposits_amounts(ether_to_gwei(33), ValidatorType.V2) == [ether_to_gwei(33)]
+        assert _get_deposits_amounts(ether_to_gwei(31), ValidatorType.V1) == []
+        assert _get_deposits_amounts(ether_to_gwei(31), ValidatorType.V2) == []
 
-    assert _get_deposits_amounts(ether_to_gwei(64), ValidatorType.V1) == [
-        MIN_ACTIVATION_BALANCE_GWEI,
-        MIN_ACTIVATION_BALANCE_GWEI,
-    ]
-    assert _get_deposits_amounts(ether_to_gwei(64), ValidatorType.V2) == [ether_to_gwei(64)]
+    def test_min_activation_balance(self):
+        """Both validator types deposit exactly the min activation balance."""
+        assert _get_deposits_amounts(ether_to_gwei(32), ValidatorType.V1) == [
+            MIN_ACTIVATION_BALANCE_GWEI
+        ]
+        assert _get_deposits_amounts(ether_to_gwei(32), ValidatorType.V2) == [
+            MIN_ACTIVATION_BALANCE_GWEI
+        ]
 
-    assert _get_deposits_amounts(ether_to_gwei(66), ValidatorType.V1) == [
-        MIN_ACTIVATION_BALANCE_GWEI,
-        MIN_ACTIVATION_BALANCE_GWEI,
-    ]
-    assert _get_deposits_amounts(ether_to_gwei(66), ValidatorType.V2) == [ether_to_gwei(66)]
+    def test_v1_ignores_remainder(self):
+        """V1 deposits fixed 32 ETH chunks, the remainder is left out."""
+        assert _get_deposits_amounts(ether_to_gwei(33), ValidatorType.V1) == [
+            MIN_ACTIVATION_BALANCE_GWEI,
+        ]
+        assert _get_deposits_amounts(ether_to_gwei(64), ValidatorType.V1) == [
+            MIN_ACTIVATION_BALANCE_GWEI,
+            MIN_ACTIVATION_BALANCE_GWEI,
+        ]
+        assert _get_deposits_amounts(ether_to_gwei(66), ValidatorType.V1) == [
+            MIN_ACTIVATION_BALANCE_GWEI,
+            MIN_ACTIVATION_BALANCE_GWEI,
+        ]
 
-    assert (
-        _get_deposits_amounts(ether_to_gwei(2048), ValidatorType.V1)
-        == [MIN_ACTIVATION_BALANCE_GWEI] * 64
-    )
-    assert _get_deposits_amounts(settings.max_validator_balance_gwei, ValidatorType.V2) == [
-        settings.max_validator_balance_gwei,
-    ]
-    assert _get_deposits_amounts(ether_to_gwei(2048), ValidatorType.V2) == [
-        settings.max_validator_balance_gwei,
-        ether_to_gwei(2048) - settings.max_validator_balance_gwei,
-    ]
+    def test_v2_single_deposit_below_max_balance(self):
+        """V2 puts all the assets into a single deposit while below the max balance."""
+        assert _get_deposits_amounts(ether_to_gwei(33), ValidatorType.V2) == [ether_to_gwei(33)]
+        assert _get_deposits_amounts(ether_to_gwei(64), ValidatorType.V2) == [ether_to_gwei(64)]
+        assert _get_deposits_amounts(ether_to_gwei(66), ValidatorType.V2) == [ether_to_gwei(66)]
 
-    assert (
-        _get_deposits_amounts(ether_to_gwei(2050), ValidatorType.V1)
-        == [MIN_ACTIVATION_BALANCE_GWEI] * 64
-    )
-    assert (
-        _get_deposits_amounts(ether_to_gwei(2081), ValidatorType.V1)
-        == [MIN_ACTIVATION_BALANCE_GWEI] * 65
-    )
-    assert _get_deposits_amounts(ether_to_gwei(2050), ValidatorType.V2) == [
-        settings.max_validator_balance_gwei,
-        ether_to_gwei(2050) - settings.max_validator_balance_gwei,
-    ]
+    def test_v1_large_assets(self):
+        """V1 splits large assets into as many 32 ETH deposits as possible."""
+        assert (
+            _get_deposits_amounts(ether_to_gwei(2048), ValidatorType.V1)
+            == [MIN_ACTIVATION_BALANCE_GWEI] * 64
+        )
+        assert (
+            _get_deposits_amounts(ether_to_gwei(2050), ValidatorType.V1)
+            == [MIN_ACTIVATION_BALANCE_GWEI] * 64
+        )
+        assert (
+            _get_deposits_amounts(ether_to_gwei(2081), ValidatorType.V1)
+            == [MIN_ACTIVATION_BALANCE_GWEI] * 65
+        )
+        assert (
+            _get_deposits_amounts(ether_to_gwei(4096), ValidatorType.V1)
+            == [MIN_ACTIVATION_BALANCE_GWEI] * 128
+        )
 
-    assert _get_deposits_amounts(ether_to_gwei(2081), ValidatorType.V2) == [
-        settings.max_validator_balance_gwei,
-        ether_to_gwei(2081) - settings.max_validator_balance_gwei,
-    ]
-    assert (
-        _get_deposits_amounts(ether_to_gwei(4096), ValidatorType.V1)
-        == [MIN_ACTIVATION_BALANCE_GWEI] * 128
-    )
-    assert _get_deposits_amounts(settings.max_validator_balance_gwei * 2, ValidatorType.V2) == [
-        settings.max_validator_balance_gwei,
-        settings.max_validator_balance_gwei,
-    ]
+    def test_v2_max_balance(self):
+        """V2 deposits the max balance as a single deposit."""
+        with patch_max_validator_balance(ether_to_gwei(2000)):
+            assert _get_deposits_amounts(ether_to_gwei(2000), ValidatorType.V2) == [
+                ether_to_gwei(2000),
+            ]
+
+    def test_v2_multiple_of_max_balance(self):
+        """V2 splits assets into full max balance deposits."""
+        with patch_max_validator_balance(ether_to_gwei(2000)):
+            assert _get_deposits_amounts(ether_to_gwei(4000), ValidatorType.V2) == [
+                ether_to_gwei(2000),
+                ether_to_gwei(2000),
+            ]
+
+    def test_v2_above_max_balance(self):
+        """V2 caps the first deposit at the max balance and deposits the remainder."""
+        with patch_max_validator_balance(ether_to_gwei(2000)):
+            assert _get_deposits_amounts(ether_to_gwei(2048), ValidatorType.V2) == [
+                ether_to_gwei(2000),
+                ether_to_gwei(48),
+            ]
+            assert _get_deposits_amounts(ether_to_gwei(2050), ValidatorType.V2) == [
+                ether_to_gwei(2000),
+                ether_to_gwei(50),
+            ]
+            assert _get_deposits_amounts(ether_to_gwei(2081), ValidatorType.V2) == [
+                ether_to_gwei(2000),
+                ether_to_gwei(81),
+            ]
+
+    def test_v2_remainder_below_min_activation_balance(self):
+        """V2 drops the remainder when it is below the min activation balance."""
+        with patch_max_validator_balance(ether_to_gwei(2000)):
+            assert _get_deposits_amounts(ether_to_gwei(2031), ValidatorType.V2) == [
+                ether_to_gwei(2000),
+            ]
 
 
-def test_get_funding_amounts(data_dir):
-    settings.set(vault=None, vault_dir=data_dir, network=HOODI)
-    public_key_1 = faker.eth_address()
-    public_key_2 = faker.eth_address()
+@pytest.mark.usefixtures('fake_settings')
+class TestGetFundingAmounts:
+    """Tests for _get_funding_amounts"""
 
-    data = _get_funding_amounts({public_key_1: ether_to_gwei(32)}, vault_assets=ether_to_gwei(1))
-    assert data == {public_key_1: ether_to_gwei(1)}
+    def test_get_funding_amounts(self):
+        with patch_max_validator_balance(ether_to_gwei(2000)):
+            public_key_1 = faker.eth_address()
+            public_key_2 = faker.eth_address()
 
-    data = _get_funding_amounts({public_key_1: ether_to_gwei(32)}, vault_assets=ether_to_gwei(100))
-    assert data == {public_key_1: ether_to_gwei(100)}
+            data = _get_funding_amounts(
+                {public_key_1: ether_to_gwei(32)}, vault_assets=ether_to_gwei(1)
+            )
+            assert data == {public_key_1: ether_to_gwei(1)}
 
-    data = _get_funding_amounts(
-        {public_key_1: ether_to_gwei(32), public_key_2: ether_to_gwei(33)},
-        vault_assets=ether_to_gwei(2100),
-    )
-    assert data == {
-        public_key_2: ether_to_gwei(1912),
-        public_key_1: ether_to_gwei(188),
-    }
+            data = _get_funding_amounts(
+                {public_key_1: ether_to_gwei(32)}, vault_assets=ether_to_gwei(100)
+            )
+            assert data == {public_key_1: ether_to_gwei(100)}
 
-    data = _get_funding_amounts(
-        {public_key_1: ether_to_gwei(1934), public_key_2: ether_to_gwei(32)},
-        vault_assets=ether_to_gwei(11.5),
-    )
-    assert data == {
-        public_key_1: ether_to_gwei(11),
-    }
+            data = _get_funding_amounts(
+                {public_key_1: ether_to_gwei(32), public_key_2: ether_to_gwei(33)},
+                vault_assets=ether_to_gwei(2100),
+            )
+            assert data == {
+                public_key_2: ether_to_gwei(1967),
+                public_key_1: ether_to_gwei(133),
+            }
 
-    data = _get_funding_amounts(
-        {public_key_1: ether_to_gwei(32), public_key_2: ether_to_gwei(33)},
-        vault_assets=ether_to_gwei(2100.5),
-    )
-    assert data == {
-        public_key_2: ether_to_gwei(1912),
-        public_key_1: ether_to_gwei(188.5),
-    }
+            data = _get_funding_amounts(
+                {public_key_1: ether_to_gwei(1989), public_key_2: ether_to_gwei(32)},
+                vault_assets=ether_to_gwei(11.5),
+            )
+            assert data == {
+                public_key_1: ether_to_gwei(11),
+            }
+
+            data = _get_funding_amounts(
+                {public_key_1: ether_to_gwei(32), public_key_2: ether_to_gwei(33)},
+                vault_assets=ether_to_gwei(2100.5),
+            )
+            assert data == {
+                public_key_2: ether_to_gwei(1967),
+                public_key_1: ether_to_gwei(133.5),
+            }
 
 
 class TestProcessFunding:
@@ -173,12 +218,6 @@ class TestProcessFunding:
             new_callable=AsyncMock,
             return_value=return_value if return_value is not None else set(),
         ):
-            yield
-
-    @staticmethod
-    @contextmanager
-    def patch_settings(**kwargs):
-        with patch.multiple(settings, create=True, **kwargs):
             yield
 
     @pytest.mark.usefixtures('fake_settings')
@@ -268,7 +307,7 @@ class TestProcessFunding:
         tx_hash = HexStr('0xabc')
 
         with (
-            self.patch_settings(max_validator_balance_gwei=ether_to_gwei(64)),
+            patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_funding_validators_balances(
                 {
                     pub_key_1: ether_to_gwei(32),
@@ -417,7 +456,7 @@ class TestProcessFunding:
         ]
 
         with (
-            self.patch_settings(max_validator_balance_gwei=ether_to_gwei(64)),
+            patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_get_latest_vault_v2_validator_public_keys(),
             patch('src.validators.consensus.consensus_client', mock_consensus),
             self.patch_is_funding_interval_passed(True),
@@ -473,7 +512,7 @@ class TestProcessFunding:
         ]
 
         with (
-            self.patch_settings(max_validator_balance_gwei=ether_to_gwei(64)),
+            patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_get_latest_vault_v2_validator_public_keys(),
             patch('src.validators.consensus.consensus_client', mock_consensus),
             self.patch_is_funding_interval_passed(True),
@@ -540,7 +579,7 @@ class TestProcessFunding:
         ]
 
         with (
-            self.patch_settings(max_validator_balance_gwei=ether_to_gwei(64)),
+            patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_get_latest_vault_v2_validator_public_keys(),
             patch('src.validators.consensus.consensus_client', mock_consensus),
             self.patch_is_funding_interval_passed(True),
@@ -582,7 +621,7 @@ class TestProcessFunding:
         ]
 
         with (
-            self.patch_settings(max_validator_balance_gwei=ether_to_gwei(64)),
+            patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_get_latest_vault_v2_validator_public_keys(),
             patch('src.validators.consensus.consensus_client', mock_consensus),
             self.patch_is_funding_interval_passed(True),
@@ -648,7 +687,7 @@ class TestProcessFunding:
         mock_consensus.get_pending_deposits.return_value = []
 
         with (
-            self.patch_settings(max_validator_balance_gwei=ether_to_gwei(64)),
+            patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_get_latest_vault_v2_validator_public_keys(),
             patch('src.validators.consensus.consensus_client', mock_consensus),
             self.patch_is_funding_interval_passed(True),
@@ -718,7 +757,7 @@ class TestProcessFunding:
         tx_hash = HexStr('0xabc')
 
         with (
-            self.patch_settings(max_validator_balance_gwei=ether_to_gwei(64)),
+            patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_funding_validators_balances(
                 {
                     pub_key_1: ether_to_gwei(32),

@@ -60,6 +60,27 @@ async def fetch_funding_validators_balances() -> dict[HexStr, Gwei]:
     return validators_balances
 
 
+async def fetch_pending_deposits_amounts(public_keys: set[HexStr], slot: str) -> dict[HexStr, Gwei]:
+    """
+    Sums pending-deposit-queue amounts (Gwei) per pubkey, restricted to ``public_keys``.
+    Unlike funding balances, counts every pending deposit regardless of its
+    withdrawal_credentials prefix, since any queued amount tied to the validator
+    is at risk of being lost if the validator exits before it is processed.
+    """
+    if not public_keys:
+        return {}
+
+    pending_amounts: dict[HexStr, Gwei] = defaultdict(lambda: Gwei(0))
+    all_pending_deposits = await consensus_client.get_pending_deposits(slot)
+    for deposit in all_pending_deposits:
+        public_key: HexStr = deposit['pubkey']
+        if public_key not in public_keys:
+            continue
+        pending_amounts[public_key] = Gwei(pending_amounts[public_key] + int(deposit['amount']))
+
+    return dict(pending_amounts)
+
+
 async def fetch_consensus_validators(
     validator_ids: list[HexStr] | list[str], slot: str = 'head'
 ) -> list[ConsensusValidator]:
