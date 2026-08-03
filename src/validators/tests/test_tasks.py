@@ -332,12 +332,24 @@ class TestProcessFunding:
     # Funding prioritizes highest balances first, so we test both cases:
     # exiting validator has lower balance (32) and higher balance (40)
     # to ensure it's excluded regardless of funding order.
+    # ACTIVE_SLASHED is covered too, since a slashed validator awaiting forced exit
+    # must be excluded from funding just like ACTIVE_EXITING.
     @pytest.mark.parametrize(
-        'active_balance, exiting_balance',
-        [(40, 32), (32, 40)],
+        'active_balance, exiting_balance, exiting_status',
+        [
+            (40, 32, ValidatorStatus.ACTIVE_EXITING),
+            (32, 40, ValidatorStatus.ACTIVE_EXITING),
+            (40, 32, ValidatorStatus.ACTIVE_SLASHED),
+            (32, 40, ValidatorStatus.ACTIVE_SLASHED),
+        ],
     )
     async def test_fetch_funding_filters_exiting_validators(
-        self, vault_validator_crud, compounding_creds, active_balance, exiting_balance
+        self,
+        vault_validator_crud,
+        compounding_creds,
+        active_balance,
+        exiting_balance,
+        exiting_status,
     ):
         """fetch_funding_validators_balances excludes exiting/exited validators."""
         pub_key_active = faker.validator_public_key()
@@ -369,7 +381,7 @@ class TestProcessFunding:
                     'withdrawal_credentials': compounding_creds,
                     'activation_epoch': '0',
                 },
-                'status': ValidatorStatus.ACTIVE_EXITING.value,
+                'status': exiting_status.value,
             },
         ]
 
@@ -527,10 +539,14 @@ class TestProcessFunding:
         }
         assert result == Gwei(0)
 
+    @pytest.mark.parametrize(
+        'exiting_status',
+        [ValidatorStatus.ACTIVE_EXITING, ValidatorStatus.ACTIVE_SLASHED],
+    )
     async def test_fetch_funding_skips_pending_deposit_for_exiting_validator(
-        self, vault_validator_crud, compounding_creds
+        self, vault_validator_crud, compounding_creds, exiting_status
     ):
-        """Pending deposit for an exiting validator is not added back into the balances."""
+        """Pending deposit for an exiting/slashed validator is not added back into the balances."""
         pub_key_active = faker.validator_public_key()
         pub_key_exiting = faker.validator_public_key()
 
@@ -560,7 +576,7 @@ class TestProcessFunding:
                     'withdrawal_credentials': compounding_creds,
                     'activation_epoch': '0',
                 },
-                'status': ValidatorStatus.ACTIVE_EXITING.value,
+                'status': exiting_status.value,
             },
         ]
 

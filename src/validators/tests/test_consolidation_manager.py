@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 from eth_typing import HexStr
-from sw_utils import ChainHead
+from sw_utils import ChainHead, ValidatorStatus
 from sw_utils.tests import faker
 from web3.types import Gwei
 
@@ -734,6 +734,71 @@ class TestConsolidationChecker:
         with pytest.raises(
             ConsolidationError,
             match=f'Target validator {target_pk} is in exiting status {EXITING_STATUSES[0].value}.',
+        ):
+            selector.get_target_source()
+
+    def test_excludes_slashed_validators(self):
+        """ACTIVE_SLASHED validators are awaiting forced exit and must be rejected as
+        both source and target, same as ACTIVE_EXITING validators."""
+        source_pk = faker.validator_public_key()
+        target_pk = faker.validator_public_key()
+        consolidation_keys = ConsolidationKeys(
+            source_public_keys=[source_pk],
+            target_public_key=target_pk,
+        )
+
+        # Test with slashed source validator
+        consensus_validators = [
+            create_consensus_validator(
+                public_key=source_pk,
+                activation_epoch=1,
+                is_compounding=False,
+                status=ValidatorStatus.ACTIVE_SLASHED,
+            ),
+            create_consensus_validator(
+                public_key=target_pk,
+                activation_epoch=1,
+                is_compounding=True,
+            ),
+        ]
+        selector = create_manager(
+            consolidation_keys=consolidation_keys,
+            vault_validators=[v.public_key for v in consensus_validators],
+            consensus_validators=consensus_validators,
+        )
+
+        with pytest.raises(
+            ConsolidationError,
+            match=f'Validator {source_pk} is in exiting status {ValidatorStatus.ACTIVE_SLASHED.value}.',
+        ):
+            selector.get_target_source()
+
+        # Test with slashed target validator
+        consensus_validators = [
+            create_consensus_validator(
+                public_key=source_pk,
+                activation_epoch=1,
+                is_compounding=False,
+            ),
+            create_consensus_validator(
+                public_key=target_pk,
+                activation_epoch=1,
+                is_compounding=True,
+                status=ValidatorStatus.ACTIVE_SLASHED,
+            ),
+        ]
+        selector = create_manager(
+            consolidation_keys=consolidation_keys,
+            vault_validators=[v.public_key for v in consensus_validators],
+            consensus_validators=consensus_validators,
+        )
+
+        with pytest.raises(
+            ConsolidationError,
+            match=(
+                f'Target validator {target_pk} is in exiting status '
+                f'{ValidatorStatus.ACTIVE_SLASHED.value}.'
+            ),
         ):
             selector.get_target_source()
 

@@ -13,7 +13,10 @@ from src.validators.database import VaultValidatorCrud
 from src.validators.event_processors import get_latest_vault_v2_validator_public_keys
 from src.validators.typings import ConsensusValidator
 
-EXITING_STATUSES = [ValidatorStatus.ACTIVE_EXITING] + EXITED_STATUSES
+EXITING_STATUSES = [
+    ValidatorStatus.ACTIVE_EXITING,
+    ValidatorStatus.ACTIVE_SLASHED,  # awaiting forced exit, not eligible for funding/consolidation
+] + EXITED_STATUSES
 
 logger = logging.getLogger(__name__)
 
