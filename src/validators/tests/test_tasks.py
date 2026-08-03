@@ -334,13 +334,19 @@ class TestProcessFunding:
     # to ensure it's excluded regardless of funding order.
     # ACTIVE_SLASHED is covered too, since a slashed validator awaiting forced exit
     # must be excluded from funding just like ACTIVE_EXITING.
+    # max_validator_balance is pinned to 64 ETH and vault_assets to 40 ETH so that the
+    # active validator's capacity never absorbs all vault_assets: in every case a
+    # remainder is left over that would be routed to the exiting/slashed validator if
+    # it were wrongly included, so a regression that stops filtering it is caught.
     @pytest.mark.parametrize(
-        'active_balance, exiting_balance, exiting_status',
+        'active_balance, exiting_balance, exiting_status, active_funded, remainder',
         [
-            (40, 32, ValidatorStatus.ACTIVE_EXITING),
-            (32, 40, ValidatorStatus.ACTIVE_EXITING),
-            (40, 32, ValidatorStatus.ACTIVE_SLASHED),
-            (32, 40, ValidatorStatus.ACTIVE_SLASHED),
+            # capacity=64-40=24, funded=24, remainder=40-24=16
+            (40, 32, ValidatorStatus.ACTIVE_EXITING, 24, 16),
+            # capacity=64-32=32, funded=32, remainder=40-32=8
+            (32, 40, ValidatorStatus.ACTIVE_EXITING, 32, 8),
+            (40, 32, ValidatorStatus.ACTIVE_SLASHED, 24, 16),
+            (32, 40, ValidatorStatus.ACTIVE_SLASHED, 32, 8),
         ],
     )
     async def test_fetch_funding_filters_exiting_validators(
@@ -350,6 +356,8 @@ class TestProcessFunding:
         active_balance,
         exiting_balance,
         exiting_status,
+        active_funded,
+        remainder,
     ):
         """fetch_funding_validators_balances excludes exiting/exited validators."""
         pub_key_active = faker.validator_public_key()
@@ -391,13 +399,14 @@ class TestProcessFunding:
         mock_consensus.get_pending_deposits.return_value = []
 
         with (
+            patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_get_latest_vault_v2_validator_public_keys(),
             patch('src.validators.consensus.consensus_client', mock_consensus),
             self.patch_is_funding_interval_passed(True),
             self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
         ):
 
-            vault_assets = ether_to_gwei(100)
+            vault_assets = ether_to_gwei(40)
             result = await self.subtask.process_funding(
                 vault_assets=vault_assets, harvest_params=None
             )
@@ -405,9 +414,9 @@ class TestProcessFunding:
         # Only active compounding validator should be funded, not the exiting one
         mock_fund.assert_called_once()
         assert dict(mock_fund.call_args[1]['validator_fundings']) == {
-            pub_key_active: ether_to_gwei(100),
+            pub_key_active: ether_to_gwei(active_funded),
         }
-        assert result == Gwei(0)
+        assert result == ether_to_gwei(remainder)
 
     async def test_fetch_funding_includes_pending_deposits(
         self, vault_validator_crud, compounding_creds
