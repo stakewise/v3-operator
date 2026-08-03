@@ -15,7 +15,7 @@ from src.validators.typings import ConsensusValidator
 
 EXITING_STATUSES = [
     ValidatorStatus.ACTIVE_EXITING,
-    ValidatorStatus.ACTIVE_SLASHED,  # awaiting forced exit, not eligible for funding/consolidation
+    ValidatorStatus.ACTIVE_SLASHED,
 ] + EXITED_STATUSES
 
 logger = logging.getLogger(__name__)

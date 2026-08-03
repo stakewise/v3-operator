@@ -747,7 +747,6 @@ class TestConsolidationChecker:
             target_public_key=target_pk,
         )
 
-        # Test with slashed source validator
         consensus_validators = [
             create_consensus_validator(
                 public_key=source_pk,
@@ -773,7 +772,6 @@ class TestConsolidationChecker:
         ):
             selector.get_target_source()
 
-        # Test with slashed target validator
         consensus_validators = [
             create_consensus_validator(
                 public_key=source_pk,

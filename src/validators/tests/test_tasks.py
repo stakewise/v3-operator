@@ -332,12 +332,6 @@ class TestProcessFunding:
     # Funding prioritizes highest balances first, so we test both cases:
     # exiting validator has lower balance (32) and higher balance (40)
     # to ensure it's excluded regardless of funding order.
-    # ACTIVE_SLASHED is covered too, since a slashed validator awaiting forced exit
-    # must be excluded from funding just like ACTIVE_EXITING.
-    # max_validator_balance is pinned to 64 ETH and vault_assets to 40 ETH so that the
-    # active validator's capacity never absorbs all vault_assets: in every case a
-    # remainder is left over that would be routed to the exiting/slashed validator if
-    # it were wrongly included, so a regression that stops filtering it is caught.
     @pytest.mark.parametrize(
         'active_balance, exiting_balance, exiting_status, active_funded, remainder',
         [
