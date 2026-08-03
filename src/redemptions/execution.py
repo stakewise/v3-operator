@@ -104,6 +104,9 @@ async def tx_process_exit_queue() -> None:
         reason = os_token_redeemer_contract.decode_custom_error(str(e.data)) or e.data
         logger.error('Failed to process exit queue: execution reverted with %s', reason)
         return
+    except Exception:  # pylint: disable=broad-except
+        error_verbose('Failed to submit processExitQueue tx')
+        return
 
     if tx_receipt is None:
         logger.error('Failed to confirm processExitQueue tx')
@@ -135,12 +138,11 @@ async def simulate_redeem_position(
             reason,
         )
         return False
-    except Exception as e:  # pylint: disable=broad-except
-        logger.error(
-            'Failed to simulate redeem position (vault %s, owner %s): %r',
+    except Exception:  # pylint: disable=broad-except
+        error_verbose(
+            'Failed to simulate redeem position (vault %s, owner %s)',
             position.vault,
             position.owner,
-            e,
         )
         return False
     logger.debug(
