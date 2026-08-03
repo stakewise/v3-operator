@@ -720,6 +720,7 @@ class TestProcessFunding:
         with (
             self.patch_get_latest_vault_v2_validator_public_keys(),
             patch('src.validators.consensus.consensus_client', mock_consensus),
+            self.patch_is_funding_interval_passed(True),
             self.patch_fund_validators_chunk(None) as mock_fund,
         ):
             vault_assets = ether_to_gwei(100)
