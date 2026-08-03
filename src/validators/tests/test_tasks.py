@@ -248,7 +248,7 @@ class TestProcessFunding:
 
     @pytest.mark.usefixtures('fake_settings')
     async def test_funding_interval_not_passed(self):
-        """Raises FundingException when funding interval hasn't passed."""
+        """Defers funding and reserves the planned amounts, leaving the rest for registration."""
         vault_assets = ether_to_gwei(100)
         pub_key = faker.validator_public_key()
         with (
@@ -256,9 +256,30 @@ class TestProcessFunding:
             self.patch_is_funding_interval_passed(False),
             self.patch_fund_validators_chunk(None) as mock_fund,
         ):
-            with pytest.raises(FundingException, match='Funding interval has not passed yet'):
-                await self.subtask.process_funding(vault_assets=vault_assets, harvest_params=None)
+            result = await self.subtask.process_funding(
+                vault_assets=vault_assets, harvest_params=None
+            )
         mock_fund.assert_not_called()
+        funding_amounts = _get_funding_amounts(
+            validators_balances={pub_key: ether_to_gwei(32)}, vault_assets=vault_assets
+        )
+        assert result == Gwei(vault_assets - sum(funding_amounts.values()))
+
+    @pytest.mark.usefixtures('fake_settings')
+    async def test_funding_interval_not_passed_reserves_all_assets(self):
+        """When planned funding would consume all assets, the deferred return is zero."""
+        vault_assets = ether_to_gwei(100)
+        pub_key = faker.validator_public_key()
+        with (
+            self.patch_funding_validators_balances({pub_key: Gwei(0)}),
+            self.patch_is_funding_interval_passed(False),
+            self.patch_fund_validators_chunk(None) as mock_fund,
+        ):
+            result = await self.subtask.process_funding(
+                vault_assets=vault_assets, harvest_params=None
+            )
+        mock_fund.assert_not_called()
+        assert result == Gwei(0)
 
     @pytest.mark.usefixtures('fake_settings')
     async def test_successful_funding_single_validator(self):
