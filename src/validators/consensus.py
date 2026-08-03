@@ -30,32 +30,37 @@ async def fetch_funding_validators_balances() -> dict[HexStr, Gwei]:
     if not vault_public_keys:
         return {}
 
-    # Initialize balances for every validator
-    # including those that are not present in CL yet, but have pending deposits.
-    validators_balances = defaultdict(lambda: Gwei(0), {key: Gwei(0) for key in vault_public_keys})
-
     # Fetch consensus validators
     consensus_block = await consensus_client.get_block('head')
     slot = consensus_block['data']['message']['slot']
     consensus_validators = await fetch_consensus_validators(list(vault_public_keys), slot=slot)
 
-    # Filter compounding and remove exiting/withdrawn validators,
-    # as they are not eligible for funding
+    # A validator seen by the CL is fundable only if it is compounding and not exiting.
+    # Others (non-compounding, exiting/exited) are tracked as ineligible so a later
+    # 0x02 pending deposit for them cannot resurrect their funding eligibility (#621).
+    validators_balances: dict[HexStr, Gwei] = {}
+    ineligible_public_keys: set[HexStr] = set()
     for validator in consensus_validators:
         if validator.is_compounding and validator.status not in EXITING_STATUSES:
             validators_balances[validator.public_key] = validator.balance
         else:
-            validators_balances.pop(validator.public_key, None)
+            ineligible_public_keys.add(validator.public_key)
 
-    # Add balances from pending deposits that are not yet reflected in the consensus node
+    # Add balances from pending deposits that are not yet reflected in the consensus node.
+    # A vault key absent from the CL set (e.g. a 0x01 V1 deposit still queued, or a key
+    # the CL hasn't caught up with yet) is only made fundable here if it has a queued
+    # 0x02 deposit: a V1 deposit would revert funding (CannotTopUpV1Validators), and
+    # otherwise treating a CL-lagged key as having full capacity would double-fund it.
     all_pending_deposits = await consensus_client.get_pending_deposits(slot)
     for deposit in all_pending_deposits:
         public_key, amount = deposit['pubkey'], int(deposit['amount'])
-        if public_key not in validators_balances:
+        if public_key not in vault_public_keys or public_key in ineligible_public_keys:
             continue
         if not deposit['withdrawal_credentials'].startswith('0x02'):
             continue
-        validators_balances[public_key] = Gwei(validators_balances[public_key] + amount)
+        validators_balances[public_key] = Gwei(
+            validators_balances.get(public_key, Gwei(0)) + amount
+        )
 
     return validators_balances
 
