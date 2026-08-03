@@ -10,7 +10,7 @@ from src.common.contracts import VaultContract, multicall_contract
 from src.common.execution import wait_for_execution_endpoints_synced
 from src.common.harvest import get_multiple_harvest_params
 from src.common.transaction import tx_manager
-from src.common.utils import error_verbose
+from src.common.utils import error_verbose, format_error
 from src.config.settings import MULTICALL_CHUNK_SIZE
 from src.meta_vault.service import is_meta_vault
 from src.redemptions.contracts import os_token_redeemer_contract
@@ -82,8 +82,8 @@ async def tx_update_vaults_state(calls: list[tuple[ChecksumAddress, HexStr]]) ->
 
     try:
         tx_receipt = await multicall_contract.tx_aggregate(calls)
-    except Exception:  # pylint: disable=broad-except
-        error_verbose('Failed to submit updateState multicall tx')
+    except Exception as e:  # pylint: disable=broad-except
+        error_verbose('Failed to submit updateState multicall tx: %s', format_error(e))
         return None
 
     if tx_receipt is None:
@@ -104,8 +104,8 @@ async def tx_process_exit_queue() -> None:
         reason = os_token_redeemer_contract.decode_custom_error(str(e.data)) or e.data
         logger.error('Failed to process exit queue: execution reverted with %s', reason)
         return
-    except Exception:  # pylint: disable=broad-except
-        error_verbose('Failed to submit processExitQueue tx')
+    except Exception as e:  # pylint: disable=broad-except
+        error_verbose('Failed to submit processExitQueue tx: %s', format_error(e))
         return
 
     if tx_receipt is None:
@@ -138,11 +138,12 @@ async def simulate_redeem_position(
             reason,
         )
         return False
-    except Exception:  # pylint: disable=broad-except
+    except Exception as e:  # pylint: disable=broad-except
         error_verbose(
-            'Failed to simulate redeem position (vault %s, owner %s)',
+            'Failed to simulate redeem position (vault %s, owner %s): %s',
             position.vault,
             position.owner,
+            format_error(e),
         )
         return False
     logger.debug(
@@ -175,11 +176,12 @@ async def tx_redeem_position(
             reason,
         )
         return False
-    except Exception:  # pylint: disable=broad-except
+    except Exception as e:  # pylint: disable=broad-except
         error_verbose(
-            'Failed to redeem position (vault %s, owner %s)',
+            'Failed to redeem position (vault %s, owner %s): %s',
             position.vault,
             position.owner,
+            format_error(e),
         )
         return False
 
