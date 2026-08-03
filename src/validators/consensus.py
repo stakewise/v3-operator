@@ -63,9 +63,6 @@ async def fetch_funding_validators_balances() -> dict[HexStr, Gwei]:
 async def fetch_pending_deposits_amounts(public_keys: set[HexStr], slot: str) -> dict[HexStr, Gwei]:
     """
     Sums pending-deposit-queue amounts (Gwei) per pubkey, restricted to ``public_keys``.
-    Unlike funding balances, counts every pending deposit regardless of its
-    withdrawal_credentials prefix, since any queued amount tied to the validator
-    is at risk of being lost if the validator exits before it is processed.
     """
     if not public_keys:
         return {}
