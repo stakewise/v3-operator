@@ -248,10 +248,12 @@ class TestProcessFunding:
 
     @pytest.mark.usefixtures('fake_settings')
     async def test_funding_interval_not_passed(self):
-        """Defers funding and reserves the planned amounts, leaving the rest for registration."""
+        """Defers funding and reserves only the planned amount, registration proceeds
+        with the remainder."""
         vault_assets = ether_to_gwei(100)
         pub_key = faker.validator_public_key()
         with (
+            patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_funding_validators_balances({pub_key: ether_to_gwei(32)}),
             self.patch_is_funding_interval_passed(False),
             self.patch_fund_validators_chunk(None) as mock_fund,
@@ -260,10 +262,7 @@ class TestProcessFunding:
                 vault_assets=vault_assets, harvest_params=None
             )
         mock_fund.assert_not_called()
-        funding_amounts = _get_funding_amounts(
-            validators_balances={pub_key: ether_to_gwei(32)}, vault_assets=vault_assets
-        )
-        assert result == Gwei(vault_assets - sum(funding_amounts.values()))
+        assert result == ether_to_gwei(68)
 
     @pytest.mark.usefixtures('fake_settings')
     async def test_funding_interval_not_passed_reserves_all_assets(self):
