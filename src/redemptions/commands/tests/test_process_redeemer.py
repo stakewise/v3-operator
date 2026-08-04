@@ -168,6 +168,21 @@ class TestRedeemPositions:
         mocks['get_withdrawable'].assert_not_called()
         mocks['submit_mock'].assert_not_called()
 
+    async def test_ltv_exceeded_position_skipped(self) -> None:
+        """A position where loan > user_assets (LTV > 1) is skipped without redeeming."""
+        pos = make_position(processed_shares=500)
+
+        with _mock_redeem_positions(withdrawable=Wei(10000), ltv_exceeded=True) as mocks:
+            await redeem_positions(
+                tree=make_tree([pos]),
+                os_token_positions=[pos],
+                converter=make_converter(100, 100),
+                block_number=BlockNumber(100),
+            )
+
+        mocks['submit_mock'].assert_not_called()
+        mocks['get_withdrawable'].assert_not_called()
+
     async def test_submit_failure_skips_position(self) -> None:
         """A failed submission skips that position; subsequent positions are still attempted."""
         pos1 = make_position(vault=VAULT_1, owner=OWNER_1, processed_shares=500)
@@ -282,6 +297,21 @@ class TestProcess:
         # The merkle tree is built from the fetched nonce; leaves use nonce - 1 internally
         assert redeem_call.kwargs['tree'].nonce == 5
 
+    async def test_stale_vault_state_skips_redemption(self) -> None:
+        """A failed vault state update leaves stale withdrawable assets and LTVs,
+        so the redemption pass is skipped until the next interval."""
+        positions = [make_position(leaf_shares=1000, processed_shares=500, shares_to_redeem=500)]
+
+        with _mock_process(positions=positions) as mocks:
+            mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
+            mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
+            mocks['mock_update_state'].return_value = False
+
+            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(0))
+
+        mocks['mock_update_state'].assert_awaited_once()
+        mocks['mock_redeem'].assert_not_awaited()
+
 
 # --- Helpers ---
 
@@ -304,6 +334,7 @@ def _mock_redeem_positions(
     is_meta_vault: bool = False,
     state_update_required: bool = False,
     submit_results: list[bool] | None = None,
+    ltv_exceeded: bool = False,
 ) -> Iterator[dict[str, MagicMock]]:
     """Mock setup for redeem_positions tests.
 
@@ -313,6 +344,8 @@ def _mock_redeem_positions(
     the unharvested-vault skip. ``submit_results`` controls per-call return values of
     tx_redeem_position; a ``False`` entry models a failed submission that should
     abort the round. Simulation always succeeds; each live position is simulated first.
+    ``ltv_exceeded`` simulates a position where the user's minted osToken loan exceeds
+    their vault assets (LTV > 1), causing the position to be skipped.
     """
     if isinstance(withdrawable, AsyncMock):
         get_withdrawable = withdrawable
@@ -335,6 +368,10 @@ def _mock_redeem_positions(
         patch(f'{MODULE}.get_withdrawable_assets', new=get_withdrawable),
         patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=is_meta_vault)),
         patch(f'{MODULE}.VaultContract', return_value=vault_contract),
+        patch(
+            f'{MODULE}.is_position_ltv_exceeded',
+            new=AsyncMock(return_value=ltv_exceeded),
+        ),
         patch(f'{MODULE}.simulate_redeem_position', new=simulate_mock),
         patch(f'{MODULE}.tx_redeem_position', new=submit_mock),
     ):
@@ -392,6 +429,10 @@ def _mock_process(
             f'{MODULE}.redeem_positions',
             new=AsyncMock(),
         ) as mock_redeem,
+        patch(
+            f'{MODULE}.update_vaults_state',
+            new=AsyncMock(return_value=True),
+        ) as mock_update_state,
         patch(f'{MODULE}.execution_client', new=mock_client),
     ):
         mock_settings.network_config.VAULT_BALANCE_SYMBOL = 'ETH'
@@ -399,6 +440,7 @@ def _mock_process(
         yield {
             'mock_redeemer': mock_redeemer,
             'mock_redeem': mock_redeem,
+            'mock_update_state': mock_update_state,
         }
 
 

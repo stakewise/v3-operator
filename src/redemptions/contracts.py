@@ -1,13 +1,11 @@
-from eth_typing import HexStr
 from web3 import Web3
 from web3.types import BlockNumber, ChecksumAddress, EventData, Wei
 
-from src.common.contracts import ContractWrapper
-from src.common.execution import transaction_gas_wrapper
+from src.common.contracts import ContractWrapper, ErrorMixin
 from src.redemptions.typings import OsTokenPosition, RedeemablePositions
 
 
-class OsTokenRedeemerContract(ContractWrapper):
+class OsTokenRedeemerContract(ContractWrapper, ErrorMixin):
     abi_path = 'abi/IOsTokenRedeemer.json'
     settings_key = 'OS_TOKEN_REDEEMER_CONTRACT_ADDRESS'
 
@@ -58,11 +56,6 @@ class OsTokenRedeemerContract(ContractWrapper):
             from_block=from_block,
             to_block=to_block,
         )
-
-    async def process_exit_queue(self) -> HexStr:
-        tx_function = self.contract.functions.processExitQueue()
-        tx_hash = await transaction_gas_wrapper(tx_function)
-        return Web3.to_hex(tx_hash)
 
     async def multicall_leaf_to_processed_shares(
         self, positions: list[OsTokenPosition], nonce: int, block_number: BlockNumber

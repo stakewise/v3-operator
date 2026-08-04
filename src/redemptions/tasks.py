@@ -7,6 +7,7 @@ from sw_utils import OsTokenConverter
 from sw_utils.typings import ChainHead, ProtocolConfig
 from web3.types import Wei
 
+from src.common.contracts import VaultContract
 from src.common.execution import get_finalized_block_number
 from src.common.protocol_config import get_protocol_config
 from src.config.settings import settings
@@ -113,6 +114,18 @@ async def aggregate_redemption_assets_by_vaults(
             for vault, shares in vault_to_shares_to_redeem.items()
         },
     )
+
+
+async def is_position_ltv_exceeded(
+    position: OsTokenPosition,
+    converter: OsTokenConverter,
+    block_number: BlockNumber,
+) -> bool:
+    vault_contract = VaultContract(position.vault)
+    minted_shares = await vault_contract.get_os_token_position(position.owner, block_number)
+    loan_assets = converter.to_assets(minted_shares)
+    user_assets = await vault_contract.get_user_assets(position.owner, block_number)
+    return loan_assets > user_assets
 
 
 async def assign_shares_to_redeem(

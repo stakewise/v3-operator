@@ -4,9 +4,16 @@ import json
 import sys
 from functools import cached_property
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
-from eth_typing import HexStr
+from eth_abi import abi as eth_abi
+from eth_typing import ABI, HexStr
+from eth_utils import (
+    abi_to_signature,
+    filter_abi_by_type,
+    function_signature_to_4byte_selector,
+    remove_0x_prefix,
+)
 from web3 import AsyncWeb3, Web3
 from web3.contract import AsyncContract
 from web3.contract.async_contract import (
@@ -14,10 +21,10 @@ from web3.contract.async_contract import (
     AsyncContractEvents,
     AsyncContractFunctions,
 )
-from web3.types import BlockNumber, ChecksumAddress, EventData, Wei
+from web3.types import BlockNumber, ChecksumAddress, EventData, TxReceipt, Wei
 
 from src.common.clients import execution_client as default_execution_client
-from src.common.execution import transaction_gas_wrapper
+from src.common.transaction import tx_manager
 from src.common.typings import (
     ExitQueueMissingAssetsParams,
     HarvestParams,
@@ -50,10 +57,12 @@ class ContractWrapper:
         return self.address or getattr(settings.network_config, self.settings_key)
 
     @cached_property
+    def abi(self) -> list:
+        return self._load_abi(self.abi_path)
+
+    @cached_property
     def contract(self) -> AsyncContract:
-        return self.execution_client.eth.contract(
-            abi=self._load_abi(self.abi_path), address=self.contract_address
-        )
+        return self.execution_client.eth.contract(abi=self.abi, address=self.contract_address)
 
     @property
     def functions(self) -> AsyncContractFunctions:
@@ -116,7 +125,7 @@ class ContractWrapper:
             from_block = BlockNumber(from_block + blocks_range + 1)
         return events
 
-    def _load_abi(self, abi_path: str) -> dict:
+    def _load_abi(self, abi_path: str) -> list:
         # get subclass file path
         file = sys.modules[self.__class__.__module__].__file__
         if not file:
@@ -125,6 +134,74 @@ class ContractWrapper:
         current_dir = Path(file).parent
         with (current_dir / abi_path).open(encoding='utf-8') as f:
             return json.load(f)
+
+
+class ErrorMixin:
+    """
+    Decodes custom error reverts using the contract ABI merged with the shared
+    StakeWise ``Errors`` library ABI.
+    """
+
+    if TYPE_CHECKING:
+        # provided by ContractWrapper, which this mixin is combined with
+        @property
+        def abi(self) -> list: ...
+
+    @cached_property
+    def shared_error_abi(self) -> ABI:
+        """
+        Parses the StakeWise ``Errors`` library ABI (``abi/Errors.json``, mirrors
+        v3-core ``contracts/libraries/Errors.sol``). These errors are reverted
+        from a linked library, so their selectors are absent from every vault ABI
+        and must be tracked here to decode reverts such as ``InvalidValidators``
+        raised by ``fundValidators``. Keep ``Errors.json`` in sync with the source.
+        """
+        path = Path(__file__).parent / 'abi' / 'Errors.json'
+        with open(path, encoding='utf-8') as f:
+            return json.load(f)
+
+    @cached_property
+    def error_abi(self) -> ABI:
+        """Contract ABI merged with the shared StakeWise ``Errors`` library ABI."""
+        return [*self.abi, *self.shared_error_abi]
+
+    def decode_custom_error(self, data: str) -> str | None:
+        """
+        Decode a custom error revert from its hex ``data``, returning a
+        human-readable ``ErrorName(name=value, ...)`` string, or ``None`` if no
+        error in the ABI matches the selector.
+
+        This is a backport of web3.py's ``decode_custom_error`` (ethereum/web3.py
+        #3821, not released yet). web3 only auto-decodes custom errors on
+        ``eth_call`` and against the contract's own ABI, so we call this
+        explicitly on the transact path and against the merged ``error_abi``.
+        """
+        hex_data = remove_0x_prefix(HexStr(data.lower()))
+        if len(hex_data) < 8:
+            return None
+
+        error_selector = hex_data[:8]
+        for error_entry in filter_abi_by_type('error', self.error_abi):
+            selector = function_signature_to_4byte_selector(abi_to_signature(error_entry)).hex()
+            if selector != error_selector:
+                continue
+
+            inputs = error_entry.get('inputs', [])
+            if not inputs:
+                return f'{error_entry['name']}()'
+            try:
+                decoded = eth_abi.decode(
+                    [inp['type'] for inp in inputs], bytes.fromhex(hex_data[8:])
+                )
+            except Exception:  # pylint: disable=broad-except
+                return f'{error_entry['name']}()'
+            params = ', '.join(
+                f'{inp['name']}={value!r}' if inp.get('name') else repr(value)
+                for inp, value in zip(inputs, decoded)
+            )
+            return f'{error_entry['name']}({params})'
+
+        return None
 
 
 class VaultStateMixin:
@@ -155,7 +232,7 @@ class BaseEncoder:
         self.contract = self.contract_class(address=ZERO_CHECKSUM_ADDRESS)
 
 
-class VaultContract(ContractWrapper, VaultStateMixin):
+class VaultContract(ContractWrapper, VaultStateMixin, ErrorMixin):
     abi_path = 'abi/IEthVault.json'
 
     async def vault_id(self) -> HexStr:
@@ -230,6 +307,25 @@ class VaultContract(ContractWrapper, VaultStateMixin):
     async def is_state_update_required(self, block_number: BlockNumber | None = None) -> bool:
         return await self.contract.functions.isStateUpdateRequired().call(
             block_identifier=block_number
+        )
+
+    async def get_os_token_position(
+        self, owner: ChecksumAddress, block_number: BlockNumber | None = None
+    ) -> Wei:
+        return Wei(
+            await self.contract.functions.osTokenPositions(owner).call(
+                block_identifier=block_number
+            )
+        )
+
+    async def get_user_assets(
+        self, owner: ChecksumAddress, block_number: BlockNumber | None = None
+    ) -> Wei:
+        shares = await self.contract.functions.getShares(owner).call(block_identifier=block_number)
+        return Wei(
+            await self.contract.functions.convertToAssets(shares).call(
+                block_identifier=block_number
+            )
         )
 
     async def version(self) -> int:
@@ -316,7 +412,7 @@ class ValidatorsRegistryContract(ContractWrapper):
         return Web3.to_hex(deposit_root)
 
 
-class KeeperContract(ContractWrapper):
+class KeeperContract(ContractWrapper, ErrorMixin):
     abi_path = 'abi/IKeeper.json'
     settings_key = 'KEEPER_CONTRACT_ADDRESS'
 
@@ -386,7 +482,7 @@ class OsTokenVaultControllerContract(ContractWrapper):
         return await self.contract.functions.totalShares().call(block_identifier=block_number)
 
 
-class RewardSplitterContract(ContractWrapper):
+class RewardSplitterContract(ContractWrapper, ErrorMixin):
     abi_path = 'abi/IRewardSplitter.json'
 
 
@@ -440,10 +536,9 @@ class MulticallContract(ContractWrapper):
     async def tx_aggregate(
         self,
         data: list[tuple[ChecksumAddress, HexStr]],
-    ) -> HexStr:
+    ) -> TxReceipt | None:
         tx_function = self.contract.functions.aggregate(data)
-        tx_hash = await transaction_gas_wrapper(tx_function)
-        return Web3.to_hex(tx_hash)
+        return await tx_manager.transact(tx_function)
 
 
 class ValidatorsCheckerContract(ContractWrapper):

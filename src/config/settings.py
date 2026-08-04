@@ -334,7 +334,7 @@ class Settings(metaclass=Singleton):
         self.concurrency = concurrency
         self.execution_timeout = decouple_config('EXECUTION_TIMEOUT', default=30, cast=int)
         self.execution_transaction_timeout = decouple_config(
-            'EXECUTION_TRANSACTION_TIMEOUT', default=300, cast=int
+            'EXECUTION_TRANSACTION_TIMEOUT', default=60, cast=int
         )
         self.execution_retry_timeout = decouple_config(
             'EXECUTION_RETRY_TIMEOUT', default=60, cast=int
@@ -409,6 +409,9 @@ EVENTS_CONCURRENCY_CHUNK: int = decouple_config(
     'EVENTS_CONCURRENCY_CHUNK', default=50_000, cast=int
 )
 EVENTS_CONCURRENCY_LIMIT: int = decouple_config('EVENTS_CONCURRENCY_LIMIT', default=10, cast=int)
+
+# Maximum number of updateState calls batched into a single multicall transaction.
+MULTICALL_CHUNK_SIZE: int = decouple_config('MULTICALL_CHUNK_SIZE', default=20, cast=int)
 
 # Backoff retries
 DEFAULT_RETRY_TIME = 60

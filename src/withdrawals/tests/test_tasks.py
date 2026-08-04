@@ -260,6 +260,7 @@ async def test_get_withdrawals(data_dir):
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
         consolidation_target_indexes=set(),
+        pending_deposits={},
     )
     expected = {'0x1': ether_to_gwei(2), '0x2': ether_to_gwei(18)}
     assert result == expected
@@ -289,6 +290,7 @@ async def test_get_withdrawals(data_dir):
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
         consolidation_target_indexes=set(),
+        pending_deposits={},
     )
     expected = {'0x1': ether_to_gwei(0), '0x2': ether_to_gwei(0)}
 
@@ -321,6 +323,7 @@ async def test_get_withdrawals(data_dir):
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
         consolidation_target_indexes=set(),
+        pending_deposits={},
     )
     assert result == {'0x1': ether_to_gwei(8), '0x2': ether_to_gwei(18)}
     settings.disable_full_withdrawals = False
@@ -350,6 +353,7 @@ async def test_get_withdrawals(data_dir):
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
         consolidation_target_indexes=set(),
+        pending_deposits={},
     )
     expected = {'0x1': ether_to_gwei(0)}
     assert result == expected
@@ -379,6 +383,7 @@ async def test_get_withdrawals(data_dir):
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
         consolidation_target_indexes=set(),
+        pending_deposits={},
     )
     expected = {'0x1': ether_to_gwei(0), '0x2': ether_to_gwei(10)}
     assert result == expected
@@ -414,6 +419,7 @@ async def test_get_withdrawals(data_dir):
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
         consolidation_target_indexes=set(),
+        pending_deposits={},
     )
     expected = {'0x1': ether_to_gwei(0), '0x2': ether_to_gwei(18), '0x3': ether_to_gwei(28)}
     assert result == expected
@@ -448,6 +454,7 @@ async def test_get_withdrawals(data_dir):
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
         consolidation_target_indexes=set(),
+        pending_deposits={},
     )
     expected = {'0x2': ether_to_gwei(0)}
     assert result == expected
@@ -482,6 +489,7 @@ async def test_get_withdrawals(data_dir):
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
         consolidation_target_indexes=set(),
+        pending_deposits={},
     )
     expected = {'0x1': ether_to_gwei(49), '0x2': ether_to_gwei(11)}
     assert result == expected
@@ -511,6 +519,7 @@ async def test_get_withdrawals(data_dir):
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
         consolidation_target_indexes=set(),
+        pending_deposits={},
     )
     expected = {'0x1': ether_to_gwei(0)}
     assert result == expected
@@ -540,6 +549,7 @@ async def test_get_withdrawals(data_dir):
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
         consolidation_target_indexes=set(),
+        pending_deposits={},
     )
     expected = {'0x1': ether_to_gwei(0), '0x2': ether_to_gwei(0)}
     assert result == expected
@@ -570,6 +580,7 @@ async def test_get_withdrawals(data_dir):
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
         consolidation_target_indexes=set(),
+        pending_deposits={},
     )
     expected = {'0x1': 0}
     assert result == expected
@@ -601,6 +612,7 @@ async def test_get_withdrawals(data_dir):
         validator_min_active_epochs=10,
         oracle_exit_indexes={1},
         consolidation_target_indexes=set(),
+        pending_deposits={},
     )
     expected = {'0x2': ether_to_gwei(0)}
     assert result == expected
@@ -632,6 +644,7 @@ async def test_get_withdrawals(data_dir):
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
         consolidation_target_indexes={1},
+        pending_deposits={},
     )
     expected = {'0x2': ether_to_gwei(0)}
     assert result == expected
@@ -663,8 +676,84 @@ async def test_get_withdrawals(data_dir):
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
         consolidation_target_indexes=set(),
+        pending_deposits={},
     )
     expected = {'0x2': ether_to_gwei(0)}
+    assert result == expected
+
+    # skips full withdrawal of a low-balance validator with large pending deposits
+    # in favor of a plain validator (mirrors incident: ~32 ETH CL balance masking
+    # ~1800 ETH of pending top-ups still in the entry queue)
+    chain_head = create_chain_head(epoch=500)
+    queued_assets = ether_to_gwei(20)
+    consensus_validators = [
+        create_consensus_validator(
+            public_key='0x1',
+            balance=ether_to_gwei(32),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=90,
+            index=1,
+        ),
+        create_consensus_validator(
+            public_key='0x2',
+            balance=ether_to_gwei(40),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=85,
+            index=2,
+        ),
+    ]
+    result = await _get_withdrawals(
+        chain_head=chain_head,
+        queued_assets=queued_assets,
+        consensus_validators=consensus_validators,
+        pending_partial_withdrawals=[],
+        validator_min_active_epochs=10,
+        oracle_exit_indexes=set(),
+        consolidation_target_indexes=set(),
+        pending_deposits={'0x1': ether_to_gwei(1800)},
+    )
+    # only the plain validator ('0x2') is exited; '0x1' with the huge pending
+    # deposit sorts last and is left untouched
+    expected = {'0x2': ether_to_gwei(0)}
+    assert result == expected
+
+    # queued_assets accounting subtracts a validator's real CL balance, not
+    # balance + pending deposits: if the pending deposit were wrongly counted
+    # as already-recovered assets, exiting '0x1' would look sufficient and
+    # '0x2' would never be exited
+    chain_head = create_chain_head(epoch=500)
+    queued_assets = ether_to_gwei(12)
+    consensus_validators = [
+        create_consensus_validator(
+            public_key='0x1',
+            balance=ether_to_gwei(10),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=90,
+            index=1,
+        ),
+        create_consensus_validator(
+            public_key='0x2',
+            balance=ether_to_gwei(50),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=85,
+            index=2,
+            is_compounding=False,
+        ),
+    ]
+    result = await _get_withdrawals(
+        chain_head=chain_head,
+        queued_assets=queued_assets,
+        consensus_validators=consensus_validators,
+        pending_partial_withdrawals=[],
+        validator_min_active_epochs=10,
+        oracle_exit_indexes=set(),
+        consolidation_target_indexes=set(),
+        pending_deposits={'0x1': ether_to_gwei(5)},
+    )
+    # '0x1' sorts first (10 + 5 = 15 ETH effective, versus '0x2' at 50 ETH), but only
+    # its real 10 ETH balance is subtracted from queued_assets, leaving 2 ETH still
+    # needed and forcing '0x2' to be exited too
+    expected = {'0x1': ether_to_gwei(0), '0x2': ether_to_gwei(0)}
     assert result == expected
 
     # zero queued assets
@@ -687,6 +776,7 @@ async def test_get_withdrawals(data_dir):
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
         consolidation_target_indexes=set(),
+        pending_deposits={},
     )
     expected = {}
     assert result == expected
@@ -703,6 +793,7 @@ async def test_get_withdrawals(data_dir):
         validator_min_active_epochs=10,
         oracle_exit_indexes=set(),
         consolidation_target_indexes=set(),
+        pending_deposits={},
     )
     assert result == {}
 
@@ -785,6 +876,7 @@ def test_filter_exitable_validators():
         oracle_exit_indexes=set(),
         partial_withdrawal_indexes=set(),
         consolidation_target_indexes=set(),
+        pending_deposits={},
     )
     assert len(result) == 1
     assert result[0].index == 1
@@ -804,6 +896,7 @@ def test_filter_exitable_validators():
         oracle_exit_indexes=set(),
         partial_withdrawal_indexes=set(),
         consolidation_target_indexes=set(),
+        pending_deposits={},
     )
     assert len(result) == 1
     assert result[0].index == 1
@@ -823,6 +916,7 @@ def test_filter_exitable_validators():
         oracle_exit_indexes={2},
         partial_withdrawal_indexes=set(),
         consolidation_target_indexes=set(),
+        pending_deposits={},
     )
     assert len(result) == 1
     assert result[0].index == 1
@@ -842,6 +936,7 @@ def test_filter_exitable_validators():
         oracle_exit_indexes=set(),
         partial_withdrawal_indexes={2},
         consolidation_target_indexes=set(),
+        pending_deposits={},
     )
     assert len(result) == 1
     assert result[0].index == 1
@@ -861,6 +956,7 @@ def test_filter_exitable_validators():
         oracle_exit_indexes=set(),
         partial_withdrawal_indexes=set(),
         consolidation_target_indexes={2},
+        pending_deposits={},
     )
     assert len(result) == 1
     assert result[0].index == 1
@@ -883,11 +979,41 @@ def test_filter_exitable_validators():
         oracle_exit_indexes=set(),
         partial_withdrawal_indexes=set(),
         consolidation_target_indexes=set(),
+        pending_deposits={},
     )
     assert len(result) == 3
     assert result[0].index == 2
     assert result[1].index == 3
     assert result[2].index == 1
+
+    # validators_with_pending_deposits_sort_last_but_are_not_excluded
+    validators = [
+        create_consensus_validator(
+            index=1,
+            public_key='0x1',
+            activation_epoch=10,
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            balance=ether_to_gwei(32),
+        ),
+        create_consensus_validator(
+            index=2,
+            public_key='0x2',
+            activation_epoch=10,
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            balance=ether_to_gwei(50),
+        ),
+    ]
+    result = _filter_exitable_validators(
+        validators,
+        max_activation_epoch=12,
+        oracle_exit_indexes=set(),
+        partial_withdrawal_indexes=set(),
+        consolidation_target_indexes=set(),
+        pending_deposits={'0x1': ether_to_gwei(1800)},
+    )
+    assert len(result) == 2
+    assert result[0].index == 2
+    assert result[1].index == 1
 
     # no_validators_returned_when_all_are_excluded
     validators = [
@@ -904,5 +1030,6 @@ def test_filter_exitable_validators():
         oracle_exit_indexes={1},
         partial_withdrawal_indexes=set(),
         consolidation_target_indexes=set(),
+        pending_deposits={},
     )
     assert len(result) == 0

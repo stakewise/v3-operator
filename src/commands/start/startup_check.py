@@ -66,7 +66,7 @@ async def startup_checks() -> None:
     await wait_execution_catch_up_consensus(chain_state)
 
     if settings.claim_fee_splitter:
-        logger.info('Checking graph nodes...')
+        logger.info('Checking graph nodes %s...', settings.graph_endpoint)
         await wait_for_graph_node_sync_to_chain_head()
 
     logger.info('Checking oracles config...')
@@ -92,7 +92,7 @@ async def startup_checks() -> None:
     await check_vault_version()
 
     if settings.enable_metrics:
-        logger.info('Checking metrics server...')
+        logger.info('Checking whether metrics port is available...')
         check_metrics_port()
 
     if (

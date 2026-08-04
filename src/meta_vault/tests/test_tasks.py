@@ -3,10 +3,16 @@ from unittest import mock
 
 import pytest
 from eth_typing import ChecksumAddress
+from hexbytes import HexBytes
 from sw_utils.tests import faker
 
+from src.config.settings import settings
 from src.meta_vault.contracts import MetaVaultContract
-from src.meta_vault.tasks import meta_vault_tree_update_state, multicall_contract
+from src.meta_vault.tasks import (
+    ProcessMetaVaultTask,
+    meta_vault_tree_update_state,
+    multicall_contract,
+)
 from src.meta_vault.tests.factories import create_vault
 from src.meta_vault.typings import Vault
 
@@ -105,17 +111,42 @@ class TestMetaVaultTreeUpdateStateCalls:
         ), mock.patch(
             'src.meta_vault.tasks.get_claimable_sub_vault_exit_requests', return_value=[]
         ), mock.patch.object(
-            multicall_contract, 'tx_aggregate', return_value='0x123'
-        ) as tx_aggregate_mock, mock.patch(
-            'src.meta_vault.tasks.execution_client', new=mock.AsyncMock()
-        ) as execution_client_mock, mock.patch.object(
+            multicall_contract,
+            'tx_aggregate',
+            return_value={
+                'status': 1,
+                'transactionHash': HexBytes(b'\x12' * 32),
+                'blockNumber': 123,
+            },
+        ) as tx_aggregate_mock, mock.patch.object(
             MetaVaultContract, 'sub_vaults_registry', return_value=faker.eth_address()
         ):
-            execution_client_mock.eth.wait_for_transaction_receipt.return_value = {
-                'status': 1,
-                'blockNumber': 123,
-            }
             yield tx_aggregate_mock
+
+
+@pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
+class TestProcessMetaVaultFeeSplitterClaim:
+    async def test_claims_when_flag_enabled(self):
+        settings.claim_fee_splitter = True
+        with self._patch() as claim_mock:
+            await ProcessMetaVaultTask([faker.eth_address()]).process_block(mock.MagicMock())
+
+        claim_mock.assert_awaited_once()
+        assert claim_mock.call_args.kwargs['update_vault_state'] is False
+
+    async def test_skips_when_flag_disabled(self):
+        settings.claim_fee_splitter = False
+        with self._patch() as claim_mock:
+            await ProcessMetaVaultTask([faker.eth_address()]).process_block(mock.MagicMock())
+
+        claim_mock.assert_not_called()
+
+    @contextmanager
+    def _patch(self):
+        with mock.patch('src.meta_vault.tasks.check_gas_price', return_value=True), mock.patch(
+            'src.meta_vault.tasks.graph_get_vaults', return_value={}
+        ), mock.patch('src.meta_vault.tasks.claim_reward_splitters') as claim_mock:
+            yield claim_mock
 
 
 class GraphMock:

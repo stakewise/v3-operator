@@ -64,6 +64,13 @@ logger = logging.getLogger(__name__)
     is_flag=True,
 )
 @click.option(
+    '--claim-fee-splitter',
+    is_flag=True,
+    envvar='CLAIM_FEE_SPLITTER',
+    help='Claim fee splitter rewards periodically on behalf of the shareholders. '
+    'Default is false.',
+)
+@click.option(
     '--min-deposit-amount-gwei',
     type=int,
     envvar='MIN_DEPOSIT_AMOUNT_GWEI',
@@ -138,6 +145,7 @@ def process_meta_vaults(
     wallet_password_file: str | None,
     max_fee_per_gas_gwei: int | None,
     min_deposit_amount_gwei: int,
+    claim_fee_splitter: bool,
 ) -> None:
     # Validate wallet configuration
     has_private_key = settings.wallet_private_key is not None
@@ -171,6 +179,7 @@ def process_meta_vaults(
         log_level=log_level,
         log_format=log_format,
         meta_vault_min_deposit_amount_gwei=Gwei(min_deposit_amount_gwei),
+        claim_fee_splitter=claim_fee_splitter,
     )
     try:
         asyncio.run(main(vault_addresses))
