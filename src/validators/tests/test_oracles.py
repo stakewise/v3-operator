@@ -79,7 +79,7 @@ class TestPollValidationApproval:
                 new=AsyncMock(return_value=approval_request),
             ),
             patch('src.validators.oracles.send_approval_requests', new=send_approval_requests_mock),
-            patch('src.validators.oracles.APPROVALS_MAX_ATTEMPTS', 3),
+            patch('src.validators.oracles.ORACLES_APPROVALS_MAX_ATTEMPTS', 3),
         ):
             with pytest.raises(NotEnoughOracleApprovalsError):
                 await poll_validation_approval(
@@ -127,7 +127,7 @@ class TestPollConsolidationSignature:
 
         with (
             patch('src.validators.oracles._send_consolidation_requests', new=send_requests_mock),
-            patch('src.validators.oracles.APPROVALS_MAX_ATTEMPTS', 3),
+            patch('src.validators.oracles.ORACLES_APPROVALS_MAX_ATTEMPTS', 3),
         ):
             with pytest.raises(ConsolidationError):
                 await poll_consolidation_signature(

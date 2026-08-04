@@ -355,7 +355,9 @@ ORACLES_CONSOLIDATION_TIMEOUT: int = decouple_config(
 )
 ORACLES_EXITS_TIMEOUT: int = decouple_config('ORACLES_EXITS_TIMEOUT', default=10, cast=int)
 # Max number of polling attempts to collect oracle approvals/signatures before giving up
-APPROVALS_MAX_ATTEMPTS: int = decouple_config('APPROVALS_MAX_ATTEMPTS', default=10, cast=int)
+ORACLES_APPROVALS_MAX_ATTEMPTS: int = decouple_config(
+    'ORACLES_APPROVALS_MAX_ATTEMPTS', default=10, cast=int
+)
 # withdrawals
 WITHDRAWALS_INTERVAL: int = decouple_config(
     'WITHDRAWALS_INTERVAL', default=43200, cast=int  # every 12 hr
