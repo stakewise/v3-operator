@@ -1,11 +1,11 @@
 from web3 import Web3
 from web3.types import BlockNumber, ChecksumAddress, EventData, Wei
 
-from src.common.contracts import ContractWrapper
+from src.common.contracts import ContractWrapper, ErrorMixin
 from src.redemptions.typings import OsTokenPosition, RedeemablePositions
 
 
-class OsTokenRedeemerContract(ContractWrapper):
+class OsTokenRedeemerContract(ContractWrapper, ErrorMixin):
     abi_path = 'abi/IOsTokenRedeemer.json'
     settings_key = 'OS_TOKEN_REDEEMER_CONTRACT_ADDRESS'
 

@@ -6,7 +6,7 @@ import pytest
 from eth_typing import BlockNumber, ChecksumAddress
 from hexbytes import HexBytes
 from web3 import Web3
-from web3.exceptions import Web3Exception
+from web3.exceptions import ContractCustomError
 from web3.types import Wei
 
 from src.redemptions.execution import (
@@ -19,6 +19,9 @@ from src.redemptions.merkle_tree import PositionsMerkleTree
 from src.redemptions.typings import OsTokenPosition
 
 MODULE = 'src.redemptions.execution'
+
+# error_verbose reads settings.verbose on the failure paths exercised below.
+pytestmark = pytest.mark.usefixtures('fake_settings')
 
 VAULT_1 = Web3.to_checksum_address('0x' + '11' * 20)
 VAULT_2 = Web3.to_checksum_address('0x' + '22' * 20)
@@ -49,11 +52,11 @@ class TestTxRedeemPosition:
         # No sync barrier when the tx reverted
         mocks['wait_for_execution_endpoints_synced'].assert_not_awaited()
 
-    @pytest.mark.parametrize('exc_class', [Web3Exception, RuntimeError, ValueError])
-    async def test_tx_build_failure_returns_false(self, exc_class: type[Exception]) -> None:
-        """Each caught exception during tx build/send returns False."""
+    async def test_tx_build_failure_returns_false(self) -> None:
+        """An error during tx build/send returns False, so a single bad position
+        cannot abort the whole redemption run."""
         position = make_position(leaf_shares=1000, shares_to_redeem=500)
-        with _mock_tx_redeem_position(send_exception=exc_class('boom')) as mocks:
+        with _mock_tx_redeem_position(send_exception=Exception('boom')) as mocks:
             result = await tx_redeem_position(
                 position=position,
                 tree=make_tree([position]),
@@ -62,15 +65,18 @@ class TestTxRedeemPosition:
         # No sync barrier when the tx build/send step raised
         mocks['wait_for_execution_endpoints_synced'].assert_not_awaited()
 
-    async def test_unexpected_exception_propagates(self) -> None:
-        """Exceptions outside the (Web3Exception, RuntimeError, ValueError) catch list propagate."""
+    async def test_custom_error_returns_false(self) -> None:
+        """A custom error revert is decoded and returns False without raising."""
         position = make_position(leaf_shares=1000, shares_to_redeem=500)
-        with _mock_tx_redeem_position(send_exception=KeyError('boom')):
-            with pytest.raises(KeyError):
-                await tx_redeem_position(
-                    position=position,
-                    tree=make_tree([position]),
-                )
+        error = ContractCustomError('reverted', data='0x1234abcd')
+        with _mock_tx_redeem_position(send_exception=error) as mocks:
+            result = await tx_redeem_position(
+                position=position,
+                tree=make_tree([position]),
+            )
+        assert result is False
+        mocks['redeemer'].decode_custom_error.assert_called_once_with('0x1234abcd')
+        mocks['wait_for_execution_endpoints_synced'].assert_not_awaited()
 
 
 class TestSimulateRedeemPosition:
@@ -84,16 +90,27 @@ class TestSimulateRedeemPosition:
         assert result is True
         mocks['call'].assert_awaited_once()
 
-    @pytest.mark.parametrize('exc_class', [Web3Exception, RuntimeError, ValueError])
-    async def test_call_failure_returns_false(self, exc_class: type[Exception]) -> None:
+    async def test_call_failure_returns_false(self) -> None:
         """A failed simulation returns False without raising."""
         position = make_position(leaf_shares=1000, shares_to_redeem=500)
-        with _mock_simulate_redeem_position(call_exception=exc_class('boom')):
+        with _mock_simulate_redeem_position(call_exception=Exception('boom')):
             result = await simulate_redeem_position(
                 position=position,
                 tree=make_tree([position]),
             )
         assert result is False
+
+    async def test_custom_error_returns_false(self) -> None:
+        """A custom error revert during simulation is decoded and returns False."""
+        position = make_position(leaf_shares=1000, shares_to_redeem=500)
+        error = ContractCustomError('reverted', data='0x1234abcd')
+        with _mock_simulate_redeem_position(call_exception=error) as mocks:
+            result = await simulate_redeem_position(
+                position=position,
+                tree=make_tree([position]),
+            )
+        assert result is False
+        mocks['redeemer'].decode_custom_error.assert_called_once_with('0x1234abcd')
 
 
 class TestTxProcessExitQueue:
@@ -113,11 +130,25 @@ class TestTxProcessExitQueue:
             mock_redeemer.contract.functions.processExitQueue.assert_called_once()
             mock_tx_manager.transact.assert_awaited_once()
 
+    async def test_custom_error_is_decoded(self) -> None:
+        """A custom error revert is decoded and swallowed."""
+        mock_tx_manager = MagicMock()
+        mock_tx_manager.transact = AsyncMock(
+            side_effect=ContractCustomError('reverted', data='0x1234abcd')
+        )
+        with (
+            patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
+            patch(f'{MODULE}.tx_manager', new=mock_tx_manager),
+        ):
+            await tx_process_exit_queue()
+            mock_redeemer.decode_custom_error.assert_called_once_with('0x1234abcd')
+
 
 class TestUpdateVaultsState:
     async def test_submits_multicall_for_harvestable_vaults(self) -> None:
         with _mock_update_vaults_state() as mocks:
-            await update_vaults_state(vaults=[VAULT_1, VAULT_2])
+            result = await update_vaults_state(vaults=[VAULT_1, VAULT_2])
+        assert result is True
         mocks['tx_aggregate'].assert_awaited_once()
         await_args = mocks['tx_aggregate'].await_args
         assert await_args is not None
@@ -125,14 +156,17 @@ class TestUpdateVaultsState:
         assert len(await_args.args[0]) == 2
 
     async def test_skips_meta_vaults(self) -> None:
+        """Nothing to update is still up to date, so the caller may proceed."""
         with _mock_update_vaults_state(is_meta_vault=True) as mocks:
-            await update_vaults_state(vaults=[VAULT_1])
+            result = await update_vaults_state(vaults=[VAULT_1])
+        assert result is True
         mocks['tx_aggregate'].assert_not_awaited()
 
     async def test_skips_when_not_harvestable(self) -> None:
         """can_harvest returns no harvest params, so there is nothing to update."""
         with _mock_update_vaults_state(harvest_params=None) as mocks:
-            await update_vaults_state(vaults=[VAULT_1])
+            result = await update_vaults_state(vaults=[VAULT_1])
+        assert result is True
         mocks['tx_aggregate'].assert_not_awaited()
 
     async def test_batches_calls_into_chunks(self) -> None:
@@ -144,10 +178,21 @@ class TestUpdateVaultsState:
         for call in mocks['tx_aggregate'].await_args_list:
             assert len(call.args[0]) == 1
 
-    async def test_raises_on_failed_receipt(self) -> None:
-        with _mock_update_vaults_state(tx_status=0):
-            with pytest.raises(RuntimeError, match='updateState multicall tx failed'):
-                await update_vaults_state(vaults=[VAULT_1])
+    async def test_stops_on_unconfirmed_receipt(self) -> None:
+        """An unconfirmed multicall stops the loop without raising, leaving the
+        remaining chunks unsubmitted, and reports stale state to the caller."""
+        with _mock_update_vaults_state(tx_status=0, chunk_size=1) as mocks:
+            result = await update_vaults_state(vaults=[VAULT_1, VAULT_2])
+        assert result is False
+        # First chunk was not confirmed, so the second chunk is never submitted.
+        assert mocks['tx_aggregate'].await_count == 1
+
+    async def test_stops_on_send_failure(self) -> None:
+        """An error while submitting stops the loop without raising."""
+        with _mock_update_vaults_state(send_exception=Exception('boom'), chunk_size=1) as mocks:
+            result = await update_vaults_state(vaults=[VAULT_1, VAULT_2])
+        assert result is False
+        assert mocks['tx_aggregate'].await_count == 1
 
 
 # --- Helpers ---
@@ -159,18 +204,23 @@ def _mock_update_vaults_state(
     harvest_params: object = object(),
     tx_status: int = 1,
     chunk_size: int | None = None,
+    send_exception: BaseException | None = None,
 ) -> Iterator[dict[str, AsyncMock]]:
     """Mock setup for update_vaults_state tests. VaultContract, harvest params and
     the multicall contract are all stubbed so only the orchestration logic is
     exercised. ``harvest_params=None`` models a vault that can_harvest filtered
-    out. ``tx_status=0`` models a failed multicall tx, i.e. ``tx_aggregate``
-    returning no receipt. ``chunk_size`` overrides MULTICALL_CHUNK_SIZE."""
+    out. ``tx_status=0`` models an unconfirmed multicall tx, i.e. ``tx_aggregate``
+    returning no receipt, while ``send_exception`` makes ``tx_aggregate`` raise.
+    ``chunk_size`` overrides MULTICALL_CHUNK_SIZE."""
     vault_contract = MagicMock()
     vault_contract.contract_address = VAULT_1
     vault_contract.get_update_state_call = MagicMock(return_value='0xdeadbeef')
 
     tx_receipt = {'status': 1, 'transactionHash': HexBytes(b'\xab' * 32)} if tx_status else None
-    tx_aggregate = AsyncMock(return_value=tx_receipt)
+    if send_exception is not None:
+        tx_aggregate = AsyncMock(side_effect=send_exception)
+    else:
+        tx_aggregate = AsyncMock(return_value=tx_receipt)
     mock_multicall = MagicMock()
     mock_multicall.tx_aggregate = tx_aggregate
 
