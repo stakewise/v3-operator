@@ -93,9 +93,6 @@ class Settings(metaclass=Singleton):
     ipfs_local_client_endpoint: str
     ipfs_local_username: str | None
     ipfs_local_password: str | None
-    ipfs_infura_client_endpoint: str
-    ipfs_infura_client_username: str | None
-    ipfs_infura_client_password: str | None
     ipfs_pinata_api_key: str | None
     ipfs_pinata_secret_key: str | None
 
@@ -306,15 +303,6 @@ class Settings(metaclass=Singleton):
         )
         self.ipfs_local_username: str | None = decouple_config('IPFS_LOCAL_USERNAME', default=None)
         self.ipfs_local_password: str | None = decouple_config('IPFS_LOCAL_PASSWORD', default=None)
-
-        # infura
-        self.ipfs_infura_client_endpoint: str = '/dns/ipfs.infura.io/tcp/5001/https'
-        self.ipfs_infura_client_username: str = decouple_config(
-            'IPFS_INFURA_CLIENT_USERNAME', default=''
-        )
-        self.ipfs_infura_client_password: str = decouple_config(
-            'IPFS_INFURA_CLIENT_PASSWORD', default=''
-        )
 
         # pinata
         self.ipfs_pinata_api_key: str = decouple_config('IPFS_PINATA_API_KEY', default='')
