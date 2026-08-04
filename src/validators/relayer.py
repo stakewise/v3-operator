@@ -12,6 +12,7 @@ from web3.types import Gwei
 from src.common.clients import OPERATOR_USER_AGENT
 from src.config.settings import settings
 from src.validators.event_processors import get_validators_start_index
+from src.validators.exceptions import EmptyRelayerResponseException
 from src.validators.typings import (
     ExitSignatureShards,
     RelayerInfoResponse,
@@ -52,11 +53,11 @@ class RelayerClient:
             amounts=list(funding_amounts),
         )
 
-        validators_manager_signature = add_0x_prefix(
-            relayer_response.get('validators_manager_signature') or HexStr('0x')
-        )
+        validators_manager_signature = relayer_response.get('validators_manager_signature')
+        if not validators_manager_signature:
+            raise EmptyRelayerResponseException
         return RelayerSignatureResponse(
-            validators_manager_signature=validators_manager_signature,
+            validators_manager_signature=add_0x_prefix(HexStr(validators_manager_signature)),
         )
 
     async def withdraw_validators(
@@ -191,7 +192,7 @@ def _parse_validator(v: dict) -> Validator:
     )
     return Validator(
         public_key=add_0x_prefix(v['public_key']),
-        amount=v['amount'],
+        amount=Gwei(int(v['amount'])),
         deposit_signature=_to_hex_or_none(v.get('deposit_signature')),
         exit_signature=_to_bls_signature_or_none(v.get('exit_signature')),
         exit_signature_shards=exit_signature_shards,

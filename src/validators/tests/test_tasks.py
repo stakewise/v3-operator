@@ -10,7 +10,7 @@ from web3.types import Gwei
 from src.common.tests.utils import ether_to_gwei
 from src.common.typings import ValidatorType
 from src.config.settings import MIN_ACTIVATION_BALANCE_GWEI, settings
-from src.validators.exceptions import FundingException
+from src.validators.exceptions import EmptyRelayerResponseException, FundingException
 from src.validators.tasks import (
     ValidatorRegistrationSubtask,
     _get_deposits_amounts,
@@ -209,6 +209,16 @@ class TestProcessFunding:
 
     @staticmethod
     @contextmanager
+    def patch_fund_validators_chunk_side_effect(side_effect):
+        with patch(
+            'src.validators.tasks.fund_validators_chunk',
+            new_callable=AsyncMock,
+            side_effect=side_effect,
+        ) as mock_fund:
+            yield mock_fund
+
+    @staticmethod
+    @contextmanager
     def patch_get_latest_vault_v2_validator_public_keys(return_value=None):
         with patch(
             'src.validators.consensus.get_latest_vault_v2_validator_public_keys',
@@ -294,6 +304,28 @@ class TestProcessFunding:
         ):
             with pytest.raises(FundingException, match='Funding transaction failed'):
                 await self.subtask.process_funding(vault_assets=vault_assets, harvest_params=None)
+
+    @pytest.mark.usefixtures('fake_settings')
+    async def test_funding_defers_on_empty_relayer_response(self):
+        """
+        Defers funding (no exception, reserves the planned-but-unfunded amount)
+        when the relayer has no validators manager signature yet.
+        """
+        vault_assets = ether_to_gwei(100)
+        pub_key = faker.validator_public_key()
+
+        with (
+            self.patch_funding_validators_balances({pub_key: ether_to_gwei(32)}),
+            self.patch_is_funding_interval_passed(True),
+            self.patch_fund_validators_chunk_side_effect(EmptyRelayerResponseException),
+        ):
+            result = await self.subtask.process_funding(
+                vault_assets=vault_assets, harvest_params=None
+            )
+
+        # the whole vault_assets was planned for the single validator but never funded,
+        # so it's fully reserved (same value as if it had been funded)
+        assert result == Gwei(0)
 
     @pytest.mark.usefixtures('fake_settings')
     async def test_funding_multiple_validators(self):

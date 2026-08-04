@@ -115,6 +115,9 @@ class ValidatorRegistrationSubtask:
         if not await _is_funding_interval_passed():
             raise FundingException('Funding interval has not passed yet')
 
+        total_planned = sum(funding_amounts.values())
+        total_funded = Gwei(0)
+
         for validator_fundings_chunk in batched(
             list(funding_amounts.items()), VALIDATORS_FUNDING_BATCH_SIZE
         ):
@@ -124,14 +127,19 @@ class ValidatorRegistrationSubtask:
                     harvest_params=harvest_params,
                     relayer=self.relayer,
                 )
-            except EmptyRelayerResponseException as e:
-                raise FundingException('Empty response from relayer') from e
+            except EmptyRelayerResponseException:
+                logger.warning(
+                    'Waiting for relayer validators manager signature, deferring funding'
+                )
+                # reserve assets planned but not yet funded, so they are not registered instead
+                return Gwei(vault_assets - (total_planned - total_funded))
 
             if not tx_hash:
                 raise FundingException('Funding transaction failed')
 
-            total_funded = sum(amount for _, amount in validator_fundings_chunk)
-            vault_assets = Gwei(max(vault_assets - total_funded, 0))
+            chunk_funded = sum(amount for _, amount in validator_fundings_chunk)
+            total_funded = Gwei(total_funded + chunk_funded)
+            vault_assets = Gwei(max(vault_assets - chunk_funded, 0))
 
         return vault_assets
 
@@ -149,13 +157,12 @@ async def fund_validators_chunk(
     logger.info('Started funding of %d validator(s)', len(validator_fundings))
     validators_manager_signature = HexStr('0x')
     if settings.relayer_endpoint:
-        # fetch validators and signature from relayer
+        # fetch validators and signature from relayer;
+        # raises EmptyRelayerResponseException if relayer has no signature yet
         validators_response = await cast(RelayerClient, relayer).fund_validators(
             validator_fundings=validator_fundings,
         )
-
-        if validators_response.validators_manager_signature:
-            validators_manager_signature = validators_response.validators_manager_signature
+        validators_manager_signature = validators_response.validators_manager_signature
 
     validators = []
     # the signature is not checked for funding active validators
@@ -183,7 +190,7 @@ async def fund_validators_chunk(
     return tx_hash
 
 
-# pylint: disable-next=too-many-locals
+# pylint: disable-next=too-many-locals,too-many-return-statements
 async def register_new_validators(
     vault_assets: Gwei,
     harvest_params: HarvestParams | None,
@@ -218,11 +225,24 @@ async def register_new_validators(
                 )
             return None
     else:
-        validators_response = await cast(RelayerClient, relayer).register_validators(
-            amounts=validators_amounts[:validators_batch_size],
-        )
+        try:
+            validators_response = await cast(RelayerClient, relayer).register_validators(
+                amounts=validators_amounts[:validators_batch_size],
+            )
+        except (KeyError, ValueError, TypeError) as e:
+            logger.warning('Invalid relayer response: %s', e)
+            return None
+
         validators = validators_response.validators
         validators_manager_signature = validators_response.validators_manager_signature
+
+        if len(validators) > validators_batch_size:
+            logger.warning(
+                'Invalid relayer response: returned %d validator(s), expected at most %d',
+                len(validators),
+                validators_batch_size,
+            )
+            return None
 
         if not validators or not validators_manager_signature:
             # Missing signature indicates that relayer is not ready with the validators,
