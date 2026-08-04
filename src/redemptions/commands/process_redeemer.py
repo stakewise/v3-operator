@@ -234,9 +234,13 @@ async def _redeem_os_token_positions(
     queued_assets = os_token_converter.to_assets(queued_shares)
     if queued_assets < Web3.to_wei(min_queued_assets, 'gwei'):
         logger.info(
-            'Queued assets %s below threshold %s. Skipping to next interval.',
-            Web3.from_wei(queued_assets, 'ether'),
-            Web3.from_wei(Web3.to_wei(min_queued_assets, 'gwei'), 'ether'),
+            'Queued assets %(queued)s %(symbol)s below threshold %(threshold)s %(symbol)s. '
+            'Skipping to next interval.',
+            {
+                'queued': Web3.from_wei(queued_assets, 'ether'),
+                'threshold': Web3.from_wei(Web3.to_wei(min_queued_assets, 'gwei'), 'ether'),
+                'symbol': settings.network_config.VAULT_BALANCE_SYMBOL,
+            },
         )
         return
 
