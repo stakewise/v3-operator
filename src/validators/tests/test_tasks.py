@@ -311,10 +311,11 @@ class TestProcessFunding:
         Defers funding (no exception, reserves the planned-but-unfunded amount)
         when the relayer has no validators manager signature yet.
         """
-        vault_assets = ether_to_gwei(100)
         pub_key = faker.validator_public_key()
+        vault_assets = ether_to_gwei(100)
 
         with (
+            patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_funding_validators_balances({pub_key: ether_to_gwei(32)}),
             self.patch_is_funding_interval_passed(True),
             self.patch_fund_validators_chunk_side_effect(EmptyRelayerResponseException),
@@ -323,9 +324,44 @@ class TestProcessFunding:
                 vault_assets=vault_assets, harvest_params=None
             )
 
-        # the whole vault_assets was planned for the single validator but never funded,
-        # so it's fully reserved (same value as if it had been funded)
-        assert result == Gwei(0)
+        # capacity=64-32=32, planned=32, nothing funded yet,
+        # so 32 out of 100 is reserved: 100 - 32 = 68
+        assert result == ether_to_gwei(68)
+
+    @pytest.mark.usefixtures('fake_settings')
+    async def test_funding_defers_mid_batch_on_empty_relayer_response(self):
+        """
+        When funding is split into single-validator batches, a chunk funded before the
+        relayer defers must stay funded, while the deferred chunk's amount is reserved.
+        """
+        pub_key_1 = faker.validator_public_key()
+        pub_key_2 = faker.validator_public_key()
+        tx_hash = HexStr('0xabc')
+        vault_assets = ether_to_gwei(200)
+
+        with (
+            patch_max_validator_balance(ether_to_gwei(64)),
+            self.patch_funding_validators_balances(
+                {
+                    pub_key_1: ether_to_gwei(32),
+                    pub_key_2: ether_to_gwei(33),
+                }
+            ),
+            self.patch_is_funding_interval_passed(True),
+            self.patch_fund_validators_chunk_side_effect(
+                [tx_hash, EmptyRelayerResponseException()]
+            ) as mock_fund,
+            patch('src.validators.tasks.VALIDATORS_FUNDING_BATCH_SIZE', 1),
+        ):
+            result = await self.subtask.process_funding(
+                vault_assets=vault_assets, harvest_params=None
+            )
+
+        assert mock_fund.call_count == 2
+        # funded by balance descending: pub_key_2 (capacity 31) succeeds,
+        # pub_key_1 (capacity 32) defers; planned = 31 + 32 = 63
+        assert result == ether_to_gwei(200) - (ether_to_gwei(31) + ether_to_gwei(32))
+        assert result == ether_to_gwei(137)
 
     @pytest.mark.usefixtures('fake_settings')
     async def test_funding_multiple_validators(self):

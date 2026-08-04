@@ -23,7 +23,11 @@ from src.config.settings import (
 from src.validators.consensus import fetch_funding_validators_balances
 from src.validators.database import NetworkValidatorCrud
 from src.validators.event_processors import get_validators_start_index
-from src.validators.exceptions import EmptyRelayerResponseException, FundingException
+from src.validators.exceptions import (
+    EmptyRelayerResponseException,
+    FundingException,
+    InvalidRelayerResponseException,
+)
 from src.validators.execution import (
     get_withdrawable_assets,
     tx_fund_validators,
@@ -229,7 +233,7 @@ async def register_new_validators(
             validators_response = await cast(RelayerClient, relayer).register_validators(
                 amounts=validators_amounts[:validators_batch_size],
             )
-        except (KeyError, ValueError, TypeError) as e:
+        except InvalidRelayerResponseException as e:
             logger.warning('Invalid relayer response: %s', e)
             return None
 

@@ -8,9 +8,14 @@ from web3.types import Gwei
 
 from src.common.tests.utils import ether_to_gwei
 from src.config.settings import settings
-from src.validators.exceptions import EmptyRelayerResponseException
+from src.validators.exceptions import (
+    EmptyRelayerResponseException,
+    InvalidRelayerResponseException,
+)
 from src.validators.relayer import RelayerClient, _parse_validator
 from src.validators.tasks import register_new_validators
+
+PUBLIC_KEY = faker.validator_public_key()
 
 
 @pytest.mark.usefixtures('fake_settings')
@@ -44,6 +49,49 @@ class TestRegisterValidators:
         assert len(result.validators) == 1
         assert result.validators[0].amount == 32000000000
         assert isinstance(result.validators[0].amount, int)
+
+
+@pytest.mark.usefixtures('fake_settings')
+class TestRegisterValidatorsMalformedResponse:
+    """RelayerClient.register_validators wraps a malformed relayer body in
+    InvalidRelayerResponseException instead of letting parsing errors escape."""
+
+    @pytest.mark.parametrize(
+        'relayer_response',
+        [
+            {'validators': [{'public_key': PUBLIC_KEY}]},
+            {'validators': [{'amount': '32000000000'}]},
+            {'validators': [{'public_key': PUBLIC_KEY, 'amount': 'not-a-number'}]},
+            {'validators': [{'public_key': PUBLIC_KEY, 'amount': 32.5}]},
+            None,
+            [],
+        ],
+        ids=[
+            'missing_amount',
+            'missing_public_key',
+            'unparseable_amount',
+            'non_integral_amount',
+            'null_body',
+            'array_body',
+        ],
+    )
+    async def test_raises_invalid_relayer_response(self, relayer_response):
+        relayer = RelayerClient()
+        with (
+            patch(
+                'src.validators.relayer.get_validators_start_index',
+                new_callable=AsyncMock,
+                return_value=0,
+            ),
+            patch.object(
+                RelayerClient,
+                '_register_validators',
+                new_callable=AsyncMock,
+                return_value=relayer_response,
+            ),
+        ):
+            with pytest.raises(InvalidRelayerResponseException):
+                await relayer.register_validators(amounts=[Gwei(32000000000)])
 
 
 @pytest.mark.usefixtures('fake_settings')
@@ -96,20 +144,46 @@ class TestParseValidator:
         with pytest.raises(KeyError):
             _parse_validator({'amount': '32000000000'})
 
+    def test_non_integral_amount_raises_value_error(self):
+        """A non-integral float amount (e.g. 32.5) must not be silently truncated."""
+        with pytest.raises(ValueError):
+            _parse_validator({'public_key': faker.validator_public_key(), 'amount': 32.5})
+
 
 @pytest.mark.usefixtures('fake_settings')
 class TestRegisterNewValidatorsMalformedResponse:
     """register_new_validators must treat a malformed relayer response as 'not ready yet'."""
 
-    @pytest.mark.parametrize('error', [TypeError('bad amount'), KeyError('amount')])
-    async def test_returns_none_and_skips_oracle_polling(self, error):
+    @pytest.mark.parametrize(
+        'relayer_response',
+        [
+            {'validators': [{'public_key': PUBLIC_KEY}]},
+            {'validators': [{'public_key': PUBLIC_KEY, 'amount': 'not-a-number'}]},
+            None,
+            [],
+        ],
+        ids=['missing_amount', 'unparseable_amount', 'null_body', 'array_body'],
+    )
+    async def test_returns_none_and_skips_oracle_polling(self, relayer_response):
+        """Drives the failure through a real RelayerClient with a mocked HTTP seam,
+        so the test exercises the actual validation path, not just the exception type."""
         vault_assets = ether_to_gwei(32)
-        relayer = Mock(spec=RelayerClient)
-        relayer.register_validators = AsyncMock(side_effect=error)
+        relayer = RelayerClient()
         protocol_config = Mock(validators_approval_batch_limit=10)
 
         with (
             patch.object(settings, 'relayer_endpoint', 'http://relayer'),
+            patch(
+                'src.validators.relayer.get_validators_start_index',
+                new_callable=AsyncMock,
+                return_value=0,
+            ),
+            patch.object(
+                RelayerClient,
+                '_register_validators',
+                new_callable=AsyncMock,
+                return_value=relayer_response,
+            ),
             patch(
                 'src.validators.tasks.get_protocol_config',
                 new_callable=AsyncMock,
