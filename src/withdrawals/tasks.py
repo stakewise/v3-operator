@@ -59,7 +59,9 @@ class WithdrawalIntervalMixin:
         from_block = BlockNumber(chain_head.block_number - partial_withdrawals_blocks_interval)
         if not last_withdrawals_block:
             last_withdrawals_block = await self._fetch_last_withdrawals_block(from_block)
-            app_state.partial_withdrawal_block = last_withdrawals_block
+            # Fall back to `from_block` when no withdrawal events were found,
+            # otherwise the lookup would be repeated on every block.
+            app_state.partial_withdrawal_block = last_withdrawals_block or from_block
 
         if (
             last_withdrawals_block
