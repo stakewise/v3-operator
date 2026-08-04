@@ -139,15 +139,6 @@ def build_ipfs_upload_clients() -> IpfsMultiUploadClient:
             )
         )
 
-    if settings.ipfs_infura_client_username and settings.ipfs_infura_client_password:
-        ipfs_client = IpfsUploadClient(
-            settings.ipfs_infura_client_endpoint,
-            settings.ipfs_infura_client_username,
-            settings.ipfs_infura_client_password,
-            timeout=settings.ipfs_upload_client_timeout,
-        )
-        clients.append(ipfs_client)
-
     if settings.ipfs_pinata_api_key and settings.ipfs_pinata_secret_key:
         pinata_client = PinataUploadClient(
             settings.ipfs_pinata_api_key,
