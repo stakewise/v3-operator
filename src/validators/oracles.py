@@ -4,7 +4,7 @@ import itertools
 import logging
 import random
 from collections import Counter
-from typing import Sequence
+from typing import Sequence, cast
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
 from eth_typing import ChecksumAddress, HexStr
@@ -24,13 +24,14 @@ from src.common.utils import (
     warning_verbose,
 )
 from src.config.settings import (
+    APPROVALS_MAX_ATTEMPTS,
     ORACLES_CONSOLIDATION_TIMEOUT,
     ORACLES_EXITS_TIMEOUT,
     ORACLES_VALIDATORS_TIMEOUT,
     settings,
 )
 from src.validators.event_processors import get_validators_start_index
-from src.validators.exceptions import RegistryRootChangedError
+from src.validators.exceptions import ConsolidationError, RegistryRootChangedError
 from src.validators.keystores.base import BaseKeystore
 from src.validators.signing.common import get_encrypted_exit_signature_shards
 from src.validators.typings import ApprovalRequest, ConsolidationRequest, Validator
@@ -54,7 +55,8 @@ async def poll_validation_approval(
     approvals_min_interval = 1
     rate_limiter = RateLimiter(approvals_min_interval)
 
-    while True:
+    last_error: NotEnoughOracleApprovalsError | None = None
+    for attempt in range(1, APPROVALS_MAX_ATTEMPTS + 1):
         # Keep min interval between requests
         await rate_limiter.ensure_interval()
 
@@ -86,10 +88,17 @@ async def poll_validation_approval(
             return oracles_request, oracles_approval
         except NotEnoughOracleApprovalsError as e:
             logger.error(
-                'Not enough oracle approvals for validator registration: %d. Threshold is %d.',
+                'Not enough oracle approvals for validator registration: %d. Threshold is %d. '
+                'Attempt %d out of %d.',
                 e.num_votes,
                 e.threshold,
+                attempt,
+                APPROVALS_MAX_ATTEMPTS,
             )
+            last_error = e
+
+    # loop always runs at least once, so last_error is set by the time the cap is exhausted
+    raise cast(NotEnoughOracleApprovalsError, last_error)
 
 
 async def poll_consolidation_signature(
@@ -107,7 +116,7 @@ async def poll_consolidation_signature(
         public_keys=target_public_keys,
         vault_address=vault,
     )
-    while True:
+    for attempt in range(1, APPROVALS_MAX_ATTEMPTS + 1):
         # Keep min interval between requests
         await rate_limiter.ensure_interval()
 
@@ -118,9 +127,12 @@ async def poll_consolidation_signature(
 
         if len(consolidation_signatures) < votes_threshold:
             logger.error(
-                'Not enough oracle approvals for validator consolidation: %d. Threshold is %d.',
+                'Not enough oracle approvals for validator consolidation: %d. Threshold is %d. '
+                'Attempt %d out of %d.',
                 len(consolidation_signatures),
                 votes_threshold,
+                attempt,
+                APPROVALS_MAX_ATTEMPTS,
             )
             continue
         signatures = b''
@@ -129,6 +141,11 @@ async def poll_consolidation_signature(
         )[:votes_threshold]:
             signatures += signature
         return signatures
+
+    raise ConsolidationError(
+        f'Not enough oracle approvals for validator consolidation after {APPROVALS_MAX_ATTEMPTS} '
+        'attempts'
+    )
 
 
 async def send_approval_requests(

@@ -10,6 +10,7 @@ from web3.types import BlockNumber, Gwei
 
 from src.common.clients import execution_client
 from src.common.contracts import VaultContract, validators_registry_contract
+from src.common.exceptions import NotEnoughOracleApprovalsError
 from src.common.execution import check_gas_price
 from src.common.harvest import get_harvest_params
 from src.common.metrics import metrics
@@ -23,7 +24,11 @@ from src.config.settings import (
 from src.validators.consensus import fetch_funding_validators_balances
 from src.validators.database import NetworkValidatorCrud
 from src.validators.event_processors import get_validators_start_index
-from src.validators.exceptions import EmptyRelayerResponseException, FundingException
+from src.validators.exceptions import (
+    EmptyRelayerResponseException,
+    FundingException,
+    RegistryRootChangedError,
+)
 from src.validators.execution import (
     get_withdrawable_assets,
     tx_fund_validators,
@@ -183,7 +188,7 @@ async def fund_validators_chunk(
     return tx_hash
 
 
-# pylint: disable-next=too-many-locals
+# pylint: disable-next=too-many-locals,too-many-return-statements
 async def register_new_validators(
     vault_assets: Gwei,
     harvest_params: HarvestParams | None,
@@ -244,12 +249,22 @@ async def register_new_validators(
         'Started registration of %d %s validator(s)', len(validators), settings.validator_type.value
     )
 
-    oracles_request, oracles_approval = await poll_validation_approval(
-        keystore=keystore,
-        validators=validators,
-        validators_registry_root=validators_registry_root,
-        validators_manager_signature=validators_manager_signature,
-    )
+    try:
+        oracles_request, oracles_approval = await poll_validation_approval(
+            keystore=keystore,
+            validators=validators,
+            validators_registry_root=validators_registry_root,
+            validators_manager_signature=validators_manager_signature,
+        )
+    except RegistryRootChangedError:
+        logger.info('Validators registry root changed, retrying in the next cycle')
+        return None
+    except NotEnoughOracleApprovalsError:
+        logger.warning(
+            'Could not collect enough oracle approvals for validator registration this cycle'
+        )
+        return None
+
     tx_hash = await validate_index_and_register_validators(
         approval=oracles_approval,
         validators=validators,
