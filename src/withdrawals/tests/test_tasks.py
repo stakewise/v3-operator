@@ -798,6 +798,60 @@ async def test_get_withdrawals(data_dir):
     assert result == {}
 
 
+@pytest.mark.asyncio
+async def test_get_withdrawals_non_compounding_exit_does_not_reduce_partial_capacity(data_dir):
+    settings.set(vault=None, vault_dir=data_dir, network=HOODI)
+
+    # v1 is 0x01 and never contributes to partial_capacity, so its full exit must not
+    # decrement it either; only v2/v3 (0x02) capacity should be tracked and consumed
+    chain_head = create_chain_head(epoch=500)
+    queued_assets = ether_to_gwei(67)
+    consensus_validators = [
+        create_consensus_validator(
+            public_key='0x1',
+            index=1,
+            balance=ether_to_gwei(40),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=90,
+            is_compounding=False,
+        ),
+        create_consensus_validator(
+            public_key='0x2',
+            index=2,
+            balance=ether_to_gwei(50),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=85,
+        ),
+        create_consensus_validator(
+            public_key='0x3',
+            index=3,
+            balance=ether_to_gwei(45),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=80,
+        ),
+    ]
+    result = await _get_withdrawals(
+        chain_head=chain_head,
+        queued_assets=queued_assets,
+        consensus_validators=consensus_validators,
+        pending_partial_withdrawals=[],
+        validator_min_active_epochs=10,
+        oracle_exit_indexes=set(),
+        consolidation_target_indexes=set(),
+        pending_deposits={},
+    )
+    # v1 (40 ETH) is the cheapest to exit and is fully exited, leaving 27 ETH still
+    # needed. partial_capacity (31 ETH from v2+v3) is untouched by v1's exit, so it
+    # covers the remainder via partials, fattest balance first: v2 gets its full
+    # 18 ETH capacity, v3 covers the rest (9 ETH) — v3 must not be fully exited.
+    expected = {
+        '0x1': ether_to_gwei(0),
+        '0x2': ether_to_gwei(18),
+        '0x3': ether_to_gwei(9),
+    }
+    assert result == expected
+
+
 async def test_get_withdrawals_boundary_activation_epoch_prefers_partial_over_full_exit(data_dir):
     settings.set(vault=None, vault_dir=data_dir, network=HOODI)
 
