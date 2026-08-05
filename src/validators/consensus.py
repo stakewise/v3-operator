@@ -33,10 +33,6 @@ async def fetch_funding_validators_balances() -> dict[HexStr, Gwei]:
     if not vault_public_keys:
         return {}
 
-    # Initialize balances for every validator
-    # including those that are not present in CL yet, but have pending deposits.
-    validators_balances = defaultdict(lambda: Gwei(0), {key: Gwei(0) for key in vault_public_keys})
-
     # Fetch consensus validators
     consensus_block = await consensus_client.get_block('head')
     slot = consensus_block['data']['message']['slot']
@@ -44,23 +40,53 @@ async def fetch_funding_validators_balances() -> dict[HexStr, Gwei]:
 
     # Filter compounding and remove exiting/withdrawn validators,
     # as they are not eligible for funding
+    validators_balances: dict[HexStr, Gwei] = {}
+    ineligible_public_keys: set[HexStr] = set()
     for validator in consensus_validators:
         if validator.is_compounding and validator.status not in EXITING_STATUSES:
             validators_balances[validator.public_key] = validator.balance
         else:
-            validators_balances.pop(validator.public_key, None)
+            ineligible_public_keys.add(validator.public_key)
 
-    # Add balances from pending deposits that are not yet reflected in the consensus node
+    # Keys not yet known to the consensus node are eligible too,
+    # their balances come solely from pending deposits.
+    eligible_public_keys = vault_public_keys - ineligible_public_keys
+
+    # Add balances from pending deposits that are not yet reflected in the consensus node.
+    pending_deposits_amounts = await fetch_compounding_pending_deposits_amounts(
+        public_keys=eligible_public_keys, slot=slot
+    )
+    for public_key, amount in pending_deposits_amounts.items():
+        validators_balances[public_key] = Gwei(
+            validators_balances.get(public_key, Gwei(0)) + amount
+        )
+
+    return validators_balances
+
+
+async def fetch_compounding_pending_deposits_amounts(
+    public_keys: set[HexStr], slot: str
+) -> dict[HexStr, Gwei]:
+    """
+    Sums pending-deposit-queue amounts (Gwei) per pubkey, restricted to ``public_keys``.
+    Only deposits with compounding (0x02) withdrawal credentials are counted:
+    non-0x02 deposits are still processed by the CL, but they never contribute
+    fundable compounding balance, so counting them would overstate top-up capacity.
+    """
+    if not public_keys:
+        return {}
+
+    pending_amounts: dict[HexStr, Gwei] = defaultdict(lambda: Gwei(0))
     all_pending_deposits = await consensus_client.get_pending_deposits(slot)
     for deposit in all_pending_deposits:
-        public_key, amount = deposit['pubkey'], int(deposit['amount'])
-        if public_key not in validators_balances:
+        public_key: HexStr = deposit['pubkey']
+        if public_key not in public_keys:
             continue
         if not deposit['withdrawal_credentials'].startswith('0x02'):
             continue
-        validators_balances[public_key] = Gwei(validators_balances[public_key] + amount)
+        pending_amounts[public_key] = Gwei(pending_amounts[public_key] + int(deposit['amount']))
 
-    return validators_balances
+    return dict(pending_amounts)
 
 
 async def fetch_pending_deposits_amounts(public_keys: set[HexStr], slot: str) -> dict[HexStr, Gwei]:
