@@ -35,9 +35,8 @@ async def fetch_funding_validators_balances() -> dict[HexStr, Gwei]:
     slot = consensus_block['data']['message']['slot']
     consensus_validators = await fetch_consensus_validators(list(vault_public_keys), slot=slot)
 
-    # A validator seen by the CL is fundable only if it is compounding and not exiting.
-    # Others (non-compounding, exiting/exited) are tracked as ineligible so a later
-    # 0x02 pending deposit for them cannot resurrect their funding eligibility (#621).
+    # Filter compounding and remove exiting/withdrawn validators,
+    # as they are not eligible for funding
     validators_balances: dict[HexStr, Gwei] = {}
     ineligible_public_keys: set[HexStr] = set()
     for validator in consensus_validators:
@@ -47,10 +46,6 @@ async def fetch_funding_validators_balances() -> dict[HexStr, Gwei]:
             ineligible_public_keys.add(validator.public_key)
 
     # Add balances from pending deposits that are not yet reflected in the consensus node.
-    # A vault key absent from the CL set (e.g. a 0x01 V1 deposit still queued, or a key
-    # the CL hasn't caught up with yet) is only made fundable here if it has a queued
-    # 0x02 deposit: a V1 deposit would revert funding (CannotTopUpV1Validators), and
-    # otherwise treating a CL-lagged key as having full capacity would double-fund it.
     all_pending_deposits = await consensus_client.get_pending_deposits(slot)
     for deposit in all_pending_deposits:
         public_key, amount = deposit['pubkey'], int(deposit['amount'])
