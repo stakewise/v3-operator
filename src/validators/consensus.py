@@ -66,8 +66,9 @@ async def fetch_compounding_pending_deposits_amounts(
 ) -> dict[HexStr, Gwei]:
     """
     Sums pending-deposit-queue amounts (Gwei) per pubkey, restricted to ``public_keys``.
-    Only deposits with compounding (0x02) withdrawal credentials are counted,
-    since deposits with other prefixes are thrown away by the CL node.
+    Only deposits with compounding (0x02) withdrawal credentials are counted:
+    non-0x02 deposits are still processed by the CL, but they never contribute
+    fundable compounding balance, so counting them would overstate top-up capacity.
     """
     if not public_keys:
         return {}
