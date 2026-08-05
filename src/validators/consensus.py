@@ -45,19 +45,45 @@ async def fetch_funding_validators_balances() -> dict[HexStr, Gwei]:
         else:
             ineligible_public_keys.add(validator.public_key)
 
+    # Keys not yet known to the consensus node are eligible too,
+    # their balances come solely from pending deposits.
+    eligible_public_keys = vault_public_keys - ineligible_public_keys
+
     # Add balances from pending deposits that are not yet reflected in the consensus node.
-    all_pending_deposits = await consensus_client.get_pending_deposits(slot)
-    for deposit in all_pending_deposits:
-        public_key, amount = deposit['pubkey'], int(deposit['amount'])
-        if public_key not in vault_public_keys or public_key in ineligible_public_keys:
-            continue
-        if not deposit['withdrawal_credentials'].startswith('0x02'):
-            continue
+    pending_deposits_amounts = await fetch_compounding_pending_deposits_amounts(
+        public_keys=eligible_public_keys, slot=slot
+    )
+    for public_key, amount in pending_deposits_amounts.items():
         validators_balances[public_key] = Gwei(
             validators_balances.get(public_key, Gwei(0)) + amount
         )
 
     return validators_balances
+
+
+async def fetch_compounding_pending_deposits_amounts(
+    public_keys: set[HexStr], slot: str
+) -> dict[HexStr, Gwei]:
+    """
+    Sums pending-deposit-queue amounts (Gwei) per pubkey, restricted to ``public_keys``.
+    Only deposits with compounding (0x02) withdrawal credentials are counted:
+    non-0x02 deposits are still processed by the CL, but they never contribute
+    fundable compounding balance, so counting them would overstate top-up capacity.
+    """
+    if not public_keys:
+        return {}
+
+    pending_amounts: dict[HexStr, Gwei] = defaultdict(lambda: Gwei(0))
+    all_pending_deposits = await consensus_client.get_pending_deposits(slot)
+    for deposit in all_pending_deposits:
+        public_key: HexStr = deposit['pubkey']
+        if public_key not in public_keys:
+            continue
+        if not deposit['withdrawal_credentials'].startswith('0x02'):
+            continue
+        pending_amounts[public_key] = Gwei(pending_amounts[public_key] + int(deposit['amount']))
+
+    return dict(pending_amounts)
 
 
 async def fetch_pending_deposits_amounts(public_keys: set[HexStr], slot: str) -> dict[HexStr, Gwei]:
