@@ -68,7 +68,7 @@ class ConsensusValidator:
         return (
             self.is_compounding
             and self.status == ValidatorStatus.ACTIVE_ONGOING
-            and self.activation_epoch < epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
+            and self.activation_epoch <= epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
         )
 
     @staticmethod
