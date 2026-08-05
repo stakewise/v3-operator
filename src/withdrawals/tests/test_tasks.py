@@ -912,6 +912,67 @@ async def test_get_withdrawals_excludes_consolidation_sources(data_dir):
     assert result == expected
 
 
+@pytest.mark.asyncio
+async def test_get_withdrawals_full_exit_does_not_overwrite_partial_assignment(data_dir):
+    settings.set(vault=None, vault_dir=data_dir, network=HOODI)
+
+    # With the B1 fix, partial_capacity is exact, so a mid-loop top-up always fully
+    # saturates queued_assets and the loop breaks on the next iteration -- the
+    # overwrite guarded against here is not reachable through real inputs today.
+    # We mock _get_partial_withdrawals to simulate a future allocation policy that
+    # under-saturates queued_assets, so the guard is locked in independently of
+    # that invariant: v1 (cheapest) is fully exited first, leaving 10 ETH still
+    # needed; the mocked call assigns v2 a 4 ETH partial (deliberately covering
+    # only part of the remainder), and the loop then reaches v2 again as the next
+    # (and only remaining) exitable validator.
+    chain_head = create_chain_head(epoch=500)
+    queued_assets = ether_to_gwei(50)
+    v1 = create_consensus_validator(
+        public_key='0x1',
+        index=1,
+        balance=ether_to_gwei(40),
+        status=ValidatorStatus.ACTIVE_ONGOING,
+        activation_epoch=200,
+        is_compounding=False,
+    )
+    v2 = create_consensus_validator(
+        public_key='0x2',
+        index=2,
+        balance=ether_to_gwei(50),
+        status=ValidatorStatus.ACTIVE_ONGOING,
+        activation_epoch=200,
+    )
+    consensus_validators = [v1, v2]
+
+    def _under_saturating_partial_withdrawals(
+        partial_validators, validator_partial_withdrawals, queued_assets
+    ):
+        if any(v.public_key == '0x2' for v in partial_validators):
+            return {'0x2': ether_to_gwei(4)}
+        return {}
+
+    with mock.patch(
+        'src.withdrawals.tasks._get_partial_withdrawals',
+        side_effect=_under_saturating_partial_withdrawals,
+    ):
+        result = await _get_withdrawals(
+            chain_head=chain_head,
+            queued_assets=queued_assets,
+            consensus_validators=consensus_validators,
+            pending_partial_withdrawals=[],
+            validator_min_active_epochs=10,
+            oracle_exit_indexes=set(),
+            consolidation_target_indexes=set(),
+            consolidation_source_indexes=set(),
+            pending_deposits={},
+        )
+
+    # v2 must keep its mid-loop partial (4 ETH); it must not be converted into a
+    # full exit (Gwei(0)) when the loop later reaches it in exitable_validators.
+    expected = {'0x1': ether_to_gwei(0), '0x2': ether_to_gwei(4)}
+    assert result == expected
+
+
 def test_is_partial_withdrawable_validator():
     epoch = 500
 

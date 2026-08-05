@@ -280,6 +280,12 @@ async def _get_withdrawals(
         if queued_assets <= 0:
             break
 
+        # A validator already assigned a partial this batch must never be converted
+        # to a full exit -- doing so would silently drop the partial amount and
+        # double-count queued_assets against both the partial and the full balance.
+        if validator.public_key in withdrawals:
+            continue
+
         withdrawals[validator.public_key] = Gwei(0)  # full withdrawal
         queued_assets = Gwei(max(0, queued_assets - validator.balance))
 
