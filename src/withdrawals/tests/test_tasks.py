@@ -973,6 +973,36 @@ async def test_get_withdrawals_full_exit_does_not_overwrite_partial_assignment(d
     assert result == expected
 
 
+async def test_get_withdrawals_boundary_activation_epoch_prefers_partial_over_full_exit(data_dir):
+    settings.set(vault=None, vault_dir=data_dir, network=HOODI)
+
+    # activation epoch exactly at the SHARD_COMMITTEE_PERIOD boundary is CL-eligible for
+    # a partial withdrawal, so it must not be routed into the full-exit branch
+    chain_head = create_chain_head(epoch=500)
+    queued_assets = ether_to_gwei(5)
+    consensus_validators = [
+        create_consensus_validator(
+            public_key='0x1',
+            balance=ether_to_gwei(40),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=chain_head.epoch - settings.network_config.SHARD_COMMITTEE_PERIOD,
+        ),
+    ]
+    result = await _get_withdrawals(
+        chain_head=chain_head,
+        queued_assets=queued_assets,
+        consensus_validators=consensus_validators,
+        pending_partial_withdrawals=[],
+        validator_min_active_epochs=10,
+        oracle_exit_indexes=set(),
+        consolidation_target_indexes=set(),
+        consolidation_source_indexes=set(),
+        pending_deposits={},
+    )
+    expected = {'0x1': ether_to_gwei(5)}
+    assert result == expected
+
+
 def test_is_partial_withdrawable_validator():
     epoch = 500
 
@@ -1001,6 +1031,15 @@ def test_is_partial_withdrawable_validator():
 
     validator = create_consensus_validator(
         balance=ether_to_gwei(32), status=ValidatorStatus.ACTIVE_ONGOING, activation_epoch=10
+    )
+    result = validator.is_partially_withdrawable(epoch)
+    assert result is True
+
+    # activation epoch exactly at the SHARD_COMMITTEE_PERIOD boundary is eligible
+    validator = create_consensus_validator(
+        balance=ether_to_gwei(32),
+        status=ValidatorStatus.ACTIVE_ONGOING,
+        activation_epoch=epoch - settings.network_config.SHARD_COMMITTEE_PERIOD,
     )
     result = validator.is_partially_withdrawable(epoch)
     assert result is True
