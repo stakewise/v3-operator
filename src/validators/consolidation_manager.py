@@ -58,13 +58,10 @@ class ConsolidationManager(ABC):
             to_block=self.chain_head.block_number,
         )
 
-        # Fetch consensus validators
-        if consolidation_keys is not None:
-            self.consensus_validators = await fetch_consensus_validators(
-                consolidation_keys.all_public_keys
-            )
-        else:
-            self.consensus_validators = await fetch_consensus_validators(self.vault_validators)
+        # Fetch consensus validators for the full vault set, not just the user-provided keys:
+        # pending CL/EL consolidation queue entries must resolve against every vault validator,
+        # otherwise in-flight requests involving an unselected validator go undetected (blind spot).
+        self.consensus_validators = await fetch_consensus_validators(self.vault_validators)
 
         # Pending consolidations
         pending_consolidations = await get_pending_consolidations(
