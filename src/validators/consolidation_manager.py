@@ -205,8 +205,6 @@ class ConsolidationSelector(ConsolidationManager):
                 continue
             if val.public_key in self.exclude_public_keys:
                 continue
-            # Target must have activated (spec is_active_validator); pending validators
-            # are silently dropped by the CL if used as target.
             if val.status not in PENDING_STATUSES:
                 target_validators.append(val)
 
@@ -372,8 +370,6 @@ class ConsolidationChecker(ConsolidationManager):
                     f'The target validator {self.target_public_key} '
                     f'is not a compounding validator.'
                 )
-            # Spec requires both source and target to be active (is_active_validator);
-            # a pending target is silently dropped by the CL.
             if target_validator.status in PENDING_STATUSES:
                 raise ConsolidationError(
                     f'Target validator {self.target_public_key} is not active '
