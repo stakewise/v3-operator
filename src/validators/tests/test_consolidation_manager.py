@@ -419,9 +419,9 @@ class TestConsolidationSelector:
         result = selector.get_target_source()
         assert result == [(source_validator, source_validator)]
 
-    def test_excludes_young_target(self):
-        """A compounding target that hasn't been active long enough must be excluded,
-        even though it would otherwise be picked as the top-up target."""
+    def test_allows_young_target(self):
+        """A compounding target that is active but younger than SHARD_COMMITTEE_PERIOD is
+        still a valid target per spec — only sources require the longer activation window."""
         epoch = 1000
         source_validator = create_consensus_validator(
             index=10,
@@ -440,9 +440,7 @@ class TestConsolidationSelector:
             consensus_validators=consensus_validators,
         )
         result = selector.get_target_source()
-        # Falls back to switching the source from 0x01 to 0x02 since the only 0x02
-        # candidate is too young to be used as target
-        assert result == [(source_validator, source_validator)]
+        assert result == [(young_target, source_validator)]
 
     def test_excludes_validator_in_target_indexes_as_source(self):
         """Test that source validator is excluded if it's in consolidating_target_indexes"""
@@ -918,7 +916,7 @@ class TestConsolidationChecker:
             target_public_key=target_pk,
         )
 
-        epoch = 1000
+        epoch = 10
         consensus_validators = [
             create_consensus_validator(
                 public_key=source_pk,
@@ -947,8 +945,8 @@ class TestConsolidationChecker:
             selector.get_target_source()
 
     def test_rejects_pending_target(self):
-        """A target that is still pending (activation_epoch far in the future) is rejected
-        by the same minimum-activation-epoch check applied to source validators."""
+        """A target that is still pending (activation_epoch far in the future, i.e. not yet
+        activated) is rejected — a target must merely be activated, per spec."""
         source_pk = faker.validator_public_key()
         target_pk = faker.validator_public_key()
         consolidation_keys = ConsolidationKeys(
@@ -977,13 +975,14 @@ class TestConsolidationChecker:
 
         with pytest.raises(
             ConsolidationError,
-            match=f'Validator {target_pk} is not active enough for consolidation.',
+            match=f'Target validator {target_pk} is not active.',
         ):
             selector.get_target_source()
 
-    def test_rejects_young_target(self):
+    def test_allows_young_target(self):
         """An active target that hasn't been active long enough (activation_epoch within
-        SHARD_COMMITTEE_PERIOD of chain head) must be rejected, same as a too-young source."""
+        SHARD_COMMITTEE_PERIOD of chain head) is still a valid target per spec — only sources
+        require the longer activation window."""
         source_pk = faker.validator_public_key()
         target_pk = faker.validator_public_key()
         consolidation_keys = ConsolidationKeys(
@@ -1010,12 +1009,8 @@ class TestConsolidationChecker:
             vault_validators=[v.public_key for v in consensus_validators],
             consensus_validators=consensus_validators,
         )
-
-        with pytest.raises(
-            ConsolidationError,
-            match=f'Validator {target_pk} is not active enough for consolidation.',
-        ):
-            selector.get_target_source()
+        result = selector.get_target_source()
+        assert result == [(consensus_validators[1], consensus_validators[0])]
 
     def test_max_balance_accounts_for_pending_incoming_consolidations(self):
         """Balance check must include pending incoming consolidation balances to the target."""

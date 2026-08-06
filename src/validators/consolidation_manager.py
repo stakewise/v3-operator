@@ -114,7 +114,7 @@ class ConsolidationManager(ABC):
         # Target validator must be:
         - in the vault
         - not exiting
-        - active for at least SHARD_COMMITTEE_PERIOD epochs
+        - active
         - not consolidating to another validator
         - a compounding validator
 
@@ -206,13 +206,15 @@ class ConsolidationSelector(ConsolidationManager):
                 continue
             if val.public_key in self.exclude_public_keys:
                 continue
-            if val.activation_epoch > self.max_activation_epoch:
+            if val.activation_epoch > self.chain_head.epoch:
                 continue
             target_validators.append(val)
 
             # additional filters for source validators
             # Source validator must be non-compounding
             if val.is_compounding:
+                continue
+            if val.activation_epoch > self.max_activation_epoch:
                 continue
             # Source validator cannot be in any ongoing consolidations (either as source or target)
             if val.index in self.consolidating_target_indexes:
@@ -351,23 +353,28 @@ class ConsolidationChecker(ConsolidationManager):
             raise ConsolidationError(
                 f'Target validator {self.target_public_key} is involved in another consolidation.'
             )
-        if target_validator.activation_epoch > self.max_activation_epoch:
-            raise ConsolidationError(
-                f'Validator {self.target_public_key} is not active enough for consolidation. '
-                f'It must be active for at least '
-                f'{settings.network_config.SHARD_COMMITTEE_PERIOD} epochs before consolidation.'
-            )
 
         if self.is_switch_to_compounding():
             if target_validator.is_compounding:
                 raise ConsolidationError(
                     f'Target validator {self.target_public_key} is already a compounding validator.'
                 )
+            # switch the 0x01 to 0x02
+            if target_validator.activation_epoch > self.max_activation_epoch:
+                raise ConsolidationError(
+                    f'Validator {self.target_public_key} is not active enough for consolidation. '
+                    f'It must be active for at least '
+                    f'{settings.network_config.SHARD_COMMITTEE_PERIOD} epochs before consolidation.'
+                )
         else:
             if not target_validator.is_compounding:
                 raise ConsolidationError(
                     f'The target validator {self.target_public_key} '
                     f'is not a compounding validator.'
+                )
+            if target_validator.activation_epoch > self.chain_head.epoch:
+                raise ConsolidationError(
+                    f'Target validator {self.target_public_key} is not active.'
                 )
         return target_validator
 
