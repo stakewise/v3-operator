@@ -368,6 +368,57 @@ class TestConsolidationSelector:
             # is less than target 1's effective balance (32 + 32 = 64 ETH)
             assert result == [(consensus_validators[1], consensus_validators[2])]
 
+    def test_picks_active_target_over_pending_target_with_smaller_balance(self):
+        """A pending (not-yet-active) 0x02 validator must never be chosen as target,
+        even if its balance is smaller than an active 0x02 candidate's."""
+        source_validator = create_consensus_validator(
+            index=10,
+            activation_epoch=1,
+            is_compounding=False,
+        )
+        pending_target = create_consensus_validator(
+            index=11,
+            activation_epoch=1,
+            is_compounding=True,
+            status=ValidatorStatus.PENDING_QUEUED,
+            balance=ether_to_gwei(1.0),
+        )
+        active_target = create_consensus_validator(
+            index=12,
+            activation_epoch=1,
+            is_compounding=True,
+            balance=ether_to_gwei(32.3),
+        )
+        consensus_validators = [source_validator, pending_target, active_target]
+        selector = create_manager(
+            vault_validators=[v.public_key for v in consensus_validators],
+            consensus_validators=consensus_validators,
+        )
+        result = selector.get_target_source()
+        assert result == [(active_target, source_validator)]
+
+    def test_switches_source_when_only_target_candidate_is_pending(self):
+        """If the only 0x02 validator in the vault is still pending, it must be treated
+        as ineligible, falling back to switching the 0x01 source to 0x02."""
+        source_validator = create_consensus_validator(
+            index=10,
+            activation_epoch=1,
+            is_compounding=False,
+        )
+        pending_target = create_consensus_validator(
+            index=11,
+            activation_epoch=1,
+            is_compounding=True,
+            status=ValidatorStatus.PENDING_QUEUED,
+        )
+        consensus_validators = [source_validator, pending_target]
+        selector = create_manager(
+            vault_validators=[v.public_key for v in consensus_validators],
+            consensus_validators=consensus_validators,
+        )
+        result = selector.get_target_source()
+        assert result == [(source_validator, source_validator)]
+
     def test_excludes_validator_in_target_indexes_as_source(self):
         """Test that source validator is excluded if it's in consolidating_target_indexes"""
         consensus_validators = [
@@ -867,6 +918,41 @@ class TestConsolidationChecker:
         with pytest.raises(
             ConsolidationError,
             match=f'Validator {consensus_validators[0].public_key} is not active enough for consolidation.',
+        ):
+            selector.get_target_source()
+
+    def test_rejects_pending_target(self):
+        """A target that has not yet activated must be rejected per the spec's
+        is_active_validator requirement, even though it is compounding."""
+        source_pk = faker.validator_public_key()
+        target_pk = faker.validator_public_key()
+        consolidation_keys = ConsolidationKeys(
+            source_public_keys=[source_pk],
+            target_public_key=target_pk,
+        )
+
+        consensus_validators = [
+            create_consensus_validator(
+                public_key=source_pk,
+                activation_epoch=1,
+                is_compounding=False,
+            ),
+            create_consensus_validator(
+                public_key=target_pk,
+                activation_epoch=1,
+                is_compounding=True,
+                status=ValidatorStatus.PENDING_QUEUED,
+            ),
+        ]
+        selector = create_manager(
+            consolidation_keys=consolidation_keys,
+            vault_validators=[v.public_key for v in consensus_validators],
+            consensus_validators=consensus_validators,
+        )
+
+        with pytest.raises(
+            ConsolidationError,
+            match=f'Target validator {target_pk} is not active',
         ):
             selector.get_target_source()
 

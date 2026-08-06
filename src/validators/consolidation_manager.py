@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 
 from eth_typing import HexStr
-from sw_utils import ChainHead
+from sw_utils import PENDING_STATUSES, ChainHead
 from web3.types import Gwei
 
 from src.common.consolidations import get_pending_consolidations
@@ -205,7 +205,10 @@ class ConsolidationSelector(ConsolidationManager):
                 continue
             if val.public_key in self.exclude_public_keys:
                 continue
-            target_validators.append(val)
+            # Target must have activated (spec is_active_validator); pending validators
+            # are silently dropped by the CL if used as target.
+            if val.status not in PENDING_STATUSES:
+                target_validators.append(val)
 
             # additional filters for source validators
             # Source validator must be non-compounding
@@ -368,6 +371,13 @@ class ConsolidationChecker(ConsolidationManager):
                 raise ConsolidationError(
                     f'The target validator {self.target_public_key} '
                     f'is not a compounding validator.'
+                )
+            # Spec requires both source and target to be active (is_active_validator);
+            # a pending target is silently dropped by the CL.
+            if target_validator.status in PENDING_STATUSES:
+                raise ConsolidationError(
+                    f'Target validator {self.target_public_key} is not active '
+                    f'(status {target_validator.status.value}).'
                 )
         return target_validator
 
