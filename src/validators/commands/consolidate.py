@@ -333,12 +333,12 @@ async def process(
             source_public_keys=source_public_keys,
             target_public_key=target_public_key,
         )
-    consolidation_manager = await ConsolidationManager.create(
-        consolidation_keys=consolidation_keys,
-        chain_head=chain_head,
-        exclude_public_keys=exclude_public_keys,
-    )
     try:
+        consolidation_manager = await ConsolidationManager.create(
+            consolidation_keys=consolidation_keys,
+            chain_head=chain_head,
+            exclude_public_keys=exclude_public_keys,
+        )
         target_source = consolidation_manager.get_target_source()
     except ConsolidationError as e:
         raise click.ClickException(str(e))
