@@ -103,6 +103,8 @@ def test_source_public_keys_file_blank_line_rejected_at_parse_time(
     args = [
         '--vault',
         vault_address,
+        '--network',
+        HOODI,
         '--consensus-endpoints',
         consensus_endpoints,
         '--execution-endpoints',
@@ -120,3 +122,36 @@ def test_source_public_keys_file_blank_line_rejected_at_parse_time(
 
     assert result.exit_code != 0
     assert 'Invalid validator public key' in result.output
+
+
+def test_empty_exclude_public_keys_file_raises(
+    vault_address: str,
+    consensus_endpoints: str,
+    execution_endpoints: str,
+    data_dir: Path,
+    tmp_path: Path,
+    runner: CliRunner,
+):
+    empty_exclude_public_keys_file = tmp_path / 'empty_exclude_public_keys.txt'
+    empty_exclude_public_keys_file.touch()
+
+    args = [
+        '--vault',
+        vault_address,
+        '--network',
+        HOODI,
+        '--consensus-endpoints',
+        consensus_endpoints,
+        '--execution-endpoints',
+        execution_endpoints,
+        '--data-dir',
+        str(data_dir),
+        '--exclude-public-keys-file',
+        str(empty_exclude_public_keys_file),
+    ]
+    with patch('src.validators.commands.consolidate.main', new_callable=AsyncMock) as mocked_main:
+        result = runner.invoke(consolidate, args)
+        mocked_main.assert_not_called()
+
+    assert result.exit_code != 0
+    assert f'No public keys found in {empty_exclude_public_keys_file}.' in result.output
