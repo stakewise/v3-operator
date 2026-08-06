@@ -378,7 +378,7 @@ class TestConsolidationSelector:
         )
         pending_target = create_consensus_validator(
             index=11,
-            activation_epoch=1,
+            activation_epoch=settings.network_config.FAR_FUTURE_EPOCH,
             is_compounding=True,
             status=ValidatorStatus.PENDING_QUEUED,
             balance=ether_to_gwei(1.0),
@@ -407,7 +407,7 @@ class TestConsolidationSelector:
         )
         pending_target = create_consensus_validator(
             index=11,
-            activation_epoch=1,
+            activation_epoch=settings.network_config.FAR_FUTURE_EPOCH,
             is_compounding=True,
             status=ValidatorStatus.PENDING_QUEUED,
         )
@@ -417,6 +417,31 @@ class TestConsolidationSelector:
             consensus_validators=consensus_validators,
         )
         result = selector.get_target_source()
+        assert result == [(source_validator, source_validator)]
+
+    def test_excludes_young_target(self):
+        """A compounding target that hasn't been active long enough must be excluded,
+        even though it would otherwise be picked as the top-up target."""
+        epoch = 1000
+        source_validator = create_consensus_validator(
+            index=10,
+            activation_epoch=1,
+            is_compounding=False,
+        )
+        young_target = create_consensus_validator(
+            index=11,
+            activation_epoch=epoch - settings.network_config.SHARD_COMMITTEE_PERIOD + 1,
+            is_compounding=True,
+        )
+        consensus_validators = [source_validator, young_target]
+        selector = create_manager(
+            chain_head=create_chain_head(epoch),
+            vault_validators=[v.public_key for v in consensus_validators],
+            consensus_validators=consensus_validators,
+        )
+        result = selector.get_target_source()
+        # Falls back to switching the source from 0x01 to 0x02 since the only 0x02
+        # candidate is too young to be used as target
         assert result == [(source_validator, source_validator)]
 
     def test_excludes_validator_in_target_indexes_as_source(self):
@@ -893,7 +918,7 @@ class TestConsolidationChecker:
             target_public_key=target_pk,
         )
 
-        epoch = 10
+        epoch = 1000
         consensus_validators = [
             create_consensus_validator(
                 public_key=source_pk,
@@ -922,8 +947,8 @@ class TestConsolidationChecker:
             selector.get_target_source()
 
     def test_rejects_pending_target(self):
-        """A target that has not yet activated must be rejected per the spec's
-        is_active_validator requirement, even though it is compounding."""
+        """A target that is still pending (activation_epoch far in the future) is rejected
+        by the same minimum-activation-epoch check applied to source validators."""
         source_pk = faker.validator_public_key()
         target_pk = faker.validator_public_key()
         consolidation_keys = ConsolidationKeys(
@@ -939,7 +964,7 @@ class TestConsolidationChecker:
             ),
             create_consensus_validator(
                 public_key=target_pk,
-                activation_epoch=1,
+                activation_epoch=settings.network_config.FAR_FUTURE_EPOCH,
                 is_compounding=True,
                 status=ValidatorStatus.PENDING_QUEUED,
             ),
@@ -952,7 +977,43 @@ class TestConsolidationChecker:
 
         with pytest.raises(
             ConsolidationError,
-            match=f'Target validator {target_pk} is not active',
+            match=f'Validator {target_pk} is not active enough for consolidation.',
+        ):
+            selector.get_target_source()
+
+    def test_rejects_young_target(self):
+        """An active target that hasn't been active long enough (activation_epoch within
+        SHARD_COMMITTEE_PERIOD of chain head) must be rejected, same as a too-young source."""
+        source_pk = faker.validator_public_key()
+        target_pk = faker.validator_public_key()
+        consolidation_keys = ConsolidationKeys(
+            source_public_keys=[source_pk],
+            target_public_key=target_pk,
+        )
+
+        epoch = 1000
+        consensus_validators = [
+            create_consensus_validator(
+                public_key=source_pk,
+                activation_epoch=1,
+                is_compounding=False,
+            ),
+            create_consensus_validator(
+                public_key=target_pk,
+                activation_epoch=epoch - settings.network_config.SHARD_COMMITTEE_PERIOD + 1,
+                is_compounding=True,
+            ),
+        ]
+        selector = create_manager(
+            consolidation_keys=consolidation_keys,
+            chain_head=create_chain_head(epoch),
+            vault_validators=[v.public_key for v in consensus_validators],
+            consensus_validators=consensus_validators,
+        )
+
+        with pytest.raises(
+            ConsolidationError,
+            match=f'Validator {target_pk} is not active enough for consolidation.',
         ):
             selector.get_target_source()
 
