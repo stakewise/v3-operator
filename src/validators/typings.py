@@ -63,7 +63,7 @@ class ConsensusValidator:
 
     @property
     def withdrawal_address(self) -> ChecksumAddress:
-        return Web3.to_checksum_address('0x' + self.withdrawal_credentials[-40:])
+        return Web3.to_checksum_address(self.withdrawal_credentials[-40:])
 
     @property
     def withdrawal_capacity(self) -> Gwei:

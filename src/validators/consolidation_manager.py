@@ -281,8 +281,9 @@ class ConsolidationChecker(ConsolidationManager):
             # Validate the source validator withdrawal address matches the vault
             if source_validator.withdrawal_address != settings.vault:
                 raise ConsolidationError(
-                    f'Validator {source_validator.public_key} withdrawal address '
-                    f'does not match the vault address.'
+                    f'Validator {source_public_key} withdrawal address '
+                    f'{source_validator.withdrawal_address} does not match '
+                    f'the vault address {settings.vault}.'
                 )
 
             # Validate the source validator has been active long enough
@@ -370,7 +371,8 @@ class ConsolidationChecker(ConsolidationManager):
             if target_validator.withdrawal_address != settings.vault:
                 raise ConsolidationError(
                     f'Validator {self.target_public_key} withdrawal address '
-                    f'does not match the vault address.'
+                    f'{target_validator.withdrawal_address} does not match '
+                    f'the vault address {settings.vault}.'
                 )
             # switch the 0x01 to 0x02
             if target_validator.activation_epoch > self.max_activation_epoch:

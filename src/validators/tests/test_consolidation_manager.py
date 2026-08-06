@@ -1,3 +1,4 @@
+import re
 from collections import defaultdict
 from unittest.mock import patch
 
@@ -850,9 +851,14 @@ class TestConsolidationChecker:
             consensus_validators=consensus_validators,
         )
 
+        source_validator = consensus_validators[0]
         with pytest.raises(
             ConsolidationError,
-            match=f'Validator {source_pk} withdrawal address does not match the vault address.',
+            match=re.escape(
+                f'Validator {source_pk} withdrawal address '
+                f'{source_validator.withdrawal_address} does not match '
+                f'the vault address {settings.vault}.'
+            ),
         ):
             selector.get_target_source()
 
@@ -877,9 +883,85 @@ class TestConsolidationChecker:
             consensus_validators=consensus_validators,
         )
 
+        target_validator = consensus_validators[0]
         with pytest.raises(
             ConsolidationError,
-            match=f'Validator {pk} withdrawal address does not match the vault address.',
+            match=re.escape(
+                f'Validator {pk} withdrawal address '
+                f'{target_validator.withdrawal_address} does not match '
+                f'the vault address {settings.vault}.'
+            ),
+        ):
+            selector.get_target_source()
+
+    def test_plain_consolidation_ignores_target_withdrawal_address(self):
+        """Only the source validators' withdrawal address must match the vault; the spec
+        does not check the target's credential address for a plain consolidation."""
+        source_pk = faker.validator_public_key()
+        target_pk = faker.validator_public_key()
+        consolidation_keys = ConsolidationKeys(
+            source_public_keys=[source_pk],
+            target_public_key=target_pk,
+        )
+
+        consensus_validators = [
+            create_consensus_validator(
+                public_key=source_pk,
+                activation_epoch=1,
+                is_compounding=False,
+            ),
+            create_consensus_validator(
+                public_key=target_pk,
+                activation_epoch=1,
+                is_compounding=True,
+                withdrawal_address=faker.eth_address(),
+            ),
+        ]
+        selector = create_manager(
+            consolidation_keys=consolidation_keys,
+            vault_validators=[v.public_key for v in consensus_validators],
+            consensus_validators=consensus_validators,
+        )
+        result = selector.get_target_source()
+        assert result == [(consensus_validators[1], consensus_validators[0])]
+
+    def test_rejects_bls_credential_source(self):
+        source_pk = faker.validator_public_key()
+        target_pk = faker.validator_public_key()
+        consolidation_keys = ConsolidationKeys(
+            source_public_keys=[source_pk],
+            target_public_key=target_pk,
+        )
+
+        source_validator = create_consensus_validator(
+            public_key=source_pk,
+            activation_epoch=1,
+            is_compounding=False,
+        )
+        source_validator.withdrawal_credentials = HexStr(
+            '0x00' + '0' * 22 + faker.eth_address()[2:].lower()
+        )
+        consensus_validators = [
+            source_validator,
+            create_consensus_validator(
+                public_key=target_pk,
+                activation_epoch=1,
+                is_compounding=True,
+            ),
+        ]
+        selector = create_manager(
+            consolidation_keys=consolidation_keys,
+            vault_validators=[v.public_key for v in consensus_validators],
+            consensus_validators=consensus_validators,
+        )
+
+        with pytest.raises(
+            ConsolidationError,
+            match=re.escape(
+                f'Validator {source_pk} withdrawal address '
+                f'{source_validator.withdrawal_address} does not match '
+                f'the vault address {settings.vault}.'
+            ),
         ):
             selector.get_target_source()
 
