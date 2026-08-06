@@ -5,18 +5,21 @@ import pytest
 from eth_typing import HexStr
 from sw_utils import ValidatorStatus
 from sw_utils.tests import faker
+from sw_utils.tests.factories import get_mocked_protocol_config
 from web3.types import Gwei
 
+from src.common.exceptions import NotEnoughOracleApprovalsError
 from src.common.tests.utils import ether_to_gwei
 from src.common.typings import ValidatorType
 from src.config.settings import MIN_ACTIVATION_BALANCE_GWEI, settings
-from src.validators.exceptions import FundingException
+from src.validators.exceptions import FundingException, RegistryRootChangedError
 from src.validators.tasks import (
     ValidatorRegistrationSubtask,
     _get_deposits_amounts,
     _get_funding_amounts,
+    register_new_validators,
 )
-from src.validators.typings import VaultValidator
+from src.validators.typings import Validator, VaultValidator
 
 
 @contextmanager
@@ -899,3 +902,76 @@ class TestProcessFunding:
         assert batch_2 == {pub_key_1: ether_to_gwei(32)}
         # 100 - 30 - 31 - 32 = 7
         assert result == ether_to_gwei(7)
+
+
+class TestRegisterNewValidators:
+    """Tests for register_new_validators error handling around poll_validation_approval"""
+
+    @staticmethod
+    @contextmanager
+    def _patch_dependencies(poll_validation_approval_mock: AsyncMock):
+        validator = Validator(
+            public_key=faker.validator_public_key(),
+            amount=MIN_ACTIVATION_BALANCE_GWEI,
+            deposit_signature=faker.validator_signature(),
+        )
+        with (
+            patch(
+                'src.validators.tasks.get_protocol_config',
+                new=AsyncMock(return_value=get_mocked_protocol_config()),
+            ),
+            patch(
+                'src.validators.tasks.validators_registry_contract.get_registry_root',
+                new=AsyncMock(return_value=faker.eth_proof()),
+            ),
+            patch(
+                'src.validators.tasks.get_validators_for_registration',
+                new=AsyncMock(return_value=[validator]),
+            ),
+            patch(
+                'src.validators.tasks.get_validators_manager_signature',
+                return_value=HexStr('0x'),
+            ),
+            patch('src.validators.tasks.check_gas_price', new=AsyncMock(return_value=True)),
+            patch(
+                'src.validators.tasks.poll_validation_approval', new=poll_validation_approval_mock
+            ),
+            patch(
+                'src.validators.tasks.validate_index_and_register_validators', new=AsyncMock()
+            ) as validate_and_register_mock,
+        ):
+            yield validate_and_register_mock
+
+    @pytest.mark.usefixtures('fake_settings')
+    async def test_returns_none_on_registry_root_changed(self):
+        """No transaction is submitted when the registry root changes mid-poll."""
+        poll_mock = AsyncMock(side_effect=RegistryRootChangedError())
+        with (
+            patch_max_validator_balance(ether_to_gwei(64)),
+            self._patch_dependencies(poll_mock) as validate_and_register_mock,
+        ):
+            result = await register_new_validators(
+                vault_assets=ether_to_gwei(32),
+                harvest_params=None,
+                keystore=None,
+            )
+
+        assert result is None
+        validate_and_register_mock.assert_not_called()
+
+    @pytest.mark.usefixtures('fake_settings')
+    async def test_returns_none_on_not_enough_oracle_approvals(self):
+        """No transaction is submitted when oracle approvals could not be collected in time."""
+        poll_mock = AsyncMock(side_effect=NotEnoughOracleApprovalsError(num_votes=1, threshold=2))
+        with (
+            patch_max_validator_balance(ether_to_gwei(64)),
+            self._patch_dependencies(poll_mock) as validate_and_register_mock,
+        ):
+            result = await register_new_validators(
+                vault_assets=ether_to_gwei(32),
+                harvest_params=None,
+                keystore=None,
+            )
+
+        assert result is None
+        validate_and_register_mock.assert_not_called()
