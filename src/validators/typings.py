@@ -4,6 +4,7 @@ from typing import NewType
 from eth_typing import BlockNumber, BLSSignature, ChecksumAddress, HexStr
 from eth_utils import add_0x_prefix
 from sw_utils import ValidatorStatus
+from web3 import Web3
 from web3.types import Gwei, Wei
 
 from src.config.settings import MIN_ACTIVATION_BALANCE_GWEI, settings
@@ -59,6 +60,10 @@ class ConsensusValidator:
     @property
     def is_compounding(self) -> bool:
         return self.withdrawal_credentials.startswith('0x02')
+
+    @property
+    def withdrawal_address(self) -> ChecksumAddress:
+        return Web3.to_checksum_address('0x' + self.withdrawal_credentials[-40:])
 
     @property
     def withdrawal_capacity(self) -> Gwei:
