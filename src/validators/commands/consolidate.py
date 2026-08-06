@@ -238,7 +238,7 @@ def consolidate(
 
     if source_public_keys and exclude_public_keys:
         raise click.ClickException(
-            '--exclude-public-keys-file and source public keys are mutually exclusive.'
+            '--exclude-public-keys-file and --source-public-keys are mutually exclusive.'
         )
 
     operator_config = OperatorConfig(vault, Path(data_dir))
