@@ -17,6 +17,18 @@ PLACEHOLDER_VAULT = Web3.to_checksum_address('0x' + '00' * 20)
 PLACEHOLDER_NETWORK = MAINNET
 
 
+HELP_TEXT = (
+    'Lists the advanced environment variables that are not documented elsewhere.\n'
+    '\n'
+    'These variables can only be set via the environment (or the vault .env file) '
+    'and are mostly intended for fine tuning.\n'
+    '\n'
+    'Environment variables that act as fallbacks for command line options are not '
+    'listed here, they are shown in the help of the corresponding command '
+    '(for example "operator start --help").'
+)
+
+
 @click.option(
     '--format',
     'output_format',
@@ -24,7 +36,7 @@ PLACEHOLDER_NETWORK = MAINNET
     help='Output format. Use markdown to generate documentation.',
     type=click.Choice(['text', 'markdown'], case_sensitive=False),
 )
-@click.command(help='Lists the environment variables recognized by the operator.')
+@click.command(help=HELP_TEXT)
 def env_vars(output_format: str) -> None:
     _load_settings()
     variables = get_env_vars()
@@ -50,6 +62,10 @@ def _load_settings() -> None:
 
 
 def _print_text(variables: list[EnvVar]) -> None:
+    for paragraph in HELP_TEXT.split('\n\n'):
+        click.echo(click.wrap_text(paragraph.strip()))
+        click.echo()
+
     for group, group_vars in _grouped(variables):
         click.secho(f'\n{group}', bold=True)
         for var in group_vars:
