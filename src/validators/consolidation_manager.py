@@ -59,12 +59,7 @@ class ConsolidationManager(ABC):
         )
 
         # Fetch consensus validators
-        if consolidation_keys is not None:
-            self.consensus_validators = await fetch_consensus_validators(
-                consolidation_keys.all_public_keys
-            )
-        else:
-            self.consensus_validators = await fetch_consensus_validators(self.vault_validators)
+        self.consensus_validators = await fetch_consensus_validators(self.vault_validators)
 
         # Pending consolidations
         pending_consolidations = await get_pending_consolidations(
