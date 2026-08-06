@@ -226,6 +226,8 @@ def consolidate(
 
     if source_public_keys_file:
         source_public_keys = _load_public_keys(source_public_keys_file)
+        if not source_public_keys:
+            raise click.ClickException(f'No public keys found in {source_public_keys_file}.')
 
     exclude_public_keys: set[HexStr] = set()
 
