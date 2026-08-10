@@ -1,6 +1,6 @@
 import re
 from collections import defaultdict
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from eth_typing import HexStr
@@ -14,6 +14,7 @@ from src.config.settings import settings
 from src.validators.consensus import EXITING_STATUSES
 from src.validators.consolidation_manager import (
     ConsolidationChecker,
+    ConsolidationManager,
     ConsolidationSelector,
 )
 from src.validators.exceptions import ConsolidationError
@@ -391,6 +392,80 @@ class TestConsolidationSelector:
         # Validator 10's credentials point elsewhere, so only validator 11 is
         # a valid source candidate and switches from 0x01 to 0x02
         assert result == [(consensus_validators[1], consensus_validators[1])]
+
+    def test_picks_active_target_over_pending_target_with_smaller_balance(self):
+        """A pending (not-yet-active) 0x02 validator must never be chosen as target,
+        even if its balance is smaller than an active 0x02 candidate's."""
+        source_validator = create_consensus_validator(
+            index=10,
+            activation_epoch=1,
+            is_compounding=False,
+        )
+        pending_target = create_consensus_validator(
+            index=11,
+            activation_epoch=settings.network_config.FAR_FUTURE_EPOCH,
+            is_compounding=True,
+            status=ValidatorStatus.PENDING_QUEUED,
+            balance=ether_to_gwei(1.0),
+        )
+        active_target = create_consensus_validator(
+            index=12,
+            activation_epoch=1,
+            is_compounding=True,
+            balance=ether_to_gwei(32.3),
+        )
+        consensus_validators = [source_validator, pending_target, active_target]
+        selector = create_manager(
+            vault_validators=[v.public_key for v in consensus_validators],
+            consensus_validators=consensus_validators,
+        )
+        result = selector.get_target_source()
+        assert result == [(active_target, source_validator)]
+
+    def test_switches_source_when_only_target_candidate_is_pending(self):
+        """If the only 0x02 validator in the vault is still pending, it must be treated
+        as ineligible, falling back to switching the 0x01 source to 0x02."""
+        source_validator = create_consensus_validator(
+            index=10,
+            activation_epoch=1,
+            is_compounding=False,
+        )
+        pending_target = create_consensus_validator(
+            index=11,
+            activation_epoch=settings.network_config.FAR_FUTURE_EPOCH,
+            is_compounding=True,
+            status=ValidatorStatus.PENDING_QUEUED,
+        )
+        consensus_validators = [source_validator, pending_target]
+        selector = create_manager(
+            vault_validators=[v.public_key for v in consensus_validators],
+            consensus_validators=consensus_validators,
+        )
+        result = selector.get_target_source()
+        assert result == [(source_validator, source_validator)]
+
+    def test_allows_young_target(self):
+        """A compounding target that is active but younger than SHARD_COMMITTEE_PERIOD is
+        still a valid target per spec — only sources require the longer activation window."""
+        epoch = 1000
+        source_validator = create_consensus_validator(
+            index=10,
+            activation_epoch=1,
+            is_compounding=False,
+        )
+        young_target = create_consensus_validator(
+            index=11,
+            activation_epoch=epoch - settings.network_config.SHARD_COMMITTEE_PERIOD + 1,
+            is_compounding=True,
+        )
+        consensus_validators = [source_validator, young_target]
+        selector = create_manager(
+            chain_head=create_chain_head(epoch),
+            vault_validators=[v.public_key for v in consensus_validators],
+            consensus_validators=consensus_validators,
+        )
+        result = selector.get_target_source()
+        assert result == [(young_target, source_validator)]
 
     def test_excludes_validator_in_target_indexes_as_source(self):
         """Test that source validator is excluded if it's in consolidating_target_indexes"""
@@ -1035,6 +1110,74 @@ class TestConsolidationChecker:
         ):
             selector.get_target_source()
 
+    def test_rejects_pending_target(self):
+        """A target that is still pending (activation_epoch far in the future, i.e. not yet
+        activated) is rejected — a target must merely be activated, per spec."""
+        source_pk = faker.validator_public_key()
+        target_pk = faker.validator_public_key()
+        consolidation_keys = ConsolidationKeys(
+            source_public_keys=[source_pk],
+            target_public_key=target_pk,
+        )
+
+        consensus_validators = [
+            create_consensus_validator(
+                public_key=source_pk,
+                activation_epoch=1,
+                is_compounding=False,
+            ),
+            create_consensus_validator(
+                public_key=target_pk,
+                activation_epoch=settings.network_config.FAR_FUTURE_EPOCH,
+                is_compounding=True,
+                status=ValidatorStatus.PENDING_QUEUED,
+            ),
+        ]
+        selector = create_manager(
+            consolidation_keys=consolidation_keys,
+            vault_validators=[v.public_key for v in consensus_validators],
+            consensus_validators=consensus_validators,
+        )
+
+        with pytest.raises(
+            ConsolidationError,
+            match=f'Target validator {target_pk} is not active.',
+        ):
+            selector.get_target_source()
+
+    def test_allows_young_target(self):
+        """An active target that hasn't been active long enough (activation_epoch within
+        SHARD_COMMITTEE_PERIOD of chain head) is still a valid target per spec — only sources
+        require the longer activation window."""
+        source_pk = faker.validator_public_key()
+        target_pk = faker.validator_public_key()
+        consolidation_keys = ConsolidationKeys(
+            source_public_keys=[source_pk],
+            target_public_key=target_pk,
+        )
+
+        epoch = 1000
+        consensus_validators = [
+            create_consensus_validator(
+                public_key=source_pk,
+                activation_epoch=1,
+                is_compounding=False,
+            ),
+            create_consensus_validator(
+                public_key=target_pk,
+                activation_epoch=epoch - settings.network_config.SHARD_COMMITTEE_PERIOD + 1,
+                is_compounding=True,
+            ),
+        ]
+        selector = create_manager(
+            consolidation_keys=consolidation_keys,
+            chain_head=create_chain_head(epoch),
+            vault_validators=[v.public_key for v in consensus_validators],
+            consensus_validators=consensus_validators,
+        )
+        result = selector.get_target_source()
+        assert result == [(consensus_validators[1], consensus_validators[0])]
+
     def test_max_balance_accounts_for_pending_incoming_consolidations(self):
         """Balance check must include pending incoming consolidation balances to the target."""
         source_pk = faker.validator_public_key()
@@ -1077,6 +1220,106 @@ class TestConsolidationChecker:
                 match='Cannot consolidate validators, total balance exceeds',
             ):
                 checker.get_target_source()
+
+
+@pytest.mark.usefixtures('fake_settings')
+class TestConsolidationManagerCreate:
+    """Regression tests for the F1 blind spot: in Checker mode, ``create()`` must fetch
+    consensus data for every vault validator, not just the user-provided keys, otherwise
+    CL/EL queue entries involving an unselected vault validator go undetected."""
+
+    async def test_el_entry_from_unselected_validator_updates_target_incoming_balance(self):
+        """EL entry X->T where X is a vault validator outside the provided keys must still
+        be resolved so the target's pending incoming balance and both indexes are tracked."""
+        source, target, other = _create_vault_trio()
+        consolidation_keys = ConsolidationKeys(
+            source_public_keys=[source.public_key],
+            target_public_key=target.public_key,
+        )
+
+        manager = await _create_manager_via_create(
+            consolidation_keys=consolidation_keys,
+            vault_validators=[v.public_key for v in (source, target, other)],
+            consensus_validators=[source, target, other],
+            execution_consolidations=[
+                _create_execution_consolidation(other, target),
+            ],
+        )
+
+        assert manager.pending_incoming_balances[target.index] == other.balance
+        assert other.index in manager.consolidating_source_indexes
+        assert target.index in manager.consolidating_target_indexes
+
+    async def test_el_entry_from_provided_target_to_unselected_validator_is_detected(self):
+        """EL entry T->X (the provided target is already an in-flight source elsewhere) must
+        flag T as consolidating, so the target is rejected as 'involved in another consolidation'.
+        """
+        source, target, other = _create_vault_trio()
+        consolidation_keys = ConsolidationKeys(
+            source_public_keys=[source.public_key],
+            target_public_key=target.public_key,
+        )
+
+        manager = await _create_manager_via_create(
+            consolidation_keys=consolidation_keys,
+            vault_validators=[v.public_key for v in (source, target, other)],
+            consensus_validators=[source, target, other],
+            execution_consolidations=[
+                _create_execution_consolidation(target, other),
+            ],
+        )
+
+        assert target.index in manager.consolidating_source_indexes
+        with pytest.raises(
+            ConsolidationError,
+            match=f'Target validator {target.public_key} is involved in another consolidation.',
+        ):
+            manager.get_target_source()
+
+    async def test_cl_entry_from_unselected_validator_does_not_crash(self):
+        """CL entry X->T where X is a vault validator outside the provided keys must resolve
+        without error, since X's balance is now fetched along with the rest of the vault."""
+        source, target, other = _create_vault_trio()
+        consolidation_keys = ConsolidationKeys(
+            source_public_keys=[source.public_key],
+            target_public_key=target.public_key,
+        )
+
+        manager = await _create_manager_via_create(
+            consolidation_keys=consolidation_keys,
+            vault_validators=[v.public_key for v in (source, target, other)],
+            consensus_validators=[source, target, other],
+            consensus_consolidations=[
+                {'source_index': str(other.index), 'target_index': str(target.index)},
+            ],
+        )
+
+        assert manager.pending_incoming_balances[target.index] == other.balance
+
+    async def test_el_blind_spot_lets_max_balance_guard_approve_overfill(self):
+        """End-to-end guard effect: once the EL entry from the unselected validator is counted
+        as pending incoming balance, the max-balance guard correctly rejects the overfill."""
+        source, target, other = _create_vault_trio()
+        consolidation_keys = ConsolidationKeys(
+            source_public_keys=[source.public_key],
+            target_public_key=target.public_key,
+        )
+
+        with patch.object(settings, 'max_validator_balance_gwei', ether_to_gwei(90)):
+            manager = await _create_manager_via_create(
+                consolidation_keys=consolidation_keys,
+                vault_validators=[v.public_key for v in (source, target, other)],
+                consensus_validators=[source, target, other],
+                execution_consolidations=[
+                    _create_execution_consolidation(other, target),
+                ],
+            )
+
+            with pytest.raises(
+                ConsolidationError,
+                match='Cannot consolidate validators, total balance exceeds',
+            ):
+                manager.get_target_source()
 
 
 def create_manager(
@@ -1127,4 +1370,76 @@ def create_manager(
         self.pending_incoming_balances = defaultdict(lambda: Gwei(0), pending_incoming_balances)
     else:
         self.pending_incoming_balances = defaultdict(lambda: Gwei(0))
+
     return self
+
+
+def _create_vault_trio() -> tuple[ConsensusValidator, ConsensusValidator, ConsensusValidator]:
+    """A source/target pair intended to be passed to the Checker, plus a third vault
+    validator ("other") that is never provided by the user but is still a vault member."""
+    source = create_consensus_validator(
+        index=10, activation_epoch=1, is_compounding=False, balance=ether_to_gwei(32.0)
+    )
+    target = create_consensus_validator(
+        index=11, activation_epoch=1, is_compounding=True, balance=ether_to_gwei(32.0)
+    )
+    other = create_consensus_validator(
+        index=12, activation_epoch=1, is_compounding=False, balance=ether_to_gwei(32.0)
+    )
+    return source, target, other
+
+
+def _create_execution_consolidation(source: ConsensusValidator, target: ConsensusValidator) -> dict:
+    return {
+        'source_address': settings.vault,
+        'source_pubkey': source.public_key,
+        'target_pubkey': target.public_key,
+    }
+
+
+async def _create_manager_via_create(
+    consolidation_keys: ConsolidationKeys | None,
+    vault_validators: list[HexStr],
+    consensus_validators: list[ConsensusValidator],
+    chain_head: ChainHead | None = None,
+    consensus_consolidations: list[dict] | None = None,
+    execution_consolidations: list[dict] | None = None,
+) -> ConsolidationManager:
+    """Exercises the real ``ConsolidationManager.create()`` assembly logic, mocking only the
+    network boundaries: vault event scan, consensus validator fetch, and the CL/EL
+    consolidation queues (the real ``get_pending_consolidations`` merge logic runs unmocked)."""
+    if chain_head is None:
+        chain_head = create_chain_head(epoch=1024)
+
+    vault_contract = MagicMock()
+    vault_contract.get_registered_validators_public_keys = AsyncMock(return_value=vault_validators)
+
+    async def fetch_requested_consensus_validators(
+        validator_ids: list[HexStr], slot: str = 'head'
+    ) -> list[ConsensusValidator]:
+        return [val for val in consensus_validators if val.public_key in validator_ids]
+
+    with (
+        patch('src.validators.consolidation_manager.VaultContract', return_value=vault_contract),
+        patch(
+            'src.validators.consolidation_manager.fetch_consensus_validators',
+            side_effect=fetch_requested_consensus_validators,
+        ),
+        patch(
+            'src.validators.consolidation_manager.get_pending_partial_withdrawals',
+            AsyncMock(return_value=[]),
+        ),
+        patch(
+            'src.common.consolidations.consensus_client.get_pending_consolidations',
+            AsyncMock(return_value=consensus_consolidations or []),
+        ),
+        patch(
+            'src.common.consolidations.get_execution_consolidations',
+            AsyncMock(return_value=execution_consolidations or []),
+        ),
+    ):
+        return await ConsolidationManager.create(
+            consolidation_keys=consolidation_keys,
+            chain_head=chain_head,
+            exclude_public_keys=set(),
+        )

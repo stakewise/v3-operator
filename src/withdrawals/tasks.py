@@ -59,7 +59,9 @@ class WithdrawalIntervalMixin:
         from_block = BlockNumber(chain_head.block_number - partial_withdrawals_blocks_interval)
         if not last_withdrawals_block:
             last_withdrawals_block = await self._fetch_last_withdrawals_block(from_block)
-            app_state.partial_withdrawal_block = last_withdrawals_block
+            # Fall back to `from_block` when no withdrawal events were found,
+            # otherwise the lookup would be repeated on every block.
+            app_state.partial_withdrawal_block = last_withdrawals_block or from_block
 
         if (
             last_withdrawals_block
@@ -147,6 +149,7 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
             validator_min_active_epochs=protocol_config.validator_min_active_epochs,
             oracle_exit_indexes={val.index for val in oracle_exiting_validators},
             consolidation_target_indexes={c.target_index for c in consolidations},
+            consolidation_source_indexes={c.source_index for c in consolidations},
             pending_deposits=pending_deposits,
         )
         if not withdrawals:
@@ -221,6 +224,7 @@ async def _get_withdrawals(
     validator_min_active_epochs: int,
     oracle_exit_indexes: set[int],
     consolidation_target_indexes: set[int],
+    consolidation_source_indexes: set[int],
     pending_deposits: dict[HexStr, Gwei],
 ) -> dict[HexStr, Gwei]:
     if queued_assets <= 0:
@@ -232,9 +236,15 @@ async def _get_withdrawals(
             withdrawal.validator_index
         ] += withdrawal.amount  # type: ignore
 
-    # Find all partial-withdrawable validators
+    # Find all partial-withdrawable validators, excluding consolidation sources: the CL
+    # ignores a consolidation whose source has a pending partial withdrawal, so counting
+    # a source's capacity here would both misstate partial_capacity and risk cancelling
+    # the vault's own consolidation.
     partial_validators = [
-        v for v in consensus_validators if v.is_partially_withdrawable(chain_head.epoch)
+        v
+        for v in consensus_validators
+        if v.is_partially_withdrawable(chain_head.epoch)
+        and v.index not in consolidation_source_indexes
     ]
     partial_validator_indexes = {v.index for v in partial_validators}
     partial_capacity = 0
@@ -263,6 +273,7 @@ async def _get_withdrawals(
         oracle_exit_indexes=oracle_exit_indexes,
         partial_withdrawal_indexes=set(validator_partial_withdrawals.keys()),
         consolidation_target_indexes=consolidation_target_indexes,
+        consolidation_source_indexes=consolidation_source_indexes,
         pending_deposits=pending_deposits,
     )
 
@@ -328,6 +339,7 @@ def _filter_exitable_validators(
     oracle_exit_indexes: set[int],
     partial_withdrawal_indexes: set[int],
     consolidation_target_indexes: set[int],
+    consolidation_source_indexes: set[int],
     pending_deposits: dict[HexStr, Gwei],
 ) -> list[ConsensusValidator]:
     """
@@ -347,6 +359,8 @@ def _filter_exitable_validators(
         if validator.index in partial_withdrawal_indexes:
             continue
         if validator.index in consolidation_target_indexes:
+            continue
+        if validator.index in consolidation_source_indexes:
             continue
         can_be_exited_validators.append(validator)
     can_be_exited_validators.sort(

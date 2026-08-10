@@ -11,7 +11,7 @@ def create_consensus_validator(
     public_key: HexStr | None = None,
     index: int | None = None,
     balance: Gwei | None = None,
-    status: ValidatorStatus | None = None,
+    status: ValidatorStatus = ValidatorStatus.ACTIVE_ONGOING,
     activation_epoch: int | None = None,
     is_compounding: bool = True,
     withdrawal_address: ChecksumAddress | None = None,
