@@ -7,14 +7,6 @@ from src.config.settings import MIN_ACTIVATION_BALANCE_GWEI, settings
 from src.validators.typings import ConsensusValidator
 
 
-def fake_non_compound_credentials(withdrawal_address: ChecksumAddress) -> HexStr:
-    return HexStr('0x01' + '0' * 22 + withdrawal_address[2:].lower())
-
-
-def fake_compound_credentials(withdrawal_address: ChecksumAddress) -> HexStr:
-    return HexStr('0x02' + '0' * 22 + withdrawal_address[2:].lower())
-
-
 def create_consensus_validator(
     public_key: HexStr | None = None,
     index: int | None = None,
@@ -34,9 +26,17 @@ def create_consensus_validator(
         index=index,
         balance=balance or MIN_ACTIVATION_BALANCE_GWEI,
         withdrawal_credentials=(
-            fake_compound_credentials(withdrawal_address)
+            _build_compound_credentials(withdrawal_address)
             if is_compounding
-            else fake_non_compound_credentials(withdrawal_address)
+            else _build_non_compound_credentials(withdrawal_address)
         ),
         activation_epoch=activation_epoch,
     )
+
+
+def _build_non_compound_credentials(withdrawal_address: ChecksumAddress) -> HexStr:
+    return HexStr('0x01' + '0' * 22 + withdrawal_address[2:].lower())
+
+
+def _build_compound_credentials(withdrawal_address: ChecksumAddress) -> HexStr:
+    return HexStr('0x02' + '0' * 22 + withdrawal_address[2:].lower())
