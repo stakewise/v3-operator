@@ -226,15 +226,19 @@ def consolidate(
 
     if source_public_keys_file:
         source_public_keys = _load_public_keys(source_public_keys_file)
+        if not source_public_keys:
+            raise click.ClickException(f'No public keys found in {source_public_keys_file}.')
 
     exclude_public_keys: set[HexStr] = set()
 
     if exclude_public_keys_file:
         exclude_public_keys = set(_load_public_keys(exclude_public_keys_file))
+        if not exclude_public_keys:
+            raise click.ClickException(f'No public keys found in {exclude_public_keys_file}.')
 
     if source_public_keys and exclude_public_keys:
         raise click.ClickException(
-            '--exclude-public-keys and --source-public-keys are mutually exclusive.'
+            '--exclude-public-keys-file and --source-public-keys are mutually exclusive.'
         )
 
     operator_config = OperatorConfig(vault, Path(data_dir))
