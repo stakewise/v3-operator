@@ -248,17 +248,37 @@ class TestProcessFunding:
 
     @pytest.mark.usefixtures('fake_settings')
     async def test_funding_interval_not_passed(self):
-        """Raises FundingException when funding interval hasn't passed."""
+        """Defers funding and reserves only the planned amount, registration proceeds
+        with the remainder."""
         vault_assets = ether_to_gwei(100)
         pub_key = faker.validator_public_key()
         with (
+            patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_funding_validators_balances({pub_key: ether_to_gwei(32)}),
             self.patch_is_funding_interval_passed(False),
             self.patch_fund_validators_chunk(None) as mock_fund,
         ):
-            with pytest.raises(FundingException, match='Funding interval has not passed yet'):
-                await self.subtask.process_funding(vault_assets=vault_assets, harvest_params=None)
+            result = await self.subtask.process_funding(
+                vault_assets=vault_assets, harvest_params=None
+            )
         mock_fund.assert_not_called()
+        assert result == ether_to_gwei(68)
+
+    @pytest.mark.usefixtures('fake_settings')
+    async def test_funding_interval_not_passed_reserves_all_assets(self):
+        """When planned funding would consume all assets, the deferred return is zero."""
+        vault_assets = ether_to_gwei(100)
+        pub_key = faker.validator_public_key()
+        with (
+            self.patch_funding_validators_balances({pub_key: Gwei(0)}),
+            self.patch_is_funding_interval_passed(False),
+            self.patch_fund_validators_chunk(None) as mock_fund,
+        ):
+            result = await self.subtask.process_funding(
+                vault_assets=vault_assets, harvest_params=None
+            )
+        mock_fund.assert_not_called()
+        assert result == Gwei(0)
 
     @pytest.mark.usefixtures('fake_settings')
     async def test_successful_funding_single_validator(self):
