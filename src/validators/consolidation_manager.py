@@ -109,6 +109,7 @@ class ConsolidationManager(ABC):
         # Target validator must be:
         - in the vault
         - not exiting
+        - active
         - not consolidating to another validator
         - a compounding validator
 
@@ -199,6 +200,8 @@ class ConsolidationSelector(ConsolidationManager):
             if val.index in self.consolidating_source_indexes:
                 continue
             if val.public_key in self.exclude_public_keys:
+                continue
+            if val.activation_epoch > self.chain_head.epoch:
                 continue
             target_validators.append(val)
 
@@ -363,6 +366,10 @@ class ConsolidationChecker(ConsolidationManager):
                 raise ConsolidationError(
                     f'The target validator {self.target_public_key} '
                     f'is not a compounding validator.'
+                )
+            if target_validator.activation_epoch > self.chain_head.epoch:
+                raise ConsolidationError(
+                    f'Target validator {self.target_public_key} is not active.'
                 )
         return target_validator
 
