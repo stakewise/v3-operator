@@ -1487,13 +1487,13 @@ async def test_get_withdrawals_partial_topup_called_at_most_once(
         assert requested == 0 or covered == requested
 
 
-async def test_get_withdrawals_pending_deposit_asymmetry_pr_777(data_dir):
-    """Documents the deliberate #777 trade-off: the exitable-validator sort key credits
+async def test_get_withdrawals_pending_deposit_asymmetry(data_dir):
+    """Documents a deliberate trade-off: `_filter_exitable_validators`'s sort key credits
     pending deposits so a topped-up validator no longer sorts as "cheapest", but
-    `queued_assets` accounting still only ever subtracts a validator's real, current CL
-    balance once it is exited -- pending deposits are never credited even though they
-    eventually land back at the vault too. All validators here are 0x01 (non-compounding)
-    so `partial_capacity` plays no role and the effect is isolated.
+    `_get_withdrawals`'s `queued_assets` accounting still only ever subtracts a validator's
+    real, current CL balance once it is exited -- pending deposits are never credited even
+    though they eventually land back at the vault too. All validators here are 0x01
+    (non-compounding) so `partial_capacity` plays no role and the effect is isolated.
     """
     settings.set(vault=None, vault_dir=data_dir, network=HOODI)
     settings.disable_full_withdrawals = False
