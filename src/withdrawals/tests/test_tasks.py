@@ -2,19 +2,33 @@ from unittest import mock
 
 import pytest
 from sw_utils import ValidatorStatus
+from web3.types import BlockNumber
 
+from src.common.app_state import AppState
 from src.common.tests.factories import create_chain_head
 from src.common.tests.utils import ether_to_gwei
-from src.common.typings import PendingPartialWithdrawal
+from src.common.typings import PendingPartialWithdrawal, Singleton
 from src.config.networks import HOODI
-from src.config.settings import settings
+from src.config.settings import WITHDRAWALS_INTERVAL, settings
 from src.validators.tests.factories import create_consensus_validator
 from src.withdrawals.tasks import (
+    WithdrawalIntervalMixin,
+    _fetch_oracle_exiting_validators,
     _filter_exitable_validators,
+    _filter_full_withdrawals,
     _get_partial_withdrawals,
     _get_withdrawals,
     _is_pending_partial_withdrawals_queue_full,
 )
+
+
+@pytest.fixture
+def reset_app_state():
+    """AppState is a process-wide singleton; drop the cached instance so each test starts
+    from a clean `partial_withdrawal_block`."""
+    Singleton._instances.pop(AppState, None)
+    yield
+    Singleton._instances.pop(AppState, None)
 
 
 def test_get_partial_withdrawals():
@@ -230,7 +244,6 @@ def test_get_partial_withdrawals():
     assert result == expected
 
 
-@pytest.mark.asyncio
 async def test_get_withdrawals(data_dir):
     settings.set(vault=None, vault_dir=data_dir, network=HOODI)
 
@@ -816,7 +829,6 @@ async def test_get_withdrawals(data_dir):
     assert result == {}
 
 
-@pytest.mark.asyncio
 async def test_get_withdrawals_non_compounding_exit_does_not_reduce_partial_capacity(data_dir):
     settings.set(vault=None, vault_dir=data_dir, network=HOODI)
 
@@ -871,7 +883,6 @@ async def test_get_withdrawals_non_compounding_exit_does_not_reduce_partial_capa
     assert result == expected
 
 
-@pytest.mark.asyncio
 async def test_get_withdrawals_excludes_consolidation_sources(data_dir):
     settings.set(vault=None, vault_dir=data_dir, network=HOODI)
 
@@ -1215,3 +1226,291 @@ def test_filter_exitable_validators():
         pending_deposits={},
     )
     assert len(result) == 0
+
+
+def test_filter_full_withdrawals():
+    withdrawals = {
+        '0x1': ether_to_gwei(0),
+        '0x2': ether_to_gwei(5),
+        '0x3': ether_to_gwei(0),
+    }
+    assert _filter_full_withdrawals(withdrawals) == ['0x1', '0x3']
+    assert _filter_full_withdrawals({}) == []
+
+
+async def test_fetch_oracle_exiting_validators():
+    validator_1 = create_consensus_validator(
+        public_key='0x1', index=1, status=ValidatorStatus.ACTIVE_ONGOING, balance=ether_to_gwei(32)
+    )
+    validator_2 = create_consensus_validator(
+        public_key='0x2', index=2, status=ValidatorStatus.ACTIVE_ONGOING, balance=ether_to_gwei(32)
+    )
+    consensus_validators = [validator_1, validator_2]
+    protocol_config = mock.MagicMock()
+
+    # intersection with vault validators only; oracle indexes not in vault are ignored
+    with mock.patch('src.withdrawals.tasks.poll_active_exits', return_value=[2, 99]):
+        result = await _fetch_oracle_exiting_validators(consensus_validators, protocol_config)
+    assert result == [validator_2]
+
+    # empty oracle response
+    with mock.patch('src.withdrawals.tasks.poll_active_exits', return_value=[]):
+        result = await _fetch_oracle_exiting_validators(consensus_validators, protocol_config)
+    assert result == []
+
+
+async def test_is_withdrawal_interval_passed_not_reached(data_dir, reset_app_state):
+    settings.set(vault=None, vault_dir=data_dir, network=HOODI)
+    blocks_interval = WITHDRAWALS_INTERVAL // settings.network_config.SECONDS_PER_BLOCK
+    chain_head = create_chain_head(block_number=100_000, epoch=500)
+
+    app_state = AppState()
+    app_state.partial_withdrawal_block = BlockNumber(
+        chain_head.block_number - blocks_interval + 1000
+    )
+
+    mixin = WithdrawalIntervalMixin()
+    result = await mixin._is_withdrawal_interval_passed(app_state, chain_head)
+
+    assert result is False
+
+
+async def test_is_withdrawal_interval_passed_reached(data_dir, reset_app_state):
+    settings.set(vault=None, vault_dir=data_dir, network=HOODI)
+    blocks_interval = WITHDRAWALS_INTERVAL // settings.network_config.SECONDS_PER_BLOCK
+    chain_head = create_chain_head(block_number=100_000, epoch=500)
+
+    app_state = AppState()
+    app_state.partial_withdrawal_block = BlockNumber(
+        chain_head.block_number - blocks_interval - 1000
+    )
+
+    mixin = WithdrawalIntervalMixin()
+    result = await mixin._is_withdrawal_interval_passed(app_state, chain_head)
+
+    assert result is True
+
+
+async def test_is_withdrawal_interval_passed_backfill_no_events(data_dir, reset_app_state):
+    settings.set(vault=None, vault_dir=data_dir, network=HOODI)
+    blocks_interval = WITHDRAWALS_INTERVAL // settings.network_config.SECONDS_PER_BLOCK
+    chain_head = create_chain_head(block_number=100_000, epoch=500)
+    from_block = BlockNumber(chain_head.block_number - blocks_interval)
+
+    app_state = AppState()
+    assert app_state.partial_withdrawal_block is None
+
+    mixin = WithdrawalIntervalMixin()
+    with mock.patch.object(
+        WithdrawalIntervalMixin, '_fetch_last_withdrawals_block', return_value=None
+    ):
+        result = await mixin._is_withdrawal_interval_passed(app_state, chain_head)
+
+    assert result is True
+    # no withdrawal events found: state falls back to from_block, not None, so the
+    # lookup isn't repeated on every subsequent block
+    assert app_state.partial_withdrawal_block == from_block
+
+
+async def test_is_withdrawal_interval_passed_backfill_from_event(data_dir, reset_app_state):
+    settings.set(vault=None, vault_dir=data_dir, network=HOODI)
+    blocks_interval = WITHDRAWALS_INTERVAL // settings.network_config.SECONDS_PER_BLOCK
+    chain_head = create_chain_head(block_number=100_000, epoch=500)
+    backfilled_block = BlockNumber(chain_head.block_number - blocks_interval + 1500)
+
+    app_state = AppState()
+    assert app_state.partial_withdrawal_block is None
+
+    mixin = WithdrawalIntervalMixin()
+    with mock.patch.object(
+        WithdrawalIntervalMixin,
+        '_fetch_last_withdrawals_block',
+        return_value=backfilled_block,
+    ) as mocked_fetch:
+        result = await mixin._is_withdrawal_interval_passed(app_state, chain_head)
+
+    mocked_fetch.assert_awaited_once_with(BlockNumber(chain_head.block_number - blocks_interval))
+    # app state is back-filled from the event even though the interval turns out to have
+    # already passed again by the time of this check
+    assert app_state.partial_withdrawal_block == backfilled_block
+    assert result is False
+
+
+async def test_get_withdrawals_partial_topup_called_at_most_once(data_dir):
+    """`_get_partial_withdrawals` is invoked at most once per `_get_withdrawals` call
+    (top-branch partials-only path OR a single mid-loop top-up, never both), and
+    whenever it is invoked mid-loop it fully saturates the `queued_assets` it was
+    given, because `partial_capacity` is only ever an underestimate of real capacity
+    at that point.
+    """
+    settings.set(vault=None, vault_dir=data_dir, network=HOODI)
+    settings.disable_full_withdrawals = False
+    chain_head = create_chain_head(epoch=500)
+
+    scenarios = [
+        # top-branch call: partial capacity alone is sufficient
+        (
+            ether_to_gwei(20),
+            [
+                create_consensus_validator(
+                    public_key='0x1',
+                    index=1,
+                    balance=ether_to_gwei(40),
+                    status=ValidatorStatus.ACTIVE_ONGOING,
+                    activation_epoch=200,
+                ),
+                create_consensus_validator(
+                    public_key='0x2',
+                    index=2,
+                    balance=ether_to_gwei(50),
+                    status=ValidatorStatus.ACTIVE_ONGOING,
+                    activation_epoch=200,
+                ),
+            ],
+        ),
+        # mid-loop top-up after a single full exit
+        (
+            ether_to_gwei(50),
+            [
+                create_consensus_validator(
+                    public_key='0x1',
+                    index=1,
+                    balance=ether_to_gwei(40),
+                    status=ValidatorStatus.ACTIVE_ONGOING,
+                    activation_epoch=90,
+                ),
+                create_consensus_validator(
+                    public_key='0x2',
+                    index=2,
+                    balance=ether_to_gwei(43),
+                    status=ValidatorStatus.ACTIVE_ONGOING,
+                    activation_epoch=85,
+                ),
+            ],
+        ),
+        # mid-loop top-up spanning two remaining validators
+        (
+            ether_to_gwei(86),
+            [
+                create_consensus_validator(
+                    public_key='0x1',
+                    index=1,
+                    balance=ether_to_gwei(40),
+                    status=ValidatorStatus.ACTIVE_ONGOING,
+                    activation_epoch=90,
+                ),
+                create_consensus_validator(
+                    public_key='0x2',
+                    index=2,
+                    balance=ether_to_gwei(50),
+                    status=ValidatorStatus.ACTIVE_ONGOING,
+                    activation_epoch=85,
+                ),
+                create_consensus_validator(
+                    public_key='0x3',
+                    index=3,
+                    balance=ether_to_gwei(60),
+                    status=ValidatorStatus.ACTIVE_ONGOING,
+                    activation_epoch=80,
+                ),
+            ],
+        ),
+        # capacity never catches up with queued_assets -> gate never fires
+        (
+            ether_to_gwei(100),
+            [
+                create_consensus_validator(
+                    public_key='0x1',
+                    index=1,
+                    balance=ether_to_gwei(40),
+                    status=ValidatorStatus.ACTIVE_ONGOING,
+                    activation_epoch=90,
+                ),
+                create_consensus_validator(
+                    public_key='0x2',
+                    index=2,
+                    balance=ether_to_gwei(50),
+                    status=ValidatorStatus.ACTIVE_ONGOING,
+                    activation_epoch=85,
+                ),
+            ],
+        ),
+    ]
+
+    for queued_assets, consensus_validators in scenarios:
+        calls: list[tuple[dict, dict]] = []
+
+        def _spy(**kwargs):  # pylint: disable=cell-var-from-loop
+            result = _get_partial_withdrawals(**kwargs)
+            calls.append((kwargs, result))
+            return result
+
+        with mock.patch('src.withdrawals.tasks._get_partial_withdrawals', side_effect=_spy):
+            await _get_withdrawals(
+                chain_head=chain_head,
+                queued_assets=queued_assets,
+                consensus_validators=consensus_validators,
+                pending_partial_withdrawals=[],
+                validator_min_active_epochs=10,
+                oracle_exit_indexes=set(),
+                consolidation_target_indexes=set(),
+                consolidation_source_indexes=set(),
+                pending_deposits={},
+            )
+
+        assert len(calls) <= 1
+        if calls:
+            call_kwargs, call_result = calls[0]
+            requested = call_kwargs['queued_assets']
+            covered = sum(call_result.values())
+            assert requested == 0 or covered == requested
+
+
+async def test_get_withdrawals_pending_deposit_asymmetry_pr_777(data_dir):
+    """Documents the deliberate #777 trade-off: the exitable-validator sort key credits
+    pending deposits so a topped-up validator no longer sorts as "cheapest", but
+    `queued_assets` accounting still only ever subtracts a validator's real, current CL
+    balance once it is exited -- pending deposits are never credited even though they
+    eventually land back at the vault too. All validators here are 0x01 (non-compounding)
+    so `partial_capacity` plays no role and the effect is isolated.
+    """
+    settings.set(vault=None, vault_dir=data_dir, network=HOODI)
+    settings.disable_full_withdrawals = False
+    chain_head = create_chain_head(epoch=500)
+    queued_assets = ether_to_gwei(12)
+    consensus_validators = [
+        create_consensus_validator(
+            public_key='0x1',
+            index=1,
+            balance=ether_to_gwei(10),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=90,
+            is_compounding=False,
+        ),
+        create_consensus_validator(
+            public_key='0x2',
+            index=2,
+            balance=ether_to_gwei(70),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=85,
+            is_compounding=False,
+        ),
+    ]
+    result = await _get_withdrawals(
+        chain_head=chain_head,
+        queued_assets=queued_assets,
+        consensus_validators=consensus_validators,
+        pending_partial_withdrawals=[],
+        validator_min_active_epochs=10,
+        oracle_exit_indexes=set(),
+        consolidation_target_indexes=set(),
+        consolidation_source_indexes=set(),
+        pending_deposits={'0x1': ether_to_gwei(50)},
+    )
+    # '0x1' sorts first (10 + 50 = 60 ETH effective, versus '0x2' at 70 ETH) and is exited
+    # first, but only its real 10 ETH balance is subtracted from queued_assets -- the 50 ETH
+    # pending deposit is not credited. That leaves 2 ETH still needed, so '0x2' (70 ETH, no
+    # pending deposits) is exited too, even though '0x1' alone would have more than covered
+    # the queue once its deposit lands. Both validators end up fully exited.
+    expected = {'0x1': ether_to_gwei(0), '0x2': ether_to_gwei(0)}
+    assert result == expected
