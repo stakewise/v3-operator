@@ -75,7 +75,7 @@ def test_calculate_validators_exits_amount():
 @pytest.mark.usefixtures('fake_settings')
 class TestGetQueuedAssets:
     async def test_missing_assets_wei_truncated_down_to_gwei(self):
-        # 5 gwei + 1 wei of dust must floor to 5 gwei, not round up
+        # 1 wei of dust must floor down, not round up
         missing_assets_wei = Wei(Web3.to_wei(5, 'gwei') + 1)
 
         with _patch(

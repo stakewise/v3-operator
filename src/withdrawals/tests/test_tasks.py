@@ -24,8 +24,7 @@ from src.withdrawals.tasks import (
 
 @pytest.fixture
 def reset_app_state():
-    """AppState is a process-wide singleton; drop the cached instance so each test starts
-    from a clean `partial_withdrawal_block`."""
+    """Drop the cached AppState singleton so each test starts with a clean state."""
     Singleton._instances.pop(AppState, None)
     yield
     Singleton._instances.pop(AppState, None)
@@ -1248,12 +1247,11 @@ async def test_fetch_oracle_exiting_validators():
     consensus_validators = [validator_1, validator_2]
     protocol_config = mock.MagicMock()
 
-    # intersection with vault validators only; oracle indexes not in vault are ignored
+    # index 99 isn't a vault validator; filtered out
     with mock.patch('src.withdrawals.tasks.poll_active_exits', return_value=[2, 99]):
         result = await _fetch_oracle_exiting_validators(consensus_validators, protocol_config)
     assert result == [validator_2]
 
-    # empty oracle response
     with mock.patch('src.withdrawals.tasks.poll_active_exits', return_value=[]):
         result = await _fetch_oracle_exiting_validators(consensus_validators, protocol_config)
     assert result == []
@@ -1307,8 +1305,7 @@ async def test_is_withdrawal_interval_passed_backfill_no_events(data_dir, reset_
         result = await mixin._is_withdrawal_interval_passed(app_state, chain_head)
 
     assert result is True
-    # no withdrawal events found: state falls back to from_block, not None, so the
-    # lookup isn't repeated on every subsequent block
+    # falls back to from_block, not None, to avoid repeating the lookup every block
     assert app_state.partial_withdrawal_block == from_block
 
 
@@ -1330,8 +1327,7 @@ async def test_is_withdrawal_interval_passed_backfill_from_event(data_dir, reset
         result = await mixin._is_withdrawal_interval_passed(app_state, chain_head)
 
     mocked_fetch.assert_awaited_once_with(BlockNumber(chain_head.block_number - blocks_interval))
-    # app state is back-filled from the event even though the interval turns out to have
-    # already passed again by the time of this check
+    # back-filled from the event even though the interval has passed again by now
     assert app_state.partial_withdrawal_block == backfilled_block
     assert result is False
 
@@ -1347,16 +1343,15 @@ async def test_is_withdrawal_interval_passed_at_exact_boundary(data_dir, reset_a
     mixin = WithdrawalIntervalMixin()
     result = await mixin._is_withdrawal_interval_passed(app_state, chain_head)
 
-    # source uses `>=` (src/withdrawals/tasks.py:68-69): at exactly `blocks_interval` blocks
-    # since the last withdrawal, the interval has not passed yet -- it only passes once
-    # the block number exceeds the interval by at least one block
+    # _is_withdrawal_interval_passed uses `>=`, so the interval hasn't passed yet at
+    # exactly blocks_interval blocks
     assert result is False
 
 
 @pytest.mark.parametrize(
     ('queued_assets', 'consensus_validators'),
     [
-        # top-branch call: partial capacity alone is sufficient
+        # top-branch: partial capacity alone is sufficient
         (
             ether_to_gwei(20),
             [
@@ -1376,7 +1371,7 @@ async def test_is_withdrawal_interval_passed_at_exact_boundary(data_dir, reset_a
                 ),
             ],
         ),
-        # mid-loop top-up after a single full exit
+        # mid-loop top-up after one full exit
         (
             ether_to_gwei(50),
             [
@@ -1396,7 +1391,7 @@ async def test_is_withdrawal_interval_passed_at_exact_boundary(data_dir, reset_a
                 ),
             ],
         ),
-        # mid-loop top-up spanning two remaining validators
+        # mid-loop top-up spans two validators
         (
             ether_to_gwei(86),
             [
@@ -1423,7 +1418,7 @@ async def test_is_withdrawal_interval_passed_at_exact_boundary(data_dir, reset_a
                 ),
             ],
         ),
-        # capacity never catches up with queued_assets -> gate never fires
+        # capacity never catches up with queued_assets
         (
             ether_to_gwei(100),
             [
@@ -1449,11 +1444,9 @@ async def test_is_withdrawal_interval_passed_at_exact_boundary(data_dir, reset_a
 async def test_get_withdrawals_partial_topup_called_at_most_once(
     data_dir, queued_assets, consensus_validators
 ):
-    """`_get_partial_withdrawals` is invoked at most once per `_get_withdrawals` call
-    (top-branch partials-only path OR a single mid-loop top-up, never both), and
-    whenever it is invoked mid-loop it fully saturates the `queued_assets` it was
-    given, because `partial_capacity` is only ever an underestimate of real capacity
-    at that point.
+    """`_get_partial_withdrawals` runs at most once per `_get_withdrawals` call, and a
+    mid-loop call always fully saturates `queued_assets` since `partial_capacity` only
+    ever underestimates real capacity at that point.
     """
     settings.set(vault=None, vault_dir=data_dir, network=HOODI)
     settings.disable_full_withdrawals = False
@@ -1488,12 +1481,10 @@ async def test_get_withdrawals_partial_topup_called_at_most_once(
 
 
 async def test_get_withdrawals_pending_deposit_asymmetry(data_dir):
-    """Documents a deliberate trade-off: `_filter_exitable_validators`'s sort key credits
-    pending deposits so a topped-up validator no longer sorts as "cheapest", but
-    `_get_withdrawals`'s `queued_assets` accounting still only ever subtracts a validator's
-    real, current CL balance once it is exited -- pending deposits are never credited even
-    though they eventually land back at the vault too. All validators here are 0x01
-    (non-compounding) so `partial_capacity` plays no role and the effect is isolated.
+    """`_filter_exitable_validators`'s sort key credits pending deposits, but
+    `_get_withdrawals`'s `queued_assets` subtraction only ever uses real CL balance --
+    deposits are never credited even once landed. Validators are 0x01 so
+    `partial_capacity` is not a factor.
     """
     settings.set(vault=None, vault_dir=data_dir, network=HOODI)
     settings.disable_full_withdrawals = False
@@ -1528,10 +1519,7 @@ async def test_get_withdrawals_pending_deposit_asymmetry(data_dir):
         consolidation_source_indexes=set(),
         pending_deposits={'0x1': ether_to_gwei(50)},
     )
-    # '0x1' sorts first (10 + 50 = 60 ETH effective, versus '0x2' at 70 ETH) and is exited
-    # first, but only its real 10 ETH balance is subtracted from queued_assets -- the 50 ETH
-    # pending deposit is not credited. That leaves 2 ETH still needed, so '0x2' (70 ETH, no
-    # pending deposits) is exited too, even though '0x1' alone would have more than covered
-    # the queue once its deposit lands. Both validators end up fully exited.
+    # '0x1' (10+50 effective) exits first but only 10 ETH counts against queued_assets,
+    # so '0x2' exits too
     expected = {'0x1': ether_to_gwei(0), '0x2': ether_to_gwei(0)}
     assert result == expected

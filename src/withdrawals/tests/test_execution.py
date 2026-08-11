@@ -104,7 +104,7 @@ class TestSubmitWithdrawValidators:
         assert result is None
 
     async def test_none_tx_receipt_returns_none(self):
-        # tx_manager.transact already returns None on a failed/timed-out receipt
+        # transact() returns None on a failed/timed-out receipt
         transact = mock.AsyncMock(return_value=None)
         vault_contract = _mock_vault_contract()
 

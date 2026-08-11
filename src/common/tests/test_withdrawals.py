@@ -9,7 +9,7 @@ from src.common.withdrawals import get_withdrawal_request_fee, get_withdrawals_c
 
 
 def test_fake_exponential_known_values():
-    # hand-computed reference vectors for factor * approx(e^(numerator/denominator))
+    # reference vectors: factor * approx(e^(numerator/denominator))
     assert fake_exponential(1, 0, 1) == 1
     assert fake_exponential(1, 1, 1) == 2
     assert fake_exponential(1, 2, 1) == 6
@@ -27,8 +27,7 @@ class TestGetWithdrawalRequestFee:
         assert fee == Wei(1)
 
     async def test_known_excess_matches_fake_exponential_formula(self):
-        # previous_excess=15, count(2) + gap_count(0) = 2 -> excess = 15 + 2 - target(2) = 15
-        # fake_exponential(MIN_EXECUTION_REQUEST_FEE=1, 15, EXECUTION_REQUEST_FEE_UPDATE_FRACTION=17) == 2
+        # excess = previous_excess(15) + count(2) - target(2) = 15; fake_exponential(1, 15, 17) == 2
         with mock.patch(
             'src.common.withdrawals.get_execution_withdrawals_count',
             mock.AsyncMock(return_value=0),
