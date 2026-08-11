@@ -79,6 +79,10 @@ class TestSubmitWithdrawValidators:
 
         assert result == Web3.to_hex(tx_hash)
         assert transact.call_args.kwargs['tx_params'] == {'value': self.tx_fee}
+        vault_contract.functions.withdrawValidators.assert_called_once_with(
+            _encode_withdrawals(self.withdrawals),
+            Web3.to_bytes(hexstr=self.signature),
+        )
 
     async def test_contract_custom_error_returns_none_without_raising(self):
         transact = mock.AsyncMock(side_effect=ContractCustomError('reverted', data='0xdeadbeef'))

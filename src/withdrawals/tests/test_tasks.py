@@ -1336,18 +1336,26 @@ async def test_is_withdrawal_interval_passed_backfill_from_event(data_dir, reset
     assert result is False
 
 
-async def test_get_withdrawals_partial_topup_called_at_most_once(data_dir):
-    """`_get_partial_withdrawals` is invoked at most once per `_get_withdrawals` call
-    (top-branch partials-only path OR a single mid-loop top-up, never both), and
-    whenever it is invoked mid-loop it fully saturates the `queued_assets` it was
-    given, because `partial_capacity` is only ever an underestimate of real capacity
-    at that point.
-    """
+async def test_is_withdrawal_interval_passed_at_exact_boundary(data_dir, reset_app_state):
     settings.set(vault=None, vault_dir=data_dir, network=HOODI)
-    settings.disable_full_withdrawals = False
-    chain_head = create_chain_head(epoch=500)
+    blocks_interval = WITHDRAWALS_INTERVAL // settings.network_config.SECONDS_PER_BLOCK
+    chain_head = create_chain_head(block_number=100_000, epoch=500)
 
-    scenarios = [
+    app_state = AppState()
+    app_state.partial_withdrawal_block = BlockNumber(chain_head.block_number - blocks_interval)
+
+    mixin = WithdrawalIntervalMixin()
+    result = await mixin._is_withdrawal_interval_passed(app_state, chain_head)
+
+    # source uses `>=` (src/withdrawals/tasks.py:68-69): at exactly `blocks_interval` blocks
+    # since the last withdrawal, the interval has not passed yet -- it only passes once
+    # the block number exceeds the interval by at least one block
+    assert result is False
+
+
+@pytest.mark.parametrize(
+    ('queued_assets', 'consensus_validators'),
+    [
         # top-branch call: partial capacity alone is sufficient
         (
             ether_to_gwei(20),
@@ -1435,35 +1443,48 @@ async def test_get_withdrawals_partial_topup_called_at_most_once(data_dir):
                 ),
             ],
         ),
-    ]
+    ],
+    ids=['partials-only', 'single-topup', 'two-validator-topup', 'gate-never-fires'],
+)
+async def test_get_withdrawals_partial_topup_called_at_most_once(
+    data_dir, queued_assets, consensus_validators
+):
+    """`_get_partial_withdrawals` is invoked at most once per `_get_withdrawals` call
+    (top-branch partials-only path OR a single mid-loop top-up, never both), and
+    whenever it is invoked mid-loop it fully saturates the `queued_assets` it was
+    given, because `partial_capacity` is only ever an underestimate of real capacity
+    at that point.
+    """
+    settings.set(vault=None, vault_dir=data_dir, network=HOODI)
+    settings.disable_full_withdrawals = False
+    chain_head = create_chain_head(epoch=500)
 
-    for queued_assets, consensus_validators in scenarios:
-        calls: list[tuple[dict, dict]] = []
+    calls: list[tuple[dict, dict]] = []
 
-        def _spy(**kwargs):  # pylint: disable=cell-var-from-loop
-            result = _get_partial_withdrawals(**kwargs)
-            calls.append((kwargs, result))
-            return result
+    def _spy(**kwargs):
+        result = _get_partial_withdrawals(**kwargs)
+        calls.append((kwargs, result))
+        return result
 
-        with mock.patch('src.withdrawals.tasks._get_partial_withdrawals', side_effect=_spy):
-            await _get_withdrawals(
-                chain_head=chain_head,
-                queued_assets=queued_assets,
-                consensus_validators=consensus_validators,
-                pending_partial_withdrawals=[],
-                validator_min_active_epochs=10,
-                oracle_exit_indexes=set(),
-                consolidation_target_indexes=set(),
-                consolidation_source_indexes=set(),
-                pending_deposits={},
-            )
+    with mock.patch('src.withdrawals.tasks._get_partial_withdrawals', side_effect=_spy):
+        await _get_withdrawals(
+            chain_head=chain_head,
+            queued_assets=queued_assets,
+            consensus_validators=consensus_validators,
+            pending_partial_withdrawals=[],
+            validator_min_active_epochs=10,
+            oracle_exit_indexes=set(),
+            consolidation_target_indexes=set(),
+            consolidation_source_indexes=set(),
+            pending_deposits={},
+        )
 
-        assert len(calls) <= 1
-        if calls:
-            call_kwargs, call_result = calls[0]
-            requested = call_kwargs['queued_assets']
-            covered = sum(call_result.values())
-            assert requested == 0 or covered == requested
+    assert len(calls) <= 1
+    if calls:
+        call_kwargs, call_result = calls[0]
+        requested = call_kwargs['queued_assets']
+        covered = sum(call_result.values())
+        assert requested == 0 or covered == requested
 
 
 async def test_get_withdrawals_pending_deposit_asymmetry_pr_777(data_dir):

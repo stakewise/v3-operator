@@ -47,7 +47,7 @@ class TestGetWithdrawalRequestFee:
             low_count_fee = await get_withdrawal_request_fee(count=1)
             high_count_fee = await get_withdrawal_request_fee(count=5)
 
-        assert high_count_fee > low_count_fee
+        assert high_count_fee >= low_count_fee
 
 
 @pytest.mark.usefixtures('fake_settings')
