@@ -12,6 +12,10 @@ from web3.types import Gwei
 from src.common.clients import OPERATOR_USER_AGENT
 from src.config.settings import settings
 from src.validators.event_processors import get_validators_start_index
+from src.validators.exceptions import (
+    EmptyRelayerResponseException,
+    InvalidRelayerResponseException,
+)
 from src.validators.typings import (
     ExitSignatureShards,
     RelayerInfoResponse,
@@ -31,11 +35,17 @@ class RelayerClient:
             settings.vault, validators_start_index, amounts
         )
 
-        validators = [_parse_validator(v) for v in relayer_response.get('validators') or []]
+        if not isinstance(relayer_response, dict):
+            raise InvalidRelayerResponseException('response body is not an object')
 
-        validators_manager_signature = _to_hex_or_none(
-            relayer_response.get('validators_manager_signature')
-        )
+        try:
+            validators = [_parse_validator(v) for v in relayer_response.get('validators') or []]
+
+            validators_manager_signature = _to_hex_or_none(
+                relayer_response.get('validators_manager_signature')
+            )
+        except (KeyError, ValueError, TypeError) as e:
+            raise InvalidRelayerResponseException(str(e)) from e
 
         return RelayerValidatorsResponse(
             validators=validators,
@@ -52,11 +62,11 @@ class RelayerClient:
             amounts=list(funding_amounts),
         )
 
-        validators_manager_signature = add_0x_prefix(
-            relayer_response.get('validators_manager_signature') or HexStr('0x')
-        )
+        validators_manager_signature = relayer_response.get('validators_manager_signature')
+        if not validators_manager_signature:
+            raise EmptyRelayerResponseException
         return RelayerSignatureResponse(
-            validators_manager_signature=validators_manager_signature,
+            validators_manager_signature=add_0x_prefix(HexStr(validators_manager_signature)),
         )
 
     async def withdraw_validators(
@@ -191,11 +201,17 @@ def _parse_validator(v: dict) -> Validator:
     )
     return Validator(
         public_key=add_0x_prefix(v['public_key']),
-        amount=v['amount'],
+        amount=_to_gwei(v['amount']),
         deposit_signature=_to_hex_or_none(v.get('deposit_signature')),
         exit_signature=_to_bls_signature_or_none(v.get('exit_signature')),
         exit_signature_shards=exit_signature_shards,
     )
+
+
+def _to_gwei(raw_amount: str | int | float) -> Gwei:
+    if isinstance(raw_amount, float) and not raw_amount.is_integer():
+        raise ValueError(f'amount is not an integral number: {raw_amount}')
+    return Gwei(int(raw_amount))
 
 
 def _to_hex_or_none(value: str | None) -> HexStr | None:
