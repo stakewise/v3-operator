@@ -912,19 +912,14 @@ async def test_get_withdrawals_excludes_consolidation_sources(data_dir):
     assert result == expected
 
 
-@pytest.mark.asyncio
 async def test_get_withdrawals_full_exit_does_not_overwrite_partial_assignment(data_dir):
     settings.set(vault=None, vault_dir=data_dir, network=HOODI)
 
-    # With the B1 fix, partial_capacity is exact, so a mid-loop top-up always fully
-    # saturates queued_assets and the loop breaks on the next iteration -- the
-    # overwrite guarded against here is not reachable through real inputs today.
-    # We mock _get_partial_withdrawals to simulate a future allocation policy that
-    # under-saturates queued_assets, so the guard is locked in independently of
-    # that invariant: v1 (cheapest) is fully exited first, leaving 10 ETH still
-    # needed; the mocked call assigns v2 a 4 ETH partial (deliberately covering
-    # only part of the remainder), and the loop then reaches v2 again as the next
-    # (and only remaining) exitable validator.
+    # Real inputs can't trigger the guarded overwrite today: partial_capacity is
+    # exact, so a mid-loop top-up always saturates queued_assets. Mock
+    # _get_partial_withdrawals to under-saturate it instead: v1 (cheapest) is fully
+    # exited, v2 gets a 4 ETH partial, and the loop then reaches v2 again as the
+    # only remaining exitable validator.
     chain_head = create_chain_head(epoch=500)
     queued_assets = ether_to_gwei(50)
     v1 = create_consensus_validator(
