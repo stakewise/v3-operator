@@ -28,14 +28,7 @@ async def fetch_funding_validators_balances() -> dict[HexStr, Gwei]:
     """
     Retrieves the consensus balances of vault validators eligible for funding.
     Includes balances from pending deposits that have not yet been processed by the
-    consensus node.
-
-    Pending consolidations are folded in too: a consolidation source keeps compounding
-    until it is processed, so it is excluded from the fundable set entirely, and its
-    balance is credited onto the target instead of the target's raw (pre-consolidation)
-    balance, since that is what the target will actually hold once the consolidation
-    lands. If a source's balance can't be determined, the target is dropped from the
-    fundable set rather than guessed at.
+    consensus node. Accounts for pending consolidations.
     """
     vault_public_keys = {v.public_key for v in VaultValidatorCrud().get_vault_validators()}
     vault_public_keys.update(await get_latest_vault_v2_validator_public_keys(settings.vault))
@@ -60,11 +53,8 @@ async def fetch_funding_validators_balances() -> dict[HexStr, Gwei]:
         else:
             ineligible_public_keys.add(validator.public_key)
 
-    # Adjust for pending consolidations: a source keeps compounding until the
-    # consolidation is processed, so it must never be funded; the target should be
-    # funded against the balance it will actually hold once the consolidation lands
-    # (its own balance plus the incoming source balance). If the source's balance
-    # can't be determined, conservatively drop the target instead of guessing.
+    # Exclude pending consolidation sources from funding and credit their balances
+    # to the targets; drop targets whose source balance is unknown.
     for cons in pending_consolidations:
         target = index_to_validator.get(cons.target_index)
         source = index_to_validator.get(cons.source_index)
