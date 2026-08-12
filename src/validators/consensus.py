@@ -48,16 +48,26 @@ async def fetch_funding_validators_balances() -> dict[HexStr, Gwei]:
     slot = str(chain_head.slot)
     consensus_validators = await fetch_consensus_validators(list(vault_public_keys), slot=slot)
     pending_consolidations = await get_pending_consolidations(chain_head, consensus_validators)
-    incoming_balances, unfundable_target_public_keys, consolidating_source_public_keys = (
-        _fold_pending_consolidations(consensus_validators, pending_consolidations)
+    incoming_balances, non_fundable_public_keys = _fold_pending_consolidations(
+        consensus_validators, pending_consolidations
     )
 
-    # Filter compounding and remove exiting/withdrawn/consolidation-source validators,
-    # as they are not eligible for funding. Consolidation targets get the incoming
-    # source balance added on top of their own.
-    validators_balances, ineligible_public_keys = _build_fundable_balances(
-        consensus_validators, incoming_balances, consolidating_source_public_keys
-    )
+    # Filter compounding and remove exiting/withdrawn/non-fundable validators, as they are
+    # not eligible for funding. Consolidation targets get the incoming source balance
+    # added on top of their own.
+    validators_balances: dict[HexStr, Gwei] = {}
+    ineligible_public_keys: set[HexStr] = set()
+    for validator in consensus_validators:
+        if (
+            validator.is_compounding
+            and validator.status not in EXITING_STATUSES
+            and validator.public_key not in non_fundable_public_keys
+        ):
+            validators_balances[validator.public_key] = Gwei(
+                validator.balance + incoming_balances[validator.index]
+            )
+        else:
+            ineligible_public_keys.add(validator.public_key)
 
     # Keys not yet known to the consensus node are eligible too,
     # their balances come solely from pending deposits.
@@ -67,9 +77,12 @@ async def fetch_funding_validators_balances() -> dict[HexStr, Gwei]:
     pending_deposits_amounts = await fetch_compounding_pending_deposits_amounts(
         public_keys=eligible_public_keys, slot=slot
     )
-    return _finalize_validators_balances(
-        validators_balances, pending_deposits_amounts, unfundable_target_public_keys
-    )
+    for public_key, amount in pending_deposits_amounts.items():
+        validators_balances[public_key] = Gwei(
+            validators_balances.get(public_key, Gwei(0)) + amount
+        )
+
+    return validators_balances
 
 
 async def fetch_compounding_pending_deposits_amounts(
@@ -132,11 +145,11 @@ async def fetch_consensus_validators(
 def _fold_pending_consolidations(
     consensus_validators: list[ConsensusValidator],
     pending_consolidations: list[PendingConsolidation],
-) -> tuple[defaultdict[int, Gwei], set[HexStr], set[HexStr]]:
+) -> tuple[defaultdict[int, Gwei], set[HexStr]]:
     """
     Sums each pending consolidation's source balance onto its target's incoming balance,
     since that is what the target will actually hold once the consolidation is processed.
-    Also reports which public keys must be excluded from the fundable set: consolidation
+    Also reports public keys that must be excluded from the fundable set: consolidation
     sources (always, since they keep compounding until processed), and targets whose
     source balance is unknown (conservatively excluded rather than guessed at).
     """
@@ -146,57 +159,20 @@ def _fold_pending_consolidations(
     }
 
     incoming_balances: defaultdict[int, Gwei] = defaultdict(lambda: Gwei(0))
-    unfundable_target_public_keys: set[HexStr] = set()
-    consolidating_source_public_keys: set[HexStr] = set()
+    non_fundable_public_keys: set[HexStr] = set()
     for cons in pending_consolidations:
         source_public_key = index_to_public_key.get(cons.source_index)
         if source_public_key is not None:
-            consolidating_source_public_keys.add(source_public_key)
+            non_fundable_public_keys.add(source_public_key)
 
         source_balance = index_to_balance.get(cons.source_index)
         if source_balance is None:
             target_public_key = index_to_public_key.get(cons.target_index)
             if target_public_key is not None:
-                unfundable_target_public_keys.add(target_public_key)
+                non_fundable_public_keys.add(target_public_key)
             continue
         incoming_balances[cons.target_index] = Gwei(
             incoming_balances[cons.target_index] + source_balance
         )
 
-    return incoming_balances, unfundable_target_public_keys, consolidating_source_public_keys
-
-
-def _build_fundable_balances(
-    consensus_validators: list[ConsensusValidator],
-    incoming_balances: defaultdict[int, Gwei],
-    consolidating_source_public_keys: set[HexStr],
-) -> tuple[dict[HexStr, Gwei], set[HexStr]]:
-    validators_balances: dict[HexStr, Gwei] = {}
-    ineligible_public_keys: set[HexStr] = set(consolidating_source_public_keys)
-    for validator in consensus_validators:
-        if validator.public_key in consolidating_source_public_keys:
-            continue
-        if validator.is_compounding and validator.status not in EXITING_STATUSES:
-            validators_balances[validator.public_key] = Gwei(
-                validator.balance + incoming_balances[validator.index]
-            )
-        else:
-            ineligible_public_keys.add(validator.public_key)
-
-    return validators_balances, ineligible_public_keys
-
-
-def _finalize_validators_balances(
-    validators_balances: dict[HexStr, Gwei],
-    pending_deposits_amounts: dict[HexStr, Gwei],
-    unfundable_target_public_keys: set[HexStr],
-) -> dict[HexStr, Gwei]:
-    for public_key, amount in pending_deposits_amounts.items():
-        validators_balances[public_key] = Gwei(
-            validators_balances.get(public_key, Gwei(0)) + amount
-        )
-
-    for target_public_key in unfundable_target_public_keys:
-        validators_balances.pop(target_public_key, None)
-
-    return validators_balances
+    return incoming_balances, non_fundable_public_keys
