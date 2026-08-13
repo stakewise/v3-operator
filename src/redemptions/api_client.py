@@ -20,8 +20,8 @@ DEFAULT_USER_AGENT = (
     'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36'
 )
 API_SUPPORTED_CHAINS = {
-    MAINNET: {'eth', 'arb'},
-    GNOSIS: {'xdai'},
+    MAINNET: 'eth',
+    GNOSIS: 'xdai',
 }
 API_SLEEP_TIMEOUT = 1
 STAKEWISE_DEBANK_PROTOCOL_IDS = ['stakewise', 'xdai_stakewise']
@@ -36,7 +36,8 @@ class APIClient:
         self.api_access_key = api_access_key
 
     async def get_protocols_locked_os_token(self, address: ChecksumAddress) -> Wei:
-        if settings.network not in API_SUPPORTED_CHAINS:
+        api_chain = API_SUPPORTED_CHAINS.get(settings.network)
+        if api_chain is None:
             raise ValueError(f'Unsupported network for API Client: {settings.network}')
 
         url = urljoin(self.base_url, 'v1/user/complex_protocol_list')
@@ -47,7 +48,7 @@ class APIClient:
         protocol_data = await self._fetch_json(url, params=params)
         total_locked_os_token = Wei(0)
         for protocol in protocol_data:
-            if protocol['chain'] not in API_SUPPORTED_CHAINS[settings.network]:
+            if protocol['chain'] != api_chain:
                 continue
             # boosted OsEth handled via graph separately
             if protocol['id'] in STAKEWISE_DEBANK_PROTOCOL_IDS:
@@ -55,7 +56,7 @@ class APIClient:
             for portfolio_item in protocol.get('portfolio_item_list', []):
                 supply_token_list = portfolio_item.get('detail', {}).get('supply_token_list', [])
                 for supply_token in supply_token_list:
-                    if supply_token['chain'] not in API_SUPPORTED_CHAINS[settings.network]:
+                    if supply_token['chain'] != api_chain:
                         continue
                     if not Web3.is_address(supply_token['id']):
                         continue
@@ -82,7 +83,4 @@ class APIClient:
     def _is_os_token(self, token_address: ChecksumAddress) -> bool:
         if token_address == ZERO_CHECKSUM_ADDRESS:
             return False
-        return token_address in (
-            settings.network_config.OS_TOKEN_CONTRACT_ADDRESS,
-            settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS,
-        )
+        return token_address == settings.network_config.OS_TOKEN_CONTRACT_ADDRESS

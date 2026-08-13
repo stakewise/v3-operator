@@ -422,8 +422,8 @@ class TestUpdateOsTokenPositions:
             ),
         ]
         os_token_holders = {
-            address_1: Web3.to_wei(3, 'ether'),
-            address_2: Web3.to_wei(12, 'ether'),
+            address_1: Web3.to_wei(4, 'ether'),
+            address_2: Web3.to_wei(13, 'ether'),
         }
         mock_protocol_data = [
             {
@@ -484,15 +484,11 @@ class TestUpdateOsTokenPositions:
             MAINNET,
             '--execution-endpoints',
             execution_endpoints,
-            '--arbitrum-endpoint',
-            execution_endpoints,
             '--verbose',
         ]
         with (
             patch_latest_block(11),
-            patch_get_arb_balance(Web3.to_wei(1, 'ether')),
             patch_os_token_redeemer_contract_nonce(6),
-            patch_os_token_arbitrum_contract_address(),
             patch_os_token_contract_address(os_token_contract_address),
             patch_os_token_converter(os_token_converter),
             patch_api_client(mock_protocol_data),
@@ -539,15 +535,11 @@ class TestUpdateOsTokenPositions:
             MAINNET,
             '--execution-endpoints',
             execution_endpoints,
-            '--arbitrum-endpoint',
-            execution_endpoints,
             '--verbose',
         ]
         with (
             patch_latest_block(11),
-            patch_get_arb_balance(Web3.to_wei(0, 'ether')),
             patch_os_token_redeemer_contract_nonce(6),
-            patch_os_token_arbitrum_contract_address(),
             patch_os_token_contract_address(os_token_contract_address),
             patch_os_token_converter(os_token_converter),
             patch_api_client(mock_protocol_data),
@@ -594,17 +586,13 @@ class TestUpdateOsTokenPositions:
             MAINNET,
             '--execution-endpoints',
             execution_endpoints,
-            '--arbitrum-endpoint',
-            execution_endpoints,
             '--verbose',
             '--min-os-token-position-amount-gwei',
             6 * 10**9,  # 6 ETH in Gwei
         ]
         with (
             patch_latest_block(11),
-            patch_get_arb_balance(Web3.to_wei(0, 'ether')),
             patch_os_token_redeemer_contract_nonce(6),
-            patch_os_token_arbitrum_contract_address(),
             patch_os_token_contract_address(os_token_contract_address),
             patch_os_token_converter(os_token_converter),
             patch_api_client(mock_protocol_data),
@@ -645,17 +633,13 @@ class TestUpdateOsTokenPositions:
             MAINNET,
             '--execution-endpoints',
             execution_endpoints,
-            '--arbitrum-endpoint',
-            execution_endpoints,
             '--verbose',
             '--min-os-token-position-amount-gwei',
             6 * 10**9,  # 6 ETH in Gwei
         ]
         with (
             patch_latest_block(11),
-            patch_get_arb_balance(Web3.to_wei(0, 'ether')),
             patch_os_token_redeemer_contract_nonce(6),
-            patch_os_token_arbitrum_contract_address(),
             patch_os_token_contract_address(os_token_contract_address),
             patch_os_token_converter(os_token_converter),
             patch_api_client(mock_protocol_data),
@@ -697,30 +681,6 @@ def patch_os_token_converter(os_token_converter: OsTokenConverter):
     with patch(
         'src.redemptions.commands.update_redeemable_positions.create_os_token_converter',
         return_value=os_token_converter,
-    ):
-        yield
-
-
-@contextlib.contextmanager
-def patch_get_arb_balance(balance):
-    encoded = balance.to_bytes(32, 'big')
-
-    async def mock_aggregate(data, block_number=None):
-        return (0, [encoded] * len(data))
-
-    with patch(
-        'src.redemptions.commands.update_redeemable_positions.MulticallContract.aggregate',
-        side_effect=mock_aggregate,
-    ):
-        yield
-
-
-@contextlib.contextmanager
-def patch_os_token_arbitrum_contract_address():
-    with patch.object(
-        settings.network_config,
-        'OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS',
-        NETWORKS[MAINNET].OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS,
     ):
         yield
 

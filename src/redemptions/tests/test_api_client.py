@@ -100,16 +100,12 @@ class TestAPIClient:
             settings.network_config,
             'OS_TOKEN_CONTRACT_ADDRESS',
             '0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38',
-        ), patch.object(
-            settings.network_config,
-            'OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS',
-            '0xf7d4e7273E5015C96728A6b02f31C505eE184603',
         ):
             client = APIClient()
             result = await client.get_protocols_locked_os_token(
                 Web3.to_checksum_address('0x1234567890abcdef1234567890abcdef12345678')
             )
-        assert result == Wei(5810497440414831)
+        assert result == Wei(4908766246664556)
 
     @pytest.mark.usefixtures('fake_settings')
     async def test_real_data_with_boost(self):
@@ -121,10 +117,6 @@ class TestAPIClient:
             settings.network_config,
             'OS_TOKEN_CONTRACT_ADDRESS',
             '0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38',
-        ), patch.object(
-            settings.network_config,
-            'OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS',
-            '0xf7d4e7273E5015C96728A6b02f31C505eE184603',
         ):
             client = APIClient()
             result = await client.get_protocols_locked_os_token(

@@ -384,15 +384,6 @@ class VaultContract(ContractWrapper, VaultStateMixin, ErrorMixin):
             return [Web3.to_hex(event['args']['publicKey']) for event in events]
 
 
-class Erc20Contract(ContractWrapper):
-    abi_path = 'abi/Erc20Token.json'
-
-    async def get_balance(
-        self, address: ChecksumAddress, block_number: BlockNumber | None = None
-    ) -> Wei:
-        return await self.contract.functions.balanceOf(address).call(block_identifier=block_number)
-
-
 class VaultEncoder(BaseEncoder):
     """Helper class to encode Vault contract ABI calls."""
 
