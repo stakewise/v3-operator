@@ -4,7 +4,6 @@ import sys
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import cast
 
 import click
 from eth_typing import BlockNumber, ChecksumAddress
@@ -17,10 +16,8 @@ from src.common.clients import (
     build_ipfs_upload_clients,
     close_clients,
     execution_client,
-    get_execution_client,
     setup_clients,
 )
-from src.common.contracts import Erc20Contract, MulticallContract
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.startup_check import (
     check_execution_nodes_network,
@@ -28,7 +25,7 @@ from src.common.startup_check import (
     wait_for_graph_node_sync_to_chain_head,
 )
 from src.common.utils import log_verbose
-from src.config.networks import AVAILABLE_NETWORKS, MAINNET, ZERO_CHECKSUM_ADDRESS
+from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
 from src.redemptions.api_client import (
     API_SLEEP_TIMEOUT,
@@ -48,7 +45,6 @@ from src.redemptions.os_token_converter import create_os_token_converter
 from src.redemptions.typings import (
     Allocator,
     ApiConfig,
-    ArbitrumConfig,
     LeverageStrategyPosition,
     OsTokenPosition,
 )
@@ -108,12 +104,6 @@ logger = logging.getLogger(__name__)
     help='API endpoint for graph node.',
 )
 @click.option(
-    '--arbitrum-endpoint',
-    type=str,
-    envvar='ARBITRUM_ENDPOINT',
-    help='API endpoint for the Arbitrum execution node. Should only be specified for mainnet.',
-)
-@click.option(
     '--log-level',
     type=click.Choice(
         LOG_LEVELS,
@@ -146,7 +136,6 @@ def update_redeemable_positions(
     execution_endpoints: str,
     execution_jwt_secret: str | None,
     graph_endpoint: str,
-    arbitrum_endpoint: str | None,
     network: str,
     verbose: bool,
     log_level: str,
@@ -173,16 +162,6 @@ def update_redeemable_positions(
         network=network,
         log_level=log_level,
     )
-    arbitrum_config: ArbitrumConfig | None = None
-    if network == MAINNET:
-        if not arbitrum_endpoint:
-            arbitrum_endpoint = click.prompt(
-                'Enter the API endpoint for the Arbitrum execution node'
-            )
-        arbitrum_config = ArbitrumConfig(
-            OS_TOKEN_CONTRACT_ADDRESS=settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS,
-            EXECUTION_ENDPOINT=cast(str, arbitrum_endpoint),
-        )
     try:
         # Try-catch to enable async calls in test - an event loop
         #  will already be running in that case
@@ -193,7 +172,6 @@ def update_redeemable_positions(
                 pool.submit(
                     lambda: asyncio.run(
                         main(
-                            arbitrum_config=arbitrum_config,
                             min_os_token_position_amount_gwei=Gwei(
                                 min_os_token_position_amount_gwei
                             ),
@@ -206,7 +184,6 @@ def update_redeemable_positions(
                 # no event loop running
                 asyncio.run(
                     main(
-                        arbitrum_config=arbitrum_config,
                         min_os_token_position_amount_gwei=Gwei(min_os_token_position_amount_gwei),
                         api_config=api_config,
                     )
@@ -219,16 +196,14 @@ def update_redeemable_positions(
 
 
 async def main(
-    arbitrum_config: ArbitrumConfig | None,
     min_os_token_position_amount_gwei: Gwei,
     api_config: ApiConfig,
 ) -> None:
     setup_logging()
     await setup_clients()
-    await _startup_check(arbitrum_config)
+    await _startup_check()
     try:
         await process(
-            arbitrum_config=arbitrum_config,
             min_os_token_position_amount_gwei=min_os_token_position_amount_gwei,
             api_config=api_config,
         )
@@ -238,7 +213,6 @@ async def main(
 
 # pylint: disable-next=too-many-locals
 async def process(
-    arbitrum_config: ArbitrumConfig | None,
     min_os_token_position_amount_gwei: Gwei,
     api_config: ApiConfig,
 ) -> None:
@@ -284,7 +258,6 @@ async def process(
     kept_shares = await get_kept_shares(
         address_to_minted_shares,
         block_number,
-        arbitrum_config,
         api_config,
     )
     logger.info('Fetched kept tokens for %s addresses...', len(address_to_minted_shares))
@@ -328,7 +301,6 @@ async def process(
 async def get_kept_shares(
     address_to_minted_shares: dict[ChecksumAddress, Wei],
     block_number: BlockNumber,
-    arbitrum_config: ArbitrumConfig | None,
     api_config: ApiConfig,
 ) -> dict[ChecksumAddress, Wei]:
     kept_shares = defaultdict(lambda: Wei(0))
@@ -338,14 +310,6 @@ async def get_kept_shares(
     os_token_holders = await graph_get_os_token_holders(block_number)
     for address in address_to_minted_shares.keys():
         kept_shares[address] = os_token_holders.get(address, Wei(0))
-
-    # arb wallet balance
-    if arbitrum_config:
-        arb_balances = await _get_arb_balances(
-            arbitrum_config, list(address_to_minted_shares.keys())
-        )
-        for address, arb_balance in arb_balances.items():
-            kept_shares[address] = Wei(kept_shares[address] + arb_balance)
 
     # rabby doesnt support hoodi so skip api call
     if settings.network not in API_SUPPORTED_CHAINS:
@@ -380,34 +344,6 @@ async def get_kept_shares(
             locked_os_token = await api_client.get_protocols_locked_os_token(address=address)
             kept_shares[address] = Wei(kept_shares[address] + locked_os_token)
     return kept_shares
-
-
-async def _get_arb_balances(
-    arbitrum_config: ArbitrumConfig,
-    addresses: list[ChecksumAddress],
-) -> dict[ChecksumAddress, Wei]:
-    logger.info(
-        'Fetching %s from Arbitrum wallet balances...',
-        settings.network_config.OS_TOKEN_BALANCE_SYMBOL,
-    )
-    arb_execution_client = get_execution_client([arbitrum_config.EXECUTION_ENDPOINT])
-    try:
-        arb_contract = Erc20Contract(
-            settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS,
-            execution_client=arb_execution_client,
-        )
-        arb_multicall = MulticallContract(
-            address=settings.network_config.MULTICALL_CONTRACT_ADDRESS,
-            execution_client=arb_execution_client,
-        )
-        calls = [
-            (arb_contract.contract_address, arb_contract.encode_abi('balanceOf', [addr]))
-            for addr in addresses
-        ]
-        _, results = await arb_multicall.aggregate(calls)
-        return {address: Wei(Web3.to_int(result)) for address, result in zip(addresses, results)}
-    finally:
-        await arb_execution_client.provider.disconnect()
 
 
 async def calculate_boost_os_token_shares(
@@ -492,7 +428,7 @@ def _reduce_boosted_amount(
     return allocators
 
 
-async def _startup_check(arbitrum_config: ArbitrumConfig | None) -> None:
+async def _startup_check() -> None:
     """Verify connectivity to execution nodes, the graph node, and IPFS upload clients."""
     logger.info('Checking connection to execution nodes...')
     await wait_for_execution_node()
@@ -500,33 +436,11 @@ async def _startup_check(arbitrum_config: ArbitrumConfig | None) -> None:
     logger.info('Checking execution nodes network...')
     await check_execution_nodes_network()
 
-    if arbitrum_config:
-        logger.info('Checking connection to Arbitrum execution node...')
-        await _check_arbitrum_execution_node(arbitrum_config)
-
     logger.info('Checking connection to graph node...')
     await wait_for_graph_node_sync_to_chain_head()
 
     logger.info('Checking IPFS upload clients...')
     await _check_ipfs_upload_clients()
-
-
-async def _check_arbitrum_execution_node(arbitrum_config: ArbitrumConfig) -> None:
-    arb_execution_client = get_execution_client([arbitrum_config.EXECUTION_ENDPOINT])
-    try:
-        block_number = await arb_execution_client.eth.block_number
-        if block_number <= 0:
-            raise RuntimeError(
-                f'Arbitrum execution node {arbitrum_config.EXECUTION_ENDPOINT} '
-                f'is not ready, current block number: {block_number}'
-            )
-        logger.info(
-            'Connected to Arbitrum execution node at %s. Current block number: %s',
-            arbitrum_config.EXECUTION_ENDPOINT,
-            block_number,
-        )
-    finally:
-        await arb_execution_client.provider.disconnect()
 
 
 async def _check_ipfs_upload_clients() -> None:

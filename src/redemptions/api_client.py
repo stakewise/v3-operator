@@ -20,7 +20,7 @@ DEFAULT_USER_AGENT = (
     'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36'
 )
 API_SUPPORTED_CHAINS = {
-    MAINNET: {'eth', 'arb'},
+    MAINNET: {'eth'},
     GNOSIS: {'xdai'},
 }
 API_SLEEP_TIMEOUT = 1
@@ -82,7 +82,4 @@ class APIClient:
     def _is_os_token(self, token_address: ChecksumAddress) -> bool:
         if token_address == ZERO_CHECKSUM_ADDRESS:
             return False
-        return token_address in (
-            settings.network_config.OS_TOKEN_CONTRACT_ADDRESS,
-            settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS,
-        )
+        return token_address == settings.network_config.OS_TOKEN_CONTRACT_ADDRESS
