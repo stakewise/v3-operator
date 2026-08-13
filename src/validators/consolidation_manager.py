@@ -206,9 +206,6 @@ class ConsolidationSelector(ConsolidationManager):
                 continue
             if val.activation_epoch > self.chain_head.epoch:
                 continue
-            # A mismatched target is executed by the CL and moves the sources' balance
-            # into a validator the vault cannot withdraw from, unlike a mismatched source
-            # which the CL silently ignores.
             if val.withdrawal_address != settings.vault:
                 continue
             target_validators.append(val)
@@ -393,7 +390,6 @@ class ConsolidationChecker(ConsolidationManager):
                 raise ConsolidationError(
                     f'Target validator {self.target_public_key} is not active.'
                 )
-            # Unlike a mismatched source, a mismatched target is executed by the CL
             if target_validator.withdrawal_address != settings.vault:
                 raise ConsolidationError(
                     f'Validator {self.target_public_key} withdrawal address '
