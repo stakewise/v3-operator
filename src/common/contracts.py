@@ -301,6 +301,16 @@ class VaultContract(ContractWrapper, VaultStateMixin, ErrorMixin):
             for event in events
         ]
 
+    async def get_v2_validator_registered_public_keys(
+        self, from_block: BlockNumber, to_block: BlockNumber | None = None
+    ) -> list[HexStr]:
+        events = await self._get_events(
+            self.events.V2ValidatorRegistered,  # type: ignore
+            from_block=from_block,
+            to_block=to_block or await self.execution_client.eth.get_block_number(),
+        )
+        return [Web3.to_hex(event['args']['publicKey']) for event in events]
+
     async def mev_escrow(self) -> ChecksumAddress:
         return await self.contract.functions.mevEscrow().call()
 
@@ -410,6 +420,15 @@ class ValidatorsRegistryContract(ContractWrapper):
         """Fetches the latest validators registry root."""
         deposit_root = await self.contract.functions.get_deposit_root().call()
         return Web3.to_hex(deposit_root)
+
+    async def get_deposit_events(
+        self, from_block: BlockNumber, to_block: BlockNumber | None = None
+    ) -> list[EventData]:
+        return await self._get_events(
+            self.events.DepositEvent,  # type: ignore
+            from_block=from_block,
+            to_block=to_block or await self.execution_client.eth.get_block_number(),
+        )
 
 
 class KeeperContract(ContractWrapper, ErrorMixin):

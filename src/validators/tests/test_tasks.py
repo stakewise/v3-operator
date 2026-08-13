@@ -251,17 +251,37 @@ class TestProcessFunding:
 
     @pytest.mark.usefixtures('fake_settings')
     async def test_funding_interval_not_passed(self):
-        """Raises FundingException when funding interval hasn't passed."""
+        """Defers funding and reserves only the planned amount, registration proceeds
+        with the remainder."""
         vault_assets = ether_to_gwei(100)
         pub_key = faker.validator_public_key()
         with (
+            patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_funding_validators_balances({pub_key: ether_to_gwei(32)}),
             self.patch_is_funding_interval_passed(False),
             self.patch_fund_validators_chunk(None) as mock_fund,
         ):
-            with pytest.raises(FundingException, match='Funding interval has not passed yet'):
-                await self.subtask.process_funding(vault_assets=vault_assets, harvest_params=None)
+            result = await self.subtask.process_funding(
+                vault_assets=vault_assets, harvest_params=None
+            )
         mock_fund.assert_not_called()
+        assert result == ether_to_gwei(68)
+
+    @pytest.mark.usefixtures('fake_settings')
+    async def test_funding_interval_not_passed_reserves_all_assets(self):
+        """When planned funding would consume all assets, the deferred return is zero."""
+        vault_assets = ether_to_gwei(100)
+        pub_key = faker.validator_public_key()
+        with (
+            self.patch_funding_validators_balances({pub_key: Gwei(0)}),
+            self.patch_is_funding_interval_passed(False),
+            self.patch_fund_validators_chunk(None) as mock_fund,
+        ):
+            result = await self.subtask.process_funding(
+                vault_assets=vault_assets, harvest_params=None
+            )
+        mock_fund.assert_not_called()
+        assert result == Gwei(0)
 
     @pytest.mark.usefixtures('fake_settings')
     async def test_successful_funding_single_validator(self):
@@ -336,11 +356,25 @@ class TestProcessFunding:
     # exiting validator has lower balance (32) and higher balance (40)
     # to ensure it's excluded regardless of funding order.
     @pytest.mark.parametrize(
-        'active_balance, exiting_balance',
-        [(40, 32), (32, 40)],
+        'active_balance, exiting_balance, exiting_status, active_funded, remainder',
+        [
+            # capacity=64-40=24, funded=24, remainder=40-24=16
+            (40, 32, ValidatorStatus.ACTIVE_EXITING, 24, 16),
+            # capacity=64-32=32, funded=32, remainder=40-32=8
+            (32, 40, ValidatorStatus.ACTIVE_EXITING, 32, 8),
+            (40, 32, ValidatorStatus.ACTIVE_SLASHED, 24, 16),
+            (32, 40, ValidatorStatus.ACTIVE_SLASHED, 32, 8),
+        ],
     )
     async def test_fetch_funding_filters_exiting_validators(
-        self, vault_validator_crud, compounding_creds, active_balance, exiting_balance
+        self,
+        vault_validator_crud,
+        compounding_creds,
+        active_balance,
+        exiting_balance,
+        exiting_status,
+        active_funded,
+        remainder,
     ):
         """fetch_funding_validators_balances excludes exiting/exited validators."""
         pub_key_active = faker.validator_public_key()
@@ -372,7 +406,7 @@ class TestProcessFunding:
                     'withdrawal_credentials': compounding_creds,
                     'activation_epoch': '0',
                 },
-                'status': ValidatorStatus.ACTIVE_EXITING.value,
+                'status': exiting_status.value,
             },
         ]
 
@@ -382,13 +416,14 @@ class TestProcessFunding:
         mock_consensus.get_pending_deposits.return_value = []
 
         with (
+            patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_get_latest_vault_v2_validator_public_keys(),
             patch('src.validators.consensus.consensus_client', mock_consensus),
             self.patch_is_funding_interval_passed(True),
             self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
         ):
 
-            vault_assets = ether_to_gwei(100)
+            vault_assets = ether_to_gwei(40)
             result = await self.subtask.process_funding(
                 vault_assets=vault_assets, harvest_params=None
             )
@@ -396,9 +431,9 @@ class TestProcessFunding:
         # Only active compounding validator should be funded, not the exiting one
         mock_fund.assert_called_once()
         assert dict(mock_fund.call_args[1]['validator_fundings']) == {
-            pub_key_active: ether_to_gwei(100),
+            pub_key_active: ether_to_gwei(active_funded),
         }
-        assert result == Gwei(0)
+        assert result == ether_to_gwei(remainder)
 
     async def test_fetch_funding_includes_pending_deposits(
         self, vault_validator_crud, compounding_creds
@@ -530,10 +565,14 @@ class TestProcessFunding:
         }
         assert result == Gwei(0)
 
+    @pytest.mark.parametrize(
+        'exiting_status',
+        [ValidatorStatus.ACTIVE_EXITING, ValidatorStatus.ACTIVE_SLASHED],
+    )
     async def test_fetch_funding_skips_pending_deposit_for_exiting_validator(
-        self, vault_validator_crud, compounding_creds
+        self, vault_validator_crud, compounding_creds, exiting_status
     ):
-        """Pending deposit for an exiting validator is not added back into the balances."""
+        """Pending deposit for an exiting/slashed validator is not added back into the balances."""
         pub_key_active = faker.validator_public_key()
         pub_key_exiting = faker.validator_public_key()
 
@@ -563,7 +602,7 @@ class TestProcessFunding:
                     'withdrawal_credentials': compounding_creds,
                     'activation_epoch': '0',
                 },
-                'status': ValidatorStatus.ACTIVE_EXITING.value,
+                'status': exiting_status.value,
             },
         ]
 
@@ -638,6 +677,101 @@ class TestProcessFunding:
             pub_key: ether_to_gwei(32),
         }
         assert result == Gwei(0)
+
+    async def test_fetch_funding_skips_v1_pending_deposit_for_cl_absent_key(
+        self, vault_validator_crud, compounding_creds
+    ):
+        """A CL-absent key whose only pending deposit is 0x01 (V1) is not funded, even
+        though a sibling compounding CL validator in the same vault is fundable normally.
+        Regression test: previously such a key was seeded at balance 0 and treated as
+        having full compounding capacity, causing fundValidators to revert with
+        CannotTopUpV1Validators."""
+        pub_key_active = faker.validator_public_key()
+        pub_key_v1_pending = faker.validator_public_key()
+        v1_creds = '0x01' + compounding_creds[4:]
+
+        vault_validator_crud.save_vault_validators(
+            [
+                VaultValidator(public_key=pub_key_active, block_number=1),
+                VaultValidator(public_key=pub_key_v1_pending, block_number=2),
+            ]
+        )
+
+        consensus_validators_data = [
+            {
+                'index': '1',
+                'balance': str(ether_to_gwei(40)),
+                'validator': {
+                    'pubkey': pub_key_active[2:],
+                    'withdrawal_credentials': compounding_creds,
+                    'activation_epoch': '0',
+                },
+                'status': ValidatorStatus.ACTIVE_ONGOING.value,
+            },
+        ]
+
+        mock_consensus = AsyncMock()
+        mock_consensus.get_block.return_value = {'data': {'message': {'slot': '100'}}}
+        # pub_key_v1_pending is not present in the consensus state yet
+        mock_consensus.get_validators_by_ids.return_value = {'data': consensus_validators_data}
+        mock_consensus.get_pending_deposits.return_value = [
+            {
+                'pubkey': pub_key_v1_pending,
+                'amount': str(ether_to_gwei(32)),
+                'withdrawal_credentials': v1_creds,
+            },
+        ]
+
+        with (
+            patch_max_validator_balance(ether_to_gwei(64)),
+            self.patch_get_latest_vault_v2_validator_public_keys(),
+            patch('src.validators.consensus.consensus_client', mock_consensus),
+            self.patch_is_funding_interval_passed(True),
+            self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
+        ):
+            vault_assets = ether_to_gwei(100)
+            result = await self.subtask.process_funding(
+                vault_assets=vault_assets, harvest_params=None
+            )
+
+        mock_fund.assert_called_once()
+        # Only the active compounding validator is funded (capacity = 64 - 40 = 24);
+        # the V1-queued key gets nothing.
+        assert dict(mock_fund.call_args[1]['validator_fundings']) == {
+            pub_key_active: ether_to_gwei(24),
+        }
+        assert result == ether_to_gwei(76)
+
+    async def test_fetch_funding_excludes_cl_absent_key_without_pending_deposit(
+        self, vault_validator_crud, compounding_creds
+    ):
+        """A DB key absent from the CL set with no pending deposits at all is excluded
+        from funding this cycle. It becomes fundable again once it either appears on
+        the CL as an active compounding validator, or gets a 0x02 pending deposit."""
+        pub_key = faker.validator_public_key()
+
+        vault_validator_crud.save_vault_validators(
+            [VaultValidator(public_key=pub_key, block_number=1)]
+        )
+
+        mock_consensus = AsyncMock()
+        mock_consensus.get_block.return_value = {'data': {'message': {'slot': '100'}}}
+        mock_consensus.get_validators_by_ids.return_value = {'data': []}
+        mock_consensus.get_pending_deposits.return_value = []
+
+        with (
+            self.patch_get_latest_vault_v2_validator_public_keys(),
+            patch('src.validators.consensus.consensus_client', mock_consensus),
+            self.patch_is_funding_interval_passed(True),
+            self.patch_fund_validators_chunk(None) as mock_fund,
+        ):
+            vault_assets = ether_to_gwei(100)
+            result = await self.subtask.process_funding(
+                vault_assets=vault_assets, harvest_params=None
+            )
+
+        mock_fund.assert_not_called()
+        assert result == vault_assets
 
     async def test_fetch_funding_excludes_non_compounding(
         self, vault_validator_crud, compounding_creds

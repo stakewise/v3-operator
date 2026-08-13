@@ -104,7 +104,10 @@ class ValidatorRegistrationSubtask:
         """
         Processes funding compounding validators.
         Returns the remaining vault assets if funding is successful.
-        Raises FundingException on failure.
+        If the funding interval has not passed yet, defers funding to the next cycle and
+        returns the assets with the planned funding amounts reserved, so registration still
+        proceeds with the unreserved remainder.
+        Raises FundingException on genuine failures (empty relayer response, failed tx).
         """
         validators_balances = await fetch_funding_validators_balances()
         funding_amounts = _get_funding_amounts(
@@ -116,7 +119,9 @@ class ValidatorRegistrationSubtask:
             return vault_assets
 
         if not await _is_funding_interval_passed():
-            raise FundingException('Funding interval has not passed yet')
+            logger.info('Funding interval has not passed yet, deferring funding to next cycle')
+            # Reserve the planned funding amounts so they are not spent on registration instead
+            return Gwei(vault_assets - sum(funding_amounts.values()))
 
         for validator_fundings_chunk in batched(
             list(funding_amounts.items()), VALIDATORS_FUNDING_BATCH_SIZE

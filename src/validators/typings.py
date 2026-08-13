@@ -4,6 +4,7 @@ from typing import NewType
 from eth_typing import BlockNumber, BLSSignature, ChecksumAddress, HexStr
 from eth_utils import add_0x_prefix
 from sw_utils import ValidatorStatus
+from web3 import Web3
 from web3.types import Gwei, Wei
 
 from src.config.settings import MIN_ACTIVATION_BALANCE_GWEI, settings
@@ -61,6 +62,10 @@ class ConsensusValidator:
         return self.withdrawal_credentials.startswith('0x02')
 
     @property
+    def withdrawal_address(self) -> ChecksumAddress:
+        return Web3.to_checksum_address(self.withdrawal_credentials[-40:])
+
+    @property
     def withdrawal_capacity(self) -> Gwei:
         return Gwei(max(0, self.balance - MIN_ACTIVATION_BALANCE_GWEI))
 
@@ -68,7 +73,7 @@ class ConsensusValidator:
         return (
             self.is_compounding
             and self.status == ValidatorStatus.ACTIVE_ONGOING
-            and self.activation_epoch < epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
+            and self.activation_epoch <= epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
         )
 
     @staticmethod
@@ -131,7 +136,3 @@ class ConsolidationRequest:
 class ConsolidationKeys:
     source_public_keys: list[HexStr]
     target_public_key: HexStr
-
-    @property
-    def all_public_keys(self) -> list[HexStr]:
-        return list(dict.fromkeys(self.source_public_keys + [self.target_public_key]))
