@@ -17,7 +17,6 @@ from src.common.app_state import AppState
 from src.common.clients import execution_client
 from src.common.consensus import get_chain_latest_head
 from src.common.contracts import VaultContract
-from src.common.exceptions import MissingConsolidationDataError
 from src.common.metrics import metrics
 from src.common.protocol_config import get_protocol_config
 from src.common.typings import PendingPartialWithdrawal
@@ -37,7 +36,7 @@ from src.validators.database import VaultValidatorCrud
 from src.validators.exceptions import EmptyRelayerResponseException
 from src.validators.oracles import poll_active_exits
 from src.validators.relayer import RelayerClient
-from src.validators.typings import ConsensusValidator
+from src.validators.typings import ConsensusValidator, ValidatorConsolidationData
 from src.withdrawals.assets import CAN_BE_EXITED_STATUSES, get_queued_assets
 from src.withdrawals.execution import submit_withdraw_validators
 
@@ -226,9 +225,8 @@ async def _get_withdrawals(
 
     consolidation_source_indexes = set()
     for validator in consensus_validators:
-        if validator.consolidation_data is None:
-            raise MissingConsolidationDataError(validator.public_key)
-        if validator.consolidation_data.is_source:
+        consolidation_data = cast(ValidatorConsolidationData, validator.consolidation_data)
+        if consolidation_data.is_source:
             consolidation_source_indexes.add(validator.index)
 
     validator_partial_withdrawals: dict[int, Gwei] = defaultdict(lambda: Gwei(0))
@@ -346,8 +344,6 @@ def _filter_exitable_validators(
     """
     can_be_exited_validators = []
     for validator in consensus_validators:
-        if validator.consolidation_data is None:
-            raise MissingConsolidationDataError(validator.public_key)
         if validator.activation_epoch > max_activation_epoch:
             continue
         if validator.status != ValidatorStatus.ACTIVE_ONGOING:
@@ -356,7 +352,9 @@ def _filter_exitable_validators(
             continue
         if validator.index in partial_withdrawal_indexes:
             continue
-        if validator.consolidation_data.is_target or validator.consolidation_data.is_source:
+
+        consolidation_data = cast(ValidatorConsolidationData, validator.consolidation_data)
+        if consolidation_data.is_target or consolidation_data.is_source:
             continue
         can_be_exited_validators.append(validator)
     can_be_exited_validators.sort(key=lambda x: (x.balance + (x.pending_balance or 0), x.index))

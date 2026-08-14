@@ -2,7 +2,7 @@ import logging
 from collections import defaultdict
 from dataclasses import replace
 from itertools import batched
-from typing import Collection
+from typing import Collection, cast
 
 from eth_typing import HexStr
 from sw_utils import ChainHead, ValidatorStatus
@@ -12,7 +12,6 @@ from web3.types import Gwei
 from src.common.clients import consensus_client
 from src.common.consensus import get_chain_latest_head
 from src.common.consolidations import get_pending_consolidations
-from src.common.exceptions import MissingConsolidationDataError
 from src.common.typings import PendingConsolidation
 from src.config.settings import settings
 from src.validators.database import VaultValidatorCrud
@@ -51,13 +50,11 @@ async def fetch_funding_validators_balances() -> dict[HexStr, Gwei]:
 
     validators_balances: dict[HexStr, Gwei] = {}
     for validator in validators:
-        consolidation_data = validator.consolidation_data
-        if consolidation_data is None:
-            raise MissingConsolidationDataError(validator.public_key)
-
         # Non-compounding and exiting/withdrawn validators are not eligible for funding.
         if not validator.is_compounding or validator.status in EXITING_STATUSES:
             continue
+
+        consolidation_data = cast(ValidatorConsolidationData, validator.consolidation_data)
 
         # Consolidation sources are drained into their targets, so they are not funded.
         if consolidation_data.is_source:
