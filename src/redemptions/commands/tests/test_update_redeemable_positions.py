@@ -493,9 +493,8 @@ class TestGetWindowRedeemedShares:
         assert result == {(vault_1, owner_1): Wei(30)}
 
     async def test_raises_when_nonce_at_snapshot_differs_from_new_file_nonce(self):
-        # a setRedeemablePositions call landed between snapshot_block and the point where
-        # the caller read the "latest" nonce: the active file no longer matches the
-        # snapshot, so leaf hashes computed with the stale nonce would be wrong.
+        # nonce changed between snapshot_block and the read here, so the active file no
+        # longer matches the snapshot.
         vault_1 = faker.eth_address()
         owner_1 = faker.eth_address()
         active_position = make_position(vault=vault_1, owner=owner_1, leaf_shares=1000)

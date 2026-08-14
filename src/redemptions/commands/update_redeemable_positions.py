@@ -265,9 +265,8 @@ async def process(
         api_config,
     )
     logger.info('Fetched kept tokens for %s addresses...', len(address_to_minted_shares))
-    # boosted shares that couldn't be matched to a same-vault mint are still not sold by the
-    # user; keep them out of redeemable amounts by treating them as kept, spread across the
-    # user's remaining vault positions by the proportional split below.
+    # unmatched boosted shares are still held by the user, so keep them out of redeemable
+    # amounts by treating them as kept.
     for address, residual in residual_boosted_shares.items():
         kept_shares[address] = Wei(kept_shares[address] + residual)
 
@@ -447,15 +446,10 @@ async def get_window_redeemed_shares(
     snapshot_block: BlockNumber,
 ) -> dict[tuple[ChecksumAddress, ChecksumAddress], Wei]:
     """
-    The currently active positions file keeps being redeemed against while this new file
-    is built and (manually, possibly hours later) submitted, but the new file's leaves
-    reset processed shares to zero since the leaf hash includes the nonce. For each
-    (vault, owner) shared with the active file, return the shares processed against it
-    strictly after `snapshot_block` so they can be subtracted from the new leaf and not
-    counted redeemable twice. `nonce` is the current on-chain nonce, read before this
-    run's `setRedeemablePositions` call increments it, matching the active file's leaves.
-    Aborts if the on-chain nonce at `snapshot_block` differs from `nonce`, which means a
-    new file went active in between and the snapshot no longer matches the active file.
+    Returns, for each (vault, owner) shared with the currently active positions file, the
+    shares processed against it strictly after `snapshot_block`, so they can be subtracted
+    from the new leaf instead of being counted redeemable twice. Aborts if the on-chain nonce
+    has changed since `snapshot_block`, since the active file no longer matches the snapshot.
     """
     new_keys = {(p.vault, p.owner) for p in new_positions}
     active_positions = await fetch_positions_from_ipfs(block_number=snapshot_block)
@@ -491,10 +485,9 @@ def _reduce_boosted_amount(
     boost_os_token_shares: dict[tuple[ChecksumAddress, ChecksumAddress], Wei],
 ) -> tuple[list[Allocator], dict[ChecksumAddress, Wei]]:
     """
-    osToken is fungible, so a user's boosted shares aren't necessarily minted at the same
-    vault the leverage strategy borrows against. Match against the same-vault mint first;
-    whatever can't be matched there is returned as a per-user residual instead of being
-    dropped, so the caller can still exclude it from redeemable amounts (as kept shares).
+    osToken is fungible, so boosted shares aren't necessarily minted at the same vault the
+    leverage strategy borrows against. Match against the same-vault mint first; return
+    whatever can't be matched there as a per-user residual instead of dropping it.
     """
     allocators_by_address = {a.address: a for a in allocators}
     residual_boosted_shares: defaultdict[ChecksumAddress, Wei] = defaultdict(lambda: Wei(0))
