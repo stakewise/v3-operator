@@ -8,6 +8,8 @@ from sw_utils.consensus import EXITED_STATUSES
 from web3.types import Gwei
 
 from src.common.clients import consensus_client
+from src.common.consensus import get_chain_latest_head
+from src.common.consolidations import get_pending_consolidations
 from src.config.settings import settings
 from src.validators.database import VaultValidatorCrud
 from src.validators.event_processors import get_latest_vault_v2_validator_public_keys
@@ -21,32 +23,52 @@ EXITING_STATUSES = [
 logger = logging.getLogger(__name__)
 
 
+# pylint: disable-next=too-many-locals
 async def fetch_funding_validators_balances() -> dict[HexStr, Gwei]:
     """
     Retrieves the consensus balances of vault validators eligible for funding.
-    Includes balances from pending deposits
-    that have not yet been processed by the consensus node.
+    Includes balances from pending deposits that have not yet been processed by the
+    consensus node. Accounts for pending consolidations.
     """
     vault_public_keys = {v.public_key for v in VaultValidatorCrud().get_vault_validators()}
-    non_finalized_public_keys = await get_latest_vault_v2_validator_public_keys(settings.vault)
-    vault_public_keys.update(non_finalized_public_keys)
+    vault_public_keys.update(await get_latest_vault_v2_validator_public_keys(settings.vault))
     if not vault_public_keys:
         return {}
 
-    # Fetch consensus validators
-    consensus_block = await consensus_client.get_block('head')
-    slot = consensus_block['data']['message']['slot']
+    # Fetch consensus validators and pending consolidations from one consistent snapshot
+    chain_head = await get_chain_latest_head()
+    slot = str(chain_head.slot)
     consensus_validators = await fetch_consensus_validators(list(vault_public_keys), slot=slot)
+    pending_consolidations = await get_pending_consolidations(chain_head, consensus_validators)
 
-    # Filter compounding and remove exiting/withdrawn validators,
-    # as they are not eligible for funding
+    # Filter compounding and remove exiting/withdrawn validators, as they are not
+    # eligible for funding.
     validators_balances: dict[HexStr, Gwei] = {}
     ineligible_public_keys: set[HexStr] = set()
+    index_to_validator: dict[int, ConsensusValidator] = {}
     for validator in consensus_validators:
+        index_to_validator[validator.index] = validator
         if validator.is_compounding and validator.status not in EXITING_STATUSES:
             validators_balances[validator.public_key] = validator.balance
         else:
             ineligible_public_keys.add(validator.public_key)
+
+    # Exclude pending consolidation sources from funding and credit their balances
+    # to the targets; drop targets whose source balance is unknown.
+    for cons in pending_consolidations:
+        target = index_to_validator.get(cons.target_index)
+        source = index_to_validator.get(cons.source_index)
+        if source is None:
+            if target is not None:
+                validators_balances.pop(target.public_key, None)
+                ineligible_public_keys.add(target.public_key)
+        else:
+            validators_balances.pop(source.public_key, None)
+            ineligible_public_keys.add(source.public_key)
+            if target is not None and target.public_key in validators_balances:
+                validators_balances[target.public_key] = Gwei(
+                    validators_balances[target.public_key] + source.balance
+                )
 
     # Keys not yet known to the consensus node are eligible too,
     # their balances come solely from pending deposits.

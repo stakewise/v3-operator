@@ -393,6 +393,32 @@ class TestConsolidationSelector:
         # a valid source candidate and switches from 0x01 to 0x02
         assert result == [(consensus_validators[1], consensus_validators[1])]
 
+    def test_excludes_target_with_mismatched_withdrawal_address(self):
+        """A mismatched target is executed by the CL (unlike a mismatched source, which the
+        CL silently ignores), moving the sources' balance into a validator the vault cannot
+        withdraw from, so it must be excluded from the target candidates entirely."""
+        consensus_validators = [
+            create_consensus_validator(
+                index=10,
+                activation_epoch=1,
+                is_compounding=False,
+            ),
+            create_consensus_validator(
+                index=11,
+                activation_epoch=1,
+                is_compounding=True,
+                withdrawal_address=faker.eth_address(),
+            ),
+        ]
+        selector = create_manager(
+            vault_validators=[v.public_key for v in consensus_validators],
+            consensus_validators=consensus_validators,
+        )
+        result = selector.get_target_source()
+        # Validator 11's credentials point elsewhere, so it can't be a target candidate;
+        # falls back to switching validator 10 from 0x01 to 0x02
+        assert result == [(consensus_validators[0], consensus_validators[0])]
+
     def test_picks_active_target_over_pending_target_with_smaller_balance(self):
         """A pending (not-yet-active) 0x02 validator must never be chosen as target,
         even if its balance is smaller than an active 0x02 candidate's."""
@@ -969,9 +995,10 @@ class TestConsolidationChecker:
         ):
             selector.get_target_source()
 
-    def test_plain_consolidation_ignores_target_withdrawal_address(self):
-        """Only the source validators' withdrawal address must match the vault; the spec
-        does not check the target's credential address for a plain consolidation."""
+    def test_rejects_plain_consolidation_target_with_mismatched_withdrawal_address(self):
+        """A mismatched target is executed by the CL (unlike a mismatched source, which the
+        CL silently ignores), moving the sources' balance into a validator the vault cannot
+        withdraw from. The target's withdrawal address must therefore match the vault too."""
         source_pk = faker.validator_public_key()
         target_pk = faker.validator_public_key()
         consolidation_keys = ConsolidationKeys(
@@ -997,8 +1024,17 @@ class TestConsolidationChecker:
             vault_validators=[v.public_key for v in consensus_validators],
             consensus_validators=consensus_validators,
         )
-        result = selector.get_target_source()
-        assert result == [(consensus_validators[1], consensus_validators[0])]
+
+        target_validator = consensus_validators[1]
+        with pytest.raises(
+            ConsolidationError,
+            match=re.escape(
+                f'Validator {target_pk} withdrawal address '
+                f'{target_validator.withdrawal_address} does not match '
+                f'the vault address {settings.vault}.'
+            ),
+        ):
+            selector.get_target_source()
 
     def test_rejects_bls_credential_source(self):
         source_pk = faker.validator_public_key()
