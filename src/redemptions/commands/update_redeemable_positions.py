@@ -4,7 +4,6 @@ import logging
 import sys
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
 from pathlib import Path
 
 import click
@@ -26,7 +25,7 @@ from src.common.startup_check import (
     wait_for_execution_node,
     wait_for_graph_node_sync_to_chain_head,
 )
-from src.common.utils import log_verbose
+from src.common.utils import get_current_timestamp, log_verbose
 from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
 from src.redemptions.api_client import (
@@ -423,7 +422,7 @@ def create_os_token_positions(
 
 
 def _save_positions_to_file(positions_payload: list[dict]) -> Path:
-    timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d_%H-%M-%S')
+    timestamp = get_current_timestamp()
     positions_file = Path(f'redeemable_positions_{timestamp}.json')
     with open(positions_file, 'w', encoding='utf-8') as f:
         json.dump(positions_payload, f, indent=2)
