@@ -1,5 +1,6 @@
 import logging
 from collections import defaultdict
+from dataclasses import replace
 from itertools import batched
 from typing import Collection
 
@@ -103,50 +104,65 @@ async def build_consensus_validators(
     validators = await fetch_consensus_validators(list(public_keys), slot=slot)
 
     if with_consolidations:
-        _apply_pending_consolidations(
+        validators = _apply_pending_consolidations(
             validators=validators,
             pending_consolidations=await get_pending_consolidations(chain_head, validators),
         )
 
     if with_pending_deposits:
-        validators += await apply_pending_deposits(
+        validators, new_validators = await apply_pending_deposits(
             validators=validators,
             public_keys=set(public_keys),
             slot=slot,
             compounding_deposits_only=compounding_deposits_only,
         )
+        validators += new_validators
 
     return validators
 
 
 def _apply_pending_consolidations(
     validators: list[ConsensusValidator], pending_consolidations: list[PendingConsolidation]
-) -> None:
+) -> list[ConsensusValidator]:
+    """
+    Returns a copy of ``validators``, in the same order, with the consolidation fields
+    filled in.
+    """
     index_to_validator = {val.index: val for val in validators}
 
+    source_indexes: set[int] = set()
+    target_indexes: set[int] = set()
     target_balances: dict[int, Gwei] = defaultdict(lambda: Gwei(0))
     unknown_source_targets: set[int] = set()
 
     for cons in pending_consolidations:
         source = index_to_validator.get(cons.source_index)
         if source is not None:
-            source.is_consolidation_source = True
+            source_indexes.add(cons.source_index)
 
-        target = index_to_validator.get(cons.target_index)
-        if target is None:
+        if cons.target_index not in index_to_validator:
             continue
-        target.is_consolidation_target = True
+        target_indexes.add(cons.target_index)
 
         if source is None:
+            # The source balance is unknown, so the target balance can't be determined
             unknown_source_targets.add(cons.target_index)
         else:
             target_balances[cons.target_index] = Gwei(
                 target_balances[cons.target_index] + source.balance
             )
 
-    for index, balance in target_balances.items():
-        if index not in unknown_source_targets:
-            index_to_validator[index].target_consolidation_balance = balance
+    return [
+        replace(
+            val,
+            is_consolidation_source=val.index in source_indexes,
+            is_consolidation_target=val.index in target_indexes,
+            target_consolidation_balance=(
+                None if val.index in unknown_source_targets else target_balances.get(val.index)
+            ),
+        )
+        for val in validators
+    ]
 
 
 async def apply_pending_deposits(
@@ -154,15 +170,19 @@ async def apply_pending_deposits(
     public_keys: set[HexStr],
     slot: str,
     compounding_deposits_only: bool = False,
-) -> list[ConsensusValidator]:
+) -> tuple[list[ConsensusValidator], list[ConsensusValidator]]:
     """
-    Fills in ``pending_balance`` of ``validators`` in place and returns the validators that
-    are not present in the beacon state yet, but already have pending deposits.
+    Returns a tuple of:
+    1) a copy of ``validators``, in the same order, with ``pending_balance`` filled in
+    2) validators that are not present in the beacon state yet, but already have
+       pending deposits
+
     Can be called separately from `build_consensus_validators` to delay fetching the
     pending deposit queue until it is really needed.
     """
-    new_validators: list[ConsensusValidator] = []
-    public_key_to_validator = {val.public_key: val for val in validators}
+    known_public_keys = {val.public_key for val in validators}
+    pending_balances: dict[HexStr, Gwei] = defaultdict(lambda: Gwei(0))
+    new_credentials: dict[HexStr, HexStr] = {}
 
     for deposit in await consensus_client.get_pending_deposits(slot):
         public_key: HexStr = deposit['pubkey']
@@ -173,23 +193,27 @@ async def apply_pending_deposits(
         if compounding_deposits_only and not withdrawal_credentials.startswith('0x02'):
             continue
 
-        validator = public_key_to_validator.get(public_key)
-        if validator is None:
+        pending_balances[public_key] = Gwei(pending_balances[public_key] + int(deposit['amount']))
+        if public_key not in known_public_keys:
             # Validator is not present in the beacon state yet
-            validator = ConsensusValidator(
-                index=UNKNOWN_VALIDATOR_INDEX,
-                public_key=public_key,
-                balance=Gwei(0),
-                withdrawal_credentials=withdrawal_credentials,
-                status=ValidatorStatus.PENDING_INITIALIZED,
-                activation_epoch=settings.network_config.FAR_FUTURE_EPOCH,
-            )
-            public_key_to_validator[public_key] = validator
-            new_validators.append(validator)
+            new_credentials.setdefault(public_key, withdrawal_credentials)
 
-        validator.pending_balance = Gwei((validator.pending_balance or 0) + int(deposit['amount']))
-
-    return new_validators
+    enriched_validators = [
+        replace(val, pending_balance=pending_balances.get(val.public_key)) for val in validators
+    ]
+    new_validators = [
+        ConsensusValidator(
+            index=UNKNOWN_VALIDATOR_INDEX,
+            public_key=public_key,
+            balance=Gwei(0),
+            withdrawal_credentials=withdrawal_credentials,
+            status=ValidatorStatus.PENDING_INITIALIZED,
+            activation_epoch=settings.network_config.FAR_FUTURE_EPOCH,
+            pending_balance=pending_balances[public_key],
+        )
+        for public_key, withdrawal_credentials in new_credentials.items()
+    ]
+    return enriched_validators, new_validators
 
 
 async def fetch_consensus_validators(

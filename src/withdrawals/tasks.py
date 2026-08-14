@@ -135,7 +135,7 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
         # The pending deposit queue is fetched only once it is clear that a withdrawal is
         # needed. Validators that are not in the beacon state yet can't be withdrawn from,
         # so the ones returned here are dropped.
-        await apply_pending_deposits(
+        consensus_validators, _ = await apply_pending_deposits(
             validators=consensus_validators,
             public_keys=vault_public_keys,
             slot=str(chain_head.slot),
