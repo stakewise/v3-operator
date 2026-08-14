@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
+from eth_typing import BlockNumber
 from sw_utils import OsTokenConverter
 from sw_utils.tests import faker
 from web3 import Web3
@@ -12,10 +13,13 @@ from src.config.networks import MAINNET, NETWORKS
 from src.config.settings import settings
 from src.redemptions.commands.update_redeemable_positions import (
     _reduce_boosted_amount,
+    _subtract_window_redeemed_shares,
     calculate_boost_os_token_shares,
     create_os_token_positions,
+    get_window_redeemed_shares,
     update_redeemable_positions,
 )
+from src.redemptions.tests.factories import make_position
 from src.redemptions.typings import (
     Allocator,
     LeverageStrategyPosition,
@@ -378,6 +382,75 @@ def test_reduces_boosted_amount():
     ]
 
 
+class TestGetWindowRedeemedShares:
+    MODULE = 'src.redemptions.commands.update_redeemable_positions'
+
+    async def test_no_active_positions_returns_empty(self):
+        with patch(f'{self.MODULE}.fetch_positions_from_ipfs', new=AsyncMock(return_value=[])):
+            result = await get_window_redeemed_shares([], nonce=5, snapshot_block=BlockNumber(100))
+        assert result == {}
+
+    async def test_no_matching_vault_owner_returns_empty(self):
+        vault_1 = faker.eth_address()
+        owner_1 = faker.eth_address()
+        other_vault = faker.eth_address()
+        active_position = make_position(vault=other_vault, owner=owner_1)
+        new_positions = [OsTokenPosition(owner=owner_1, vault=vault_1, leaf_shares=Wei(1000))]
+
+        with patch(
+            f'{self.MODULE}.fetch_positions_from_ipfs',
+            new=AsyncMock(return_value=[active_position]),
+        ):
+            result = await get_window_redeemed_shares(
+                new_positions, nonce=5, snapshot_block=BlockNumber(100)
+            )
+        assert result == {}
+
+    async def test_subtracts_shares_redeemed_after_snapshot(self):
+        vault_1 = faker.eth_address()
+        owner_1 = faker.eth_address()
+        active_position = make_position(vault=vault_1, owner=owner_1, leaf_shares=1000)
+        new_positions = [OsTokenPosition(owner=owner_1, vault=vault_1, leaf_shares=Wei(700))]
+
+        async def fake_iter_processed_shares(positions, nonce, block_number):
+            # more shares processed at the later ("latest") read than at the snapshot block
+            value = Wei(60) if block_number == BlockNumber(100) else Wei(90)
+            for _ in positions:
+                yield value
+
+        with (
+            patch(
+                f'{self.MODULE}.fetch_positions_from_ipfs',
+                new=AsyncMock(return_value=[active_position]),
+            ),
+            patch(f'{self.MODULE}.iter_processed_shares', new=fake_iter_processed_shares),
+            patch(f'{self.MODULE}.execution_client', new=AsyncMock()) as execution_client_mock,
+        ):
+            execution_client_mock.eth.get_block.return_value = {'number': BlockNumber(150)}
+            result = await get_window_redeemed_shares(
+                new_positions, nonce=5, snapshot_block=BlockNumber(100)
+            )
+
+        assert result == {(vault_1, owner_1): Wei(30)}
+
+
+def test_subtract_window_redeemed_shares_clamps_and_drops_zero():
+    vault_1 = faker.eth_address()
+    owner_1 = faker.eth_address()
+    owner_2 = faker.eth_address()
+    positions = [
+        OsTokenPosition(owner=owner_1, vault=vault_1, leaf_shares=Wei(100)),
+        OsTokenPosition(owner=owner_2, vault=vault_1, leaf_shares=Wei(50)),
+    ]
+    window_redeemed_shares = {
+        (vault_1, owner_1): Wei(40),
+        # exceeds the leaf's own shares: clamp at zero instead of going negative
+        (vault_1, owner_2): Wei(999),
+    }
+    result = _subtract_window_redeemed_shares(positions, window_redeemed_shares)
+    assert result == [OsTokenPosition(owner=owner_1, vault=vault_1, leaf_shares=Wei(60))]
+
+
 @pytest.mark.usefixtures('_init_config')
 class TestUpdateOsTokenPositions:
     @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
@@ -493,6 +566,7 @@ class TestUpdateOsTokenPositions:
             patch_os_token_converter(os_token_converter),
             patch_api_client(mock_protocol_data),
             patch_graph_calls(allocators, leverage_positions, os_token_holders),
+            patch_window_redeemed_shares(),
             patch_ipfs_client() as mock_upload_json,
             patch_startup_check(),
         ):
@@ -544,6 +618,7 @@ class TestUpdateOsTokenPositions:
             patch_os_token_converter(os_token_converter),
             patch_api_client(mock_protocol_data),
             patch_graph_calls(allocators, leverage_positions, os_token_holders),
+            patch_window_redeemed_shares(),
             patch_ipfs_client() as mock_upload_json,
             patch_startup_check(),
         ):
@@ -556,6 +631,98 @@ class TestUpdateOsTokenPositions:
                 '0x9b4419ebea301ed07e591b477e69499f35e4c3cd69538c2f22a6a014b06e5bbd'
                 in result.output.strip()
             )
+
+    @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
+    async def test_window_redeemed_shares_are_subtracted(
+        self,
+        vault_address: str,
+        execution_endpoints: str,
+        runner: CliRunner,
+    ):
+        address_1 = Web3.to_checksum_address('0x2242b8ab71521f6abEE4B4D83195E70AcB08727a')
+        vault_1 = Web3.to_checksum_address('0xEd735de172272C03CA6F60c1d90D83D9CFB46D22')
+        allocators = [
+            Allocator(
+                address=address_1,
+                vault_os_token_positions=[
+                    VaultOsTokenPosition(
+                        address=vault_1, minted_shares=Web3.to_wei(10, 'ether'), ltv=0.5
+                    ),
+                ],
+            ),
+        ]
+        leverage_positions: list[LeverageStrategyPosition] = []
+        os_token_holders: dict[ChecksumAddress, Wei] = {}
+        mock_protocol_data = []
+        os_token_converter = OsTokenConverter(110, 100)
+        args = [
+            '--network',
+            MAINNET,
+            '--execution-endpoints',
+            execution_endpoints,
+            '--verbose',
+        ]
+        with (
+            patch_latest_block(11),
+            patch_os_token_redeemer_contract_nonce(6),
+            patch_os_token_contract_address(os_token_contract_address),
+            patch_os_token_converter(os_token_converter),
+            patch_api_client(mock_protocol_data),
+            patch_graph_calls(allocators, leverage_positions, os_token_holders),
+            patch_window_redeemed_shares({(vault_1, address_1): Web3.to_wei(4, 'ether')}),
+            patch_ipfs_client() as mock_upload_json,
+            patch_startup_check(),
+        ):
+            result = runner.invoke(update_redeemable_positions, args, input='\n')
+            assert result.exit_code == 0
+            mock_upload_json.assert_called_once_with(
+                [{'owner': address_1, 'vault': vault_1, 'leaf_shares': '6000000000000000000'}]
+            )
+
+    @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
+    async def test_window_redeemed_shares_drop_fully_redeemed_position(
+        self,
+        vault_address: str,
+        execution_endpoints: str,
+        runner: CliRunner,
+    ):
+        address_1 = Web3.to_checksum_address('0x2242b8ab71521f6abEE4B4D83195E70AcB08727a')
+        vault_1 = Web3.to_checksum_address('0xEd735de172272C03CA6F60c1d90D83D9CFB46D22')
+        allocators = [
+            Allocator(
+                address=address_1,
+                vault_os_token_positions=[
+                    VaultOsTokenPosition(
+                        address=vault_1, minted_shares=Web3.to_wei(10, 'ether'), ltv=0.5
+                    ),
+                ],
+            ),
+        ]
+        leverage_positions: list[LeverageStrategyPosition] = []
+        os_token_holders: dict[ChecksumAddress, Wei] = {}
+        mock_protocol_data = []
+        os_token_converter = OsTokenConverter(110, 100)
+        args = [
+            '--network',
+            MAINNET,
+            '--execution-endpoints',
+            execution_endpoints,
+            '--verbose',
+        ]
+        with (
+            patch_latest_block(11),
+            patch_os_token_redeemer_contract_nonce(6),
+            patch_os_token_contract_address(os_token_contract_address),
+            patch_os_token_converter(os_token_converter),
+            patch_api_client(mock_protocol_data),
+            patch_graph_calls(allocators, leverage_positions, os_token_holders),
+            patch_window_redeemed_shares({(vault_1, address_1): Web3.to_wei(10, 'ether')}),
+            patch_ipfs_client() as mock_upload_json,
+            patch_startup_check(),
+        ):
+            result = runner.invoke(update_redeemable_positions, args, input='\n')
+            assert result.exit_code == 0
+            mock_upload_json.assert_not_called()
 
     @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
     async def test_min_leaf_shares(
@@ -597,6 +764,7 @@ class TestUpdateOsTokenPositions:
             patch_os_token_converter(os_token_converter),
             patch_api_client(mock_protocol_data),
             patch_graph_calls(allocators, leverage_positions, os_token_holders),
+            patch_window_redeemed_shares(),
             patch_ipfs_client() as mock_upload_json,
             patch_startup_check(),
         ):
@@ -644,6 +812,7 @@ class TestUpdateOsTokenPositions:
             patch_os_token_converter(os_token_converter),
             patch_api_client(mock_protocol_data),
             patch_graph_calls(allocators, leverage_positions, os_token_holders),
+            patch_window_redeemed_shares(),
             patch_ipfs_client() as mock_upload_json,
             patch_startup_check(),
         ):
@@ -720,6 +889,15 @@ def patch_ipfs_client():
         'src.redemptions.commands.update_redeemable_positions.build_ipfs_upload_clients', mock_build
     ):
         yield mock_upload_json
+
+
+@contextlib.contextmanager
+def patch_window_redeemed_shares(shares_map=None):
+    with patch(
+        'src.redemptions.commands.update_redeemable_positions.get_window_redeemed_shares',
+        new=AsyncMock(return_value=shares_map or {}),
+    ):
+        yield
 
 
 @contextlib.contextmanager
