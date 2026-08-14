@@ -242,7 +242,7 @@ async def process(
         leverage_positions=leverage_positions,
         os_token_converter=os_token_converter,
     )
-    allocators = _reduce_boosted_amount(allocators, boost_os_token_shares)
+    allocators, residual_boosted_shares = _reduce_boosted_amount(allocators, boost_os_token_shares)
 
     # filter zero positions. Filter before kept shares calculation to reduce api calls
     min_minted_shares = Web3.to_wei(min_os_token_position_amount_gwei, 'gwei')
@@ -265,6 +265,11 @@ async def process(
         api_config,
     )
     logger.info('Fetched kept tokens for %s addresses...', len(address_to_minted_shares))
+    # boosted shares that couldn't be matched to a same-vault mint are still not sold by the
+    # user; keep them out of redeemable amounts by treating them as kept, spread across the
+    # user's remaining vault positions by the proportional split below.
+    for address, residual in residual_boosted_shares.items():
+        kept_shares[address] = Wei(kept_shares[address] + residual)
 
     os_token_positions = create_os_token_positions(allocators, kept_shares, min_minted_shares)
     if not os_token_positions:
@@ -471,13 +476,29 @@ async def get_window_redeemed_shares(
 def _reduce_boosted_amount(
     allocators: list[Allocator],
     boost_os_token_shares: dict[tuple[ChecksumAddress, ChecksumAddress], Wei],
-) -> list[Allocator]:
-    for allocator in allocators:
-        for vault_share in allocator.vault_os_token_positions:
-            key = allocator.address, vault_share.address
-            boosted_amount = boost_os_token_shares.get(key, Wei(0))
-            vault_share.minted_shares = Wei(max(0, vault_share.minted_shares - boosted_amount))
-    return allocators
+) -> tuple[list[Allocator], dict[ChecksumAddress, Wei]]:
+    """
+    osToken is fungible, so a user's boosted shares aren't necessarily minted at the same
+    vault the leverage strategy borrows against. Match against the same-vault mint first;
+    whatever can't be matched there is returned as a per-user residual instead of being
+    dropped, so the caller can still exclude it from redeemable amounts (as kept shares).
+    """
+    allocators_by_address = {a.address: a for a in allocators}
+    residual_boosted_shares: defaultdict[ChecksumAddress, Wei] = defaultdict(lambda: Wei(0))
+    for (user, vault), boosted_amount in boost_os_token_shares.items():
+        allocator = allocators_by_address.get(user)
+        vault_share = None
+        if allocator is not None:
+            vault_share = next(
+                (vs for vs in allocator.vault_os_token_positions if vs.address == vault), None
+            )
+        matched = min(vault_share.minted_shares, boosted_amount) if vault_share else Wei(0)
+        if vault_share is not None and matched:
+            vault_share.minted_shares = Wei(vault_share.minted_shares - matched)
+        residual = Wei(boosted_amount - matched)
+        if residual:
+            residual_boosted_shares[user] = Wei(residual_boosted_shares[user] + residual)
+    return allocators, residual_boosted_shares
 
 
 def _subtract_window_redeemed_shares(

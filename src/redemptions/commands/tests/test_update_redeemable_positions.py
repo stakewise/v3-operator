@@ -332,7 +332,7 @@ def test_reduces_boosted_amount():
         )
     ]
     boost_ostoken_shares = {}
-    result = _reduce_boosted_amount(allocators, boost_ostoken_shares)
+    result, residual = _reduce_boosted_amount(allocators, boost_ostoken_shares)
     assert result == [
         Allocator(
             address=address_1,
@@ -342,6 +342,7 @@ def test_reduces_boosted_amount():
             ],
         )
     ]
+    assert residual == {}
     # basic reduction
     allocators = [
         Allocator(
@@ -364,7 +365,7 @@ def test_reduces_boosted_amount():
         (address_2, vault_2): Wei(1500),
     }
 
-    result = _reduce_boosted_amount(allocators, boost_ostoken_shares)
+    result, residual = _reduce_boosted_amount(allocators, boost_ostoken_shares)
     assert result == [
         Allocator(
             address=address_1,
@@ -380,6 +381,63 @@ def test_reduces_boosted_amount():
             ],
         ),
     ]
+    assert residual == {}
+
+
+def test_reduces_boosted_amount_cross_vault_residual():
+    address_1 = faker.eth_address()
+    vault_1 = faker.eth_address()
+    vault_2 = faker.eth_address()
+
+    # boosted at vault_2, but the user only minted at vault_1: no same-vault mint to
+    # match against, so the full boosted amount becomes a residual for the user.
+    allocators = [
+        Allocator(
+            address=address_1,
+            vault_os_token_positions=[
+                VaultOsTokenPosition(address=vault_1, minted_shares=Wei(1000), ltv=0.5),
+            ],
+        ),
+    ]
+    boost_ostoken_shares = {(address_1, vault_2): Wei(400)}
+
+    result, residual = _reduce_boosted_amount(allocators, boost_ostoken_shares)
+    assert result == [
+        Allocator(
+            address=address_1,
+            vault_os_token_positions=[
+                VaultOsTokenPosition(address=vault_1, minted_shares=Wei(1000), ltv=0.5),
+            ],
+        ),
+    ]
+    assert residual == {address_1: Wei(400)}
+
+
+def test_reduces_boosted_amount_excess_over_same_vault_mint_becomes_residual():
+    address_1 = faker.eth_address()
+    vault_1 = faker.eth_address()
+
+    # boosted amount exceeds the same-vault mint: match what fits, carry the rest as residual.
+    allocators = [
+        Allocator(
+            address=address_1,
+            vault_os_token_positions=[
+                VaultOsTokenPosition(address=vault_1, minted_shares=Wei(300), ltv=0.5),
+            ],
+        ),
+    ]
+    boost_ostoken_shares = {(address_1, vault_1): Wei(500)}
+
+    result, residual = _reduce_boosted_amount(allocators, boost_ostoken_shares)
+    assert result == [
+        Allocator(
+            address=address_1,
+            vault_os_token_positions=[
+                VaultOsTokenPosition(address=vault_1, minted_shares=Wei(0), ltv=0.5),
+            ],
+        ),
+    ]
+    assert residual == {address_1: Wei(200)}
 
 
 class TestGetWindowRedeemedShares:
@@ -723,6 +781,65 @@ class TestUpdateOsTokenPositions:
             result = runner.invoke(update_redeemable_positions, args, input='\n')
             assert result.exit_code == 0
             mock_upload_json.assert_not_called()
+
+    @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
+    async def test_cross_vault_boost_reduces_redeemable_amount(
+        self,
+        vault_address: str,
+        execution_endpoints: str,
+        runner: CliRunner,
+    ):
+        address_1 = Web3.to_checksum_address('0x2242b8ab71521f6abEE4B4D83195E70AcB08727a')
+        vault_1 = Web3.to_checksum_address('0xEd735de172272C03CA6F60c1d90D83D9CFB46D22')
+        vault_2 = Web3.to_checksum_address('0xe8Ea1025b49D2B51C536cFBc0833F021ba4c6903')
+        allocators = [
+            Allocator(
+                address=address_1,
+                vault_os_token_positions=[
+                    VaultOsTokenPosition(
+                        address=vault_1, minted_shares=Web3.to_wei(10, 'ether'), ltv=0.5
+                    ),
+                ],
+            ),
+        ]
+        # boosted into a leverage strategy keyed to vault_2, where the user never minted
+        leverage_positions = [
+            LeverageStrategyPosition(
+                user=address_1,
+                vault=vault_2,
+                proxy=Web3.to_checksum_address(faker.eth_address()),
+                os_token_shares=Web3.to_wei(3, 'ether'),
+                exiting_os_token_shares=Wei(0),
+                assets=Wei(0),
+                exiting_assets=Wei(0),
+            ),
+        ]
+        os_token_holders: dict[ChecksumAddress, Wei] = {}
+        mock_protocol_data = []
+        os_token_converter = OsTokenConverter(110, 100)
+        args = [
+            '--network',
+            MAINNET,
+            '--execution-endpoints',
+            execution_endpoints,
+            '--verbose',
+        ]
+        with (
+            patch_latest_block(11),
+            patch_os_token_redeemer_contract_nonce(6),
+            patch_os_token_contract_address(os_token_contract_address),
+            patch_os_token_converter(os_token_converter),
+            patch_api_client(mock_protocol_data),
+            patch_graph_calls(allocators, leverage_positions, os_token_holders),
+            patch_window_redeemed_shares(),
+            patch_ipfs_client() as mock_upload_json,
+            patch_startup_check(),
+        ):
+            result = runner.invoke(update_redeemable_positions, args, input='\n')
+            assert result.exit_code == 0
+            mock_upload_json.assert_called_once_with(
+                [{'owner': address_1, 'vault': vault_1, 'leaf_shares': '7000000000000000000'}]
+            )
 
     @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
     async def test_min_leaf_shares(
