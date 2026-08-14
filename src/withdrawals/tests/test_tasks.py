@@ -965,10 +965,8 @@ async def test_get_withdrawals_excludes_oracle_exiting_validators_from_partials(
 async def test_get_withdrawals_excludes_oracle_exiting_from_partial_capacity(data_dir):
     settings.set(vault=None, vault_dir=data_dir, network=HOODI)
 
-    # v1 is still ACTIVE_ONGOING on the CL but already oracle-exiting: new partial
-    # requests for it would pay 0 once its exit_epoch is set, so it must not inflate
-    # partial_capacity or receive a partial withdrawal. Excluding it drops combined
-    # capacity (8 + 18 ETH) below the 20 ETH request, routing v2 to a full exit instead.
+    # v1 is still ACTIVE_ONGOING on the CL but already oracle-exiting, so it must not
+    # inflate partial_capacity or receive a partial withdrawal; only v2 gets exited.
     chain_head = create_chain_head(epoch=500)
     queued_assets = ether_to_gwei(20)
     consensus_validators = [
