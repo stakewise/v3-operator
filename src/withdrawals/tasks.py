@@ -245,12 +245,15 @@ async def _get_withdrawals(
     # Find all partial-withdrawable validators, excluding consolidation sources: the CL
     # ignores a consolidation whose source has a pending partial withdrawal, so counting
     # a source's capacity here would both misstate partial_capacity and risk cancelling
-    # the vault's own consolidation.
+    # the vault's own consolidation. Also exclude oracle-exiting validators: they are
+    # still ACTIVE_ONGOING on the CL, but new partial requests for them would pay 0
+    # once their exit_epoch is set.
     partial_validators = [
         v
         for v in consensus_validators
         if v.is_partially_withdrawable(chain_head.epoch)
         and v.index not in consolidation_source_indexes
+        and v.index not in oracle_exit_indexes
     ]
     partial_validator_indexes = {v.index for v in partial_validators}
     partial_capacity = 0
