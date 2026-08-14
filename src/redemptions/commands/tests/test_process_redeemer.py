@@ -331,12 +331,9 @@ class TestProcess:
         mocks['mock_redeem'].assert_not_called()
 
     async def test_no_eligible_positions(self) -> None:
-        """IPFS returns positions but assign_shares_to_redeem filters them all out."""
-        pos = make_position(leaf_shares=1000)
-        with (
-            _mock_process(positions=[pos]) as mocks,
-            patch(f'{MODULE}.assign_shares_to_redeem', new=AsyncMock(return_value=[])),
-        ):
+        """All fetched positions are fully processed (unprocessed_shares <= 1)."""
+        pos = make_position(leaf_shares=1000, processed_shares=1000, shares_to_redeem=0)
+        with _mock_process(positions=[pos]) as mocks:
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
             mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
             await process(block_number=BlockNumber(100), min_queued_assets=Gwei(0))
@@ -512,10 +509,6 @@ def _mock_process(
         ),
         patch(
             f'{MODULE}.fetch_positions_with_processed_shares',
-            new=AsyncMock(return_value=positions),
-        ),
-        patch(
-            f'{MODULE}.assign_shares_to_redeem',
             new=AsyncMock(return_value=positions),
         ),
         patch(

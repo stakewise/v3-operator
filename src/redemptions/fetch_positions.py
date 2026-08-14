@@ -186,13 +186,15 @@ async def iter_minted_shares(
     multicalls, yielding one value per position. Positions may point at different vault
     contracts, so calls are routed through the generic Multicall contract rather than
     the OsTokenRedeemer's own multicall used for leafToProcessedShares."""
+    if not positions:
+        return
+    # osTokenPositions(owner) calldata encoding only depends on the ABI, not the target
+    # address, so one VaultContract instance can encode calls for every vault.
+    encoder = VaultContract(positions[0].vault)
     for i in range(0, len(positions), OS_TOKEN_REDEEMER_CHUNK_SIZE):
         batch = positions[i : i + OS_TOKEN_REDEEMER_CHUNK_SIZE]
         calls = [
-            (
-                VaultContract(position.vault).contract_address,
-                VaultContract(position.vault).encode_abi('osTokenPositions', [position.owner]),
-            )
+            (position.vault, encoder.encode_abi('osTokenPositions', [position.owner]))
             for position in batch
         ]
         _, results = await multicall_contract.aggregate(calls, block_number=block_number)

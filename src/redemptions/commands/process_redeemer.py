@@ -46,7 +46,7 @@ from src.redemptions.os_token_converter import (
     OsTokenConverter,
     create_os_token_converter,
 )
-from src.redemptions.tasks import assign_shares_to_redeem, is_position_ltv_exceeded
+from src.redemptions.tasks import is_position_ltv_exceeded
 from src.redemptions.typings import OsTokenPosition
 from src.validators.execution import get_withdrawable_assets
 
@@ -277,12 +277,9 @@ async def _redeem_os_token_positions(
     positions_with_processed_shares = await fetch_positions_with_processed_shares(
         nonce=nonce, block_number=block_number
     )
-    logger.info('Assigning shares to redeem')
-    os_token_positions = await assign_shares_to_redeem(
-        positions_with_processed_shares,
-        total_redemption_shares=Wei(queued_shares),
-    )
-    if not os_token_positions:
+    if queued_shares <= 0 or not any(
+        position.unprocessed_shares > 1 for position in positions_with_processed_shares
+    ):
         logger.info('No redeemable positions found. Skipping to next interval.')
         return
 
