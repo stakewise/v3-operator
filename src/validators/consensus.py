@@ -1,15 +1,17 @@
 import logging
 from collections import defaultdict
 from itertools import batched
+from typing import Collection
 
 from eth_typing import HexStr
-from sw_utils import ValidatorStatus
+from sw_utils import ChainHead, ValidatorStatus
 from sw_utils.consensus import EXITED_STATUSES
 from web3.types import Gwei
 
 from src.common.clients import consensus_client
 from src.common.consensus import get_chain_latest_head
 from src.common.consolidations import get_pending_consolidations
+from src.common.typings import PendingConsolidation
 from src.config.settings import settings
 from src.validators.database import VaultValidatorCrud
 from src.validators.event_processors import get_latest_vault_v2_validator_public_keys
@@ -20,10 +22,13 @@ EXITING_STATUSES = [
     ValidatorStatus.ACTIVE_SLASHED,
 ] + EXITED_STATUSES
 
+# Index assigned to validators that are not present in the beacon state yet
+# and were built solely from their pending deposits.
+UNKNOWN_VALIDATOR_INDEX = -1
+
 logger = logging.getLogger(__name__)
 
 
-# pylint: disable-next=too-many-locals
 async def fetch_funding_validators_balances() -> dict[HexStr, Gwei]:
     """
     Retrieves the consensus balances of vault validators eligible for funding.
@@ -35,98 +40,156 @@ async def fetch_funding_validators_balances() -> dict[HexStr, Gwei]:
     if not vault_public_keys:
         return {}
 
-    # Fetch consensus validators and pending consolidations from one consistent snapshot
-    chain_head = await get_chain_latest_head()
-    slot = str(chain_head.slot)
-    consensus_validators = await fetch_consensus_validators(list(vault_public_keys), slot=slot)
-    pending_consolidations = await get_pending_consolidations(chain_head, consensus_validators)
-
-    # Filter compounding and remove exiting/withdrawn validators, as they are not
-    # eligible for funding.
-    validators_balances: dict[HexStr, Gwei] = {}
-    ineligible_public_keys: set[HexStr] = set()
-    index_to_validator: dict[int, ConsensusValidator] = {}
-    for validator in consensus_validators:
-        index_to_validator[validator.index] = validator
-        if validator.is_compounding and validator.status not in EXITING_STATUSES:
-            validators_balances[validator.public_key] = validator.balance
-        else:
-            ineligible_public_keys.add(validator.public_key)
-
-    # Exclude pending consolidation sources from funding and credit their balances
-    # to the targets; drop targets whose source balance is unknown.
-    for cons in pending_consolidations:
-        target = index_to_validator.get(cons.target_index)
-        source = index_to_validator.get(cons.source_index)
-        if source is None:
-            if target is not None:
-                validators_balances.pop(target.public_key, None)
-                ineligible_public_keys.add(target.public_key)
-        else:
-            validators_balances.pop(source.public_key, None)
-            ineligible_public_keys.add(source.public_key)
-            if target is not None and target.public_key in validators_balances:
-                validators_balances[target.public_key] = Gwei(
-                    validators_balances[target.public_key] + source.balance
-                )
-
-    # Keys not yet known to the consensus node are eligible too,
-    # their balances come solely from pending deposits.
-    eligible_public_keys = vault_public_keys - ineligible_public_keys
-
-    # Add balances from pending deposits that are not yet reflected in the consensus node.
-    pending_deposits_amounts = await fetch_compounding_pending_deposits_amounts(
-        public_keys=eligible_public_keys, slot=slot
+    validators = await build_consensus_validators(
+        public_keys=vault_public_keys,
+        with_pending_deposits=True,
+        with_consolidations=True,
+        compounding_deposits_only=True,
     )
-    for public_key, amount in pending_deposits_amounts.items():
-        validators_balances[public_key] = Gwei(
-            validators_balances.get(public_key, Gwei(0)) + amount
+
+    validators_balances: dict[HexStr, Gwei] = {}
+    for validator in validators:
+        # Non-compounding and exiting/withdrawn validators are not eligible for funding.
+        if not validator.is_compounding or validator.status in EXITING_STATUSES:
+            continue
+
+        # Consolidation sources are drained into their targets, so they are not funded.
+        if validator.is_consolidation_source:
+            continue
+
+        # Drop targets whose source balance is unknown instead of guessing
+        # their post-consolidation balance.
+        if validator.is_consolidation_target and validator.target_consolidation_balance is None:
+            continue
+
+        validators_balances[validator.public_key] = Gwei(
+            validator.balance
+            + (validator.pending_balance or 0)
+            + (validator.target_consolidation_balance or 0)
         )
 
     return validators_balances
 
 
-async def fetch_compounding_pending_deposits_amounts(
-    public_keys: set[HexStr], slot: str
-) -> dict[HexStr, Gwei]:
+async def build_consensus_validators(
+    public_keys: Collection[HexStr],
+    chain_head: ChainHead | None = None,
+    with_pending_deposits: bool = False,
+    with_consolidations: bool = False,
+    compounding_deposits_only: bool = False,
+) -> list[ConsensusValidator]:
     """
-    Sums pending-deposit-queue amounts (Gwei) per pubkey, restricted to ``public_keys``.
-    Only deposits with compounding (0x02) withdrawal credentials are counted:
-    non-0x02 deposits are still processed by the CL, but they never contribute
-    fundable compounding balance, so counting them would overstate top-up capacity.
+    Fetches the consensus validators for ``public_keys`` and optionally enriches them with
+    the pending deposits and pending consolidations data from the same chain snapshot.
+
+    ``with_pending_deposits`` fills in ``pending_balance`` and additionally returns validators
+    that are not present in the beacon state yet, but already have pending deposits. Such
+    validators get ``UNKNOWN_VALIDATOR_INDEX`` and their withdrawal credentials come from
+    the deposit itself.
+    ``compounding_deposits_only`` restricts pending deposits to the ones with compounding
+    (0x02) withdrawal credentials: non-0x02 deposits are still processed by the CL, but they
+    never contribute fundable compounding balance.
+
+    ``with_consolidations`` fills in ``is_consolidation_source``, ``is_consolidation_target``
+    and ``target_consolidation_balance``. The latter is the total balance the target will
+    receive from its pending consolidation sources; it stays ``None`` when at least one of
+    the sources is not among the fetched validators, i.e. its balance is unknown.
     """
     if not public_keys:
-        return {}
+        return []
 
-    pending_amounts: dict[HexStr, Gwei] = defaultdict(lambda: Gwei(0))
-    all_pending_deposits = await consensus_client.get_pending_deposits(slot)
-    for deposit in all_pending_deposits:
+    chain_head = chain_head or await get_chain_latest_head()
+    slot = str(chain_head.slot)
+    validators = await fetch_consensus_validators(list(public_keys), slot=slot)
+
+    if with_consolidations:
+        _apply_pending_consolidations(
+            validators=validators,
+            pending_consolidations=await get_pending_consolidations(chain_head, validators),
+        )
+
+    if with_pending_deposits:
+        validators += await apply_pending_deposits(
+            validators=validators,
+            public_keys=set(public_keys),
+            slot=slot,
+            compounding_deposits_only=compounding_deposits_only,
+        )
+
+    return validators
+
+
+def _apply_pending_consolidations(
+    validators: list[ConsensusValidator], pending_consolidations: list[PendingConsolidation]
+) -> None:
+    index_to_validator = {val.index: val for val in validators}
+
+    target_balances: dict[int, Gwei] = defaultdict(lambda: Gwei(0))
+    unknown_source_targets: set[int] = set()
+
+    for cons in pending_consolidations:
+        source = index_to_validator.get(cons.source_index)
+        if source is not None:
+            source.is_consolidation_source = True
+
+        target = index_to_validator.get(cons.target_index)
+        if target is None:
+            continue
+        target.is_consolidation_target = True
+
+        if source is None:
+            unknown_source_targets.add(cons.target_index)
+        else:
+            target_balances[cons.target_index] = Gwei(
+                target_balances[cons.target_index] + source.balance
+            )
+
+    for index, balance in target_balances.items():
+        if index not in unknown_source_targets:
+            index_to_validator[index].target_consolidation_balance = balance
+
+
+async def apply_pending_deposits(
+    validators: list[ConsensusValidator],
+    public_keys: set[HexStr],
+    slot: str,
+    compounding_deposits_only: bool = False,
+) -> list[ConsensusValidator]:
+    """
+    Fills in ``pending_balance`` of ``validators`` in place and returns the validators that
+    are not present in the beacon state yet, but already have pending deposits.
+    Can be called separately from `build_consensus_validators` to delay fetching the
+    pending deposit queue until it is really needed.
+    """
+    new_validators: list[ConsensusValidator] = []
+    public_key_to_validator = {val.public_key: val for val in validators}
+
+    for deposit in await consensus_client.get_pending_deposits(slot):
         public_key: HexStr = deposit['pubkey']
         if public_key not in public_keys:
             continue
-        if not deposit['withdrawal_credentials'].startswith('0x02'):
+
+        withdrawal_credentials: HexStr = deposit['withdrawal_credentials']
+        if compounding_deposits_only and not withdrawal_credentials.startswith('0x02'):
             continue
-        pending_amounts[public_key] = Gwei(pending_amounts[public_key] + int(deposit['amount']))
 
-    return dict(pending_amounts)
+        validator = public_key_to_validator.get(public_key)
+        if validator is None:
+            # Validator is not present in the beacon state yet
+            validator = ConsensusValidator(
+                index=UNKNOWN_VALIDATOR_INDEX,
+                public_key=public_key,
+                balance=Gwei(0),
+                withdrawal_credentials=withdrawal_credentials,
+                status=ValidatorStatus.PENDING_INITIALIZED,
+                activation_epoch=settings.network_config.FAR_FUTURE_EPOCH,
+            )
+            public_key_to_validator[public_key] = validator
+            new_validators.append(validator)
 
+        validator.pending_balance = Gwei((validator.pending_balance or 0) + int(deposit['amount']))
 
-async def fetch_pending_deposits_amounts(public_keys: set[HexStr], slot: str) -> dict[HexStr, Gwei]:
-    """
-    Sums pending-deposit-queue amounts (Gwei) per pubkey, restricted to ``public_keys``.
-    """
-    if not public_keys:
-        return {}
-
-    pending_amounts: dict[HexStr, Gwei] = defaultdict(lambda: Gwei(0))
-    all_pending_deposits = await consensus_client.get_pending_deposits(slot)
-    for deposit in all_pending_deposits:
-        public_key: HexStr = deposit['pubkey']
-        if public_key not in public_keys:
-            continue
-        pending_amounts[public_key] = Gwei(pending_amounts[public_key] + int(deposit['amount']))
-
-    return dict(pending_amounts)
+    return new_validators
 
 
 async def fetch_consensus_validators(

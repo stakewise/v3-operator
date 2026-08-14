@@ -49,6 +49,7 @@ class Validator:
 
 
 @dataclass
+# pylint: disable-next=too-many-instance-attributes
 class ConsensusValidator:
     index: int
     public_key: HexStr
@@ -56,6 +57,13 @@ class ConsensusValidator:
     withdrawal_credentials: HexStr
     status: ValidatorStatus
     activation_epoch: int
+
+    # Optional fields populated by `build_consensus_validators` when the corresponding
+    # flag is passed. They stay unset when the data was not requested.
+    pending_balance: Gwei | None = None
+    target_consolidation_balance: Gwei | None = None
+    is_consolidation_source: bool = False
+    is_consolidation_target: bool = False
 
     @property
     def is_compounding(self) -> bool:

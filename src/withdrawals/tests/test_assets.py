@@ -19,22 +19,21 @@ def test_calculate_validators_exits_amount():
         create_consensus_validator(index=2, balance=16),
     ]
     consensus_validators = []
-    source_consolidations_indexes = set()
-    result = _calculate_validators_exits_amount(
-        consensus_validators, oracle_exiting_validators, source_consolidations_indexes
-    )
+    result = _calculate_validators_exits_amount(consensus_validators, oracle_exiting_validators)
     assert result == Web3.to_wei(48, 'gwei')
 
-    # excludes_validators_in_source_consolidations_indexes
+    # excludes_consolidation_sources
     oracle_exiting_validators = []
     consensus_validators = [
-        create_consensus_validator(index=1, balance=32, status=ValidatorStatus.ACTIVE_EXITING),
+        create_consensus_validator(
+            index=1,
+            balance=32,
+            status=ValidatorStatus.ACTIVE_EXITING,
+            is_consolidation_source=True,
+        ),
         create_consensus_validator(index=2, balance=16, status=ValidatorStatus.ACTIVE_EXITING),
     ]
-    source_consolidations_indexes = {1}
-    result = _calculate_validators_exits_amount(
-        consensus_validators, oracle_exiting_validators, source_consolidations_indexes
-    )
+    result = _calculate_validators_exits_amount(consensus_validators, oracle_exiting_validators)
     assert result == Web3.to_wei(16, 'gwei')
 
     # excludes_validators_not_in_exiting_status
@@ -43,10 +42,7 @@ def test_calculate_validators_exits_amount():
         create_consensus_validator(index=1, balance=32, status=ValidatorStatus.ACTIVE_ONGOING),
         create_consensus_validator(index=2, balance=16, status=ValidatorStatus.EXITED_UNSLASHED),
     ]
-    source_consolidations_indexes = set()
-    result = _calculate_validators_exits_amount(
-        consensus_validators, oracle_exiting_validators, source_consolidations_indexes
-    )
+    result = _calculate_validators_exits_amount(consensus_validators, oracle_exiting_validators)
     assert result == Web3.to_wei(16, 'gwei')
 
     # calculates_combined_balance_for_oracle_and_manual_exits
@@ -56,19 +52,13 @@ def test_calculate_validators_exits_amount():
     consensus_validators = [
         create_consensus_validator(index=2, balance=16, status=ValidatorStatus.ACTIVE_EXITING),
     ]
-    source_consolidations_indexes = set()
-    result = _calculate_validators_exits_amount(
-        consensus_validators, oracle_exiting_validators, source_consolidations_indexes
-    )
+    result = _calculate_validators_exits_amount(consensus_validators, oracle_exiting_validators)
     assert result == Web3.to_wei(48, 'gwei')
 
     # returns_zero_when_no_validators_provided
     oracle_exiting_validators = []
     consensus_validators = []
-    source_consolidations_indexes = set()
-    result = _calculate_validators_exits_amount(
-        consensus_validators, oracle_exiting_validators, source_consolidations_indexes
-    )
+    result = _calculate_validators_exits_amount(consensus_validators, oracle_exiting_validators)
     assert result == Web3.to_wei(0, 'gwei')
 
 
@@ -85,7 +75,6 @@ class TestGetQueuedAssets:
             result = await get_queued_assets(
                 consensus_validators=[],
                 oracle_exiting_validators=[],
-                consolidations=[],
                 pending_partial_withdrawals=[],
                 chain_head=create_chain_head(),
             )
@@ -112,7 +101,6 @@ class TestGetQueuedAssets:
             await get_queued_assets(
                 consensus_validators=consensus_validators,
                 oracle_exiting_validators=oracle_exiting_validators,
-                consolidations=[],
                 pending_partial_withdrawals=pending_partial_withdrawals,
                 chain_head=create_chain_head(),
             )

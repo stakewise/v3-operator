@@ -10,11 +10,7 @@ from web3.types import Gwei, Wei
 
 from src.common.contracts import validators_checker_contract
 from src.common.harvest import get_harvest_params
-from src.common.typings import (
-    ExitQueueMissingAssetsParams,
-    PendingConsolidation,
-    PendingPartialWithdrawal,
-)
+from src.common.typings import ExitQueueMissingAssetsParams, PendingPartialWithdrawal
 from src.config.settings import settings
 from src.validators.typings import ConsensusValidator
 
@@ -40,7 +36,6 @@ EXITING_STATUSES = [
 async def get_queued_assets(
     consensus_validators: list[ConsensusValidator],
     oracle_exiting_validators: list[ConsensusValidator],
-    consolidations: list[PendingConsolidation],
     pending_partial_withdrawals: list[PendingPartialWithdrawal],
     chain_head: ChainHead,
 ) -> Gwei:
@@ -62,11 +57,9 @@ async def get_queued_assets(
     )
 
     # fetch active validators exits
-    source_consolidations_indexes = {cons.source_index for cons in consolidations}
     validators_exits_amount = _calculate_validators_exits_amount(
         consensus_validators=consensus_validators,
         oracle_exiting_validators=oracle_exiting_validators,
-        source_consolidations_indexes=source_consolidations_indexes,
     )
 
     # Withdrawing assets are assets that are ready to cover the exit requests
@@ -97,7 +90,6 @@ async def get_queued_assets(
 def _calculate_validators_exits_amount(
     consensus_validators: list[ConsensusValidator],
     oracle_exiting_validators: list[ConsensusValidator],
-    source_consolidations_indexes: set[int],
 ) -> Wei:
     """
     Calculate the sum of exiting validators balances. Exiting validators are:
@@ -113,9 +105,10 @@ def _calculate_validators_exits_amount(
         oracle_exiting_indexes.add(val.index)
         total_exiting_amount += val.balance
 
-    excluded_indexes = source_consolidations_indexes.union(oracle_exiting_indexes)
     for val in consensus_validators:
-        if val.index not in excluded_indexes and val.status in EXITING_STATUSES:
+        if val.is_consolidation_source or val.index in oracle_exiting_indexes:
+            continue
+        if val.status in EXITING_STATUSES:
             total_exiting_amount += val.balance
 
     return Web3.to_wei(total_exiting_amount, 'gwei')

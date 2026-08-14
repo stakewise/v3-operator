@@ -16,7 +16,6 @@ from web3.types import BlockNumber, Gwei, Wei
 from src.common.app_state import AppState
 from src.common.clients import execution_client
 from src.common.consensus import get_chain_latest_head
-from src.common.consolidations import get_pending_consolidations
 from src.common.contracts import VaultContract
 from src.common.metrics import metrics
 from src.common.protocol_config import get_protocol_config
@@ -32,10 +31,7 @@ from src.config.settings import (
     WITHDRAWALS_INTERVAL,
     settings,
 )
-from src.validators.consensus import (
-    fetch_consensus_validators,
-    fetch_pending_deposits_amounts,
-)
+from src.validators.consensus import apply_pending_deposits, build_consensus_validators
 from src.validators.database import VaultValidatorCrud
 from src.validators.exceptions import EmptyRelayerResponseException
 from src.validators.oracles import poll_active_exits
@@ -103,15 +99,15 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
         if not await self._is_withdrawal_interval_passed(app_state, chain_head):
             return
 
-        vault_validators = VaultValidatorCrud().get_vault_validators()
-        consensus_validators = await fetch_consensus_validators(
-            [val.public_key for val in vault_validators],
-            slot=str(chain_head.slot),
+        vault_public_keys = {val.public_key for val in VaultValidatorCrud().get_vault_validators()}
+        consensus_validators = await build_consensus_validators(
+            public_keys=vault_public_keys,
+            chain_head=chain_head,
+            with_consolidations=True,
         )
         oracle_exiting_validators = await _fetch_oracle_exiting_validators(
             consensus_validators, protocol_config
         )
-        consolidations = await get_pending_consolidations(chain_head, consensus_validators)
 
         active_validators = [v for v in consensus_validators if v.status in CAN_BE_EXITED_STATUSES]
         pending_partial_withdrawals = await get_pending_partial_withdrawals(
@@ -122,7 +118,6 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
             consensus_validators=consensus_validators,
             oracle_exiting_validators=oracle_exiting_validators,
             pending_partial_withdrawals=pending_partial_withdrawals,
-            consolidations=consolidations,
             chain_head=chain_head,
         )
         metrics.queued_assets.labels(network=settings.network).set(int(queued_assets))
@@ -137,8 +132,12 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
             )
             return
 
-        pending_deposits = await fetch_pending_deposits_amounts(
-            public_keys={val.public_key for val in vault_validators},
+        # The pending deposit queue is fetched only once it is clear that a withdrawal is
+        # needed. Validators that are not in the beacon state yet can't be withdrawn from,
+        # so the ones returned here are dropped.
+        await apply_pending_deposits(
+            validators=consensus_validators,
+            public_keys=vault_public_keys,
             slot=str(chain_head.slot),
         )
         withdrawals = await _get_withdrawals(
@@ -148,9 +147,6 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
             pending_partial_withdrawals=pending_partial_withdrawals,
             validator_min_active_epochs=protocol_config.validator_min_active_epochs,
             oracle_exit_indexes={val.index for val in oracle_exiting_validators},
-            consolidation_target_indexes={c.target_index for c in consolidations},
-            consolidation_source_indexes={c.source_index for c in consolidations},
-            pending_deposits=pending_deposits,
         )
         if not withdrawals:
             logger.info(
@@ -223,9 +219,6 @@ async def _get_withdrawals(
     pending_partial_withdrawals: list[PendingPartialWithdrawal],
     validator_min_active_epochs: int,
     oracle_exit_indexes: set[int],
-    consolidation_target_indexes: set[int],
-    consolidation_source_indexes: set[int],
-    pending_deposits: dict[HexStr, Gwei],
 ) -> dict[HexStr, Gwei]:
     if queued_assets <= 0:
         return {}
@@ -245,7 +238,7 @@ async def _get_withdrawals(
         v
         for v in consensus_validators
         if v.is_partially_withdrawable(chain_head.epoch)
-        and v.index not in consolidation_source_indexes
+        and not v.is_consolidation_source
         and v.index not in oracle_exit_indexes
     ]
     partial_validator_indexes = {v.index for v in partial_validators}
@@ -274,9 +267,6 @@ async def _get_withdrawals(
         max_activation_epoch=max(max_activation_epoch, 0),
         oracle_exit_indexes=oracle_exit_indexes,
         partial_withdrawal_indexes=set(validator_partial_withdrawals.keys()),
-        consolidation_target_indexes=consolidation_target_indexes,
-        consolidation_source_indexes=consolidation_source_indexes,
-        pending_deposits=pending_deposits,
     )
 
     withdrawals: dict[HexStr, Gwei] = {}
@@ -334,15 +324,11 @@ def _get_partial_withdrawals(
     return withdrawals
 
 
-# pylint: disable-next=too-many-arguments
 def _filter_exitable_validators(
     consensus_validators: list[ConsensusValidator],
     max_activation_epoch: int,
     oracle_exit_indexes: set[int],
     partial_withdrawal_indexes: set[int],
-    consolidation_target_indexes: set[int],
-    consolidation_source_indexes: set[int],
-    pending_deposits: dict[HexStr, Gwei],
 ) -> list[ConsensusValidator]:
     """
     Return validators eligible for exit, ordered by balance to minimize assets exited.
@@ -360,14 +346,10 @@ def _filter_exitable_validators(
             continue
         if validator.index in partial_withdrawal_indexes:
             continue
-        if validator.index in consolidation_target_indexes:
-            continue
-        if validator.index in consolidation_source_indexes:
+        if validator.is_consolidation_target or validator.is_consolidation_source:
             continue
         can_be_exited_validators.append(validator)
-    can_be_exited_validators.sort(
-        key=lambda x: (x.balance + pending_deposits.get(x.public_key, 0), x.index)
-    )
+    can_be_exited_validators.sort(key=lambda x: (x.balance + (x.pending_balance or 0), x.index))
 
     return can_be_exited_validators
 

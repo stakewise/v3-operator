@@ -15,6 +15,10 @@ def create_consensus_validator(
     activation_epoch: int | None = None,
     is_compounding: bool = True,
     withdrawal_address: ChecksumAddress | None = None,
+    pending_balance: Gwei | None = None,
+    target_consolidation_balance: Gwei | None = None,
+    is_consolidation_source: bool = False,
+    is_consolidation_target: bool = False,
 ) -> ConsensusValidator:
     # settings.vault is unset in tests that don't use the fake_settings fixture
     withdrawal_address = (
@@ -31,6 +35,10 @@ def create_consensus_validator(
             else _build_non_compound_credentials(withdrawal_address)
         ),
         activation_epoch=activation_epoch,
+        pending_balance=pending_balance,
+        target_consolidation_balance=target_consolidation_balance,
+        is_consolidation_source=is_consolidation_source,
+        is_consolidation_target=is_consolidation_target,
     )
 
 
