@@ -482,6 +482,7 @@ class TestGetWindowRedeemedShares:
                 new=AsyncMock(return_value=[active_position]),
             ),
             patch(f'{self.MODULE}.iter_processed_shares', new=fake_iter_processed_shares),
+            patch(f'{self.MODULE}.os_token_redeemer_contract.nonce', new=AsyncMock(return_value=5)),
             patch(f'{self.MODULE}.execution_client', new=AsyncMock()) as execution_client_mock,
         ):
             execution_client_mock.eth.get_block.return_value = {'number': BlockNumber(150)}
@@ -490,6 +491,27 @@ class TestGetWindowRedeemedShares:
             )
 
         assert result == {(vault_1, owner_1): Wei(30)}
+
+    async def test_raises_when_nonce_at_snapshot_differs_from_new_file_nonce(self):
+        # a setRedeemablePositions call landed between snapshot_block and the point where
+        # the caller read the "latest" nonce: the active file no longer matches the
+        # snapshot, so leaf hashes computed with the stale nonce would be wrong.
+        vault_1 = faker.eth_address()
+        owner_1 = faker.eth_address()
+        active_position = make_position(vault=vault_1, owner=owner_1, leaf_shares=1000)
+        new_positions = [OsTokenPosition(owner=owner_1, vault=vault_1, leaf_shares=Wei(700))]
+
+        with (
+            patch(
+                f'{self.MODULE}.fetch_positions_from_ipfs',
+                new=AsyncMock(return_value=[active_position]),
+            ),
+            patch(f'{self.MODULE}.os_token_redeemer_contract.nonce', new=AsyncMock(return_value=6)),
+        ):
+            with pytest.raises(RuntimeError):
+                await get_window_redeemed_shares(
+                    new_positions, nonce=5, snapshot_block=BlockNumber(100)
+                )
 
 
 def test_subtract_window_redeemed_shares_clamps_and_drops_zero():
@@ -505,8 +527,20 @@ def test_subtract_window_redeemed_shares_clamps_and_drops_zero():
         # exceeds the leaf's own shares: clamp at zero instead of going negative
         (vault_1, owner_2): Wei(999),
     }
-    result = _subtract_window_redeemed_shares(positions, window_redeemed_shares)
+    result = _subtract_window_redeemed_shares(positions, window_redeemed_shares, Wei(0))
     assert result == [OsTokenPosition(owner=owner_1, vault=vault_1, leaf_shares=Wei(60))]
+
+
+def test_subtract_window_redeemed_shares_drops_positions_below_dust_threshold():
+    vault_1 = faker.eth_address()
+    owner_1 = faker.eth_address()
+    positions = [
+        OsTokenPosition(owner=owner_1, vault=vault_1, leaf_shares=Wei(100)),
+    ]
+    # leaves 10 shares, below the dust threshold enforced when the positions were built
+    window_redeemed_shares = {(vault_1, owner_1): Wei(90)}
+    result = _subtract_window_redeemed_shares(positions, window_redeemed_shares, Wei(20))
+    assert result == []
 
 
 @pytest.mark.usefixtures('_init_config')
