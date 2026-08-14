@@ -15,7 +15,11 @@ from src.validators.consensus import (
     fetch_funding_validators_balances,
 )
 from src.validators.tests.factories import create_consensus_validator
-from src.validators.typings import ConsensusValidator, VaultValidator
+from src.validators.typings import (
+    ConsensusValidator,
+    ValidatorConsolidationData,
+    VaultValidator,
+)
 
 
 @pytest.mark.usefixtures('fake_settings')
@@ -154,16 +158,14 @@ class TestFetchFundingValidatorsBalances:
 class TestBuildConsensusValidators:
     async def test_without_flags_leaves_optional_fields_unset(self):
         """The optional fields stay unset when the data behind them was not requested."""
-        validator = create_consensus_validator(index=1)
+        validator = create_consensus_validator(index=1, with_consolidation_data=False)
 
         with patch_funding_dependencies(consensus_validators=[validator]):
             result = await build_consensus_validators([validator.public_key])
 
         assert len(result) == 1
         assert result[0].pending_balance is None
-        assert result[0].target_consolidation_balance is None
-        assert result[0].is_consolidation_source is False
-        assert result[0].is_consolidation_target is False
+        assert result[0].consolidation_data is None
 
     async def test_without_flags_skips_extra_lookups(self):
         """Pending deposits and consolidations are not fetched unless explicitly requested."""
@@ -191,19 +193,23 @@ class TestBuildConsensusValidators:
             )
 
         # the original validators are left untouched
-        assert source.is_consolidation_source is False
-        assert target.is_consolidation_target is False
+        assert source.consolidation_data == ValidatorConsolidationData(
+            is_source=False, is_target=False
+        )
+        assert target.consolidation_data == ValidatorConsolidationData(
+            is_source=False, is_target=False
+        )
 
         result_source, result_target = result
         assert result_source.public_key == source.public_key
-        assert result_source.is_consolidation_source is True
-        assert result_source.is_consolidation_target is False
-        assert result_source.target_consolidation_balance is None
+        assert result_source.consolidation_data == ValidatorConsolidationData(
+            is_source=True, is_target=False, target_balance=None
+        )
 
         assert result_target.public_key == target.public_key
-        assert result_target.is_consolidation_target is True
-        assert result_target.is_consolidation_source is False
-        assert result_target.target_consolidation_balance == ether_to_gwei(20)
+        assert result_target.consolidation_data == ValidatorConsolidationData(
+            is_source=False, is_target=True, target_balance=ether_to_gwei(20)
+        )
 
     async def test_leaves_target_balance_unknown_for_missing_source(self):
         """The target's consolidation balance can't be determined when a source is not fetched."""
@@ -223,8 +229,9 @@ class TestBuildConsensusValidators:
 
         result_target = result[0]
         assert result_target.public_key == target.public_key
-        assert result_target.is_consolidation_target is True
-        assert result_target.target_consolidation_balance is None
+        assert result_target.consolidation_data == ValidatorConsolidationData(
+            is_source=False, is_target=True, target_balance=None
+        )
 
     async def test_adds_pending_deposits(self, compounding_creds):
         """Pending deposits fill in pending_balance and add validators absent from the beacon state."""
@@ -409,11 +416,14 @@ class TestBuildConsensusValidators:
             )
 
         result_source, result_target = result
-        assert result_source.is_consolidation_source is True
+        assert result_source.consolidation_data == ValidatorConsolidationData(
+            is_source=True, is_target=False, target_balance=None
+        )
         assert result_source.pending_balance is None
 
-        assert result_target.is_consolidation_target is True
-        assert result_target.target_consolidation_balance == ether_to_gwei(20)
+        assert result_target.consolidation_data == ValidatorConsolidationData(
+            is_source=False, is_target=True, target_balance=ether_to_gwei(20)
+        )
         assert result_target.pending_balance == ether_to_gwei(5)
 
 

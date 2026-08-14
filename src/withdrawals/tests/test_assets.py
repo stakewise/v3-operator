@@ -6,9 +6,11 @@ from sw_utils import ValidatorStatus
 from web3 import Web3
 from web3.types import Gwei, Wei
 
+from src.common.exceptions import MissingConsolidationDataError
 from src.common.tests.factories import create_chain_head
 from src.common.typings import PendingPartialWithdrawal
 from src.validators.tests.factories import create_consensus_validator
+from src.validators.typings import ValidatorConsolidationData
 from src.withdrawals.assets import _calculate_validators_exits_amount, get_queued_assets
 
 
@@ -29,7 +31,7 @@ def test_calculate_validators_exits_amount():
             index=1,
             balance=32,
             status=ValidatorStatus.ACTIVE_EXITING,
-            is_consolidation_source=True,
+            consolidation_data=ValidatorConsolidationData(is_source=True, is_target=False),
         ),
         create_consensus_validator(index=2, balance=16, status=ValidatorStatus.ACTIVE_EXITING),
     ]
@@ -60,6 +62,18 @@ def test_calculate_validators_exits_amount():
     consensus_validators = []
     result = _calculate_validators_exits_amount(consensus_validators, oracle_exiting_validators)
     assert result == Web3.to_wei(0, 'gwei')
+
+    # raises_when_consolidation_data_was_not_loaded
+    consensus_validators = [
+        create_consensus_validator(
+            index=1,
+            balance=32,
+            status=ValidatorStatus.ACTIVE_EXITING,
+            with_consolidation_data=False,
+        ),
+    ]
+    with pytest.raises(MissingConsolidationDataError, match='Consolidation data is not loaded'):
+        _calculate_validators_exits_amount(consensus_validators, [])
 
 
 @pytest.mark.usefixtures('fake_settings')

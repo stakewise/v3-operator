@@ -49,6 +49,16 @@ class Validator:
 
 
 @dataclass
+class ValidatorConsolidationData:
+    is_source: bool
+    is_target: bool
+
+    # Total balance the target will receive from its pending consolidation sources.
+    # Stays `None` when at least one of the source balances is unknown.
+    target_balance: Gwei | None = None
+
+
+@dataclass
 # pylint: disable-next=too-many-instance-attributes
 class ConsensusValidator:
     index: int
@@ -59,11 +69,9 @@ class ConsensusValidator:
     activation_epoch: int
 
     # Optional fields populated by `build_consensus_validators` when the corresponding
-    # flag is passed. They stay unset when the data was not requested.
+    # flag is passed. They stay `None` when the data was not requested.
     pending_balance: Gwei | None = None
-    target_consolidation_balance: Gwei | None = None
-    is_consolidation_source: bool = False
-    is_consolidation_target: bool = False
+    consolidation_data: ValidatorConsolidationData | None = None
 
     @property
     def is_compounding(self) -> bool:

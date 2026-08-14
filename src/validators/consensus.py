@@ -12,11 +12,12 @@ from web3.types import Gwei
 from src.common.clients import consensus_client
 from src.common.consensus import get_chain_latest_head
 from src.common.consolidations import get_pending_consolidations
+from src.common.exceptions import MissingConsolidationDataError
 from src.common.typings import PendingConsolidation
 from src.config.settings import settings
 from src.validators.database import VaultValidatorCrud
 from src.validators.event_processors import get_latest_vault_v2_validator_public_keys
-from src.validators.typings import ConsensusValidator
+from src.validators.typings import ConsensusValidator, ValidatorConsolidationData
 
 EXITING_STATUSES = [
     ValidatorStatus.ACTIVE_EXITING,
@@ -50,23 +51,27 @@ async def fetch_funding_validators_balances() -> dict[HexStr, Gwei]:
 
     validators_balances: dict[HexStr, Gwei] = {}
     for validator in validators:
+        consolidation_data = validator.consolidation_data
+        if consolidation_data is None:
+            raise MissingConsolidationDataError(validator.public_key)
+
         # Non-compounding and exiting/withdrawn validators are not eligible for funding.
         if not validator.is_compounding or validator.status in EXITING_STATUSES:
             continue
 
         # Consolidation sources are drained into their targets, so they are not funded.
-        if validator.is_consolidation_source:
+        if consolidation_data.is_source:
             continue
 
         # Drop targets whose source balance is unknown instead of guessing
         # their post-consolidation balance.
-        if validator.is_consolidation_target and validator.target_consolidation_balance is None:
+        if consolidation_data.is_target and consolidation_data.target_balance is None:
             continue
 
         validators_balances[validator.public_key] = Gwei(
             validator.balance
             + (validator.pending_balance or 0)
-            + (validator.target_consolidation_balance or 0)
+            + (consolidation_data.target_balance or 0)
         )
 
     return validators_balances
@@ -91,10 +96,8 @@ async def build_consensus_validators(
     (0x02) withdrawal credentials: non-0x02 deposits are still processed by the CL, but they
     never contribute fundable compounding balance.
 
-    ``with_consolidations`` fills in ``is_consolidation_source``, ``is_consolidation_target``
-    and ``target_consolidation_balance``. The latter is the total balance the target will
-    receive from its pending consolidation sources; it stays ``None`` when at least one of
-    the sources is not among the fetched validators, i.e. its balance is unknown.
+    ``with_consolidations`` fills in ``consolidation_data``, which stays ``None`` when the
+    data was not requested.
     """
     if not public_keys:
         return []
@@ -116,6 +119,17 @@ async def build_consensus_validators(
             slot=slot,
             compounding_deposits_only=compounding_deposits_only,
         )
+        if with_consolidations:
+            # Fill in empty consolidation data for consistency with the rest of the
+            # returned validators. Validators that are not in the beacon state yet
+            # can't take part in consolidations.
+            new_validators = [
+                replace(
+                    val,
+                    consolidation_data=ValidatorConsolidationData(is_source=False, is_target=False),
+                )
+                for val in new_validators
+            ]
         validators += new_validators
 
     return validators
@@ -125,8 +139,9 @@ def _apply_pending_consolidations(
     validators: list[ConsensusValidator], pending_consolidations: list[PendingConsolidation]
 ) -> list[ConsensusValidator]:
     """
-    Returns a copy of ``validators``, in the same order, with the consolidation fields
-    filled in.
+    Returns a copy of ``validators``, in the same order, with ``consolidation_data``
+    filled in. ``target_balance`` stays ``None`` when at least one of the target's sources
+    is not among the fetched validators, i.e. its balance is unknown.
     """
     index_to_validator = {val.index: val for val in validators}
 
@@ -152,17 +167,21 @@ def _apply_pending_consolidations(
                 target_balances[cons.target_index] + source.balance
             )
 
-    return [
-        replace(
-            val,
-            is_consolidation_source=val.index in source_indexes,
-            is_consolidation_target=val.index in target_indexes,
-            target_consolidation_balance=(
-                None if val.index in unknown_source_targets else target_balances.get(val.index)
-            ),
+    enriched_validators = []
+    for val in validators:
+        if val.index in unknown_source_targets:
+            target_balance = None
+        else:
+            target_balance = target_balances.get(val.index)
+
+        consolidation_data = ValidatorConsolidationData(
+            is_source=val.index in source_indexes,
+            is_target=val.index in target_indexes,
+            target_balance=target_balance,
         )
-        for val in validators
-    ]
+        enriched_validators.append(replace(val, consolidation_data=consolidation_data))
+
+    return enriched_validators
 
 
 async def apply_pending_deposits(

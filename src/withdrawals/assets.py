@@ -9,6 +9,7 @@ from web3 import Web3
 from web3.types import Gwei, Wei
 
 from src.common.contracts import validators_checker_contract
+from src.common.exceptions import MissingConsolidationDataError
 from src.common.harvest import get_harvest_params
 from src.common.typings import ExitQueueMissingAssetsParams, PendingPartialWithdrawal
 from src.config.settings import settings
@@ -106,7 +107,9 @@ def _calculate_validators_exits_amount(
         total_exiting_amount += val.balance
 
     for val in consensus_validators:
-        if val.is_consolidation_source or val.index in oracle_exiting_indexes:
+        if val.consolidation_data is None:
+            raise MissingConsolidationDataError(val.public_key)
+        if val.consolidation_data.is_source or val.index in oracle_exiting_indexes:
             continue
         if val.status in EXITING_STATUSES:
             total_exiting_amount += val.balance

@@ -11,6 +11,7 @@ from src.common.typings import PendingPartialWithdrawal, Singleton
 from src.config.networks import HOODI
 from src.config.settings import WITHDRAWALS_INTERVAL, settings
 from src.validators.tests.factories import create_consensus_validator
+from src.validators.typings import ValidatorConsolidationData
 from src.withdrawals.tasks import (
     WithdrawalIntervalMixin,
     _fetch_oracle_exiting_validators,
@@ -615,7 +616,7 @@ async def test_get_withdrawals(data_dir):
             status=ValidatorStatus.ACTIVE_ONGOING,
             activation_epoch=90,
             index=1,
-            is_consolidation_target=True,
+            consolidation_data=ValidatorConsolidationData(is_source=False, is_target=True),
         ),
         create_consensus_validator(
             public_key='0x2',
@@ -844,7 +845,7 @@ async def test_get_withdrawals_excludes_consolidation_sources(data_dir):
             balance=ether_to_gwei(40),
             status=ValidatorStatus.ACTIVE_ONGOING,
             activation_epoch=90,
-            is_consolidation_source=True,
+            consolidation_data=ValidatorConsolidationData(is_source=True, is_target=False),
         ),
         create_consensus_validator(
             public_key='0x2',
@@ -1083,7 +1084,7 @@ def test_filter_exitable_validators():
             activation_epoch=10,
             status=ValidatorStatus.ACTIVE_ONGOING,
             balance=32,
-            is_consolidation_target=True,
+            consolidation_data=ValidatorConsolidationData(is_source=False, is_target=True),
         ),
     ]
     result = _filter_exitable_validators(
@@ -1105,7 +1106,7 @@ def test_filter_exitable_validators():
             activation_epoch=10,
             status=ValidatorStatus.ACTIVE_ONGOING,
             balance=32,
-            is_consolidation_source=True,
+            consolidation_data=ValidatorConsolidationData(is_source=True, is_target=False),
         ),
     ]
     result = _filter_exitable_validators(
