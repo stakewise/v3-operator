@@ -245,8 +245,8 @@ async def _get_withdrawals(
     # Find all partial-withdrawable validators, excluding consolidation sources: the CL
     # ignores a consolidation whose source has a pending partial withdrawal, so counting
     # a source's capacity here would both misstate partial_capacity and risk cancelling
-    # the vault's own consolidation. Also exclude oracle-exiting validators, since new
-    # partial requests for them would pay 0 once their exit_epoch is set.
+    # the vault's own consolidation. Also exclude oracle-exiting validators: a partial
+    # on them is either dropped by the CL or blocks their exit.
     partial_validators = [
         v
         for v in consensus_validators

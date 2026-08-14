@@ -9,6 +9,7 @@ from sw_utils.typings import ChainHead
 from web3 import Web3
 from web3.types import Gwei, Wei
 
+from src.common.tests.factories import create_chain_head
 from src.common.tests.utils import ether_to_gwei
 from src.common.typings import ValidatorType
 from src.config.settings import MIN_ACTIVATION_BALANCE_GWEI, settings
@@ -212,6 +213,27 @@ class TestProcessFunding:
 
     @staticmethod
     @contextmanager
+    def patch_chain_head_and_consolidations(slot: int = 100):
+        """fetch_funding_validators_balances now derives its snapshot from
+        get_chain_latest_head and folds in pending consolidations; tests exercising the
+        real function stub both so they only need to mock the beacon
+        validator/pending-deposit lookups."""
+        with (
+            patch(
+                'src.validators.consensus.get_chain_latest_head',
+                new_callable=AsyncMock,
+                return_value=create_chain_head(slot=slot),
+            ),
+            patch(
+                'src.validators.consensus.get_pending_consolidations',
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+        ):
+            yield
+
+    @staticmethod
+    @contextmanager
     def patch_get_latest_vault_v2_validator_public_keys(return_value=None):
         with patch(
             'src.validators.consensus.get_latest_vault_v2_validator_public_keys',
@@ -411,13 +433,13 @@ class TestProcessFunding:
         ]
 
         mock_consensus = AsyncMock()
-        mock_consensus.get_block.return_value = {'data': {'message': {'slot': '100'}}}
         mock_consensus.get_validators_by_ids.return_value = {'data': consensus_validators_data}
         mock_consensus.get_pending_deposits.return_value = []
 
         with (
             patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_get_latest_vault_v2_validator_public_keys(),
+            self.patch_chain_head_and_consolidations(),
             patch('src.validators.consensus.consensus_client', mock_consensus),
             self.patch_is_funding_interval_passed(True),
             self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
@@ -480,7 +502,6 @@ class TestProcessFunding:
         ]
 
         mock_consensus = AsyncMock()
-        mock_consensus.get_block.return_value = {'data': {'message': {'slot': '100'}}}
         mock_consensus.get_validators_by_ids.return_value = {'data': consensus_validators_data}
         mock_consensus.get_pending_deposits.return_value = [
             {
@@ -493,6 +514,7 @@ class TestProcessFunding:
         with (
             patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_get_latest_vault_v2_validator_public_keys(),
+            self.patch_chain_head_and_consolidations(),
             patch('src.validators.consensus.consensus_client', mock_consensus),
             self.patch_is_funding_interval_passed(True),
             self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
@@ -536,7 +558,6 @@ class TestProcessFunding:
         ]
 
         mock_consensus = AsyncMock()
-        mock_consensus.get_block.return_value = {'data': {'message': {'slot': '100'}}}
         mock_consensus.get_validators_by_ids.return_value = {'data': consensus_validators_data}
         mock_consensus.get_pending_deposits.return_value = [
             {
@@ -549,6 +570,7 @@ class TestProcessFunding:
         with (
             patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_get_latest_vault_v2_validator_public_keys(),
+            self.patch_chain_head_and_consolidations(),
             patch('src.validators.consensus.consensus_client', mock_consensus),
             self.patch_is_funding_interval_passed(True),
             self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
@@ -607,7 +629,6 @@ class TestProcessFunding:
         ]
 
         mock_consensus = AsyncMock()
-        mock_consensus.get_block.return_value = {'data': {'message': {'slot': '100'}}}
         mock_consensus.get_validators_by_ids.return_value = {'data': consensus_validators_data}
         mock_consensus.get_pending_deposits.return_value = [
             {
@@ -620,6 +641,7 @@ class TestProcessFunding:
         with (
             patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_get_latest_vault_v2_validator_public_keys(),
+            self.patch_chain_head_and_consolidations(),
             patch('src.validators.consensus.consensus_client', mock_consensus),
             self.patch_is_funding_interval_passed(True),
             self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
@@ -648,7 +670,6 @@ class TestProcessFunding:
         )
 
         mock_consensus = AsyncMock()
-        mock_consensus.get_block.return_value = {'data': {'message': {'slot': '100'}}}
         # Validator is not present in the consensus state yet
         mock_consensus.get_validators_by_ids.return_value = {'data': []}
         mock_consensus.get_pending_deposits.return_value = [
@@ -662,6 +683,7 @@ class TestProcessFunding:
         with (
             patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_get_latest_vault_v2_validator_public_keys(),
+            self.patch_chain_head_and_consolidations(),
             patch('src.validators.consensus.consensus_client', mock_consensus),
             self.patch_is_funding_interval_passed(True),
             self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
@@ -711,7 +733,6 @@ class TestProcessFunding:
         ]
 
         mock_consensus = AsyncMock()
-        mock_consensus.get_block.return_value = {'data': {'message': {'slot': '100'}}}
         # pub_key_v1_pending is not present in the consensus state yet
         mock_consensus.get_validators_by_ids.return_value = {'data': consensus_validators_data}
         mock_consensus.get_pending_deposits.return_value = [
@@ -725,6 +746,7 @@ class TestProcessFunding:
         with (
             patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_get_latest_vault_v2_validator_public_keys(),
+            self.patch_chain_head_and_consolidations(),
             patch('src.validators.consensus.consensus_client', mock_consensus),
             self.patch_is_funding_interval_passed(True),
             self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
@@ -755,12 +777,12 @@ class TestProcessFunding:
         )
 
         mock_consensus = AsyncMock()
-        mock_consensus.get_block.return_value = {'data': {'message': {'slot': '100'}}}
         mock_consensus.get_validators_by_ids.return_value = {'data': []}
         mock_consensus.get_pending_deposits.return_value = []
 
         with (
             self.patch_get_latest_vault_v2_validator_public_keys(),
+            self.patch_chain_head_and_consolidations(),
             patch('src.validators.consensus.consensus_client', mock_consensus),
             self.patch_is_funding_interval_passed(True),
             self.patch_fund_validators_chunk(None) as mock_fund,
@@ -816,13 +838,13 @@ class TestProcessFunding:
         ]
 
         mock_consensus = AsyncMock()
-        mock_consensus.get_block.return_value = {'data': {'message': {'slot': '100'}}}
         mock_consensus.get_validators_by_ids.return_value = {'data': consensus_validators_data}
         mock_consensus.get_pending_deposits.return_value = []
 
         with (
             patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_get_latest_vault_v2_validator_public_keys(),
+            self.patch_chain_head_and_consolidations(),
             patch('src.validators.consensus.consensus_client', mock_consensus),
             self.patch_is_funding_interval_passed(True),
             self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
@@ -860,12 +882,12 @@ class TestProcessFunding:
         ]
 
         mock_consensus = AsyncMock()
-        mock_consensus.get_block.return_value = {'data': {'message': {'slot': '100'}}}
         mock_consensus.get_validators_by_ids.return_value = {'data': consensus_validators_data}
         mock_consensus.get_pending_deposits.return_value = []
 
         with (
             self.patch_get_latest_vault_v2_validator_public_keys({pub_key}),
+            self.patch_chain_head_and_consolidations(),
             patch('src.validators.consensus.consensus_client', mock_consensus),
             self.patch_is_funding_interval_passed(True),
             self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
