@@ -9,6 +9,7 @@ from web3 import Web3
 from web3.types import Wei
 
 from src.common.clients import ipfs_fetch_client
+from src.common.contracts import VaultContract, multicall_contract
 from src.common.typings import Singleton
 from src.config.settings import OS_TOKEN_REDEEMER_CHUNK_SIZE, settings
 from src.redemptions.contracts import os_token_redeemer_contract
@@ -175,6 +176,28 @@ async def iter_processed_shares(
         )
         for res in rpc_results:
             yield res
+
+
+async def iter_minted_shares(
+    positions: list[OsTokenPosition],
+    block_number: BlockNumber,
+) -> AsyncIterator[Wei]:
+    """Fetch each position owner's live vault.osTokenPositions(owner) via batched
+    multicalls, yielding one value per position. Positions may point at different vault
+    contracts, so calls are routed through the generic Multicall contract rather than
+    the OsTokenRedeemer's own multicall used for leafToProcessedShares."""
+    for i in range(0, len(positions), OS_TOKEN_REDEEMER_CHUNK_SIZE):
+        batch = positions[i : i + OS_TOKEN_REDEEMER_CHUNK_SIZE]
+        calls = [
+            (
+                VaultContract(position.vault).contract_address,
+                VaultContract(position.vault).encode_abi('osTokenPositions', [position.owner]),
+            )
+            for position in batch
+        ]
+        _, results = await multicall_contract.aggregate(calls, block_number=block_number)
+        for res in results:
+            yield Wei(Web3.to_int(res))
 
 
 async def cached_fetch_positions_from_ipfs(
