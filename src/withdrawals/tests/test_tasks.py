@@ -16,6 +16,7 @@ from src.withdrawals.tasks import (
     _fetch_oracle_exiting_validators,
     _filter_exitable_validators,
     _filter_full_withdrawals,
+    _filter_non_exiting_validators,
     _get_partial_withdrawals,
     _get_withdrawals,
     _is_pending_partial_withdrawals_queue_full,
@@ -1274,6 +1275,36 @@ def test_filter_full_withdrawals():
     }
     assert _filter_full_withdrawals(withdrawals) == ['0x1', '0x3']
     assert _filter_full_withdrawals({}) == []
+
+
+def test_filter_non_exiting_validators():
+    # an exiting validator's index is dropped even though it is in CAN_BE_EXITED_STATUSES
+    validators = [
+        create_consensus_validator(index=1, status=ValidatorStatus.ACTIVE_ONGOING, balance=32),
+        create_consensus_validator(index=2, status=ValidatorStatus.ACTIVE_EXITING, balance=32),
+    ]
+    result = _filter_non_exiting_validators(validators, oracle_exiting_validators=[])
+    assert [v.index for v in result] == [1]
+
+    # a validator still ACTIVE_ONGOING on the CL but already in the oracle's exiting
+    # set is excluded too, so its pending partial isn't counted on top of the balance
+    # already summed via the oracle-exiting branch
+    validators = [
+        create_consensus_validator(index=1, status=ValidatorStatus.ACTIVE_ONGOING, balance=32),
+        create_consensus_validator(index=2, status=ValidatorStatus.ACTIVE_ONGOING, balance=32),
+    ]
+    oracle_exiting_validators = [
+        create_consensus_validator(index=2, status=ValidatorStatus.ACTIVE_ONGOING, balance=32),
+    ]
+    result = _filter_non_exiting_validators(validators, oracle_exiting_validators)
+    assert [v.index for v in result] == [1]
+
+    # a validator outside CAN_BE_EXITED_STATUSES (e.g. still pending) is also excluded
+    validators = [
+        create_consensus_validator(index=1, status=ValidatorStatus.PENDING_QUEUED, balance=32),
+    ]
+    result = _filter_non_exiting_validators(validators, oracle_exiting_validators=[])
+    assert result == []
 
 
 async def test_fetch_oracle_exiting_validators():
