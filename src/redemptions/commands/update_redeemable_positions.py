@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import sys
 from collections import defaultdict
@@ -24,7 +25,7 @@ from src.common.startup_check import (
     wait_for_execution_node,
     wait_for_graph_node_sync_to_chain_head,
 )
-from src.common.utils import log_verbose
+from src.common.utils import get_current_timestamp, log_verbose
 from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
 from src.redemptions.api_client import (
@@ -278,9 +279,9 @@ async def process(
             'total_redeemable_eth': Web3.from_wei(total_redeemable, 'ether'),
         },
     )
-    ipfs_upload_client = build_ipfs_upload_clients()
-    ipfs_hash = await ipfs_upload_client.upload_json([p.as_dict() for p in os_token_positions])
-    click.echo(f'Redeemable os token positions uploaded to IPFS: hash={ipfs_hash}')
+    positions_payload = [p.as_dict() for p in os_token_positions]
+    positions_file = _save_positions_to_file(positions_payload)
+    click.echo(f'Redeemable os token positions saved to {positions_file}')
 
     # calculate merkle root
     nonce = await os_token_redeemer_contract.nonce()
@@ -295,6 +296,10 @@ async def process(
         ],
     )
     click.echo(f'Generated Merkle Tree root: {tree.root}')
+
+    ipfs_upload_client = build_ipfs_upload_clients()
+    ipfs_hash = await ipfs_upload_client.upload_json(positions_payload)
+    click.echo(f'Redeemable os token positions uploaded to IPFS: hash={ipfs_hash}')
 
 
 # pylint: disable-next=too-many-locals
@@ -414,6 +419,14 @@ def create_os_token_positions(
         key=lambda p: (position_ltv[p.owner, p.vault], p.leaf_shares), reverse=True
     )
     return os_token_positions
+
+
+def _save_positions_to_file(positions_payload: list[dict]) -> Path:
+    timestamp = get_current_timestamp()
+    positions_file = Path(f'redeemable_positions_{timestamp}.json')
+    with open(positions_file, 'w', encoding='utf-8') as f:
+        json.dump(positions_payload, f, indent=2)
+    return positions_file
 
 
 def _reduce_boosted_amount(
