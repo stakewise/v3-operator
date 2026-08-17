@@ -36,10 +36,6 @@ from src.redemptions.api_client import (
     APIClient,
 )
 from src.redemptions.contracts import os_token_redeemer_contract
-from src.redemptions.fetch_positions import (
-    fetch_positions_from_ipfs,
-    iter_processed_shares,
-)
 from src.redemptions.graph import (
     graph_get_leverage_positions,
     graph_get_os_token_holders,
@@ -274,19 +270,6 @@ async def process(
     if not os_token_positions:
         logger.info('No redeemable os token positions to upload, exiting...')
         return
-
-    nonce = await os_token_redeemer_contract.nonce()
-    window_redeemed_shares = await get_window_redeemed_shares(
-        os_token_positions, nonce, block_number
-    )
-    if window_redeemed_shares:
-        os_token_positions = _subtract_window_redeemed_shares(
-            os_token_positions, window_redeemed_shares
-        )
-    if not os_token_positions:
-        logger.info('No redeemable os token positions to upload, exiting...')
-        return
-
     total_redeemable = sum(p.leaf_shares for p in os_token_positions)
     logger.info(
         'Created %(count)s redeemable os token positions. '
@@ -304,6 +287,7 @@ async def process(
     click.echo(f'Redeemable os token positions uploaded to IPFS: hash={ipfs_hash}')
 
     # calculate merkle root
+    nonce = await os_token_redeemer_contract.nonce()
     leaves = [r.merkle_leaf(nonce) for r in os_token_positions]
     tree = StandardMerkleTree.of(
         leaves,
@@ -436,42 +420,6 @@ def create_os_token_positions(
     return os_token_positions
 
 
-async def get_window_redeemed_shares(
-    new_positions: list[OsTokenPosition],
-    nonce: int,
-    snapshot_block: BlockNumber,
-) -> dict[tuple[ChecksumAddress, ChecksumAddress], Wei]:
-    """
-    The currently active positions file keeps being redeemed against while this new file
-    is built and (manually, possibly hours later) submitted, but the new file's leaves
-    reset processed shares to zero since the leaf hash includes the nonce. For each
-    (vault, owner) shared with the active file, return the shares processed against it
-    strictly after `snapshot_block` so they can be subtracted from the new leaf and not
-    counted redeemable twice. `nonce` is the current on-chain nonce, read before this
-    run's `setRedeemablePositions` call increments it, matching the active file's leaves.
-    """
-    new_keys = {(p.vault, p.owner) for p in new_positions}
-    active_positions = await fetch_positions_from_ipfs(block_number=snapshot_block)
-    matching_positions = [p for p in active_positions if (p.vault, p.owner) in new_keys]
-    if not matching_positions:
-        return {}
-
-    latest_block = await execution_client.eth.get_block('latest')
-    snapshot_processed = [
-        shares async for shares in iter_processed_shares(matching_positions, nonce, snapshot_block)
-    ]
-    current_processed = [
-        shares
-        async for shares in iter_processed_shares(matching_positions, nonce, latest_block['number'])
-    ]
-    return {
-        (position.vault, position.owner): Wei(max(0, current - snapshot))
-        for position, snapshot, current in zip(
-            matching_positions, snapshot_processed, current_processed
-        )
-    }
-
-
 def _reduce_boosted_amount(
     allocators: list[Allocator],
     boost_os_token_shares: dict[tuple[ChecksumAddress, ChecksumAddress], Wei],
@@ -497,20 +445,6 @@ def _reduce_boosted_amount(
         if residual:
             residual_boosted_shares[user] = Wei(residual_boosted_shares[user] + residual)
     return allocators, residual_boosted_shares
-
-
-def _subtract_window_redeemed_shares(
-    positions: list[OsTokenPosition],
-    window_redeemed_shares: dict[tuple[ChecksumAddress, ChecksumAddress], Wei],
-) -> list[OsTokenPosition]:
-    adjusted_positions = []
-    for position in positions:
-        redeemed = window_redeemed_shares.get((position.vault, position.owner))
-        if redeemed:
-            position.leaf_shares = Wei(max(0, position.leaf_shares - redeemed))
-        if position.leaf_shares > 0:
-            adjusted_positions.append(position)
-    return adjusted_positions
 
 
 async def _startup_check() -> None:
