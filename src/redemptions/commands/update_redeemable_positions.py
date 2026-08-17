@@ -281,7 +281,7 @@ async def process(
     )
     if window_redeemed_shares:
         os_token_positions = _subtract_window_redeemed_shares(
-            os_token_positions, window_redeemed_shares, min_minted_shares
+            os_token_positions, window_redeemed_shares
         )
     if not os_token_positions:
         logger.info('No redeemable os token positions to upload, exiting...')
@@ -315,10 +315,6 @@ async def process(
         ],
     )
     click.echo(f'Generated Merkle Tree root: {tree.root}')
-    click.echo(
-        'Submit this root promptly: redemptions processed after this point are not '
-        'subtracted from the amounts above.'
-    )
 
 
 # pylint: disable-next=too-many-locals
@@ -446,23 +442,19 @@ async def get_window_redeemed_shares(
     snapshot_block: BlockNumber,
 ) -> dict[tuple[ChecksumAddress, ChecksumAddress], Wei]:
     """
-    Returns, for each (vault, owner) shared with the currently active positions file, the
-    shares processed against it strictly after `snapshot_block`, so they can be subtracted
-    from the new leaf instead of being counted redeemable twice. Aborts if the on-chain nonce
-    has changed since `snapshot_block`, since the active file no longer matches the snapshot.
+    The currently active positions file keeps being redeemed against while this new file
+    is built and (manually, possibly hours later) submitted, but the new file's leaves
+    reset processed shares to zero since the leaf hash includes the nonce. For each
+    (vault, owner) shared with the active file, return the shares processed against it
+    strictly after `snapshot_block` so they can be subtracted from the new leaf and not
+    counted redeemable twice. `nonce` is the current on-chain nonce, read before this
+    run's `setRedeemablePositions` call increments it, matching the active file's leaves.
     """
     new_keys = {(p.vault, p.owner) for p in new_positions}
     active_positions = await fetch_positions_from_ipfs(block_number=snapshot_block)
     matching_positions = [p for p in active_positions if (p.vault, p.owner) in new_keys]
     if not matching_positions:
         return {}
-
-    snapshot_nonce = await os_token_redeemer_contract.nonce(snapshot_block)
-    if snapshot_nonce != nonce:
-        raise RuntimeError(
-            'Active redeemable positions file changed since the snapshot block; rerun to '
-            'rebuild against the currently active file.'
-        )
 
     latest_block = await execution_client.eth.get_block('latest')
     snapshot_processed = [
@@ -510,14 +502,13 @@ def _reduce_boosted_amount(
 def _subtract_window_redeemed_shares(
     positions: list[OsTokenPosition],
     window_redeemed_shares: dict[tuple[ChecksumAddress, ChecksumAddress], Wei],
-    min_minted_shares: Wei,
 ) -> list[OsTokenPosition]:
     adjusted_positions = []
     for position in positions:
         redeemed = window_redeemed_shares.get((position.vault, position.owner))
         if redeemed:
             position.leaf_shares = Wei(max(0, position.leaf_shares - redeemed))
-        if position.leaf_shares > 0 and position.leaf_shares >= min_minted_shares:
+        if position.leaf_shares > 0:
             adjusted_positions.append(position)
     return adjusted_positions
 
