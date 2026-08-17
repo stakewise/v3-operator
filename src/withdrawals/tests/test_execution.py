@@ -1,3 +1,4 @@
+import contextlib
 from unittest import mock
 
 import pytest
@@ -78,7 +79,7 @@ class TestSubmitWithdrawValidators:
             result = await submit_withdraw_validators(self.withdrawals, self.tx_fee, self.signature)
 
         assert result == Web3.to_hex(tx_hash)
-        assert transact.call_args.kwargs['tx_params'] == {'value': self.tx_fee}
+        assert transact.call_args.args[1] == {'value': self.tx_fee}
         vault_contract.functions.withdrawValidators.assert_called_once_with(
             _encode_withdrawals(self.withdrawals),
             Web3.to_bytes(hexstr=self.signature),
@@ -121,9 +122,9 @@ def _mock_vault_contract(decoded_error: str | None = None) -> mock.Mock:
     return vault_contract
 
 
+@contextlib.contextmanager
 def _patch(vault_contract: mock.Mock, transact: mock.AsyncMock):
-    return mock.patch.multiple(
-        'src.withdrawals.execution',
-        VaultContract=mock.Mock(return_value=vault_contract),
-        tx_manager=mock.Mock(transact=transact),
-    )
+    with mock.patch(
+        'src.withdrawals.execution.VaultContract', return_value=vault_contract
+    ), mock.patch('src.common.transaction.tx_manager', mock.Mock(transact=transact)):
+        yield
