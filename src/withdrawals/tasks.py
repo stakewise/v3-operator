@@ -41,11 +41,7 @@ from src.validators.exceptions import EmptyRelayerResponseException
 from src.validators.oracles import poll_active_exits
 from src.validators.relayer import RelayerClient
 from src.validators.typings import ConsensusValidator
-from src.withdrawals.assets import (
-    CAN_BE_EXITED_STATUSES,
-    EXITING_STATUSES,
-    get_queued_assets,
-)
+from src.withdrawals.assets import get_queued_assets
 from src.withdrawals.execution import submit_withdraw_validators
 
 logger = logging.getLogger(__name__)
@@ -392,9 +388,7 @@ def _filter_non_exiting_validators(
     return [
         v
         for v in consensus_validators
-        if v.status in CAN_BE_EXITED_STATUSES
-        and v.status not in EXITING_STATUSES
-        and v.index not in oracle_exiting_indexes
+        if v.status == ValidatorStatus.ACTIVE_ONGOING and v.index not in oracle_exiting_indexes
     ]
 
 

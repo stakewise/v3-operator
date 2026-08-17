@@ -1316,7 +1316,7 @@ def test_filter_full_withdrawals():
 
 
 def test_filter_non_exiting_validators():
-    # an exiting validator's index is dropped even though it is in CAN_BE_EXITED_STATUSES
+    # a validator that isn't ACTIVE_ONGOING (e.g. already exiting) is dropped
     validators = [
         create_consensus_validator(index=1, status=ValidatorStatus.ACTIVE_ONGOING, balance=32),
         create_consensus_validator(index=2, status=ValidatorStatus.ACTIVE_EXITING, balance=32),
@@ -1337,7 +1337,7 @@ def test_filter_non_exiting_validators():
     result = _filter_non_exiting_validators(validators, oracle_exiting_validators)
     assert [v.index for v in result] == [1]
 
-    # a validator outside CAN_BE_EXITED_STATUSES (e.g. still pending) is also excluded
+    # a validator that isn't ACTIVE_ONGOING (e.g. still pending) is also excluded
     validators = [
         create_consensus_validator(index=1, status=ValidatorStatus.PENDING_QUEUED, balance=32),
     ]
