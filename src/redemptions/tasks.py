@@ -14,7 +14,6 @@ from src.config.settings import settings
 from src.redemptions.contracts import os_token_redeemer_contract
 from src.redemptions.fetch_positions import (
     fetch_positions_with_processed_shares,
-    iter_minted_shares,
     update_positions_cache,
     update_processed_shares_cache,
 )
@@ -97,7 +96,6 @@ async def aggregate_redemption_assets_by_vaults(
     total_redemption_shares = os_token_converter.to_shares(total_redemption_assets)
 
     positions = await fetch_positions_with_processed_shares(nonce=nonce, block_number=block_number)
-    positions = await _cap_positions_by_minted_shares(positions, block_number=block_number)
     positions = await assign_shares_to_redeem(
         positions,
         total_redemption_shares=total_redemption_shares,
@@ -122,15 +120,12 @@ async def is_position_ltv_exceeded(
     position: OsTokenPosition,
     converter: OsTokenConverter,
     block_number: BlockNumber,
-) -> tuple[bool, Wei]:
-    """Returns whether the position's LTV exceeds 1, together with the owner's live
-    minted osToken shares (vault.osTokenPositions(owner)) so callers can cap
-    shares_to_redeem without an extra RPC call."""
+) -> bool:
     vault_contract = VaultContract(position.vault)
     minted_shares = await vault_contract.get_os_token_position(position.owner, block_number)
     loan_assets = converter.to_assets(minted_shares)
     user_assets = await vault_contract.get_user_assets(position.owner, block_number)
-    return loan_assets > user_assets, minted_shares
+    return loan_assets > user_assets
 
 
 async def assign_shares_to_redeem(
@@ -165,21 +160,3 @@ async def assign_shares_to_redeem(
             return redeemable
 
     return redeemable
-
-
-async def _cap_positions_by_minted_shares(
-    positions: list[OsTokenPosition],
-    block_number: BlockNumber,
-) -> list[OsTokenPosition]:
-    """Cap each position's leaf_shares by processed_shares + the owner's live minted
-    osToken shares, mirroring the contract's own min() against vault.osTokenPositions(owner).
-    An owner who repaid or was liquidated after the file was published then contributes 0
-    unprocessed shares, instead of absorbing redemption target that can never be redeemed."""
-    minted_shares = [ms async for ms in iter_minted_shares(positions, block_number)]
-    return [
-        replace(
-            position,
-            leaf_shares=Wei(min(position.leaf_shares, position.processed_shares + owner_minted)),
-        )
-        for position, owner_minted in zip(positions, minted_shares)
-    ]

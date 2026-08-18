@@ -2,7 +2,6 @@ import asyncio
 import logging
 import sys
 from dataclasses import replace
-from decimal import Decimal
 from pathlib import Path
 
 import click
@@ -46,7 +45,7 @@ from src.redemptions.os_token_converter import (
     OsTokenConverter,
     create_os_token_converter,
 )
-from src.redemptions.tasks import is_position_ltv_exceeded
+from src.redemptions.tasks import assign_shares_to_redeem, is_position_ltv_exceeded
 from src.redemptions.typings import OsTokenPosition
 from src.validators.execution import get_withdrawable_assets
 
@@ -55,11 +54,6 @@ logger = logging.getLogger(__name__)
 DEFAULT_INTERVAL = 60  # 1 minute
 DEFAULT_MIN_QUEUED_ASSETS = Web3.to_wei(0.1, 'ether')
 DEFAULT_MIN_QUEUED_ASSETS_GWEI = Web3.from_wei(DEFAULT_MIN_QUEUED_ASSETS, 'gwei')
-
-# Haircut applied when a position is capped to a vault's withdrawable assets, so osToken
-# rate growth (avgRewardPerSecond) between simulation and tx inclusion can't push
-# receivedAssets above availableAssets and revert the redeem call.
-WITHDRAWABLE_ASSETS_HAIRCUT = Decimal('0.999')
 
 
 @click.option(
@@ -277,75 +271,58 @@ async def _redeem_os_token_positions(
     positions_with_processed_shares = await fetch_positions_with_processed_shares(
         nonce=nonce, block_number=block_number
     )
-    if queued_shares <= 0 or not any(
-        position.unprocessed_shares > 1 for position in positions_with_processed_shares
-    ):
+    logger.info('Assigning shares to redeem')
+    os_token_positions = await assign_shares_to_redeem(
+        positions_with_processed_shares,
+        total_redemption_shares=Wei(queued_shares),
+    )
+    if not os_token_positions:
         logger.info('No redeemable positions found. Skipping to next interval.')
         return
 
     if not dry_run:
         # Bring vaults up to date on-chain so withdrawable assets and position LTV
         # are computed from fresh state rather than skipping unharvested vaults.
-        vaults = list(
-            {
-                position.vault
-                for position in positions_with_processed_shares
-                if position.unprocessed_shares > 1
-            }
-        )
+        vaults = list({position.vault for position in os_token_positions})
         if not await update_vaults_state(vaults=vaults):
             logger.error('Some vaults were left with stale state. Skipping to next interval.')
             return
 
         # Re-fetch the block number so the freshly-updated state is visible downstream.
         block_number = await execution_client.eth.block_number
-        # Recreate the converter after harvesting settles: convertToAssets grows every
-        # second, so a snapshot taken before waiting for receipts would already be stale.
-        os_token_converter = await create_os_token_converter(block_number)
 
     tree = PositionsMerkleTree(all_positions, nonce)
     await redeem_positions(
         tree=tree,
-        os_token_positions=positions_with_processed_shares,
-        total_redemption_shares=Wei(queued_shares),
+        os_token_positions=os_token_positions,
         converter=os_token_converter,
         block_number=block_number,
         dry_run=dry_run,
     )
 
 
-# pylint: disable-next=too-many-arguments,too-many-locals
 async def redeem_positions(
     tree: PositionsMerkleTree,
     os_token_positions: list[OsTokenPosition],
-    total_redemption_shares: Wei,
     converter: OsTokenConverter,
     block_number: BlockNumber,
     dry_run: bool = False,
 ) -> None:
-    """Redeem positions one by one, assigning each position's shares_to_redeem lazily from
-    the remaining budget as the loop progresses. A position skipped for any reason (LTV > 1,
-    meta vault, unharvested vault, no live minted position, zero withdrawable, failed
-    simulation or submission) frees its share of the budget for later positions in the
-    file, instead of a fixed prefix of the file consuming the whole budget upfront.
+    """Redeem positions one by one. Each position's shares_to_redeem is already set by
+    assign_shares_to_redeem; this function further caps it by the vault's withdrawable assets.
 
-    Each position is further capped by the owner's live minted osToken position (which may
-    have shrunk below the file's leafShares since publication) and by the vault's
-    withdrawable assets.
+    Meta-vault positions are skipped entirely. Vaults whose on-chain state is
+    stale (unharvested) are skipped, since their withdrawable assets would be
+    outdated. A position that fails to simulate or submit is skipped, so the
+    remaining positions are still processed.
     """
     vault_to_withdrawable: dict[ChecksumAddress, Wei] = {}
     unharvested_vaults: set[ChecksumAddress] = set()
-    remaining_shares = total_redemption_shares
 
     for position in os_token_positions:
-        if remaining_shares <= 0:
-            break
-
-        unprocessed_shares = position.unprocessed_shares
-        if unprocessed_shares <= 1:
-            continue
-
         logger.info('Processing position index=%d', position.index)
+        shares_to_redeem = position.shares_to_redeem
+        assets_to_redeem = converter.to_assets(shares_to_redeem)
 
         if await is_meta_vault(position.vault):
             logger.warning(
@@ -358,23 +335,23 @@ async def redeem_positions(
         if position.vault in unharvested_vaults:
             continue
 
-        live_shares = await _get_live_shares(position, unprocessed_shares, converter, block_number)
-        if live_shares <= 0:
+        if await is_position_ltv_exceeded(position, converter, block_number):
+            logger.info('Skipping position index=%d: LTV > 1', position.index)
             continue
 
-        withdrawable = await _get_vault_withdrawable(
-            position.vault, vault_to_withdrawable, unharvested_vaults, block_number
-        )
-        if withdrawable is None:
-            continue
-
-        shares_to_redeem = Wei(min(live_shares, remaining_shares))
-        assets_to_redeem = converter.to_assets(shares_to_redeem)
+        if position.vault not in vault_to_withdrawable:
+            if await VaultContract(position.vault).is_state_update_required(block_number):
+                logger.info('Skipping unharvested vault %s', position.vault)
+                unharvested_vaults.add(position.vault)
+                continue
+            vault_to_withdrawable[position.vault] = await get_withdrawable_assets(
+                position.vault, block_number=block_number
+            )
+        withdrawable = vault_to_withdrawable[position.vault]
 
         if withdrawable < assets_to_redeem:
-            shares_to_redeem, assets_to_redeem = _apply_withdrawable_haircut(
-                withdrawable, converter
-            )
+            shares_to_redeem = converter.to_shares(withdrawable)
+            assets_to_redeem = withdrawable
 
         if shares_to_redeem <= 0:
             continue
@@ -390,58 +367,7 @@ async def redeem_positions(
             if not await tx_redeem_position(position=position_to_redeem, tree=tree):
                 continue
 
-        remaining_shares = Wei(remaining_shares - shares_to_redeem)
         vault_to_withdrawable[position.vault] = Wei(withdrawable - assets_to_redeem)
-
-
-async def _get_live_shares(
-    position: OsTokenPosition,
-    unprocessed_shares: Wei,
-    converter: OsTokenConverter,
-    block_number: BlockNumber,
-) -> Wei:
-    """Owner's unprocessed shares capped by the live minted osToken position. Returns 0
-    when the position's LTV exceeds 1 or the owner has no live position left to redeem
-    (e.g. repaid or liquidated after the file was published)."""
-    ltv_exceeded, minted_shares = await is_position_ltv_exceeded(position, converter, block_number)
-    if ltv_exceeded:
-        logger.info('Skipping position index=%d: LTV > 1', position.index)
-        return Wei(0)
-
-    live_shares = Wei(min(unprocessed_shares, minted_shares))
-    if live_shares <= 0:
-        logger.info(
-            'Skipping position index=%d: owner has no live osToken position', position.index
-        )
-    return live_shares
-
-
-async def _get_vault_withdrawable(
-    vault: ChecksumAddress,
-    vault_to_withdrawable: dict[ChecksumAddress, Wei],
-    unharvested_vaults: set[ChecksumAddress],
-    block_number: BlockNumber,
-) -> Wei | None:
-    """Cached withdrawable assets for a vault, populated on first use. Returns None (and
-    marks the vault unharvested) when its on-chain state requires an update first."""
-    if vault not in vault_to_withdrawable:
-        if await VaultContract(vault).is_state_update_required(block_number):
-            logger.info('Skipping unharvested vault %s', vault)
-            unharvested_vaults.add(vault)
-            return None
-        vault_to_withdrawable[vault] = await get_withdrawable_assets(
-            vault, block_number=block_number
-        )
-    return vault_to_withdrawable[vault]
-
-
-def _apply_withdrawable_haircut(withdrawable: Wei, converter: OsTokenConverter) -> tuple[Wei, Wei]:
-    """Haircut applied when a position is capped to the vault's withdrawable assets, so
-    osToken rate growth between simulation and tx inclusion can't push receivedAssets
-    above availableAssets and revert the redeem call. Returns (shares_to_redeem,
-    assets_to_redeem)."""
-    assets_to_redeem = Wei(int(withdrawable * WITHDRAWABLE_ASSETS_HAIRCUT))
-    return converter.to_shares(assets_to_redeem), assets_to_redeem
 
 
 async def _startup_check() -> None:

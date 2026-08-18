@@ -2,11 +2,10 @@ from unittest import mock
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from eth_typing import BlockNumber, HexStr
+from eth_typing import BlockNumber
 from web3 import Web3
 from web3.types import Wei
 
-from src.common.contracts import VaultContract, multicall_contract
 from src.config.settings import OS_TOKEN_REDEEMER_CHUNK_SIZE, settings
 from src.redemptions.contracts import os_token_redeemer_contract
 from src.redemptions.fetch_positions import (
@@ -16,7 +15,6 @@ from src.redemptions.fetch_positions import (
     cached_fetch_positions_from_ipfs,
     cached_iter_processed_shares,
     fetch_positions_from_ipfs,
-    iter_minted_shares,
     iter_processed_shares,
     update_positions_cache,
     update_processed_shares_cache,
@@ -374,65 +372,6 @@ class TestIterProcessedShares:
 
     def _mock_multicall(self, *batch_results: list[int]):
         return mock.AsyncMock(side_effect=[[Wei(v) for v in batch] for batch in batch_results])
-
-
-class TestIterMintedShares:
-    async def test_empty_positions(self):
-        results = [v async for v in iter_minted_shares([], block_number=BlockNumber(10))]
-        assert results == []
-
-    async def test_single_batch(self):
-        positions = [make_position() for _ in range(3)]
-        with mock.patch.object(
-            multicall_contract,
-            'aggregate',
-            new=self._mock_aggregate([50, 200, 0]),
-        ), mock.patch.object(VaultContract, 'encode_abi', return_value=HexStr('0xabc')):
-            results = [v async for v in iter_minted_shares(positions, block_number=BlockNumber(10))]
-        assert results == [Wei(50), Wei(200), Wei(0)]
-
-    async def test_two_batches_align_with_positions(self):
-        first_batch = [make_position() for _ in range(OS_TOKEN_REDEEMER_CHUNK_SIZE)]
-        second_batch = [make_position() for _ in range(5)]
-        positions = first_batch + second_batch
-
-        half = OS_TOKEN_REDEEMER_CHUNK_SIZE // 2
-        batch1_values = [1000] * half + [0] * (OS_TOKEN_REDEEMER_CHUNK_SIZE - half)
-        batch2_values = [0] * 5
-
-        aggregate_mock = self._mock_aggregate(batch1_values, batch2_values)
-        with mock.patch.object(
-            multicall_contract, 'aggregate', new=aggregate_mock
-        ), mock.patch.object(VaultContract, 'encode_abi', return_value=HexStr('0xabc')):
-            results = [v async for v in iter_minted_shares(positions, block_number=BlockNumber(10))]
-
-        assert len(results) == OS_TOKEN_REDEEMER_CHUNK_SIZE + 5
-        assert results[:OS_TOKEN_REDEEMER_CHUNK_SIZE] == [Wei(v) for v in batch1_values]
-        assert results[OS_TOKEN_REDEEMER_CHUNK_SIZE:] == [Wei(v) for v in batch2_values]
-        assert aggregate_mock.call_count == 2
-
-    async def test_calls_target_each_position_vault(self):
-        positions = [make_position() for _ in range(2)]
-        captured_calls = []
-
-        async def _aggregate(calls, block_number=None):
-            captured_calls.extend(calls)
-            return BlockNumber(10), [(0).to_bytes(32, 'big') for _ in calls]
-
-        with mock.patch.object(multicall_contract, 'aggregate', new=_aggregate), mock.patch.object(
-            VaultContract, 'encode_abi', return_value=HexStr('0xabc')
-        ):
-            [v async for v in iter_minted_shares(positions, block_number=BlockNumber(10))]
-
-        assert [address for address, _ in captured_calls] == [p.vault for p in positions]
-
-    def _mock_aggregate(self, *batch_values: list[int]):
-        return mock.AsyncMock(
-            side_effect=[
-                (BlockNumber(10), [Wei(v).to_bytes(32, 'big') for v in batch])
-                for batch in batch_values
-            ]
-        )
 
 
 class TestCachedIterProcessedShares:
