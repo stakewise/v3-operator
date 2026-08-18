@@ -10,6 +10,7 @@ from web3 import Web3
 from web3.types import Gwei, Wei
 
 from src.redemptions.commands.process_redeemer import (
+    WITHDRAWABLE_ASSETS_HAIRCUT,
     _startup_check,
     process,
     redeem_positions,
@@ -66,7 +67,8 @@ class TestRedeemPositions:
             )
 
         assert mocks['submit_mock'].await_count == 1
-        assert _submitted_position(mocks).shares_to_redeem == Wei(100)
+        expected_shares = Wei(int(100 * WITHDRAWABLE_ASSETS_HAIRCUT))
+        assert _submitted_position(mocks).shares_to_redeem == expected_shares
 
     async def test_single_position_zero_withdrawable_skipped(self) -> None:
         position = make_position(processed_shares=500)
@@ -105,7 +107,10 @@ class TestRedeemPositions:
         first_position = _submitted_position(mocks, 0)
         second_position = _submitted_position(mocks, 1)
         assert first_position.owner == OWNER_1 and first_position.shares_to_redeem == Wei(500)
-        assert second_position.owner == OWNER_2 and second_position.shares_to_redeem == Wei(200)
+        # Remaining withdrawable after pos1 is 200; capped further by the haircut.
+        expected_second_shares = Wei(int(200 * WITHDRAWABLE_ASSETS_HAIRCUT))
+        assert second_position.owner == OWNER_2
+        assert second_position.shares_to_redeem == expected_second_shares
 
     async def test_budget_derived_ignoring_incoming_shares_to_redeem(self) -> None:
         """shares_to_redeem is assigned lazily from unprocessed_shares and the remaining
@@ -237,6 +242,25 @@ class TestRedeemPositions:
         assert submitted.owner == OWNER_2
         assert submitted.shares_to_redeem == Wei(1000)
 
+    async def test_capped_to_withdrawable_applies_haircut(self) -> None:
+        """When withdrawable < assets_to_redeem, a small margin is subtracted so that
+        osToken rate growth between simulation and tx inclusion can't push receivedAssets
+        over the vault's withdrawable assets."""
+        pos = make_position(leaf_shares=1200, processed_shares=0)
+
+        with _mock_redeem_positions(withdrawable=Wei(1000)) as mocks:
+            await redeem_positions(
+                tree=make_tree([pos]),
+                os_token_positions=[pos],
+                total_redemption_shares=Wei(1200),
+                converter=make_converter(100, 100),
+                block_number=BlockNumber(100),
+            )
+
+        submitted = _submitted_position(mocks)
+        assert submitted.shares_to_redeem == Wei(int(1000 * WITHDRAWABLE_ASSETS_HAIRCUT))
+        assert submitted.shares_to_redeem < Wei(1000)
+
 
 # --- Async function tests (with mocks) ---
 
@@ -329,6 +353,29 @@ class TestProcess:
         # The merkle tree is built from the fetched nonce; leaves use nonce - 1 internally
         assert redeem_call.kwargs['tree'].nonce == 5
         assert redeem_call.kwargs['total_redemption_shares'] == Wei(1000)
+
+    async def test_converter_recreated_after_vault_state_update(self) -> None:
+        """The osToken converter used for redemption must reflect state after
+        update_vaults_state settles, not the snapshot taken before waiting for receipts."""
+        positions = [make_position(leaf_shares=1000, processed_shares=500, shares_to_redeem=500)]
+        converter_before = make_converter(100, 100)
+        converter_after = make_converter(200, 100)
+
+        with (
+            _mock_process(positions=positions) as mocks,
+            patch(
+                f'{MODULE}.create_os_token_converter',
+                new=AsyncMock(side_effect=[converter_before, converter_after]),
+            ) as mock_create_converter,
+        ):
+            mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
+            mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
+
+            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(0))
+
+        assert mock_create_converter.await_count == 2
+        redeem_call = mocks['mock_redeem'].await_args
+        assert redeem_call.kwargs['converter'] is converter_after
 
     async def test_stale_vault_state_skips_redemption(self) -> None:
         """A failed vault state update leaves stale withdrawable assets and LTVs,

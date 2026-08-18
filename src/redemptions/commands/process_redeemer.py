@@ -2,6 +2,7 @@ import asyncio
 import logging
 import sys
 from dataclasses import replace
+from decimal import Decimal
 from pathlib import Path
 
 import click
@@ -54,6 +55,11 @@ logger = logging.getLogger(__name__)
 DEFAULT_INTERVAL = 60  # 1 minute
 DEFAULT_MIN_QUEUED_ASSETS = Web3.to_wei(0.1, 'ether')
 DEFAULT_MIN_QUEUED_ASSETS_GWEI = Web3.from_wei(DEFAULT_MIN_QUEUED_ASSETS, 'gwei')
+
+# Haircut applied when a position is capped to a vault's withdrawable assets, so osToken
+# rate growth (avgRewardPerSecond) between simulation and tx inclusion can't push
+# receivedAssets above availableAssets and revert the redeem call.
+WITHDRAWABLE_ASSETS_HAIRCUT = Decimal('0.999')
 
 
 @click.option(
@@ -293,6 +299,9 @@ async def _redeem_os_token_positions(
 
         # Re-fetch the block number so the freshly-updated state is visible downstream.
         block_number = await execution_client.eth.block_number
+        # Recreate the converter after harvesting settles: convertToAssets grows every
+        # second, so a snapshot taken before waiting for receipts would already be stale.
+        os_token_converter = await create_os_token_converter(block_number)
 
     tree = PositionsMerkleTree(all_positions, nonce)
     await redeem_positions(
@@ -363,8 +372,9 @@ async def redeem_positions(
         assets_to_redeem = converter.to_assets(shares_to_redeem)
 
         if withdrawable < assets_to_redeem:
-            shares_to_redeem = converter.to_shares(withdrawable)
-            assets_to_redeem = withdrawable
+            shares_to_redeem, assets_to_redeem = _apply_withdrawable_haircut(
+                withdrawable, converter
+            )
 
         if shares_to_redeem <= 0:
             continue
@@ -382,25 +392,6 @@ async def redeem_positions(
 
         remaining_shares = Wei(remaining_shares - shares_to_redeem)
         vault_to_withdrawable[position.vault] = Wei(withdrawable - assets_to_redeem)
-
-
-async def _get_vault_withdrawable(
-    vault: ChecksumAddress,
-    vault_to_withdrawable: dict[ChecksumAddress, Wei],
-    unharvested_vaults: set[ChecksumAddress],
-    block_number: BlockNumber,
-) -> Wei | None:
-    """Cached withdrawable assets for a vault, populated on first use. Returns None (and
-    marks the vault unharvested) when its on-chain state requires an update first."""
-    if vault not in vault_to_withdrawable:
-        if await VaultContract(vault).is_state_update_required(block_number):
-            logger.info('Skipping unharvested vault %s', vault)
-            unharvested_vaults.add(vault)
-            return None
-        vault_to_withdrawable[vault] = await get_withdrawable_assets(
-            vault, block_number=block_number
-        )
-    return vault_to_withdrawable[vault]
 
 
 async def _get_live_shares(
@@ -423,6 +414,34 @@ async def _get_live_shares(
             'Skipping position index=%d: owner has no live osToken position', position.index
         )
     return live_shares
+
+
+async def _get_vault_withdrawable(
+    vault: ChecksumAddress,
+    vault_to_withdrawable: dict[ChecksumAddress, Wei],
+    unharvested_vaults: set[ChecksumAddress],
+    block_number: BlockNumber,
+) -> Wei | None:
+    """Cached withdrawable assets for a vault, populated on first use. Returns None (and
+    marks the vault unharvested) when its on-chain state requires an update first."""
+    if vault not in vault_to_withdrawable:
+        if await VaultContract(vault).is_state_update_required(block_number):
+            logger.info('Skipping unharvested vault %s', vault)
+            unharvested_vaults.add(vault)
+            return None
+        vault_to_withdrawable[vault] = await get_withdrawable_assets(
+            vault, block_number=block_number
+        )
+    return vault_to_withdrawable[vault]
+
+
+def _apply_withdrawable_haircut(withdrawable: Wei, converter: OsTokenConverter) -> tuple[Wei, Wei]:
+    """Haircut applied when a position is capped to the vault's withdrawable assets, so
+    osToken rate growth between simulation and tx inclusion can't push receivedAssets
+    above availableAssets and revert the redeem call. Returns (shares_to_redeem,
+    assets_to_redeem)."""
+    assets_to_redeem = Wei(int(withdrawable * WITHDRAWABLE_ASSETS_HAIRCUT))
+    return converter.to_shares(assets_to_redeem), assets_to_redeem
 
 
 async def _startup_check() -> None:
