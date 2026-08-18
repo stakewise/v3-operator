@@ -18,16 +18,6 @@ from src.common.typings import (
 from src.config.settings import settings
 from src.validators.typings import ConsensusValidator
 
-CAN_BE_EXITED_STATUSES = [
-    ValidatorStatus.ACTIVE_ONGOING,
-    ValidatorStatus.ACTIVE_EXITING,
-    ValidatorStatus.ACTIVE_SLASHED,
-    ValidatorStatus.EXITED_UNSLASHED,
-    ValidatorStatus.EXITED_SLASHED,
-    ValidatorStatus.WITHDRAWAL_POSSIBLE,
-]
-
-
 EXITING_STATUSES = [
     ValidatorStatus.ACTIVE_EXITING,
     ValidatorStatus.ACTIVE_SLASHED,
