@@ -183,13 +183,11 @@ async def iter_live_shares(
     block_number: BlockNumber,
 ) -> AsyncIterator[Wei]:
     """Fetch each position owner's live vault.osTokenPositions(owner) via batched
-    multicalls, yielding one value per position. Positions may point at different vault
-    contracts, so calls are routed through the generic Multicall contract rather than
-    the OsTokenRedeemer's own multicall used for leafToProcessedShares."""
+    multicalls, yielding one value per position."""
     if not positions:
         return
-    # osTokenPositions(owner) calldata encoding only depends on the ABI, not the target
-    # address, so one VaultContract instance can encode calls for every vault.
+    # Calldata encoding depends only on the ABI, so one VaultContract instance can encode
+    # calls for every vault.
     encoder = VaultContract(positions[0].vault)
     for i in range(0, len(positions), OS_TOKEN_REDEEMER_CHUNK_SIZE):
         batch = positions[i : i + OS_TOKEN_REDEEMER_CHUNK_SIZE]

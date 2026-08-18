@@ -145,9 +145,7 @@ async def assign_shares_to_redeem(
     - Each position's shares_to_redeem is set to min(unprocessed_shares, remaining_budget).
     - Iteration stops as soon as the cumulative shares_to_redeem reaches total_redemption_shares.
     - If live_shares is given (aligned index-wise with positions), it further caps
-      unprocessed_shares by the owner's live osToken position, mirroring the contract's own
-      min() against vault.osTokenPositions(owner); leaf_shares itself is never modified,
-      since it is baked into the merkle leaf.
+      unprocessed_shares by the owner's live osToken position (vault.osTokenPositions(owner)).
     """
     if total_redemption_shares <= 0:
         return []
