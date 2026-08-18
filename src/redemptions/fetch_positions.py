@@ -178,7 +178,7 @@ async def iter_processed_shares(
             yield res
 
 
-async def iter_minted_shares(
+async def iter_live_shares(
     positions: list[OsTokenPosition],
     block_number: BlockNumber,
 ) -> AsyncIterator[Wei]:

@@ -14,7 +14,7 @@ from src.config.settings import settings
 from src.redemptions.contracts import os_token_redeemer_contract
 from src.redemptions.fetch_positions import (
     fetch_positions_with_processed_shares,
-    iter_minted_shares,
+    iter_live_shares,
     update_positions_cache,
     update_processed_shares_cache,
 )
@@ -97,11 +97,11 @@ async def aggregate_redemption_assets_by_vaults(
     total_redemption_shares = os_token_converter.to_shares(total_redemption_assets)
 
     positions = await fetch_positions_with_processed_shares(nonce=nonce, block_number=block_number)
-    minted_shares = [ms async for ms in iter_minted_shares(positions, block_number)]
+    live_shares = [ls async for ls in iter_live_shares(positions, block_number)]
     positions = await assign_shares_to_redeem(
         positions,
         total_redemption_shares=total_redemption_shares,
-        live_shares=minted_shares,
+        live_shares=live_shares,
     )
 
     # Aggregate shares_to_redeem by vault

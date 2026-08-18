@@ -16,7 +16,7 @@ from src.redemptions.fetch_positions import (
     cached_fetch_positions_from_ipfs,
     cached_iter_processed_shares,
     fetch_positions_from_ipfs,
-    iter_minted_shares,
+    iter_live_shares,
     iter_processed_shares,
     update_positions_cache,
     update_processed_shares_cache,
@@ -376,9 +376,9 @@ class TestIterProcessedShares:
         return mock.AsyncMock(side_effect=[[Wei(v) for v in batch] for batch in batch_results])
 
 
-class TestIterMintedShares:
+class TestIterLiveShares:
     async def test_empty_positions(self):
-        results = [v async for v in iter_minted_shares([], block_number=BlockNumber(10))]
+        results = [v async for v in iter_live_shares([], block_number=BlockNumber(10))]
         assert results == []
 
     async def test_single_batch(self):
@@ -388,7 +388,7 @@ class TestIterMintedShares:
             'aggregate',
             new=self._mock_aggregate([50, 200, 0]),
         ), mock.patch.object(VaultContract, 'encode_abi', return_value=HexStr('0xabc')):
-            results = [v async for v in iter_minted_shares(positions, block_number=BlockNumber(10))]
+            results = [v async for v in iter_live_shares(positions, block_number=BlockNumber(10))]
         assert results == [Wei(50), Wei(200), Wei(0)]
 
     async def test_two_batches_align_with_positions(self):
@@ -404,7 +404,7 @@ class TestIterMintedShares:
         with mock.patch.object(
             multicall_contract, 'aggregate', new=aggregate_mock
         ), mock.patch.object(VaultContract, 'encode_abi', return_value=HexStr('0xabc')):
-            results = [v async for v in iter_minted_shares(positions, block_number=BlockNumber(10))]
+            results = [v async for v in iter_live_shares(positions, block_number=BlockNumber(10))]
 
         assert len(results) == OS_TOKEN_REDEEMER_CHUNK_SIZE + 5
         assert results[:OS_TOKEN_REDEEMER_CHUNK_SIZE] == [Wei(v) for v in batch1_values]
@@ -422,7 +422,7 @@ class TestIterMintedShares:
         with mock.patch.object(multicall_contract, 'aggregate', new=_aggregate), mock.patch.object(
             VaultContract, 'encode_abi', return_value=HexStr('0xabc')
         ):
-            [v async for v in iter_minted_shares(positions, block_number=BlockNumber(10))]
+            [v async for v in iter_live_shares(positions, block_number=BlockNumber(10))]
 
         assert [address for address, _ in captured_calls] == [p.vault for p in positions]
 
