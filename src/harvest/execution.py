@@ -11,7 +11,7 @@ from src.config.settings import settings
 logger = logging.getLogger(__name__)
 
 
-async def submit_harvest_transaction(harvest_params: HarvestParams) -> HexStr | None:
+async def submit_harvest_transaction(harvest_params: HarvestParams) -> HexStr:
     vault_contract = VaultContract(settings.vault)
     tx_function = vault_contract.functions.updateState(
         (
@@ -27,6 +27,6 @@ async def submit_harvest_transaction(harvest_params: HarvestParams) -> HexStr | 
         action='harvest',
     )
     if tx_receipt is None:
-        return None
+        raise RuntimeError('Failed to confirm harvest tx')
 
     return Web3.to_hex(tx_receipt['transactionHash'])

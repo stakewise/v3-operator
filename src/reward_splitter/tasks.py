@@ -143,7 +143,7 @@ async def claim_reward_splitters_for_vault(
         tx_receipt = await transact_checked(
             tx_function,
             contract=contract,
-            action='process fee splitter',
+            action=f'process fee splitter {address}',
         )
         if tx_receipt is None:
             raise RuntimeError('Failed to confirm fee splitter tx')

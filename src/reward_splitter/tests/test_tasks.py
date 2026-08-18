@@ -128,6 +128,10 @@ class TestClaimRewardSplittersForVault:
             )
 
         transact_checked_mock.assert_awaited_once()
+        assert (
+            transact_checked_mock.await_args.kwargs['action']
+            == f'process fee splitter {reward_splitter.address}'
+        )
 
 
 @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
