@@ -302,8 +302,11 @@ async def transact_checked(
     estimate_gas: bool = False,
     revert_hint: str = '',
 ) -> TxReceipt | None:
-    """Submits `tx_function` via `tx_manager` and normalizes reverts/errors/unconfirmed
-    receipts into a logged `None`, so call sites don't hand-roll this each time."""
+    """Submits `tx_function` via `tx_manager`.
+
+    Returns the tx receipt on success. On revert, transaction error, or an
+    unconfirmed/failed receipt, logs the error and returns `None`.
+    """
     try:
         tx_receipt = await tx_manager.transact(
             tx_function, tx_params, high_priority=high_priority, estimate_gas=estimate_gas
