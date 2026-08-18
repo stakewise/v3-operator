@@ -97,10 +97,11 @@ async def aggregate_redemption_assets_by_vaults(
     total_redemption_shares = os_token_converter.to_shares(total_redemption_assets)
 
     positions = await fetch_positions_with_processed_shares(nonce=nonce, block_number=block_number)
-    positions = await _cap_positions_by_minted_shares(positions, block_number=block_number)
+    minted_shares = [ms async for ms in iter_minted_shares(positions, block_number)]
     positions = await assign_shares_to_redeem(
         positions,
         total_redemption_shares=total_redemption_shares,
+        live_shares=minted_shares,
     )
 
     # Aggregate shares_to_redeem by vault
@@ -133,6 +134,7 @@ async def is_position_ltv_exceeded(
 async def assign_shares_to_redeem(
     positions: list[OsTokenPosition],
     total_redemption_shares: Wei,
+    live_shares: list[Wei] | None = None,
 ) -> list[OsTokenPosition]:
     """
     Iterate pre-enriched positions (processed_shares already set from on-chain) and set
@@ -142,6 +144,10 @@ async def assign_shares_to_redeem(
     - Fully processed positions (unprocessed_shares <= 1) are skipped.
     - Each position's shares_to_redeem is set to min(unprocessed_shares, remaining_budget).
     - Iteration stops as soon as the cumulative shares_to_redeem reaches total_redemption_shares.
+    - If live_shares is given (aligned index-wise with positions), it further caps
+      unprocessed_shares by the owner's live osToken position, mirroring the contract's own
+      min() against vault.osTokenPositions(owner); leaf_shares itself is never modified,
+      since it is baked into the merkle leaf.
     """
     if total_redemption_shares <= 0:
         return []
@@ -149,9 +155,11 @@ async def assign_shares_to_redeem(
     redeemable: list[OsTokenPosition] = []
     remaining_shares = total_redemption_shares
 
-    for position in positions:
+    for index, position in enumerate(positions):
         unprocessed_shares = position.unprocessed_shares
-        # Skip fully processed positions; tolerate 1 wei rounding error.
+        if live_shares is not None:
+            unprocessed_shares = Wei(min(unprocessed_shares, live_shares[index]))
+        # Skip fully processed (or dead) positions; tolerate 1 wei rounding error.
         if unprocessed_shares <= 1:
             continue
 
@@ -162,21 +170,3 @@ async def assign_shares_to_redeem(
             return redeemable
 
     return redeemable
-
-
-async def _cap_positions_by_minted_shares(
-    positions: list[OsTokenPosition],
-    block_number: BlockNumber,
-) -> list[OsTokenPosition]:
-    """Cap each position's leaf_shares by processed_shares + the owner's live minted
-    osToken shares, mirroring the contract's own min() against vault.osTokenPositions(owner).
-    An owner who repaid or was liquidated after the file was published then contributes 0
-    unprocessed shares, instead of absorbing redemption target that can never be redeemed."""
-    minted_shares = [ms async for ms in iter_minted_shares(positions, block_number)]
-    return [
-        replace(
-            position,
-            leaf_shares=Wei(min(position.leaf_shares, position.processed_shares + owner_minted)),
-        )
-        for position, owner_minted in zip(positions, minted_shares)
-    ]
