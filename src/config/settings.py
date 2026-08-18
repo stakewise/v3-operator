@@ -496,7 +496,7 @@ class Settings(metaclass=Singleton):
         )
         self.graph_page_size = decouple_config(
             'GRAPH_PAGE_SIZE',
-            default=100,
+            default=500,
             cast=int,
             group='Subgraph',
             description='Number of records requested from the subgraph per page.',
