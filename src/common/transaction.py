@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from math import ceil
-from typing import Protocol
+from typing import TYPE_CHECKING
 
 from hexbytes import HexBytes
 from web3 import Web3
@@ -14,6 +14,9 @@ from src.common.execution import build_gas_manager
 from src.common.utils import format_error
 from src.common.wallet import wallet
 from src.config.settings import ATTEMPTS_WITH_DEFAULT_GAS, settings
+
+if TYPE_CHECKING:
+    from src.common.contracts import ErrorMixin
 
 logger = logging.getLogger(__name__)
 
@@ -288,17 +291,11 @@ def _is_fee_too_low_error(e: Web3RPCError) -> bool:
 tx_manager = TransactionManager()
 
 
-class _ErrorDecodable(Protocol):
-    # matches ErrorMixin.decode_custom_error (src/common/contracts.py); a structural
-    # Protocol here avoids importing contracts.py, which itself imports this module
-    def decode_custom_error(self, data: str) -> str | None: ...
-
-
 # pylint: disable-next=too-many-arguments
 async def transact_checked(
     tx_function: AsyncContractFunction,
     *,
-    contract: _ErrorDecodable,
+    contract: 'ErrorMixin',
     action: str,
     tx_params: TxParams | None = None,
     high_priority: bool = False,
