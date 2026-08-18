@@ -37,7 +37,7 @@ from src.validators.exceptions import EmptyRelayerResponseException
 from src.validators.oracles import poll_active_exits
 from src.validators.relayer import RelayerClient
 from src.validators.typings import ConsensusValidator, ValidatorConsolidationData
-from src.withdrawals.assets import CAN_BE_EXITED_STATUSES, get_queued_assets
+from src.withdrawals.assets import get_queued_assets
 from src.withdrawals.execution import submit_withdraw_validators
 
 logger = logging.getLogger(__name__)
@@ -109,10 +109,12 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
             consensus_validators, protocol_config
         )
 
-        active_validators = [v for v in consensus_validators if v.status in CAN_BE_EXITED_STATUSES]
+        non_exiting_validators = _filter_non_exiting_validators(
+            consensus_validators, oracle_exiting_validators
+        )
         pending_partial_withdrawals = await get_pending_partial_withdrawals(
             chain_head=chain_head,
-            consensus_validators=active_validators,
+            consensus_validators=non_exiting_validators,
         )
         queued_assets = await get_queued_assets(
             consensus_validators=consensus_validators,
@@ -360,6 +362,24 @@ def _filter_exitable_validators(
     can_be_exited_validators.sort(key=lambda x: (x.balance + (x.pending_balance or 0), x.index))
 
     return can_be_exited_validators
+
+
+def _filter_non_exiting_validators(
+    consensus_validators: list[ConsensusValidator],
+    oracle_exiting_validators: list[ConsensusValidator],
+) -> list[ConsensusValidator]:
+    """
+    A CL pending partial withdrawal on a validator whose exit_epoch is set pays 0 and
+    is dequeued without withdrawing, while its full balance is already counted as
+    exiting elsewhere -- exclude such validators so their pending partials aren't
+    double-counted.
+    """
+    oracle_exiting_indexes = {val.index for val in oracle_exiting_validators}
+    return [
+        v
+        for v in consensus_validators
+        if v.status == ValidatorStatus.ACTIVE_ONGOING and v.index not in oracle_exiting_indexes
+    ]
 
 
 async def _fetch_oracle_exiting_validators(

@@ -17,6 +17,7 @@ from src.withdrawals.tasks import (
     _fetch_oracle_exiting_validators,
     _filter_exitable_validators,
     _filter_full_withdrawals,
+    _filter_non_exiting_validators,
     _get_partial_withdrawals,
     _get_withdrawals,
     _is_pending_partial_withdrawals_queue_full,
@@ -903,6 +904,41 @@ async def test_get_withdrawals_excludes_oracle_exiting_validators_from_partials(
     assert result == expected
 
 
+async def test_get_withdrawals_excludes_oracle_exiting_from_partial_capacity(data_dir):
+    settings.set(vault=None, vault_dir=data_dir, network=HOODI)
+
+    # v1 is still ACTIVE_ONGOING on the CL but already oracle-exiting, so it must not
+    # inflate partial_capacity or receive a partial withdrawal; only v2 gets exited.
+    chain_head = create_chain_head(epoch=500)
+    queued_assets = ether_to_gwei(20)
+    consensus_validators = [
+        create_consensus_validator(
+            public_key='0x1',
+            index=1,
+            balance=ether_to_gwei(40),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=90,
+        ),
+        create_consensus_validator(
+            public_key='0x2',
+            index=2,
+            balance=ether_to_gwei(50),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=90,
+        ),
+    ]
+    result = await _get_withdrawals(
+        chain_head=chain_head,
+        queued_assets=queued_assets,
+        consensus_validators=consensus_validators,
+        pending_partial_withdrawals=[],
+        validator_min_active_epochs=10,
+        oracle_exit_indexes={1},
+    )
+    expected = {'0x2': ether_to_gwei(0)}
+    assert result == expected
+
+
 async def test_get_withdrawals_boundary_activation_epoch_prefers_partial_over_full_exit(data_dir):
     settings.set(vault=None, vault_dir=data_dir, network=HOODI)
 
@@ -1195,6 +1231,36 @@ def test_filter_full_withdrawals():
     }
     assert _filter_full_withdrawals(withdrawals) == ['0x1', '0x3']
     assert _filter_full_withdrawals({}) == []
+
+
+def test_filter_non_exiting_validators():
+    # a validator that isn't ACTIVE_ONGOING (e.g. already exiting) is dropped
+    validators = [
+        create_consensus_validator(index=1, status=ValidatorStatus.ACTIVE_ONGOING, balance=32),
+        create_consensus_validator(index=2, status=ValidatorStatus.ACTIVE_EXITING, balance=32),
+    ]
+    result = _filter_non_exiting_validators(validators, oracle_exiting_validators=[])
+    assert [v.index for v in result] == [1]
+
+    # a validator still ACTIVE_ONGOING on the CL but already in the oracle's exiting
+    # set is excluded too, so its pending partial isn't counted on top of the balance
+    # already summed via the oracle-exiting branch
+    validators = [
+        create_consensus_validator(index=1, status=ValidatorStatus.ACTIVE_ONGOING, balance=32),
+        create_consensus_validator(index=2, status=ValidatorStatus.ACTIVE_ONGOING, balance=32),
+    ]
+    oracle_exiting_validators = [
+        create_consensus_validator(index=2, status=ValidatorStatus.ACTIVE_ONGOING, balance=32),
+    ]
+    result = _filter_non_exiting_validators(validators, oracle_exiting_validators)
+    assert [v.index for v in result] == [1]
+
+    # a validator that isn't ACTIVE_ONGOING (e.g. still pending) is also excluded
+    validators = [
+        create_consensus_validator(index=1, status=ValidatorStatus.PENDING_QUEUED, balance=32),
+    ]
+    result = _filter_non_exiting_validators(validators, oracle_exiting_validators=[])
+    assert result == []
 
 
 async def test_fetch_oracle_exiting_validators():
