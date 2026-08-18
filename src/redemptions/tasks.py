@@ -120,12 +120,15 @@ async def is_position_ltv_exceeded(
     position: OsTokenPosition,
     converter: OsTokenConverter,
     block_number: BlockNumber,
-) -> bool:
+) -> tuple[bool, Wei]:
+    """Returns whether the position's LTV exceeds 1, together with the owner's live
+    minted osToken shares (vault.osTokenPositions(owner)) so callers can cap
+    shares_to_redeem without an extra RPC call."""
     vault_contract = VaultContract(position.vault)
     minted_shares = await vault_contract.get_os_token_position(position.owner, block_number)
     loan_assets = converter.to_assets(minted_shares)
     user_assets = await vault_contract.get_user_assets(position.owner, block_number)
-    return loan_assets > user_assets
+    return loan_assets > user_assets, minted_shares
 
 
 async def assign_shares_to_redeem(

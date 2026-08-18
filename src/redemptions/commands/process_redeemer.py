@@ -335,9 +335,11 @@ async def redeem_positions(
         if position.vault in unharvested_vaults:
             continue
 
-        if await is_position_ltv_exceeded(position, converter, block_number):
-            logger.info('Skipping position index=%d: LTV > 1', position.index)
+        live_shares = await _get_live_shares(position, shares_to_redeem, converter, block_number)
+        if live_shares <= 0:
             continue
+        shares_to_redeem = live_shares
+        assets_to_redeem = converter.to_assets(shares_to_redeem)
 
         if position.vault not in vault_to_withdrawable:
             if await VaultContract(position.vault).is_state_update_required(block_number):
@@ -368,6 +370,28 @@ async def redeem_positions(
                 continue
 
         vault_to_withdrawable[position.vault] = Wei(withdrawable - assets_to_redeem)
+
+
+async def _get_live_shares(
+    position: OsTokenPosition,
+    unprocessed_shares: Wei,
+    converter: OsTokenConverter,
+    block_number: BlockNumber,
+) -> Wei:
+    """Owner's unprocessed shares capped by the live minted osToken position. Returns 0
+    when the position's LTV exceeds 1 or the owner has no live position left to redeem
+    (e.g. repaid or liquidated after the file was published)."""
+    ltv_exceeded, minted_shares = await is_position_ltv_exceeded(position, converter, block_number)
+    if ltv_exceeded:
+        logger.info('Skipping position index=%d: LTV > 1', position.index)
+        return Wei(0)
+
+    live_shares = Wei(min(unprocessed_shares, minted_shares))
+    if live_shares <= 0:
+        logger.info(
+            'Skipping position index=%d: owner has no live osToken position', position.index
+        )
+    return live_shares
 
 
 async def _startup_check() -> None:

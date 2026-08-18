@@ -202,6 +202,36 @@ class TestRedeemPositions:
         # The first position fails but the round continues to the second
         assert mocks['submit_mock'].await_count == 2
 
+    async def test_zero_live_position_skipped_prefix_budget_not_reallocated(self) -> None:
+        """A position whose owner has fully repaid or been liquidated (minted_shares == 0)
+        is skipped without redeeming. Because shares_to_redeem is pre-assigned by a fixed
+        prefix pass, a later position's budget is unaffected by the skip."""
+        pos1 = make_position(
+            vault=VAULT_1,
+            owner=OWNER_1,
+            leaf_shares=1000,
+            processed_shares=0,
+            shares_to_redeem=1000,
+        )
+        pos2 = make_position(
+            vault=VAULT_2, owner=OWNER_2, leaf_shares=1000, processed_shares=0, shares_to_redeem=500
+        )
+
+        with _mock_redeem_positions(
+            withdrawable=Wei(10000), minted_shares=[Wei(0), Wei(1000)]
+        ) as mocks:
+            await redeem_positions(
+                tree=make_tree([pos1, pos2]),
+                os_token_positions=[pos1, pos2],
+                converter=make_converter(100, 100),
+                block_number=BlockNumber(100),
+            )
+
+        assert mocks['submit_mock'].await_count == 1
+        submitted = _submitted_position(mocks)
+        assert submitted.owner == OWNER_2
+        assert submitted.shares_to_redeem == Wei(500)
+
 
 # --- Async function tests (with mocks) ---
 
@@ -335,6 +365,7 @@ def _mock_redeem_positions(
     state_update_required: bool = False,
     submit_results: list[bool] | None = None,
     ltv_exceeded: bool = False,
+    minted_shares: Wei | list[Wei] | None = None,
 ) -> Iterator[dict[str, MagicMock]]:
     """Mock setup for redeem_positions tests.
 
@@ -346,6 +377,10 @@ def _mock_redeem_positions(
     abort the round. Simulation always succeeds; each live position is simulated first.
     ``ltv_exceeded`` simulates a position where the user's minted osToken loan exceeds
     their vault assets (LTV > 1), causing the position to be skipped.
+    ``minted_shares`` mocks the live vault.osTokenPositions(owner) value returned
+    alongside the LTV check; a constant applies to every call, a list is consumed in
+    call order (one entry per position). Defaults to an effectively unbounded value so
+    the unprocessed_shares cap is the only one exercised unless a test overrides it.
     """
     if isinstance(withdrawable, AsyncMock):
         get_withdrawable = withdrawable
@@ -364,13 +399,22 @@ def _mock_redeem_positions(
     vault_contract = MagicMock()
     vault_contract.is_state_update_required = AsyncMock(return_value=state_update_required)
 
+    if isinstance(minted_shares, list):
+        is_position_ltv_exceeded_mock = AsyncMock(
+            side_effect=[(ltv_exceeded, shares) for shares in minted_shares]
+        )
+    else:
+        is_position_ltv_exceeded_mock = AsyncMock(
+            return_value=(ltv_exceeded, minted_shares if minted_shares is not None else Wei(10**30))
+        )
+
     with (
         patch(f'{MODULE}.get_withdrawable_assets', new=get_withdrawable),
         patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=is_meta_vault)),
         patch(f'{MODULE}.VaultContract', return_value=vault_contract),
         patch(
             f'{MODULE}.is_position_ltv_exceeded',
-            new=AsyncMock(return_value=ltv_exceeded),
+            new=is_position_ltv_exceeded_mock,
         ),
         patch(f'{MODULE}.simulate_redeem_position', new=simulate_mock),
         patch(f'{MODULE}.tx_redeem_position', new=submit_mock),
