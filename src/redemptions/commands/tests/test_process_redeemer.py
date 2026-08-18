@@ -32,6 +32,7 @@ class TestRedeemPositions:
             await redeem_positions(
                 tree=make_tree(),
                 os_token_positions=[],
+                total_redemption_shares=Wei(1000),
                 converter=make_converter(),
                 block_number=BlockNumber(100),
             )
@@ -44,6 +45,7 @@ class TestRedeemPositions:
             await redeem_positions(
                 tree=make_tree([position]),
                 os_token_positions=[position],
+                total_redemption_shares=Wei(500),
                 converter=make_converter(),
                 block_number=BlockNumber(100),
             )
@@ -58,6 +60,7 @@ class TestRedeemPositions:
             await redeem_positions(
                 tree=make_tree([position]),
                 os_token_positions=[position],
+                total_redemption_shares=Wei(500),
                 converter=make_converter(100, 100),
                 block_number=BlockNumber(100),
             )
@@ -72,6 +75,7 @@ class TestRedeemPositions:
             await redeem_positions(
                 tree=make_tree([position]),
                 os_token_positions=[position],
+                total_redemption_shares=Wei(500),
                 converter=make_converter(100, 100),
                 block_number=BlockNumber(100),
             )
@@ -88,6 +92,7 @@ class TestRedeemPositions:
             await redeem_positions(
                 tree=make_tree([pos1, pos2]),
                 os_token_positions=[pos1, pos2],
+                total_redemption_shares=Wei(2000),
                 converter=make_converter(100, 100),
                 block_number=BlockNumber(100),
             )
@@ -102,16 +107,16 @@ class TestRedeemPositions:
         assert first_position.owner == OWNER_1 and first_position.shares_to_redeem == Wei(500)
         assert second_position.owner == OWNER_2 and second_position.shares_to_redeem == Wei(200)
 
-    async def test_pre_capped_shares_to_redeem_submitted_not_unprocessed(self) -> None:
-        """assign_shares_to_redeem may cap shares_to_redeem below unprocessed_shares.
-        redeem_positions must submit the pre-capped value, not re-derive from unprocessed_shares."""
-        # unprocessed_shares = 1000, but budget was exhausted mid-position
-        pos = make_position(leaf_shares=1000, processed_shares=0, shares_to_redeem=400)
+    async def test_budget_derived_ignoring_incoming_shares_to_redeem(self) -> None:
+        """shares_to_redeem is assigned lazily from unprocessed_shares and the remaining
+        budget; any incoming shares_to_redeem on the position object is ignored."""
+        pos = make_position(leaf_shares=1000, processed_shares=0, shares_to_redeem=999_999)
 
         with _mock_redeem_positions(withdrawable=Wei(10000)) as mocks:
             await redeem_positions(
                 tree=make_tree([pos]),
                 os_token_positions=[pos],
+                total_redemption_shares=Wei(400),
                 converter=make_converter(),
                 block_number=BlockNumber(100),
             )
@@ -126,6 +131,7 @@ class TestRedeemPositions:
             await redeem_positions(
                 tree=make_tree([pos]),
                 os_token_positions=[pos],
+                total_redemption_shares=Wei(500),
                 converter=make_converter(),
                 block_number=BlockNumber(100),
             )
@@ -143,6 +149,7 @@ class TestRedeemPositions:
             await redeem_positions(
                 tree=make_tree([pos]),
                 os_token_positions=[pos],
+                total_redemption_shares=Wei(500),
                 converter=make_converter(100, 100),
                 block_number=BlockNumber(100),
             )
@@ -161,6 +168,7 @@ class TestRedeemPositions:
             await redeem_positions(
                 tree=make_tree([pos]),
                 os_token_positions=[pos],
+                total_redemption_shares=Wei(500),
                 converter=make_converter(100, 100),
                 block_number=BlockNumber(100),
             )
@@ -176,6 +184,7 @@ class TestRedeemPositions:
             await redeem_positions(
                 tree=make_tree([pos]),
                 os_token_positions=[pos],
+                total_redemption_shares=Wei(500),
                 converter=make_converter(100, 100),
                 block_number=BlockNumber(100),
             )
@@ -184,7 +193,8 @@ class TestRedeemPositions:
         mocks['get_withdrawable'].assert_not_called()
 
     async def test_submit_failure_skips_position(self) -> None:
-        """A failed submission skips that position; subsequent positions are still attempted."""
+        """A failed submission skips that position; subsequent positions are still attempted
+        with the full remaining budget, since the failed position's budget is not consumed."""
         pos1 = make_position(vault=VAULT_1, owner=OWNER_1, processed_shares=500)
         pos2 = make_position(vault=VAULT_2, owner=OWNER_2, processed_shares=500)
 
@@ -195,27 +205,21 @@ class TestRedeemPositions:
             await redeem_positions(
                 tree=make_tree([pos1, pos2]),
                 os_token_positions=[pos1, pos2],
+                total_redemption_shares=Wei(1000),
                 converter=make_converter(100, 100),
                 block_number=BlockNumber(100),
             )
 
         # The first position fails but the round continues to the second
         assert mocks['submit_mock'].await_count == 2
+        assert _submitted_position(mocks, 1).shares_to_redeem == Wei(500)
 
-    async def test_zero_live_position_skipped_prefix_budget_not_reallocated(self) -> None:
+    async def test_zero_live_position_skipped_budget_reallocated(self) -> None:
         """A position whose owner has fully repaid or been liquidated (minted_shares == 0)
-        is skipped without redeeming. Because shares_to_redeem is pre-assigned by a fixed
-        prefix pass, a later position's budget is unaffected by the skip."""
-        pos1 = make_position(
-            vault=VAULT_1,
-            owner=OWNER_1,
-            leaf_shares=1000,
-            processed_shares=0,
-            shares_to_redeem=1000,
-        )
-        pos2 = make_position(
-            vault=VAULT_2, owner=OWNER_2, leaf_shares=1000, processed_shares=0, shares_to_redeem=500
-        )
+        is skipped without consuming budget, so a later file entry still gets redeemed
+        with the freed budget."""
+        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, leaf_shares=1000, processed_shares=0)
+        pos2 = make_position(vault=VAULT_2, owner=OWNER_2, leaf_shares=1000, processed_shares=0)
 
         with _mock_redeem_positions(
             withdrawable=Wei(10000), minted_shares=[Wei(0), Wei(1000)]
@@ -223,6 +227,7 @@ class TestRedeemPositions:
             await redeem_positions(
                 tree=make_tree([pos1, pos2]),
                 os_token_positions=[pos1, pos2],
+                total_redemption_shares=Wei(1000),
                 converter=make_converter(100, 100),
                 block_number=BlockNumber(100),
             )
@@ -230,7 +235,7 @@ class TestRedeemPositions:
         assert mocks['submit_mock'].await_count == 1
         submitted = _submitted_position(mocks)
         assert submitted.owner == OWNER_2
-        assert submitted.shares_to_redeem == Wei(500)
+        assert submitted.shares_to_redeem == Wei(1000)
 
 
 # --- Async function tests (with mocks) ---
@@ -302,12 +307,9 @@ class TestProcess:
         mocks['mock_redeem'].assert_not_called()
 
     async def test_no_eligible_positions(self) -> None:
-        """IPFS returns positions but assign_shares_to_redeem filters them all out."""
-        pos = make_position(leaf_shares=1000)
-        with (
-            _mock_process(positions=[pos]) as mocks,
-            patch(f'{MODULE}.assign_shares_to_redeem', new=AsyncMock(return_value=[])),
-        ):
+        """All fetched positions are fully processed (unprocessed_shares <= 1)."""
+        pos = make_position(leaf_shares=1000, processed_shares=1000, shares_to_redeem=0)
+        with _mock_process(positions=[pos]) as mocks:
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
             mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
             await process(block_number=BlockNumber(100), min_queued_assets=Gwei(0))
@@ -326,6 +328,7 @@ class TestProcess:
         redeem_call = mocks['mock_redeem'].await_args
         # The merkle tree is built from the fetched nonce; leaves use nonce - 1 internally
         assert redeem_call.kwargs['tree'].nonce == 5
+        assert redeem_call.kwargs['total_redemption_shares'] == Wei(1000)
 
     async def test_stale_vault_state_skips_redemption(self) -> None:
         """A failed vault state update leaves stale withdrawable assets and LTVs,
@@ -459,10 +462,6 @@ def _mock_process(
         ),
         patch(
             f'{MODULE}.fetch_positions_with_processed_shares',
-            new=AsyncMock(return_value=positions),
-        ),
-        patch(
-            f'{MODULE}.assign_shares_to_redeem',
             new=AsyncMock(return_value=positions),
         ),
         patch(

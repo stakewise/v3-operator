@@ -45,7 +45,7 @@ from src.redemptions.os_token_converter import (
     OsTokenConverter,
     create_os_token_converter,
 )
-from src.redemptions.tasks import assign_shares_to_redeem, is_position_ltv_exceeded
+from src.redemptions.tasks import is_position_ltv_exceeded
 from src.redemptions.typings import OsTokenPosition
 from src.validators.execution import get_withdrawable_assets
 
@@ -271,19 +271,22 @@ async def _redeem_os_token_positions(
     positions_with_processed_shares = await fetch_positions_with_processed_shares(
         nonce=nonce, block_number=block_number
     )
-    logger.info('Assigning shares to redeem')
-    os_token_positions = await assign_shares_to_redeem(
-        positions_with_processed_shares,
-        total_redemption_shares=Wei(queued_shares),
-    )
-    if not os_token_positions:
+    if queued_shares <= 0 or not any(
+        position.unprocessed_shares > 1 for position in positions_with_processed_shares
+    ):
         logger.info('No redeemable positions found. Skipping to next interval.')
         return
 
     if not dry_run:
         # Bring vaults up to date on-chain so withdrawable assets and position LTV
         # are computed from fresh state rather than skipping unharvested vaults.
-        vaults = list({position.vault for position in os_token_positions})
+        vaults = list(
+            {
+                position.vault
+                for position in positions_with_processed_shares
+                if position.unprocessed_shares > 1
+            }
+        )
         if not await update_vaults_state(vaults=vaults):
             logger.error('Some vaults were left with stale state. Skipping to next interval.')
             return
@@ -294,35 +297,46 @@ async def _redeem_os_token_positions(
     tree = PositionsMerkleTree(all_positions, nonce)
     await redeem_positions(
         tree=tree,
-        os_token_positions=os_token_positions,
+        os_token_positions=positions_with_processed_shares,
+        total_redemption_shares=Wei(queued_shares),
         converter=os_token_converter,
         block_number=block_number,
         dry_run=dry_run,
     )
 
 
+# pylint: disable-next=too-many-arguments,too-many-locals
 async def redeem_positions(
     tree: PositionsMerkleTree,
     os_token_positions: list[OsTokenPosition],
+    total_redemption_shares: Wei,
     converter: OsTokenConverter,
     block_number: BlockNumber,
     dry_run: bool = False,
 ) -> None:
-    """Redeem positions one by one. Each position's shares_to_redeem is already set by
-    assign_shares_to_redeem; this function further caps it by the vault's withdrawable assets.
+    """Redeem positions one by one, assigning each position's shares_to_redeem lazily from
+    the remaining budget as the loop progresses. A position skipped for any reason (LTV > 1,
+    meta vault, unharvested vault, no live minted position, zero withdrawable, failed
+    simulation or submission) frees its share of the budget for later positions in the
+    file, instead of a fixed prefix of the file consuming the whole budget upfront.
 
-    Meta-vault positions are skipped entirely. Vaults whose on-chain state is
-    stale (unharvested) are skipped, since their withdrawable assets would be
-    outdated. A position that fails to simulate or submit is skipped, so the
-    remaining positions are still processed.
+    Each position is further capped by the owner's live minted osToken position (which may
+    have shrunk below the file's leafShares since publication) and by the vault's
+    withdrawable assets.
     """
     vault_to_withdrawable: dict[ChecksumAddress, Wei] = {}
     unharvested_vaults: set[ChecksumAddress] = set()
+    remaining_shares = total_redemption_shares
 
     for position in os_token_positions:
+        if remaining_shares <= 0:
+            break
+
+        unprocessed_shares = position.unprocessed_shares
+        if unprocessed_shares <= 1:
+            continue
+
         logger.info('Processing position index=%d', position.index)
-        shares_to_redeem = position.shares_to_redeem
-        assets_to_redeem = converter.to_assets(shares_to_redeem)
 
         if await is_meta_vault(position.vault):
             logger.warning(
@@ -335,21 +349,18 @@ async def redeem_positions(
         if position.vault in unharvested_vaults:
             continue
 
-        live_shares = await _get_live_shares(position, shares_to_redeem, converter, block_number)
+        live_shares = await _get_live_shares(position, unprocessed_shares, converter, block_number)
         if live_shares <= 0:
             continue
-        shares_to_redeem = live_shares
-        assets_to_redeem = converter.to_assets(shares_to_redeem)
 
-        if position.vault not in vault_to_withdrawable:
-            if await VaultContract(position.vault).is_state_update_required(block_number):
-                logger.info('Skipping unharvested vault %s', position.vault)
-                unharvested_vaults.add(position.vault)
-                continue
-            vault_to_withdrawable[position.vault] = await get_withdrawable_assets(
-                position.vault, block_number=block_number
-            )
-        withdrawable = vault_to_withdrawable[position.vault]
+        withdrawable = await _get_vault_withdrawable(
+            position.vault, vault_to_withdrawable, unharvested_vaults, block_number
+        )
+        if withdrawable is None:
+            continue
+
+        shares_to_redeem = Wei(min(live_shares, remaining_shares))
+        assets_to_redeem = converter.to_assets(shares_to_redeem)
 
         if withdrawable < assets_to_redeem:
             shares_to_redeem = converter.to_shares(withdrawable)
@@ -369,7 +380,27 @@ async def redeem_positions(
             if not await tx_redeem_position(position=position_to_redeem, tree=tree):
                 continue
 
+        remaining_shares = Wei(remaining_shares - shares_to_redeem)
         vault_to_withdrawable[position.vault] = Wei(withdrawable - assets_to_redeem)
+
+
+async def _get_vault_withdrawable(
+    vault: ChecksumAddress,
+    vault_to_withdrawable: dict[ChecksumAddress, Wei],
+    unharvested_vaults: set[ChecksumAddress],
+    block_number: BlockNumber,
+) -> Wei | None:
+    """Cached withdrawable assets for a vault, populated on first use. Returns None (and
+    marks the vault unharvested) when its on-chain state requires an update first."""
+    if vault not in vault_to_withdrawable:
+        if await VaultContract(vault).is_state_update_required(block_number):
+            logger.info('Skipping unharvested vault %s', vault)
+            unharvested_vaults.add(vault)
+            return None
+        vault_to_withdrawable[vault] = await get_withdrawable_assets(
+            vault, block_number=block_number
+        )
+    return vault_to_withdrawable[vault]
 
 
 async def _get_live_shares(
