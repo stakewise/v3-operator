@@ -211,7 +211,10 @@ async def apply_pending_deposits(
 
         pending_balances[public_key] = Gwei(pending_balances[public_key] + int(deposit['amount']))
         if public_key not in known_public_keys:
-            # Validator is not present in the beacon state yet
+            # Validator is not present in the beacon state yet.
+            # A validator's withdrawal credentials are set
+            # by the deposit that creates it, and later deposits in the queue
+            # for the same pubkey don't change them.
             new_credentials.setdefault(public_key, withdrawal_credentials)
 
     enriched_validators = [
