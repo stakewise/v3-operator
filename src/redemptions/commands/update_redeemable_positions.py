@@ -239,19 +239,19 @@ async def process(
         leverage_positions=leverage_positions,
         os_token_converter=os_token_converter,
     )
-    allocators, residual_boosted_shares = _reduce_boosted_amount(allocators, boost_os_token_shares)
+    residual_boosted_shares = _distribute_boosted_shares(allocators, boost_os_token_shares)
 
     # filter zero positions. Filter before kept shares calculation to reduce api calls
-    min_minted_shares = Web3.to_wei(min_os_token_position_amount_gwei, 'gwei')
+    min_redeemable_shares = Web3.to_wei(min_os_token_position_amount_gwei, 'gwei')
     for allocator in allocators:
         allocator.vault_os_token_positions = [
             vault_share
             for vault_share in allocator.vault_os_token_positions
-            if vault_share.minted_shares >= min_minted_shares
+            if vault_share.redeemable_shares >= min_redeemable_shares
         ]
 
     if not allocators:
-        logger.info('No allocators with minted shares above the threshold found, exiting...')
+        logger.info('No allocators with redeemable shares above the threshold found, exiting...')
         return
 
     logger.info('Fetching kept tokens for %s addresses', len(allocators))
@@ -267,7 +267,7 @@ async def process(
     for address, residual in residual_boosted_shares.items():
         kept_shares[address] = Wei(kept_shares[address] + residual)
 
-    os_token_positions = create_os_token_positions(allocators, kept_shares, min_minted_shares)
+    os_token_positions = create_os_token_positions(allocators, kept_shares, min_redeemable_shares)
     if not os_token_positions:
         logger.info('No redeemable os token positions to upload, exiting...')
         return
@@ -385,7 +385,7 @@ async def calculate_boost_os_token_shares(
 def create_os_token_positions(
     allocators: list[Allocator],
     kept_shares: dict[ChecksumAddress, Wei],
-    min_minted_shares: Wei,
+    min_redeemable_shares: Wei,
 ) -> list[OsTokenPosition]:
     """
     Calculate vault proportions and create redeemable os token positions.
@@ -409,7 +409,7 @@ def create_os_token_positions(
             else:
                 vault_amount = int(redeemable_amount * proportion)
             allocated_amount += vault_amount
-            if vault_amount < min_minted_shares:
+            if vault_amount < min_redeemable_shares:
                 continue
             os_token_positions.append(
                 OsTokenPosition(
@@ -433,10 +433,10 @@ def _save_positions_to_file(positions_payload: list[dict]) -> Path:
     return positions_file
 
 
-def _reduce_boosted_amount(
+def _distribute_boosted_shares(
     allocators: list[Allocator],
     boost_os_token_shares: dict[tuple[ChecksumAddress, ChecksumAddress], Wei],
-) -> tuple[list[Allocator], dict[ChecksumAddress, Wei]]:
+) -> dict[ChecksumAddress, Wei]:
     """
     osToken is fungible, so boosted shares aren't necessarily minted at the same vault the
     leverage strategy borrows against. Match against the same-vault mint first; return
@@ -448,14 +448,15 @@ def _reduce_boosted_amount(
         allocator = allocators_by_address.get(user)
         if allocator is None:
             continue
-        vault_share = allocator.get_vault_position(vault)
-        matched = min(vault_share.minted_shares, boosted_amount) if vault_share else Wei(0)
-        if vault_share and matched:
-            vault_share.minted_shares = Wei(vault_share.minted_shares - matched)
+        vault_position = allocator.get_vault_position(vault)
+        matched = Wei(0)
+        if vault_position:
+            matched = min(vault_position.minted_shares, boosted_amount)
+            vault_position.boosted_shares = matched
         residual = Wei(boosted_amount - matched)
         if residual:
             residual_boosted_shares[user] = Wei(residual_boosted_shares[user] + residual)
-    return allocators, residual_boosted_shares
+    return residual_boosted_shares
 
 
 async def _startup_check() -> None:
