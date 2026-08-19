@@ -29,6 +29,9 @@ class Allocator:
             return {}
         return {s.address: s.minted_shares / total for s in self.vault_os_token_positions}
 
+    def get_vault_position(self, vault: ChecksumAddress) -> VaultOsTokenPosition | None:
+        return next((vs for vs in self.vault_os_token_positions if vs.address == vault), None)
+
 
 @dataclass
 class LeverageStrategyPosition:
