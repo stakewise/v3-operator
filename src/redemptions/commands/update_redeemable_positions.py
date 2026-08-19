@@ -4,7 +4,6 @@ import sys
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import cast
 
 import click
 from eth_typing import BlockNumber, ChecksumAddress
@@ -48,7 +47,6 @@ from src.redemptions.typings import (
     ApiConfig,
     LeverageStrategyPosition,
     OsTokenPosition,
-    VaultOsTokenPosition,
 )
 
 logger = logging.getLogger(__name__)
@@ -437,12 +435,9 @@ def _reduce_boosted_amount(
         allocator = allocators_by_address.get(user)
         if allocator is None:
             continue
-        vault_share = next(
-            (vs for vs in allocator.vault_os_token_positions if vs.address == vault), None
-        )
+        vault_share = allocator.get_vault_position(vault)
         matched = min(vault_share.minted_shares, boosted_amount) if vault_share else Wei(0)
-        if matched:
-            vault_share = cast(VaultOsTokenPosition, vault_share)
+        if vault_share and matched:
             vault_share.minted_shares = Wei(vault_share.minted_shares - matched)
         residual = Wei(boosted_amount - matched)
         if residual:
