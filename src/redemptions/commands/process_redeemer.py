@@ -45,7 +45,7 @@ from src.redemptions.os_token_converter import (
     OsTokenConverter,
     create_os_token_converter,
 )
-from src.redemptions.tasks import assign_shares_to_redeem, is_position_ltv_exceeded
+from src.redemptions.tasks import assign_shares_to_redeem, get_vault_os_token_position
 from src.redemptions.typings import OsTokenPosition
 from src.validators.execution import get_withdrawable_assets
 
@@ -335,16 +335,16 @@ async def redeem_positions(
         if position.vault in unharvested_vaults:
             continue
 
-        ltv_exceeded, minted_shares = await is_position_ltv_exceeded(
+        vault_os_token_position = await get_vault_os_token_position(
             position, converter, block_number
         )
-        if ltv_exceeded:
+        if vault_os_token_position.ltv > 1:
             logger.info('Skipping position index=%d: LTV > 1', position.index)
             continue
 
         # Cap by the live minted position: the owner may have repaid or been
         # liquidated after the positions file was published.
-        shares_to_redeem = Wei(min(shares_to_redeem, minted_shares))
+        shares_to_redeem = Wei(min(shares_to_redeem, vault_os_token_position.minted_shares))
         if shares_to_redeem <= 0:
             logger.info(
                 'Skipping position index=%d: owner has no live osToken position', position.index

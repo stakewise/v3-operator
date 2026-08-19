@@ -19,7 +19,7 @@ from src.redemptions.fetch_positions import (
     update_processed_shares_cache,
 )
 from src.redemptions.os_token_converter import create_os_token_converter
-from src.redemptions.typings import OsTokenPosition
+from src.redemptions.typings import OsTokenPosition, VaultOsTokenPosition
 
 logger = logging.getLogger(__name__)
 
@@ -119,19 +119,27 @@ async def aggregate_redemption_assets_by_vaults(
     )
 
 
-async def is_position_ltv_exceeded(
+async def get_vault_os_token_position(
     position: OsTokenPosition,
     converter: OsTokenConverter,
     block_number: BlockNumber,
-) -> tuple[bool, Wei]:
-    """Returns whether the position's LTV exceeds 1, together with the owner's live
-    minted osToken shares (vault.osTokenPositions(owner)) so callers can cap
-    shares_to_redeem without an extra RPC call."""
+) -> VaultOsTokenPosition:
+    """Fetch the owner's live osToken debt position in the position's vault.
+    Mirrors the OsTokenPosition of the VaultOsToken contract."""
     vault_contract = VaultContract(position.vault)
     minted_shares = await vault_contract.get_os_token_position(position.owner, block_number)
     loan_assets = converter.to_assets(minted_shares)
     user_assets = await vault_contract.get_user_assets(position.owner, block_number)
-    return loan_assets > user_assets, minted_shares
+    if user_assets > 0:
+        ltv = loan_assets / user_assets
+    else:
+        ltv = float('inf') if loan_assets > 0 else 0.0
+
+    return VaultOsTokenPosition(
+        address=position.vault,
+        minted_shares=minted_shares,
+        ltv=ltv,
+    )
 
 
 async def assign_shares_to_redeem(
