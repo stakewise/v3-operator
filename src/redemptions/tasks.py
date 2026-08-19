@@ -14,6 +14,7 @@ from src.config.settings import settings
 from src.redemptions.contracts import os_token_redeemer_contract
 from src.redemptions.fetch_positions import (
     fetch_positions_with_processed_shares,
+    iter_live_shares,
     update_positions_cache,
     update_processed_shares_cache,
 )
@@ -96,9 +97,11 @@ async def aggregate_redemption_assets_by_vaults(
     total_redemption_shares = os_token_converter.to_shares(total_redemption_assets)
 
     positions = await fetch_positions_with_processed_shares(nonce=nonce, block_number=block_number)
+    live_shares = [ls async for ls in iter_live_shares(positions, block_number)]
     positions = await assign_shares_to_redeem(
         positions,
         total_redemption_shares=total_redemption_shares,
+        live_shares=live_shares,
     )
 
     # Aggregate shares_to_redeem by vault
@@ -134,6 +137,7 @@ async def is_position_ltv_exceeded(
 async def assign_shares_to_redeem(
     positions: list[OsTokenPosition],
     total_redemption_shares: Wei,
+    live_shares: list[Wei] | None = None,
 ) -> list[OsTokenPosition]:
     """
     Iterate pre-enriched positions (processed_shares already set from on-chain) and set
@@ -143,6 +147,8 @@ async def assign_shares_to_redeem(
     - Fully processed positions (unprocessed_shares <= 1) are skipped.
     - Each position's shares_to_redeem is set to min(unprocessed_shares, remaining_budget).
     - Iteration stops as soon as the cumulative shares_to_redeem reaches total_redemption_shares.
+    - If live_shares is given (aligned index-wise with positions), it further caps
+      unprocessed_shares by the owner's live osToken position (vault.osTokenPositions(owner)).
     """
     if total_redemption_shares <= 0:
         return []
@@ -150,9 +156,11 @@ async def assign_shares_to_redeem(
     redeemable: list[OsTokenPosition] = []
     remaining_shares = total_redemption_shares
 
-    for position in positions:
+    for index, position in enumerate(positions):
         unprocessed_shares = position.unprocessed_shares
-        # Skip fully processed positions; tolerate 1 wei rounding error.
+        if live_shares is not None:
+            unprocessed_shares = Wei(min(unprocessed_shares, live_shares[index]))
+        # Skip fully processed (or dead) positions; tolerate 1 wei rounding error.
         if unprocessed_shares <= 1:
             continue
 
