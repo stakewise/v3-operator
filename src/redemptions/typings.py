@@ -25,12 +25,12 @@ class Allocator:
     vault_os_token_positions: list[VaultOsTokenPosition]
 
     @property
-    def total_shares(self) -> Wei:
+    def total_redeemable_shares(self) -> Wei:
         return Wei(sum(s.redeemable_shares for s in self.vault_os_token_positions))
 
     @property
     def vaults_proportions(self) -> dict[ChecksumAddress, float]:
-        total = self.total_shares
+        total = self.total_redeemable_shares
         if total == 0:
             return {}
         return {s.address: s.redeemable_shares / total for s in self.vault_os_token_positions}

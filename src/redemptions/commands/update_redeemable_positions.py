@@ -245,9 +245,9 @@ async def process(
     min_redeemable_shares = Web3.to_wei(min_os_token_position_amount_gwei, 'gwei')
     for allocator in allocators:
         allocator.vault_os_token_positions = [
-            vault_share
-            for vault_share in allocator.vault_os_token_positions
-            if vault_share.redeemable_shares >= min_redeemable_shares
+            vault_position
+            for vault_position in allocator.vault_os_token_positions
+            if vault_position.redeemable_shares >= min_redeemable_shares
         ]
 
     if not allocators:
@@ -255,13 +255,13 @@ async def process(
         return
 
     logger.info('Fetching kept tokens for %s addresses', len(allocators))
-    address_to_minted_shares = {a.address: a.total_shares for a in allocators}
+    address_to_redeemable_shares = {a.address: a.total_redeemable_shares for a in allocators}
     kept_shares = await get_kept_shares(
-        address_to_minted_shares,
+        address_to_redeemable_shares,
         block_number,
         api_config,
     )
-    logger.info('Fetched kept tokens for %s addresses...', len(address_to_minted_shares))
+    logger.info('Fetched kept tokens for %s addresses...', len(address_to_redeemable_shares))
     # unmatched boosted shares are still held by the user, so keep them out of redeemable
     # amounts by treating them as kept.
     for address, residual in residual_boosted_shares.items():
@@ -308,7 +308,7 @@ async def process(
 
 # pylint: disable-next=too-many-locals
 async def get_kept_shares(
-    address_to_minted_shares: dict[ChecksumAddress, Wei],
+    address_to_redeemable_shares: dict[ChecksumAddress, Wei],
     block_number: BlockNumber,
     api_config: ApiConfig,
 ) -> dict[ChecksumAddress, Wei]:
@@ -317,7 +317,7 @@ async def get_kept_shares(
         'Fetching %s balances from the subgraph...', settings.network_config.OS_TOKEN_BALANCE_SYMBOL
     )
     os_token_holders = await graph_get_os_token_holders(block_number)
-    for address in address_to_minted_shares.keys():
+    for address in address_to_redeemable_shares.keys():
         kept_shares[address] = os_token_holders.get(address, Wei(0))
 
     # rabby doesnt support hoodi so skip api call
@@ -326,8 +326,8 @@ async def get_kept_shares(
 
     # do not fetch data from api if all os token are in the wallet
     api_addresses = []
-    for address in address_to_minted_shares.keys():
-        if address_to_minted_shares[address] >= kept_shares[address]:
+    for address in address_to_redeemable_shares.keys():
+        if address_to_redeemable_shares[address] >= kept_shares[address]:
             api_addresses.append(address)
 
     if not api_addresses:
@@ -395,11 +395,11 @@ def create_os_token_positions(
     position_ltv: dict[tuple[ChecksumAddress, ChecksumAddress], float] = {}
     for allocator in allocators:
         allocator_kept_shares = kept_shares.get(allocator.address, Wei(0))
-        redeemable_amount = max(0, allocator.total_shares - allocator_kept_shares)
+        redeemable_amount = max(0, allocator.total_redeemable_shares - allocator_kept_shares)
         if redeemable_amount == 0:
             continue
 
-        vault_ltv = {vs.address: vs.ltv for vs in allocator.vault_os_token_positions}
+        vault_ltv = {p.address: p.ltv for p in allocator.vault_os_token_positions}
         allocated_amount = 0
         vaults_proportions = allocator.vaults_proportions.items()
         for index, (vault_address, proportion) in enumerate(vaults_proportions):

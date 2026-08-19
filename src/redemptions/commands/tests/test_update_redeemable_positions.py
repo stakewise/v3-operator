@@ -182,7 +182,7 @@ def test_create_os_token_positions_multiple_vaults_3():
     ]
 
 
-def test_create_os_token_positions_min_minted_shares():
+def test_create_os_token_positions_min_redeemable_shares():
     address_1 = faker.eth_address()
     vault_1 = faker.eth_address()
     vault_2 = faker.eth_address()
@@ -383,7 +383,7 @@ def test_distributes_boosted_shares():
             ],
         ),
     ]
-    assert [a.total_shares for a in allocators] == [Wei(200), Wei(1000)]
+    assert [a.total_redeemable_shares for a in allocators] == [Wei(200), Wei(1000)]
     assert residual == {}
 
 
@@ -442,7 +442,7 @@ def test_distributes_boosted_shares_excess_over_same_vault_mint_becomes_residual
             ],
         ),
     ]
-    assert allocators[0].total_shares == Wei(0)
+    assert allocators[0].total_redeemable_shares == Wei(0)
     assert residual == {address_1: Wei(200)}
 
 
