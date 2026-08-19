@@ -23,6 +23,8 @@ class VaultOsTokenPosition:
 class Allocator:
     address: ChecksumAddress
     vault_os_token_positions: list[VaultOsTokenPosition]
+    # boosted shares that couldn't be matched against a same-vault mint
+    residual_boosted_shares: Wei = Wei(0)
 
     @property
     def total_redeemable_shares(self) -> Wei:

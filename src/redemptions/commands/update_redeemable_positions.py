@@ -239,7 +239,7 @@ async def process(
         leverage_positions=leverage_positions,
         os_token_converter=os_token_converter,
     )
-    residual_boosted_shares = _distribute_boosted_shares(allocators, boost_os_token_shares)
+    _distribute_boosted_shares(allocators, boost_os_token_shares)
 
     # filter zero positions. Filter before kept shares calculation to reduce api calls
     min_redeemable_shares = Web3.to_wei(min_os_token_position_amount_gwei, 'gwei')
@@ -264,8 +264,10 @@ async def process(
     logger.info('Fetched kept tokens for %s addresses...', len(address_to_redeemable_shares))
     # unmatched boosted shares are still held by the user, so keep them out of redeemable
     # amounts by treating them as kept.
-    for address, residual in residual_boosted_shares.items():
-        kept_shares[address] = Wei(kept_shares[address] + residual)
+    for allocator in allocators:
+        kept_shares[allocator.address] = Wei(
+            kept_shares[allocator.address] + allocator.residual_boosted_shares
+        )
 
     os_token_positions = create_os_token_positions(allocators, kept_shares, min_redeemable_shares)
     if not os_token_positions:
@@ -436,14 +438,13 @@ def _save_positions_to_file(positions_payload: list[dict]) -> Path:
 def _distribute_boosted_shares(
     allocators: list[Allocator],
     boost_os_token_shares: dict[tuple[ChecksumAddress, ChecksumAddress], Wei],
-) -> dict[ChecksumAddress, Wei]:
+) -> None:
     """
     osToken is fungible, so boosted shares aren't necessarily minted at the same vault the
-    leverage strategy borrows against. Match against the same-vault mint first; return
-    whatever can't be matched there as a per-user residual instead of dropping it.
+    leverage strategy borrows against. Match against the same-vault mint first; store
+    whatever can't be matched there as the allocator residual instead of dropping it.
     """
     allocators_by_address = {a.address: a for a in allocators}
-    residual_boosted_shares: defaultdict[ChecksumAddress, Wei] = defaultdict(lambda: Wei(0))
     for (user, vault), boosted_amount in boost_os_token_shares.items():
         allocator = allocators_by_address.get(user)
         if allocator is None:
@@ -453,10 +454,9 @@ def _distribute_boosted_shares(
         if vault_position:
             matched = min(vault_position.minted_shares, boosted_amount)
             vault_position.boosted_shares = matched
-        residual = Wei(boosted_amount - matched)
-        if residual:
-            residual_boosted_shares[user] = Wei(residual_boosted_shares[user] + residual)
-    return residual_boosted_shares
+        allocator.residual_boosted_shares = Wei(
+            allocator.residual_boosted_shares + boosted_amount - matched
+        )
 
 
 async def _startup_check() -> None:

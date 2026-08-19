@@ -328,7 +328,7 @@ def test_distributes_boosted_shares():
         )
     ]
     boost_ostoken_shares = {}
-    residual = _distribute_boosted_shares(allocators, boost_ostoken_shares)
+    _distribute_boosted_shares(allocators, boost_ostoken_shares)
     assert allocators == [
         Allocator(
             address=address_1,
@@ -338,7 +338,6 @@ def test_distributes_boosted_shares():
             ],
         )
     ]
-    assert residual == {}
     # basic reduction
     allocators = [
         Allocator(
@@ -361,7 +360,7 @@ def test_distributes_boosted_shares():
         (address_2, vault_2): Wei(1500),
     }
 
-    residual = _distribute_boosted_shares(allocators, boost_ostoken_shares)
+    _distribute_boosted_shares(allocators, boost_ostoken_shares)
     assert allocators == [
         Allocator(
             address=address_1,
@@ -384,7 +383,7 @@ def test_distributes_boosted_shares():
         ),
     ]
     assert [a.total_redeemable_shares for a in allocators] == [Wei(200), Wei(1000)]
-    assert residual == {}
+    assert [a.residual_boosted_shares for a in allocators] == [Wei(0), Wei(0)]
 
 
 def test_distributes_boosted_shares_cross_vault_residual():
@@ -404,16 +403,16 @@ def test_distributes_boosted_shares_cross_vault_residual():
     ]
     boost_ostoken_shares = {(address_1, vault_2): Wei(400)}
 
-    residual = _distribute_boosted_shares(allocators, boost_ostoken_shares)
+    _distribute_boosted_shares(allocators, boost_ostoken_shares)
     assert allocators == [
         Allocator(
             address=address_1,
             vault_os_token_positions=[
                 VaultOsTokenPosition(address=vault_1, minted_shares=Wei(1000), ltv=0.5),
             ],
+            residual_boosted_shares=Wei(400),
         ),
     ]
-    assert residual == {address_1: Wei(400)}
 
 
 def test_distributes_boosted_shares_excess_over_same_vault_mint_becomes_residual():
@@ -431,7 +430,7 @@ def test_distributes_boosted_shares_excess_over_same_vault_mint_becomes_residual
     ]
     boost_ostoken_shares = {(address_1, vault_1): Wei(500)}
 
-    residual = _distribute_boosted_shares(allocators, boost_ostoken_shares)
+    _distribute_boosted_shares(allocators, boost_ostoken_shares)
     assert allocators == [
         Allocator(
             address=address_1,
@@ -440,10 +439,11 @@ def test_distributes_boosted_shares_excess_over_same_vault_mint_becomes_residual
                     address=vault_1, minted_shares=Wei(300), ltv=0.5, boosted_shares=Wei(300)
                 ),
             ],
+            residual_boosted_shares=Wei(200),
         ),
     ]
     assert allocators[0].total_redeemable_shares == Wei(0)
-    assert residual == {address_1: Wei(200)}
+    assert allocators[0].residual_boosted_shares == Wei(200)
 
 
 @pytest.mark.usefixtures('_init_config')
