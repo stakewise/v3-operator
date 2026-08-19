@@ -305,7 +305,7 @@ async def _redeem_os_token_positions(
     )
 
 
-# pylint: disable-next=too-many-arguments,too-many-locals
+# pylint: disable-next=too-many-arguments,too-many-locals,too-many-branches
 async def redeem_positions(
     tree: PositionsMerkleTree,
     os_token_positions: list[OsTokenPosition],
@@ -349,8 +349,20 @@ async def redeem_positions(
         if position.vault in unharvested_vaults:
             continue
 
-        live_shares = await _get_live_shares(position, unprocessed_shares, converter, block_number)
+        ltv_exceeded, minted_shares = await is_position_ltv_exceeded(
+            position, converter, block_number
+        )
+        if ltv_exceeded:
+            logger.info('Skipping position index=%d: LTV > 1', position.index)
+            continue
+
+        # Cap by the live minted position: the owner may have repaid or been
+        # liquidated after the positions file was published.
+        live_shares = Wei(min(unprocessed_shares, minted_shares))
         if live_shares <= 0:
+            logger.info(
+                'Skipping position index=%d: owner has no live osToken position', position.index
+            )
             continue
 
         withdrawable = await _get_vault_withdrawable(
@@ -401,28 +413,6 @@ async def _get_vault_withdrawable(
             vault, block_number=block_number
         )
     return vault_to_withdrawable[vault]
-
-
-async def _get_live_shares(
-    position: OsTokenPosition,
-    unprocessed_shares: Wei,
-    converter: OsTokenConverter,
-    block_number: BlockNumber,
-) -> Wei:
-    """Owner's unprocessed shares capped by the live minted osToken position. Returns 0
-    when the position's LTV exceeds 1 or the owner has no live position left to redeem
-    (e.g. repaid or liquidated after the file was published)."""
-    ltv_exceeded, minted_shares = await is_position_ltv_exceeded(position, converter, block_number)
-    if ltv_exceeded:
-        logger.info('Skipping position index=%d: LTV > 1', position.index)
-        return Wei(0)
-
-    live_shares = Wei(min(unprocessed_shares, minted_shares))
-    if live_shares <= 0:
-        logger.info(
-            'Skipping position index=%d: owner has no live osToken position', position.index
-        )
-    return live_shares
 
 
 async def _startup_check() -> None:
