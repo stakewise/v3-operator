@@ -11,23 +11,34 @@ class VaultOsTokenPosition:
     address: ChecksumAddress
     minted_shares: Wei
     ltv: float
+    # part of the minted shares that backs a leverage strategy position
+    boosted_shares: Wei = Wei(0)
+
+    @property
+    def redeemable_shares(self) -> Wei:
+        return Wei(max(0, self.minted_shares - self.boosted_shares))
 
 
 @dataclass
 class Allocator:
     address: ChecksumAddress
     vault_os_token_positions: list[VaultOsTokenPosition]
+    # boosted shares that couldn't be matched against a same-vault mint
+    residual_boosted_shares: Wei = Wei(0)
 
     @property
-    def total_shares(self) -> Wei:
-        return Wei(sum(s.minted_shares for s in self.vault_os_token_positions))
+    def total_redeemable_shares(self) -> Wei:
+        return Wei(sum(s.redeemable_shares for s in self.vault_os_token_positions))
 
     @property
     def vaults_proportions(self) -> dict[ChecksumAddress, float]:
-        total = self.total_shares
+        total = self.total_redeemable_shares
         if total == 0:
             return {}
-        return {s.address: s.minted_shares / total for s in self.vault_os_token_positions}
+        return {s.address: s.redeemable_shares / total for s in self.vault_os_token_positions}
+
+    def get_vault_position(self, vault: ChecksumAddress) -> VaultOsTokenPosition | None:
+        return next((vs for vs in self.vault_os_token_positions if vs.address == vault), None)
 
 
 @dataclass
