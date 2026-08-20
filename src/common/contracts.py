@@ -24,7 +24,7 @@ from web3.contract.async_contract import (
 from web3.types import BlockNumber, ChecksumAddress, EventData, TxReceipt, Wei
 
 from src.common.clients import execution_client as default_execution_client
-from src.common.transaction import tx_manager
+from src.common.transaction import transact_checked
 from src.common.typings import (
     ExitQueueMissingAssetsParams,
     HarvestParams,
@@ -532,7 +532,7 @@ class RewardSplitterEncoder(BaseEncoder):
         )
 
 
-class MulticallContract(ContractWrapper):
+class MulticallContract(ContractWrapper, ErrorMixin):
     abi_path = 'abi/Multicall.json'
     settings_key = 'MULTICALL_CONTRACT_ADDRESS'
 
@@ -548,7 +548,7 @@ class MulticallContract(ContractWrapper):
         data: list[tuple[ChecksumAddress, HexStr]],
     ) -> TxReceipt | None:
         tx_function = self.contract.functions.aggregate(data)
-        return await tx_manager.transact(tx_function)
+        return await transact_checked(tx_function, contract=self, action='aggregate multicall')
 
 
 class ValidatorsCheckerContract(ContractWrapper):

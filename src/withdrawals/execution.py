@@ -2,12 +2,10 @@ import logging
 
 from eth_typing import HexStr
 from web3 import Web3
-from web3.exceptions import ContractCustomError
 from web3.types import Gwei, Wei
 
 from src.common.contracts import VaultContract
-from src.common.transaction import tx_manager
-from src.common.utils import format_error
+from src.common.transaction import transact_checked
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -21,22 +19,17 @@ async def submit_withdraw_validators(
     """Sends withdrawValidators transaction to vault contract"""
     logger.info('Submitting a withdrawal from validator(s) transaction')
     vault_contract = VaultContract(settings.vault)
-    try:
-        tx_function = vault_contract.functions.withdrawValidators(
-            _encode_withdrawals(withdrawals),
-            Web3.to_bytes(hexstr=validators_manager_signature),
-        )
-        tx_receipt = await tx_manager.transact(tx_function, tx_params={'value': tx_fee})
-    except ContractCustomError as e:
-        reason = vault_contract.decode_custom_error(str(e.data)) or e.data
-        logger.info('Failed to withdraw from validators: execution reverted with %s', reason)
-        return None
-    except Exception as e:
-        logger.info('Failed to withdraw from validators: %s', format_error(e))
-        return None
-
+    tx_function = vault_contract.functions.withdrawValidators(
+        _encode_withdrawals(withdrawals),
+        Web3.to_bytes(hexstr=validators_manager_signature),
+    )
+    tx_receipt = await transact_checked(
+        tx_function,
+        contract=vault_contract,
+        action='withdraw from validators',
+        tx_params={'value': tx_fee},
+    )
     if tx_receipt is None:
-        logger.info('Withdraw validators transaction failed')
         return None
     return Web3.to_hex(tx_receipt['transactionHash'])
 

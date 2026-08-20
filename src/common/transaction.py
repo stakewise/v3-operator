@@ -1,17 +1,22 @@
 import asyncio
 import logging
 from math import ceil
+from typing import TYPE_CHECKING
 
 from hexbytes import HexBytes
 from web3 import Web3
 from web3.contract.async_contract import AsyncContractFunction
-from web3.exceptions import TimeExhausted, Web3RPCError
+from web3.exceptions import ContractCustomError, TimeExhausted, Web3RPCError
 from web3.types import Nonce, TxParams, TxReceipt, Wei
 
 from src.common.clients import execution_client
 from src.common.execution import build_gas_manager
+from src.common.utils import format_error
 from src.common.wallet import wallet
 from src.config.settings import ATTEMPTS_WITH_DEFAULT_GAS, settings
+
+if TYPE_CHECKING:
+    from src.common.contracts import ErrorMixin
 
 logger = logging.getLogger(__name__)
 
@@ -284,3 +289,38 @@ def _is_fee_too_low_error(e: Web3RPCError) -> bool:
 
 
 tx_manager = TransactionManager()
+
+
+# pylint: disable-next=too-many-arguments
+async def transact_checked(
+    tx_function: AsyncContractFunction,
+    *,
+    contract: 'ErrorMixin',
+    action: str,
+    tx_params: TxParams | None = None,
+    high_priority: bool = False,
+    estimate_gas: bool = False,
+    revert_hint: str = '',
+) -> TxReceipt | None:
+    """Submits `tx_function` via `tx_manager`.
+
+    Returns the tx receipt on success. On revert, transaction error, or an
+    unconfirmed/failed receipt, logs the error and returns `None`.
+    """
+    try:
+        tx_receipt = await tx_manager.transact(
+            tx_function, tx_params, high_priority=high_priority, estimate_gas=estimate_gas
+        )
+    except ContractCustomError as e:
+        reason = contract.decode_custom_error(str(e.data)) or e.data
+        logger.error('Failed to %s: execution reverted with %s.%s', action, reason, revert_hint)
+        return None
+    except Exception as e:  # pylint: disable=broad-except
+        logger.error('Failed to %s: %s', action, format_error(e))
+        if settings.verbose:
+            logger.exception(e)
+        return None
+    if tx_receipt is None:
+        logger.error('Failed to %s: transaction was not confirmed', action)
+        return None
+    return tx_receipt
