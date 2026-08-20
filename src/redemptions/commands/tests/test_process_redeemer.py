@@ -16,7 +16,7 @@ from src.redemptions.commands.process_redeemer import (
 )
 from src.redemptions.merkle_tree import PositionsMerkleTree
 from src.redemptions.os_token_converter import OsTokenConverter
-from src.redemptions.typings import OsTokenPosition
+from src.redemptions.typings import OsTokenPosition, VaultOsTokenPosition
 
 MODULE = 'src.redemptions.commands.process_redeemer'
 
@@ -380,8 +380,8 @@ def _mock_redeem_positions(
     abort the round. Simulation always succeeds; each live position is simulated first.
     ``ltv_exceeded`` simulates a position where the user's minted osToken loan exceeds
     their vault assets (LTV > 1), causing the position to be skipped.
-    ``minted_shares`` mocks the live vault.osTokenPositions(owner) value returned
-    alongside the LTV check; a constant applies to every call, a list is consumed in
+    ``minted_shares`` mocks the live vault.osTokenPositions(owner) value of the
+    returned VaultOsTokenPosition; a constant applies to every call, a list is consumed in
     call order (one entry per position). Defaults to an effectively unbounded value so
     the unprocessed_shares cap is the only one exercised unless a test overrides it.
     """
@@ -402,13 +402,22 @@ def _mock_redeem_positions(
     vault_contract = MagicMock()
     vault_contract.is_state_update_required = AsyncMock(return_value=state_update_required)
 
+    ltv = 2.0 if ltv_exceeded else 0.5
+    vault_address = faker.eth_address()
     if isinstance(minted_shares, list):
-        is_position_ltv_exceeded_mock = AsyncMock(
-            side_effect=[(ltv_exceeded, shares) for shares in minted_shares]
+        get_vault_os_token_position_mock = AsyncMock(
+            side_effect=[
+                VaultOsTokenPosition(address=vault_address, minted_shares=shares, ltv=ltv)
+                for shares in minted_shares
+            ]
         )
     else:
-        is_position_ltv_exceeded_mock = AsyncMock(
-            return_value=(ltv_exceeded, minted_shares if minted_shares is not None else Wei(10**30))
+        get_vault_os_token_position_mock = AsyncMock(
+            return_value=VaultOsTokenPosition(
+                address=vault_address,
+                minted_shares=minted_shares if minted_shares is not None else Wei(10**30),
+                ltv=ltv,
+            )
         )
 
     with (
@@ -416,8 +425,8 @@ def _mock_redeem_positions(
         patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=is_meta_vault)),
         patch(f'{MODULE}.VaultContract', return_value=vault_contract),
         patch(
-            f'{MODULE}.is_position_ltv_exceeded',
-            new=is_position_ltv_exceeded_mock,
+            f'{MODULE}.get_vault_os_token_position',
+            new=get_vault_os_token_position_mock,
         ),
         patch(f'{MODULE}.simulate_redeem_position', new=simulate_mock),
         patch(f'{MODULE}.tx_redeem_position', new=submit_mock),
