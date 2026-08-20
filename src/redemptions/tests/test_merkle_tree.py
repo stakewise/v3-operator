@@ -5,14 +5,14 @@ from src.redemptions.tests.factories import make_position
 class TestPositionsMerkleTree:
     def test_single_position(self) -> None:
         position = make_position(leaf_shares=1000)
-        result = PositionsMerkleTree([position], nonce=5).get_multi_proof([position])
+        result = PositionsMerkleTree([position], leaf_nonce=4).get_multi_proof([position])
         assert len(result.leaves) == 1
 
     def test_partial_redeem(self) -> None:
         pos1 = make_position(leaf_shares=1000)
         pos2 = make_position(leaf_shares=2000)
 
-        result = PositionsMerkleTree([pos1, pos2], nonce=5).get_multi_proof([pos1])
+        result = PositionsMerkleTree([pos1, pos2], leaf_nonce=4).get_multi_proof([pos1])
         assert len(result.leaves) == 1
         assert len(result.proof) > 0
 
@@ -20,5 +20,5 @@ class TestPositionsMerkleTree:
         pos1 = make_position(leaf_shares=1000)
         pos2 = make_position(leaf_shares=2000)
 
-        result = PositionsMerkleTree([pos1, pos2], nonce=5).get_multi_proof([pos1, pos2])
+        result = PositionsMerkleTree([pos1, pos2], leaf_nonce=4).get_multi_proof([pos1, pos2])
         assert len(result.leaves) == 2

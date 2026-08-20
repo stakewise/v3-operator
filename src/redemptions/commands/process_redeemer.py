@@ -291,7 +291,9 @@ async def _redeem_os_token_positions(
         # Re-fetch the block number so the freshly-updated state is visible downstream.
         block_number = await execution_client.eth.block_number
 
-    tree = PositionsMerkleTree(all_positions, nonce)
+    # Leaves use `nonce - 1`: setting the positions root increments the
+    # on-chain nonce, leaving it one ahead of the nonce baked into the leaves.
+    tree = PositionsMerkleTree(all_positions, leaf_nonce=nonce - 1)
     await redeem_positions(
         tree=tree,
         os_token_positions=os_token_positions,

@@ -324,8 +324,8 @@ class TestProcess:
 
         mocks['mock_redeem'].assert_awaited_once()
         redeem_call = mocks['mock_redeem'].await_args
-        # The merkle tree is built from the fetched nonce; leaves use nonce - 1 internally
-        assert redeem_call.kwargs['tree'].nonce == 5
+        # The merkle tree is built from the fetched nonce; leaves use nonce - 1
+        assert redeem_call.kwargs['tree'].leaf_nonce == 4
 
     async def test_stale_vault_state_skips_redemption(self) -> None:
         """A failed vault state update leaves stale withdrawable assets and LTVs,
@@ -506,7 +506,7 @@ def make_tree(
 ) -> PositionsMerkleTree:
     """Build a positions merkle tree. Defaults to a single position so callers that
     only need a valid tree (e.g. when tx_redeem_position is mocked) can omit it."""
-    return PositionsMerkleTree(positions or [make_position()], nonce)
+    return PositionsMerkleTree(positions or [make_position()], leaf_nonce=nonce)
 
 
 def make_position(

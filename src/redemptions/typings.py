@@ -5,6 +5,8 @@ from multiproof.standard import standard_leaf_hash
 from web3 import Web3
 from web3.types import Wei
 
+LEAF_TYPES = ['uint256', 'address', 'uint256', 'address']
+
 
 @dataclass
 class VaultOsTokenPosition:
@@ -99,7 +101,7 @@ class OsTokenPosition:
         """Get the Merkle leaf hash"""
         return standard_leaf_hash(
             values=(nonce, self.vault, self.leaf_shares, self.owner),
-            types=['uint256', 'address', 'uint256', 'address'],
+            types=LEAF_TYPES,
         )
 
 
