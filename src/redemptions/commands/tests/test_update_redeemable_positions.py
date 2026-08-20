@@ -11,7 +11,7 @@ from web3.types import ChecksumAddress, Wei
 from src.config.networks import MAINNET, NETWORKS
 from src.config.settings import settings
 from src.redemptions.commands.update_redeemable_positions import (
-    _reduce_boosted_amount,
+    _distribute_boosted_shares,
     calculate_boost_os_token_shares,
     create_os_token_positions,
     update_redeemable_positions,
@@ -182,7 +182,7 @@ def test_create_os_token_positions_multiple_vaults_3():
     ]
 
 
-def test_create_os_token_positions_min_minted_shares():
+def test_create_os_token_positions_min_redeemable_shares():
     address_1 = faker.eth_address()
     vault_1 = faker.eth_address()
     vault_2 = faker.eth_address()
@@ -312,7 +312,7 @@ async def test_calculate_boost_os_token_shares():
     }
 
 
-def test_reduces_boosted_amount():
+def test_distributes_boosted_shares():
     address_1 = faker.eth_address()
     address_2 = faker.eth_address()
     vault_1 = faker.eth_address()
@@ -328,8 +328,8 @@ def test_reduces_boosted_amount():
         )
     ]
     boost_ostoken_shares = {}
-    result, residual = _reduce_boosted_amount(allocators, boost_ostoken_shares)
-    assert result == [
+    _distribute_boosted_shares(allocators, boost_ostoken_shares)
+    assert allocators == [
         Allocator(
             address=address_1,
             vault_os_token_positions=[
@@ -338,7 +338,6 @@ def test_reduces_boosted_amount():
             ],
         )
     ]
-    assert residual == {}
     # basic reduction
     allocators = [
         Allocator(
@@ -361,26 +360,33 @@ def test_reduces_boosted_amount():
         (address_2, vault_2): Wei(1500),
     }
 
-    result, residual = _reduce_boosted_amount(allocators, boost_ostoken_shares)
-    assert result == [
+    _distribute_boosted_shares(allocators, boost_ostoken_shares)
+    assert allocators == [
         Allocator(
             address=address_1,
             vault_os_token_positions=[
-                VaultOsTokenPosition(address=vault_1, minted_shares=Wei(200), ltv=0.5),
+                VaultOsTokenPosition(
+                    address=vault_1, minted_shares=Wei(500), ltv=0.5, boosted_shares=Wei(300)
+                ),
             ],
         ),
         Allocator(
             address=address_2,
             vault_os_token_positions=[
-                VaultOsTokenPosition(address=vault_1, minted_shares=Wei(500), ltv=0.5),
-                VaultOsTokenPosition(address=vault_2, minted_shares=Wei(500), ltv=0.5),
+                VaultOsTokenPosition(
+                    address=vault_1, minted_shares=Wei(1000), ltv=0.5, boosted_shares=Wei(500)
+                ),
+                VaultOsTokenPosition(
+                    address=vault_2, minted_shares=Wei(2000), ltv=0.5, boosted_shares=Wei(1500)
+                ),
             ],
         ),
     ]
-    assert residual == {}
+    assert [a.total_redeemable_shares for a in allocators] == [Wei(200), Wei(1000)]
+    assert [a.residual_boosted_shares for a in allocators] == [Wei(0), Wei(0)]
 
 
-def test_reduces_boosted_amount_cross_vault_residual():
+def test_distributes_boosted_shares_cross_vault_residual():
     address_1 = faker.eth_address()
     vault_1 = faker.eth_address()
     vault_2 = faker.eth_address()
@@ -397,19 +403,19 @@ def test_reduces_boosted_amount_cross_vault_residual():
     ]
     boost_ostoken_shares = {(address_1, vault_2): Wei(400)}
 
-    result, residual = _reduce_boosted_amount(allocators, boost_ostoken_shares)
-    assert result == [
+    _distribute_boosted_shares(allocators, boost_ostoken_shares)
+    assert allocators == [
         Allocator(
             address=address_1,
             vault_os_token_positions=[
                 VaultOsTokenPosition(address=vault_1, minted_shares=Wei(1000), ltv=0.5),
             ],
+            residual_boosted_shares=Wei(400),
         ),
     ]
-    assert residual == {address_1: Wei(400)}
 
 
-def test_reduces_boosted_amount_excess_over_same_vault_mint_becomes_residual():
+def test_distributes_boosted_shares_excess_over_same_vault_mint_becomes_residual():
     address_1 = faker.eth_address()
     vault_1 = faker.eth_address()
 
@@ -424,16 +430,20 @@ def test_reduces_boosted_amount_excess_over_same_vault_mint_becomes_residual():
     ]
     boost_ostoken_shares = {(address_1, vault_1): Wei(500)}
 
-    result, residual = _reduce_boosted_amount(allocators, boost_ostoken_shares)
-    assert result == [
+    _distribute_boosted_shares(allocators, boost_ostoken_shares)
+    assert allocators == [
         Allocator(
             address=address_1,
             vault_os_token_positions=[
-                VaultOsTokenPosition(address=vault_1, minted_shares=Wei(0), ltv=0.5),
+                VaultOsTokenPosition(
+                    address=vault_1, minted_shares=Wei(300), ltv=0.5, boosted_shares=Wei(300)
+                ),
             ],
+            residual_boosted_shares=Wei(200),
         ),
     ]
-    assert residual == {address_1: Wei(200)}
+    assert allocators[0].total_redeemable_shares == Wei(0)
+    assert allocators[0].residual_boosted_shares == Wei(200)
 
 
 @pytest.mark.usefixtures('_init_config')
