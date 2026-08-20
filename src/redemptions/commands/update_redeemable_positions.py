@@ -231,7 +231,7 @@ async def process(
 
     # filter zero positions. Filter before kept shares calculation to reduce api calls
     min_redeemable_shares = Web3.to_wei(min_os_token_position_amount_gwei, 'gwei')
-    _filter_min_redeemable_shares(allocators, min_redeemable_shares)
+    allocators = _filter_min_redeemable_shares(allocators, min_redeemable_shares)
 
     if not allocators:
         logger.info('No allocators with redeemable shares above the threshold found, exiting...')
@@ -284,13 +284,21 @@ async def _apply_boost(
 def _filter_min_redeemable_shares(
     allocators: list[Allocator],
     min_redeemable_shares: Wei,
-) -> None:
+) -> list[Allocator]:
+    result = []
     for allocator in allocators:
-        allocator.vault_os_token_positions = [
+        vault_os_token_positions = [
             vault_position
             for vault_position in allocator.vault_os_token_positions
             if vault_position.redeemable_shares >= min_redeemable_shares
         ]
+        # drop allocators left with no vault positions so populate_kept_shares
+        # doesn't waste a rate-limited api call on a guaranteed-zero position
+        if not vault_os_token_positions:
+            continue
+        allocator.vault_os_token_positions = vault_os_token_positions
+        result.append(allocator)
+    return result
 
 
 def _build_api_client(api_config: ApiConfig) -> APIClient | None:

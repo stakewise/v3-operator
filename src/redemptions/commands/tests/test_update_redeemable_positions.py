@@ -12,6 +12,7 @@ from src.config.networks import MAINNET, NETWORKS
 from src.config.settings import settings
 from src.redemptions.commands.update_redeemable_positions import (
     _distribute_boosted_shares,
+    _filter_min_redeemable_shares,
     calculate_boost_os_token_shares,
     create_os_token_positions,
     update_redeemable_positions,
@@ -296,6 +297,60 @@ async def test_calculate_boost_os_token_shares():
         (address_2, vault_1): 100,
         (address_2, vault_2): 3095,
     }
+
+
+def test_filter_min_redeemable_shares_drops_allocators_left_with_no_positions():
+    address_1 = faker.eth_address()
+    address_2 = faker.eth_address()
+    vault_1 = faker.eth_address()
+    vault_2 = faker.eth_address()
+
+    allocator_a = Allocator(
+        address=Web3.to_checksum_address(address_1),
+        vault_os_token_positions=[
+            VaultOsTokenPosition(
+                address=Web3.to_checksum_address(vault_1), minted_shares=Wei(500), ltv=0.5
+            ),
+            VaultOsTokenPosition(
+                address=Web3.to_checksum_address(vault_2), minted_shares=Wei(100), ltv=0.5
+            ),
+        ],
+    )
+    allocator_b = Allocator(
+        address=Web3.to_checksum_address(address_2),
+        vault_os_token_positions=[
+            VaultOsTokenPosition(
+                address=Web3.to_checksum_address(vault_1), minted_shares=Wei(50), ltv=0.5
+            ),
+        ],
+    )
+
+    result = _filter_min_redeemable_shares([allocator_a, allocator_b], Wei(200))
+    assert result == [allocator_a]
+    assert result[0].vault_os_token_positions == [
+        VaultOsTokenPosition(
+            address=Web3.to_checksum_address(vault_1), minted_shares=Wei(500), ltv=0.5
+        ),
+    ]
+
+
+def test_filter_min_redeemable_shares_zero_threshold_keeps_everything():
+    address_1 = faker.eth_address()
+    vault_1 = faker.eth_address()
+
+    allocators = [
+        Allocator(
+            address=Web3.to_checksum_address(address_1),
+            vault_os_token_positions=[
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_1), minted_shares=Wei(0), ltv=0.5
+                ),
+            ],
+        ),
+    ]
+
+    result = _filter_min_redeemable_shares(allocators, Wei(0))
+    assert result == allocators
 
 
 def test_distributes_boosted_shares():
