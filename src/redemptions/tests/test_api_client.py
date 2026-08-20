@@ -7,16 +7,19 @@ from web3.types import Wei
 
 from src.config.networks import MAINNET
 from src.config.settings import settings
-from src.redemptions.api_client import APIClient
+from src.redemptions.api_client import API_SLEEP_TIMEOUT, RABBY_API_SOURCE, APIClient
+from src.redemptions.typings import ApiConfig
+
+DEFAULT_API_CONFIG = ApiConfig(source=RABBY_API_SOURCE, sleep_timeout=API_SLEEP_TIMEOUT)
 
 
 class TestAPIClient:
     @pytest.mark.usefixtures('fake_settings')
     async def test_zero_when_no_protocol_data(self):
-        client = APIClient()
         with patch.object(settings, 'network', MAINNET), patch(
             'src.redemptions.api_client.APIClient._fetch_json', return_value=[]
         ):
+            client = APIClient(DEFAULT_API_CONFIG)
             result = await client.get_protocols_locked_os_token(
                 Web3.to_checksum_address('0x1234567890abcdef1234567890abcdef12345678')
             )
@@ -84,7 +87,7 @@ class TestAPIClient:
             'OS_TOKEN_CONTRACT_ADDRESS',
             '0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38',
         ):
-            client = APIClient()
+            client = APIClient(DEFAULT_API_CONFIG)
             result = await client.get_protocols_locked_os_token(
                 Web3.to_checksum_address('0x1234567890abcdef1234567890abcdef12345678')
             )
@@ -101,7 +104,7 @@ class TestAPIClient:
             'OS_TOKEN_CONTRACT_ADDRESS',
             '0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38',
         ):
-            client = APIClient()
+            client = APIClient(DEFAULT_API_CONFIG)
             result = await client.get_protocols_locked_os_token(
                 Web3.to_checksum_address('0x1234567890abcdef1234567890abcdef12345678')
             )
@@ -118,7 +121,7 @@ class TestAPIClient:
             'OS_TOKEN_CONTRACT_ADDRESS',
             '0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38',
         ):
-            client = APIClient()
+            client = APIClient(DEFAULT_API_CONFIG)
             result = await client.get_protocols_locked_os_token(
                 Web3.to_checksum_address('0x1234567890abcdef1234567890abcdef12345678')
             )

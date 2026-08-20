@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from dataclasses import dataclass
 
 from eth_typing import ChecksumAddress, HexStr
@@ -27,20 +28,48 @@ class Allocator:
     vault_os_token_positions: list[VaultOsTokenPosition]
     # boosted shares that couldn't be matched against a same-vault mint
     residual_boosted_shares: Wei = Wei(0)
+    # osToken balance held in the owner's wallet, from the subgraph
+    wallet_shares: Wei = Wei(0)
+    # osToken locked in third-party protocols (Rabby/DeBank), from the API
+    locked_shares: Wei = Wei(0)
 
     @property
     def total_redeemable_shares(self) -> Wei:
         return Wei(sum(s.redeemable_shares for s in self.vault_os_token_positions))
 
     @property
-    def vaults_proportions(self) -> dict[ChecksumAddress, float]:
-        total = self.total_redeemable_shares
-        if total == 0:
-            return {}
-        return {s.address: s.redeemable_shares / total for s in self.vault_os_token_positions}
+    def kept_shares(self) -> Wei:
+        return Wei(self.wallet_shares + self.locked_shares + self.residual_boosted_shares)
+
+    @property
+    def redeemable_shares(self) -> Wei:
+        return Wei(max(0, self.total_redeemable_shares - self.kept_shares))
 
     def get_vault_position(self, vault: ChecksumAddress) -> VaultOsTokenPosition | None:
         return next((vs for vs in self.vault_os_token_positions if vs.address == vault), None)
+
+    def iter_vault_slices(self, min_shares: Wei) -> Iterator[tuple[VaultOsTokenPosition, Wei]]:
+        """
+        Split ``redeemable_shares`` across vaults proportionally to each vault's (post-boost)
+        redeemable share of the total. The last vault absorbs the rounding dust. Slices below
+        ``min_shares`` are dropped, but still count towards the running allocated total so the
+        dust rule stays exact.
+        """
+        redeemable_amount = self.redeemable_shares
+        if redeemable_amount == 0:
+            return
+        total = self.total_redeemable_shares
+        allocated_amount = 0
+        positions = self.vault_os_token_positions
+        for index, position in enumerate(positions):
+            if index == len(positions) - 1:
+                vault_amount = max(0, int(redeemable_amount - allocated_amount))
+            else:
+                vault_amount = int(redeemable_amount * (position.redeemable_shares / total))
+            allocated_amount += vault_amount
+            if vault_amount < min_shares:
+                continue
+            yield position, Wei(vault_amount)
 
 
 @dataclass
