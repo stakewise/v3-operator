@@ -27,6 +27,7 @@ async def submit_harvest_transaction(harvest_params: HarvestParams) -> HexStr:
         action='harvest',
     )
     if tx_receipt is None:
+        # raise so BaseTask.run increments metrics.exception_count
         raise RuntimeError('Failed to confirm harvest tx')
 
     return Web3.to_hex(tx_receipt['transactionHash'])
