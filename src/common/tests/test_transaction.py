@@ -5,7 +5,7 @@ from unittest import mock
 import pytest
 from hexbytes import HexBytes
 from web3 import Web3
-from web3.exceptions import TimeExhausted, Web3RPCError
+from web3.exceptions import ContractCustomError, TimeExhausted, Web3RPCError
 from web3.types import Wei
 
 from src.common.transaction import (
@@ -13,6 +13,7 @@ from src.common.transaction import (
     Fees,
     TransactionManager,
     _is_fee_too_low_error,
+    transact_checked,
 )
 
 GWEI = Web3.to_wei(1, 'gwei')
@@ -306,6 +307,43 @@ class TestTransactionManager:
         params = transact.call_args.args[0]
         assert params['maxFeePerGas'] == cap
         assert params['maxPriorityFeePerGas'] <= params['maxFeePerGas']
+
+
+@pytest.mark.usefixtures('fake_settings')
+class TestTransactChecked:
+    async def test_success_returns_receipt(self):
+        receipt = {'status': 1, 'transactionHash': HexBytes('0xab')}
+        tx_manager_mock = mock.Mock(transact=mock.AsyncMock(return_value=receipt))
+        with mock.patch('src.common.transaction.tx_manager', tx_manager_mock):
+            result = await transact_checked(mock.Mock(), contract=mock.Mock(), action='do stuff')
+
+        assert result is receipt
+
+    async def test_revert_returns_none(self):
+        contract = mock.Mock()
+        contract.decode_custom_error = mock.Mock(return_value='InvalidValidators()')
+        tx_manager_mock = mock.Mock(
+            transact=mock.AsyncMock(side_effect=ContractCustomError('reverted', data='0xdeadbeef'))
+        )
+        with mock.patch('src.common.transaction.tx_manager', tx_manager_mock):
+            result = await transact_checked(mock.Mock(), contract=contract, action='do stuff')
+
+        assert result is None
+        contract.decode_custom_error.assert_called_once_with('0xdeadbeef')
+
+    async def test_generic_exception_returns_none(self):
+        tx_manager_mock = mock.Mock(transact=mock.AsyncMock(side_effect=ValueError('boom')))
+        with mock.patch('src.common.transaction.tx_manager', tx_manager_mock):
+            result = await transact_checked(mock.Mock(), contract=mock.Mock(), action='do stuff')
+
+        assert result is None
+
+    async def test_none_receipt_returns_none(self):
+        tx_manager_mock = mock.Mock(transact=mock.AsyncMock(return_value=None))
+        with mock.patch('src.common.transaction.tx_manager', tx_manager_mock):
+            result = await transact_checked(mock.Mock(), contract=mock.Mock(), action='do stuff')
+
+        assert result is None
 
 
 @pytest.mark.parametrize(

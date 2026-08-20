@@ -2,7 +2,6 @@ import logging
 
 from sw_utils import InterruptHandler
 from web3 import Web3
-from web3.exceptions import ContractCustomError
 from web3.types import BlockNumber, ChecksumAddress, HexStr, Wei
 
 from src.common.app_state import AppState
@@ -11,7 +10,7 @@ from src.common.contracts import RewardSplitterContract, RewardSplitterEncoder
 from src.common.execution import check_gas_price
 from src.common.harvest import get_harvest_params
 from src.common.tasks import BaseTask
-from src.common.transaction import tx_manager
+from src.common.transaction import transact_checked
 from src.common.typings import ExitRequest, HarvestParams
 from src.common.wallet import wallet
 from src.config.settings import FEE_SPLITTER_INTERVAL, FEE_SPLITTER_MIN_ASSETS, settings
@@ -141,12 +140,11 @@ async def claim_reward_splitters_for_vault(
             execution_client=execution_client,
         )
         tx_function = contract.functions.multicall(address_calls)
-        try:
-            tx_receipt = await tx_manager.transact(tx_function)
-        except ContractCustomError as e:
-            reason = contract.decode_custom_error(str(e.data)) or e.data
-            logger.error('Fee splitter %s transaction execution reverted with %s', address, reason)
-            raise
+        tx_receipt = await transact_checked(
+            tx_function,
+            contract=contract,
+            action=f'process fee splitter {address}',
+        )
         if tx_receipt is None:
             raise RuntimeError('Failed to confirm fee splitter tx')
 

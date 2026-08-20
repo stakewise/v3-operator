@@ -1,16 +1,11 @@
-import logging
-
 from eth_typing import HexStr
 from web3 import AsyncWeb3
-from web3.exceptions import ContractCustomError
 from web3.types import ChecksumAddress, TxReceipt, Wei
 
 from src.common.contracts import BaseEncoder, ContractWrapper, ErrorMixin
-from src.common.transaction import tx_manager
+from src.common.transaction import transact_checked
 from src.common.typings import HarvestParams
 from src.meta_vault.typings import SubVaultExitRequest
-
-logger = logging.getLogger(__name__)
 
 
 class MetaVaultContract(ContractWrapper, ErrorMixin):
@@ -58,12 +53,7 @@ class SubVaultsRegistryContract(ContractWrapper, ErrorMixin):
 
     async def deposit_to_sub_vaults(self) -> TxReceipt | None:
         tx_function = self.contract.functions.depositToSubVaults()
-        try:
-            return await tx_manager.transact(tx_function)
-        except ContractCustomError as e:
-            reason = self.decode_custom_error(str(e.data)) or e.data
-            logger.error('Deposit to sub vaults execution reverted with %s', reason)
-            raise
+        return await transact_checked(tx_function, contract=self, action='deposit to sub vaults')
 
 
 class SubVaultsRegistryEncoder(BaseEncoder):
