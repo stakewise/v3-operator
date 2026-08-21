@@ -1,6 +1,8 @@
 import asyncio
 import functools
 from collections.abc import AsyncIterator, Callable
+from dataclasses import replace
+from itertools import batched
 from typing import Any, cast
 
 import aioitertools
@@ -124,15 +126,7 @@ async def fetch_positions_with_processed_shares(
     async for position, processed_shares in aioitertools.zip(
         positions, cached_iter_processed_shares(positions, nonce, block_number)
     ):
-        enriched.append(
-            OsTokenPosition(
-                owner=position.owner,
-                vault=position.vault,
-                leaf_shares=position.leaf_shares,
-                index=position.index,
-                processed_shares=processed_shares,
-            )
-        )
+        enriched.append(replace(position, processed_shares=processed_shares))
     return enriched
 
 
@@ -169,8 +163,7 @@ async def iter_processed_shares(
 ) -> AsyncIterator[Wei]:
     """Fetch processed shares via batched multicalls, yielding one value per position.
     The generator flattens batch results so callers see a flat stream aligned with positions."""
-    for i in range(0, len(positions), OS_TOKEN_REDEEMER_CHUNK_SIZE):
-        batch = positions[i : i + OS_TOKEN_REDEEMER_CHUNK_SIZE]
+    for batch in batched(positions, OS_TOKEN_REDEEMER_CHUNK_SIZE):
         rpc_results = await os_token_redeemer_contract.multicall_leaf_to_processed_shares(
             batch, nonce, block_number
         )
@@ -189,8 +182,7 @@ async def iter_live_shares(
     # Calldata encoding depends only on the ABI, so one VaultContract instance can encode
     # calls for every vault.
     encoder = VaultContract(positions[0].vault)
-    for i in range(0, len(positions), OS_TOKEN_REDEEMER_CHUNK_SIZE):
-        batch = positions[i : i + OS_TOKEN_REDEEMER_CHUNK_SIZE]
+    for batch in batched(positions, OS_TOKEN_REDEEMER_CHUNK_SIZE):
         calls = [
             (position.vault, encoder.encode_abi('osTokenPositions', [position.owner]))
             for position in batch

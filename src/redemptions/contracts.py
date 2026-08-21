@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 from web3 import Web3
 from web3.types import BlockNumber, ChecksumAddress, EventData, Wei
 
@@ -58,7 +60,7 @@ class OsTokenRedeemerContract(ContractWrapper, ErrorMixin):
         )
 
     async def multicall_leaf_to_processed_shares(
-        self, positions: list[OsTokenPosition], nonce: int, block_number: BlockNumber
+        self, positions: Sequence[OsTokenPosition], nonce: int, block_number: BlockNumber
     ) -> list[Wei]:
         calls = [
             self.encode_abi('leafToProcessedShares', [p.leaf_hash(nonce - 1)]) for p in positions
