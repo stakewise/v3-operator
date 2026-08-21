@@ -4,7 +4,7 @@ from typing import Iterator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from eth_typing import BlockNumber, ChecksumAddress
+from eth_typing import BlockNumber
 from sw_utils.tests import faker
 from web3 import Web3
 from web3.types import Gwei, Wei
@@ -14,8 +14,8 @@ from src.redemptions.commands.process_redeemer import (
     process,
     redeem_positions,
 )
-from src.redemptions.merkle_tree import PositionsMerkleTree
 from src.redemptions.os_token_converter import OsTokenConverter
+from src.redemptions.tests.factories import make_position, make_tree
 from src.redemptions.typings import OsTokenPosition, VaultOsTokenPosition
 
 MODULE = 'src.redemptions.commands.process_redeemer'
@@ -80,8 +80,8 @@ class TestRedeemPositions:
 
     async def test_multiple_positions_share_vault_cache(self) -> None:
         """Withdrawable is fetched once per vault, decremented after each redemption."""
-        pos1 = make_position(owner=OWNER_1, processed_shares=500)
-        pos2 = make_position(owner=OWNER_2, processed_shares=0)
+        pos1 = make_position(vault=VAULT_1, owner=OWNER_1, processed_shares=500)
+        pos2 = make_position(vault=VAULT_1, owner=OWNER_2, processed_shares=0)
 
         get_withdrawable = AsyncMock(return_value=Wei(700))
         with _mock_redeem_positions(withdrawable=get_withdrawable) as mocks:
@@ -499,41 +499,3 @@ def _mock_process(
 
 def make_converter(total_assets: int = 110, total_shares: int = 100) -> OsTokenConverter:
     return OsTokenConverter(Wei(total_assets), Wei(total_shares))
-
-
-def make_tree(
-    positions: list[OsTokenPosition] | None = None, nonce: int = 5
-) -> PositionsMerkleTree:
-    """Build a positions merkle tree. Defaults to a single position so callers that
-    only need a valid tree (e.g. when tx_redeem_position is mocked) can omit it."""
-    return PositionsMerkleTree(positions or [make_position()], leaf_nonce=nonce)
-
-
-def make_position(
-    vault: ChecksumAddress = VAULT_1,
-    owner: ChecksumAddress = OWNER_1,
-    leaf_shares: int = 1000,
-    processed_shares: int = 500,
-    shares_to_redeem: int | None = None,
-) -> OsTokenPosition:
-    """Build a test position.
-
-    ``processed_shares`` defaults to half of ``leaf_shares`` so redemption-loop
-    tests don't silently no-op when a caller forgets to set it.
-
-    ``shares_to_redeem`` defaults to ``leaf_shares - processed_shares``
-    (i.e. unprocessed shares), mirroring what ``assign_shares_to_redeem`` would set
-    before handing positions to ``redeem_positions``.  Pass an explicit value
-    when testing the partial-fill or zero-withdrawable edge cases.
-    """
-    effective_shares_to_redeem = (
-        shares_to_redeem if shares_to_redeem is not None else leaf_shares - processed_shares
-    )
-    return OsTokenPosition(
-        vault=vault,
-        owner=owner,
-        leaf_shares=Wei(leaf_shares),
-        index=0,
-        processed_shares=Wei(processed_shares),
-        shares_to_redeem=Wei(effective_shares_to_redeem),
-    )
