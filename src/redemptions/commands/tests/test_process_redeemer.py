@@ -266,13 +266,13 @@ class TestProcess:
     async def test_no_queued_shares(self) -> None:
         with _mock_process() as mocks:
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(0))
-            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(1))
+            await process(min_queued_assets=Gwei(1))
 
     async def test_below_threshold(self) -> None:
         with _mock_process() as mocks:
             # 500 wei queued shares, threshold is 1000 Gwei
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(500))
-            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(1000))
+            await process(min_queued_assets=Gwei(1000))
             mocks['mock_redeem'].assert_not_called()
 
     async def test_gas_price_check_fails(self) -> None:
@@ -281,7 +281,7 @@ class TestProcess:
             _mock_process() as mocks,
             patch(f'{MODULE}.check_gas_price', new=AsyncMock(return_value=False)),
         ):
-            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(0))
+            await process(min_queued_assets=Gwei(0))
         mocks['mock_redeemer'].queued_shares.assert_not_called()
         mocks['mock_redeem'].assert_not_called()
 
@@ -290,7 +290,7 @@ class TestProcess:
         with _mock_process() as mocks:
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
             mocks['mock_redeemer'].nonce = AsyncMock(return_value=0)
-            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(0))
+            await process(min_queued_assets=Gwei(0))
         mocks['mock_redeem'].assert_not_called()
 
     async def test_no_positions_from_ipfs(self) -> None:
@@ -298,7 +298,7 @@ class TestProcess:
         with _mock_process(positions=[]) as mocks:
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
             mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
-            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(0))
+            await process(min_queued_assets=Gwei(0))
         mocks['mock_redeem'].assert_not_called()
 
     async def test_no_eligible_positions(self) -> None:
@@ -310,7 +310,7 @@ class TestProcess:
         ):
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
             mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
-            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(0))
+            await process(min_queued_assets=Gwei(0))
         mocks['mock_redeem'].assert_not_called()
 
     async def test_successful_redemption(self) -> None:
@@ -320,7 +320,7 @@ class TestProcess:
             mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
             mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
 
-            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(0))
+            await process(min_queued_assets=Gwei(0))
 
         mocks['mock_redeem'].assert_awaited_once()
         redeem_call = mocks['mock_redeem'].await_args
@@ -337,7 +337,7 @@ class TestProcess:
             mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
             mocks['mock_update_state'].return_value = False
 
-            await process(block_number=BlockNumber(100), min_queued_assets=Gwei(0))
+            await process(min_queued_assets=Gwei(0))
 
         mocks['mock_update_state'].assert_awaited_once()
         mocks['mock_redeem'].assert_not_awaited()
