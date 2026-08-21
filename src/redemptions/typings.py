@@ -5,6 +5,8 @@ from multiproof.standard import standard_leaf_hash
 from web3 import Web3
 from web3.types import Wei
 
+LEAF_TYPES = ['uint256', 'address', 'uint256', 'address']
+
 
 @dataclass
 class VaultOsTokenPosition:
@@ -86,11 +88,21 @@ class OsTokenPosition:
         return Wei(max(0, self.leaf_shares - self.processed_shares))
 
     def as_dict(self) -> dict:
+        """``as_dict``/``from_dict`` define the IPFS positions file schema (kept in one place)."""
         return {
             'owner': self.owner,
             'vault': self.vault,
             'leaf_shares': str(self.leaf_shares),
         }
+
+    @classmethod
+    def from_dict(cls, data: dict, index: int = 0) -> 'OsTokenPosition':
+        return cls(
+            owner=Web3.to_checksum_address(data['owner']),
+            vault=Web3.to_checksum_address(data['vault']),
+            leaf_shares=Wei(int(data['leaf_shares'])),
+            index=index,
+        )
 
     def merkle_leaf(self, nonce: int) -> tuple[int, ChecksumAddress, Wei, ChecksumAddress]:
         return nonce, self.vault, self.leaf_shares, self.owner
@@ -99,7 +111,7 @@ class OsTokenPosition:
         """Get the Merkle leaf hash"""
         return standard_leaf_hash(
             values=(nonce, self.vault, self.leaf_shares, self.owner),
-            types=['uint256', 'address', 'uint256', 'address'],
+            types=LEAF_TYPES,
         )
 
 

@@ -8,7 +8,6 @@ from pathlib import Path
 
 import click
 from eth_typing import BlockNumber, ChecksumAddress
-from multiproof import StandardMerkleTree
 from sw_utils import OsTokenConverter
 from web3 import Web3
 from web3.types import Gwei, Wei
@@ -42,6 +41,7 @@ from src.redemptions.graph import (
     graph_get_os_token_holders,
     graph_get_redeemable_allocators,
 )
+from src.redemptions.merkle_tree import PositionsMerkleTree
 from src.redemptions.os_token_converter import create_os_token_converter
 from src.redemptions.typings import (
     Allocator,
@@ -291,16 +291,7 @@ async def process(
 
     # calculate merkle root
     nonce = await os_token_redeemer_contract.nonce()
-    leaves = [r.merkle_leaf(nonce) for r in os_token_positions]
-    tree = StandardMerkleTree.of(
-        leaves,
-        [
-            'uint256',
-            'address',
-            'uint256',
-            'address',
-        ],
-    )
+    tree = PositionsMerkleTree(os_token_positions, leaf_nonce=nonce)
     click.echo(f'Generated Merkle Tree root: {tree.root}')
 
     ipfs_upload_client = build_ipfs_upload_clients()

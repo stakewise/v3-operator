@@ -310,7 +310,7 @@ def _mock_simulate_redeem_position(
 def make_tree(
     positions: list[OsTokenPosition] | None = None, nonce: int = 5
 ) -> PositionsMerkleTree:
-    return PositionsMerkleTree(positions or [make_position()], nonce)
+    return PositionsMerkleTree(positions or [make_position()], leaf_nonce=nonce)
 
 
 def make_position(

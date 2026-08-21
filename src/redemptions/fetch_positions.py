@@ -228,14 +228,6 @@ async def fetch_positions_from_ipfs(
     data = cast(list[dict], await ipfs_fetch_client.fetch_json(redeemable_positions.ipfs_hash))
 
     # data structure example:
-    # [{"owner:" 0x01, "leaf_shares": 100000, "vault": 0x02}, ...]
+    # [{"owner": 0x01, "leaf_shares": 100000, "vault": 0x02}, ...]
 
-    return [
-        OsTokenPosition(
-            owner=Web3.to_checksum_address(item['owner']),
-            vault=Web3.to_checksum_address(item['vault']),
-            leaf_shares=Wei(int(item['leaf_shares'])),
-            index=index,
-        )
-        for index, item in enumerate(data)
-    ]
+    return [OsTokenPosition.from_dict(item, index=index) for index, item in enumerate(data)]
