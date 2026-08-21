@@ -212,7 +212,6 @@ async def main(
         await close_clients()
 
 
-# pylint: disable-next=too-many-locals
 async def process(
     min_os_token_position_amount_gwei: Gwei,
     api_config: ApiConfig,
@@ -222,17 +221,57 @@ async def process(
     """
     finalized_block = await execution_client.eth.get_block('finalized')
     block_number = finalized_block['number']
+
+    allocators = await _fetch_allocators(block_number)
+
+    logger.info('Fetching boosted positions from the subgraph...')
+    leverage_positions = await graph_get_leverage_positions(block_number)
+    allocators = _exclude_boost_proxies(allocators, leverage_positions)
+    await _apply_boost(allocators, leverage_positions, block_number)
+
+    # filter zero positions. Filter before kept shares calculation to reduce api calls
+    min_redeemable_shares = Web3.to_wei(min_os_token_position_amount_gwei, 'gwei')
+    allocators = _filter_min_redeemable_shares(allocators, min_redeemable_shares)
+
+    if not allocators:
+        logger.info('No allocators with redeemable shares above the threshold found, exiting...')
+        return
+
+    logger.info('Fetching kept tokens for %s addresses', len(allocators))
+    api_client = _build_api_client(api_config)
+    await populate_kept_shares(allocators, block_number, api_client)
+    logger.info('Fetched kept tokens for %s addresses...', len(allocators))
+
+    os_token_positions = create_os_token_positions(allocators, min_redeemable_shares)
+    if not os_token_positions:
+        logger.info('No redeemable os token positions to upload, exiting...')
+        return
+
+    await _publish_positions(os_token_positions)
+
+
+async def _fetch_allocators(block_number: BlockNumber) -> list[Allocator]:
     logger.info('Fetching allocators from the subgraph...')
     allocators = await graph_get_redeemable_allocators(block_number)
     logger.info('Fetched %s allocators from the subgraph', len(allocators))
+    return allocators
 
-    # filter boost proxy positions
-    logger.info('Fetching boosted positions from the subgraph...')
-    leverage_positions = await graph_get_leverage_positions(block_number)
+
+def _exclude_boost_proxies(
+    allocators: list[Allocator],
+    leverage_positions: list[LeverageStrategyPosition],
+) -> list[Allocator]:
+    """Boost proxies hold minted osToken on behalf of a user; they are never allocators."""
     boost_proxies = {pos.proxy for pos in leverage_positions}
     logger.info('Found %s proxy positions to exclude', len(boost_proxies))
-    allocators = [a for a in allocators if a.address not in boost_proxies]
-    # reduce boosted positions
+    return [a for a in allocators if a.address not in boost_proxies]
+
+
+async def _apply_boost(
+    allocators: list[Allocator],
+    leverage_positions: list[LeverageStrategyPosition],
+    block_number: BlockNumber,
+) -> None:
     os_token_converter = await create_os_token_converter(block_number)
     boost_os_token_shares = await calculate_boost_os_token_shares(
         users={a.address for a in allocators},
@@ -241,38 +280,35 @@ async def process(
     )
     _distribute_boosted_shares(allocators, boost_os_token_shares)
 
-    # filter zero positions. Filter before kept shares calculation to reduce api calls
-    min_redeemable_shares = Web3.to_wei(min_os_token_position_amount_gwei, 'gwei')
+
+def _filter_min_redeemable_shares(
+    allocators: list[Allocator],
+    min_redeemable_shares: Wei,
+) -> list[Allocator]:
+    result = []
     for allocator in allocators:
-        allocator.vault_os_token_positions = [
+        vault_os_token_positions = [
             vault_position
             for vault_position in allocator.vault_os_token_positions
             if vault_position.redeemable_shares >= min_redeemable_shares
         ]
+        # drop allocators left with no vault positions so populate_kept_shares
+        # doesn't waste a rate-limited api call on a guaranteed-zero position
+        if not vault_os_token_positions:
+            continue
+        allocator.vault_os_token_positions = vault_os_token_positions
+        result.append(allocator)
+    return result
 
-    if not allocators:
-        logger.info('No allocators with redeemable shares above the threshold found, exiting...')
-        return
 
-    logger.info('Fetching kept tokens for %s addresses', len(allocators))
-    address_to_redeemable_shares = {a.address: a.total_redeemable_shares for a in allocators}
-    kept_shares = await get_kept_shares(
-        address_to_redeemable_shares,
-        block_number,
-        api_config,
-    )
-    logger.info('Fetched kept tokens for %s addresses...', len(address_to_redeemable_shares))
-    # unmatched boosted shares are still held by the user, so keep them out of redeemable
-    # amounts by treating them as kept.
-    for allocator in allocators:
-        kept_shares[allocator.address] = Wei(
-            kept_shares[allocator.address] + allocator.residual_boosted_shares
-        )
+def _build_api_client(api_config: ApiConfig) -> APIClient | None:
+    # rabby doesnt support hoodi so skip api call
+    if settings.network not in API_SUPPORTED_CHAINS:
+        return None
+    return APIClient(api_config)
 
-    os_token_positions = create_os_token_positions(allocators, kept_shares, min_redeemable_shares)
-    if not os_token_positions:
-        logger.info('No redeemable os token positions to upload, exiting...')
-        return
+
+async def _publish_positions(os_token_positions: list[OsTokenPosition]) -> None:
     total_redeemable = sum(p.leaf_shares for p in os_token_positions)
     logger.info(
         'Created %(count)s redeemable os token positions. '
@@ -299,53 +335,47 @@ async def process(
     click.echo(f'Redeemable os token positions uploaded to IPFS: hash={ipfs_hash}')
 
 
-# pylint: disable-next=too-many-locals
-async def get_kept_shares(
-    address_to_redeemable_shares: dict[ChecksumAddress, Wei],
+async def populate_kept_shares(
+    allocators: list[Allocator],
     block_number: BlockNumber,
-    api_config: ApiConfig,
-) -> dict[ChecksumAddress, Wei]:
-    kept_shares = defaultdict(lambda: Wei(0))
+    api_client: APIClient | None,
+) -> None:
+    """Sets ``wallet_shares`` for every allocator, then ``locked_shares`` via the API — but only
+    for allocators whose wallet balance doesn't already cover their redeemable amount, and only
+    when the network is API-supported."""
     logger.info(
         'Fetching %s balances from the subgraph...', settings.network_config.OS_TOKEN_BALANCE_SYMBOL
     )
     os_token_holders = await graph_get_os_token_holders(block_number)
-    for address in address_to_redeemable_shares.keys():
-        kept_shares[address] = os_token_holders.get(address, Wei(0))
+    for allocator in allocators:
+        allocator.wallet_shares = os_token_holders.get(allocator.address, Wei(0))
 
-    # rabby doesnt support hoodi so skip api call
-    if settings.network not in API_SUPPORTED_CHAINS:
-        return kept_shares
+    if api_client is None:
+        return
 
     # do not fetch data from api if all os token are in the wallet
-    api_addresses = []
-    for address in address_to_redeemable_shares.keys():
-        if address_to_redeemable_shares[address] >= kept_shares[address]:
-            api_addresses.append(address)
-
-    if not api_addresses:
-        return kept_shares
+    api_allocators = [a for a in allocators if a.total_redeemable_shares >= a.wallet_shares]
+    if not api_allocators:
+        return
 
     logger.info(
         'Fetching locked %s from %s API for %s addresses...',
         settings.network_config.OS_TOKEN_BALANCE_SYMBOL,
-        api_config.source,
-        len(api_addresses),
+        api_client.source,
+        len(api_allocators),
     )
-    api_client = APIClient(api_source=api_config.source, api_access_key=api_config.access_key)
-    # fetch locked os token from the api
     with click.progressbar(
-        api_addresses,
+        api_allocators,
         label='Fetching os token amount locked in protocols from the api:\t\t',
         show_percent=False,
         show_pos=True,
     ) as progress_bar:
-        for index, address in enumerate(progress_bar):
+        for index, allocator in enumerate(progress_bar):
             if index:
-                await asyncio.sleep(api_config.sleep_timeout)  # to avoid rate limiting
-            locked_os_token = await api_client.get_protocols_locked_os_token(address=address)
-            kept_shares[address] = Wei(kept_shares[address] + locked_os_token)
-    return kept_shares
+                await asyncio.sleep(api_client.sleep_timeout)  # to avoid rate limiting
+            allocator.locked_shares = await api_client.get_protocols_locked_os_token(
+                address=allocator.address
+            )
 
 
 async def calculate_boost_os_token_shares(
@@ -356,9 +386,6 @@ async def calculate_boost_os_token_shares(
     boosted_positions: defaultdict[tuple[ChecksumAddress, ChecksumAddress], Wei] = defaultdict(
         lambda: Wei(0)
     )
-    if not leverage_positions:
-        return boosted_positions
-
     for position in leverage_positions:
         if position.user not in users:
             continue
@@ -377,45 +404,26 @@ async def calculate_boost_os_token_shares(
 
 def create_os_token_positions(
     allocators: list[Allocator],
-    kept_shares: dict[ChecksumAddress, Wei],
     min_redeemable_shares: Wei,
 ) -> list[OsTokenPosition]:
     """
-    Calculate vault proportions and create redeemable os token positions.
-    Sort by ltv descending, then amount descending.
+    Split each allocator's redeemable shares across its vaults and sort the resulting
+    positions by ltv descending, then amount descending.
     """
-    os_token_positions: list[OsTokenPosition] = []
-    position_ltv: dict[tuple[ChecksumAddress, ChecksumAddress], float] = {}
-    for allocator in allocators:
-        allocator_kept_shares = kept_shares.get(allocator.address, Wei(0))
-        redeemable_amount = max(0, allocator.total_redeemable_shares - allocator_kept_shares)
-        if redeemable_amount == 0:
-            continue
-
-        vault_ltv = {p.address: p.ltv for p in allocator.vault_os_token_positions}
-        allocated_amount = 0
-        vaults_proportions = allocator.vaults_proportions.items()
-        for index, (vault_address, proportion) in enumerate(vaults_proportions):
-            # dust handling
-            if index == len(vaults_proportions) - 1:
-                vault_amount = max(0, int(redeemable_amount - allocated_amount))
-            else:
-                vault_amount = int(redeemable_amount * proportion)
-            allocated_amount += vault_amount
-            if vault_amount < min_redeemable_shares:
-                continue
-            os_token_positions.append(
-                OsTokenPosition(
-                    owner=allocator.address,
-                    vault=vault_address,
-                    leaf_shares=Wei(vault_amount),
-                )
-            )
-            position_ltv[allocator.address, vault_address] = vault_ltv[vault_address]
-    os_token_positions.sort(
-        key=lambda p: (position_ltv[p.owner, p.vault], p.leaf_shares), reverse=True
-    )
-    return os_token_positions
+    slices = [
+        vault_slice
+        for allocator in allocators
+        for vault_slice in allocator.iter_vault_slices(min_redeemable_shares)
+    ]
+    slices.sort(key=lambda s: (s.vault_position.ltv, s.amount), reverse=True)
+    return [
+        OsTokenPosition(
+            owner=s.allocator.address,
+            vault=s.vault_position.address,
+            leaf_shares=s.amount,
+        )
+        for s in slices
+    ]
 
 
 def _save_positions_to_file(positions_payload: list[dict]) -> Path:

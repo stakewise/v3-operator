@@ -6,6 +6,7 @@ from web3.types import Wei
 
 from src.config.networks import GNOSIS, MAINNET, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
+from src.redemptions.typings import ApiConfig
 
 RABBY_API_ENDPOINT = 'https://api.rabby.io/'
 DEBANK_API_ENDPOINT = 'https://pro-openapi.debank.com/'
@@ -29,17 +30,18 @@ STAKEWISE_DEBANK_PROTOCOL_IDS = ['stakewise', 'xdai_stakewise']
 
 class APIClient:
 
-    def __init__(
-        self, api_source: str = RABBY_API_SOURCE, api_access_key: str | None = None
-    ) -> None:
-        self.base_url = API_SOURCES[api_source]
-        self.api_access_key = api_access_key
-
-    async def get_protocols_locked_os_token(self, address: ChecksumAddress) -> Wei:
+    def __init__(self, api_config: ApiConfig) -> None:
         api_chain = API_SUPPORTED_CHAINS.get(settings.network)
         if api_chain is None:
             raise ValueError(f'Unsupported network for API Client: {settings.network}')
 
+        self.base_url = API_SOURCES[api_config.source]
+        self.source = api_config.source
+        self.access_key = api_config.access_key
+        self.sleep_timeout = api_config.sleep_timeout
+        self.api_chain = api_chain
+
+    async def get_protocols_locked_os_token(self, address: ChecksumAddress) -> Wei:
         url = urljoin(self.base_url, 'v1/user/complex_protocol_list')
         params = {
             'id': address,
@@ -48,7 +50,7 @@ class APIClient:
         protocol_data = await self._fetch_json(url, params=params)
         total_locked_os_token = Wei(0)
         for protocol in protocol_data:
-            if protocol['chain'] != api_chain:
+            if protocol['chain'] != self.api_chain:
                 continue
             # boosted OsEth handled via graph separately
             if protocol['id'] in STAKEWISE_DEBANK_PROTOCOL_IDS:
@@ -56,7 +58,7 @@ class APIClient:
             for portfolio_item in protocol.get('portfolio_item_list', []):
                 supply_token_list = portfolio_item.get('detail', {}).get('supply_token_list', [])
                 for supply_token in supply_token_list:
-                    if supply_token['chain'] != api_chain:
+                    if supply_token['chain'] != self.api_chain:
                         continue
                     if not Web3.is_address(supply_token['id']):
                         continue
@@ -69,8 +71,8 @@ class APIClient:
 
     async def _fetch_json(self, url: str, params: dict | None = None) -> dict | list:
         headers: dict[str, str] = {'user-agent': DEFAULT_USER_AGENT}
-        if self.api_access_key:
-            headers['AccessKey'] = self.api_access_key
+        if self.access_key:
+            headers['AccessKey'] = self.access_key
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 url=url,
