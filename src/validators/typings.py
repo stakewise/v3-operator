@@ -4,6 +4,7 @@ from typing import NewType
 from eth_typing import BlockNumber, BLSSignature, ChecksumAddress, HexStr
 from eth_utils import add_0x_prefix
 from sw_utils import ValidatorStatus
+from web3 import Web3
 from web3.types import Gwei, Wei
 
 from src.config.settings import MIN_ACTIVATION_BALANCE_GWEI, settings
@@ -48,6 +49,17 @@ class Validator:
 
 
 @dataclass
+class ValidatorConsolidationData:
+    is_source: bool
+    is_target: bool
+
+    # Total balance the target will receive from its pending consolidation sources.
+    # Stays `None` when at least one of the source balances is unknown.
+    target_balance: Gwei | None = None
+
+
+@dataclass
+# pylint: disable-next=too-many-instance-attributes
 class ConsensusValidator:
     index: int
     public_key: HexStr
@@ -56,9 +68,18 @@ class ConsensusValidator:
     status: ValidatorStatus
     activation_epoch: int
 
+    # Optional fields populated by `build_consensus_validators` when the corresponding
+    # flag is passed. They stay `None` when the data was not requested.
+    pending_balance: Gwei | None = None
+    consolidation_data: ValidatorConsolidationData | None = None
+
     @property
     def is_compounding(self) -> bool:
         return self.withdrawal_credentials.startswith('0x02')
+
+    @property
+    def withdrawal_address(self) -> ChecksumAddress:
+        return Web3.to_checksum_address(self.withdrawal_credentials[-40:])
 
     @property
     def withdrawal_capacity(self) -> Gwei:
@@ -68,7 +89,7 @@ class ConsensusValidator:
         return (
             self.is_compounding
             and self.status == ValidatorStatus.ACTIVE_ONGOING
-            and self.activation_epoch < epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
+            and self.activation_epoch <= epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
         )
 
     @staticmethod
@@ -131,7 +152,3 @@ class ConsolidationRequest:
 class ConsolidationKeys:
     source_public_keys: list[HexStr]
     target_public_key: HexStr
-
-    @property
-    def all_public_keys(self) -> list[HexStr]:
-        return list(dict.fromkeys(self.source_public_keys + [self.target_public_key]))

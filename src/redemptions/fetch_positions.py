@@ -9,6 +9,7 @@ from web3 import Web3
 from web3.types import Wei
 
 from src.common.clients import ipfs_fetch_client
+from src.common.contracts import VaultContract, multicall_contract
 from src.common.typings import Singleton
 from src.config.settings import OS_TOKEN_REDEEMER_CHUNK_SIZE, settings
 from src.redemptions.contracts import os_token_redeemer_contract
@@ -177,6 +178,28 @@ async def iter_processed_shares(
             yield res
 
 
+async def iter_live_shares(
+    positions: list[OsTokenPosition],
+    block_number: BlockNumber,
+) -> AsyncIterator[Wei]:
+    """Fetch each position owner's live vault.osTokenPositions(owner) via batched
+    multicalls, yielding one value per position."""
+    if not positions:
+        return
+    # Calldata encoding depends only on the ABI, so one VaultContract instance can encode
+    # calls for every vault.
+    encoder = VaultContract(positions[0].vault)
+    for i in range(0, len(positions), OS_TOKEN_REDEEMER_CHUNK_SIZE):
+        batch = positions[i : i + OS_TOKEN_REDEEMER_CHUNK_SIZE]
+        calls = [
+            (position.vault, encoder.encode_abi('osTokenPositions', [position.owner]))
+            for position in batch
+        ]
+        _, results = await multicall_contract.aggregate(calls, block_number=block_number)
+        for res in results:
+            yield Wei(Web3.to_int(res))
+
+
 async def cached_fetch_positions_from_ipfs(
     nonce: int,
     block_number: BlockNumber,
@@ -205,14 +228,6 @@ async def fetch_positions_from_ipfs(
     data = cast(list[dict], await ipfs_fetch_client.fetch_json(redeemable_positions.ipfs_hash))
 
     # data structure example:
-    # [{"owner:" 0x01, "leaf_shares": 100000, "vault": 0x02}, ...]
+    # [{"owner": 0x01, "leaf_shares": 100000, "vault": 0x02}, ...]
 
-    return [
-        OsTokenPosition(
-            owner=Web3.to_checksum_address(item['owner']),
-            vault=Web3.to_checksum_address(item['vault']),
-            leaf_shares=Wei(int(item['leaf_shares'])),
-            index=index,
-        )
-        for index, item in enumerate(data)
-    ]
+    return [OsTokenPosition.from_dict(item, index=index) for index, item in enumerate(data)]

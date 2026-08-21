@@ -45,7 +45,7 @@ from src.redemptions.os_token_converter import (
     OsTokenConverter,
     create_os_token_converter,
 )
-from src.redemptions.tasks import assign_shares_to_redeem, is_position_ltv_exceeded
+from src.redemptions.tasks import assign_shares_to_redeem, get_vault_os_token_position
 from src.redemptions.typings import OsTokenPosition
 from src.validators.execution import get_withdrawable_assets
 
@@ -234,9 +234,13 @@ async def _redeem_os_token_positions(
     queued_assets = os_token_converter.to_assets(queued_shares)
     if queued_assets < Web3.to_wei(min_queued_assets, 'gwei'):
         logger.info(
-            'Queued assets %s below threshold %s. Skipping to next interval.',
-            Web3.from_wei(queued_assets, 'ether'),
-            Web3.from_wei(Web3.to_wei(min_queued_assets, 'gwei'), 'ether'),
+            'Queued assets %(queued)s %(symbol)s below threshold %(threshold)s %(symbol)s. '
+            'Skipping to next interval.',
+            {
+                'queued': Web3.from_wei(queued_assets, 'ether'),
+                'threshold': Web3.from_wei(Web3.to_wei(min_queued_assets, 'gwei'), 'ether'),
+                'symbol': settings.network_config.VAULT_BALANCE_SYMBOL,
+            },
         )
         return
 
@@ -287,7 +291,9 @@ async def _redeem_os_token_positions(
         # Re-fetch the block number so the freshly-updated state is visible downstream.
         block_number = await execution_client.eth.block_number
 
-    tree = PositionsMerkleTree(all_positions, nonce)
+    # Leaves use `nonce - 1`: setting the positions root increments the
+    # on-chain nonce, leaving it one ahead of the nonce baked into the leaves.
+    tree = PositionsMerkleTree(all_positions, leaf_nonce=nonce - 1)
     await redeem_positions(
         tree=tree,
         os_token_positions=os_token_positions,
@@ -331,9 +337,22 @@ async def redeem_positions(
         if position.vault in unharvested_vaults:
             continue
 
-        if await is_position_ltv_exceeded(position, converter, block_number):
+        vault_os_token_position = await get_vault_os_token_position(
+            position, converter, block_number
+        )
+        if vault_os_token_position.ltv > 1:
             logger.info('Skipping position index=%d: LTV > 1', position.index)
             continue
+
+        # Cap by the live minted position: the owner may have repaid or been
+        # liquidated after the positions file was published.
+        shares_to_redeem = Wei(min(shares_to_redeem, vault_os_token_position.minted_shares))
+        if shares_to_redeem <= 0:
+            logger.info(
+                'Skipping position index=%d: owner has no live osToken position', position.index
+            )
+            continue
+        assets_to_redeem = converter.to_assets(shares_to_redeem)
 
         if position.vault not in vault_to_withdrawable:
             if await VaultContract(position.vault).is_state_update_required(block_number):

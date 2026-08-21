@@ -1,14 +1,13 @@
 import asyncio
+import json
 import logging
 import sys
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import cast
 
 import click
 from eth_typing import BlockNumber, ChecksumAddress
-from multiproof import StandardMerkleTree
 from sw_utils import OsTokenConverter
 from web3 import Web3
 from web3.types import Gwei, Wei
@@ -17,18 +16,16 @@ from src.common.clients import (
     build_ipfs_upload_clients,
     close_clients,
     execution_client,
-    get_execution_client,
     setup_clients,
 )
-from src.common.contracts import Erc20Contract, MulticallContract
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.startup_check import (
     check_execution_nodes_network,
     wait_for_execution_node,
     wait_for_graph_node_sync_to_chain_head,
 )
-from src.common.utils import log_verbose
-from src.config.networks import AVAILABLE_NETWORKS, MAINNET, ZERO_CHECKSUM_ADDRESS
+from src.common.utils import get_current_timestamp, log_verbose
+from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
 from src.redemptions.api_client import (
     API_SLEEP_TIMEOUT,
@@ -44,11 +41,11 @@ from src.redemptions.graph import (
     graph_get_os_token_holders,
     graph_get_redeemable_allocators,
 )
+from src.redemptions.merkle_tree import PositionsMerkleTree
 from src.redemptions.os_token_converter import create_os_token_converter
 from src.redemptions.typings import (
     Allocator,
     ApiConfig,
-    ArbitrumConfig,
     LeverageStrategyPosition,
     OsTokenPosition,
 )
@@ -108,12 +105,6 @@ logger = logging.getLogger(__name__)
     help='API endpoint for graph node.',
 )
 @click.option(
-    '--arbitrum-endpoint',
-    type=str,
-    envvar='ARBITRUM_ENDPOINT',
-    help='API endpoint for the Arbitrum execution node. Should only be specified for mainnet.',
-)
-@click.option(
     '--log-level',
     type=click.Choice(
         LOG_LEVELS,
@@ -146,7 +137,6 @@ def update_redeemable_positions(
     execution_endpoints: str,
     execution_jwt_secret: str | None,
     graph_endpoint: str,
-    arbitrum_endpoint: str | None,
     network: str,
     verbose: bool,
     log_level: str,
@@ -173,16 +163,6 @@ def update_redeemable_positions(
         network=network,
         log_level=log_level,
     )
-    arbitrum_config: ArbitrumConfig | None = None
-    if network == MAINNET:
-        if not arbitrum_endpoint:
-            arbitrum_endpoint = click.prompt(
-                'Enter the API endpoint for the Arbitrum execution node'
-            )
-        arbitrum_config = ArbitrumConfig(
-            OS_TOKEN_CONTRACT_ADDRESS=settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS,
-            EXECUTION_ENDPOINT=cast(str, arbitrum_endpoint),
-        )
     try:
         # Try-catch to enable async calls in test - an event loop
         #  will already be running in that case
@@ -193,7 +173,6 @@ def update_redeemable_positions(
                 pool.submit(
                     lambda: asyncio.run(
                         main(
-                            arbitrum_config=arbitrum_config,
                             min_os_token_position_amount_gwei=Gwei(
                                 min_os_token_position_amount_gwei
                             ),
@@ -206,7 +185,6 @@ def update_redeemable_positions(
                 # no event loop running
                 asyncio.run(
                     main(
-                        arbitrum_config=arbitrum_config,
                         min_os_token_position_amount_gwei=Gwei(min_os_token_position_amount_gwei),
                         api_config=api_config,
                     )
@@ -219,16 +197,14 @@ def update_redeemable_positions(
 
 
 async def main(
-    arbitrum_config: ArbitrumConfig | None,
     min_os_token_position_amount_gwei: Gwei,
     api_config: ApiConfig,
 ) -> None:
     setup_logging()
     await setup_clients()
-    await _startup_check(arbitrum_config)
+    await _startup_check()
     try:
         await process(
-            arbitrum_config=arbitrum_config,
             min_os_token_position_amount_gwei=min_os_token_position_amount_gwei,
             api_config=api_config,
         )
@@ -238,7 +214,6 @@ async def main(
 
 # pylint: disable-next=too-many-locals
 async def process(
-    arbitrum_config: ArbitrumConfig | None,
     min_os_token_position_amount_gwei: Gwei,
     api_config: ApiConfig,
 ) -> None:
@@ -264,32 +239,37 @@ async def process(
         leverage_positions=leverage_positions,
         os_token_converter=os_token_converter,
     )
-    allocators = _reduce_boosted_amount(allocators, boost_os_token_shares)
+    _distribute_boosted_shares(allocators, boost_os_token_shares)
 
     # filter zero positions. Filter before kept shares calculation to reduce api calls
-    min_minted_shares = Web3.to_wei(min_os_token_position_amount_gwei, 'gwei')
+    min_redeemable_shares = Web3.to_wei(min_os_token_position_amount_gwei, 'gwei')
     for allocator in allocators:
         allocator.vault_os_token_positions = [
-            vault_share
-            for vault_share in allocator.vault_os_token_positions
-            if vault_share.minted_shares >= min_minted_shares
+            vault_position
+            for vault_position in allocator.vault_os_token_positions
+            if vault_position.redeemable_shares >= min_redeemable_shares
         ]
 
     if not allocators:
-        logger.info('No allocators with minted shares above the threshold found, exiting...')
+        logger.info('No allocators with redeemable shares above the threshold found, exiting...')
         return
 
     logger.info('Fetching kept tokens for %s addresses', len(allocators))
-    address_to_minted_shares = {a.address: a.total_shares for a in allocators}
+    address_to_redeemable_shares = {a.address: a.total_redeemable_shares for a in allocators}
     kept_shares = await get_kept_shares(
-        address_to_minted_shares,
+        address_to_redeemable_shares,
         block_number,
-        arbitrum_config,
         api_config,
     )
-    logger.info('Fetched kept tokens for %s addresses...', len(address_to_minted_shares))
+    logger.info('Fetched kept tokens for %s addresses...', len(address_to_redeemable_shares))
+    # unmatched boosted shares are still held by the user, so keep them out of redeemable
+    # amounts by treating them as kept.
+    for allocator in allocators:
+        kept_shares[allocator.address] = Wei(
+            kept_shares[allocator.address] + allocator.residual_boosted_shares
+        )
 
-    os_token_positions = create_os_token_positions(allocators, kept_shares, min_minted_shares)
+    os_token_positions = create_os_token_positions(allocators, kept_shares, min_redeemable_shares)
     if not os_token_positions:
         logger.info('No redeemable os token positions to upload, exiting...')
         return
@@ -305,30 +285,24 @@ async def process(
             'total_redeemable_eth': Web3.from_wei(total_redeemable, 'ether'),
         },
     )
-    ipfs_upload_client = build_ipfs_upload_clients()
-    ipfs_hash = await ipfs_upload_client.upload_json([p.as_dict() for p in os_token_positions])
-    click.echo(f'Redeemable os token positions uploaded to IPFS: hash={ipfs_hash}')
+    positions_payload = [p.as_dict() for p in os_token_positions]
+    positions_file = _save_positions_to_file(positions_payload)
+    click.echo(f'Redeemable os token positions saved to {positions_file}')
 
     # calculate merkle root
     nonce = await os_token_redeemer_contract.nonce()
-    leaves = [r.merkle_leaf(nonce) for r in os_token_positions]
-    tree = StandardMerkleTree.of(
-        leaves,
-        [
-            'uint256',
-            'address',
-            'uint256',
-            'address',
-        ],
-    )
+    tree = PositionsMerkleTree(os_token_positions, leaf_nonce=nonce)
     click.echo(f'Generated Merkle Tree root: {tree.root}')
+
+    ipfs_upload_client = build_ipfs_upload_clients()
+    ipfs_hash = await ipfs_upload_client.upload_json(positions_payload)
+    click.echo(f'Redeemable os token positions uploaded to IPFS: hash={ipfs_hash}')
 
 
 # pylint: disable-next=too-many-locals
 async def get_kept_shares(
-    address_to_minted_shares: dict[ChecksumAddress, Wei],
+    address_to_redeemable_shares: dict[ChecksumAddress, Wei],
     block_number: BlockNumber,
-    arbitrum_config: ArbitrumConfig | None,
     api_config: ApiConfig,
 ) -> dict[ChecksumAddress, Wei]:
     kept_shares = defaultdict(lambda: Wei(0))
@@ -336,16 +310,8 @@ async def get_kept_shares(
         'Fetching %s balances from the subgraph...', settings.network_config.OS_TOKEN_BALANCE_SYMBOL
     )
     os_token_holders = await graph_get_os_token_holders(block_number)
-    for address in address_to_minted_shares.keys():
+    for address in address_to_redeemable_shares.keys():
         kept_shares[address] = os_token_holders.get(address, Wei(0))
-
-    # arb wallet balance
-    if arbitrum_config:
-        arb_balances = await _get_arb_balances(
-            arbitrum_config, list(address_to_minted_shares.keys())
-        )
-        for address, arb_balance in arb_balances.items():
-            kept_shares[address] = Wei(kept_shares[address] + arb_balance)
 
     # rabby doesnt support hoodi so skip api call
     if settings.network not in API_SUPPORTED_CHAINS:
@@ -353,8 +319,8 @@ async def get_kept_shares(
 
     # do not fetch data from api if all os token are in the wallet
     api_addresses = []
-    for address in address_to_minted_shares.keys():
-        if address_to_minted_shares[address] >= kept_shares[address]:
+    for address in address_to_redeemable_shares.keys():
+        if address_to_redeemable_shares[address] >= kept_shares[address]:
             api_addresses.append(address)
 
     if not api_addresses:
@@ -380,34 +346,6 @@ async def get_kept_shares(
             locked_os_token = await api_client.get_protocols_locked_os_token(address=address)
             kept_shares[address] = Wei(kept_shares[address] + locked_os_token)
     return kept_shares
-
-
-async def _get_arb_balances(
-    arbitrum_config: ArbitrumConfig,
-    addresses: list[ChecksumAddress],
-) -> dict[ChecksumAddress, Wei]:
-    logger.info(
-        'Fetching %s from Arbitrum wallet balances...',
-        settings.network_config.OS_TOKEN_BALANCE_SYMBOL,
-    )
-    arb_execution_client = get_execution_client([arbitrum_config.EXECUTION_ENDPOINT])
-    try:
-        arb_contract = Erc20Contract(
-            settings.network_config.OS_TOKEN_ARBITRUM_CONTRACT_ADDRESS,
-            execution_client=arb_execution_client,
-        )
-        arb_multicall = MulticallContract(
-            address=settings.network_config.MULTICALL_CONTRACT_ADDRESS,
-            execution_client=arb_execution_client,
-        )
-        calls = [
-            (arb_contract.contract_address, arb_contract.encode_abi('balanceOf', [addr]))
-            for addr in addresses
-        ]
-        _, results = await arb_multicall.aggregate(calls)
-        return {address: Wei(Web3.to_int(result)) for address, result in zip(addresses, results)}
-    finally:
-        await arb_execution_client.provider.disconnect()
 
 
 async def calculate_boost_os_token_shares(
@@ -440,7 +378,7 @@ async def calculate_boost_os_token_shares(
 def create_os_token_positions(
     allocators: list[Allocator],
     kept_shares: dict[ChecksumAddress, Wei],
-    min_minted_shares: Wei,
+    min_redeemable_shares: Wei,
 ) -> list[OsTokenPosition]:
     """
     Calculate vault proportions and create redeemable os token positions.
@@ -450,11 +388,11 @@ def create_os_token_positions(
     position_ltv: dict[tuple[ChecksumAddress, ChecksumAddress], float] = {}
     for allocator in allocators:
         allocator_kept_shares = kept_shares.get(allocator.address, Wei(0))
-        redeemable_amount = max(0, allocator.total_shares - allocator_kept_shares)
+        redeemable_amount = max(0, allocator.total_redeemable_shares - allocator_kept_shares)
         if redeemable_amount == 0:
             continue
 
-        vault_ltv = {vs.address: vs.ltv for vs in allocator.vault_os_token_positions}
+        vault_ltv = {p.address: p.ltv for p in allocator.vault_os_token_positions}
         allocated_amount = 0
         vaults_proportions = allocator.vaults_proportions.items()
         for index, (vault_address, proportion) in enumerate(vaults_proportions):
@@ -464,7 +402,7 @@ def create_os_token_positions(
             else:
                 vault_amount = int(redeemable_amount * proportion)
             allocated_amount += vault_amount
-            if vault_amount < min_minted_shares:
+            if vault_amount < min_redeemable_shares:
                 continue
             os_token_positions.append(
                 OsTokenPosition(
@@ -480,19 +418,39 @@ def create_os_token_positions(
     return os_token_positions
 
 
-def _reduce_boosted_amount(
+def _save_positions_to_file(positions_payload: list[dict]) -> Path:
+    timestamp = get_current_timestamp()
+    positions_file = Path(f'redeemable_positions_{timestamp}.json')
+    with open(positions_file, 'w', encoding='utf-8') as f:
+        json.dump(positions_payload, f, indent=2)
+    return positions_file
+
+
+def _distribute_boosted_shares(
     allocators: list[Allocator],
     boost_os_token_shares: dict[tuple[ChecksumAddress, ChecksumAddress], Wei],
-) -> list[Allocator]:
-    for allocator in allocators:
-        for vault_share in allocator.vault_os_token_positions:
-            key = allocator.address, vault_share.address
-            boosted_amount = boost_os_token_shares.get(key, Wei(0))
-            vault_share.minted_shares = Wei(max(0, vault_share.minted_shares - boosted_amount))
-    return allocators
+) -> None:
+    """
+    osToken is fungible, so boosted shares aren't necessarily minted at the same vault the
+    leverage strategy borrows against. Match against the same-vault mint first; store
+    whatever can't be matched there as the allocator residual instead of dropping it.
+    """
+    allocators_by_address = {a.address: a for a in allocators}
+    for (user, vault), boosted_amount in boost_os_token_shares.items():
+        allocator = allocators_by_address.get(user)
+        if allocator is None:
+            continue
+        vault_position = allocator.get_vault_position(vault)
+        matched = Wei(0)
+        if vault_position:
+            matched = min(vault_position.minted_shares, boosted_amount)
+            vault_position.boosted_shares = matched
+        allocator.residual_boosted_shares = Wei(
+            allocator.residual_boosted_shares + boosted_amount - matched
+        )
 
 
-async def _startup_check(arbitrum_config: ArbitrumConfig | None) -> None:
+async def _startup_check() -> None:
     """Verify connectivity to execution nodes, the graph node, and IPFS upload clients."""
     logger.info('Checking connection to execution nodes...')
     await wait_for_execution_node()
@@ -500,33 +458,11 @@ async def _startup_check(arbitrum_config: ArbitrumConfig | None) -> None:
     logger.info('Checking execution nodes network...')
     await check_execution_nodes_network()
 
-    if arbitrum_config:
-        logger.info('Checking connection to Arbitrum execution node...')
-        await _check_arbitrum_execution_node(arbitrum_config)
-
     logger.info('Checking connection to graph node...')
     await wait_for_graph_node_sync_to_chain_head()
 
     logger.info('Checking IPFS upload clients...')
     await _check_ipfs_upload_clients()
-
-
-async def _check_arbitrum_execution_node(arbitrum_config: ArbitrumConfig) -> None:
-    arb_execution_client = get_execution_client([arbitrum_config.EXECUTION_ENDPOINT])
-    try:
-        block_number = await arb_execution_client.eth.block_number
-        if block_number <= 0:
-            raise RuntimeError(
-                f'Arbitrum execution node {arbitrum_config.EXECUTION_ENDPOINT} '
-                f'is not ready, current block number: {block_number}'
-            )
-        logger.info(
-            'Connected to Arbitrum execution node at %s. Current block number: %s',
-            arbitrum_config.EXECUTION_ENDPOINT,
-            block_number,
-        )
-    finally:
-        await arb_execution_client.provider.disconnect()
 
 
 async def _check_ipfs_upload_clients() -> None:

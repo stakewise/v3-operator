@@ -28,8 +28,6 @@ class HarvestTask(BaseTask):
 
         logger.info('Starting vault %s harvest', settings.vault)
 
-        tx_hash = await submit_harvest_transaction(harvest_params=harvest_params)
+        await submit_harvest_transaction(harvest_params=harvest_params)
 
-        if not tx_hash:
-            return
         logger.info('Successfully harvested')

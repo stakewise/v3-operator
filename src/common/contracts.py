@@ -24,7 +24,7 @@ from web3.contract.async_contract import (
 from web3.types import BlockNumber, ChecksumAddress, EventData, TxReceipt, Wei
 
 from src.common.clients import execution_client as default_execution_client
-from src.common.transaction import tx_manager
+from src.common.transaction import transact_checked
 from src.common.typings import (
     ExitQueueMissingAssetsParams,
     HarvestParams,
@@ -301,6 +301,16 @@ class VaultContract(ContractWrapper, VaultStateMixin, ErrorMixin):
             for event in events
         ]
 
+    async def get_v2_validator_registered_public_keys(
+        self, from_block: BlockNumber, to_block: BlockNumber | None = None
+    ) -> list[HexStr]:
+        events = await self._get_events(
+            self.events.V2ValidatorRegistered,  # type: ignore
+            from_block=from_block,
+            to_block=to_block or await self.execution_client.eth.get_block_number(),
+        )
+        return [Web3.to_hex(event['args']['publicKey']) for event in events]
+
     async def mev_escrow(self) -> ChecksumAddress:
         return await self.contract.functions.mevEscrow().call()
 
@@ -374,15 +384,6 @@ class VaultContract(ContractWrapper, VaultStateMixin, ErrorMixin):
             return [Web3.to_hex(event['args']['publicKey']) for event in events]
 
 
-class Erc20Contract(ContractWrapper):
-    abi_path = 'abi/Erc20Token.json'
-
-    async def get_balance(
-        self, address: ChecksumAddress, block_number: BlockNumber | None = None
-    ) -> Wei:
-        return await self.contract.functions.balanceOf(address).call(block_identifier=block_number)
-
-
 class VaultEncoder(BaseEncoder):
     """Helper class to encode Vault contract ABI calls."""
 
@@ -410,6 +411,15 @@ class ValidatorsRegistryContract(ContractWrapper):
         """Fetches the latest validators registry root."""
         deposit_root = await self.contract.functions.get_deposit_root().call()
         return Web3.to_hex(deposit_root)
+
+    async def get_deposit_events(
+        self, from_block: BlockNumber, to_block: BlockNumber | None = None
+    ) -> list[EventData]:
+        return await self._get_events(
+            self.events.DepositEvent,  # type: ignore
+            from_block=from_block,
+            to_block=to_block or await self.execution_client.eth.get_block_number(),
+        )
 
 
 class KeeperContract(ContractWrapper, ErrorMixin):
@@ -522,7 +532,7 @@ class RewardSplitterEncoder(BaseEncoder):
         )
 
 
-class MulticallContract(ContractWrapper):
+class MulticallContract(ContractWrapper, ErrorMixin):
     abi_path = 'abi/Multicall.json'
     settings_key = 'MULTICALL_CONTRACT_ADDRESS'
 
@@ -538,7 +548,7 @@ class MulticallContract(ContractWrapper):
         data: list[tuple[ChecksumAddress, HexStr]],
     ) -> TxReceipt | None:
         tx_function = self.contract.functions.aggregate(data)
-        return await tx_manager.transact(tx_function)
+        return await transact_checked(tx_function, contract=self, action='aggregate multicall')
 
 
 class ValidatorsCheckerContract(ContractWrapper):

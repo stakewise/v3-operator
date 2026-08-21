@@ -5,29 +5,42 @@ from multiproof.standard import standard_leaf_hash
 from web3 import Web3
 from web3.types import Wei
 
+LEAF_TYPES = ['uint256', 'address', 'uint256', 'address']
+
 
 @dataclass
 class VaultOsTokenPosition:
     address: ChecksumAddress
     minted_shares: Wei
     ltv: float
+    # part of the minted shares that backs a leverage strategy position
+    boosted_shares: Wei = Wei(0)
+
+    @property
+    def redeemable_shares(self) -> Wei:
+        return Wei(max(0, self.minted_shares - self.boosted_shares))
 
 
 @dataclass
 class Allocator:
     address: ChecksumAddress
     vault_os_token_positions: list[VaultOsTokenPosition]
+    # boosted shares that couldn't be matched against a same-vault mint
+    residual_boosted_shares: Wei = Wei(0)
 
     @property
-    def total_shares(self) -> Wei:
-        return Wei(sum(s.minted_shares for s in self.vault_os_token_positions))
+    def total_redeemable_shares(self) -> Wei:
+        return Wei(sum(s.redeemable_shares for s in self.vault_os_token_positions))
 
     @property
     def vaults_proportions(self) -> dict[ChecksumAddress, float]:
-        total = self.total_shares
+        total = self.total_redeemable_shares
         if total == 0:
             return {}
-        return {s.address: s.minted_shares / total for s in self.vault_os_token_positions}
+        return {s.address: s.redeemable_shares / total for s in self.vault_os_token_positions}
+
+    def get_vault_position(self, vault: ChecksumAddress) -> VaultOsTokenPosition | None:
+        return next((vs for vs in self.vault_os_token_positions if vs.address == vault), None)
 
 
 @dataclass
@@ -75,11 +88,21 @@ class OsTokenPosition:
         return Wei(max(0, self.leaf_shares - self.processed_shares))
 
     def as_dict(self) -> dict:
+        """``as_dict``/``from_dict`` define the IPFS positions file schema (kept in one place)."""
         return {
             'owner': self.owner,
             'vault': self.vault,
             'leaf_shares': str(self.leaf_shares),
         }
+
+    @classmethod
+    def from_dict(cls, data: dict, index: int = 0) -> 'OsTokenPosition':
+        return cls(
+            owner=Web3.to_checksum_address(data['owner']),
+            vault=Web3.to_checksum_address(data['vault']),
+            leaf_shares=Wei(int(data['leaf_shares'])),
+            index=index,
+        )
 
     def merkle_leaf(self, nonce: int) -> tuple[int, ChecksumAddress, Wei, ChecksumAddress]:
         return nonce, self.vault, self.leaf_shares, self.owner
@@ -88,7 +111,7 @@ class OsTokenPosition:
         """Get the Merkle leaf hash"""
         return standard_leaf_hash(
             values=(nonce, self.vault, self.leaf_shares, self.owner),
-            types=['uint256', 'address', 'uint256', 'address'],
+            types=LEAF_TYPES,
         )
 
 
@@ -97,12 +120,6 @@ class ApiConfig:
     source: str
     sleep_timeout: float
     access_key: str | None = None
-
-
-@dataclass
-class ArbitrumConfig:
-    OS_TOKEN_CONTRACT_ADDRESS: ChecksumAddress
-    EXECUTION_ENDPOINT: str
 
 
 @dataclass

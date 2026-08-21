@@ -59,12 +59,7 @@ class ConsolidationManager(ABC):
         )
 
         # Fetch consensus validators
-        if consolidation_keys is not None:
-            self.consensus_validators = await fetch_consensus_validators(
-                consolidation_keys.all_public_keys
-            )
-        else:
-            self.consensus_validators = await fetch_consensus_validators(self.vault_validators)
+        self.consensus_validators = await fetch_consensus_validators(self.vault_validators)
 
         # Pending consolidations
         pending_consolidations = await get_pending_consolidations(
@@ -106,6 +101,7 @@ class ConsolidationManager(ABC):
         - unique
         - in the vault
         - not exiting
+        - withdrawal address matches the vault
         - active for at least SHARD_COMMITTEE_PERIOD epochs
         - not consolidating to another validator
         - not consolidating from another validator
@@ -114,13 +110,16 @@ class ConsolidationManager(ABC):
         # Target validator must be:
         - in the vault
         - not exiting
+        - active
         - not consolidating to another validator
         - a compounding validator
+        - withdrawal address matches the vault
 
         # For switch from 0x01 to 0x02:
         - source and target public keys are the same
         - in the vault
         - not exiting
+        - withdrawal address matches the vault
         - active for at least SHARD_COMMITTEE_PERIOD epochs
         """
         raise NotImplementedError()
@@ -205,6 +204,10 @@ class ConsolidationSelector(ConsolidationManager):
                 continue
             if val.public_key in self.exclude_public_keys:
                 continue
+            if val.activation_epoch > self.chain_head.epoch:
+                continue
+            if val.withdrawal_address != settings.vault:
+                continue
             target_validators.append(val)
 
             # additional filters for source validators
@@ -272,6 +275,14 @@ class ConsolidationChecker(ConsolidationManager):
                 raise ConsolidationError(
                     f'Validator {source_public_key} is in exiting '
                     f'status {source_validator.status.value}.'
+                )
+
+            # Validate the source validator withdrawal address matches the vault
+            if source_validator.withdrawal_address != settings.vault:
+                raise ConsolidationError(
+                    f'Validator {source_public_key} withdrawal address '
+                    f'{source_validator.withdrawal_address} does not match '
+                    f'the vault address {settings.vault}.'
                 )
 
             # Validate the source validator has been active long enough
@@ -356,6 +367,12 @@ class ConsolidationChecker(ConsolidationManager):
                 raise ConsolidationError(
                     f'Target validator {self.target_public_key} is already a compounding validator.'
                 )
+            if target_validator.withdrawal_address != settings.vault:
+                raise ConsolidationError(
+                    f'Validator {self.target_public_key} withdrawal address '
+                    f'{target_validator.withdrawal_address} does not match '
+                    f'the vault address {settings.vault}.'
+                )
             # switch the 0x01 to 0x02
             if target_validator.activation_epoch > self.max_activation_epoch:
                 raise ConsolidationError(
@@ -368,6 +385,16 @@ class ConsolidationChecker(ConsolidationManager):
                 raise ConsolidationError(
                     f'The target validator {self.target_public_key} '
                     f'is not a compounding validator.'
+                )
+            if target_validator.activation_epoch > self.chain_head.epoch:
+                raise ConsolidationError(
+                    f'Target validator {self.target_public_key} is not active.'
+                )
+            if target_validator.withdrawal_address != settings.vault:
+                raise ConsolidationError(
+                    f'Validator {self.target_public_key} withdrawal address '
+                    f'{target_validator.withdrawal_address} does not match '
+                    f'the vault address {settings.vault}.'
                 )
         return target_validator
 
