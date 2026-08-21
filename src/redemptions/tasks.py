@@ -4,7 +4,7 @@ from dataclasses import replace
 
 from eth_typing import BlockNumber, ChecksumAddress
 from sw_utils import OsTokenConverter
-from sw_utils.typings import ChainHead, ProtocolConfig
+from sw_utils.typings import ChainHead
 from web3.types import Wei
 
 from src.common.contracts import VaultContract
@@ -39,23 +39,6 @@ async def get_redemption_assets(chain_head: ChainHead) -> Wei:
     await update_positions_cache(finalized_block_number)
     await update_processed_shares_cache(finalized_block_number)
 
-    protocol_config = await get_protocol_config()
-    vault_to_redemption_assets = await get_vault_to_redemption_assets_direct(
-        chain_head=chain_head, nonce=nonce, protocol_config=protocol_config
-    )
-    return vault_to_redemption_assets[settings.vault]
-
-
-async def get_vault_to_redemption_assets_direct(
-    chain_head: ChainHead, nonce: int, protocol_config: ProtocolConfig
-) -> defaultdict[ChecksumAddress, Wei]:
-    """
-    Get redemption assets per vault, based only on assets directly assigned
-    to each vault in the IPFS redeemable positions file. Meta vault assets are
-    not yet distributed across their sub-vault tree.
-
-    For Gno networks return value is in GNO-Wei.
-    """
     queued_shares = await os_token_redeemer_contract.queued_shares(
         block_number=chain_head.block_number
     )
@@ -65,6 +48,7 @@ async def get_vault_to_redemption_assets_direct(
     # OsToken in-protocol rate may increase while vault assets are exiting.
     # Ensure sufficient assets are allocated for redemption by applying
     # a conservative APR adjustment.
+    protocol_config = await get_protocol_config()
     total_redemption_assets = Wei(
         int(total_redemption_assets * protocol_config.os_token_redeem_multiplier)
     )
@@ -75,7 +59,7 @@ async def get_vault_to_redemption_assets_direct(
         os_token_converter=os_token_converter,
         block_number=chain_head.block_number,
     )
-    return vault_to_redemption_assets
+    return vault_to_redemption_assets.get(settings.vault, Wei(0))
 
 
 async def aggregate_redemption_assets_by_vaults(
@@ -83,7 +67,7 @@ async def aggregate_redemption_assets_by_vaults(
     nonce: int,
     os_token_converter: OsTokenConverter,
     block_number: BlockNumber,
-) -> defaultdict[ChecksumAddress, Wei]:
+) -> dict[ChecksumAddress, Wei]:
     """
     Iterate through redeemable positions until the total redemption assets are exhausted.
     Aggregate shares_to_redeem by vault and convert to assets.
@@ -107,16 +91,15 @@ async def aggregate_redemption_assets_by_vaults(
     # Aggregate shares_to_redeem by vault
     vault_to_shares_to_redeem: defaultdict[ChecksumAddress, Wei] = defaultdict(lambda: Wei(0))
     for position in positions:
-        vault_to_shares_to_redeem[position.vault] += position.shares_to_redeem  # type: ignore
+        vault_to_shares_to_redeem[position.vault] = Wei(
+            vault_to_shares_to_redeem[position.vault] + position.shares_to_redeem
+        )
 
     # Convert shares to assets per vault
-    return defaultdict(
-        lambda: Wei(0),
-        {
-            vault: os_token_converter.to_assets(shares)
-            for vault, shares in vault_to_shares_to_redeem.items()
-        },
-    )
+    return {
+        vault: os_token_converter.to_assets(shares)
+        for vault, shares in vault_to_shares_to_redeem.items()
+    }
 
 
 async def get_vault_os_token_position(

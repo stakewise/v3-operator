@@ -184,7 +184,7 @@ class TestAggregateRedemptionAssetsByVaults:
                 block_number=BlockNumber(0),
             )
             assert len(redemption_assets_by_vaults) <= 1  # length can be 0 if no assets to redeem
-            assert redemption_assets_by_vaults[vault_1] == expected_redeemed_assets
+            assert redemption_assets_by_vaults.get(vault_1, Wei(0)) == expected_redeemed_assets
 
     @pytest.mark.parametrize(
         'total_redemption_assets, leaf_shares, processed_shares, expected_redeemed_assets',
@@ -257,10 +257,18 @@ class TestAggregateRedemptionAssetsByVaults:
             assert len(redemption_assets_by_vaults) <= 2
             # allow 1 wei difference due to rounding
             assert (
-                abs(redemption_assets_by_vaults[vault_1] - expected_redeemed_assets['vault_1']) <= 1
+                abs(
+                    redemption_assets_by_vaults.get(vault_1, Wei(0))
+                    - expected_redeemed_assets['vault_1']
+                )
+                <= 1
             )
             assert (
-                abs(redemption_assets_by_vaults[vault_2] - expected_redeemed_assets['vault_2']) <= 1
+                abs(
+                    redemption_assets_by_vaults.get(vault_2, Wei(0))
+                    - expected_redeemed_assets['vault_2']
+                )
+                <= 1
             )
 
     async def test_2_vaults_many_users(self):
