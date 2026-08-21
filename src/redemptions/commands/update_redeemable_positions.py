@@ -30,7 +30,6 @@ from src.config.settings import settings
 from src.redemptions.api_client import (
     API_SLEEP_TIMEOUT,
     API_SOURCES,
-    API_SUPPORTED_CHAINS,
     DEBANK_API_SOURCE,
     RABBY_API_SOURCE,
     APIClient,
@@ -238,7 +237,7 @@ async def process(
         return
 
     logger.info('Fetching kept tokens for %s addresses', len(allocators))
-    api_client = _build_api_client(api_config)
+    api_client = APIClient.for_network(api_config)
     await populate_kept_shares(allocators, block_number, api_client)
     logger.info('Fetched kept tokens for %s addresses...', len(allocators))
 
@@ -299,13 +298,6 @@ def _filter_min_redeemable_shares(
         allocator.vault_os_token_positions = vault_os_token_positions
         result.append(allocator)
     return result
-
-
-def _build_api_client(api_config: ApiConfig) -> APIClient | None:
-    # rabby doesnt support hoodi so skip api call
-    if settings.network not in API_SUPPORTED_CHAINS:
-        return None
-    return APIClient(api_config)
 
 
 async def _publish_positions(os_token_positions: list[OsTokenPosition]) -> None:
