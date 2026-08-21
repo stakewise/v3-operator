@@ -324,7 +324,6 @@ async def redeem_positions(
     for position in os_token_positions:
         logger.info('Processing position index=%d', position.index)
         shares_to_redeem = position.shares_to_redeem
-        assets_to_redeem = converter.to_assets(shares_to_redeem)
 
         if await is_meta_vault(position.vault):
             logger.warning(
