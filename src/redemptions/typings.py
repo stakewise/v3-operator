@@ -48,7 +48,7 @@ class Allocator:
     def get_vault_position(self, vault: ChecksumAddress) -> VaultOsTokenPosition | None:
         return next((vs for vs in self.vault_os_token_positions if vs.address == vault), None)
 
-    def iter_vault_slices(self, min_shares: Wei) -> Iterator[tuple[VaultOsTokenPosition, Wei]]:
+    def iter_vault_slices(self, min_shares: Wei) -> Iterator['VaultSlice']:
         """
         Split ``redeemable_shares`` across vaults proportionally to each vault's (post-boost)
         redeemable share of the total. The last vault absorbs the rounding dust. Slices below
@@ -69,7 +69,14 @@ class Allocator:
             allocated_amount += vault_amount
             if vault_amount < min_shares:
                 continue
-            yield position, Wei(vault_amount)
+            yield VaultSlice(allocator=self, vault_position=position, amount=Wei(vault_amount))
+
+
+@dataclass(frozen=True)
+class VaultSlice:
+    allocator: Allocator
+    vault_position: VaultOsTokenPosition
+    amount: Wei
 
 
 @dataclass

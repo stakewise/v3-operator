@@ -411,14 +411,18 @@ def create_os_token_positions(
     positions by ltv descending, then amount descending.
     """
     slices = [
-        (vault_position.ltv, vault_amount, allocator.address, vault_position.address)
+        vault_slice
         for allocator in allocators
-        for vault_position, vault_amount in allocator.iter_vault_slices(min_redeemable_shares)
+        for vault_slice in allocator.iter_vault_slices(min_redeemable_shares)
     ]
-    slices.sort(key=lambda s: (s[0], s[1]), reverse=True)
+    slices.sort(key=lambda s: (s.vault_position.ltv, s.amount), reverse=True)
     return [
-        OsTokenPosition(owner=owner, vault=vault, leaf_shares=vault_amount)
-        for _, vault_amount, owner, vault in slices
+        OsTokenPosition(
+            owner=s.allocator.address,
+            vault=s.vault_position.address,
+            leaf_shares=s.amount,
+        )
+        for s in slices
     ]
 
 

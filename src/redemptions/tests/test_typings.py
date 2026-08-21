@@ -73,7 +73,7 @@ class TestAllocator:
 
         slices = list(allocator.iter_vault_slices(Wei(0)))
 
-        assert [(p.address, amount) for p, amount in slices] == [
+        assert [(s.vault_position.address, s.amount) for s in slices] == [
             (vault_1, Wei(299)),
             (vault_2, Wei(600)),
         ]
@@ -93,7 +93,7 @@ class TestAllocator:
 
         slices = list(allocator.iter_vault_slices(Wei(15)))
 
-        assert [(p.address, amount) for p, amount in slices] == [(vault_2, Wei(990))]
+        assert [(s.vault_position.address, s.amount) for s in slices] == [(vault_2, Wei(990))]
 
     def test_iter_vault_slices_yields_nothing_when_fully_kept(self) -> None:
         vault = Web3.to_checksum_address(faker.eth_address())
