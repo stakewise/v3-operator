@@ -3,11 +3,10 @@ from typing import Iterator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from eth_typing import BlockNumber, ChecksumAddress
+from eth_typing import BlockNumber
 from hexbytes import HexBytes
 from web3 import Web3
 from web3.exceptions import ContractCustomError
-from web3.types import Wei
 
 from src.redemptions.execution import (
     simulate_redeem_position,
@@ -15,8 +14,7 @@ from src.redemptions.execution import (
     tx_redeem_position,
     update_vaults_state,
 )
-from src.redemptions.merkle_tree import PositionsMerkleTree
-from src.redemptions.typings import OsTokenPosition
+from src.redemptions.tests.factories import make_position, make_tree
 
 MODULE = 'src.redemptions.execution'
 
@@ -305,29 +303,3 @@ def _mock_simulate_redeem_position(
             'redeemer': mock_redeemer,
             'call': call_mock,
         }
-
-
-def make_tree(
-    positions: list[OsTokenPosition] | None = None, nonce: int = 5
-) -> PositionsMerkleTree:
-    return PositionsMerkleTree(positions or [make_position()], leaf_nonce=nonce)
-
-
-def make_position(
-    vault: ChecksumAddress = VAULT_1,
-    owner: ChecksumAddress = OWNER_1,
-    leaf_shares: int = 1000,
-    processed_shares: int = 500,
-    shares_to_redeem: int | None = None,
-) -> OsTokenPosition:
-    effective_shares_to_redeem = (
-        shares_to_redeem if shares_to_redeem is not None else leaf_shares - processed_shares
-    )
-    return OsTokenPosition(
-        vault=vault,
-        owner=owner,
-        leaf_shares=Wei(leaf_shares),
-        index=0,
-        processed_shares=Wei(processed_shares),
-        shares_to_redeem=Wei(effective_shares_to_redeem),
-    )

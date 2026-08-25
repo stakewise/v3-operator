@@ -184,9 +184,7 @@ async def main(
     try:
         with InterruptHandler() as interrupt_handler:
             while not interrupt_handler.exit:
-                block_number = await execution_client.eth.block_number
                 await process(
-                    block_number=block_number,
                     min_queued_assets=min_queued_assets,
                     dry_run=dry_run,
                 )
@@ -197,7 +195,6 @@ async def main(
 
 
 async def process(
-    block_number: BlockNumber,
     min_queued_assets: Gwei,
     dry_run: bool = False,
 ) -> None:
@@ -310,13 +307,16 @@ async def redeem_positions(
     block_number: BlockNumber,
     dry_run: bool = False,
 ) -> None:
-    """Redeem positions one by one. Each position's shares_to_redeem is already set by
-    assign_shares_to_redeem; this function further caps it by the vault's withdrawable assets.
+    """Redeem positions one by one, applying skips and caps on top of the shares_to_redeem
+    already assigned by assign_shares_to_redeem:
 
-    Meta-vault positions are skipped entirely. Vaults whose on-chain state is
-    stale (unharvested) are skipped, since their withdrawable assets would be
-    outdated. A position that fails to simulate or submit is skipped, so the
-    remaining positions are still processed.
+    - Meta-vault positions are skipped (unexpected; logged as a warning).
+    - Positions on a vault already marked unharvested this round are skipped.
+    - A live position with LTV > 1 is skipped.
+    - shares_to_redeem is capped by the owner's live minted shares.
+    - A vault requiring a state update is marked unharvested and its positions skipped.
+    - shares_to_redeem is capped by the vault's remaining withdrawable assets.
+    - A position that fails to simulate or submit is skipped; the rest continue.
     """
     vault_to_withdrawable: dict[ChecksumAddress, Wei] = {}
     unharvested_vaults: set[ChecksumAddress] = set()
@@ -324,7 +324,6 @@ async def redeem_positions(
     for position in os_token_positions:
         logger.info('Processing position index=%d', position.index)
         shares_to_redeem = position.shares_to_redeem
-        assets_to_redeem = converter.to_assets(shares_to_redeem)
 
         if await is_meta_vault(position.vault):
             logger.warning(

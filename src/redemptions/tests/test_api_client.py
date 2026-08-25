@@ -5,7 +5,7 @@ import pytest
 from web3 import Web3
 from web3.types import Wei
 
-from src.config.networks import MAINNET
+from src.config.networks import HOODI, MAINNET
 from src.config.settings import settings
 from src.redemptions.api_client import API_SLEEP_TIMEOUT, RABBY_API_SOURCE, APIClient
 from src.redemptions.typings import ApiConfig
@@ -24,6 +24,18 @@ class TestAPIClient:
                 Web3.to_checksum_address('0x1234567890abcdef1234567890abcdef12345678')
             )
         assert result == Wei(0)
+
+    @pytest.mark.usefixtures('fake_settings')
+    async def test_build_client_returns_none_on_unsupported_network(self):
+        with patch.object(settings, 'network', HOODI):
+            client = APIClient.build_client(DEFAULT_API_CONFIG)
+        assert client is None
+
+    @pytest.mark.usefixtures('fake_settings')
+    async def test_build_client_returns_instance_on_supported_network(self):
+        with patch.object(settings, 'network', MAINNET):
+            client = APIClient.build_client(DEFAULT_API_CONFIG)
+        assert isinstance(client, APIClient)
 
     @pytest.mark.usefixtures('fake_settings')
     async def test_excludes_stakewise_protocol_from_total(self):

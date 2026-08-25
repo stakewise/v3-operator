@@ -41,6 +41,13 @@ class APIClient:
         self.sleep_timeout = api_config.sleep_timeout
         self.api_chain = api_chain
 
+    @classmethod
+    def build_client(cls, api_config: ApiConfig) -> 'APIClient | None':
+        # rabby doesnt support hoodi so skip api call
+        if settings.network not in API_SUPPORTED_CHAINS:
+            return None
+        return cls(api_config)
+
     async def get_protocols_locked_os_token(self, address: ChecksumAddress) -> Wei:
         url = urljoin(self.base_url, 'v1/user/complex_protocol_list')
         params = {
