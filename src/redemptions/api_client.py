@@ -42,7 +42,7 @@ class APIClient:
         self.api_chain = api_chain
 
     @classmethod
-    def for_network(cls, api_config: ApiConfig) -> 'APIClient | None':
+    def build_client(cls, api_config: ApiConfig) -> 'APIClient | None':
         # rabby doesnt support hoodi so skip api call
         if settings.network not in API_SUPPORTED_CHAINS:
             return None

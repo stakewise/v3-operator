@@ -26,15 +26,15 @@ class TestAPIClient:
         assert result == Wei(0)
 
     @pytest.mark.usefixtures('fake_settings')
-    async def test_for_network_returns_none_on_unsupported_network(self):
+    async def test_build_client_returns_none_on_unsupported_network(self):
         with patch.object(settings, 'network', HOODI):
-            client = APIClient.for_network(DEFAULT_API_CONFIG)
+            client = APIClient.build_client(DEFAULT_API_CONFIG)
         assert client is None
 
     @pytest.mark.usefixtures('fake_settings')
-    async def test_for_network_returns_instance_on_supported_network(self):
+    async def test_build_client_returns_instance_on_supported_network(self):
         with patch.object(settings, 'network', MAINNET):
-            client = APIClient.for_network(DEFAULT_API_CONFIG)
+            client = APIClient.build_client(DEFAULT_API_CONFIG)
         assert isinstance(client, APIClient)
 
     @pytest.mark.usefixtures('fake_settings')

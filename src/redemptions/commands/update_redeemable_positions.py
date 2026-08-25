@@ -237,7 +237,7 @@ async def process(
         return
 
     logger.info('Fetching kept tokens for %s addresses', len(allocators))
-    api_client = APIClient.for_network(api_config)
+    api_client = APIClient.build_client(api_config)
     await populate_kept_shares(allocators, block_number, api_client)
     logger.info('Fetched kept tokens for %s addresses...', len(allocators))
 
