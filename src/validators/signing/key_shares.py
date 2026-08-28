@@ -24,11 +24,17 @@ def bls_signature_and_public_key_to_shares(
     message: bytes, signature: BLSSignature, public_key: BLSPubkey, threshold: int, total: int
 ) -> tuple[list[BLSSignature], list[BLSPubkey]]:
     """
-    Given `message`, `signature` and `public_key` so that
-    `signature` for `message` can be verified with `public_key`.
+    Splits a BLS signature and its public key into shares.
 
-    The function splits `signature` and `public_key` to shares so that
-    each signature share can be verified with corresponding public key share.
+    Takes a `message`, a `signature` over it, and the `public_key` that verifies
+    that signature, and returns `total` signature shares and `total` public key
+    shares such that:
+
+    * each signature share verifies against the public key share with the same index;
+    * any `threshold` of the signature shares recover the original signature.
+
+    The underlying math is explained in the article:
+    https://hackmd.io/@NYPTmCKNRYOe_7SxNexObA/S1EpOB2cWx
     """
     message_g2 = hash_to_G2(
         message, G2ProofOfPossession.DST, cast(HASH, G2ProofOfPossession.xmd_hash_function)
