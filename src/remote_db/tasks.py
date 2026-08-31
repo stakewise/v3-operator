@@ -99,6 +99,11 @@ def setup_web3signer(db_url: str, b64_encrypt_key: str, output_dir: Path) -> Non
     if not output_dir.exists():
         output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Remove key files from a previous, larger export before writing the current set -
+    # otherwise Web3Signer would keep loading keys the operator believes were removed.
+    for filepath in output_dir.glob('key_*.yaml'):
+        filepath.unlink()
+
     sorted_private_keys = sorted(list(private_keys))
     for index, private_key in enumerate(sorted_private_keys):
         filename = f'key_{index}.yaml'
