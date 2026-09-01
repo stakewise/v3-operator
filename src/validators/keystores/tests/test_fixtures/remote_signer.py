@@ -117,3 +117,76 @@ def mocked_remote_signer(
             repeat=True,
         )
         yield
+
+
+@pytest.fixture
+def mocked_remote_signer_partial_import(
+    remote_signer_url: str,
+) -> Generator:
+    """Same as ``mocked_remote_signer``, except the import endpoint reports the first
+    submitted keystore as failed, simulating a partial import from the remote signer."""
+    _remote_signer_pubkey_privkey_mapping: dict[HexStr, BLSPrivkey] = {}
+
+    def _mocked_keymanager_import_endpoint(url, **kwargs) -> CallbackResult:
+        data = kwargs['json']
+        keystores = [Keystore.from_json(json.loads(keystore)) for keystore in data['keystores']]
+        passwords = data['passwords']
+
+        results = []
+        for index, (keystore, password) in enumerate(zip(keystores, passwords)):
+            if index == 0:
+                results.append({'status': 'error', 'message': 'invalid keystore'})
+                continue
+
+            priv_key = BLSPrivkey(keystore.decrypt(password))
+            pubkey = Web3.to_hex(bls.SkToPk(priv_key))
+            _remote_signer_pubkey_privkey_mapping[pubkey] = priv_key
+            results.append({'status': 'imported'})
+
+        return CallbackResult(status=200, payload={'data': results})
+
+    def _mocked_keymanager_delete_endpoint(url, **kwargs) -> CallbackResult:
+        data = kwargs['json']
+        pubkeys = data['pubkeys']
+
+        for pubkey in pubkeys:
+            _remote_signer_pubkey_privkey_mapping.pop(pubkey)
+
+        return CallbackResult(
+            status=200, payload={'data': [{'status': 'deleted'} for _ in pubkeys]}
+        )
+
+    def _mocked_keymanager_list_endpoint(url, **kwargs) -> CallbackResult:
+        return CallbackResult(
+            status=200,
+            payload={
+                'data': [
+                    {'validating_pubkey': pubkey}
+                    for pubkey in _remote_signer_pubkey_privkey_mapping.keys()
+                ]
+            },
+        )
+
+    with aioresponses() as m:
+        # Mocked keymanager list keys endpoint
+        m.get(
+            f'{remote_signer_url}/eth/v1/keystores',
+            callback=_mocked_keymanager_list_endpoint,
+            repeat=True,
+        )
+
+        # Mocked keymanager import keystores endpoint
+        m.post(
+            f'{remote_signer_url}/eth/v1/keystores',
+            callback=_mocked_keymanager_import_endpoint,
+            repeat=True,
+        )
+
+        # Mocked keymanager delete keys endpoint
+        m.delete(
+            f'{remote_signer_url}/eth/v1/keystores',
+            callback=_mocked_keymanager_delete_endpoint,
+            repeat=True,
+        )
+
+        yield

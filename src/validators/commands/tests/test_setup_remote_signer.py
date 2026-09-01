@@ -103,3 +103,33 @@ class TestOperatorRemoteSignerSetup:
                 f'Done. Successfully configured operator to use remote signer for {key_count} public key(s)'
                 in result.output
             )
+
+    @pytest.mark.usefixtures(
+        '_init_config',
+        '_create_keys',
+        'fake_settings',
+        'mocked_remote_signer_partial_import',
+        'setup_test_clients',
+    )
+    def test_partial_import_preserves_local_keystores(
+        self,
+        vault_address: HexAddress,
+        data_dir: Path,
+        vault_dir: Path,
+        keystores_dir: Path,
+        remote_signer_url: str,
+        runner: CliRunner,
+    ):
+        args = [
+            '--remote-signer-url',
+            remote_signer_url,
+            '--vault',
+            str(vault_address),
+            '--data-dir',
+            str(data_dir),
+        ]
+
+        result = runner.invoke(setup_remote_signer, args, input='y')
+        assert result.exit_code != 0
+        assert 'were NOT removed' in result.output
+        assert keystores_dir.exists() is True
