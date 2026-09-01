@@ -1,6 +1,6 @@
 import asyncio
 from contextlib import contextmanager
-from typing import Iterator
+from typing import Generator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -347,7 +347,7 @@ class TestProcess:
 
 
 @contextmanager
-def _mock_startup_checks() -> Iterator[None]:
+def _mock_startup_checks() -> Generator[None, None, None]:
     """Patch the execution-node, network and wallet-balance checks run by _startup_check,
     leaving the Position Manager role check under test."""
     with (
@@ -366,7 +366,7 @@ def _mock_redeem_positions(
     submit_results: list[bool] | None = None,
     ltv_exceeded: bool = False,
     minted_shares: Wei | list[Wei] | None = None,
-) -> Iterator[dict[str, MagicMock]]:
+) -> Generator[dict[str, MagicMock], None, None]:
     """Mock setup for redeem_positions tests.
 
     ``withdrawable`` may be a constant Wei value (returned on every call) or an
@@ -443,7 +443,7 @@ def _submitted_position(mocks: dict[str, MagicMock], index: int = 0) -> OsTokenP
 @contextmanager
 def _mock_process(
     positions: list[OsTokenPosition] | None = None,
-) -> Iterator[dict[str, MagicMock]]:
+) -> Generator[dict[str, MagicMock], None, None]:
     """Common mock setup for process() tests."""
     positions = positions or []
     mock_client = MagicMock()

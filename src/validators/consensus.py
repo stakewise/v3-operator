@@ -5,11 +5,11 @@ from itertools import batched
 from typing import AsyncIterator, Collection, Sequence, cast
 
 from eth_typing import HexStr
-from sw_utils import ChainHead, ValidatorStatus
+from sw_utils import ChainHead, ExtendedAsyncBeacon, ValidatorStatus
 from sw_utils.consensus import EXITED_STATUSES
 from web3.types import Gwei
 
-from src.common.clients import consensus_client
+from src.common.clients import consensus_client as default_consensus_client
 from src.common.consensus import get_chain_latest_head
 from src.common.consolidations import get_pending_consolidations
 from src.common.typings import PendingConsolidation
@@ -200,7 +200,7 @@ async def apply_pending_deposits(
     pending_balances: dict[HexStr, Gwei] = defaultdict(lambda: Gwei(0))
     new_credentials: dict[HexStr, HexStr] = {}
 
-    for deposit in await consensus_client.get_pending_deposits(slot):
+    for deposit in await default_consensus_client.get_pending_deposits(slot):
         public_key: HexStr = deposit['pubkey']
         if public_key not in public_keys:
             continue
@@ -244,8 +244,10 @@ async def fetch_consensus_validators(
 async def iter_validators_by_ids(
     validator_ids: Sequence[str] | Sequence[HexStr],
     state_id: str = 'head',
+    consensus_client: ExtendedAsyncBeacon | None = None,
 ) -> AsyncIterator[ConsensusValidator]:
     """Yields the consensus validators for the given ids, fetching them in chunks."""
+    consensus_client = consensus_client or default_consensus_client
     for chunk in batched(validator_ids, settings.validators_fetch_chunk_size):
         response = await consensus_client.get_validators_by_ids(
             validator_ids=chunk, state_id=state_id

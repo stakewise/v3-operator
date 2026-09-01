@@ -1,8 +1,6 @@
-from unittest import mock
-from unittest.mock import AsyncMock
-
 import pytest
 
+from src.common.tests.utils import patch_consensus_client
 from src.exits.consensus import get_validator_public_keys
 
 
@@ -17,9 +15,7 @@ class TestGetValidatorPublicKeys:
                 _beacon_validator(index='999', pubkey='0xbb'),
             ]
         }
-        with mock.patch(
-            'src.validators.consensus.consensus_client', new=AsyncMock()
-        ) as consensus_mock:
+        with patch_consensus_client() as consensus_mock:
             consensus_mock.get_validators_by_ids.return_value = response
             result = await get_validator_public_keys([10])
 

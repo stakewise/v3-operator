@@ -10,7 +10,7 @@ from web3 import Web3
 from web3.types import Gwei, Wei
 
 from src.common.tests.factories import create_chain_head
-from src.common.tests.utils import ether_to_gwei
+from src.common.tests.utils import ether_to_gwei, patch_consensus_client
 from src.common.typings import ValidatorType
 from src.config.settings import MIN_ACTIVATION_BALANCE_GWEI, settings
 from src.validators.exceptions import FundingException
@@ -440,7 +440,7 @@ class TestProcessFunding:
             patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_get_latest_vault_v2_validator_public_keys(),
             self.patch_chain_head_and_consolidations(),
-            patch('src.validators.consensus.consensus_client', mock_consensus),
+            patch_consensus_client(mock_consensus),
             self.patch_is_funding_interval_passed(True),
             self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
         ):
@@ -515,7 +515,7 @@ class TestProcessFunding:
             patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_get_latest_vault_v2_validator_public_keys(),
             self.patch_chain_head_and_consolidations(),
-            patch('src.validators.consensus.consensus_client', mock_consensus),
+            patch_consensus_client(mock_consensus),
             self.patch_is_funding_interval_passed(True),
             self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
         ):
@@ -571,7 +571,7 @@ class TestProcessFunding:
             patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_get_latest_vault_v2_validator_public_keys(),
             self.patch_chain_head_and_consolidations(),
-            patch('src.validators.consensus.consensus_client', mock_consensus),
+            patch_consensus_client(mock_consensus),
             self.patch_is_funding_interval_passed(True),
             self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
         ):
@@ -642,7 +642,7 @@ class TestProcessFunding:
             patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_get_latest_vault_v2_validator_public_keys(),
             self.patch_chain_head_and_consolidations(),
-            patch('src.validators.consensus.consensus_client', mock_consensus),
+            patch_consensus_client(mock_consensus),
             self.patch_is_funding_interval_passed(True),
             self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
         ):
@@ -684,7 +684,7 @@ class TestProcessFunding:
             patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_get_latest_vault_v2_validator_public_keys(),
             self.patch_chain_head_and_consolidations(),
-            patch('src.validators.consensus.consensus_client', mock_consensus),
+            patch_consensus_client(mock_consensus),
             self.patch_is_funding_interval_passed(True),
             self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
         ):
@@ -747,7 +747,7 @@ class TestProcessFunding:
             patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_get_latest_vault_v2_validator_public_keys(),
             self.patch_chain_head_and_consolidations(),
-            patch('src.validators.consensus.consensus_client', mock_consensus),
+            patch_consensus_client(mock_consensus),
             self.patch_is_funding_interval_passed(True),
             self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
         ):
@@ -783,7 +783,7 @@ class TestProcessFunding:
         with (
             self.patch_get_latest_vault_v2_validator_public_keys(),
             self.patch_chain_head_and_consolidations(),
-            patch('src.validators.consensus.consensus_client', mock_consensus),
+            patch_consensus_client(mock_consensus),
             self.patch_is_funding_interval_passed(True),
             self.patch_fund_validators_chunk(None) as mock_fund,
         ):
@@ -845,7 +845,7 @@ class TestProcessFunding:
             patch_max_validator_balance(ether_to_gwei(64)),
             self.patch_get_latest_vault_v2_validator_public_keys(),
             self.patch_chain_head_and_consolidations(),
-            patch('src.validators.consensus.consensus_client', mock_consensus),
+            patch_consensus_client(mock_consensus),
             self.patch_is_funding_interval_passed(True),
             self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
         ):
@@ -888,7 +888,7 @@ class TestProcessFunding:
         with (
             self.patch_get_latest_vault_v2_validator_public_keys({pub_key}),
             self.patch_chain_head_and_consolidations(),
-            patch('src.validators.consensus.consensus_client', mock_consensus),
+            patch_consensus_client(mock_consensus),
             self.patch_is_funding_interval_passed(True),
             self.patch_fund_validators_chunk(HexStr('0xabc')) as mock_fund,
         ):
