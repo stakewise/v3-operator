@@ -338,9 +338,7 @@ class Settings(metaclass=Singleton):
         self.ipfs_fetch_endpoints = decouple_config(
             'IPFS_FETCH_ENDPOINTS',
             cast=Csv(),
-            default='https://ipfs.io,'
-            'https://stakewise.myfilebase.com,'
-            'https://stakewise-ipfs.quicknode-ipfs.com',
+            default='https://stakewise.myfilebase.com,https://stakewise-ipfs.quicknode-ipfs.com',
             group='IPFS',
             description='Comma separated IPFS gateways used to fetch oracle data.',
         )
