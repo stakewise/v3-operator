@@ -2,7 +2,7 @@ import logging
 from collections import defaultdict
 from dataclasses import replace
 from itertools import batched
-from typing import Collection, cast
+from typing import AsyncIterator, Collection, Sequence, cast
 
 from eth_typing import HexStr
 from sw_utils import ChainHead, ValidatorStatus
@@ -238,12 +238,17 @@ async def apply_pending_deposits(
 async def fetch_consensus_validators(
     validator_ids: list[HexStr] | list[str], slot: str = 'head'
 ) -> list[ConsensusValidator]:
-    validators = []
-    for chunk_keys in batched(validator_ids, settings.validators_fetch_chunk_size):
-        beacon_validators = await consensus_client.get_validators_by_ids(
-            validator_ids=chunk_keys, state_id=slot
-        )
-        for beacon_validator in beacon_validators['data']:
-            validators.append(ConsensusValidator.from_consensus_data(beacon_validator))
+    return [validator async for validator in iter_validators_by_ids(validator_ids, state_id=slot)]
 
-    return validators
+
+async def iter_validators_by_ids(
+    validator_ids: Sequence[str] | Sequence[HexStr],
+    state_id: str = 'head',
+) -> AsyncIterator[ConsensusValidator]:
+    """Yields the consensus validators for the given ids, fetching them in chunks."""
+    for chunk in batched(validator_ids, settings.validators_fetch_chunk_size):
+        response = await consensus_client.get_validators_by_ids(
+            validator_ids=chunk, state_id=state_id
+        )
+        for beacon_validator in response['data']:
+            yield ConsensusValidator.from_consensus_data(beacon_validator)

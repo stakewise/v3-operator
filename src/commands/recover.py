@@ -7,12 +7,7 @@ from eth_typing import BlockNumber, ChecksumAddress, HexStr
 from eth_utils import add_0x_prefix
 from sw_utils.consensus import EXITED_STATUSES, ValidatorStatus
 
-from src.common.clients import (
-    close_clients,
-    consensus_client,
-    execution_client,
-    setup_clients,
-)
+from src.common.clients import close_clients, execution_client, setup_clients
 from src.common.contracts import VaultContract
 from src.common.credentials import CredentialManager
 from src.common.logging import LOG_LEVELS, setup_logging
@@ -22,6 +17,7 @@ from src.common.validators import validate_eth_address, validate_mnemonic
 from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_NETWORK, settings
+from src.validators.consensus import iter_validators_by_ids
 
 
 @click.command(help='Recover config data directory and keystores.')
@@ -241,13 +237,8 @@ async def _fetch_registered_validators(
     validator_statuses: dict[HexStr, ValidatorStatus | None] = {
         public_key: None for public_key in public_keys
     }
-    for i in range(0, len(public_keys), settings.validators_fetch_chunk_size):
-        validators = await consensus_client.get_validators_by_ids(
-            public_keys[i : i + settings.validators_fetch_chunk_size]
-        )
-        for beacon_validator in validators['data']:
-            public_key = add_0x_prefix(beacon_validator['validator']['pubkey'])
-            validator_statuses[public_key] = ValidatorStatus(beacon_validator['status'])
+    async for validator in iter_validators_by_ids(public_keys):
+        validator_statuses[validator.public_key] = validator.status
     click.secho('Fetched statuses for registered validators', bold=True)
 
     return validator_statuses
