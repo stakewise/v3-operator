@@ -26,7 +26,7 @@ from src.config.settings import (
     REMOTE_SIGNER_UPLOAD_CHUNK_SIZE,
     settings,
 )
-from src.validators.keystores.local import LocalKeystore
+from src.validators.keystores.local import KeystoreFile, LocalKeystore
 
 logger = logging.getLogger(__name__)
 
@@ -214,6 +214,9 @@ async def process(vault: ChecksumAddress | None) -> None:
                     f' - status code {resp.status}, body: {await resp.text()}'
                 )
 
+            results = (await resp.json()).get('data') or []
+            _ensure_keystores_imported(keystore_files_chunk, results)
+
     click.echo(
         f'Successfully imported {len(keystore_files)} keys into remote signer.',
     )
@@ -239,3 +242,24 @@ async def process(vault: ChecksumAddress | None) -> None:
         f' Successfully configured operator to use remote signer'
         f' for {len(keystore_files)} public key(s)!',
     )
+
+
+def _ensure_keystores_imported(
+    keystore_files_chunk: tuple[KeystoreFile, ...], results: list[dict]
+) -> None:
+    """Verify the remote signer imported every keystore in the chunk.
+
+    A 200 response can still be a partial import: the keymanager API reports per-keystore
+    outcomes in the body, so each one must be checked before the local keystores are
+    considered safe to delete.
+    """
+    if len(results) != len(keystore_files_chunk):
+        raise RuntimeError(f'Unexpected import response from remote signer: {results}')
+
+    for keystore_file, result in zip(keystore_files_chunk, results):
+        if result.get('status') not in ('imported', 'duplicate'):
+            raise click.ClickException(
+                f'Keystore {keystore_file.name} failed to import into the remote '
+                f"signer ({result.get('status')} - {result.get('message', '')}); "
+                'local keystores were NOT removed.'
+            )

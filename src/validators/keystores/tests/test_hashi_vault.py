@@ -186,3 +186,18 @@ class TestHashiVault:
         assert HashiVaultStub.prefixed_pk_2 in keystore
         assert HashiVaultStub.prefixed_pk_3 in keystore
         assert HashiVaultStub.prefixed_pk_4 in keystore
+
+    @pytest.mark.usefixtures('mocked_hashi_vault')
+    async def test_hashi_vault_rejects_mismatched_public_key(
+        self,
+        hashi_vault_url: str,
+    ):
+        settings.hashi_vault_url = hashi_vault_url
+        settings.hashi_vault_engine_name = 'secret'
+        settings.hashi_vault_token = 'Secret'
+        settings.hashi_vault_key_paths = ['ethereum/signing/mismatched/keystores']
+        settings.hashi_vault_key_prefixes = []
+        settings.hashi_vault_parallelism = 1
+
+        with pytest.raises(RuntimeError, match='does not match'):
+            await HashiVaultKeystore.load()

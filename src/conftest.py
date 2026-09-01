@@ -38,6 +38,7 @@ from src.validators.keystores.tests.test_fixtures.hashi_vault import (
 )
 from src.validators.keystores.tests.test_fixtures.remote_signer import (
     mocked_remote_signer,
+    mocked_remote_signer_partial_import,
     remote_signer_url,
 )
 from src.validators.signing.tests.oracle_functions import OracleCommittee

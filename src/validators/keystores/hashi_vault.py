@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from itertools import batched
 from typing import Iterable
 
+import milagro_bls_binding as bls
 from aiohttp import ClientSession, ClientTimeout
 from eth_typing import HexStr
 from eth_utils import add_0x_prefix
@@ -155,6 +156,14 @@ class HashiVaultBundledKeysLoader(HashiVaultKeysLoader):
             if not sk:
                 continue
             sk_bytes = Web3.to_bytes(hexstr=sk)
+            # The label is otherwise trusted as the key's identity and feeds the
+            # anti-double-registration and duplicate-key safety checks, so a
+            # mismatched label/secret pair must be rejected rather than loaded silently.
+            if bls.SkToPk(sk_bytes) != Web3.to_bytes(hexstr=pk):
+                raise RuntimeError(
+                    f'Public key {add_0x_prefix(HexStr(pk))} does not match the derived '
+                    f'public key of its private key at {secret_url}'
+                )
             keys.append((add_0x_prefix(HexStr(pk)), BLSPrivkey(sk_bytes)))
         validator_keys = Keys(dict(keys))
 
@@ -249,6 +258,12 @@ class HashiVaultPrefixedKeysLoader(HashiVaultKeysLoader):
             )
         sk = list(key_data['data']['data'].values())[0]
         sk_bytes = Web3.to_bytes(hexstr=sk)
+        # Same identity check as in the bundled loader.
+        if bls.SkToPk(sk_bytes) != Web3.to_bytes(hexstr=pk):
+            raise RuntimeError(
+                f'Public key {pk} does not match the derived '
+                f'public key of its private key at {secret_url}'
+            )
         return Keys({pk: BLSPrivkey(sk_bytes)})
 
 
