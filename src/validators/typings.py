@@ -2,11 +2,11 @@ from dataclasses import dataclass
 from typing import NewType
 
 from eth_typing import BlockNumber, BLSSignature, ChecksumAddress, HexStr
-from eth_utils import add_0x_prefix
 from sw_utils import ValidatorStatus
 from web3 import Web3
 from web3.types import Gwei, Wei
 
+from src.common.typings import normalize_public_key
 from src.config.settings import MIN_ACTIVATION_BALANCE_GWEI, settings
 
 BLSPrivkey = NewType('BLSPrivkey', bytes)
@@ -96,7 +96,7 @@ class ConsensusValidator:
     def from_consensus_data(beacon_validator: dict) -> 'ConsensusValidator':
         return ConsensusValidator(
             index=int(beacon_validator['index']),
-            public_key=add_0x_prefix(beacon_validator['validator']['pubkey']),
+            public_key=normalize_public_key(beacon_validator['validator']['pubkey']),
             balance=Gwei(int(beacon_validator['balance'])),
             withdrawal_credentials=beacon_validator['validator']['withdrawal_credentials'],
             status=ValidatorStatus(beacon_validator['status']),

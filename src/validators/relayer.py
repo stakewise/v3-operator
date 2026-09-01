@@ -10,6 +10,7 @@ from web3 import Web3
 from web3.types import Gwei
 
 from src.common.clients import OPERATOR_USER_AGENT
+from src.common.typings import normalize_public_key
 from src.config.settings import settings
 from src.validators.event_processors import get_validators_start_index
 from src.validators.typings import (
@@ -190,7 +191,7 @@ def _parse_validator(v: dict) -> Validator:
         else None
     )
     return Validator(
-        public_key=add_0x_prefix(v['public_key']),
+        public_key=normalize_public_key(v['public_key']),
         amount=v['amount'],
         deposit_signature=_to_hex_or_none(v.get('deposit_signature')),
         exit_signature=_to_bls_signature_or_none(v.get('exit_signature')),

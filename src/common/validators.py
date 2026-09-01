@@ -7,6 +7,7 @@ from eth_utils import is_address, is_hexstr, to_checksum_address
 from web3 import Web3
 
 from src.common.language import validate_mnemonic as verify_mnemonic
+from src.common.typings import normalize_public_key
 from src.config.settings import (
     MAX_EFFECTIVE_BALANCE,
     MAX_EFFECTIVE_BALANCE_GWEI,
@@ -73,10 +74,11 @@ def validate_dappnode_execution_endpoints(
 def validate_public_key(ctx: click.Context, param: click.Parameter, value: str) -> str | None:
     if not value:
         return None
-    if not _is_public_key(value):
+    public_key = normalize_public_key(value)
+    if not _is_public_key(public_key):
         raise click.BadParameter('Invalid validator public key')
 
-    return value
+    return public_key
 
 
 def validate_public_keys(
@@ -84,11 +86,12 @@ def validate_public_keys(
 ) -> list[HexStr] | None:
     if not value:
         return None
-    for key in value.split(','):
-        if not _is_public_key(key):
+    public_keys = [normalize_public_key(key) for key in value.split(',')]
+    for public_key in public_keys:
+        if not _is_public_key(public_key):
             raise click.BadParameter('Invalid validator public key')
 
-    return [HexStr(address) for address in value.split(',')]
+    return public_keys
 
 
 def validate_public_keys_file(ctx: click.Context, param: click.Parameter, value: str) -> str | None:
@@ -97,7 +100,7 @@ def validate_public_keys_file(ctx: click.Context, param: click.Parameter, value:
     with open(value, 'r', encoding='utf-8') as f:
         for line in f:
             key = line.strip()
-            if not _is_public_key(key):
+            if not _is_public_key(normalize_public_key(key)):
                 raise click.BadParameter(f'Invalid validator public key: {key}')
 
     return value

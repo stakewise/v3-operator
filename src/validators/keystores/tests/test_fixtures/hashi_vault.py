@@ -52,6 +52,12 @@ def mocked_hashi_vault(
         HashiVaultStub.bundled_pk_1: HashiVaultStub.bundled_sk_2,
     }
 
+    # Same key as bundled_pk_1, labeled without the 0x prefix and in upper case.
+    # Exercises public key normalization on load.
+    _hashi_vault_uppercase_pk_sk_mapping = {
+        HashiVaultStub.bundled_pk_1[2:].upper(): HashiVaultStub.bundled_sk_1,
+    }
+
     _hashi_vault_prefixed_pk_sk_mapping1 = {
         HashiVaultStub.prefixed_pk_1: HashiVaultStub.prefixed_sk_1,
         HashiVaultStub.prefixed_pk_2: HashiVaultStub.prefixed_sk_2,
@@ -101,6 +107,11 @@ def mocked_hashi_vault(
         m.get(
             f'{hashi_vault_url}/v1/secret/data/ethereum/signing/same/keystores',
             callback=partial(_mocked_secret_path, _hashi_vault_pk_sk_mapping_1),
+            repeat=True,
+        )
+        m.get(
+            f'{hashi_vault_url}/v1/secret/data/ethereum/signing/uppercase/keystores',
+            callback=partial(_mocked_secret_path, _hashi_vault_uppercase_pk_sk_mapping),
             repeat=True,
         )
         m.get(

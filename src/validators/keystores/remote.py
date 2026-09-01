@@ -15,6 +15,7 @@ from sw_utils.signing import compute_deposit_domain, compute_signing_root
 from sw_utils.typings import ConsensusFork
 from web3 import Web3
 
+from src.common.typings import normalize_public_key
 from src.config.networks import NETWORKS
 from src.config.settings import REMOTE_SIGNER_TIMEOUT, settings
 from src.validators.keystores.base import BaseKeystore
@@ -158,7 +159,7 @@ class RemoteSignerKeystore(BaseKeystore):
             response = await session.get(signer_url)
 
             response.raise_for_status()
-            return await response.json()
+            return [normalize_public_key(public_key) for public_key in await response.json()]
 
     @staticmethod
     async def _sign_exit_request(

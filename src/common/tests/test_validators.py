@@ -131,6 +131,23 @@ def test_validate_public_keys_file():
             validate_public_keys_file(None, None, 'mock_file_path')
 
 
+def test_validate_public_keys_normalization():
+    """Upper case and unprefixed keys are accepted and reduced to the canonical form."""
+    public_key = faker.validator_public_key()
+    variants = [
+        public_key.upper().replace('0X', '0x'),
+        public_key[2:],
+        public_key[2:].upper(),
+    ]
+
+    for variant in variants:
+        assert validate_public_key(None, None, variant) == public_key
+        assert validate_public_keys(None, None, variant) == [public_key]
+
+        with patch('builtins.open', mock_open(read_data=variant + '\n')):
+            assert validate_public_keys_file(None, None, 'mock_file_path') == 'mock_file_path'
+
+
 def test_is_public_key():
     # returns_true_for_valid_public_key
     result = _is_public_key('0x' + 'a' * 96)

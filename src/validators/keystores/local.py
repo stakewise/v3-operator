@@ -7,13 +7,13 @@ from typing import NewType
 
 import milagro_bls_binding as bls
 from eth_typing import BLSPrivateKey, BLSSignature, HexStr
-from eth_utils import add_0x_prefix
 from staking_deposit.key_handling.keystore import ScryptKeystore
 from sw_utils.signing import get_exit_message_signing_root
 from sw_utils.typings import ConsensusFork
 from web3 import Web3
 
 from src.common.credentials import CredentialManager
+from src.common.typings import normalize_public_key
 from src.config.settings import settings
 from src.validators.exceptions import KeystoreException
 from src.validators.keystores.base import BaseKeystore
@@ -179,6 +179,6 @@ class LocalKeystore(BaseKeystore):
 
         # extract index from path: m/12381/3600/<index>/0/0
         key_index = int(keystore.path.split('/')[-3])
-        public_key = add_0x_prefix(HexStr(keystore.pubkey))
+        public_key = normalize_public_key(keystore.pubkey)
 
         return key_index, public_key

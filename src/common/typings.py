@@ -1,9 +1,15 @@
 from dataclasses import dataclass
 from enum import Enum
 
+from eth_typing import HexStr
+from eth_utils import add_0x_prefix
 from hexbytes import HexBytes
 from web3 import Web3
 from web3.types import ChecksumAddress, Gwei, Wei
+
+
+def normalize_public_key(public_key: str) -> HexStr:
+    return add_0x_prefix(HexStr(public_key.lower()))
 
 
 @dataclass

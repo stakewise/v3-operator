@@ -5,7 +5,6 @@ from pathlib import Path
 
 import click
 from eth_typing import BlockNumber, ChecksumAddress, HexStr
-from eth_utils import add_0x_prefix
 from sw_utils import ChainHead
 from web3 import Web3
 from web3.types import Gwei, Wei
@@ -20,6 +19,7 @@ from src.common.execution import check_gas_price
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.protocol_config import get_protocol_config
 from src.common.startup_check import check_validators_manager
+from src.common.typings import normalize_public_key
 from src.common.utils import log_verbose
 from src.common.validators import (
     validate_eth_address,
@@ -446,7 +446,7 @@ def _encode_validators(target_source_public_keys: list[tuple[HexStr, HexStr]]) -
 def _load_public_keys(public_keys_file: Path) -> list[HexStr]:
     """Loads public keys from file."""
     with open(public_keys_file, 'r', encoding='utf-8') as f:
-        public_keys = [add_0x_prefix(HexStr(line.rstrip())) for line in f]
+        public_keys = [normalize_public_key(line.rstrip()) for line in f]
 
     return public_keys
 

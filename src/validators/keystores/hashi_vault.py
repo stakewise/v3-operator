@@ -9,9 +9,9 @@ from typing import Iterable
 import milagro_bls_binding as bls
 from aiohttp import ClientSession, ClientTimeout
 from eth_typing import HexStr
-from eth_utils import add_0x_prefix
 from web3 import Web3
 
+from src.common.typings import normalize_public_key
 from src.config.settings import HASHI_VAULT_TIMEOUT, settings
 from src.validators.keystores.local import Keys, LocalKeystore
 from src.validators.typings import BLSPrivkey
@@ -161,10 +161,10 @@ class HashiVaultBundledKeysLoader(HashiVaultKeysLoader):
             # mismatched label/secret pair must be rejected rather than loaded silently.
             if bls.SkToPk(sk_bytes) != Web3.to_bytes(hexstr=pk):
                 raise RuntimeError(
-                    f'Public key {add_0x_prefix(HexStr(pk))} does not match the derived '
+                    f'Public key {normalize_public_key(pk)} does not match the derived '
                     f'public key of its private key at {secret_url}'
                 )
-            keys.append((add_0x_prefix(HexStr(pk)), BLSPrivkey(sk_bytes)))
+            keys.append((normalize_public_key(pk), BLSPrivkey(sk_bytes)))
         validator_keys = Keys(dict(keys))
 
         logger.info('Loaded %d keys from %s', len(validator_keys), secret_url)
@@ -250,7 +250,7 @@ class HashiVaultPrefixedKeysLoader(HashiVaultKeysLoader):
                 logger.error('hashi vault error: %s', error)
             raise RuntimeError('Can not retrieve validator signing keys from hashi vault')
         # Last chunk of URL is a public key
-        pk = add_0x_prefix(HexStr(secret_url.strip('/').split('/')[-1]))
+        pk = normalize_public_key(secret_url.strip('/').split('/')[-1])
         if len(key_data['data']['data']) > 1:
             raise RuntimeError(
                 f'Invalid multi-value secret at path {secret_url}, '
