@@ -78,6 +78,7 @@ class TestGetQueuedAssets:
                 oracle_exiting_validators=[],
                 pending_partial_withdrawals=[],
                 chain_head=create_chain_head(),
+                redemption_assets=Wei(0),
             )
 
         assert result == Gwei(5)
@@ -104,6 +105,7 @@ class TestGetQueuedAssets:
                 oracle_exiting_validators=oracle_exiting_validators,
                 pending_partial_withdrawals=pending_partial_withdrawals,
                 chain_head=create_chain_head(),
+                redemption_assets=Wei(0),
             )
 
         call_kwargs = mocks['missing_assets'].call_args.kwargs

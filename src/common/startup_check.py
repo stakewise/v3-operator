@@ -9,7 +9,6 @@ import click
 import psutil
 from aiohttp import ClientSession, ClientTimeout
 from click import ClickException
-from eth_typing import BlockNumber
 from packaging.version import InvalidVersion, Version
 from sw_utils import (
     ChainHead,
@@ -31,6 +30,7 @@ from src.common.contracts import (
     keeper_contract,
     validators_registry_contract,
 )
+from src.common.execution import get_finalized_block_number
 from src.common.harvest import get_harvest_params
 from src.common.protocol_config import get_protocol_config
 from src.common.utils import format_error, round_down, warning_verbose
@@ -170,7 +170,6 @@ async def wait_execution_catch_up_consensus(
     Check execution node is synced to the consensus finalized block.
     """
     execution_client = default_execution_client
-
     while True:
         if interrupt_handler and interrupt_handler.exit:
             return
@@ -207,7 +206,7 @@ async def wait_for_graph_node_sync_to_chain_head() -> None:
     )
     await graph_client.setup()
     try:
-        finalized_block_number = await _get_finalized_block_number()
+        finalized_block_number = await get_finalized_block_number()
         graph_block_number = await graph_client.get_last_synced_block()
 
         while graph_block_number < finalized_block_number:
@@ -216,7 +215,7 @@ async def wait_for_graph_node_sync_to_chain_head() -> None:
                 settings.graph_endpoint,
             )
             await asyncio.sleep(settings.network_config.SECONDS_PER_BLOCK)
-            finalized_block_number = await _get_finalized_block_number()
+            finalized_block_number = await get_finalized_block_number()
             graph_block_number = await graph_client.get_last_synced_block()
     finally:
         await graph_client.disconnect()
@@ -447,8 +446,10 @@ async def check_events_logs() -> None:
 
 
 async def check_vault_withdrawable_assets() -> None:
-    harvest_params = await get_harvest_params()
-    withdrawable_assets = await get_withdrawable_assets(harvest_params=harvest_params)
+    harvest_params = await get_harvest_params(settings.vault)
+    withdrawable_assets = await get_withdrawable_assets(
+        settings.vault, harvest_params=harvest_params
+    )
 
     # Note. We round down assets in the log message because of the case when assets
     # is slightly less than required amount to register validator.
@@ -514,13 +515,3 @@ def check_hardware_requirements(data_dir: Path, network: str, no_confirm: bool) 
             default=False,
         ):
             raise click.Abort()
-
-
-async def _get_finalized_block_number() -> BlockNumber:
-    """
-    Do not call get_chain_finalized_head() here because it requires consensus client.
-    In process-meta-vaults command it should work without consensus client.
-    """
-    execution_client = default_execution_client
-    finalized_block = await execution_client.eth.get_block('finalized')
-    return finalized_block['number']

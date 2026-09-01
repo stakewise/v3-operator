@@ -1,7 +1,7 @@
 import logging
 from typing import Sequence
 
-from eth_typing import HexStr
+from eth_typing import BlockNumber, ChecksumAddress, HexStr
 from sw_utils.typings import Bytes32
 from web3 import Web3
 from web3.exceptions import ContractCustomError
@@ -107,11 +107,17 @@ async def tx_fund_validators(
     return Web3.to_hex(tx_receipt['transactionHash'])
 
 
-async def get_withdrawable_assets(harvest_params: HarvestParams | None) -> Wei:
+async def get_withdrawable_assets(
+    vault: ChecksumAddress,
+    harvest_params: HarvestParams | None = None,
+    block_number: BlockNumber | None = None,
+) -> Wei:
     """Fetches vault's available assets for staking."""
-    vault_contract = VaultContract(settings.vault)
+    vault_contract = VaultContract(vault)
     if harvest_params is None:
-        return await vault_contract.functions.withdrawableAssets().call()
+        return await vault_contract.functions.withdrawableAssets().call(
+            block_identifier=block_number
+        )
 
     calls = [
         vault_contract.get_update_state_call(harvest_params),

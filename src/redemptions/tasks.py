@@ -1,0 +1,164 @@
+import logging
+from collections import defaultdict
+from dataclasses import replace
+
+from eth_typing import BlockNumber, ChecksumAddress
+from sw_utils import OsTokenConverter
+from sw_utils.typings import ChainHead
+from web3.types import Wei
+
+from src.common.contracts import VaultContract
+from src.common.execution import get_finalized_block_number
+from src.common.protocol_config import get_protocol_config
+from src.config.settings import settings
+from src.redemptions.contracts import os_token_redeemer_contract
+from src.redemptions.fetch_positions import (
+    fetch_positions_with_processed_shares,
+    iter_live_shares,
+    update_positions_cache,
+    update_processed_shares_cache,
+)
+from src.redemptions.os_token_converter import create_os_token_converter
+from src.redemptions.typings import OsTokenPosition, VaultOsTokenPosition
+
+logger = logging.getLogger(__name__)
+
+
+async def get_redemption_assets(chain_head: ChainHead) -> Wei:
+    """
+    Get redemption assets for operator's vault.
+    For Gno networks return value in GNO-Wei.
+    """
+    nonce = await os_token_redeemer_contract.nonce(chain_head.block_number)
+    if nonce == 0:
+        logger.info('Zero nonce for redemption. Skipping redemption assets.')
+        return Wei(0)
+
+    # Update osToken positions caches
+    finalized_block_number = await get_finalized_block_number()
+    await update_positions_cache(finalized_block_number)
+    await update_processed_shares_cache(finalized_block_number)
+
+    queued_shares = await os_token_redeemer_contract.queued_shares(
+        block_number=chain_head.block_number
+    )
+    os_token_converter = await create_os_token_converter(chain_head.block_number)
+    total_redemption_assets = os_token_converter.to_assets(queued_shares)
+
+    # OsToken in-protocol rate may increase while vault assets are exiting.
+    # Ensure sufficient assets are allocated for redemption by applying
+    # a conservative APR adjustment.
+    protocol_config = await get_protocol_config()
+    total_redemption_assets = Wei(
+        int(total_redemption_assets * protocol_config.os_token_redeem_multiplier)
+    )
+
+    vault_to_redemption_assets = await aggregate_redemption_assets_by_vaults(
+        total_redemption_assets,
+        nonce=nonce,
+        os_token_converter=os_token_converter,
+        block_number=chain_head.block_number,
+    )
+    return vault_to_redemption_assets.get(settings.vault, Wei(0))
+
+
+async def aggregate_redemption_assets_by_vaults(
+    total_redemption_assets: Wei,
+    nonce: int,
+    os_token_converter: OsTokenConverter,
+    block_number: BlockNumber,
+) -> dict[ChecksumAddress, Wei]:
+    """
+    Iterate through redeemable positions until the total redemption assets are exhausted.
+    Aggregate shares_to_redeem by vault and convert to assets.
+
+    :param total_redemption_assets: The total amount of assets available for redemption.
+    For Gno networks total_redemption_assets is in GNO-Wei.
+
+    :return: A mapping of vault addresses to their corresponding assets to redeem.
+    """
+    # Convert total redemption assets to shares
+    total_redemption_shares = os_token_converter.to_shares(total_redemption_assets)
+
+    positions = await fetch_positions_with_processed_shares(nonce=nonce, block_number=block_number)
+    live_shares = [ls async for ls in iter_live_shares(positions, block_number)]
+    positions = await assign_shares_to_redeem(
+        positions,
+        total_redemption_shares=total_redemption_shares,
+        live_shares=live_shares,
+    )
+
+    # Aggregate shares_to_redeem by vault
+    vault_to_shares_to_redeem: defaultdict[ChecksumAddress, Wei] = defaultdict(lambda: Wei(0))
+    for position in positions:
+        vault_to_shares_to_redeem[position.vault] = Wei(
+            vault_to_shares_to_redeem[position.vault] + position.shares_to_redeem
+        )
+
+    # Convert shares to assets per vault
+    return {
+        vault: os_token_converter.to_assets(shares)
+        for vault, shares in vault_to_shares_to_redeem.items()
+    }
+
+
+async def get_vault_os_token_position(
+    position: OsTokenPosition,
+    converter: OsTokenConverter,
+    block_number: BlockNumber,
+) -> VaultOsTokenPosition:
+    """Fetch the owner's live osToken debt position in the position's vault.
+    Mirrors the OsTokenPosition of the VaultOsToken contract."""
+    vault_contract = VaultContract(position.vault)
+    minted_shares = await vault_contract.get_os_token_position(position.owner, block_number)
+    loan_assets = converter.to_assets(minted_shares)
+    user_assets = await vault_contract.get_user_assets(position.owner, block_number)
+    if user_assets > 0:
+        ltv = loan_assets / user_assets
+    else:
+        ltv = float('inf') if loan_assets > 0 else 0.0
+
+    return VaultOsTokenPosition(
+        address=position.vault,
+        minted_shares=minted_shares,
+        ltv=ltv,
+    )
+
+
+async def assign_shares_to_redeem(
+    positions: list[OsTokenPosition],
+    total_redemption_shares: Wei,
+    live_shares: list[Wei] | None = None,
+) -> list[OsTokenPosition]:
+    """
+    Iterate pre-enriched positions (processed_shares already set from on-chain) and set
+    shares_to_redeem on each, stopping once the budget is exhausted.
+
+    Rules:
+    - Fully processed positions (unprocessed_shares <= 1) are skipped.
+    - Each position's shares_to_redeem is set to min(unprocessed_shares, remaining_budget).
+    - Iteration stops as soon as the cumulative shares_to_redeem reaches total_redemption_shares.
+    - If live_shares is given (aligned index-wise with positions), it further caps
+      unprocessed_shares by the owner's live osToken position (vault.osTokenPositions(owner)).
+    """
+    if total_redemption_shares <= 0:
+        return []
+
+    redeemable: list[OsTokenPosition] = []
+    remaining_shares = total_redemption_shares
+
+    for index, position in enumerate(positions):
+        unprocessed_shares = position.unprocessed_shares
+        if live_shares is not None:
+            unprocessed_shares = Wei(min(unprocessed_shares, live_shares[index]))
+        # Skip fully processed (or dead) positions; tolerate 1 wei rounding error.
+        if unprocessed_shares <= 1:
+            continue
+
+        capped_unprocessed = Wei(min(unprocessed_shares, remaining_shares))
+        redeemable.append(replace(position, shares_to_redeem=capped_unprocessed))
+        remaining_shares -= capped_unprocessed  # type: ignore
+        if remaining_shares <= 0:
+            return redeemable
+
+    return redeemable

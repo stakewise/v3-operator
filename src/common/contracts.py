@@ -235,6 +235,10 @@ class BaseEncoder:
 class VaultContract(ContractWrapper, VaultStateMixin, ErrorMixin):
     abi_path = 'abi/IEthVault.json'
 
+    async def vault_id(self) -> HexStr:
+        raw = await self.contract.functions.vaultId().call()
+        return Web3.to_hex(raw)
+
     async def get_registered_validators_public_keys(
         self, from_block: BlockNumber, to_block: BlockNumber
     ) -> list[HexStr]:
@@ -309,6 +313,30 @@ class VaultContract(ContractWrapper, VaultStateMixin, ErrorMixin):
 
     async def mev_escrow(self) -> ChecksumAddress:
         return await self.contract.functions.mevEscrow().call()
+
+    async def is_state_update_required(self, block_number: BlockNumber | None = None) -> bool:
+        return await self.contract.functions.isStateUpdateRequired().call(
+            block_identifier=block_number
+        )
+
+    async def get_os_token_position(
+        self, owner: ChecksumAddress, block_number: BlockNumber | None = None
+    ) -> Wei:
+        return Wei(
+            await self.contract.functions.osTokenPositions(owner).call(
+                block_identifier=block_number
+            )
+        )
+
+    async def get_user_assets(
+        self, owner: ChecksumAddress, block_number: BlockNumber | None = None
+    ) -> Wei:
+        shares = await self.contract.functions.getShares(owner).call(block_identifier=block_number)
+        return Wei(
+            await self.contract.functions.convertToAssets(shares).call(
+                block_identifier=block_number
+            )
+        )
 
     async def version(self) -> int:
         return await self.contract.functions.version().call()
@@ -453,6 +481,17 @@ class KeeperContract(ContractWrapper, ErrorMixin):
         )
 
 
+class OsTokenVaultControllerContract(ContractWrapper):
+    abi_path = 'abi/IOsTokenVaultController.json'
+    settings_key = 'OS_TOKEN_VAULT_CONTROLLER_CONTRACT_ADDRESS'
+
+    async def total_assets(self, block_number: BlockNumber | None = None) -> Wei:
+        return await self.contract.functions.totalAssets().call(block_identifier=block_number)
+
+    async def total_shares(self, block_number: BlockNumber | None = None) -> Wei:
+        return await self.contract.functions.totalShares().call(block_identifier=block_number)
+
+
 class RewardSplitterContract(ContractWrapper, ErrorMixin):
     abi_path = 'abi/IRewardSplitter.json'
 
@@ -588,8 +627,7 @@ class ValidatorsCheckerContract(ContractWrapper):
             [
                 params.vault,
                 params.withdrawing_assets,
-                # redemptionAssets: redemptions are a v5 feature, not used on this branch
-                0,
+                params.redemption_assets,
                 params.exit_queue_cumulative_ticket,
             ],
         )
@@ -599,3 +637,4 @@ validators_registry_contract = ValidatorsRegistryContract()
 keeper_contract = KeeperContract()
 multicall_contract = MulticallContract()
 validators_checker_contract = ValidatorsCheckerContract()
+os_token_vault_controller_contract = OsTokenVaultControllerContract()

@@ -88,6 +88,14 @@ class Settings(metaclass=Singleton):
     ipfs_fetch_endpoints: list[str]
     ipfs_timeout: int
     ipfs_retry_timeout: int
+
+    ipfs_upload_client_timeout: int
+    ipfs_local_client_endpoint: str
+    ipfs_local_username: str | None
+    ipfs_local_password: str | None
+    ipfs_pinata_api_key: str | None
+    ipfs_pinata_secret_key: str | None
+
     genesis_validators_ipfs_timeout: int
     genesis_validators_ipfs_retry_timeout: int
     validators_fetch_chunk_size: int
@@ -349,6 +357,52 @@ class Settings(metaclass=Singleton):
             description='Total time spent retrying a failed IPFS request, in seconds.',
         )
 
+        self.ipfs_upload_client_timeout = decouple_config(
+            'IPFS_UPLOAD_CLIENT_TIMEOUT',
+            default=30,
+            cast=int,
+            group='IPFS',
+            description='Timeout of a single IPFS upload request, in seconds.',
+        )
+
+        # local IPFS
+        self.ipfs_local_client_endpoint: str = decouple_config(
+            'IPFS_LOCAL_CLIENT_ENDPOINT',
+            default='',
+            group='IPFS',
+            description='Endpoint of a local/self-hosted IPFS node used to upload oracle data.',
+        )
+        self.ipfs_local_username: str | None = decouple_config(
+            'IPFS_LOCAL_USERNAME',
+            default=None,
+            group='IPFS',
+            description='Username for basic auth against the local IPFS node.',
+        )
+        self.ipfs_local_password: str | None = decouple_config(
+            'IPFS_LOCAL_PASSWORD',
+            default=None,
+            group='IPFS',
+            description='Password for basic auth against the local IPFS node.',
+        )
+
+        # pinata
+        self.ipfs_pinata_api_key: str = decouple_config(
+            'IPFS_PINATA_API_KEY',
+            default='',
+            group='IPFS',
+            description=(
+                'Pinata API key used to upload oracle data to the Pinata IPFS pinning service.'
+            ),
+        )
+        self.ipfs_pinata_secret_key: str = decouple_config(
+            'IPFS_PINATA_SECRET_KEY',
+            default='',
+            group='IPFS',
+            description=(
+                'Pinata secret key used to upload oracle data to the Pinata IPFS pinning service.'
+            ),
+        )
+
         # Genesis validators ipfs fetch may have larger timeouts
         self.genesis_validators_ipfs_timeout = decouple_config(
             'GENESIS_VALIDATORS_IPFS_TIMEOUT',
@@ -440,7 +494,7 @@ class Settings(metaclass=Singleton):
         )
         self.graph_page_size = decouple_config(
             'GRAPH_PAGE_SIZE',
-            default=100,
+            default=500,
             cast=int,
             group='Subgraph',
             description='Number of records requested from the subgraph per page.',
@@ -550,6 +604,15 @@ EVENTS_CONCURRENCY_LIMIT: int = decouple_config(
     ),
 )
 
+# Maximum number of updateState calls batched into a single multicall transaction.
+MULTICALL_CHUNK_SIZE: int = decouple_config(
+    'MULTICALL_CHUNK_SIZE',
+    default=20,
+    cast=int,
+    group='Redemptions',
+    description='Maximum number of updateState calls batched into a single multicall transaction.',
+)
+
 # Backoff retries
 DEFAULT_RETRY_TIME = 60
 
@@ -590,6 +653,18 @@ VALIDATORS_FUNDING_BATCH_SIZE = decouple_config(
     default=10,
     group='Validators',
     description='Number of validators funded in a single transaction.',
+)
+
+# Batch size for OsTokenRedeemer read-only multicalls (e.g. fetching processed shares in bulk)
+OS_TOKEN_REDEEMER_CHUNK_SIZE: int = decouple_config(
+    'OS_TOKEN_REDEEMER_CHUNK_SIZE',
+    cast=int,
+    default=1000,
+    group='Redemptions',
+    description=(
+        'Batch size for OsTokenRedeemer read-only multicalls, '
+        'e.g. fetching processed shares in bulk.'
+    ),
 )
 
 # Minimum amount of rewards to process reward splitter

@@ -48,7 +48,7 @@ async def claim_reward_splitters(
     by the meta vault tree update).
     """
     if update_vault_state and len(vaults) > 1:
-        # get_harvest_params always reads settings.vault internally, so a single
+        # harvest_params are fetched once for settings.vault below, so a single
         # fetch cannot be reused across multiple vaults when updating their state.
         logger.error('Updating vault state is not supported when claiming for multiple vaults')
         return
@@ -65,7 +65,7 @@ async def claim_reward_splitters(
 
     logger.info('Fetching fee splitters')
 
-    harvest_params = await get_harvest_params() if update_vault_state else None
+    harvest_params = await get_harvest_params(settings.vault) if update_vault_state else None
 
     for vault in vaults:
         try:

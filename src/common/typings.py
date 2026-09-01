@@ -38,6 +38,7 @@ class OraclesApproval:
 class ExitQueueMissingAssetsParams:
     vault: ChecksumAddress
     withdrawing_assets: Wei
+    redemption_assets: Wei
     exit_queue_cumulative_ticket: int
 
 

@@ -1,5 +1,7 @@
+import asyncio
 import logging
 
+from eth_typing import BlockNumber
 from sw_utils import GasManager, InterruptHandler
 from web3 import Web3
 from web3.types import Wei
@@ -11,6 +13,8 @@ from src.common.wallet import wallet
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
+
+EXECUTION_ENDPOINT_SYNC_POLL_INTERVAL = 0.1
 
 
 class WalletTask(BaseTask):
@@ -45,6 +49,19 @@ async def get_wallet_balance() -> Wei:
 async def check_gas_price(high_priority: bool = False) -> bool:
     gas_manager = build_gas_manager()
     return await gas_manager.check_gas_price(high_priority)
+
+
+async def wait_for_execution_endpoints_synced(target_block: BlockNumber) -> None:
+    while True:
+        current_block = await execution_client.eth.block_number
+        if current_block >= target_block:
+            return
+        await asyncio.sleep(EXECUTION_ENDPOINT_SYNC_POLL_INTERVAL)
+
+
+async def get_finalized_block_number() -> BlockNumber:
+    finalized_block = await execution_client.eth.get_block('finalized')
+    return BlockNumber(finalized_block['number'])
 
 
 def build_gas_manager() -> GasManager:

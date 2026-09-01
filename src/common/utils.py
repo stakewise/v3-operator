@@ -43,6 +43,20 @@ def log_verbose(e: Exception) -> None:
         logger.error(format_error(e))
 
 
+def error_verbose(msg: str, *args) -> None:  # type: ignore
+    """Log an error message, attaching the traceback of the exception currently
+    being handled when verbose mode is on. Mirrors the ``logger.error``
+    signature, so unlike ``log_verbose`` the message is not lost.
+
+    Call from inside an ``except`` block, otherwise there is no traceback for
+    the verbose branch to attach.
+    """
+    if settings.verbose:
+        logger.exception(msg, *args)
+    else:
+        logger.error(msg, *args)
+
+
 def warning_verbose(msg: str, *args) -> None:  # type: ignore
     if settings.verbose:
         logger.warning(msg, *args)

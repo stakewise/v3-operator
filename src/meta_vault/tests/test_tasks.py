@@ -7,6 +7,7 @@ from hexbytes import HexBytes
 from sw_utils.tests import faker
 
 from src.config.settings import settings
+from src.meta_vault.contracts import MetaVaultContract
 from src.meta_vault.tasks import (
     ProcessMetaVaultTask,
     meta_vault_tree_update_state,
@@ -117,7 +118,9 @@ class TestMetaVaultTreeUpdateStateCalls:
                 'transactionHash': HexBytes(b'\x12' * 32),
                 'blockNumber': 123,
             },
-        ) as tx_aggregate_mock:
+        ) as tx_aggregate_mock, mock.patch.object(
+            MetaVaultContract, 'sub_vaults_registry', return_value=faker.eth_address()
+        ):
             yield tx_aggregate_mock
 
 
