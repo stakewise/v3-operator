@@ -2,6 +2,7 @@ import json
 from functools import partial
 from typing import Generator
 
+import milagro_bls_binding as bls
 import pytest
 from aioresponses import CallbackResult, aioresponses
 from sw_utils.tests import faker
@@ -13,30 +14,24 @@ def hashi_vault_url() -> str:
     return 'http://vault:8200'
 
 
+def _generate_key_pair() -> tuple[str, str]:
+    """Generate a private key and the public key derived from it, the same way
+    HashiVaultKeystore verifies loaded keys against their label."""
+    sk = Web3.to_hex(faker.private_key())
+    pk = Web3.to_hex(bls.SkToPk(Web3.to_bytes(hexstr=sk)))
+    return pk, sk
+
+
 class HashiVaultStub:
-    bundled_pk_1 = faker.validator_public_key()
-    bundled_sk_1 = Web3.to_hex(faker.private_key())
+    bundled_pk_1, bundled_sk_1 = _generate_key_pair()
+    bundled_pk_2, bundled_sk_2 = _generate_key_pair()
+    bundled_pk_3, bundled_sk_3 = _generate_key_pair()
+    bundled_pk_4, bundled_sk_4 = _generate_key_pair()
 
-    bundled_pk_2 = faker.validator_public_key()
-    bundled_sk_2 = Web3.to_hex(faker.private_key())
-
-    bundled_pk_3 = faker.validator_public_key()
-    bundled_sk_3 = Web3.to_hex(faker.private_key())
-
-    bundled_pk_4 = faker.validator_public_key()
-    bundled_sk_4 = Web3.to_hex(faker.private_key())
-
-    prefixed_pk_1 = faker.validator_public_key()
-    prefixed_sk_1 = Web3.to_hex(faker.private_key())
-
-    prefixed_pk_2 = faker.validator_public_key()
-    prefixed_sk_2 = Web3.to_hex(faker.private_key())
-
-    prefixed_pk_3 = faker.validator_public_key()
-    prefixed_sk_3 = Web3.to_hex(faker.private_key())
-
-    prefixed_pk_4 = faker.validator_public_key()
-    prefixed_sk_4 = Web3.to_hex(faker.private_key())
+    prefixed_pk_1, prefixed_sk_1 = _generate_key_pair()
+    prefixed_pk_2, prefixed_sk_2 = _generate_key_pair()
+    prefixed_pk_3, prefixed_sk_3 = _generate_key_pair()
+    prefixed_pk_4, prefixed_sk_4 = _generate_key_pair()
 
 
 @pytest.fixture
@@ -50,6 +45,11 @@ def mocked_hashi_vault(
     _hashi_vault_pk_sk_mapping_2 = {
         HashiVaultStub.bundled_pk_3: HashiVaultStub.bundled_sk_3,
         HashiVaultStub.bundled_pk_4: HashiVaultStub.bundled_sk_4,
+    }
+    # Label pubkey (bundled_pk_1) does not match the secret's derived pubkey
+    # (bundled_sk_2 belongs to bundled_pk_2), simulating a mislabeled entry.
+    _hashi_vault_pk_sk_mismatched_mapping = {
+        HashiVaultStub.bundled_pk_1: HashiVaultStub.bundled_sk_2,
     }
 
     _hashi_vault_prefixed_pk_sk_mapping1 = {
@@ -149,6 +149,12 @@ def mocked_hashi_vault(
         m.get(
             f'{hashi_vault_url}/v1/secret/data/ethereum/inaccessible/keystores',
             callback=_mocked_error_path,
+            repeat=True,
+        )
+        # Mocked bundled signing keys endpoint with a mislabeled key
+        m.get(
+            f'{hashi_vault_url}/v1/secret/data/ethereum/signing/mismatched/keystores',
+            callback=partial(_mocked_secret_path, _hashi_vault_pk_sk_mismatched_mapping),
             repeat=True,
         )
         yield
