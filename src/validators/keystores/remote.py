@@ -99,8 +99,9 @@ class RemoteSignerKeystore(BaseKeystore):
     ) -> dict:
         fork_version = NETWORKS[settings.network].GENESIS_FORK_VERSION
         withdrawal_credentials = get_withdrawal_credentials()
+        public_key_bytes = BLSPubkey(Web3.to_bytes(hexstr=public_key))
         signing_root = self._get_deposit_signing_root(
-            public_key=BLSPubkey(Web3.to_bytes(hexstr=public_key)),
+            public_key=public_key_bytes,
             withdrawal_credentials=withdrawal_credentials,
             amount=amount,
             fork_version=fork_version,
@@ -112,7 +113,9 @@ class RemoteSignerKeystore(BaseKeystore):
             signing_root=signing_root,
             fork_version=fork_version,
         )
-        public_key_bytes = Web3.to_bytes(hexstr=public_key)
+        if not bls.Verify(public_key_bytes, signing_root, signature):
+            raise RuntimeError(f'Deposit signature verification failed for public_key={public_key}')
+
         deposit_data = SerializableDepositData(
             pubkey=public_key_bytes,
             withdrawal_credentials=withdrawal_credentials,
