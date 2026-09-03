@@ -199,6 +199,60 @@ class TestRemoteDbSetupWeb3Signer:
             output = 'Successfully retrieved web3signer private keys from the database.\n'
             assert output.strip() in result.output.strip()
 
+    def test_setup_web3signer_removes_stale_keys_on_shrink(
+        self,
+        data_dir: Path,
+        vault_address: HexAddress,
+        runner: CliRunner,
+        execution_endpoints: str,
+    ):
+        db_url = 'postgresql://user:password@localhost:5432/dbname'
+        encryption_key = '43ueY4nqsiajWHTnkdqrc3OWj2W+t0bbdBISJFjZ3Ck='
+
+        args = [
+            '--db-url',
+            db_url,
+            '--vault',
+            vault_address,
+            '--data-dir',
+            str(data_dir),
+            'setup-web3signer',
+            '--output-dir',
+            './web3signer',
+            '--encrypt-key',
+            encryption_key,
+        ]
+        keypairs = _get_remote_db_keypairs(base64.b64decode(encryption_key), total_validators=3)
+
+        with (
+            runner.isolated_filesystem(),
+            mock.patch.object(KeyPairsCrud, 'get_first_keypair', return_value=keypairs[0]),
+            mock.patch.object(KeyPairsCrud, 'get_keypairs', return_value=keypairs),
+        ):
+            result = runner.invoke(remote_db_group, args)
+            assert result.exit_code == 0
+
+            web3signer_dir = Path('./web3signer')
+            assert (web3signer_dir / 'key_0.yaml').exists()
+            assert (web3signer_dir / 'key_1.yaml').exists()
+            assert (web3signer_dir / 'key_2.yaml').exists()
+
+            other_filepath = web3signer_dir / 'other.txt'
+            other_filepath.write_text('unrelated file')
+
+            with (
+                mock.patch.object(KeyPairsCrud, 'get_first_keypair', return_value=keypairs[0]),
+                mock.patch.object(KeyPairsCrud, 'get_keypairs', return_value=keypairs[:1]),
+            ):
+                result = runner.invoke(remote_db_group, args)
+                assert result.exit_code == 0
+
+            assert (web3signer_dir / 'key_0.yaml').exists()
+            assert not (web3signer_dir / 'key_1.yaml').exists()
+            assert not (web3signer_dir / 'key_2.yaml').exists()
+            assert sorted(web3signer_dir.glob('key_*.yaml')) == [web3signer_dir / 'key_0.yaml']
+            assert other_filepath.exists()
+
 
 @pytest.mark.usefixtures(
     '_patch_check_db_connection',
