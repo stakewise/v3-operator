@@ -1,8 +1,6 @@
-from unittest import mock
-from unittest.mock import AsyncMock
-
 import pytest
 
+from src.common.tests.utils import patch_consensus_client
 from src.exits.consensus import get_validator_public_keys
 
 
@@ -13,13 +11,28 @@ class TestGetValidatorPublicKeys:
         # the unrequested record must not end up in the index-to-public-key mapping.
         response = {
             'data': [
-                {'index': '10', 'validator': {'pubkey': '0xaa'}},
-                {'index': '999', 'validator': {'pubkey': '0xbb'}},
+                _beacon_validator(index='10', pubkey='0xaa'),
+                _beacon_validator(index='999', pubkey='0xbb'),
             ]
         }
-        with mock.patch('src.exits.consensus.consensus_client', new=AsyncMock()) as consensus_mock:
+        with patch_consensus_client() as consensus_mock:
             consensus_mock.get_validators_by_ids.return_value = response
             result = await get_validator_public_keys([10])
 
         assert result == {10: '0xaa'}
-        consensus_mock.get_validators_by_ids.assert_called_once_with(['10'], state_id='finalized')
+        consensus_mock.get_validators_by_ids.assert_called_once_with(
+            validator_ids=('10',), state_id='finalized'
+        )
+
+
+def _beacon_validator(index: str, pubkey: str) -> dict:
+    return {
+        'index': index,
+        'balance': '32000000000',
+        'status': 'active_ongoing',
+        'validator': {
+            'pubkey': pubkey,
+            'withdrawal_credentials': '0x01',
+            'activation_epoch': '0',
+        },
+    }

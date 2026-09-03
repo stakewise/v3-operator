@@ -7,7 +7,7 @@ from sw_utils.tests import faker
 from web3.types import Gwei
 
 from src.common.tests.factories import create_chain_head
-from src.common.tests.utils import ether_to_gwei
+from src.common.tests.utils import ether_to_gwei, patch_consensus_client
 from src.common.typings import PendingConsolidation
 from src.validators.consensus import (
     UNKNOWN_VALIDATOR_INDEX,
@@ -456,7 +456,7 @@ def patch_funding_dependencies(
             new_callable=AsyncMock,
             return_value=pending_consolidations or [],
         ) as mock_consolidations,
-        patch('src.validators.consensus.consensus_client', mock_consensus),
+        patch_consensus_client(mock_consensus),
     ):
         yield {
             'chain_head': mock_chain_head,

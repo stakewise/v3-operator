@@ -6,7 +6,7 @@ from pathlib import Path
 
 from eth_typing import BlockNumber
 from sw_utils import ExtendedAsyncBeacon
-from sw_utils.consensus import ACTIVE_STATUSES, ValidatorStatus
+from sw_utils.consensus import ACTIVE_STATUSES
 from web3 import AsyncWeb3
 from web3.types import BlockData, Timestamp
 
@@ -25,6 +25,7 @@ from src.nodewise.typings import (
     StatusHistoryRecord,
     SyncStageProgress,
 )
+from src.validators.consensus import iter_validators_by_ids
 from src.validators.keystores.local import LocalKeystore
 
 logger = logging.getLogger(__name__)
@@ -135,18 +136,16 @@ async def _get_number_of_active_validators(
     if not public_keys:
         return 0
 
+    active_count = 0
     try:
-        validators = (await consensus_client.get_validators_by_ids(public_keys))['data']
+        async for validator in iter_validators_by_ids(
+            public_keys, consensus_client=consensus_client
+        ):
+            if validator.status in ACTIVE_STATUSES:
+                active_count += 1
     except Exception as e:
         warning_verbose('Error fetching validators: %s', format_error(e))
         return 0
-
-    active_count = 0
-
-    for validator in validators:
-        status = ValidatorStatus(validator['status'])
-        if status in ACTIVE_STATUSES:
-            active_count += 1
 
     return active_count
 
