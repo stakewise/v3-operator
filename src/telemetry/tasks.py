@@ -1,17 +1,18 @@
 import logging
 import time
-from urllib.parse import urljoin
 
 import aiohttp
 from aiohttp import ClientTimeout
 from eth_account.messages import encode_defunct
 from eth_typing import ChecksumAddress, HexStr
 from sw_utils import InterruptHandler
+from sw_utils.common import urljoin
 from web3 import Web3
 
 import src
 from src.common.clients import OPERATOR_USER_AGENT
 from src.common.tasks import BaseTask
+from src.common.utils import format_error
 from src.common.wallet import wallet
 from src.config.settings import TELEMETRY_INTERVAL, settings
 
@@ -53,7 +54,7 @@ class TelemetryTask(BaseTask):
         try:
             await self.report_operator_version()
         except Exception as e:
-            logger.warning('Failed to report operator version: %s', e)
+            logger.info('Failed to report operator version: %s', format_error(e))
 
     async def report_operator_version(self) -> None:
         timestamp = int(time.time())
@@ -63,8 +64,7 @@ class TelemetryTask(BaseTask):
         )
         signature = self._sign_message(message)
 
-        base_url = settings.network_config.STAKEWISE_REST_API_URL
-        url = urljoin(base_url + '/', TELEMETRY_ENDPOINT)
+        url = urljoin(settings.network_config.STAKEWISE_REST_API_URL, TELEMETRY_ENDPOINT)
         payload = {
             'vault': settings.vault,
             'operator_version': operator_version,
