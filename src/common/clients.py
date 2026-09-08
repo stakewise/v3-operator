@@ -149,8 +149,9 @@ def build_ipfs_upload_clients() -> IpfsMultiUploadClient:
 
     if not clients:
         raise ValueError(
-            'No IPFS client settings configured. '
-            'Please provide IPFS_LOCAL_CLIENT_ENDPOINT or third party IPFS services settings.'
+            'IPFS upload client is not configured. '
+            'Set IPFS_LOCAL_CLIENT_ENDPOINT to upload via a local IPFS node, '
+            'or set both IPFS_PINATA_API_KEY and IPFS_PINATA_SECRET_KEY to upload via Pinata.'
         )
     return IpfsMultiUploadClient(clients)
 
