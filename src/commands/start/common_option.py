@@ -146,6 +146,13 @@ start_common_options = [
         help='Disable funding of existing 0x02 validators. Default is false.',
     ),
     click.option(
+        '--disable-telemetry',
+        is_flag=True,
+        envvar='DISABLE_TELEMETRY',
+        help='Disable reporting the operator version to the StakeWise backend.'
+        ' Default is false.',
+    ),
+    click.option(
         '--execution-endpoints',
         type=str,
         envvar='EXECUTION_ENDPOINTS',

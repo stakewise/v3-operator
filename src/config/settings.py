@@ -57,6 +57,7 @@ class Settings(metaclass=Singleton):
     disable_withdrawals: bool
     disable_validators_registration: bool
     disable_validators_funding: bool
+    disable_telemetry: bool
     verbose: bool
     enable_metrics: bool
     metrics_host: str
@@ -175,6 +176,7 @@ class Settings(metaclass=Singleton):
         disable_withdrawals: bool = False,
         disable_validators_registration: bool = False,
         disable_validators_funding: bool = False,
+        disable_telemetry: bool = False,
         verbose: bool = False,
         enable_metrics: bool = False,
         metrics_port: int = DEFAULT_METRICS_PORT,
@@ -233,6 +235,7 @@ class Settings(metaclass=Singleton):
         self.disable_withdrawals = disable_withdrawals
         self.disable_validators_registration = disable_validators_registration
         self.disable_validators_funding = disable_validators_funding
+        self.disable_telemetry = disable_telemetry
         self.verbose = verbose
         self.enable_metrics = enable_metrics
         self.metrics_host = metrics_host
@@ -575,6 +578,15 @@ WITHDRAWALS_INTERVAL: int = decouple_config(
     description='Minimum time between withdrawal processing runs, in seconds.',
 )
 MIN_WITHDRAWAL_AMOUNT_GWEI: Gwei = Gwei(1)
+
+# telemetry
+TELEMETRY_INTERVAL: int = decouple_config(
+    'TELEMETRY_INTERVAL',
+    default=86400,  # every 24 hr
+    cast=int,
+    group='Telemetry',
+    description='Minimum time between operator version reports, in seconds.',
+)
 
 # common
 MIN_ACTIVATION_BALANCE: Wei = Web3.to_wei(32, 'ether')

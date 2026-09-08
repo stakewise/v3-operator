@@ -79,7 +79,7 @@ def submit_rated_network(
         network=network,
         execution_endpoints='',
         consensus_endpoints='',
-        graph_endpoint=NETWORKS[network].STAKEWISE_API_URL,
+        graph_endpoint=NETWORKS[network].STAKEWISE_GRAPHQL_API_URL,
     )
     click.secho('Starting rated self report...')
     asyncio.run(_report_validators(vault, pool_tag, token, network))

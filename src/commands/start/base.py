@@ -19,6 +19,7 @@ from src.exits.tasks import ExitSignatureTask
 from src.harvest.tasks import HarvestTask
 from src.nodewise.commands.node_start import main as run_nodes
 from src.reward_splitter.tasks import SplitRewardTask
+from src.telemetry.tasks import TelemetryTask
 from src.validators.database import (
     CheckpointCrud,
     NetworkValidatorCrud,
@@ -78,6 +79,9 @@ async def process() -> None:
 
     if settings.relayer_endpoint:
         relayer = RelayerClient()
+        # Telemetry is signed by the vault validators manager. In relayer mode that role
+        # belongs to the relayer, so the operator wallet cannot produce a valid signature.
+        settings.disable_telemetry = True
     elif not settings.disable_validators_registration:
         keystore = await load_keystore()
 
@@ -108,6 +112,8 @@ async def process() -> None:
             tasks.append(HarvestTask().run(interrupt_handler))
         if settings.claim_fee_splitter:
             tasks.append(SplitRewardTask().run(interrupt_handler))
+        if not settings.disable_telemetry:
+            tasks.append(TelemetryTask().run(interrupt_handler))
 
         await asyncio.gather(*tasks)
 
