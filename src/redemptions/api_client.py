@@ -52,6 +52,7 @@ class APIClient:
         url = urljoin(self.base_url, 'v1/user/complex_protocol_list')
         params = {
             'id': address,
+            'chain_id': self.api_chain,
         }
 
         protocol_data = await self._fetch_json(url, params=params)
