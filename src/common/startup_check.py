@@ -25,11 +25,7 @@ from web3.exceptions import BadFunctionCallOutput
 import src
 from src.common.clients import OPERATOR_USER_AGENT
 from src.common.clients import execution_client as default_execution_client
-from src.common.contracts import (
-    VaultContract,
-    keeper_contract,
-    validators_registry_contract,
-)
+from src.common.contracts import VaultContract, validators_registry_contract
 from src.common.execution import get_finalized_block_number
 from src.common.harvest import get_harvest_params
 from src.common.protocol_config import get_protocol_config
@@ -425,15 +421,6 @@ async def check_operator_version() -> None:
 
 async def check_events_logs() -> None:
     """Check that EL client didn't prune logs"""
-    events = await keeper_contract.events.ConfigUpdated.get_logs(
-        from_block=settings.network_config.CONFIG_UPDATE_EVENT_BLOCK,
-        to_block=settings.network_config.CONFIG_UPDATE_EVENT_BLOCK,
-    )
-    if not events:
-        raise ValueError(
-            "Can't find oracle config. Please, ensure that EL client didn't prune event logs."
-        )
-
     events = await validators_registry_contract.events.DepositEvent.get_logs(
         from_block=settings.network_config.GENESIS_VALIDATORS_LAST_BLOCK,
         to_block=settings.network_config.GENESIS_VALIDATORS_LAST_BLOCK,
