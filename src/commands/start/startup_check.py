@@ -69,7 +69,7 @@ async def startup_checks() -> None:
         logger.info('Checking graph nodes %s...', settings.graph_endpoint)
         await wait_for_graph_node_sync_to_chain_head()
 
-    logger.info('Checking oracles config...')
+    logger.info('Checking event logs...')
     await check_events_logs()
 
     logger.info('Checking vault address %s...', settings.vault)

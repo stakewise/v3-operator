@@ -40,7 +40,9 @@ class NetworkConfig(BaseNetworkConfig):
     STAKEWISE_REST_API_URL: str
     STAKEWISE_GRAPH_ENDPOINT: str
     RATED_API_URL: str
-    CONFIG_UPDATE_EVENT_BLOCK: BlockNumber
+    # Newest known `ConfigUpdated` event, and a block with no newer event up to it.
+    CONFIG_UPDATE_LAST_EVENT_BLOCK: BlockNumber
+    CONFIG_UPDATE_CHECKPOINT_BLOCK: BlockNumber
     OS_TOKEN_REDEEMER_GENESIS_BLOCK: BlockNumber
     MAX_FEE_PER_GAS_GWEI: Gwei
     MAX_VALIDATOR_BALANCE_GWEI: Gwei
@@ -111,7 +113,8 @@ NETWORKS: dict[str, NetworkConfig] = {
             'https://graphs.stakewise.io/mainnet/subgraphs/name/stakewise/prod'
         ),
         RATED_API_URL='https://api.rated.network',
-        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(21471524),
+        CONFIG_UPDATE_LAST_EVENT_BLOCK=BlockNumber(25093055),
+        CONFIG_UPDATE_CHECKPOINT_BLOCK=BlockNumber(25934000),
         OS_TOKEN_REDEEMER_GENESIS_BLOCK=BlockNumber(24923158),
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
         MAX_VALIDATOR_BALANCE_GWEI=Gwei(int(Web3.from_wei(Web3.to_wei(300, 'ether'), 'gwei'))),
@@ -162,7 +165,8 @@ NETWORKS: dict[str, NetworkConfig] = {
         STAKEWISE_REST_API_URL='https://hoodi-api.stakewise.io',
         STAKEWISE_GRAPH_ENDPOINT='https://graphs.stakewise.io/hoodi/subgraphs/name/stakewise/prod',
         RATED_API_URL='https://api.rated.network',
-        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(94090),
+        CONFIG_UPDATE_LAST_EVENT_BLOCK=BlockNumber(1279009),
+        CONFIG_UPDATE_CHECKPOINT_BLOCK=BlockNumber(3584000),
         OS_TOKEN_REDEEMER_GENESIS_BLOCK=BlockNumber(2657589),
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
         MAX_VALIDATOR_BALANCE_GWEI=Gwei(int(Web3.from_wei(Web3.to_wei(300, 'ether'), 'gwei'))),
@@ -215,7 +219,8 @@ NETWORKS: dict[str, NetworkConfig] = {
             'https://graphs.stakewise.io/gnosis/subgraphs/name/stakewise/prod'
         ),
         RATED_API_URL='https://api.rated.network',
-        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(37640206),
+        CONFIG_UPDATE_LAST_EVENT_BLOCK=BlockNumber(42392284),
+        CONFIG_UPDATE_CHECKPOINT_BLOCK=BlockNumber(48148000),
         OS_TOKEN_REDEEMER_GENESIS_BLOCK=BlockNumber(45773287),
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
         MAX_VALIDATOR_BALANCE_GWEI=Gwei(int(Web3.from_wei(Web3.to_wei(1800, 'ether'), 'gwei'))),
