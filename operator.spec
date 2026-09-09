@@ -21,6 +21,7 @@ datas += collect_data_files('certifi')
 datas += collect_data_files('coincurve')
 datas += collect_data_files('eth_account')
 datas += collect_data_files('eth_utils')
+datas += collect_data_files('multiformats_config')
 datas += copy_metadata('py_ecc')
 
 block_cipher = None
