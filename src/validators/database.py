@@ -94,10 +94,8 @@ class CheckpointCrud:
             return BlockNumber(result[0]) if result else None
 
     def update_validators_checkpoint(self, block_number: BlockNumber) -> None:
-        """Advances the checkpoint. Never lowers it.
-
-        The checkpoint doubles as the vault scans' floor, so a seeded value must survive a
-        node whose finalized head is still behind it.
+        """
+        Advances the checkpoint. Never lowers it.
         """
         with db_client.get_db_connection() as conn:
             conn.execute(

@@ -62,11 +62,8 @@ class NetworkConfig(BaseNetworkConfig):
 
 @dataclass
 class CheckpointsConfig:
-    """Pinned points past which the operator does not need execution client event logs.
-
-    Refreshed per release by the generators under `local/`; see
-    `local/issues/78 - event-logs-checkpoints/`. A stale checkpoint is harmless -- it only
-    means scanning more blocks -- but a wrong one breaks the path that depends on it.
+    """
+    Pinned points past which the operator does not need execution client event logs.
     """
 
     # Newest known `ConfigUpdated` event, and a block with no newer event up to it.
