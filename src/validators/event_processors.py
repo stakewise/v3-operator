@@ -114,10 +114,10 @@ class VaultValidatorsProcessor(EventProcessor):
 
     async def get_from_block(self) -> BlockNumber:
         checkpoint = CheckpointCrud().get_validators_checkpoint()
-        if not checkpoint:
-            return settings.network_config.KEEPER_GENESIS_BLOCK
+        if checkpoint is not None:
+            return BlockNumber(checkpoint + 1)
 
-        return BlockNumber(checkpoint + 1)
+        return settings.network_config.KEEPER_GENESIS_BLOCK
 
     # pylint: disable-next=unused-argument
     async def process_events(self, events: list[EventData], to_block: BlockNumber) -> None:
@@ -136,10 +136,10 @@ class VaultV2ValidatorsProcessor(VaultValidatorsProcessor):
 
     async def get_from_block(self) -> BlockNumber:
         checkpoint = CheckpointCrud().get_validators_checkpoint()
-        if not checkpoint:
-            return settings.network_config.KEEPER_GENESIS_BLOCK
+        if checkpoint is not None:
+            return BlockNumber(checkpoint + 1)
 
-        return BlockNumber(checkpoint + 1)
+        return _v2_validators_genesis_block()
 
 
 async def get_validators_start_index() -> int:
@@ -172,16 +172,22 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
 
 async def get_latest_vault_v2_validator_public_keys(vault_address: ChecksumAddress) -> Set[HexStr]:
     """Fetches the latest vault v2 validator public keys registered after finalized block"""
-    block_number = CheckpointCrud().get_validators_checkpoint()
-    if block_number:
-        from_block = BlockNumber(block_number + 1)
+    checkpoint = CheckpointCrud().get_validators_checkpoint()
+    if checkpoint is not None:
+        from_block = BlockNumber(checkpoint + 1)
     else:
-        from_block = settings.network_config.KEEPER_GENESIS_BLOCK
+        from_block = _v2_validators_genesis_block()
     vault_contract = VaultContract(vault_address)
     public_keys = await vault_contract.get_v2_validator_registered_public_keys(
         from_block=from_block
     )
     return set(public_keys)
+
+
+def _v2_validators_genesis_block() -> BlockNumber:
+    """The earliest block a `V2ValidatorRegistered` event can appear at."""
+    network_config = settings.network_config
+    return BlockNumber(max(network_config.KEEPER_GENESIS_BLOCK, network_config.PECTRA_BLOCK))
 
 
 def process_network_validator_event(

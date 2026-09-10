@@ -136,6 +136,13 @@ class TestCheckpointCrud:
         cp = checkpoint_crud.get_validators_checkpoint()
         assert cp == BlockNumber(200)
 
+    def test_update_never_lowers(self, checkpoint_crud):
+        checkpoint_crud.update_validators_checkpoint(BlockNumber(200))
+        checkpoint_crud.update_validators_checkpoint(BlockNumber(100))
+
+        cp = checkpoint_crud.get_validators_checkpoint()
+        assert cp == BlockNumber(200)
+
     def test_setup_idempotent(self, checkpoint_crud):
         checkpoint_crud.setup()
 

@@ -200,7 +200,7 @@ def _mock_block_number(block_number: BlockNumber):
 def _mock_checkpoints():
     """Pins the checkpoint / last event blocks of the network config."""
     return patch.multiple(
-        settings.network_config,
+        settings.network_config.CHECKPOINTS,
         CONFIG_UPDATE_CHECKPOINT_BLOCK=BlockNumber(90000),
         CONFIG_UPDATE_LAST_EVENT_BLOCK=BlockNumber(80000),
     )

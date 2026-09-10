@@ -81,8 +81,8 @@ async def _get_config_updated_event_since_checkpoint(to_block: BlockNumber) -> E
     Cold cache lookup. Scans from the checkpoint to avoid re-scanning the whole
     history, and falls back to the last known event block when nothing is newer.
     """
-    network_config = settings.network_config
-    from_block = BlockNumber(network_config.CONFIG_UPDATE_CHECKPOINT_BLOCK + 1)
+    checkpoints = settings.network_config.CHECKPOINTS
+    from_block = BlockNumber(checkpoints.CONFIG_UPDATE_CHECKPOINT_BLOCK + 1)
 
     if from_block <= to_block:
         logger.debug(
@@ -94,7 +94,7 @@ async def _get_config_updated_event_since_checkpoint(to_block: BlockNumber) -> E
         if event:
             return event
 
-    last_event_block = network_config.CONFIG_UPDATE_LAST_EVENT_BLOCK
+    last_event_block = checkpoints.CONFIG_UPDATE_LAST_EVENT_BLOCK
     return await keeper_contract.get_config_updated_event(
         from_block=last_event_block, to_block=last_event_block
     )

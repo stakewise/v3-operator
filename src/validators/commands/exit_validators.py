@@ -139,6 +139,10 @@ def exit_validators(
     """
     Trigger vault validator exits via vault contract.
     To initiate a full validator exit, send a withdrawal request with a zero amount.
+
+    Vault validators are read from the vault contract events, never from the operator
+    database, so that the command also works in database-less setups. `--vault-first-block`
+    narrows the scanned block range.
     """
     if all([indexes, count]):
         raise click.ClickException('Please provide either --indexes or --count, not both.')

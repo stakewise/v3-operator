@@ -109,6 +109,13 @@ def recover(
     log_level: str,
     vault_first_block: BlockNumber | None,
 ) -> None:
+    """
+    Recover the config data directory and the keystores.
+
+    Vault validators are read from the vault contract events, never from the operator
+    database, so that the command also works in database-less setups. `--vault-first-block`
+    narrows the scanned block range.
+    """
     # pylint: disable=duplicate-code
     operator_config = OperatorConfig(
         vault,
