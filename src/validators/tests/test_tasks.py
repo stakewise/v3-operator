@@ -1,3 +1,4 @@
+import logging
 from contextlib import contextmanager
 from unittest.mock import AsyncMock, patch
 
@@ -1101,15 +1102,20 @@ class TestLoadVaultValidators:
         fetch_mock.assert_not_awaited()
         assert CheckpointCrud().get_validators_checkpoint() is None
 
-    async def test_warns_when_vault_has_no_validators(
+    async def test_logs_when_vault_has_no_validators(
         self, checkpoint_crud, vault_validator_crud, caplog
     ):
         data = _dump_record(3_400_000, faker.eth_address(), faker.validator_public_key())
 
-        with patch_vault_validators_dump(data):
+        with (
+            caplog.at_level(logging.INFO, logger='src.validators.tasks'),
+            patch_vault_validators_dump(data),
+        ):
             await load_vault_validators()
 
         assert 'has no validators for vault' in caplog.text
+        assert 'Loaded' not in caplog.text
+        assert VaultValidatorCrud().get_vault_validators() == []
         assert CheckpointCrud().get_validators_checkpoint() == BlockNumber(3_500_000)
 
 
