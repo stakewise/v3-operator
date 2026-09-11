@@ -381,17 +381,19 @@ async def load_vault_validators() -> None:
     data = await _fetch_ipfs_dump(ipfs_hash)
     validators = parse_vault_validators_dump(data, settings.vault, last_block)
 
-    VaultValidatorCrud().save_vault_validators(validators)
+    if validators:
+        VaultValidatorCrud().save_vault_validators(validators)
     checkpoint_crud.update_validators_checkpoint(last_block)
 
-    if not validators:
-        logger.warning(
+    if validators:
+        logger.info('Loaded %d vault validators', len(validators))
+    else:
+        logger.info(
             'The vault validators dump has no validators for vault %s. '
             'Vault events will be scanned starting from block %d. ',
             settings.vault,
             last_block,
         )
-    logger.info('Loaded %d vault validators', len(validators))
 
 
 def parse_vault_validators_dump(
