@@ -114,13 +114,16 @@ async def _fetch_last_update_block() -> BlockNumber | None:
     app_state = AppState()
     update_cache = app_state.exit_signature_update_cache
 
-    from_block: BlockNumber | None = None
-    if (checkpoint_block := update_cache.checkpoint_block) is not None:
-        from_block = BlockNumber(checkpoint_block + 1)
+    if update_cache.checkpoint_block is None:
+        # Cold cache: start from the release checkpoint instead of the keeper genesis block.
+        checkpoints = settings.network_config.CHECKPOINTS
+        update_cache.checkpoint_block = checkpoints.EXIT_SIGNATURES_CHECKPOINT_BLOCK
+        update_cache.last_event_block = checkpoints.EXIT_SIGNATURES_LAST_EVENT_BLOCK
 
+    from_block = BlockNumber(update_cache.checkpoint_block + 1)
     to_block = await execution_client.eth.get_block_number()
 
-    if from_block is not None and from_block > to_block:
+    if from_block > to_block:
         return update_cache.last_event_block
 
     last_event = await keeper_contract.get_exit_signatures_updated_event(
