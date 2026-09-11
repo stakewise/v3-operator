@@ -1,3 +1,4 @@
+import logging
 from contextlib import contextmanager
 from unittest.mock import AsyncMock, patch
 
@@ -12,13 +13,17 @@ from web3.types import Gwei, Wei
 from src.common.tests.factories import create_chain_head
 from src.common.tests.utils import ether_to_gwei, patch_consensus_client
 from src.common.typings import ValidatorType
+from src.config.networks import HOODI, NETWORKS
 from src.config.settings import MIN_ACTIVATION_BALANCE_GWEI, settings
+from src.validators.database import CheckpointCrud, VaultValidatorCrud
 from src.validators.exceptions import FundingException
 from src.validators.tasks import (
     ValidatorRegistrationSubtask,
     _get_deposits_amounts,
     _get_funding_amounts,
     get_vault_assets,
+    load_vault_validators,
+    parse_vault_validators_dump,
 )
 from src.validators.typings import VaultValidator
 
@@ -1010,3 +1015,127 @@ class TestGetVaultAssets:
             ),
         ):
             yield
+
+
+class TestParseVaultValidatorsDump:
+    def test_filters_by_vault(self, fake_settings):
+        other_vault = faker.eth_address()
+        ours = [faker.validator_public_key() for _ in range(2)]
+        theirs = faker.validator_public_key()
+        data = (
+            _dump_record(10, settings.vault, ours[0])
+            + _dump_record(11, other_vault, theirs)
+            + _dump_record(12, settings.vault, ours[1])
+        )
+
+        validators = parse_vault_validators_dump(data, settings.vault, BlockNumber(100))
+
+        assert validators == [
+            VaultValidator(public_key=ours[0], block_number=BlockNumber(10)),
+            VaultValidator(public_key=ours[1], block_number=BlockNumber(12)),
+        ]
+
+    def test_accepts_lowercase_vault(self, fake_settings):
+        public_key = faker.validator_public_key()
+        data = _dump_record(10, settings.vault.lower(), public_key)
+
+        validators = parse_vault_validators_dump(data, settings.vault, BlockNumber(100))
+
+        assert validators == [VaultValidator(public_key=public_key, block_number=BlockNumber(10))]
+
+    def test_empty_dump(self, fake_settings):
+        with pytest.raises(ValueError, match='Malformed vault validators dump'):
+            parse_vault_validators_dump(b'', settings.vault, BlockNumber(100))
+
+    def test_truncated_record(self, fake_settings):
+        data = _dump_record(10, settings.vault, faker.validator_public_key())
+
+        with pytest.raises(ValueError, match='Malformed vault validators dump'):
+            parse_vault_validators_dump(data[:-1], settings.vault, BlockNumber(100))
+
+    def test_unsorted_records(self, fake_settings):
+        data = _dump_record(12, settings.vault, faker.validator_public_key()) + _dump_record(
+            10, settings.vault, faker.validator_public_key()
+        )
+
+        with pytest.raises(ValueError, match='not sorted by block number'):
+            parse_vault_validators_dump(data, settings.vault, BlockNumber(100))
+
+    def test_block_above_last_block(self, fake_settings):
+        data = _dump_record(101, settings.vault, faker.validator_public_key())
+
+        with pytest.raises(ValueError, match='above its last block'):
+            parse_vault_validators_dump(data, settings.vault, BlockNumber(100))
+
+
+class TestLoadVaultValidators:
+    async def test_seeds_validators_and_checkpoint(self, checkpoint_crud, vault_validator_crud):
+        public_key = faker.validator_public_key()
+        data = _dump_record(3_400_000, settings.vault, public_key)
+
+        with patch_vault_validators_dump(data):
+            await load_vault_validators()
+
+        assert VaultValidatorCrud().get_vault_validators() == [
+            VaultValidator(public_key=public_key, block_number=BlockNumber(3_400_000))
+        ]
+        assert CheckpointCrud().get_validators_checkpoint() == BlockNumber(3_500_000)
+
+    async def test_skips_when_checkpoint_exists(self, checkpoint_crud, vault_validator_crud):
+        checkpoint_crud.update_validators_checkpoint(BlockNumber(3_400_000))
+        data = _dump_record(3_000_000, settings.vault, faker.validator_public_key())
+
+        with patch_vault_validators_dump(data) as fetch_mock:
+            await load_vault_validators()
+
+        fetch_mock.assert_not_awaited()
+        assert VaultValidatorCrud().get_vault_validators() == []
+        assert CheckpointCrud().get_validators_checkpoint() == BlockNumber(3_400_000)
+
+    async def test_skips_without_ipfs_hash(self, checkpoint_crud, vault_validator_crud):
+        with (
+            patch.object(NETWORKS[HOODI].CHECKPOINTS, 'VAULT_VALIDATORS_IPFS_HASH', ''),
+            patch('src.validators.tasks._fetch_ipfs_dump', AsyncMock()) as fetch_mock,
+        ):
+            await load_vault_validators()
+
+        fetch_mock.assert_not_awaited()
+        assert CheckpointCrud().get_validators_checkpoint() is None
+
+    async def test_logs_when_vault_has_no_validators(
+        self, checkpoint_crud, vault_validator_crud, caplog
+    ):
+        data = _dump_record(3_400_000, faker.eth_address(), faker.validator_public_key())
+
+        with (
+            caplog.at_level(logging.INFO, logger='src.validators.tasks'),
+            patch_vault_validators_dump(data),
+        ):
+            await load_vault_validators()
+
+        assert 'has no validators for vault' in caplog.text
+        assert 'Loaded' not in caplog.text
+        assert VaultValidatorCrud().get_vault_validators() == []
+        assert CheckpointCrud().get_validators_checkpoint() == BlockNumber(3_500_000)
+
+
+def _dump_record(block_number: int, vault: str, public_key: HexStr) -> bytes:
+    return (
+        block_number.to_bytes(4, 'big')
+        + Web3.to_bytes(hexstr=vault)
+        + Web3.to_bytes(hexstr=public_key)
+    )
+
+
+@contextmanager
+def patch_vault_validators_dump(data: bytes, last_block: int = 3_500_000):
+    with (
+        patch.object(
+            NETWORKS[HOODI].CHECKPOINTS, 'VAULT_VALIDATORS_IPFS_HASH', 'bafyvaultvalidators'
+        ),
+        patch.object(
+            NETWORKS[HOODI].CHECKPOINTS, 'VAULT_VALIDATORS_LAST_BLOCK', BlockNumber(last_block)
+        ),
+        patch('src.validators.tasks._fetch_ipfs_dump', AsyncMock(return_value=data)) as fetch_mock,
+    ):
+        yield fetch_mock

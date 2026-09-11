@@ -29,7 +29,11 @@ from src.validators.event_processors import scan_validators_events
 from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
 from src.validators.relayer import RelayerClient
-from src.validators.tasks import ValidatorRegistrationSubtask, load_genesis_validators
+from src.validators.tasks import (
+    ValidatorRegistrationSubtask,
+    load_genesis_validators,
+    load_vault_validators,
+)
 from src.withdrawals.tasks import ValidatorWithdrawalSubtask
 
 logger = logging.getLogger(__name__)
@@ -73,6 +77,9 @@ async def process() -> None:
 
     # load network validators from ipfs dump
     await load_genesis_validators()
+
+    # load vault validators from ipfs dump
+    await load_vault_validators()
 
     keystore: BaseKeystore | None = None
     relayer: RelayerClient | None = None
