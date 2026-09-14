@@ -20,9 +20,12 @@ from src.meta_vault.commands.process_meta_vaults import process_meta_vaults
 from src.nodewise.commands.node_install import node_install
 from src.nodewise.commands.node_start import node_start
 from src.nodewise.commands.node_status import node_status_command as node_status
+from src.redemptions.commands.fetch_redeemable_positions import (
+    fetch_redeemable_positions,
+)
 from src.redemptions.commands.process_redeemer import process_redeemer
-from src.redemptions.commands.update_redeemable_positions import (
-    update_redeemable_positions,
+from src.redemptions.commands.publish_redeemable_positions import (
+    publish_redeemable_positions,
 )
 from src.remote_db.commands import remote_db_group
 from src.validators.commands.consolidate import consolidate
@@ -59,7 +62,8 @@ cli.add_command(submit_rated_network)
 cli.add_command(node_install)
 cli.add_command(node_start)
 cli.add_command(node_status)
-cli.add_command(update_redeemable_positions)
+cli.add_command(fetch_redeemable_positions)
+cli.add_command(publish_redeemable_positions)
 cli.add_command(process_redeemer)
 cli.add_command(env_vars)
 

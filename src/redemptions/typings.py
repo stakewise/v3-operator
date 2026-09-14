@@ -1,10 +1,10 @@
 from collections.abc import Iterator
 from dataclasses import dataclass
 
-from eth_typing import ChecksumAddress, HexStr
+from eth_typing import BlockNumber, ChecksumAddress, HexStr
 from multiproof.standard import standard_leaf_hash
 from web3 import Web3
-from web3.types import Wei
+from web3.types import Gwei, Wei
 
 LEAF_TYPES = ['uint256', 'address', 'uint256', 'address']
 
@@ -20,6 +20,24 @@ class VaultOsTokenPosition:
     @property
     def redeemable_shares(self) -> Wei:
         return Wei(max(0, self.minted_shares - self.boosted_shares))
+
+    def as_dict(self) -> dict:
+        """``as_dict``/``from_dict`` define the allocators snapshot file schema."""
+        return {
+            'vault': self.address,
+            'minted_shares': str(self.minted_shares),
+            'boosted_shares': str(self.boosted_shares),
+            'ltv': self.ltv,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'VaultOsTokenPosition':
+        return cls(
+            address=Web3.to_checksum_address(data['vault']),
+            minted_shares=Wei(int(data['minted_shares'])),
+            boosted_shares=Wei(int(data['boosted_shares'])),
+            ltv=float(data['ltv']),
+        )
 
 
 @dataclass
@@ -47,6 +65,28 @@ class Allocator:
 
     def get_vault_position(self, vault: ChecksumAddress) -> VaultOsTokenPosition | None:
         return next((vs for vs in self.vault_os_token_positions if vs.address == vault), None)
+
+    def as_dict(self) -> dict:
+        """``as_dict``/``from_dict`` define the allocators snapshot file schema."""
+        return {
+            'address': self.address,
+            'wallet_shares': str(self.wallet_shares),
+            'locked_shares': str(self.locked_shares),
+            'residual_boosted_shares': str(self.residual_boosted_shares),
+            'vault_os_token_positions': [p.as_dict() for p in self.vault_os_token_positions],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'Allocator':
+        return cls(
+            address=Web3.to_checksum_address(data['address']),
+            vault_os_token_positions=[
+                VaultOsTokenPosition.from_dict(p) for p in data['vault_os_token_positions']
+            ],
+            residual_boosted_shares=Wei(int(data['residual_boosted_shares'])),
+            wallet_shares=Wei(int(data['wallet_shares'])),
+            locked_shares=Wei(int(data['locked_shares'])),
+        )
 
     def iter_vault_slices(self, min_shares: Wei) -> Iterator['VaultSlice']:
         """
@@ -77,6 +117,31 @@ class VaultSlice:
     allocator: Allocator
     vault_position: VaultOsTokenPosition
     amount: Wei
+
+
+@dataclass
+class AllocatorsSnapshot:
+    """The file written by ``fetch-redeemable-positions`` and read by
+    ``publish-redeemable-positions``."""
+
+    block_number: BlockNumber
+    min_os_token_position_amount_gwei: Gwei
+    allocators: list[Allocator]
+
+    def as_dict(self) -> dict:
+        return {
+            'block_number': self.block_number,
+            'min_os_token_position_amount_gwei': self.min_os_token_position_amount_gwei,
+            'allocators': [a.as_dict() for a in self.allocators],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'AllocatorsSnapshot':
+        return cls(
+            block_number=BlockNumber(int(data['block_number'])),
+            min_os_token_position_amount_gwei=Gwei(int(data['min_os_token_position_amount_gwei'])),
+            allocators=[Allocator.from_dict(a) for a in data['allocators']],
+        )
 
 
 @dataclass
