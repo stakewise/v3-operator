@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import click
+from eth_typing import ChecksumAddress
 
 from src.common.clients import build_ipfs_upload_clients, close_clients, setup_clients
 from src.common.logging import LOG_LEVELS, setup_logging
@@ -150,9 +151,31 @@ async def process(
 def _load_snapshot(positions_file: Path) -> RedeemablePositionsSnapshot:
     try:
         with open(positions_file, encoding='utf-8') as f:
-            return RedeemablePositionsSnapshot.from_dict(json.load(f))
+            snapshot = RedeemablePositionsSnapshot.from_dict(json.load(f))
     except (json.JSONDecodeError, KeyError, ValueError, TypeError) as e:
         raise click.ClickException(f'Invalid positions file {positions_file}: {e!r}') from e
+    _validate_positions(positions_file, snapshot.positions)
+    return snapshot
+
+
+def _validate_positions(positions_file: Path, positions: list[OsTokenPosition]) -> None:
+    # the file may be hand-edited between fetch and publish, so copy-paste duplicates and
+    # sign mistakes must be rejected here, before any network work
+    seen_owner_vault_pairs: set[tuple[ChecksumAddress, ChecksumAddress]] = set()
+    for position in positions:
+        if position.leaf_shares <= 0:
+            raise click.ClickException(
+                f'Invalid positions file {positions_file}: position #{position.index} '
+                f'({position.owner}, {position.vault}) has non-positive leaf_shares '
+                f'{position.leaf_shares}'
+            )
+        owner_vault_pair = (position.owner, position.vault)
+        if owner_vault_pair in seen_owner_vault_pairs:
+            raise click.ClickException(
+                f'Invalid positions file {positions_file}: duplicate position #{position.index} '
+                f'for owner {position.owner} in vault {position.vault}'
+            )
+        seen_owner_vault_pairs.add(owner_vault_pair)
 
 
 async def _publish_positions(os_token_positions: list[OsTokenPosition]) -> None:
