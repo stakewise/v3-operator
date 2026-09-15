@@ -52,8 +52,8 @@ class Allocator:
         """
         Split ``redeemable_shares`` across vaults proportionally to each vault's (post-boost)
         redeemable share of the total. The last vault absorbs the rounding dust. Slices below
-        ``min_shares`` are dropped, but still count towards the running allocated total so the
-        dust rule stays exact.
+        ``min_shares``, and zero-amount slices regardless of ``min_shares``, are dropped, but
+        still count towards the running allocated total so the dust rule stays exact.
         """
         redeemable_amount = self.redeemable_shares
         if redeemable_amount == 0:
@@ -67,7 +67,7 @@ class Allocator:
             else:
                 vault_amount = int(redeemable_amount * (position.redeemable_shares / total))
             allocated_amount += vault_amount
-            if vault_amount < min_shares:
+            if vault_amount == 0 or vault_amount < min_shares:
                 continue
             yield VaultSlice(allocator=self, vault_position=position, amount=Wei(vault_amount))
 

@@ -52,7 +52,7 @@ class TestPublishRedeemablePositions:
             patch_startup_check(),
             runner.isolated_filesystem(),
         ):
-            positions_file = Path('redeemable_positions_11.json')
+            positions_file = Path('redeemable_positions_mainnet_11.json')
             with open(positions_file, 'w', encoding='utf-8') as f:
                 json.dump(snapshot.as_dict(), f)
 
@@ -94,7 +94,7 @@ class TestPublishRedeemablePositions:
             patch_startup_check(),
             runner.isolated_filesystem(),
         ):
-            positions_file = Path('redeemable_positions_11.json')
+            positions_file = Path('redeemable_positions_mainnet_11.json')
             with open(positions_file, 'w', encoding='utf-8') as f:
                 json.dump(snapshot.as_dict(), f)
 
@@ -141,7 +141,7 @@ class TestPublishRedeemablePositions:
             patch_startup_check(),
             runner.isolated_filesystem(),
         ):
-            positions_file = Path('redeemable_positions_11.json')
+            positions_file = Path('redeemable_positions_mainnet_11.json')
             with open(positions_file, 'w', encoding='utf-8') as f:
                 json.dump(snapshot.as_dict(), f)
 
@@ -185,7 +185,7 @@ class TestPublishRedeemablePositions:
             patch_startup_check(),
             runner.isolated_filesystem(),
         ):
-            positions_file = Path('redeemable_positions_11.json')
+            positions_file = Path('redeemable_positions_mainnet_11.json')
             with open(positions_file, 'w', encoding='utf-8') as f:
                 f.write('{not valid json')
 
@@ -229,7 +229,7 @@ class TestPublishRedeemablePositions:
             patch_startup_check(),
             runner.isolated_filesystem(),
         ):
-            positions_file = Path('redeemable_positions_11.json')
+            positions_file = Path('redeemable_positions_mainnet_11.json')
             with open(positions_file, 'w', encoding='utf-8') as f:
                 json.dump(snapshot.as_dict(), f)
 
@@ -280,7 +280,7 @@ class TestPublishRedeemablePositions:
             patch_startup_check(),
             runner.isolated_filesystem(),
         ):
-            positions_file = Path('redeemable_positions_11.json')
+            positions_file = Path('redeemable_positions_mainnet_11.json')
             with open(positions_file, 'w', encoding='utf-8') as f:
                 json.dump(snapshot.as_dict(), f)
 

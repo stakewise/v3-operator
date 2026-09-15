@@ -227,7 +227,6 @@ def test_create_os_token_positions_multiple_vaults_3():
     result = create_os_token_positions(allocators, Wei(0))
     assert result == [
         OsTokenPosition(owner=address_1, vault=vault_2, leaf_shares=Wei(900), ltv=0.5),
-        OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(0), ltv=0.5),
     ]
 
 
@@ -556,7 +555,7 @@ class TestFetchRedeemablePositions:
             assert result.exit_code == 0
             assert 'Fetching redeemable positions at block: 11' in result.output
 
-            snapshot_file = Path('redeemable_positions_11.json')
+            snapshot_file = Path('redeemable_positions_mainnet_11.json')
             assert snapshot_file.exists()
             assert f'Redeemable positions saved to {snapshot_file}' in result.output
 
@@ -628,7 +627,7 @@ class TestFetchRedeemablePositions:
             result = runner.invoke(fetch_redeemable_positions, args, input='\n')
             assert result.exit_code == 0
 
-            with open('redeemable_positions_11.json', encoding='utf-8') as f:
+            with open('redeemable_positions_mainnet_11.json', encoding='utf-8') as f:
                 data = json.load(f)
 
             # redeemable = minted(10) - residual boost(3) = 7 ether
@@ -685,7 +684,7 @@ class TestFetchRedeemablePositions:
             result = runner.invoke(fetch_redeemable_positions, args, input='\n')
             assert result.exit_code == 0
 
-            with open('redeemable_positions_11.json', encoding='utf-8') as f:
+            with open('redeemable_positions_mainnet_11.json', encoding='utf-8') as f:
                 data = json.load(f)
 
             assert data['positions'] == []
@@ -734,7 +733,7 @@ class TestFetchRedeemablePositions:
 
             second_result = runner.invoke(fetch_redeemable_positions, args, input='\n')
             assert second_result.exit_code != 0
-            assert 'redeemable_positions_11.json already exists' in second_result.output
+            assert 'redeemable_positions_mainnet_11.json already exists' in second_result.output
 
 
 @contextlib.contextmanager

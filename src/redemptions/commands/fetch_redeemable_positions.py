@@ -401,7 +401,7 @@ async def calculate_boost_os_token_shares(
 
 
 def _save_snapshot_to_file(snapshot: RedeemablePositionsSnapshot) -> Path:
-    snapshot_file = Path(f'redeemable_positions_{snapshot.block_number}.json')
+    snapshot_file = Path(f'redeemable_positions_{settings.network}_{snapshot.block_number}.json')
     if snapshot_file.exists():
         raise click.ClickException(
             f'{snapshot_file} already exists, remove or rename it before fetching again'

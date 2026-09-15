@@ -358,6 +358,53 @@ class TestFetchAndPublishRedeemablePositions:
         )
 
     @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
+    async def test_zero_amount_slice_is_dropped_before_publish(
+        self,
+        vault_address: str,
+        execution_endpoints: str,
+        runner: CliRunner,
+    ):
+        """A vault whose proportional share rounds down to zero must never reach the
+        positions file, since publish rejects non-positive leaf_shares."""
+        address_1 = Web3.to_checksum_address('0x2242b8ab71521f6abEE4B4D83195E70AcB08727a')
+        vault_1 = Web3.to_checksum_address('0xEd735de172272C03CA6F60c1d90D83D9CFB46D22')
+        vault_2 = Web3.to_checksum_address('0xe8Ea1025b49D2B51C536cFBc0833F021ba4c6903')
+        allocators = [
+            Allocator(
+                address=address_1,
+                vault_os_token_positions=[
+                    VaultOsTokenPosition(address=vault_1, minted_shares=Wei(1), ltv=0.5),
+                    VaultOsTokenPosition(address=vault_2, minted_shares=Wei(999), ltv=0.5),
+                ],
+            ),
+        ]
+        leverage_positions: list[LeverageStrategyPosition] = []
+        os_token_holders = {address_1: Wei(100)}
+        mock_protocol_data: list[dict] = []
+        os_token_converter = OsTokenConverter(110, 100)
+
+        fetch_and_publish(
+            runner=runner,
+            execution_endpoints=execution_endpoints,
+            allocators=allocators,
+            leverage_positions=leverage_positions,
+            os_token_holders=os_token_holders,
+            mock_protocol_data=mock_protocol_data,
+            os_token_converter=os_token_converter,
+            assert_result=lambda publish_result, mock_upload_json: (
+                mock_upload_json.assert_called_once_with(
+                    [
+                        {
+                            'owner': address_1,
+                            'vault': vault_2,
+                            'leaf_shares': '900',
+                        }
+                    ]
+                )
+            ),
+        )
+
+    @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
     async def test_hand_edited_positions_file_is_reflected_in_upload(
         self,
         vault_address: str,
@@ -414,7 +461,7 @@ class TestFetchAndPublishRedeemablePositions:
             fetch_result = runner.invoke(fetch_redeemable_positions, fetch_args, input='\n')
             assert fetch_result.exit_code == 0
 
-            positions_file = 'redeemable_positions_11.json'
+            positions_file = 'redeemable_positions_mainnet_11.json'
             with open(positions_file, encoding='utf-8') as f:
                 snapshot_data = json.load(f)
 
@@ -500,7 +547,7 @@ def fetch_and_publish(
             execution_endpoints,
             '--verbose',
             '--positions-file',
-            'redeemable_positions_11.json',
+            'redeemable_positions_mainnet_11.json',
         ]
         with (
             patch_os_token_redeemer_contract_nonce(6),
