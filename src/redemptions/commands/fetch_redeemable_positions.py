@@ -12,19 +12,14 @@ from sw_utils import OsTokenConverter
 from web3 import Web3
 from web3.types import Gwei, Wei
 
-from src.common.clients import (
-    build_ipfs_upload_clients,
-    close_clients,
-    execution_client,
-    setup_clients,
-)
+from src.common.clients import close_clients, execution_client, setup_clients
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.startup_check import (
     check_execution_nodes_network,
     wait_for_execution_node,
     wait_for_graph_node_sync_to_chain_head,
 )
-from src.common.utils import get_current_timestamp, log_verbose
+from src.common.utils import log_verbose
 from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
 from src.redemptions.api_client import (
@@ -34,19 +29,18 @@ from src.redemptions.api_client import (
     RABBY_API_SOURCE,
     APIClient,
 )
-from src.redemptions.contracts import os_token_redeemer_contract
 from src.redemptions.graph import (
     graph_get_leverage_positions,
     graph_get_os_token_holders,
     graph_get_redeemable_allocators,
 )
-from src.redemptions.merkle_tree import PositionsMerkleTree
 from src.redemptions.os_token_converter import create_os_token_converter
 from src.redemptions.typings import (
     Allocator,
     ApiConfig,
     LeverageStrategyPosition,
     OsTokenPosition,
+    RedeemablePositionsSnapshot,
 )
 
 logger = logging.getLogger(__name__)
@@ -130,9 +124,9 @@ logger = logging.getLogger(__name__)
         case_sensitive=False,
     ),
 )
-@click.command(help='Updates redeemable os token positions')
+@click.command(help='Fetches redeemable os token positions and saves them to a local file')
 # pylint: disable-next=too-many-arguments,too-many-locals
-def update_redeemable_positions(
+def fetch_redeemable_positions(
     execution_endpoints: str,
     execution_jwt_secret: str | None,
     graph_endpoint: str,
@@ -190,6 +184,8 @@ def update_redeemable_positions(
                 )
             else:
                 raise e
+    except click.ClickException:
+        raise
     except Exception as e:
         log_verbose(e)
         sys.exit(1)
@@ -216,10 +212,12 @@ async def process(
     api_config: ApiConfig,
 ) -> None:
     """
-    Fetch redeemable os token positions, calculate kept os token amounts and upload to IPFS.
+    Fetch redeemable os token positions, calculate kept os token amounts and save them
+    to a local snapshot file for ``publish-redeemable-positions`` to pick up.
     """
     finalized_block = await execution_client.eth.get_block('finalized')
     block_number = finalized_block['number']
+    click.echo(f'Fetching redeemable positions at block: {block_number}')
 
     allocators = await _fetch_allocators(block_number)
 
@@ -233,20 +231,30 @@ async def process(
     allocators = _filter_min_redeemable_shares(allocators, min_redeemable_shares)
 
     if not allocators:
-        logger.info('No allocators with redeemable shares above the threshold found, exiting...')
-        return
+        logger.info('No allocators with redeemable shares above the threshold found')
+    else:
+        logger.info('Fetching kept tokens for %s addresses', len(allocators))
+        api_client = APIClient.build_client(api_config)
+        await populate_kept_shares(allocators, block_number, api_client)
+        logger.info('Fetched kept tokens for %s addresses...', len(allocators))
 
-    logger.info('Fetching kept tokens for %s addresses', len(allocators))
-    api_client = APIClient.build_client(api_config)
-    await populate_kept_shares(allocators, block_number, api_client)
-    logger.info('Fetched kept tokens for %s addresses...', len(allocators))
+    positions = create_os_token_positions(allocators, min_redeemable_shares)
+    total_redeemable = sum(p.leaf_shares for p in positions)
+    logger.info(
+        'Created %(count)s redeemable os token positions. '
+        'Total redeemed %(os_token_symbol)s amount: '
+        '%(total_redeemable)s (%(total_redeemable_eth).5f %(os_token_symbol)s)',
+        {
+            'count': len(positions),
+            'os_token_symbol': settings.network_config.OS_TOKEN_BALANCE_SYMBOL,
+            'total_redeemable': total_redeemable,
+            'total_redeemable_eth': Web3.from_wei(total_redeemable, 'ether'),
+        },
+    )
 
-    os_token_positions = create_os_token_positions(allocators, min_redeemable_shares)
-    if not os_token_positions:
-        logger.info('No redeemable os token positions to upload, exiting...')
-        return
-
-    await _publish_positions(os_token_positions)
+    snapshot = RedeemablePositionsSnapshot(block_number=block_number, positions=positions)
+    snapshot_file = _save_snapshot_to_file(snapshot)
+    click.echo(f'Redeemable positions saved to {snapshot_file}')
 
 
 async def _fetch_allocators(block_number: BlockNumber) -> list[Allocator]:
@@ -300,31 +308,29 @@ def _filter_min_redeemable_shares(
     return result
 
 
-async def _publish_positions(os_token_positions: list[OsTokenPosition]) -> None:
-    total_redeemable = sum(p.leaf_shares for p in os_token_positions)
-    logger.info(
-        'Created %(count)s redeemable os token positions. '
-        'Total redeemed %(os_token_symbol)s amount: '
-        '%(total_redeemable)s (%(total_redeemable_eth).5f %(os_token_symbol)s)',
-        {
-            'count': len(os_token_positions),
-            'os_token_symbol': settings.network_config.OS_TOKEN_BALANCE_SYMBOL,
-            'total_redeemable': total_redeemable,
-            'total_redeemable_eth': Web3.from_wei(total_redeemable, 'ether'),
-        },
-    )
-    positions_payload = [p.as_dict() for p in os_token_positions]
-    positions_file = _save_positions_to_file(positions_payload)
-    click.echo(f'Redeemable os token positions saved to {positions_file}')
-
-    # calculate merkle root
-    nonce = await os_token_redeemer_contract.nonce()
-    tree = PositionsMerkleTree(os_token_positions, leaf_nonce=nonce)
-    click.echo(f'Generated Merkle Tree root: {tree.root}')
-
-    ipfs_upload_client = build_ipfs_upload_clients()
-    ipfs_hash = await ipfs_upload_client.upload_json(positions_payload)
-    click.echo(f'Redeemable os token positions uploaded to IPFS: hash={ipfs_hash}')
+def create_os_token_positions(
+    allocators: list[Allocator],
+    min_redeemable_shares: Wei,
+) -> list[OsTokenPosition]:
+    """
+    Split each allocator's redeemable shares across its vaults and sort the resulting
+    positions by ltv descending, then amount descending.
+    """
+    slices = [
+        vault_slice
+        for allocator in allocators
+        for vault_slice in allocator.iter_vault_slices(min_redeemable_shares)
+    ]
+    slices.sort(key=lambda s: (s.vault_position.ltv, s.amount), reverse=True)
+    return [
+        OsTokenPosition(
+            owner=s.allocator.address,
+            vault=s.vault_position.address,
+            leaf_shares=s.amount,
+            ltv=s.vault_position.ltv,
+        )
+        for s in slices
+    ]
 
 
 async def populate_kept_shares(
@@ -394,36 +400,15 @@ async def calculate_boost_os_token_shares(
     return boosted_positions
 
 
-def create_os_token_positions(
-    allocators: list[Allocator],
-    min_redeemable_shares: Wei,
-) -> list[OsTokenPosition]:
-    """
-    Split each allocator's redeemable shares across its vaults and sort the resulting
-    positions by ltv descending, then amount descending.
-    """
-    slices = [
-        vault_slice
-        for allocator in allocators
-        for vault_slice in allocator.iter_vault_slices(min_redeemable_shares)
-    ]
-    slices.sort(key=lambda s: (s.vault_position.ltv, s.amount), reverse=True)
-    return [
-        OsTokenPosition(
-            owner=s.allocator.address,
-            vault=s.vault_position.address,
-            leaf_shares=s.amount,
+def _save_snapshot_to_file(snapshot: RedeemablePositionsSnapshot) -> Path:
+    snapshot_file = Path(f'redeemable_positions_{settings.network}_{snapshot.block_number}.json')
+    if snapshot_file.exists():
+        raise click.ClickException(
+            f'{snapshot_file} already exists, remove or rename it before fetching again'
         )
-        for s in slices
-    ]
-
-
-def _save_positions_to_file(positions_payload: list[dict]) -> Path:
-    timestamp = get_current_timestamp()
-    positions_file = Path(f'redeemable_positions_{timestamp}.json')
-    with open(positions_file, 'w', encoding='utf-8') as f:
-        json.dump(positions_payload, f, indent=2)
-    return positions_file
+    with open(snapshot_file, 'w', encoding='utf-8') as f:
+        json.dump(snapshot.as_dict(), f, indent=2)
+    return snapshot_file
 
 
 def _distribute_boosted_shares(
@@ -451,7 +436,7 @@ def _distribute_boosted_shares(
 
 
 async def _startup_check() -> None:
-    """Verify connectivity to execution nodes, the graph node, and IPFS upload clients."""
+    """Verify connectivity to execution nodes and the graph node."""
     logger.info('Checking connection to execution nodes...')
     await wait_for_execution_node()
 
@@ -460,12 +445,3 @@ async def _startup_check() -> None:
 
     logger.info('Checking connection to graph node...')
     await wait_for_graph_node_sync_to_chain_head()
-
-    logger.info('Checking IPFS upload clients...')
-    await _check_ipfs_upload_clients()
-
-
-async def _check_ipfs_upload_clients() -> None:
-    ipfs_upload_client = build_ipfs_upload_clients()
-    ipfs_hash = await ipfs_upload_client.upload_json({'a': 'b'})
-    logger.info('Connected to IPFS upload clients. Test hash: %s', ipfs_hash)
