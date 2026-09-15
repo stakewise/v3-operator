@@ -7,6 +7,7 @@ from typing import cast
 from sw_utils import (
     BaseUploadClient,
     ExtendedAsyncBeacon,
+    FilebaseUploadClient,
     IpfsFetchClient,
     IpfsMultiUploadClient,
     IpfsUploadClient,
@@ -147,11 +148,20 @@ def build_ipfs_upload_clients() -> IpfsMultiUploadClient:
         )
         clients.append(pinata_client)
 
+    if settings.ipfs_filebase_api_token:
+        clients.append(
+            FilebaseUploadClient(
+                settings.ipfs_filebase_api_token,
+                timeout=settings.ipfs_upload_client_timeout,
+            )
+        )
+
     if not clients:
         raise ValueError(
             'IPFS upload client is not configured. '
             'Set IPFS_LOCAL_CLIENT_ENDPOINT to upload via a local IPFS node, '
-            'or set both IPFS_PINATA_API_KEY and IPFS_PINATA_SECRET_KEY to upload via Pinata.'
+            'set both IPFS_PINATA_API_KEY and IPFS_PINATA_SECRET_KEY to upload via Pinata, '
+            'or set IPFS_FILEBASE_API_TOKEN to upload via Filebase.'
         )
     return IpfsMultiUploadClient(clients)
 

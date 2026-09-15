@@ -96,6 +96,7 @@ class Settings(metaclass=Singleton):
     ipfs_local_password: str | None
     ipfs_pinata_api_key: str | None
     ipfs_pinata_secret_key: str | None
+    ipfs_filebase_api_token: str | None
 
     genesis_validators_ipfs_timeout: int
     genesis_validators_ipfs_retry_timeout: int
@@ -403,6 +404,17 @@ class Settings(metaclass=Singleton):
             group='IPFS',
             description=(
                 'Pinata secret key used to upload oracle data to the Pinata IPFS pinning service.'
+            ),
+        )
+
+        # filebase
+        self.ipfs_filebase_api_token: str = decouple_config(
+            'IPFS_FILEBASE_API_TOKEN',
+            default='',
+            group='IPFS',
+            description=(
+                'Filebase API token used to upload oracle data to the '
+                'Filebase IPFS pinning service.'
             ),
         )
 
