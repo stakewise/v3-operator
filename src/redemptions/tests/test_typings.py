@@ -1,13 +1,13 @@
 from eth_typing import BlockNumber
 from sw_utils.tests import faker
 from web3 import Web3
-from web3.types import Gwei, Wei
+from web3.types import Wei
 
 from src.redemptions.tests.factories import make_position
 from src.redemptions.typings import (
     Allocator,
-    AllocatorsSnapshot,
     OsTokenPosition,
+    RedeemablePositionsSnapshot,
     VaultOsTokenPosition,
 )
 
@@ -39,6 +39,16 @@ class TestOsTokenPositionCodec:
 
         assert restored.owner == owner
         assert restored.vault == vault
+
+    def test_from_dict_defaults_missing_ltv_to_zero(self) -> None:
+        owner = faker.eth_address()
+        vault = faker.eth_address()
+
+        restored = OsTokenPosition.from_dict(
+            {'owner': owner, 'vault': vault, 'leaf_shares': '1000'}
+        )
+
+        assert restored.ltv == 0.0
 
 
 class TestAllocator:
@@ -114,106 +124,59 @@ class TestAllocator:
         assert not list(allocator.iter_vault_slices(Wei(0)))
 
 
-class TestVaultOsTokenPositionCodec:
+class TestRedeemablePositionsSnapshotCodec:
     def test_round_trip(self) -> None:
-        position = VaultOsTokenPosition(
-            address=Web3.to_checksum_address(faker.eth_address()),
-            minted_shares=Wei(1000),
-            ltv=0.5,
-            boosted_shares=Wei(200),
-        )
-
-        restored = VaultOsTokenPosition.from_dict(position.as_dict())
-
-        assert restored == position
-
-    def test_from_dict_checksums_lowercase_address(self) -> None:
-        vault = faker.eth_address()
-
-        restored = VaultOsTokenPosition.from_dict(
-            {'vault': vault.lower(), 'minted_shares': '1000', 'boosted_shares': '0', 'ltv': 0.5}
-        )
-
-        assert restored.address == vault
-
-
-class TestAllocatorCodec:
-    def test_round_trip(self) -> None:
-        allocator = Allocator(
-            address=Web3.to_checksum_address(faker.eth_address()),
-            vault_os_token_positions=[
-                VaultOsTokenPosition(
-                    address=Web3.to_checksum_address(faker.eth_address()),
-                    minted_shares=Wei(1000),
-                    ltv=0.5,
-                    boosted_shares=Wei(100),
-                ),
-            ],
-            residual_boosted_shares=Wei(10),
-            wallet_shares=Wei(20),
-            locked_shares=Wei(30),
-        )
-
-        restored = Allocator.from_dict(allocator.as_dict())
-
-        assert restored == allocator
-
-    def test_round_trip_no_positions(self) -> None:
-        allocator = Allocator(
-            address=Web3.to_checksum_address(faker.eth_address()),
-            vault_os_token_positions=[],
-        )
-
-        restored = Allocator.from_dict(allocator.as_dict())
-
-        assert restored == allocator
-
-    def test_from_dict_checksums_lowercase_address(self) -> None:
-        address = faker.eth_address()
-
-        restored = Allocator.from_dict(
-            {
-                'address': address.lower(),
-                'wallet_shares': '0',
-                'locked_shares': '0',
-                'residual_boosted_shares': '0',
-                'vault_os_token_positions': [],
-            }
-        )
-
-        assert restored.address == address
-
-
-class TestAllocatorsSnapshotCodec:
-    def test_round_trip(self) -> None:
-        snapshot = AllocatorsSnapshot(
+        snapshot = RedeemablePositionsSnapshot(
             block_number=BlockNumber(123),
-            min_os_token_position_amount_gwei=Gwei(10),
-            allocators=[
-                Allocator(
-                    address=Web3.to_checksum_address(faker.eth_address()),
-                    vault_os_token_positions=[
-                        VaultOsTokenPosition(
-                            address=Web3.to_checksum_address(faker.eth_address()),
-                            minted_shares=Wei(1000),
-                            ltv=0.5,
-                        ),
-                    ],
+            positions=[
+                OsTokenPosition(
+                    owner=Web3.to_checksum_address(faker.eth_address()),
+                    vault=Web3.to_checksum_address(faker.eth_address()),
+                    leaf_shares=Wei(1000),
+                    ltv=0.5,
                 ),
             ],
         )
 
-        restored = AllocatorsSnapshot.from_dict(snapshot.as_dict())
+        restored = RedeemablePositionsSnapshot.from_dict(snapshot.as_dict())
 
-        assert restored == snapshot
+        assert restored.block_number == snapshot.block_number
+        assert len(restored.positions) == 1
+        restored_position = restored.positions[0]
+        original_position = snapshot.positions[0]
+        assert restored_position.owner == original_position.owner
+        assert restored_position.vault == original_position.vault
+        assert restored_position.leaf_shares == original_position.leaf_shares
+        assert restored_position.ltv == original_position.ltv
+        assert restored_position.index == 0
 
-    def test_round_trip_empty_allocators(self) -> None:
-        snapshot = AllocatorsSnapshot(
+    def test_round_trip_empty_positions(self) -> None:
+        snapshot = RedeemablePositionsSnapshot(block_number=BlockNumber(1), positions=[])
+
+        restored = RedeemablePositionsSnapshot.from_dict(snapshot.as_dict())
+
+        assert restored.block_number == snapshot.block_number
+        assert restored.positions == []
+
+    def test_from_dict_assigns_sequential_indexes(self) -> None:
+        snapshot = RedeemablePositionsSnapshot(
             block_number=BlockNumber(1),
-            min_os_token_position_amount_gwei=Gwei(0),
-            allocators=[],
+            positions=[
+                OsTokenPosition(
+                    owner=Web3.to_checksum_address(faker.eth_address()),
+                    vault=Web3.to_checksum_address(faker.eth_address()),
+                    leaf_shares=Wei(1000),
+                    ltv=0.5,
+                ),
+                OsTokenPosition(
+                    owner=Web3.to_checksum_address(faker.eth_address()),
+                    vault=Web3.to_checksum_address(faker.eth_address()),
+                    leaf_shares=Wei(500),
+                    ltv=0.9,
+                ),
+            ],
         )
 
-        restored = AllocatorsSnapshot.from_dict(snapshot.as_dict())
+        restored = RedeemablePositionsSnapshot.from_dict(snapshot.as_dict())
 
-        assert restored == snapshot
+        assert [p.index for p in restored.positions] == [0, 1]

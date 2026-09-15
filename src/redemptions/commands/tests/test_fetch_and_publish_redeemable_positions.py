@@ -5,6 +5,8 @@ and payloads mirror the ones the single update-redeemable-positions command used
 since splitting the command did not change the underlying computation.
 """
 
+import json
+
 import pytest
 from click.testing import CliRunner
 from sw_utils import OsTokenConverter
@@ -30,7 +32,6 @@ from src.redemptions.commands.tests.test_fetch_redeemable_positions import (
     patch_startup_check as patch_fetch_startup_check,
 )
 from src.redemptions.commands.tests.test_publish_redeemable_positions import (
-    patch_graph_get_redeemable_allocators,
     patch_ipfs_client,
     patch_os_token_redeemer_contract_nonce,
 )
@@ -356,6 +357,104 @@ class TestFetchAndPublishRedeemablePositions:
             ),
         )
 
+    @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
+    async def test_hand_edited_positions_file_is_reflected_in_upload(
+        self,
+        vault_address: str,
+        execution_endpoints: str,
+        runner: CliRunner,
+    ):
+        """The positions file sits between the two commands as a plain, editable artifact:
+        an operator may drop or shrink positions before publishing."""
+        address_1 = Web3.to_checksum_address('0x2242b8ab71521f6abEE4B4D83195E70AcB08727a')
+        address_2 = Web3.to_checksum_address('0x24c8DBBC3d1C35C4159787b1f7a62bea1A814242')
+        vault_1 = Web3.to_checksum_address('0xEd735de172272C03CA6F60c1d90D83D9CFB46D22')
+        vault_2 = Web3.to_checksum_address('0xe8Ea1025b49D2B51C536cFBc0833F021ba4c6903')
+        allocators = [
+            Allocator(
+                address=address_1,
+                vault_os_token_positions=[
+                    VaultOsTokenPosition(
+                        address=vault_1, minted_shares=Web3.to_wei(10, 'ether'), ltv=0.5
+                    ),
+                ],
+            ),
+            Allocator(
+                address=address_2,
+                vault_os_token_positions=[
+                    VaultOsTokenPosition(
+                        address=vault_2, minted_shares=Web3.to_wei(12, 'ether'), ltv=0.9
+                    ),
+                ],
+            ),
+        ]
+        leverage_positions: list[LeverageStrategyPosition] = []
+        os_token_holders: dict[ChecksumAddress, Wei] = {}
+        mock_protocol_data: list[dict] = []
+        os_token_converter = OsTokenConverter(110, 100)
+
+        fetch_args = [
+            '--network',
+            MAINNET,
+            '--execution-endpoints',
+            execution_endpoints,
+            '--verbose',
+            '--min-os-token-position-amount-gwei',
+            0,
+        ]
+        with (
+            patch_finalized_block(11),
+            patch_os_token_contract_address(os_token_contract_address),
+            patch_os_token_converter(os_token_converter),
+            patch_api_client(mock_protocol_data),
+            patch_graph_calls(allocators, leverage_positions, os_token_holders),
+            patch_fetch_startup_check(),
+            runner.isolated_filesystem(),
+        ):
+            fetch_result = runner.invoke(fetch_redeemable_positions, fetch_args, input='\n')
+            assert fetch_result.exit_code == 0
+
+            positions_file = 'redeemable_positions_11.json'
+            with open(positions_file, encoding='utf-8') as f:
+                snapshot_data = json.load(f)
+
+            assert len(snapshot_data['positions']) == 2
+            # drop address_1's position entirely, and shrink address_2's leaf_shares
+            snapshot_data['positions'] = [
+                p for p in snapshot_data['positions'] if p['owner'] == address_2
+            ]
+            snapshot_data['positions'][0]['leaf_shares'] = str(Web3.to_wei(5, 'ether'))
+            with open(positions_file, 'w', encoding='utf-8') as f:
+                json.dump(snapshot_data, f)
+
+            publish_args = [
+                '--network',
+                MAINNET,
+                '--execution-endpoints',
+                execution_endpoints,
+                '--verbose',
+                '--positions-file',
+                positions_file,
+            ]
+            with (
+                patch_os_token_redeemer_contract_nonce(6),
+                patch_ipfs_client() as mock_upload_json,
+                patch_publish_startup_check(),
+            ):
+                publish_result = runner.invoke(
+                    publish_redeemable_positions, publish_args, input='\n'
+                )
+                assert publish_result.exit_code == 0
+                mock_upload_json.assert_called_once_with(
+                    [
+                        {
+                            'owner': address_2,
+                            'vault': vault_2,
+                            'leaf_shares': str(Web3.to_wei(5, 'ether')),
+                        }
+                    ]
+                )
+
 
 def assert_output_contains(result, expected: str) -> None:
     assert expected in result.output.strip()
@@ -400,14 +499,11 @@ def fetch_and_publish(
             '--execution-endpoints',
             execution_endpoints,
             '--verbose',
-            '--allocators-file',
-            'redeemable_allocators_11.json',
+            '--positions-file',
+            'redeemable_positions_11.json',
         ]
         with (
             patch_os_token_redeemer_contract_nonce(6),
-            # the same allocators/LTVs are still current, so the refreshed root matches the
-            # pre-split single-command computation exactly
-            patch_graph_get_redeemable_allocators(allocators),
             patch_ipfs_client() as mock_upload_json,
             patch_publish_startup_check(),
         ):

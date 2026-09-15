@@ -37,9 +37,10 @@ from src.redemptions.graph import (
 from src.redemptions.os_token_converter import create_os_token_converter
 from src.redemptions.typings import (
     Allocator,
-    AllocatorsSnapshot,
     ApiConfig,
     LeverageStrategyPosition,
+    OsTokenPosition,
+    RedeemablePositionsSnapshot,
 )
 
 logger = logging.getLogger(__name__)
@@ -183,6 +184,8 @@ def fetch_redeemable_positions(
                 )
             else:
                 raise e
+    except click.ClickException:
+        raise
     except Exception as e:
         log_verbose(e)
         sys.exit(1)
@@ -234,19 +237,24 @@ async def process(
         api_client = APIClient.build_client(api_config)
         await populate_kept_shares(allocators, block_number, api_client)
         logger.info('Fetched kept tokens for %s addresses...', len(allocators))
-        allocators = _filter_min_vault_slices(allocators, min_redeemable_shares)
-        logger.info(
-            '%s allocators have redeemable shares above the threshold after kept shares',
-            len(allocators),
-        )
 
-    snapshot = AllocatorsSnapshot(
-        block_number=block_number,
-        min_os_token_position_amount_gwei=min_os_token_position_amount_gwei,
-        allocators=allocators,
+    positions = create_os_token_positions(allocators, min_redeemable_shares)
+    total_redeemable = sum(p.leaf_shares for p in positions)
+    logger.info(
+        'Created %(count)s redeemable os token positions. '
+        'Total redeemed %(os_token_symbol)s amount: '
+        '%(total_redeemable)s (%(total_redeemable_eth).5f %(os_token_symbol)s)',
+        {
+            'count': len(positions),
+            'os_token_symbol': settings.network_config.OS_TOKEN_BALANCE_SYMBOL,
+            'total_redeemable': total_redeemable,
+            'total_redeemable_eth': Web3.from_wei(total_redeemable, 'ether'),
+        },
     )
+
+    snapshot = RedeemablePositionsSnapshot(block_number=block_number, positions=positions)
     snapshot_file = _save_snapshot_to_file(snapshot)
-    click.echo(f'Redeemable allocators saved to {snapshot_file}')
+    click.echo(f'Redeemable positions saved to {snapshot_file}')
 
 
 async def _fetch_allocators(block_number: BlockNumber) -> list[Allocator]:
@@ -300,12 +308,29 @@ def _filter_min_redeemable_shares(
     return result
 
 
-def _filter_min_vault_slices(
+def create_os_token_positions(
     allocators: list[Allocator],
     min_redeemable_shares: Wei,
-) -> list[Allocator]:
-    """Drops allocators that would produce no positions in publish-redeemable-positions."""
-    return [a for a in allocators if any(a.iter_vault_slices(min_redeemable_shares))]
+) -> list[OsTokenPosition]:
+    """
+    Split each allocator's redeemable shares across its vaults and sort the resulting
+    positions by ltv descending, then amount descending.
+    """
+    slices = [
+        vault_slice
+        for allocator in allocators
+        for vault_slice in allocator.iter_vault_slices(min_redeemable_shares)
+    ]
+    slices.sort(key=lambda s: (s.vault_position.ltv, s.amount), reverse=True)
+    return [
+        OsTokenPosition(
+            owner=s.allocator.address,
+            vault=s.vault_position.address,
+            leaf_shares=s.amount,
+            ltv=s.vault_position.ltv,
+        )
+        for s in slices
+    ]
 
 
 async def populate_kept_shares(
@@ -375,8 +400,12 @@ async def calculate_boost_os_token_shares(
     return boosted_positions
 
 
-def _save_snapshot_to_file(snapshot: AllocatorsSnapshot) -> Path:
-    snapshot_file = Path(f'redeemable_allocators_{snapshot.block_number}.json')
+def _save_snapshot_to_file(snapshot: RedeemablePositionsSnapshot) -> Path:
+    snapshot_file = Path(f'redeemable_positions_{snapshot.block_number}.json')
+    if snapshot_file.exists():
+        raise click.ClickException(
+            f'{snapshot_file} already exists, remove or rename it before fetching again'
+        )
     with open(snapshot_file, 'w', encoding='utf-8') as f:
         json.dump(snapshot.as_dict(), f, indent=2)
     return snapshot_file

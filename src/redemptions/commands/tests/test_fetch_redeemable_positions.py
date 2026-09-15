@@ -15,13 +15,14 @@ from src.config.settings import settings
 from src.redemptions.commands.fetch_redeemable_positions import (
     _distribute_boosted_shares,
     _filter_min_redeemable_shares,
-    _filter_min_vault_slices,
     calculate_boost_os_token_shares,
+    create_os_token_positions,
     fetch_redeemable_positions,
 )
 from src.redemptions.typings import (
     Allocator,
     LeverageStrategyPosition,
+    OsTokenPosition,
     VaultOsTokenPosition,
 )
 
@@ -82,64 +83,218 @@ def test_filter_min_redeemable_shares_zero_threshold_keeps_everything():
     assert result == allocators
 
 
-def test_filter_min_vault_slices_drops_allocators_covered_by_kept_shares():
+def test_create_os_token_positions_zero_allocators():
+    result = create_os_token_positions([], Wei(0))
+    assert result == []
+
+
+def test_create_os_token_positions_single_vault():
+    address_1 = faker.eth_address()
+    vault_1 = faker.eth_address()
+    allocators = [
+        Allocator(
+            address=Web3.to_checksum_address(address_1),
+            vault_os_token_positions=[
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_1), minted_shares=Wei(150), ltv=0.5
+                ),
+            ],
+        )
+    ]
+    result = create_os_token_positions(allocators, Wei(0))
+    assert result == [
+        OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(150), ltv=0.5)
+    ]
+
+
+def test_create_os_token_positions_kept_tokens():
+    address_1 = faker.eth_address()
+    vault_1 = faker.eth_address()
+
+    allocators = [
+        Allocator(
+            address=Web3.to_checksum_address(address_1),
+            vault_os_token_positions=[
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_1), minted_shares=Wei(150), ltv=0.5
+                ),
+            ],
+            wallet_shares=Wei(100),
+        )
+    ]
+    result = create_os_token_positions(allocators, Wei(0))
+    assert result == [OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(50), ltv=0.5)]
+
+
+def test_create_os_token_positions_multiple_allocators():
     address_1 = faker.eth_address()
     address_2 = faker.eth_address()
     vault_1 = faker.eth_address()
 
-    # fully covered by locked shares -> no vault slice survives
-    allocator_a = Allocator(
-        address=Web3.to_checksum_address(address_1),
-        vault_os_token_positions=[
-            VaultOsTokenPosition(
-                address=Web3.to_checksum_address(vault_1), minted_shares=Wei(500), ltv=0.5
-            ),
-        ],
-        locked_shares=Wei(500),
-    )
-    # a slice above the threshold survives
-    allocator_b = Allocator(
-        address=Web3.to_checksum_address(address_2),
-        vault_os_token_positions=[
-            VaultOsTokenPosition(
-                address=Web3.to_checksum_address(vault_1), minted_shares=Wei(500), ltv=0.5
-            ),
-        ],
-        locked_shares=Wei(100),
-    )
+    allocators = [
+        Allocator(
+            address=Web3.to_checksum_address(address_1),
+            vault_os_token_positions=[
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_1), minted_shares=Wei(150), ltv=0.5
+                ),
+            ],
+        ),
+        Allocator(
+            address=Web3.to_checksum_address(address_2),
+            vault_os_token_positions=[
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_1), minted_shares=Wei(75), ltv=0.5
+                ),
+            ],
+            wallet_shares=Wei(75),
+        ),
+    ]
+    result = create_os_token_positions(allocators, Wei(0))
+    assert result == [
+        OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(150), ltv=0.5)
+    ]
 
-    result = _filter_min_vault_slices([allocator_a, allocator_b], Wei(200))
-    assert result == [allocator_b]
+
+def test_create_os_token_positions_multiple_vaults_1():
+    address_1 = faker.eth_address()
+    vault_1 = faker.eth_address()
+    vault_2 = faker.eth_address()
+
+    allocators = [
+        Allocator(
+            address=Web3.to_checksum_address(address_1),
+            vault_os_token_positions=[
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_1), minted_shares=Wei(150), ltv=0.5
+                ),
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_2), minted_shares=Wei(150), ltv=0.5
+                ),
+            ],
+        )
+    ]
+    result = create_os_token_positions(allocators, Wei(0))
+    assert result == [
+        OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(150), ltv=0.5),
+        OsTokenPosition(owner=address_1, vault=vault_2, leaf_shares=Wei(150), ltv=0.5),
+    ]
 
 
-def test_filter_min_vault_slices_zero_threshold_drops_only_zero_redeemable():
+def test_create_os_token_positions_multiple_vaults_2():
+    address_1 = faker.eth_address()
+    vault_1 = faker.eth_address()
+    vault_2 = faker.eth_address()
+    allocators = [
+        Allocator(
+            address=Web3.to_checksum_address(address_1),
+            vault_os_token_positions=[
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_1), minted_shares=Wei(333), ltv=0.5
+                ),
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_2), minted_shares=Wei(666), ltv=0.5
+                ),
+            ],
+            wallet_shares=Wei(100),
+        )
+    ]
+    result = create_os_token_positions(allocators, Wei(0))
+    assert result == [
+        OsTokenPosition(owner=address_1, vault=vault_2, leaf_shares=Wei(600), ltv=0.5),
+        OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(299), ltv=0.5),
+    ]
+
+
+def test_create_os_token_positions_multiple_vaults_3():
+    address_1 = faker.eth_address()
+    vault_1 = faker.eth_address()
+    vault_2 = faker.eth_address()
+    allocators = [
+        Allocator(
+            address=Web3.to_checksum_address(address_1),
+            vault_os_token_positions=[
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_1), minted_shares=Wei(1), ltv=0.5
+                ),
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_2), minted_shares=Wei(999), ltv=0.5
+                ),
+            ],
+            wallet_shares=Wei(100),
+        )
+    ]
+    result = create_os_token_positions(allocators, Wei(0))
+    assert result == [
+        OsTokenPosition(owner=address_1, vault=vault_2, leaf_shares=Wei(900), ltv=0.5),
+        OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(0), ltv=0.5),
+    ]
+
+
+def test_create_os_token_positions_min_redeemable_shares():
+    address_1 = faker.eth_address()
+    vault_1 = faker.eth_address()
+    vault_2 = faker.eth_address()
+    allocators = [
+        Allocator(
+            address=Web3.to_checksum_address(address_1),
+            vault_os_token_positions=[
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_1), minted_shares=Wei(333), ltv=0.5
+                ),
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_2), minted_shares=Wei(666), ltv=0.5
+                ),
+            ],
+            wallet_shares=Wei(100),
+        )
+    ]
+    result = create_os_token_positions(allocators, Wei(300))
+    assert result == [
+        OsTokenPosition(owner=address_1, vault=vault_2, leaf_shares=Wei(600), ltv=0.5),
+    ]
+
+
+def test_create_os_token_positions_ordering_by_ltv_and_amount():
     address_1 = faker.eth_address()
     address_2 = faker.eth_address()
+    address_3 = faker.eth_address()
     vault_1 = faker.eth_address()
+    vault_2 = faker.eth_address()
 
-    # fully covered by locked shares -> zero redeemable, dropped even with zero threshold
-    allocator_a = Allocator(
-        address=Web3.to_checksum_address(address_1),
-        vault_os_token_positions=[
-            VaultOsTokenPosition(
-                address=Web3.to_checksum_address(vault_1), minted_shares=Wei(500), ltv=0.5
-            ),
-        ],
-        locked_shares=Wei(500),
-    )
-    # any positive redeemable amount is kept when the threshold is zero
-    allocator_b = Allocator(
-        address=Web3.to_checksum_address(address_2),
-        vault_os_token_positions=[
-            VaultOsTokenPosition(
-                address=Web3.to_checksum_address(vault_1), minted_shares=Wei(500), ltv=0.5
-            ),
-        ],
-        locked_shares=Wei(1),
-    )
-
-    result = _filter_min_vault_slices([allocator_a, allocator_b], Wei(0))
-    assert result == [allocator_b]
+    allocators = [
+        Allocator(
+            address=Web3.to_checksum_address(address_1),
+            vault_os_token_positions=[
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_1), minted_shares=Wei(1000), ltv=0.3
+                ),
+            ],
+        ),
+        Allocator(
+            address=Web3.to_checksum_address(address_2),
+            vault_os_token_positions=[
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_1), minted_shares=Wei(500), ltv=0.9
+                ),
+            ],
+        ),
+        Allocator(
+            address=Web3.to_checksum_address(address_3),
+            vault_os_token_positions=[
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_2), minted_shares=Wei(200), ltv=0.9
+                ),
+            ],
+        ),
+    ]
+    result = create_os_token_positions(allocators, Wei(0))
+    # sorted by ltv desc, then amount desc
+    assert result == [
+        OsTokenPosition(owner=address_2, vault=vault_1, leaf_shares=Wei(500), ltv=0.9),
+        OsTokenPosition(owner=address_3, vault=vault_2, leaf_shares=Wei(200), ltv=0.9),
+        OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(1000), ltv=0.3),
+    ]
 
 
 async def test_calculate_boost_os_token_shares():
@@ -401,25 +556,20 @@ class TestFetchRedeemablePositions:
             assert result.exit_code == 0
             assert 'Fetching redeemable positions at block: 11' in result.output
 
-            snapshot_file = Path('redeemable_allocators_11.json')
+            snapshot_file = Path('redeemable_positions_11.json')
             assert snapshot_file.exists()
-            assert f'Redeemable allocators saved to {snapshot_file}' in result.output
+            assert f'Redeemable positions saved to {snapshot_file}' in result.output
 
             with open(snapshot_file, encoding='utf-8') as f:
                 data = json.load(f)
 
             assert data['block_number'] == 11
-            assert data['min_os_token_position_amount_gwei'] == 0
-            assert len(data['allocators']) == 1
-            allocator_data = data['allocators'][0]
-            assert allocator_data['address'] == address_1
-            assert allocator_data['wallet_shares'] == str(Web3.to_wei(4, 'ether'))
-            assert allocator_data['locked_shares'] == str(Web3.to_wei(2, 'ether'))
-            assert allocator_data['vault_os_token_positions'] == [
+            # redeemable = minted(10) - wallet(4) - locked(2) = 4 ether
+            assert data['positions'] == [
                 {
+                    'owner': address_1,
                     'vault': vault_1,
-                    'minted_shares': str(Web3.to_wei(10, 'ether')),
-                    'boosted_shares': '0',
+                    'leaf_shares': str(Web3.to_wei(4, 'ether')),
                     'ltv': 0.5,
                 }
             ]
@@ -478,12 +628,18 @@ class TestFetchRedeemablePositions:
             result = runner.invoke(fetch_redeemable_positions, args, input='\n')
             assert result.exit_code == 0
 
-            with open('redeemable_allocators_11.json', encoding='utf-8') as f:
+            with open('redeemable_positions_11.json', encoding='utf-8') as f:
                 data = json.load(f)
 
-            allocator_data = data['allocators'][0]
-            assert allocator_data['residual_boosted_shares'] == str(Web3.to_wei(3, 'ether'))
-            assert allocator_data['vault_os_token_positions'][0]['boosted_shares'] == '0'
+            # redeemable = minted(10) - residual boost(3) = 7 ether
+            assert data['positions'] == [
+                {
+                    'owner': address_1,
+                    'vault': vault_1,
+                    'leaf_shares': str(Web3.to_wei(7, 'ether')),
+                    'ltv': 0.5,
+                }
+            ]
 
     @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
     async def test_min_leaf_shares_writes_empty_snapshot(
@@ -529,11 +685,56 @@ class TestFetchRedeemablePositions:
             result = runner.invoke(fetch_redeemable_positions, args, input='\n')
             assert result.exit_code == 0
 
-            with open('redeemable_allocators_11.json', encoding='utf-8') as f:
+            with open('redeemable_positions_11.json', encoding='utf-8') as f:
                 data = json.load(f)
 
-            assert data['allocators'] == []
-            assert data['min_os_token_position_amount_gwei'] == 6 * 10**9
+            assert data['positions'] == []
+
+    @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
+    async def test_second_fetch_run_at_same_block_refuses_to_overwrite(
+        self,
+        vault_address: str,
+        execution_endpoints: str,
+        runner: CliRunner,
+    ):
+        address_1 = Web3.to_checksum_address('0x2242b8ab71521f6abEE4B4D83195E70AcB08727a')
+        vault_1 = Web3.to_checksum_address('0xEd735de172272C03CA6F60c1d90D83D9CFB46D22')
+        allocators = [
+            Allocator(
+                address=address_1,
+                vault_os_token_positions=[
+                    VaultOsTokenPosition(
+                        address=vault_1, minted_shares=Web3.to_wei(10, 'ether'), ltv=0.5
+                    ),
+                ],
+            ),
+        ]
+        leverage_positions: list[LeverageStrategyPosition] = []
+        os_token_holders: dict[ChecksumAddress, Wei] = {}
+        mock_protocol_data: list[dict] = []
+        os_token_converter = OsTokenConverter(110, 100)
+        args = [
+            '--network',
+            MAINNET,
+            '--execution-endpoints',
+            execution_endpoints,
+            '--verbose',
+        ]
+        with (
+            patch_finalized_block(11),
+            patch_os_token_contract_address(os_token_contract_address),
+            patch_os_token_converter(os_token_converter),
+            patch_api_client(mock_protocol_data),
+            patch_graph_calls(allocators, leverage_positions, os_token_holders),
+            patch_startup_check(),
+            runner.isolated_filesystem(),
+        ):
+            first_result = runner.invoke(fetch_redeemable_positions, args, input='\n')
+            assert first_result.exit_code == 0
+
+            second_result = runner.invoke(fetch_redeemable_positions, args, input='\n')
+            assert second_result.exit_code != 0
+            assert 'redeemable_positions_11.json already exists' in second_result.output
 
 
 @contextlib.contextmanager
