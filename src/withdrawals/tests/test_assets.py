@@ -87,14 +87,15 @@ class TestGetQueuedAssets:
                 oracle_exiting_validators=[],
                 pending_partial_withdrawals=[],
                 chain_head=create_chain_head(),
-                redemption_assets=Wei(0),
+                # non-zero so the first call's params differ from the zero/zero total call
+                redemption_assets=Wei(1),
             )
 
         assert result == ExitQueueAssets(missing=Gwei(6), total=Gwei(10))
         assert mocks['missing_assets'].await_count == 2
 
     async def test_second_call_uses_zero_withdrawing_and_redemption_assets(self):
-        with _patch(cumulative_tickets=0, missing_assets=Wei(0)) as mocks:
+        with _patch(cumulative_tickets=0, missing_assets=Wei(456)) as mocks:
             await get_queued_assets(
                 consensus_validators=[],
                 oracle_exiting_validators=[],
@@ -112,6 +113,19 @@ class TestGetQueuedAssets:
         assert first_params.redemption_assets == Wei(123)
         assert second_params.withdrawing_assets == Wei(0)
         assert second_params.redemption_assets == Wei(0)
+
+    async def test_second_call_skipped_when_no_missing_assets(self):
+        with _patch(cumulative_tickets=0, missing_assets=Wei(0)) as mocks:
+            result = await get_queued_assets(
+                consensus_validators=[],
+                oracle_exiting_validators=[],
+                pending_partial_withdrawals=[],
+                chain_head=create_chain_head(),
+                redemption_assets=Wei(0),
+            )
+
+        assert result.total == Gwei(0)
+        mocks['missing_assets'].assert_called_once()
 
     async def test_withdrawing_assets_sums_pending_partials_and_exiting_validators(self):
         pending_partial_withdrawals = [
@@ -190,12 +204,29 @@ class TestCalculateWithdrawalBuffer:
             network_config=network_config,
         )
         without_pending = calculate_withdrawal_buffer(pending_partials_count=0, **kwargs)
-        # a full sweep's worth of pending partials adds exactly one slot of latency
+
+        # a small pending-partials queue drains within the withdrawability delay itself,
+        # so it adds no extra latency
+        small_pending = calculate_withdrawal_buffer(pending_partials_count=1_000, **kwargs)
+        assert small_pending == without_pending
+
+        # a pending-partials queue whose sweep wait (196_608 s) exceeds the withdrawability
+        # delay (98_304 s) adds the difference between the two
+        large_pending_count = 131_072
         with_pending = calculate_withdrawal_buffer(
-            pending_partials_count=network_config.MAX_PENDING_PARTIALS_PER_WITHDRAWALS_SWEEP,
-            **kwargs,
+            pending_partials_count=large_pending_count, **kwargs
         )
-        extra_latency_seconds = network_config.SECONDS_PER_SLOT
+        sweep_wait_seconds = (
+            large_pending_count
+            * network_config.SECONDS_PER_SLOT
+            // network_config.MAX_PENDING_PARTIALS_PER_WITHDRAWALS_SWEEP
+        )
+        assert sweep_wait_seconds == 196_608
+        withdrawability_delay_seconds = (
+            network_config.MIN_VALIDATOR_WITHDRAWABILITY_DELAY_EPOCHS
+            * network_config.SECONDS_PER_EPOCH
+        )
+        extra_latency_seconds = sweep_wait_seconds - withdrawability_delay_seconds
         expected_extra = (
             kwargs['total_queue_assets']
             * kwargs['avg_reward_per_second']
@@ -219,29 +250,33 @@ class TestCalculateWithdrawalBuffer:
             network_config=network_config,
         )
 
-        latency_seconds = (
-            network_config.MIN_VALIDATOR_WITHDRAWABILITY_DELAY_EPOCHS
-            * network_config.SECONDS_PER_EPOCH
-            + rewards_delay
-        )
-        expected = (
-            total_queue_assets
-            * avg_reward_per_second
-            * latency_seconds
-            * WITHDRAWAL_BUFFER_SAFETY_FACTOR
-            // 10**18
-        )
-        assert result == expected
+        assert result == 9_734_246
+        # same inputs on mainnet's epoch/slot times must yield a different buffer,
+        # proving the result actually depends on Gnosis's own network config
         assert network_config.SECONDS_PER_EPOCH != NETWORKS[MAINNET].SECONDS_PER_EPOCH
+        assert result != calculate_withdrawal_buffer(
+            total_queue_assets=total_queue_assets,
+            pending_partials_count=0,
+            avg_reward_per_second=avg_reward_per_second,
+            rewards_delay=rewards_delay,
+            network_config=NETWORKS[MAINNET],
+        )
 
 
 @contextlib.contextmanager
 def _patch(cumulative_tickets: int, missing_assets: Wei, total_assets: Wei | None = None):
     if total_assets is None:
         total_assets = missing_assets
+
+    def _get_exit_queue_missing_assets(*, exit_queue_missing_assets_params, **_kwargs):
+        params = exit_queue_missing_assets_params
+        if params.withdrawing_assets == 0 and params.redemption_assets == 0:
+            return total_assets
+        return missing_assets
+
     get_harvest_params_mock = mock.AsyncMock(return_value=None)
     cumulative_tickets_mock = mock.AsyncMock(return_value=cumulative_tickets)
-    missing_assets_mock = mock.AsyncMock(side_effect=[missing_assets, total_assets])
+    missing_assets_mock = mock.AsyncMock(side_effect=_get_exit_queue_missing_assets)
     with mock.patch(
         'src.withdrawals.assets.get_harvest_params', get_harvest_params_mock
     ), mock.patch.multiple(

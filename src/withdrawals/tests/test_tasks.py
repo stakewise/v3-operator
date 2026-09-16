@@ -1622,6 +1622,79 @@ async def test_get_withdrawals_buffer_does_not_trigger_full_exit(data_dir):
     assert result == expected
 
 
+async def test_get_withdrawals_full_exit_covers_shortfall_skips_buffered_partial(data_dir):
+    """A full exit that already covers the shortfall on its own must not trigger a
+    buffer-only partial top-up on other validators: the shortfall is 0 at that point,
+    so requesting `buffer` gwei of partials from '0x2' would be pure overpayment.
+    """
+    settings.set(vault=None, vault_dir=data_dir, network=HOODI)
+    chain_head = create_chain_head(epoch=500)
+    consensus_validators = [
+        create_consensus_validator(
+            public_key='0x1',
+            index=1,
+            balance=ether_to_gwei(32),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=200,
+            is_compounding=False,
+        ),
+        create_consensus_validator(
+            public_key='0x2',
+            index=2,
+            balance=ether_to_gwei(40),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=200,
+        ),
+    ]
+    result = await _get_withdrawals(
+        chain_head=chain_head,
+        queued_assets=ether_to_gwei(20),
+        consensus_validators=consensus_validators,
+        pending_partial_withdrawals=[],
+        validator_min_active_epochs=10,
+        oracle_exit_indexes=set(),
+        buffer=Gwei(20_000_000),
+    )
+    expected = {'0x1': Gwei(0)}
+    assert result == expected
+
+
+async def test_get_withdrawals_full_exit_shortfall_tail_still_gets_buffer(data_dir):
+    """When the full exit leaves a genuine remaining shortfall, the buffer must still
+    be applied to the partial top-up covering that tail.
+    """
+    settings.set(vault=None, vault_dir=data_dir, network=HOODI)
+    chain_head = create_chain_head(epoch=500)
+    consensus_validators = [
+        create_consensus_validator(
+            public_key='0x1',
+            index=1,
+            balance=ether_to_gwei(32),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=200,
+            is_compounding=False,
+        ),
+        create_consensus_validator(
+            public_key='0x2',
+            index=2,
+            balance=ether_to_gwei(50),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=200,
+        ),
+    ]
+    result = await _get_withdrawals(
+        chain_head=chain_head,
+        queued_assets=ether_to_gwei(40),
+        consensus_validators=consensus_validators,
+        pending_partial_withdrawals=[],
+        validator_min_active_epochs=10,
+        oracle_exit_indexes=set(),
+        buffer=Gwei(20_000_000),
+    )
+    expected = {'0x1': Gwei(0), '0x2': Gwei(ether_to_gwei(8) + 20_000_000)}
+    assert result == expected
+
+
 # pylint: disable-next=too-many-locals
 async def test_process_submits_shortfall_plus_buffer(data_dir, reset_app_state):
     settings.set(vault=None, vault_dir=data_dir, network=HOODI)

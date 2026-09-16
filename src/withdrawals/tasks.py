@@ -208,13 +208,14 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
 
         app_state.partial_withdrawal_block = chain_head.block_number
 
-        withdrawn_assets = Web3.to_wei(sum(withdrawals.values()), 'gwei')
+        withdrawn_assets = Web3.to_wei(exit_queue.missing, 'gwei')
         if settings.network in GNO_NETWORKS:
             # apply mGNO -> GNO exchange rate
             withdrawn_assets = convert_to_gno(withdrawn_assets)
 
         logger.info(
-            'Successfully withdrew %s %s for validators with public key(s) %s, tx hash: %s',
+            'Successfully submitted withdrawal request(s) covering %s %s of exit queue '
+            'shortfall for validators with public key(s) %s, tx hash: %s',
             round_down(Web3.from_wei(withdrawn_assets, 'ether'), 2),
             settings.network_config.VAULT_BALANCE_SYMBOL,
             ', '.join(withdrawals.keys()),
@@ -304,6 +305,10 @@ async def _get_withdrawals(
 
         withdrawals[validator.public_key] = Gwei(0)  # full withdrawal
         queued_assets = Gwei(max(0, queued_assets - validator.balance))
+        if queued_assets <= 0:
+            # The full exit above already covers the shortfall; skip the partial
+            # top-up so we don't request buffer-only partials that aren't needed.
+            break
 
         # Remove exited validator from partials
         if validator.index in partial_validator_indexes:

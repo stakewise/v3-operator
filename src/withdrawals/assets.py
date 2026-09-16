@@ -84,16 +84,19 @@ async def get_queued_assets(
     )
     # Total assets still in the queue after the simulated harvest: the whole
     # share-denominated base that keeps accruing rewards, see calculate_withdrawal_buffer.
-    total_assets = await validators_checker_contract.get_exit_queue_missing_assets(
-        exit_queue_missing_assets_params=ExitQueueMissingAssetsParams(
-            vault=settings.vault,
-            withdrawing_assets=Wei(0),
-            redemption_assets=Wei(0),
-            exit_queue_cumulative_ticket=exit_queue_cumulative_ticket,
-        ),
-        harvest_params=harvest_params,
-        block_number=chain_head.block_number,
-    )
+    # Skipped when there is no shortfall, since the buffer it feeds is never used either.
+    total_assets = Wei(0)
+    if missing_assets > 0:
+        total_assets = await validators_checker_contract.get_exit_queue_missing_assets(
+            exit_queue_missing_assets_params=ExitQueueMissingAssetsParams(
+                vault=settings.vault,
+                withdrawing_assets=Wei(0),
+                redemption_assets=Wei(0),
+                exit_queue_cumulative_ticket=exit_queue_cumulative_ticket,
+            ),
+            harvest_params=harvest_params,
+            block_number=chain_head.block_number,
+        )
 
     if settings.network in GNO_NETWORKS:
         # apply GNO -> mGNO exchange rate
@@ -115,18 +118,22 @@ def calculate_withdrawal_buffer(
 ) -> Gwei:
     """
     The exit queue is share-denominated and keeps accruing rewards on `total_queue_assets`
-    while an EL-triggered partial withdrawal request for it waits through
-    `MIN_VALIDATOR_WITHDRAWABILITY_DELAY_EPOCHS`, its turn in the network-wide pending-partials
-    sweep, and the next vault harvest (`rewards_delay`). Requesting only the exact shortfall
+    while an EL-triggered partial withdrawal request for it waits through the later of
+    `MIN_VALIDATOR_WITHDRAWABILITY_DELAY_EPOCHS` and its turn in the network-wide
+    pending-partials sweep (the sweep drains concurrently with the withdrawability delay, not
+    after it), plus the next vault harvest (`rewards_delay`). Requesting only the exact shortfall
     would leave a new dust shortfall at every reward update, so the request is padded with the
     rewards expected to accrue over that whole latency window, times a safety factor. Any excess
     lands as withdrawable assets in the vault and is re-staked by the normal funding path.
     """
     latency_seconds = (
-        network_config.MIN_VALIDATOR_WITHDRAWABILITY_DELAY_EPOCHS * network_config.SECONDS_PER_EPOCH
-        + pending_partials_count
-        * network_config.SECONDS_PER_SLOT
-        // network_config.MAX_PENDING_PARTIALS_PER_WITHDRAWALS_SWEEP
+        max(
+            network_config.MIN_VALIDATOR_WITHDRAWABILITY_DELAY_EPOCHS
+            * network_config.SECONDS_PER_EPOCH,
+            pending_partials_count
+            * network_config.SECONDS_PER_SLOT
+            // network_config.MAX_PENDING_PARTIALS_PER_WITHDRAWALS_SWEEP,
+        )
         + rewards_delay
     )
     buffer = (
