@@ -10,6 +10,7 @@ from src.common.language import validate_mnemonic as verify_mnemonic
 from src.config.settings import (
     MAX_EFFECTIVE_BALANCE,
     MAX_EFFECTIVE_BALANCE_GWEI,
+    MAX_MIN_WITHDRAWAL_AMOUNT_GWEI,
     MIN_ACTIVATION_BALANCE,
     MIN_ACTIVATION_BALANCE_GWEI,
     MIN_DEPOSIT_AMOUNT,
@@ -142,6 +143,21 @@ def validate_min_deposit_amount_gwei(ctx: click.Context, param: click.Parameter,
             f'{MIN_DEPOSIT_AMOUNT_GWEI} Gwei '
             f'({Web3.from_wei(MIN_DEPOSIT_AMOUNT, 'ether')} ETH)'
         )
+    return value
+
+
+def validate_min_withdrawal_amount_gwei(
+    ctx: click.Context, param: click.Parameter, value: int
+) -> int:
+    if value < 1 or value > MAX_MIN_WITHDRAWAL_AMOUNT_GWEI:
+        max_eth = Web3.from_wei(Web3.to_wei(MAX_MIN_WITHDRAWAL_AMOUNT_GWEI, 'gwei'), 'ether')
+        message = (
+            f'min-withdrawal-amount-gwei must be between 1 and {MAX_MIN_WITHDRAWAL_AMOUNT_GWEI} '
+            f'Gwei ({max_eth} ETH), the oracle exit threshold. A higher value could leave a '
+            f'shortfall the operator declines to serve with a partial withdrawal, which the '
+            f'oracle would eventually cover with a full validator exit instead.'
+        )
+        raise click.BadParameter(message)
     return value
 
 

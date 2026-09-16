@@ -70,6 +70,7 @@ def start_remote_signer(
     max_validator_balance_gwei: int | None,
     min_deposit_delay: int,
     max_withdrawal_request_fee_gwei: int,
+    min_withdrawal_amount_gwei: int,
 ) -> None:
     operator_config = OperatorConfig(vault, Path(data_dir))
     if network is None:
@@ -111,6 +112,7 @@ def start_remote_signer(
         ),
         min_deposit_delay=min_deposit_delay,
         max_withdrawal_request_fee_gwei=Gwei(max_withdrawal_request_fee_gwei),
+        min_withdrawal_amount_gwei=Gwei(min_withdrawal_amount_gwei),
     )
 
     try:

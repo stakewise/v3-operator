@@ -124,7 +124,7 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
 
         metrics.queued_assets.labels(network=settings.network).set(int(exit_queue.missing))
 
-        if exit_queue.missing <= 0:
+        if exit_queue.missing < settings.min_withdrawal_amount_gwei:
             return
 
         pending_partials_count = await get_withdrawals_count(chain_head)
