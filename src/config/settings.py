@@ -589,7 +589,9 @@ WITHDRAWALS_INTERVAL: int = decouple_config(
     group='Withdrawals',
     description='Minimum time between withdrawal processing runs, in seconds.',
 )
-MIN_WITHDRAWAL_AMOUNT_GWEI: Gwei = Gwei(1)
+# Safety multiplier applied to the estimated reward accrual buffer, see
+# src.withdrawals.assets.calculate_withdrawal_buffer.
+WITHDRAWAL_BUFFER_SAFETY_FACTOR = 2
 
 # telemetry
 TELEMETRY_INTERVAL: int = decouple_config(

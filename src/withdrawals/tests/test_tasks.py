@@ -1,8 +1,9 @@
 from unittest import mock
 
 import pytest
+from eth_typing import HexStr
 from sw_utils import ValidatorStatus
-from web3.types import BlockNumber
+from web3.types import BlockNumber, Gwei, Wei
 
 from src.common.app_state import AppState
 from src.common.tests.factories import create_chain_head
@@ -10,9 +11,12 @@ from src.common.tests.utils import ether_to_gwei
 from src.common.typings import PendingPartialWithdrawal, Singleton
 from src.config.networks import HOODI
 from src.config.settings import WITHDRAWALS_INTERVAL, settings
+from src.validators.database import VaultValidatorCrud
 from src.validators.tests.factories import create_consensus_validator
 from src.validators.typings import ValidatorConsolidationData
+from src.withdrawals.assets import calculate_withdrawal_buffer
 from src.withdrawals.tasks import (
+    ValidatorWithdrawalSubtask,
     WithdrawalIntervalMixin,
     _fetch_oracle_exiting_validators,
     _filter_exitable_validators,
@@ -22,6 +26,7 @@ from src.withdrawals.tasks import (
     _get_withdrawals,
     _is_pending_partial_withdrawals_queue_full,
 )
+from src.withdrawals.typings import ExitQueueAssets
 
 
 @pytest.fixture
@@ -244,6 +249,44 @@ def test_get_partial_withdrawals():
     )
     assert result == expected
 
+    # buffer included in queued_assets: need + buffer fits within the largest
+    # validator's capacity, so it is requested from that validator alone
+    validators = [
+        create_consensus_validator(
+            public_key='0x1',
+            balance=ether_to_gwei(40),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=200,
+        ),
+        create_consensus_validator(
+            public_key='0x2',
+            balance=ether_to_gwei(50),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=200,
+        ),
+    ]
+    need = ether_to_gwei(10)
+    buffer = ether_to_gwei(2)
+    expected = {'0x2': ether_to_gwei(12)}
+    result = _get_partial_withdrawals(
+        partial_validators=validators,
+        queued_assets=Gwei(need + buffer),
+        validator_partial_withdrawals={},
+    )
+    assert result == expected
+
+    # buffer included in queued_assets: need + buffer exceeds the largest validator's
+    # capacity, so the request is capped there and spills over to the next validator
+    need = ether_to_gwei(17)
+    buffer = ether_to_gwei(4)
+    expected = {'0x2': ether_to_gwei(18), '0x1': ether_to_gwei(3)}
+    result = _get_partial_withdrawals(
+        partial_validators=validators,
+        queued_assets=Gwei(need + buffer),
+        validator_partial_withdrawals={},
+    )
+    assert result == expected
+
 
 async def test_get_withdrawals(data_dir):
     settings.set(vault=None, vault_dir=data_dir, network=HOODI)
@@ -268,6 +311,7 @@ async def test_get_withdrawals(data_dir):
     ]
     result = await _get_withdrawals(
         chain_head=chain_head,
+        buffer=Gwei(0),
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
         pending_partial_withdrawals=[],
@@ -296,6 +340,7 @@ async def test_get_withdrawals(data_dir):
     ]
     result = await _get_withdrawals(
         chain_head=chain_head,
+        buffer=Gwei(0),
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
         pending_partial_withdrawals=[],
@@ -327,6 +372,7 @@ async def test_get_withdrawals(data_dir):
     ]
     result = await _get_withdrawals(
         chain_head=chain_head,
+        buffer=Gwei(0),
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
         pending_partial_withdrawals=[],
@@ -355,6 +401,7 @@ async def test_get_withdrawals(data_dir):
     ]
     result = await _get_withdrawals(
         chain_head=chain_head,
+        buffer=Gwei(0),
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
         pending_partial_withdrawals=[],
@@ -383,6 +430,7 @@ async def test_get_withdrawals(data_dir):
     ]
     result = await _get_withdrawals(
         chain_head=chain_head,
+        buffer=Gwei(0),
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
         pending_partial_withdrawals=[],
@@ -417,6 +465,7 @@ async def test_get_withdrawals(data_dir):
     ]
     result = await _get_withdrawals(
         chain_head=chain_head,
+        buffer=Gwei(0),
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
         pending_partial_withdrawals=[],
@@ -450,6 +499,7 @@ async def test_get_withdrawals(data_dir):
     ]
     result = await _get_withdrawals(
         chain_head=chain_head,
+        buffer=Gwei(0),
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
         pending_partial_withdrawals=pending_partial_withdrawals,
@@ -483,6 +533,7 @@ async def test_get_withdrawals(data_dir):
     ]
     result = await _get_withdrawals(
         chain_head=chain_head,
+        buffer=Gwei(0),
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
         pending_partial_withdrawals=pending_partial_withdrawals,
@@ -511,6 +562,7 @@ async def test_get_withdrawals(data_dir):
     ]
     result = await _get_withdrawals(
         chain_head=chain_head,
+        buffer=Gwei(0),
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
         pending_partial_withdrawals=[],
@@ -539,6 +591,7 @@ async def test_get_withdrawals(data_dir):
     ]
     result = await _get_withdrawals(
         chain_head=chain_head,
+        buffer=Gwei(0),
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
         pending_partial_withdrawals=[],
@@ -568,6 +621,7 @@ async def test_get_withdrawals(data_dir):
     ]
     result = await _get_withdrawals(
         chain_head=chain_head,
+        buffer=Gwei(0),
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
         pending_partial_withdrawals=[],
@@ -598,6 +652,7 @@ async def test_get_withdrawals(data_dir):
     ]
     result = await _get_withdrawals(
         chain_head=chain_head,
+        buffer=Gwei(0),
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
         pending_partial_withdrawals=[],
@@ -629,6 +684,7 @@ async def test_get_withdrawals(data_dir):
     ]
     result = await _get_withdrawals(
         chain_head=chain_head,
+        buffer=Gwei(0),
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
         pending_partial_withdrawals=[],
@@ -659,6 +715,7 @@ async def test_get_withdrawals(data_dir):
     ]
     result = await _get_withdrawals(
         chain_head=chain_head,
+        buffer=Gwei(0),
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
         pending_partial_withdrawals=[],
@@ -692,6 +749,7 @@ async def test_get_withdrawals(data_dir):
     ]
     result = await _get_withdrawals(
         chain_head=chain_head,
+        buffer=Gwei(0),
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
         pending_partial_withdrawals=[],
@@ -729,6 +787,7 @@ async def test_get_withdrawals(data_dir):
     ]
     result = await _get_withdrawals(
         chain_head=chain_head,
+        buffer=Gwei(0),
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
         pending_partial_withdrawals=[],
@@ -755,6 +814,7 @@ async def test_get_withdrawals(data_dir):
     ]
     result = await _get_withdrawals(
         chain_head=chain_head,
+        buffer=Gwei(0),
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
         pending_partial_withdrawals=[],
@@ -770,6 +830,7 @@ async def test_get_withdrawals(data_dir):
 
     result = await _get_withdrawals(
         chain_head=chain_head,
+        buffer=Gwei(0),
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
         pending_partial_withdrawals=[],
@@ -812,6 +873,7 @@ async def test_get_withdrawals_non_compounding_exit_does_not_reduce_partial_capa
     ]
     result = await _get_withdrawals(
         chain_head=chain_head,
+        buffer=Gwei(0),
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
         pending_partial_withdrawals=[],
@@ -858,6 +920,7 @@ async def test_get_withdrawals_excludes_consolidation_sources(data_dir):
     ]
     result = await _get_withdrawals(
         chain_head=chain_head,
+        buffer=Gwei(0),
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
         pending_partial_withdrawals=[],
@@ -894,6 +957,7 @@ async def test_get_withdrawals_excludes_oracle_exiting_validators_from_partials(
     ]
     result = await _get_withdrawals(
         chain_head=chain_head,
+        buffer=Gwei(0),
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
         pending_partial_withdrawals=[],
@@ -929,6 +993,7 @@ async def test_get_withdrawals_excludes_oracle_exiting_from_partial_capacity(dat
     ]
     result = await _get_withdrawals(
         chain_head=chain_head,
+        buffer=Gwei(0),
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
         pending_partial_withdrawals=[],
@@ -956,6 +1021,7 @@ async def test_get_withdrawals_boundary_activation_epoch_prefers_partial_over_fu
     ]
     result = await _get_withdrawals(
         chain_head=chain_head,
+        buffer=Gwei(0),
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
         pending_partial_withdrawals=[],
@@ -1008,33 +1074,13 @@ def test_is_partial_withdrawable_validator():
     assert result is True
 
 
-async def test_is_pending_partial_withdrawals_queue_full():
+def test_is_pending_partial_withdrawals_queue_full():
     limit = 100
-    chain_head = create_chain_head(epoch=500)
 
-    with mock.patch.object(
-        settings.network_config, 'PENDING_PARTIAL_WITHDRAWALS_LIMIT', new=limit
-    ), mock.patch(
-        'src.withdrawals.tasks.get_withdrawals_count',
-        return_value=limit - 1,
-    ):
-        assert await _is_pending_partial_withdrawals_queue_full(chain_head) is False
-
-    with mock.patch.object(
-        settings.network_config, 'PENDING_PARTIAL_WITHDRAWALS_LIMIT', new=limit
-    ), mock.patch(
-        'src.withdrawals.tasks.get_withdrawals_count',
-        return_value=limit,
-    ):
-        assert await _is_pending_partial_withdrawals_queue_full(chain_head) is True
-
-    with mock.patch.object(
-        settings.network_config, 'PENDING_PARTIAL_WITHDRAWALS_LIMIT', new=limit
-    ), mock.patch(
-        'src.withdrawals.tasks.get_withdrawals_count',
-        return_value=limit + 1,
-    ):
-        assert await _is_pending_partial_withdrawals_queue_full(chain_head) is True
+    with mock.patch.object(settings.network_config, 'PENDING_PARTIAL_WITHDRAWALS_LIMIT', new=limit):
+        assert _is_pending_partial_withdrawals_queue_full(limit - 1) is False
+        assert _is_pending_partial_withdrawals_queue_full(limit) is True
+        assert _is_pending_partial_withdrawals_queue_full(limit + 1) is True
 
 
 def test_filter_exitable_validators():
@@ -1488,6 +1534,7 @@ async def test_get_withdrawals_partial_topup_called_at_most_once(
     with mock.patch('src.withdrawals.tasks._get_partial_withdrawals', side_effect=_spy):
         await _get_withdrawals(
             chain_head=chain_head,
+            buffer=Gwei(0),
             queued_assets=queued_assets,
             consensus_validators=consensus_validators,
             pending_partial_withdrawals=[],
@@ -1534,6 +1581,7 @@ async def test_get_withdrawals_pending_deposit_asymmetry(data_dir):
     ]
     result = await _get_withdrawals(
         chain_head=chain_head,
+        buffer=Gwei(0),
         queued_assets=queued_assets,
         consensus_validators=consensus_validators,
         pending_partial_withdrawals=[],
@@ -1544,3 +1592,161 @@ async def test_get_withdrawals_pending_deposit_asymmetry(data_dir):
     # so '0x2' exits too
     expected = {'0x1': ether_to_gwei(0), '0x2': ether_to_gwei(0)}
     assert result == expected
+
+
+async def test_get_withdrawals_buffer_does_not_trigger_full_exit(data_dir):
+    """A buffer that pushes the buffered request above partial_capacity must not flip
+    the partial-only branch into a full exit: the branch decision uses the unbuffered
+    shortfall, and `_get_partial_withdrawals` caps the buffered request at capacity.
+    """
+    settings.set(vault=None, vault_dir=data_dir, network=HOODI)
+    chain_head = create_chain_head(epoch=500)
+    consensus_validators = [
+        create_consensus_validator(
+            public_key='0x1',
+            balance=ether_to_gwei(40),
+            status=ValidatorStatus.ACTIVE_ONGOING,
+            activation_epoch=200,
+        ),
+    ]
+    result = await _get_withdrawals(
+        chain_head=chain_head,
+        queued_assets=ether_to_gwei(7.9),  # just below the validator's 8 ETH capacity
+        consensus_validators=consensus_validators,
+        pending_partial_withdrawals=[],
+        validator_min_active_epochs=10,
+        oracle_exit_indexes=set(),
+        buffer=ether_to_gwei(1),
+    )
+    expected = {'0x1': ether_to_gwei(8)}
+    assert result == expected
+
+
+# pylint: disable-next=too-many-locals
+async def test_process_submits_shortfall_plus_buffer(data_dir, reset_app_state):
+    settings.set(vault=None, vault_dir=data_dir, network=HOODI)
+    chain_head = create_chain_head(epoch=500)
+    protocol_config = mock.MagicMock(validator_min_active_epochs=10)
+    # a single compounding validator with plenty of partial-withdrawal capacity
+    validator = create_consensus_validator(
+        public_key='0x1',
+        index=1,
+        balance=ether_to_gwei(40),
+        status=ValidatorStatus.ACTIVE_ONGOING,
+        activation_epoch=200,
+    )
+    missing = ether_to_gwei(1)
+    total = missing
+    avg_reward_per_second = 636_924_636
+    rewards_delay = 43_200
+    pending_partials_count = 0
+    exit_queue = ExitQueueAssets(missing=missing, total=total)
+    buffer = calculate_withdrawal_buffer(
+        total_queue_assets=total,
+        pending_partials_count=pending_partials_count,
+        avg_reward_per_second=avg_reward_per_second,
+        rewards_delay=rewards_delay,
+        network_config=settings.network_config,
+    )
+    expected_withdrawals = {'0x1': Gwei(missing + buffer)}
+
+    with mock.patch(
+        'src.withdrawals.tasks.get_chain_latest_head', return_value=chain_head
+    ), mock.patch(
+        'src.withdrawals.tasks.get_protocol_config', return_value=protocol_config
+    ), mock.patch.object(
+        WithdrawalIntervalMixin, '_is_withdrawal_interval_passed', return_value=True
+    ), mock.patch.object(
+        VaultValidatorCrud, 'get_vault_validators', return_value=[validator]
+    ), mock.patch(
+        'src.withdrawals.tasks.build_consensus_validators', return_value=[validator]
+    ), mock.patch(
+        'src.withdrawals.tasks._fetch_oracle_exiting_validators', return_value=[]
+    ), mock.patch(
+        'src.withdrawals.tasks.get_pending_partial_withdrawals', return_value=[]
+    ), mock.patch(
+        'src.withdrawals.tasks.get_redemption_assets', return_value=Wei(0)
+    ), mock.patch(
+        'src.withdrawals.tasks.get_queued_assets', return_value=exit_queue
+    ), mock.patch(
+        'src.withdrawals.tasks.get_withdrawals_count', return_value=pending_partials_count
+    ), mock.patch(
+        'src.withdrawals.tasks.os_token_vault_controller_contract.avg_reward_per_second',
+        return_value=avg_reward_per_second,
+    ), mock.patch(
+        'src.withdrawals.tasks.keeper_contract.rewards_delay', return_value=rewards_delay
+    ), mock.patch(
+        'src.withdrawals.tasks.apply_pending_deposits', return_value=([validator], [])
+    ), mock.patch(
+        'src.withdrawals.tasks.get_withdrawal_request_fee', return_value=Wei(0)
+    ), mock.patch(
+        'src.withdrawals.tasks.submit_withdraw_validators', return_value=HexStr('0xabc')
+    ) as mocked_submit, mock.patch(
+        'src.withdrawals.tasks.execution_client', new=mock.AsyncMock()
+    ) as mocked_execution_client:
+        mocked_execution_client.eth.get_transaction.return_value = {'blockNumber': 123}
+        subtask = ValidatorWithdrawalSubtask(relayer=None)
+        await subtask.process()
+
+    mocked_submit.assert_called_once()
+    assert mocked_submit.call_args.kwargs['withdrawals'] == expected_withdrawals
+
+
+# pylint: disable-next=too-many-locals
+async def test_process_submits_tiny_shortfall_without_threshold(data_dir, reset_app_state):
+    """There is no minimum-shortfall threshold: even a 10 Gwei shortfall, for which the
+    computed buffer rounds down to 0, is still submitted for withdrawal.
+    """
+    settings.set(vault=None, vault_dir=data_dir, network=HOODI)
+    chain_head = create_chain_head(epoch=500)
+    protocol_config = mock.MagicMock(validator_min_active_epochs=10)
+    validator = create_consensus_validator(
+        public_key='0x1',
+        index=1,
+        balance=ether_to_gwei(40),
+        status=ValidatorStatus.ACTIVE_ONGOING,
+        activation_epoch=200,
+    )
+    missing = Gwei(10)
+    exit_queue = ExitQueueAssets(missing=missing, total=missing)
+
+    with mock.patch(
+        'src.withdrawals.tasks.get_chain_latest_head', return_value=chain_head
+    ), mock.patch(
+        'src.withdrawals.tasks.get_protocol_config', return_value=protocol_config
+    ), mock.patch.object(
+        WithdrawalIntervalMixin, '_is_withdrawal_interval_passed', return_value=True
+    ), mock.patch.object(
+        VaultValidatorCrud, 'get_vault_validators', return_value=[validator]
+    ), mock.patch(
+        'src.withdrawals.tasks.build_consensus_validators', return_value=[validator]
+    ), mock.patch(
+        'src.withdrawals.tasks._fetch_oracle_exiting_validators', return_value=[]
+    ), mock.patch(
+        'src.withdrawals.tasks.get_pending_partial_withdrawals', return_value=[]
+    ), mock.patch(
+        'src.withdrawals.tasks.get_redemption_assets', return_value=Wei(0)
+    ), mock.patch(
+        'src.withdrawals.tasks.get_queued_assets', return_value=exit_queue
+    ), mock.patch(
+        'src.withdrawals.tasks.get_withdrawals_count', return_value=0
+    ), mock.patch(
+        'src.withdrawals.tasks.os_token_vault_controller_contract.avg_reward_per_second',
+        return_value=636_924_636,
+    ), mock.patch(
+        'src.withdrawals.tasks.keeper_contract.rewards_delay', return_value=43_200
+    ), mock.patch(
+        'src.withdrawals.tasks.apply_pending_deposits', return_value=([validator], [])
+    ), mock.patch(
+        'src.withdrawals.tasks.get_withdrawal_request_fee', return_value=Wei(0)
+    ), mock.patch(
+        'src.withdrawals.tasks.submit_withdraw_validators', return_value=HexStr('0xabc')
+    ) as mocked_submit, mock.patch(
+        'src.withdrawals.tasks.execution_client', new=mock.AsyncMock()
+    ) as mocked_execution_client:
+        mocked_execution_client.eth.get_transaction.return_value = {'blockNumber': 123}
+        subtask = ValidatorWithdrawalSubtask(relayer=None)
+        await subtask.process()
+
+    mocked_submit.assert_called_once()
+    assert mocked_submit.call_args.kwargs['withdrawals'] == {'0x1': Gwei(10)}
