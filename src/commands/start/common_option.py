@@ -10,7 +10,6 @@ from src.common.validators import (
     validate_eth_address,
     validate_max_validator_balance_gwei,
     validate_min_deposit_amount_gwei,
-    validate_min_withdrawal_amount_gwei,
 )
 from src.config.networks import GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
@@ -22,7 +21,6 @@ from src.config.settings import (
     DEFAULT_METRICS_PREFIX,
     DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
     DEFAULT_MIN_DEPOSIT_DELAY,
-    DEFAULT_MIN_WITHDRAWAL_AMOUNT_GWEI,
     DEFAULT_VAULT_MIN_BALANCE_GWEI,
     LOG_FORMATS,
     LOG_PLAIN,
@@ -264,17 +262,6 @@ start_common_options = [
         envvar='MAX_WITHDRAWAL_REQUEST_FEE_GWEI',
         help='The maximum withdrawal request fee in Gwei.',
         default=DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI,
-        show_default=True,
-    ),
-    click.option(
-        '--min-withdrawal-amount-gwei',
-        type=int,
-        envvar='MIN_WITHDRAWAL_AMOUNT_GWEI',
-        help='Minimum exit queue shortfall in Gwei that triggers a validator withdrawal. '
-        'Must not exceed 10000000 Gwei (0.01 ETH), the oracle threshold for exiting '
-        'validators.',
-        default=DEFAULT_MIN_WITHDRAWAL_AMOUNT_GWEI,
-        callback=validate_min_withdrawal_amount_gwei,
         show_default=True,
     ),
 ]

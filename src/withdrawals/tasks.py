@@ -25,7 +25,11 @@ from src.common.withdrawals import (
     get_withdrawal_request_fee,
     get_withdrawals_count,
 )
-from src.config.settings import WITHDRAWALS_INTERVAL, settings
+from src.config.settings import (
+    MIN_WITHDRAWAL_AMOUNT_GWEI,
+    WITHDRAWALS_INTERVAL,
+    settings,
+)
 from src.redemptions.tasks import get_redemption_assets
 from src.validators.consensus import apply_pending_deposits, build_consensus_validators
 from src.validators.database import VaultValidatorCrud
@@ -124,7 +128,7 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
 
         metrics.queued_assets.labels(network=settings.network).set(int(exit_queue.missing))
 
-        if exit_queue.missing < settings.min_withdrawal_amount_gwei:
+        if exit_queue.missing < MIN_WITHDRAWAL_AMOUNT_GWEI:
             return
 
         pending_partials_count = await get_withdrawals_count(chain_head)
@@ -145,8 +149,8 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
             network_config=settings.network_config,
         )
         logger.debug(
-            'Exit queue shortfall is %s Gwei, padding the withdrawal request with a %s Gwei '
-            'buffer to cover rewards accrued while it is pending',
+            'Exit queue shortfall is %s Gwei, padding the withdrawal request with a buffer '
+            'of up to %s Gwei to cover rewards accrued while it is pending',
             exit_queue.missing,
             buffer,
         )

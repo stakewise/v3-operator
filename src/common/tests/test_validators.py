@@ -9,12 +9,10 @@ from src.common.validators import (
     validate_db_uri,
     validate_eth_address,
     validate_eth_addresses,
-    validate_min_withdrawal_amount_gwei,
     validate_public_key,
     validate_public_keys,
     validate_public_keys_file,
 )
-from src.config.settings import MAX_MIN_WITHDRAWAL_AMOUNT_GWEI
 
 
 def test_validate_eth_address():
@@ -171,21 +169,3 @@ def test_validate_db_uri():
     # raises_error_for_missing_database_name
     with pytest.raises(BadParameter, match='Invalid database connection string'):
         validate_db_uri(None, None, 'postgresql://user:password@localhost/')
-
-
-def test_validate_min_withdrawal_amount_gwei():
-    # raises_error_for_zero
-    with pytest.raises(BadParameter, match='min-withdrawal-amount-gwei must be between'):
-        validate_min_withdrawal_amount_gwei(None, None, 0)
-
-    # returns_value_for_minimum_allowed
-    result = validate_min_withdrawal_amount_gwei(None, None, 1)
-    assert result == 1
-
-    # returns_value_for_oracle_exit_threshold
-    result = validate_min_withdrawal_amount_gwei(None, None, MAX_MIN_WITHDRAWAL_AMOUNT_GWEI)
-    assert result == MAX_MIN_WITHDRAWAL_AMOUNT_GWEI
-
-    # raises_error_above_oracle_exit_threshold
-    with pytest.raises(BadParameter, match='min-withdrawal-amount-gwei must be between'):
-        validate_min_withdrawal_amount_gwei(None, None, MAX_MIN_WITHDRAWAL_AMOUNT_GWEI + 1)

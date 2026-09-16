@@ -1766,9 +1766,9 @@ async def test_process_submits_shortfall_plus_buffer(data_dir, reset_app_state):
 
 
 # pylint: disable-next=too-many-locals
-async def test_process_submits_tiny_shortfall_without_threshold(data_dir, reset_app_state):
-    """There is no minimum-shortfall threshold: even a 10 Gwei shortfall, for which the
-    computed buffer rounds down to 0, is still submitted for withdrawal.
+async def test_process_submits_tiny_shortfall_at_default_threshold(data_dir, reset_app_state):
+    """At the default MIN_WITHDRAWAL_AMOUNT_GWEI of 1 Gwei, even a 10 Gwei shortfall, for
+    which the computed buffer rounds down to 0, is still submitted for withdrawal.
     """
     settings.set(vault=None, vault_dir=data_dir, network=HOODI)
     chain_head = create_chain_head(epoch=500)
@@ -1835,7 +1835,6 @@ async def test_process_skips_shortfall_below_min_withdrawal_amount_threshold(
         vault=None,
         vault_dir=data_dir,
         network=HOODI,
-        min_withdrawal_amount_gwei=Gwei(1_000_000),
     )
     chain_head = create_chain_head(epoch=500)
     protocol_config = mock.MagicMock(validator_min_active_epochs=10)
@@ -1850,6 +1849,8 @@ async def test_process_skips_shortfall_below_min_withdrawal_amount_threshold(
     exit_queue = ExitQueueAssets(missing=missing, total=missing)
 
     with mock.patch(
+        'src.withdrawals.tasks.MIN_WITHDRAWAL_AMOUNT_GWEI', Gwei(1_000_000)
+    ), mock.patch(
         'src.withdrawals.tasks.get_chain_latest_head', return_value=chain_head
     ), mock.patch(
         'src.withdrawals.tasks.get_protocol_config', return_value=protocol_config
@@ -1887,7 +1888,6 @@ async def test_process_submits_shortfall_at_min_withdrawal_amount_threshold(
         vault=None,
         vault_dir=data_dir,
         network=HOODI,
-        min_withdrawal_amount_gwei=Gwei(1_000_000),
     )
     chain_head = create_chain_head(epoch=500)
     protocol_config = mock.MagicMock(validator_min_active_epochs=10)
@@ -1902,6 +1902,8 @@ async def test_process_submits_shortfall_at_min_withdrawal_amount_threshold(
     exit_queue = ExitQueueAssets(missing=missing, total=missing)
 
     with mock.patch(
+        'src.withdrawals.tasks.MIN_WITHDRAWAL_AMOUNT_GWEI', Gwei(1_000_000)
+    ), mock.patch(
         'src.withdrawals.tasks.get_chain_latest_head', return_value=chain_head
     ), mock.patch(
         'src.withdrawals.tasks.get_protocol_config', return_value=protocol_config

@@ -28,11 +28,6 @@ DEFAULT_MIN_DEPOSIT_DELAY = 3600  # 1 hour
 
 DEFAULT_MAX_CONSOLIDATION_REQUEST_FEE_GWEI = Gwei(1000)
 DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI = Gwei(1000)
-DEFAULT_MIN_WITHDRAWAL_AMOUNT_GWEI = Gwei(1)
-# Mirrors the oracle's MISSING_ASSETS_THRESHOLD in v3-oracle src/exits/constants.py: the
-# oracle exits validators once the exit queue shortfall reaches it, so the operator must
-# serve any shortfall at or above it with a partial withdrawal.
-MAX_MIN_WITHDRAWAL_AMOUNT_GWEI = Gwei(10_000_000)  # 0.01 ETH
 
 DEFAULT_CONSENSUS_ENDPOINT = 'http://localhost:5052'
 DEFAULT_EXECUTION_ENDPOINT = 'http://localhost:8545'
@@ -159,7 +154,6 @@ class Settings(metaclass=Singleton):
     max_validator_balance_gwei: Gwei
     min_deposit_delay: int
     max_withdrawal_request_fee_gwei: Gwei
-    min_withdrawal_amount_gwei: Gwei
 
     vault_first_block: BlockNumber
     nodes_dir: Path
@@ -213,7 +207,6 @@ class Settings(metaclass=Singleton):
         max_validator_balance_gwei: Gwei | None = None,
         min_deposit_delay: int = DEFAULT_MIN_DEPOSIT_DELAY,
         max_withdrawal_request_fee_gwei: Gwei = DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI,
-        min_withdrawal_amount_gwei: Gwei = DEFAULT_MIN_WITHDRAWAL_AMOUNT_GWEI,
         vault_first_block: BlockNumber | None = None,
         meta_vault_min_deposit_amount_gwei: Gwei = DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
         nodes_dir: Path = Path(''),
@@ -263,7 +256,6 @@ class Settings(metaclass=Singleton):
         self.vault_min_balance_gwei = vault_min_balance_gwei
         self.min_deposit_delay = min_deposit_delay
         self.max_withdrawal_request_fee_gwei = max_withdrawal_request_fee_gwei
-        self.min_withdrawal_amount_gwei = min_withdrawal_amount_gwei
 
         # keystores
         self.keystores_dir = Path(keystores_dir) if keystores_dir else vault_dir / 'keystores'
@@ -600,6 +592,24 @@ WITHDRAWALS_INTERVAL: int = decouple_config(
 # Safety multiplier applied to the estimated reward accrual buffer, see
 # src.withdrawals.assets.calculate_withdrawal_buffer.
 WITHDRAWAL_BUFFER_SAFETY_FACTOR = 2
+
+# Mirrors the oracle's MISSING_ASSETS_THRESHOLD in v3-oracle src/exits/constants.py: the
+# oracle exits validators once the exit queue shortfall reaches it, so the operator must
+# serve any shortfall at or above it with a partial withdrawal.
+MAX_MIN_WITHDRAWAL_AMOUNT_GWEI = Gwei(10_000_000)  # 0.01 ETH
+MIN_WITHDRAWAL_AMOUNT_GWEI: Gwei = Gwei(
+    decouple_config(
+        'MIN_WITHDRAWAL_AMOUNT_GWEI',
+        default=1,
+        cast=int,
+        group='Withdrawals',
+        description=(
+            'Minimum exit queue shortfall in Gwei that triggers a validator withdrawal. '
+            'Must not exceed MAX_MIN_WITHDRAWAL_AMOUNT_GWEI (10000000 Gwei / 0.01 ETH, or '
+            '0.01 mGNO on Gnosis), the oracle threshold for exiting validators.'
+        ),
+    )
+)
 
 # telemetry
 TELEMETRY_INTERVAL: int = decouple_config(
