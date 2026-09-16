@@ -9,6 +9,7 @@ import pytest
 from eth_typing import ChecksumAddress
 from sw_utils.typings import ConsensusFork, ProtocolConfig
 
+from src.common.app_state import AppState, ExitSignatureUpdateCache
 from src.common.utils import get_current_timestamp
 from src.config.settings import settings
 from src.exits.tasks import _fetch_last_update_block, _get_oracles_request
@@ -90,7 +91,18 @@ class TestFetchLastExitSignatureUpdateBlock:
     async def test_normal(self):
         get_event_func = 'src.exits.tasks.keeper_contract.get_exit_signatures_updated_event'
         vault_address = settings.vault
-        # no events, checkpoint moved from None to 8
+        # node is behind the checkpoint, no scan
+        with (
+            mock.patch(get_event_func, return_value=None) as get_event_mock,
+            patch_latest_block(5),
+            patch_checkpoints(checkpoint_block=6),
+        ):
+            last_update_block = await _fetch_last_update_block()
+
+        assert last_update_block is None
+        get_event_mock.assert_not_called()
+
+        # no events, checkpoint moved from 6 to 8
         with (
             mock.patch(get_event_func, return_value=None) as get_event_mock,
             patch_latest_block(8),
@@ -98,7 +110,7 @@ class TestFetchLastExitSignatureUpdateBlock:
             last_update_block = await _fetch_last_update_block()
 
         assert last_update_block is None
-        get_event_mock.assert_called_once_with(vault=vault_address, from_block=None, to_block=8)
+        get_event_mock.assert_called_once_with(vault=vault_address, from_block=7, to_block=8)
 
         # no events, checkpoint moved to 9
         with (
@@ -129,6 +141,31 @@ class TestFetchLastExitSignatureUpdateBlock:
 
         assert last_update_block == 11
         get_event_mock.assert_called_once_with(vault=vault_address, from_block=16, to_block=20)
+
+    async def test_cold_cache_uses_checkpoint_last_event(self):
+        get_event_func = 'src.exits.tasks.keeper_contract.get_exit_signatures_updated_event'
+        with (
+            mock.patch(get_event_func, return_value=None) as get_event_mock,
+            patch_latest_block(20),
+            patch_checkpoints(checkpoint_block=10, last_event_block=7),
+        ):
+            last_update_block = await _fetch_last_update_block()
+
+        assert last_update_block == 7
+        get_event_mock.assert_called_once_with(vault=settings.vault, from_block=11, to_block=20)
+
+
+@pytest.fixture(autouse=True)
+def reset_exit_signature_update_cache():
+    AppState().exit_signature_update_cache = ExitSignatureUpdateCache()
+
+
+def patch_checkpoints(checkpoint_block: int, last_event_block: int | None = None):
+    return mock.patch.multiple(
+        settings.network_config.CHECKPOINTS,
+        EXIT_SIGNATURES_CHECKPOINT_BLOCK=checkpoint_block,
+        EXIT_SIGNATURES_LAST_EVENT_BLOCK=last_event_block,
+    )
 
 
 @contextlib.contextmanager

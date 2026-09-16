@@ -73,6 +73,11 @@ class CheckpointsConfig:
     # events up to `VAULT_VALIDATORS_LAST_BLOCK`. 72-byte records.
     VAULT_VALIDATORS_IPFS_HASH: str
     VAULT_VALIDATORS_LAST_BLOCK: BlockNumber
+    # Starting point for scanning `ExitSignaturesUpdated` events, and the last event
+    # block to assume before it. None deliberately: older events (legacy rotations)
+    # are long finalized and synced by oracles, so they don't gate a new rotation.
+    EXIT_SIGNATURES_LAST_EVENT_BLOCK: BlockNumber | None
+    EXIT_SIGNATURES_CHECKPOINT_BLOCK: BlockNumber
 
 
 @dataclass
@@ -133,6 +138,8 @@ NETWORKS: dict[str, NetworkConfig] = {
                 'bafybeigywptyz3lo7pb4rby2gwagdamyeahw2yklijupwfxqjjzfuqebpm'
             ),
             VAULT_VALIDATORS_LAST_BLOCK=BlockNumber(25934000),
+            EXIT_SIGNATURES_LAST_EVENT_BLOCK=None,
+            EXIT_SIGNATURES_CHECKPOINT_BLOCK=BlockNumber(25934000),
         ),
         OS_TOKEN_REDEEMER_GENESIS_BLOCK=BlockNumber(24923158),
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
@@ -191,6 +198,8 @@ NETWORKS: dict[str, NetworkConfig] = {
                 'bafkreihalltsgohglgsphglrbmbcnvbuohgwfqa5r5wnnsgiic53zpkliy'
             ),
             VAULT_VALIDATORS_LAST_BLOCK=BlockNumber(3584000),
+            EXIT_SIGNATURES_LAST_EVENT_BLOCK=None,
+            EXIT_SIGNATURES_CHECKPOINT_BLOCK=BlockNumber(3584000),
         ),
         OS_TOKEN_REDEEMER_GENESIS_BLOCK=BlockNumber(2657589),
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
@@ -251,6 +260,8 @@ NETWORKS: dict[str, NetworkConfig] = {
                 'bafybeicl67j5kcvn5lzhydi5pmp5wjnot23topveijwggodb2ueay2qk5a'
             ),
             VAULT_VALIDATORS_LAST_BLOCK=BlockNumber(48148000),
+            EXIT_SIGNATURES_LAST_EVENT_BLOCK=None,
+            EXIT_SIGNATURES_CHECKPOINT_BLOCK=BlockNumber(48148000),
         ),
         OS_TOKEN_REDEEMER_GENESIS_BLOCK=BlockNumber(45773287),
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
