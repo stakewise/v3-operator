@@ -605,8 +605,8 @@ MIN_WITHDRAWAL_AMOUNT_GWEI: Gwei = Gwei(
         group='Withdrawals',
         description=(
             'Minimum exit queue shortfall in Gwei that triggers a validator withdrawal. '
-            'Must not exceed MAX_MIN_WITHDRAWAL_AMOUNT_GWEI (10000000 Gwei / 0.01 ETH, or '
-            '0.01 mGNO on Gnosis), the oracle threshold for exiting validators.'
+            'Must not exceed 10000000 Gwei (0.01 ETH, or 0.01 mGNO on Gnosis), the oracle '
+            'threshold for exiting validators.'
         ),
     )
 )

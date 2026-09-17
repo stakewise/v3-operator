@@ -72,8 +72,8 @@ def test_calculate_validators_exits_amount():
 
 @pytest.mark.usefixtures('fake_settings')
 class TestGetQueuedAssets:
-    async def test_missing_and_total_assets_wei_rounded_up_to_gwei(self):
-        # 1 wei of dust must round up, not truncate down
+    async def test_missing_and_total_assets_wei_truncated_down_to_gwei(self):
+        # 1 wei of dust must be truncated down, not rounded up
         missing_assets_wei = Wei(Web3.to_wei(5, 'gwei') + 1)
         total_assets_wei = Wei(Web3.to_wei(9, 'gwei') + 1)
 
@@ -91,7 +91,7 @@ class TestGetQueuedAssets:
                 redemption_assets=Wei(1),
             )
 
-        assert result == ExitQueueAssets(missing=Gwei(6), total=Gwei(10))
+        assert result == ExitQueueAssets(missing=Gwei(5), total=Gwei(9))
         assert mocks['missing_assets'].await_count == 2
 
     async def test_second_call_uses_zero_withdrawing_and_redemption_assets(self):

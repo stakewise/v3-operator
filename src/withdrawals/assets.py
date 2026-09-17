@@ -104,8 +104,8 @@ async def get_queued_assets(
         total_assets = convert_to_mgno(total_assets)
 
     return ExitQueueAssets(
-        missing=_wei_to_gwei_round_up(missing_assets),
-        total=_wei_to_gwei_round_up(total_assets),
+        missing=Gwei(int(Web3.from_wei(missing_assets, 'gwei'))),
+        total=Gwei(int(Web3.from_wei(total_assets, 'gwei'))),
     )
 
 
@@ -172,8 +172,3 @@ def _calculate_validators_exits_amount(
             total_exiting_amount += val.balance
 
     return Web3.to_wei(total_exiting_amount, 'gwei')
-
-
-def _wei_to_gwei_round_up(amount: Wei) -> Gwei:
-    # Round up so wei-level dust below 1 gwei is never truncated away.
-    return Gwei(-(-amount // 10**9))
