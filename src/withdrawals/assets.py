@@ -84,7 +84,7 @@ async def get_queued_assets(
     )
     # Total assets still in the queue after the simulated harvest: the whole
     # share-denominated base that keeps accruing rewards, see calculate_withdrawal_buffer.
-    # Skipped when there is no shortfall, since the buffer it feeds is never used either.
+    # Skipped when the shortfall is zero: the buffer it feeds is not used then.
     total_assets = Wei(0)
     if missing_assets > 0:
         total_assets = await validators_checker_contract.get_exit_queue_missing_assets(

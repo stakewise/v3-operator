@@ -1828,14 +1828,10 @@ async def test_process_submits_tiny_shortfall_at_default_threshold(data_dir, res
 async def test_process_skips_shortfall_below_min_withdrawal_amount_threshold(
     data_dir, reset_app_state
 ):
-    """A shortfall below the configured min-withdrawal-amount-gwei threshold is not
+    """A shortfall below the configured MIN_WITHDRAWAL_AMOUNT_GWEI threshold is not
     submitted for withdrawal.
     """
-    settings.set(
-        vault=None,
-        vault_dir=data_dir,
-        network=HOODI,
-    )
+    settings.set(vault=None, vault_dir=data_dir, network=HOODI)
     chain_head = create_chain_head(epoch=500)
     protocol_config = mock.MagicMock(validator_min_active_epochs=10)
     validator = create_consensus_validator(
@@ -1881,14 +1877,10 @@ async def test_process_skips_shortfall_below_min_withdrawal_amount_threshold(
 async def test_process_submits_shortfall_at_min_withdrawal_amount_threshold(
     data_dir, reset_app_state
 ):
-    """A shortfall at least as large as the configured min-withdrawal-amount-gwei
+    """A shortfall at least as large as the configured MIN_WITHDRAWAL_AMOUNT_GWEI
     threshold is submitted for withdrawal.
     """
-    settings.set(
-        vault=None,
-        vault_dir=data_dir,
-        network=HOODI,
-    )
+    settings.set(vault=None, vault_dir=data_dir, network=HOODI)
     chain_head = create_chain_head(epoch=500)
     protocol_config = mock.MagicMock(validator_min_active_epochs=10)
     validator = create_consensus_validator(

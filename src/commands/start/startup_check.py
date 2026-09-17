@@ -41,15 +41,12 @@ logger = logging.getLogger(__name__)
 async def startup_checks() -> None:
     validate_settings()
 
-    if (
-        MIN_WITHDRAWAL_AMOUNT_GWEI < 1
-        or MIN_WITHDRAWAL_AMOUNT_GWEI > MAX_MIN_WITHDRAWAL_AMOUNT_GWEI
-    ):
+    if not 1 <= MIN_WITHDRAWAL_AMOUNT_GWEI <= MAX_MIN_WITHDRAWAL_AMOUNT_GWEI:
         raise ValueError(
-            'MIN_WITHDRAWAL_AMOUNT_GWEI setting should be between 1 and '
-            f'{MAX_MIN_WITHDRAWAL_AMOUNT_GWEI} Gwei: above that the operator would skip exit '
-            'queue shortfalls the oracle already treats as exit-worthy and cover with a full '
-            'validator exit'
+            f'MIN_WITHDRAWAL_AMOUNT_GWEI setting should be between 1 and '
+            f'{MAX_MIN_WITHDRAWAL_AMOUNT_GWEI} Gwei. Above {MAX_MIN_WITHDRAWAL_AMOUNT_GWEI} Gwei '
+            'the operator would skip exit queue shortfalls that the oracle covers with a full '
+            'validator exit.'
         )
 
     logger.info('Checking for newer operator version...')

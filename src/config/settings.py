@@ -595,7 +595,7 @@ WITHDRAWAL_BUFFER_SAFETY_FACTOR = 2
 
 # Mirrors the oracle's MISSING_ASSETS_THRESHOLD in v3-oracle src/exits/constants.py: the
 # oracle exits validators once the exit queue shortfall reaches it, so the operator must
-# serve any shortfall at or above it with a partial withdrawal.
+# not ignore any shortfall at or above it.
 MAX_MIN_WITHDRAWAL_AMOUNT_GWEI = Gwei(10_000_000)  # 0.01 ETH
 MIN_WITHDRAWAL_AMOUNT_GWEI: Gwei = Gwei(
     decouple_config(
