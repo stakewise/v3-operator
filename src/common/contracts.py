@@ -480,6 +480,9 @@ class KeeperContract(ContractWrapper, ErrorMixin):
             block_identifier=block_number
         )
 
+    async def rewards_delay(self, block_number: BlockNumber | None = None) -> int:
+        return await self.contract.functions.rewardsDelay().call(block_identifier=block_number)
+
 
 class OsTokenVaultControllerContract(ContractWrapper):
     abi_path = 'abi/IOsTokenVaultController.json'
@@ -490,6 +493,11 @@ class OsTokenVaultControllerContract(ContractWrapper):
 
     async def total_shares(self, block_number: BlockNumber | None = None) -> Wei:
         return await self.contract.functions.totalShares().call(block_identifier=block_number)
+
+    async def avg_reward_per_second(self, block_number: BlockNumber | None = None) -> int:
+        return await self.contract.functions.avgRewardPerSecond().call(
+            block_identifier=block_number
+        )
 
 
 class RewardSplitterContract(ContractWrapper, ErrorMixin):
