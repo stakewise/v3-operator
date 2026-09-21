@@ -7,7 +7,7 @@ from web3 import Web3
 from web3.types import Wei
 
 from src.common.contracts import VaultContract, multicall_contract
-from src.config.settings import OS_TOKEN_REDEEMER_CHUNK_SIZE, settings
+from src.config.settings import OS_TOKEN_REDEEMER_CHUNK_SIZE
 from src.redemptions.contracts import os_token_redeemer_contract
 from src.redemptions.fetch_positions import (
     ZERO_MERKLE_ROOT,
@@ -68,7 +68,7 @@ class TestProcessedSharesCacheIsValidOn:
             result = await cache.is_valid_on(nonce=5, block_number=BlockNumber(100))
         assert result is False
 
-    async def test_no_checkpoint_uses_genesis_block(self, fake_settings):
+    async def test_no_checkpoint_returns_false(self):
         cache = ProcessedSharesCache()
         cache.nonce = 5
         cache.checkpoint_block = None
@@ -78,9 +78,8 @@ class TestProcessedSharesCacheIsValidOn:
             new=mock_events,
         ):
             result = await cache.is_valid_on(nonce=5, block_number=BlockNumber(100))
-        assert result is True
-        call_kwargs = mock_events.call_args.kwargs
-        assert call_kwargs['from_block'] == settings.network_config.OS_TOKEN_REDEEMER_GENESIS_BLOCK
+        assert result is False
+        mock_events.assert_not_called()
 
     async def test_checkpoint_set_uses_next_block(self):
         cache = ProcessedSharesCache()

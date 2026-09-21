@@ -13,7 +13,7 @@ from web3.types import Wei
 from src.common.clients import ipfs_fetch_client
 from src.common.contracts import VaultContract, multicall_contract
 from src.common.typings import Singleton
-from src.config.settings import OS_TOKEN_REDEEMER_CHUNK_SIZE, settings
+from src.config.settings import OS_TOKEN_REDEEMER_CHUNK_SIZE
 from src.redemptions.contracts import os_token_redeemer_contract
 from src.redemptions.typings import OsTokenPosition
 
@@ -52,19 +52,18 @@ class ProcessedSharesCache(metaclass=Singleton):
     async def is_valid_on(self, nonce: int, block_number: BlockNumber) -> bool:
         if self.nonce != nonce:
             return False
+        if self.checkpoint_block is None:
+            # Cache was never populated at a block, so there is nothing to validate.
+            # The caller rebuilds it from `leafToProcessedShares`.
+            return False
         if self.checkpoint_block == block_number:
             return True
-        if self.checkpoint_block is not None and self.checkpoint_block > block_number:
+        if self.checkpoint_block > block_number:
             # Probably logic error if cache checkpoint block is in the future compared
             # to the given block number
             return False
-        from_block = (
-            BlockNumber(self.checkpoint_block + 1)
-            if self.checkpoint_block is not None
-            else settings.network_config.OS_TOKEN_REDEEMER_GENESIS_BLOCK
-        )
         events = await os_token_redeemer_contract.get_os_token_positions_redeemed_events(
-            from_block=from_block, to_block=block_number
+            from_block=BlockNumber(self.checkpoint_block + 1), to_block=block_number
         )
         return not events
 
