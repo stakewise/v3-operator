@@ -27,6 +27,7 @@ from src.common.startup_check import (
 )
 from src.common.wallet import wallet
 from src.config.settings import (
+    MAX_WITHDRAWAL_BUFFER_GWEI,
     MIN_WITHDRAWAL_BUFFER_GWEI,
     MISSING_ASSETS_THRESHOLD_GWEI,
     ORACLE_MISSING_ASSETS_THRESHOLD_GWEI,
@@ -50,8 +51,11 @@ async def startup_checks() -> None:
             'validator exit.'
         )
 
-    if MIN_WITHDRAWAL_BUFFER_GWEI < 0:
-        raise ValueError('MIN_WITHDRAWAL_BUFFER_GWEI setting should not be negative.')
+    if not 0 <= MIN_WITHDRAWAL_BUFFER_GWEI <= MAX_WITHDRAWAL_BUFFER_GWEI:
+        raise ValueError(
+            f'MIN_WITHDRAWAL_BUFFER_GWEI setting should be between 0 and '
+            f'{MAX_WITHDRAWAL_BUFFER_GWEI} Gwei.'
+        )
 
     logger.info('Checking for newer operator version...')
     await check_operator_version()

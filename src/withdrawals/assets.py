@@ -14,6 +14,7 @@ from src.common.contracts import VaultContract, validators_checker_contract
 from src.common.harvest import get_harvest_params
 from src.common.typings import ExitQueueMissingAssetsParams, PendingPartialWithdrawal
 from src.config.settings import (
+    MAX_WITHDRAWAL_BUFFER_GWEI,
     MIN_WITHDRAWAL_BUFFER_GWEI,
     WITHDRAWAL_BUFFER_BPS,
     settings,
@@ -108,9 +109,11 @@ def calculate_withdrawal_buffer(total_queue_assets: Gwei) -> Gwei:
     (about 27h for a partial withdrawal, up to ~11 days for a full exit), so requesting the
     exact shortfall leaves a new tiny one after every reward update. 0.1% of the queue covers
     about 18 days of rewards at 2% APR; the floor covers queues too small for the ratio.
+    The cap keeps the buffer from growing with very large queues, the excess would only be
+    re-staked.
     """
     buffer = max(total_queue_assets * WITHDRAWAL_BUFFER_BPS // 10_000, MIN_WITHDRAWAL_BUFFER_GWEI)
-    return Gwei(buffer)
+    return Gwei(min(buffer, MAX_WITHDRAWAL_BUFFER_GWEI))
 
 
 def _calculate_validators_exits_amount(

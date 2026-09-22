@@ -177,6 +177,19 @@ class TestCalculateWithdrawalBuffer:
             result = calculate_withdrawal_buffer(Gwei(5_000_000))
         assert result == 5_000
 
+    def test_large_queue_capped(self):
+        result = calculate_withdrawal_buffer(Gwei(2600 * 10**9))
+        assert result == 1_000_000_000
+
+    def test_exactly_at_cap(self):
+        result = calculate_withdrawal_buffer(Gwei(1000 * 10**9))
+        assert result == 1_000_000_000
+
+    def test_floor_above_cap_is_capped(self):
+        with mock.patch('src.withdrawals.assets.MIN_WITHDRAWAL_BUFFER_GWEI', Gwei(2_000_000_000)):
+            result = calculate_withdrawal_buffer(Gwei(0))
+        assert result == 1_000_000_000
+
 
 @contextlib.contextmanager
 def _patch(

@@ -591,6 +591,8 @@ WITHDRAWALS_INTERVAL: int = decouple_config(
 )
 # Withdrawal buffer is 0.1% of the exit queue, see calculate_withdrawal_buffer.
 WITHDRAWAL_BUFFER_BPS = 10
+# Excess buffer only lands as withdrawable assets and is re-staked, so cap it at 1 ETH.
+MAX_WITHDRAWAL_BUFFER_GWEI = Gwei(1_000_000_000)  # 1 ETH
 
 # The oracle exits validators once the shortfall reaches this value (MISSING_ASSETS_THRESHOLD
 # in v3-oracle), so the operator must not skip shortfalls at or above it.
@@ -616,7 +618,8 @@ MIN_WITHDRAWAL_BUFFER_GWEI: Gwei = Gwei(
         group='Withdrawals',
         description=(
             'Minimum buffer in Gwei added on top of the exit queue shortfall in a '
-            'validator withdrawal request.'
+            'validator withdrawal request. Must not exceed 1000000000 Gwei '
+            '(1 ETH, or 1 mGNO on Gnosis).'
         ),
     )
 )
