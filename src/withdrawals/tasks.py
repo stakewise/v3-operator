@@ -22,7 +22,7 @@ from src.common.withdrawals import (
     get_withdrawals_count,
 )
 from src.config.settings import (
-    MIN_WITHDRAWAL_AMOUNT_GWEI,
+    MISSING_ASSETS_THRESHOLD_GWEI,
     WITHDRAWALS_INTERVAL,
     settings,
 )
@@ -33,7 +33,7 @@ from src.validators.exceptions import EmptyRelayerResponseException
 from src.validators.oracles import poll_active_exits
 from src.validators.relayer import RelayerClient
 from src.validators.typings import ConsensusValidator, ValidatorConsolidationData
-from src.withdrawals.assets import get_queued_assets
+from src.withdrawals.assets import calculate_withdrawal_buffer, get_queued_assets
 from src.withdrawals.execution import submit_withdraw_validators
 
 logger = logging.getLogger(__name__)
@@ -114,7 +114,7 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
         )
         redemption_assets = await get_redemption_assets(chain_head=chain_head)
 
-        queued_assets = await get_queued_assets(
+        exit_queue = await get_queued_assets(
             consensus_validators=consensus_validators,
             oracle_exiting_validators=oracle_exiting_validators,
             pending_partial_withdrawals=pending_partial_withdrawals,
@@ -122,9 +122,9 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
             redemption_assets=redemption_assets,
         )
 
-        metrics.queued_assets.labels(network=settings.network).set(int(queued_assets))
+        metrics.queued_assets.labels(network=settings.network).set(int(exit_queue.missing))
 
-        if queued_assets < MIN_WITHDRAWAL_AMOUNT_GWEI:
+        if exit_queue.missing < MISSING_ASSETS_THRESHOLD_GWEI:
             return
 
         if await _is_pending_partial_withdrawals_queue_full(chain_head):
@@ -133,6 +133,14 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
                 'the pending partial withdrawals queue has exceeded its limit.'
             )
             return
+
+        buffer = calculate_withdrawal_buffer(exit_queue.total)
+        logger.debug(
+            'Exit queue shortfall is %s Gwei, padding the withdrawal request with a buffer '
+            'of up to %s Gwei to cover rewards accrued while it is pending',
+            exit_queue.missing,
+            buffer,
+        )
 
         # The pending deposit queue is fetched only once it is clear that a withdrawal is
         # needed. Validators that are not in the beacon state yet can't be withdrawn from,
@@ -144,16 +152,17 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
         )
         withdrawals = await _get_withdrawals(
             chain_head=chain_head,
-            queued_assets=queued_assets,
+            queued_assets=exit_queue.missing,
             consensus_validators=consensus_validators,
             pending_partial_withdrawals=pending_partial_withdrawals,
             validator_min_active_epochs=protocol_config.validator_min_active_epochs,
             oracle_exit_indexes={val.index for val in oracle_exiting_validators},
+            buffer=buffer,
         )
         if not withdrawals:
             logger.info(
                 'No eligible validators found for withdrawal of %s Gwei',
-                queued_assets,
+                exit_queue.missing,
             )
             return
 
@@ -190,13 +199,14 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
 
         app_state.partial_withdrawal_block = chain_head.block_number
 
-        withdrawn_assets = Web3.to_wei(queued_assets, 'gwei')
+        withdrawn_assets = Web3.to_wei(exit_queue.missing, 'gwei')
         if settings.network in GNO_NETWORKS:
             # apply mGNO -> GNO exchange rate
             withdrawn_assets = convert_to_gno(withdrawn_assets)
 
         logger.info(
-            'Successfully withdrew %s %s for validators with public key(s) %s, tx hash: %s',
+            'Successfully submitted withdrawal request(s) covering %s %s of exit queue '
+            'shortfall for validators with public key(s) %s, tx hash: %s',
             round_down(Web3.from_wei(withdrawn_assets, 'ether'), 2),
             settings.network_config.VAULT_BALANCE_SYMBOL,
             ', '.join(withdrawals.keys()),
@@ -221,6 +231,7 @@ async def _get_withdrawals(
     pending_partial_withdrawals: list[PendingPartialWithdrawal],
     validator_min_active_epochs: int,
     oracle_exit_indexes: set[int],
+    buffer: Gwei,
 ) -> dict[HexStr, Gwei]:
     if queued_assets <= 0:
         return {}
@@ -256,12 +267,12 @@ async def _get_withdrawals(
         if partial_withdrawals < validator.withdrawal_capacity:
             partial_capacity += validator.withdrawal_capacity - partial_withdrawals
 
-    # If enough partials, use only them
+    # If enough partials, use only them. The buffer does not affect this decision.
     if partial_capacity >= queued_assets or settings.disable_full_withdrawals:
         return _get_partial_withdrawals(
             partial_validators=partial_validators,
             validator_partial_withdrawals=validator_partial_withdrawals,
-            queued_assets=queued_assets,
+            queued_assets=Gwei(queued_assets + buffer),
         )
 
     # Otherwise, add full withdrawals as needed
@@ -284,6 +295,9 @@ async def _get_withdrawals(
 
         withdrawals[validator.public_key] = Gwei(0)  # full withdrawal
         queued_assets = Gwei(max(0, queued_assets - validator.balance))
+        if queued_assets <= 0:
+            # The full exit covers the shortfall, no buffer-only partials needed.
+            break
 
         # Remove exited validator from partials
         if validator.index in partial_validator_indexes:
@@ -294,7 +308,7 @@ async def _get_withdrawals(
                     p for p in partial_validators if p.public_key not in withdrawals
                 ],
                 validator_partial_withdrawals=validator_partial_withdrawals,
-                queued_assets=queued_assets,
+                queued_assets=Gwei(queued_assets + buffer),
             )
             withdrawals.update(partials)
             queued_assets = Gwei(max(0, queued_assets - sum(partials.values())))

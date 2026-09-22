@@ -26,7 +26,14 @@ from src.common.startup_check import (
     wait_for_keystores_dir,
 )
 from src.common.wallet import wallet
-from src.config.settings import WITHDRAWALS_INTERVAL, settings
+from src.config.settings import (
+    MAX_WITHDRAWAL_BUFFER_GWEI,
+    MIN_WITHDRAWAL_BUFFER_GWEI,
+    MISSING_ASSETS_THRESHOLD_GWEI,
+    ORACLE_MISSING_ASSETS_THRESHOLD_GWEI,
+    WITHDRAWALS_INTERVAL,
+    settings,
+)
 from src.validators.keystores.local import LocalKeystore
 
 logger = logging.getLogger(__name__)
@@ -35,6 +42,20 @@ logger = logging.getLogger(__name__)
 # pylint: disable-next=too-many-statements
 async def startup_checks() -> None:
     validate_settings()
+
+    if not 1 <= MISSING_ASSETS_THRESHOLD_GWEI <= ORACLE_MISSING_ASSETS_THRESHOLD_GWEI:
+        raise ValueError(
+            f'MISSING_ASSETS_THRESHOLD_GWEI setting should be between 1 and '
+            f'{ORACLE_MISSING_ASSETS_THRESHOLD_GWEI} Gwei. Above the oracle threshold the '
+            'operator would skip exit queue shortfalls that the oracle covers with a full '
+            'validator exit.'
+        )
+
+    if not 0 <= MIN_WITHDRAWAL_BUFFER_GWEI <= MAX_WITHDRAWAL_BUFFER_GWEI:
+        raise ValueError(
+            f'MIN_WITHDRAWAL_BUFFER_GWEI setting should be between 0 and '
+            f'{MAX_WITHDRAWAL_BUFFER_GWEI} Gwei.'
+        )
 
     logger.info('Checking for newer operator version...')
     await check_operator_version()

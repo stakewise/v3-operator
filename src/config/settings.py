@@ -589,7 +589,40 @@ WITHDRAWALS_INTERVAL: int = decouple_config(
     group='Withdrawals',
     description='Minimum time between withdrawal processing runs, in seconds.',
 )
-MIN_WITHDRAWAL_AMOUNT_GWEI: Gwei = Gwei(1)
+# Withdrawal buffer is 0.1% of the exit queue, see calculate_withdrawal_buffer.
+WITHDRAWAL_BUFFER_BPS = 10
+# Excess buffer only lands as withdrawable assets and is re-staked, so cap it at 1 ETH.
+MAX_WITHDRAWAL_BUFFER_GWEI = Gwei(1_000_000_000)  # 1 ETH
+
+# The oracle exits validators once the shortfall reaches this value (MISSING_ASSETS_THRESHOLD
+# in v3-oracle), so the operator must not skip shortfalls at or above it.
+ORACLE_MISSING_ASSETS_THRESHOLD_GWEI = Gwei(10_000_000)  # 0.01 ETH
+MISSING_ASSETS_THRESHOLD_GWEI: Gwei = Gwei(
+    decouple_config(
+        'MISSING_ASSETS_THRESHOLD_GWEI',
+        default=1,
+        cast=int,
+        group='Withdrawals',
+        description=(
+            'Minimum exit queue shortfall in Gwei that triggers a validator withdrawal. '
+            'Must not exceed 10000000 Gwei (0.01 ETH, or 0.01 mGNO on Gnosis), the oracle '
+            'threshold for exiting validators.'
+        ),
+    )
+)
+MIN_WITHDRAWAL_BUFFER_GWEI: Gwei = Gwei(
+    decouple_config(
+        'MIN_WITHDRAWAL_BUFFER_GWEI',
+        default=10_000,
+        cast=int,
+        group='Withdrawals',
+        description=(
+            'Minimum buffer in Gwei added on top of the exit queue shortfall in a '
+            'validator withdrawal request. Must not exceed 1000000000 Gwei '
+            '(1 ETH, or 1 mGNO on Gnosis).'
+        ),
+    )
+)
 
 # telemetry
 TELEMETRY_INTERVAL: int = decouple_config(

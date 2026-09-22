@@ -14,6 +14,7 @@ from eth_utils import (
     function_signature_to_4byte_selector,
     remove_0x_prefix,
 )
+from sw_utils import OsTokenConverter
 from web3 import AsyncWeb3, Web3
 from web3.contract import AsyncContract
 from web3.contract.async_contract import (
@@ -346,6 +347,32 @@ class VaultContract(ContractWrapper, VaultStateMixin, ErrorMixin):
 
     async def get_exit_queue_index(self, position_ticket: int) -> int:
         return await self.contract.functions.getExitQueueIndex(position_ticket).call()
+
+    async def get_queued_exit_assets(
+        self, harvest_params: HarvestParams | None, block_number: BlockNumber
+    ) -> Wei:
+        """
+        Value of the queued exit shares, the part of the exit queue that keeps accruing rewards.
+        Legacy asset-denominated exits are fixed and excluded.
+        """
+        calls: list[HexStr] = []
+        if harvest_params is not None:
+            calls.append(self.get_update_state_call(harvest_params))
+        calls.append(self.encode_abi(fn_name='getExitQueueData', args=[]))
+        calls.append(self.encode_abi(fn_name='totalAssets', args=[]))
+        calls.append(self.encode_abi(fn_name='totalShares', args=[]))
+
+        multicall_response = await self.contract.functions.multicall(calls).call(
+            block_identifier=block_number
+        )
+        queued_shares, *_ = eth_abi.decode(
+            ['uint128', 'uint128', 'uint128', 'uint128', 'uint256'], multicall_response[-3]
+        )
+        converter = OsTokenConverter(
+            total_assets=Wei(Web3.to_int(multicall_response[-2])),
+            total_shares=Wei(Web3.to_int(multicall_response[-1])),
+        )
+        return converter.to_assets(Wei(queued_shares))
 
     async def get_validator_withdrawal_submitted_events(
         self,
