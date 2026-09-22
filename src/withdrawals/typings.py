@@ -15,5 +15,5 @@ class WithdrawalEvent:
 class ExitQueueAssets:
     # Shortfall to withdraw now
     missing: Gwei
-    # Whole exit queue value, the base for the withdrawal buffer
+    # Value of the queued exit shares, the base for the withdrawal buffer
     total: Gwei
