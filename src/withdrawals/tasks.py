@@ -22,7 +22,7 @@ from src.common.withdrawals import (
     get_withdrawals_count,
 )
 from src.config.settings import (
-    MIN_WITHDRAWAL_AMOUNT_GWEI,
+    MISSING_ASSETS_THRESHOLD_GWEI,
     WITHDRAWALS_INTERVAL,
     settings,
 )
@@ -124,7 +124,7 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
 
         metrics.queued_assets.labels(network=settings.network).set(int(exit_queue.missing))
 
-        if exit_queue.missing < MIN_WITHDRAWAL_AMOUNT_GWEI:
+        if exit_queue.missing < MISSING_ASSETS_THRESHOLD_GWEI:
             return
 
         if await _is_pending_partial_withdrawals_queue_full(chain_head):

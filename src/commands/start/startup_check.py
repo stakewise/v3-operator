@@ -27,9 +27,9 @@ from src.common.startup_check import (
 )
 from src.common.wallet import wallet
 from src.config.settings import (
-    MAX_MIN_WITHDRAWAL_AMOUNT_GWEI,
-    MIN_WITHDRAWAL_AMOUNT_GWEI,
     MIN_WITHDRAWAL_BUFFER_GWEI,
+    MISSING_ASSETS_THRESHOLD_GWEI,
+    ORACLE_MISSING_ASSETS_THRESHOLD_GWEI,
     WITHDRAWALS_INTERVAL,
     settings,
 )
@@ -42,11 +42,11 @@ logger = logging.getLogger(__name__)
 async def startup_checks() -> None:
     validate_settings()
 
-    if not 1 <= MIN_WITHDRAWAL_AMOUNT_GWEI <= MAX_MIN_WITHDRAWAL_AMOUNT_GWEI:
+    if not 1 <= MISSING_ASSETS_THRESHOLD_GWEI <= ORACLE_MISSING_ASSETS_THRESHOLD_GWEI:
         raise ValueError(
-            f'MIN_WITHDRAWAL_AMOUNT_GWEI setting should be between 1 and '
-            f'{MAX_MIN_WITHDRAWAL_AMOUNT_GWEI} Gwei. Above {MAX_MIN_WITHDRAWAL_AMOUNT_GWEI} Gwei '
-            'the operator would skip exit queue shortfalls that the oracle covers with a full '
+            f'MISSING_ASSETS_THRESHOLD_GWEI setting should be between 1 and '
+            f'{ORACLE_MISSING_ASSETS_THRESHOLD_GWEI} Gwei. Above the oracle threshold the '
+            'operator would skip exit queue shortfalls that the oracle covers with a full '
             'validator exit.'
         )
 

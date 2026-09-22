@@ -15,7 +15,7 @@ from src.common.harvest import get_harvest_params
 from src.common.typings import ExitQueueMissingAssetsParams, PendingPartialWithdrawal
 from src.config.settings import (
     MIN_WITHDRAWAL_BUFFER_GWEI,
-    WITHDRAWAL_BUFFER_RATIO_DIVISOR,
+    WITHDRAWAL_BUFFER_BPS,
     settings,
 )
 from src.validators.typings import ConsensusValidator, ValidatorConsolidationData
@@ -109,7 +109,7 @@ def calculate_withdrawal_buffer(total_queue_assets: Gwei) -> Gwei:
     exact shortfall leaves a new tiny one after every reward update. 0.1% of the queue covers
     about 18 days of rewards at 2% APR; the floor covers queues too small for the ratio.
     """
-    buffer = max(total_queue_assets // WITHDRAWAL_BUFFER_RATIO_DIVISOR, MIN_WITHDRAWAL_BUFFER_GWEI)
+    buffer = max(total_queue_assets * WITHDRAWAL_BUFFER_BPS // 10_000, MIN_WITHDRAWAL_BUFFER_GWEI)
     return Gwei(buffer)
 
 

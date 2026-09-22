@@ -589,15 +589,15 @@ WITHDRAWALS_INTERVAL: int = decouple_config(
     group='Withdrawals',
     description='Minimum time between withdrawal processing runs, in seconds.',
 )
-# Withdrawal buffer is 1/1000 (0.1%) of the exit queue, see calculate_withdrawal_buffer.
-WITHDRAWAL_BUFFER_RATIO_DIVISOR = 1000
+# Withdrawal buffer is 0.1% of the exit queue, see calculate_withdrawal_buffer.
+WITHDRAWAL_BUFFER_BPS = 10
 
 # The oracle exits validators once the shortfall reaches this value (MISSING_ASSETS_THRESHOLD
 # in v3-oracle), so the operator must not skip shortfalls at or above it.
-MAX_MIN_WITHDRAWAL_AMOUNT_GWEI = Gwei(10_000_000)  # 0.01 ETH
-MIN_WITHDRAWAL_AMOUNT_GWEI: Gwei = Gwei(
+ORACLE_MISSING_ASSETS_THRESHOLD_GWEI = Gwei(10_000_000)  # 0.01 ETH
+MISSING_ASSETS_THRESHOLD_GWEI: Gwei = Gwei(
     decouple_config(
-        'MIN_WITHDRAWAL_AMOUNT_GWEI',
+        'MISSING_ASSETS_THRESHOLD_GWEI',
         default=1,
         cast=int,
         group='Withdrawals',

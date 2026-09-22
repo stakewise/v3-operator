@@ -1803,9 +1803,7 @@ async def test_process_submits_tiny_shortfall_at_default_threshold(data_dir, res
     assert mocked_submit.call_args.kwargs['withdrawals'] == {'0x1': Gwei(10_010)}
 
 
-async def test_process_skips_shortfall_below_min_withdrawal_amount_threshold(
-    data_dir, reset_app_state
-):
+async def test_process_skips_shortfall_below_missing_assets_threshold(data_dir, reset_app_state):
     settings.set(vault=None, vault_dir=data_dir, network=HOODI)
     chain_head = create_chain_head(epoch=500)
     protocol_config = mock.MagicMock(validator_min_active_epochs=10)
@@ -1820,7 +1818,7 @@ async def test_process_skips_shortfall_below_min_withdrawal_amount_threshold(
     exit_queue = ExitQueueAssets(missing=missing, total=missing)
 
     with mock.patch(
-        'src.withdrawals.tasks.MIN_WITHDRAWAL_AMOUNT_GWEI', Gwei(1_000_000)
+        'src.withdrawals.tasks.MISSING_ASSETS_THRESHOLD_GWEI', Gwei(1_000_000)
     ), mock.patch(
         'src.withdrawals.tasks.get_chain_latest_head', return_value=chain_head
     ), mock.patch(
@@ -1849,9 +1847,7 @@ async def test_process_skips_shortfall_below_min_withdrawal_amount_threshold(
 
 
 # pylint: disable-next=too-many-locals
-async def test_process_submits_shortfall_at_min_withdrawal_amount_threshold(
-    data_dir, reset_app_state
-):
+async def test_process_submits_shortfall_at_missing_assets_threshold(data_dir, reset_app_state):
     settings.set(vault=None, vault_dir=data_dir, network=HOODI)
     chain_head = create_chain_head(epoch=500)
     protocol_config = mock.MagicMock(validator_min_active_epochs=10)
@@ -1866,7 +1862,7 @@ async def test_process_submits_shortfall_at_min_withdrawal_amount_threshold(
     exit_queue = ExitQueueAssets(missing=missing, total=missing)
 
     with mock.patch(
-        'src.withdrawals.tasks.MIN_WITHDRAWAL_AMOUNT_GWEI', Gwei(1_000_000)
+        'src.withdrawals.tasks.MISSING_ASSETS_THRESHOLD_GWEI', Gwei(1_000_000)
     ), mock.patch(
         'src.withdrawals.tasks.get_chain_latest_head', return_value=chain_head
     ), mock.patch(
