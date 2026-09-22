@@ -42,19 +42,6 @@ class ExitQueueMissingAssetsParams:
     exit_queue_cumulative_ticket: int
 
 
-@dataclass(frozen=True)
-class ExitQueueState:
-    """Vault exit queue state from getExitQueueData plus totalAssets and totalShares."""
-
-    queued_shares: int
-    unclaimed_assets: int
-    total_exiting_tickets: int
-    total_exiting_assets: int
-    total_tickets: int
-    total_assets: int
-    total_shares: int
-
-
 @dataclass
 class PendingConsolidation:
     source_index: int

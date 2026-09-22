@@ -14,6 +14,7 @@ from eth_utils import (
     function_signature_to_4byte_selector,
     remove_0x_prefix,
 )
+from sw_utils import OsTokenConverter
 from web3 import AsyncWeb3, Web3
 from web3.contract import AsyncContract
 from web3.contract.async_contract import (
@@ -27,7 +28,6 @@ from src.common.clients import execution_client as default_execution_client
 from src.common.transaction import transact_checked
 from src.common.typings import (
     ExitQueueMissingAssetsParams,
-    ExitQueueState,
     HarvestParams,
     RewardVoteInfo,
 )
@@ -348,9 +348,13 @@ class VaultContract(ContractWrapper, VaultStateMixin, ErrorMixin):
     async def get_exit_queue_index(self, position_ticket: int) -> int:
         return await self.contract.functions.getExitQueueIndex(position_ticket).call()
 
-    async def get_exit_queue_state(
+    async def get_queued_exit_assets(
         self, harvest_params: HarvestParams | None, block_number: BlockNumber
-    ) -> ExitQueueState:
+    ) -> Wei:
+        """
+        Value of the queued exit shares, the part of the exit queue that keeps accruing rewards.
+        Legacy asset-denominated exits are fixed and excluded.
+        """
         calls: list[HexStr] = []
         if harvest_params is not None:
             calls.append(self.get_update_state_call(harvest_params))
@@ -361,24 +365,14 @@ class VaultContract(ContractWrapper, VaultStateMixin, ErrorMixin):
         multicall_response = await self.contract.functions.multicall(calls).call(
             block_identifier=block_number
         )
-        (
-            queued_shares,
-            unclaimed_assets,
-            total_exiting_tickets,
-            total_exiting_assets,
-            total_tickets,
-        ) = eth_abi.decode(
+        queued_shares, *_ = eth_abi.decode(
             ['uint128', 'uint128', 'uint128', 'uint128', 'uint256'], multicall_response[-3]
         )
-        return ExitQueueState(
-            queued_shares=queued_shares,
-            unclaimed_assets=unclaimed_assets,
-            total_exiting_tickets=total_exiting_tickets,
-            total_exiting_assets=total_exiting_assets,
-            total_tickets=total_tickets,
-            total_assets=Web3.to_int(multicall_response[-2]),
-            total_shares=Web3.to_int(multicall_response[-1]),
+        converter = OsTokenConverter(
+            total_assets=Wei(Web3.to_int(multicall_response[-2])),
+            total_shares=Wei(Web3.to_int(multicall_response[-1])),
         )
+        return converter.to_assets(Wei(queued_shares))
 
     async def get_validator_withdrawal_submitted_events(
         self,
