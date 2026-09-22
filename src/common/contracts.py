@@ -35,6 +35,7 @@ from src.config.networks import ZERO_CHECKSUM_ADDRESS
 from src.config.settings import (
     EVENTS_CONCURRENCY_CHUNK,
     EVENTS_CONCURRENCY_LIMIT,
+    SECONDS_PER_MONTH,
     settings,
 )
 from src.validators.typings import V2ValidatorEventData
@@ -468,9 +469,18 @@ class KeeperContract(ContractWrapper, ErrorMixin):
     ) -> RewardVoteInfo | None:
         """Fetches the last rewards update."""
         to_block = block_number or await self.execution_client.eth.get_block_number()
+        # Rewards are updated regularly, so looking one month back is enough
+        # and avoids scanning all the way to the keeper genesis block.
+        approx_blocks_per_month = SECONDS_PER_MONTH // settings.network_config.SECONDS_PER_BLOCK
+        from_block = BlockNumber(
+            max(
+                settings.network_config.KEEPER_GENESIS_BLOCK,
+                to_block - approx_blocks_per_month,
+            )
+        )
         last_event = await self._get_last_event(
             self.events.RewardsUpdated,  # type: ignore
-            from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
+            from_block=from_block,
             to_block=to_block,
         )
         if not last_event:

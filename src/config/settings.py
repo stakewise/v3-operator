@@ -670,6 +670,8 @@ MULTICALL_CHUNK_SIZE: int = decouple_config(
     description='Maximum number of updateState calls batched into a single multicall transaction.',
 )
 
+SECONDS_PER_MONTH: int = 2628000
+
 # Backoff retries
 DEFAULT_RETRY_TIME = 60
 
