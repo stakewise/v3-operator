@@ -10,9 +10,13 @@ from sw_utils import (
 from web3 import Web3
 from web3.types import Gwei, Wei
 
-from src.common.contracts import validators_checker_contract
+from src.common.contracts import VaultContract, validators_checker_contract
 from src.common.harvest import get_harvest_params
-from src.common.typings import ExitQueueMissingAssetsParams, PendingPartialWithdrawal
+from src.common.typings import (
+    ExitQueueMissingAssetsParams,
+    ExitQueueState,
+    PendingPartialWithdrawal,
+)
 from src.config.settings import (
     MIN_WITHDRAWAL_BUFFER_GWEI,
     WITHDRAWAL_BUFFER_RATIO_DIVISOR,
@@ -87,16 +91,10 @@ async def get_queued_assets(
     # Whole queue value for the withdrawal buffer. Not needed when nothing is missing.
     total_assets = Wei(0)
     if missing_assets > 0:
-        total_assets = await validators_checker_contract.get_exit_queue_missing_assets(
-            exit_queue_missing_assets_params=ExitQueueMissingAssetsParams(
-                vault=settings.vault,
-                withdrawing_assets=Wei(0),
-                redemption_assets=Wei(0),
-                exit_queue_cumulative_ticket=exit_queue_cumulative_ticket,
-            ),
-            harvest_params=harvest_params,
-            block_number=chain_head.block_number,
+        state = await VaultContract(settings.vault).get_exit_queue_state(
+            harvest_params, chain_head.block_number
         )
+        total_assets = _calculate_exit_queue_assets(state, exit_queue_cumulative_ticket)
 
     if settings.network in GNO_NETWORKS:
         # apply GNO -> mGNO exchange rate
@@ -146,3 +144,29 @@ def _calculate_validators_exits_amount(
             total_exiting_amount += val.balance
 
     return Web3.to_wei(total_exiting_amount, 'gwei')
+
+
+def _calculate_exit_queue_assets(state: ExitQueueState, exit_queue_cumulative_ticket: int) -> Wei:
+    """
+    Mirrors ``ValidatorsChecker.getExitQueueMissingAssets`` with ``redemptionAssets = 0`` and
+    without subtracting the vault's available balance: the withdrawal buffer must cover rewards
+    accruing on the whole queue, including the part the vault's own balance already covers.
+    """
+    total_tickets_to_cover = max(0, exit_queue_cumulative_ticket - state.total_tickets)
+
+    assets = 0
+    if state.total_exiting_tickets > 0:
+        legacy_tickets_to_cover = min(total_tickets_to_cover, state.total_exiting_tickets)
+        assets += (
+            legacy_tickets_to_cover * state.total_exiting_assets // state.total_exiting_tickets
+        )
+        total_tickets_to_cover -= legacy_tickets_to_cover
+
+    if total_tickets_to_cover > 0 and state.queued_shares > 0:
+        shares_to_cover = min(total_tickets_to_cover, state.queued_shares)
+        if state.total_shares == 0:
+            assets += shares_to_cover
+        else:
+            assets += shares_to_cover * state.total_assets // state.total_shares
+
+    return Wei(assets)

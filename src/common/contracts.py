@@ -27,6 +27,7 @@ from src.common.clients import execution_client as default_execution_client
 from src.common.transaction import transact_checked
 from src.common.typings import (
     ExitQueueMissingAssetsParams,
+    ExitQueueState,
     HarvestParams,
     RewardVoteInfo,
 )
@@ -346,6 +347,38 @@ class VaultContract(ContractWrapper, VaultStateMixin, ErrorMixin):
 
     async def get_exit_queue_index(self, position_ticket: int) -> int:
         return await self.contract.functions.getExitQueueIndex(position_ticket).call()
+
+    async def get_exit_queue_state(
+        self, harvest_params: HarvestParams | None, block_number: BlockNumber
+    ) -> ExitQueueState:
+        calls: list[HexStr] = []
+        if harvest_params is not None:
+            calls.append(self.get_update_state_call(harvest_params))
+        calls.append(self.encode_abi(fn_name='getExitQueueData', args=[]))
+        calls.append(self.encode_abi(fn_name='totalAssets', args=[]))
+        calls.append(self.encode_abi(fn_name='totalShares', args=[]))
+
+        multicall_response = await self.contract.functions.multicall(calls).call(
+            block_identifier=block_number
+        )
+        (
+            queued_shares,
+            unclaimed_assets,
+            total_exiting_tickets,
+            total_exiting_assets,
+            total_tickets,
+        ) = eth_abi.decode(
+            ['uint128', 'uint128', 'uint128', 'uint128', 'uint256'], multicall_response[-3]
+        )
+        return ExitQueueState(
+            queued_shares=queued_shares,
+            unclaimed_assets=unclaimed_assets,
+            total_exiting_tickets=total_exiting_tickets,
+            total_exiting_assets=total_exiting_assets,
+            total_tickets=total_tickets,
+            total_assets=Web3.to_int(multicall_response[-2]),
+            total_shares=Web3.to_int(multicall_response[-1]),
+        )
 
     async def get_validator_withdrawal_submitted_events(
         self,
