@@ -12,3 +12,14 @@ class NotEnoughOracleApprovalsError(ValueError):
         super().__init__(NOT_ENOUGH_ORACLE_APPROVALS)
         self.num_votes = num_votes
         self.threshold = threshold
+
+
+class ExecutionBehindConsensusError(RuntimeError):
+    def __init__(self, execution_block_number: int, consensus_block_number: int):
+        super().__init__(
+            f'The execution client has not imported the consensus head block yet: '
+            f'execution block {execution_block_number}, '
+            f'consensus block {consensus_block_number}'
+        )
+        self.execution_block_number = execution_block_number
+        self.consensus_block_number = consensus_block_number
