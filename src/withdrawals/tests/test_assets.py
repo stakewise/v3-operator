@@ -8,8 +8,6 @@ from web3.types import Gwei, Wei
 
 from src.common.tests.factories import create_chain_head
 from src.common.typings import PendingPartialWithdrawal
-from src.config.networks import GNOSIS, MAINNET, NETWORKS
-from src.config.settings import WITHDRAWAL_BUFFER_SAFETY_FACTOR
 from src.validators.tests.factories import create_consensus_validator
 from src.validators.typings import ValidatorConsolidationData
 from src.withdrawals.assets import (
@@ -157,110 +155,26 @@ class TestGetQueuedAssets:
 
 
 class TestCalculateWithdrawalBuffer:
-    def test_120_eth_queue_zero_pending_mainnet(self):
-        network_config = NETWORKS[MAINNET]
-        avg_reward_per_second = 636_924_636
-        rewards_delay = 43_200
-        total_queue_assets = Gwei(120_000_000_000)
+    def test_120_eth_queue_uses_ratio(self):
+        result = calculate_withdrawal_buffer(Gwei(120 * 10**9))
+        assert result == 120_000_000
 
-        result = calculate_withdrawal_buffer(
-            total_queue_assets=total_queue_assets,
-            pending_partials_count=0,
-            avg_reward_per_second=avg_reward_per_second,
-            rewards_delay=rewards_delay,
-            network_config=network_config,
-        )
+    def test_below_switch_point_uses_floor(self):
+        result = calculate_withdrawal_buffer(Gwei(5_000_000))
+        assert result == 10_000
 
-        latency_seconds = (
-            network_config.MIN_VALIDATOR_WITHDRAWABILITY_DELAY_EPOCHS
-            * network_config.SECONDS_PER_EPOCH
-            + rewards_delay
-        )
-        expected = (
-            total_queue_assets
-            * avg_reward_per_second
-            * latency_seconds
-            * WITHDRAWAL_BUFFER_SAFETY_FACTOR
-            // 10**18
-        )
-        assert result == expected == 21_630_572
+    def test_zero_queue_uses_floor(self):
+        result = calculate_withdrawal_buffer(Gwei(0))
+        assert result == 10_000
 
-    def test_tiny_queue_yields_zero_buffer(self):
-        result = calculate_withdrawal_buffer(
-            total_queue_assets=Gwei(10),
-            pending_partials_count=0,
-            avg_reward_per_second=636_924_636,
-            rewards_delay=43_200,
-            network_config=NETWORKS[MAINNET],
-        )
-        assert result == 0
+    def test_exactly_at_switch_point(self):
+        result = calculate_withdrawal_buffer(Gwei(10_000_000))
+        assert result == 10_000
 
-    def test_pending_partials_count_adds_sweep_wait_time(self):
-        network_config = NETWORKS[MAINNET]
-        kwargs = dict(
-            total_queue_assets=Gwei(120_000_000_000),
-            avg_reward_per_second=636_924_636,
-            rewards_delay=43_200,
-            network_config=network_config,
-        )
-        without_pending = calculate_withdrawal_buffer(pending_partials_count=0, **kwargs)
-
-        # a small pending-partials queue drains within the withdrawability delay itself,
-        # so it adds no extra latency
-        small_pending = calculate_withdrawal_buffer(pending_partials_count=1_000, **kwargs)
-        assert small_pending == without_pending
-
-        # a pending-partials queue whose sweep wait (196_608 s) exceeds the withdrawability
-        # delay (98_304 s) adds the difference between the two
-        large_pending_count = 131_072
-        with_pending = calculate_withdrawal_buffer(
-            pending_partials_count=large_pending_count, **kwargs
-        )
-        sweep_wait_seconds = (
-            large_pending_count
-            * network_config.SECONDS_PER_SLOT
-            // network_config.MAX_PENDING_PARTIALS_PER_WITHDRAWALS_SWEEP
-        )
-        assert sweep_wait_seconds == 196_608
-        withdrawability_delay_seconds = (
-            network_config.MIN_VALIDATOR_WITHDRAWABILITY_DELAY_EPOCHS
-            * network_config.SECONDS_PER_EPOCH
-        )
-        extra_latency_seconds = sweep_wait_seconds - withdrawability_delay_seconds
-        expected_extra = (
-            kwargs['total_queue_assets']
-            * kwargs['avg_reward_per_second']
-            * extra_latency_seconds
-            * WITHDRAWAL_BUFFER_SAFETY_FACTOR
-            // 10**18
-        )
-        assert with_pending - without_pending == expected_extra
-
-    def test_gnosis_uses_its_own_slot_and_epoch_times(self):
-        network_config = NETWORKS[GNOSIS]
-        avg_reward_per_second = 636_924_636
-        rewards_delay = 43_200
-        total_queue_assets = Gwei(120_000_000_000)
-
-        result = calculate_withdrawal_buffer(
-            total_queue_assets=total_queue_assets,
-            pending_partials_count=0,
-            avg_reward_per_second=avg_reward_per_second,
-            rewards_delay=rewards_delay,
-            network_config=network_config,
-        )
-
-        assert result == 9_734_246
-        # same inputs on mainnet's epoch/slot times must yield a different buffer,
-        # proving the result actually depends on Gnosis's own network config
-        assert network_config.SECONDS_PER_EPOCH != NETWORKS[MAINNET].SECONDS_PER_EPOCH
-        assert result != calculate_withdrawal_buffer(
-            total_queue_assets=total_queue_assets,
-            pending_partials_count=0,
-            avg_reward_per_second=avg_reward_per_second,
-            rewards_delay=rewards_delay,
-            network_config=NETWORKS[MAINNET],
-        )
+    def test_patched_floor_changes_result(self):
+        with mock.patch('src.withdrawals.assets.MIN_WITHDRAWAL_BUFFER_GWEI', Gwei(500)):
+            result = calculate_withdrawal_buffer(Gwei(5_000_000))
+        assert result == 5_000
 
 
 @contextlib.contextmanager

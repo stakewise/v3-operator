@@ -29,6 +29,7 @@ from src.common.wallet import wallet
 from src.config.settings import (
     MAX_MIN_WITHDRAWAL_AMOUNT_GWEI,
     MIN_WITHDRAWAL_AMOUNT_GWEI,
+    MIN_WITHDRAWAL_BUFFER_GWEI,
     WITHDRAWALS_INTERVAL,
     settings,
 )
@@ -48,6 +49,9 @@ async def startup_checks() -> None:
             'the operator would skip exit queue shortfalls that the oracle covers with a full '
             'validator exit.'
         )
+
+    if MIN_WITHDRAWAL_BUFFER_GWEI < 0:
+        raise ValueError('MIN_WITHDRAWAL_BUFFER_GWEI setting should not be negative.')
 
     logger.info('Checking for newer operator version...')
     await check_operator_version()

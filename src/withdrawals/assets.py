@@ -13,8 +13,11 @@ from web3.types import Gwei, Wei
 from src.common.contracts import validators_checker_contract
 from src.common.harvest import get_harvest_params
 from src.common.typings import ExitQueueMissingAssetsParams, PendingPartialWithdrawal
-from src.config.networks import NetworkConfig
-from src.config.settings import WITHDRAWAL_BUFFER_SAFETY_FACTOR, settings
+from src.config.settings import (
+    MIN_WITHDRAWAL_BUFFER_GWEI,
+    WITHDRAWAL_BUFFER_RATIO_DIVISOR,
+    settings,
+)
 from src.validators.typings import ConsensusValidator, ValidatorConsolidationData
 from src.withdrawals.typings import ExitQueueAssets
 
@@ -36,9 +39,8 @@ async def get_queued_assets(
     redemption_assets: Wei,
 ) -> ExitQueueAssets:
     """
-    Get the exit queue's missing assets (the net shortfall that must be requested now) and
-    total assets (the whole remaining queue, used by `calculate_withdrawal_buffer`).
-    For Gno networks both are returned in mGNO-Gwei.
+    Get the exit queue shortfall and the whole exit queue value.
+    For Gno networks both are in mGNO-Gwei.
     """
     harvest_params = await get_harvest_params(settings.vault, chain_head.block_number)
 
@@ -82,9 +84,7 @@ async def get_queued_assets(
         harvest_params=harvest_params,
         block_number=chain_head.block_number,
     )
-    # Total assets still in the queue after the simulated harvest: the whole
-    # share-denominated base that keeps accruing rewards, see calculate_withdrawal_buffer.
-    # Skipped when the shortfall is zero: the buffer it feeds is not used then.
+    # Whole queue value for the withdrawal buffer. Not needed when nothing is missing.
     total_assets = Wei(0)
     if missing_assets > 0:
         total_assets = await validators_checker_contract.get_exit_queue_missing_assets(
@@ -109,40 +109,14 @@ async def get_queued_assets(
     )
 
 
-def calculate_withdrawal_buffer(
-    total_queue_assets: Gwei,
-    pending_partials_count: int,
-    avg_reward_per_second: int,
-    rewards_delay: int,
-    network_config: NetworkConfig,
-) -> Gwei:
+def calculate_withdrawal_buffer(total_queue_assets: Gwei) -> Gwei:
     """
-    The exit queue is share-denominated and keeps accruing rewards on `total_queue_assets`
-    while an EL-triggered partial withdrawal request for it waits through the later of
-    `MIN_VALIDATOR_WITHDRAWABILITY_DELAY_EPOCHS` and its turn in the network-wide
-    pending-partials sweep (the sweep drains concurrently with the withdrawability delay, not
-    after it), plus the next vault harvest (`rewards_delay`). Requesting only the exact shortfall
-    would leave a new dust shortfall at every reward update, so the request is padded with the
-    rewards expected to accrue over that whole latency window, times a safety factor. Any excess
-    lands as withdrawable assets in the vault and is re-staked by the normal funding path.
+    Queued assets keep accruing rewards while the withdrawal is pending on the consensus layer
+    (about 27h for a partial withdrawal, up to ~11 days for a full exit), so requesting the
+    exact shortfall leaves a new tiny one after every reward update. 0.1% of the queue covers
+    about 18 days of rewards at 2% APR; the floor covers queues too small for the ratio.
     """
-    latency_seconds = (
-        max(
-            network_config.MIN_VALIDATOR_WITHDRAWABILITY_DELAY_EPOCHS
-            * network_config.SECONDS_PER_EPOCH,
-            pending_partials_count
-            * network_config.SECONDS_PER_SLOT
-            // network_config.MAX_PENDING_PARTIALS_PER_WITHDRAWALS_SWEEP,
-        )
-        + rewards_delay
-    )
-    buffer = (
-        total_queue_assets
-        * avg_reward_per_second
-        * latency_seconds
-        * WITHDRAWAL_BUFFER_SAFETY_FACTOR
-        // 10**18
-    )
+    buffer = max(total_queue_assets // WITHDRAWAL_BUFFER_RATIO_DIVISOR, MIN_WITHDRAWAL_BUFFER_GWEI)
     return Gwei(buffer)
 
 

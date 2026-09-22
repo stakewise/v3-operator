@@ -11,11 +11,7 @@ from web3.types import BlockNumber, Gwei, Wei
 from src.common.app_state import AppState
 from src.common.clients import execution_client
 from src.common.consensus import get_chain_latest_head
-from src.common.contracts import (
-    VaultContract,
-    keeper_contract,
-    os_token_vault_controller_contract,
-)
+from src.common.contracts import VaultContract
 from src.common.metrics import metrics
 from src.common.protocol_config import get_protocol_config
 from src.common.typings import PendingPartialWithdrawal
@@ -131,23 +127,14 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
         if exit_queue.missing < MIN_WITHDRAWAL_AMOUNT_GWEI:
             return
 
-        pending_partials_count = await get_withdrawals_count(chain_head)
-        if _is_pending_partial_withdrawals_queue_full(pending_partials_count):
+        if await _is_pending_partial_withdrawals_queue_full(chain_head):
             logger.info(
                 'Partial withdrawals are currently skipped because '
                 'the pending partial withdrawals queue has exceeded its limit.'
             )
             return
 
-        buffer = calculate_withdrawal_buffer(
-            total_queue_assets=exit_queue.total,
-            pending_partials_count=pending_partials_count,
-            avg_reward_per_second=await os_token_vault_controller_contract.avg_reward_per_second(
-                chain_head.block_number
-            ),
-            rewards_delay=await keeper_contract.rewards_delay(chain_head.block_number),
-            network_config=settings.network_config,
-        )
+        buffer = calculate_withdrawal_buffer(exit_queue.total)
         logger.debug(
             'Exit queue shortfall is %s Gwei, padding the withdrawal request with a buffer '
             'of up to %s Gwei to cover rewards accrued while it is pending',
@@ -280,8 +267,7 @@ async def _get_withdrawals(
         if partial_withdrawals < validator.withdrawal_capacity:
             partial_capacity += validator.withdrawal_capacity - partial_withdrawals
 
-    # If enough partials, use only them. The branch decision uses the unbuffered shortfall;
-    # the request itself is padded with the buffer (see calculate_withdrawal_buffer).
+    # If enough partials, use only them. The buffer does not affect this decision.
     if partial_capacity >= queued_assets or settings.disable_full_withdrawals:
         return _get_partial_withdrawals(
             partial_validators=partial_validators,
@@ -310,15 +296,13 @@ async def _get_withdrawals(
         withdrawals[validator.public_key] = Gwei(0)  # full withdrawal
         queued_assets = Gwei(max(0, queued_assets - validator.balance))
         if queued_assets <= 0:
-            # The full exit above already covers the shortfall; skip the partial
-            # top-up so we don't request buffer-only partials that aren't needed.
+            # The full exit covers the shortfall, no buffer-only partials needed.
             break
 
         # Remove exited validator from partials
         if validator.index in partial_validator_indexes:
             partial_capacity = Gwei(partial_capacity - validator.withdrawal_capacity)
         if partial_capacity >= queued_assets:
-            # Buffer the request here too, for the same reason as above.
             partials = _get_partial_withdrawals(
                 partial_validators=[
                     p for p in partial_validators if p.public_key not in withdrawals
@@ -424,8 +408,9 @@ async def _fetch_oracle_exiting_validators(
     return [val for val in consensus_validators if val.index in vault_oracles_exiting_indexes]
 
 
-def _is_pending_partial_withdrawals_queue_full(pending_partials_count: int) -> bool:
-    return pending_partials_count >= settings.network_config.PENDING_PARTIAL_WITHDRAWALS_LIMIT
+async def _is_pending_partial_withdrawals_queue_full(chain_head: ChainHead) -> bool:
+    queue_length = await get_withdrawals_count(chain_head)
+    return queue_length >= settings.network_config.PENDING_PARTIAL_WITHDRAWALS_LIMIT
 
 
 def _filter_full_withdrawals(withdrawals: dict[HexStr, Gwei]) -> list[HexStr]:

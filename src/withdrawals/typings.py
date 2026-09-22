@@ -13,9 +13,7 @@ class WithdrawalEvent:
 
 @dataclass(frozen=True)
 class ExitQueueAssets:
-    # Net shortfall to request now: queue value minus vault balance, in-flight withdrawals
-    # and exiting validators, plus osToken redemptions.
+    # Shortfall to withdraw now
     missing: Gwei
-    # Whole remaining queue value ignoring in-flight coverage; it keeps accruing rewards,
-    # so it is the base for the withdrawal buffer.
+    # Whole exit queue value, the base for the withdrawal buffer
     total: Gwei

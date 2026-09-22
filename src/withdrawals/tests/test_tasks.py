@@ -14,7 +14,6 @@ from src.config.settings import WITHDRAWALS_INTERVAL, settings
 from src.validators.database import VaultValidatorCrud
 from src.validators.tests.factories import create_consensus_validator
 from src.validators.typings import ValidatorConsolidationData
-from src.withdrawals.assets import calculate_withdrawal_buffer
 from src.withdrawals.tasks import (
     ValidatorWithdrawalSubtask,
     WithdrawalIntervalMixin,
@@ -249,8 +248,7 @@ def test_get_partial_withdrawals():
     )
     assert result == expected
 
-    # buffer included in queued_assets: need + buffer fits within the largest
-    # validator's capacity, so it is requested from that validator alone
+    # need + buffer fits the largest validator
     validators = [
         create_consensus_validator(
             public_key='0x1',
@@ -275,8 +273,7 @@ def test_get_partial_withdrawals():
     )
     assert result == expected
 
-    # buffer included in queued_assets: need + buffer exceeds the largest validator's
-    # capacity, so the request is capped there and spills over to the next validator
+    # need + buffer spills over to the next validator
     need = ether_to_gwei(17)
     buffer = ether_to_gwei(4)
     expected = {'0x2': ether_to_gwei(18), '0x1': ether_to_gwei(3)}
@@ -1074,13 +1071,24 @@ def test_is_partial_withdrawable_validator():
     assert result is True
 
 
-def test_is_pending_partial_withdrawals_queue_full():
+async def test_is_pending_partial_withdrawals_queue_full():
     limit = 100
+    chain_head = create_chain_head(epoch=500)
 
-    with mock.patch.object(settings.network_config, 'PENDING_PARTIAL_WITHDRAWALS_LIMIT', new=limit):
-        assert _is_pending_partial_withdrawals_queue_full(limit - 1) is False
-        assert _is_pending_partial_withdrawals_queue_full(limit) is True
-        assert _is_pending_partial_withdrawals_queue_full(limit + 1) is True
+    with mock.patch.object(
+        settings.network_config, 'PENDING_PARTIAL_WITHDRAWALS_LIMIT', new=limit
+    ), mock.patch('src.withdrawals.tasks.get_withdrawals_count', return_value=limit - 1):
+        assert await _is_pending_partial_withdrawals_queue_full(chain_head) is False
+
+    with mock.patch.object(
+        settings.network_config, 'PENDING_PARTIAL_WITHDRAWALS_LIMIT', new=limit
+    ), mock.patch('src.withdrawals.tasks.get_withdrawals_count', return_value=limit):
+        assert await _is_pending_partial_withdrawals_queue_full(chain_head) is True
+
+    with mock.patch.object(
+        settings.network_config, 'PENDING_PARTIAL_WITHDRAWALS_LIMIT', new=limit
+    ), mock.patch('src.withdrawals.tasks.get_withdrawals_count', return_value=limit + 1):
+        assert await _is_pending_partial_withdrawals_queue_full(chain_head) is True
 
 
 def test_filter_exitable_validators():
@@ -1595,10 +1603,7 @@ async def test_get_withdrawals_pending_deposit_asymmetry(data_dir):
 
 
 async def test_get_withdrawals_buffer_does_not_trigger_full_exit(data_dir):
-    """A buffer that pushes the buffered request above partial_capacity must not flip
-    the partial-only branch into a full exit: the branch decision uses the unbuffered
-    shortfall, and `_get_partial_withdrawals` caps the buffered request at capacity.
-    """
+    """The buffer must not turn a partial-only withdrawal into a full exit."""
     settings.set(vault=None, vault_dir=data_dir, network=HOODI)
     chain_head = create_chain_head(epoch=500)
     consensus_validators = [
@@ -1623,10 +1628,7 @@ async def test_get_withdrawals_buffer_does_not_trigger_full_exit(data_dir):
 
 
 async def test_get_withdrawals_full_exit_covers_shortfall_skips_buffered_partial(data_dir):
-    """A full exit that already covers the shortfall on its own must not trigger a
-    buffer-only partial top-up on other validators: the shortfall is 0 at that point,
-    so requesting `buffer` gwei of partials from '0x2' would be pure overpayment.
-    """
+    """No buffer-only partials after a full exit that covers the shortfall."""
     settings.set(vault=None, vault_dir=data_dir, network=HOODI)
     chain_head = create_chain_head(epoch=500)
     consensus_validators = [
@@ -1660,9 +1662,7 @@ async def test_get_withdrawals_full_exit_covers_shortfall_skips_buffered_partial
 
 
 async def test_get_withdrawals_full_exit_shortfall_tail_still_gets_buffer(data_dir):
-    """When the full exit leaves a genuine remaining shortfall, the buffer must still
-    be applied to the partial top-up covering that tail.
-    """
+    """The shortfall left after a full exit is still requested with the buffer."""
     settings.set(vault=None, vault_dir=data_dir, network=HOODI)
     chain_head = create_chain_head(epoch=500)
     consensus_validators = [
@@ -1710,18 +1710,9 @@ async def test_process_submits_shortfall_plus_buffer(data_dir, reset_app_state):
     )
     missing = ether_to_gwei(1)
     total = missing
-    avg_reward_per_second = 636_924_636
-    rewards_delay = 43_200
     pending_partials_count = 0
     exit_queue = ExitQueueAssets(missing=missing, total=total)
-    buffer = calculate_withdrawal_buffer(
-        total_queue_assets=total,
-        pending_partials_count=pending_partials_count,
-        avg_reward_per_second=avg_reward_per_second,
-        rewards_delay=rewards_delay,
-        network_config=settings.network_config,
-    )
-    expected_withdrawals = {'0x1': Gwei(missing + buffer)}
+    expected_withdrawals = {'0x1': Gwei(missing + max(total // 1000, 10_000))}
 
     with mock.patch(
         'src.withdrawals.tasks.get_chain_latest_head', return_value=chain_head
@@ -1744,11 +1735,6 @@ async def test_process_submits_shortfall_plus_buffer(data_dir, reset_app_state):
     ), mock.patch(
         'src.withdrawals.tasks.get_withdrawals_count', return_value=pending_partials_count
     ), mock.patch(
-        'src.withdrawals.tasks.os_token_vault_controller_contract.avg_reward_per_second',
-        return_value=avg_reward_per_second,
-    ), mock.patch(
-        'src.withdrawals.tasks.keeper_contract.rewards_delay', return_value=rewards_delay
-    ), mock.patch(
         'src.withdrawals.tasks.apply_pending_deposits', return_value=([validator], [])
     ), mock.patch(
         'src.withdrawals.tasks.get_withdrawal_request_fee', return_value=Wei(0)
@@ -1765,11 +1751,8 @@ async def test_process_submits_shortfall_plus_buffer(data_dir, reset_app_state):
     assert mocked_submit.call_args.kwargs['withdrawals'] == expected_withdrawals
 
 
-# pylint: disable-next=too-many-locals
 async def test_process_submits_tiny_shortfall_at_default_threshold(data_dir, reset_app_state):
-    """At the default MIN_WITHDRAWAL_AMOUNT_GWEI of 1 Gwei, even a 10 Gwei shortfall, for
-    which the computed buffer rounds down to 0, is still submitted for withdrawal.
-    """
+    """A tiny shortfall gets padded with the default floor buffer and is still submitted."""
     settings.set(vault=None, vault_dir=data_dir, network=HOODI)
     chain_head = create_chain_head(epoch=500)
     protocol_config = mock.MagicMock(validator_min_active_epochs=10)
@@ -1804,11 +1787,6 @@ async def test_process_submits_tiny_shortfall_at_default_threshold(data_dir, res
     ), mock.patch(
         'src.withdrawals.tasks.get_withdrawals_count', return_value=0
     ), mock.patch(
-        'src.withdrawals.tasks.os_token_vault_controller_contract.avg_reward_per_second',
-        return_value=636_924_636,
-    ), mock.patch(
-        'src.withdrawals.tasks.keeper_contract.rewards_delay', return_value=43_200
-    ), mock.patch(
         'src.withdrawals.tasks.apply_pending_deposits', return_value=([validator], [])
     ), mock.patch(
         'src.withdrawals.tasks.get_withdrawal_request_fee', return_value=Wei(0)
@@ -1822,15 +1800,12 @@ async def test_process_submits_tiny_shortfall_at_default_threshold(data_dir, res
         await subtask.process()
 
     mocked_submit.assert_called_once()
-    assert mocked_submit.call_args.kwargs['withdrawals'] == {'0x1': Gwei(10)}
+    assert mocked_submit.call_args.kwargs['withdrawals'] == {'0x1': Gwei(10_010)}
 
 
 async def test_process_skips_shortfall_below_min_withdrawal_amount_threshold(
     data_dir, reset_app_state
 ):
-    """A shortfall below the configured MIN_WITHDRAWAL_AMOUNT_GWEI threshold is not
-    submitted for withdrawal.
-    """
     settings.set(vault=None, vault_dir=data_dir, network=HOODI)
     chain_head = create_chain_head(epoch=500)
     protocol_config = mock.MagicMock(validator_min_active_epochs=10)
@@ -1877,9 +1852,6 @@ async def test_process_skips_shortfall_below_min_withdrawal_amount_threshold(
 async def test_process_submits_shortfall_at_min_withdrawal_amount_threshold(
     data_dir, reset_app_state
 ):
-    """A shortfall at least as large as the configured MIN_WITHDRAWAL_AMOUNT_GWEI
-    threshold is submitted for withdrawal.
-    """
     settings.set(vault=None, vault_dir=data_dir, network=HOODI)
     chain_head = create_chain_head(epoch=500)
     protocol_config = mock.MagicMock(validator_min_active_epochs=10)
@@ -1915,11 +1887,6 @@ async def test_process_submits_shortfall_at_min_withdrawal_amount_threshold(
         'src.withdrawals.tasks.get_queued_assets', return_value=exit_queue
     ), mock.patch(
         'src.withdrawals.tasks.get_withdrawals_count', return_value=0
-    ), mock.patch(
-        'src.withdrawals.tasks.os_token_vault_controller_contract.avg_reward_per_second',
-        return_value=636_924_636,
-    ), mock.patch(
-        'src.withdrawals.tasks.keeper_contract.rewards_delay', return_value=43_200
     ), mock.patch(
         'src.withdrawals.tasks.apply_pending_deposits', return_value=([validator], [])
     ), mock.patch(
