@@ -339,7 +339,8 @@ async def load_genesis_validators() -> None:
     Load consensus network validators from the ipfs dump.
     Used to speed up service startup
     """
-    ipfs_hash = settings.network_config.GENESIS_VALIDATORS_IPFS_HASH
+    checkpoints = settings.network_config.CHECKPOINTS
+    ipfs_hash = checkpoints.GENESIS_VALIDATORS_IPFS_HASH
     if not (NetworkValidatorCrud().get_last_network_validator() is None and ipfs_hash):
         return
 

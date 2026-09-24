@@ -421,9 +421,10 @@ async def check_operator_version() -> None:
 
 async def check_events_logs() -> None:
     """Check that EL client didn't prune logs"""
+    checkpoints = settings.network_config.CHECKPOINTS
     events = await validators_registry_contract.events.DepositEvent.get_logs(
-        from_block=settings.network_config.GENESIS_VALIDATORS_LAST_BLOCK,
-        to_block=settings.network_config.GENESIS_VALIDATORS_LAST_BLOCK,
+        from_block=checkpoints.GENESIS_VALIDATORS_LAST_BLOCK,
+        to_block=checkpoints.GENESIS_VALIDATORS_LAST_BLOCK,
     )
     if not events:
         raise ValueError(
