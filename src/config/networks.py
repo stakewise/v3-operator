@@ -22,8 +22,8 @@ def _load_base_kwargs(network: str) -> dict:
     # nested dataclasses (e.g. `ContractRelease` inside `CONTRACTS_RELEASES`)
     # into plain dicts, breaking attribute access on them.
     base = BASE_NETWORKS[network]
-    # `CHECKPOINTS` is rebuilt per network as `OperatorCheckpointsConfig`.
-    return {f.name: getattr(base, f.name) for f in fields(base) if f.name != 'CHECKPOINTS'}
+    ignored_fields = ('CHECKPOINTS',)
+    return {f.name: getattr(base, f.name) for f in fields(base) if f.name not in ignored_fields}
 
 
 @dataclass
