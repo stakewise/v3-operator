@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, fields
+from dataclasses import asdict, dataclass, fields
 from datetime import timedelta
 
 from ens.constants import EMPTY_ADDR_HEX
 from eth_typing import BlockNumber, ChecksumAddress
 from sw_utils.networks import GNOSIS, HOODI, MAINNET
 from sw_utils.networks import NETWORKS as BASE_NETWORKS
-from sw_utils.networks import BaseNetworkConfig
+from sw_utils.networks import BaseNetworkConfig, CheckpointsConfig
 from web3 import Web3
 from web3.types import Gwei, Wei
 
@@ -22,7 +22,8 @@ def _load_base_kwargs(network: str) -> dict:
     # nested dataclasses (e.g. `ContractRelease` inside `CONTRACTS_RELEASES`)
     # into plain dicts, breaking attribute access on them.
     base = BASE_NETWORKS[network]
-    return {f.name: getattr(base, f.name) for f in fields(base)}
+    ignored_fields = ('CHECKPOINTS',)
+    return {f.name: getattr(base, f.name) for f in fields(base) if f.name not in ignored_fields}
 
 
 @dataclass
@@ -40,7 +41,7 @@ class NetworkConfig(BaseNetworkConfig):
     STAKEWISE_REST_API_URL: str
     STAKEWISE_GRAPH_ENDPOINT: str
     RATED_API_URL: str
-    CHECKPOINTS: CheckpointsConfig
+    CHECKPOINTS: OperatorCheckpointsConfig
     MAX_FEE_PER_GAS_GWEI: Gwei
     MAX_VALIDATOR_BALANCE_GWEI: Gwei
     SHARD_COMMITTEE_PERIOD: int
@@ -60,14 +61,11 @@ class NetworkConfig(BaseNetworkConfig):
 
 
 @dataclass
-class CheckpointsConfig:
+class OperatorCheckpointsConfig(CheckpointsConfig):
     """
-    Pinned points past which the operator does not need execution client event logs.
+    Operator-specific checkpoints on top of the shared sw-utils ones.
     """
 
-    # Newest known `ConfigUpdated` event, and a block with no newer event up to it.
-    CONFIG_UPDATE_LAST_EVENT_BLOCK: BlockNumber
-    CONFIG_UPDATE_CHECKPOINT_BLOCK: BlockNumber
     # Network-wide dump of all vaults' `ValidatorRegistered` / `V2ValidatorRegistered`
     # events up to `VAULT_VALIDATORS_LAST_BLOCK`. 72-byte records.
     VAULT_VALIDATORS_IPFS_HASH: str
@@ -130,9 +128,8 @@ NETWORKS: dict[str, NetworkConfig] = {
             'https://graphs.stakewise.io/mainnet/subgraphs/name/stakewise/prod'
         ),
         RATED_API_URL='https://api.rated.network',
-        CHECKPOINTS=CheckpointsConfig(
-            CONFIG_UPDATE_LAST_EVENT_BLOCK=BlockNumber(25093055),
-            CONFIG_UPDATE_CHECKPOINT_BLOCK=BlockNumber(25934000),
+        CHECKPOINTS=OperatorCheckpointsConfig(
+            **asdict(BASE_NETWORKS[MAINNET].CHECKPOINTS),
             VAULT_VALIDATORS_IPFS_HASH=(
                 'bafybeigywptyz3lo7pb4rby2gwagdamyeahw2yklijupwfxqjjzfuqebpm'
             ),
@@ -189,9 +186,8 @@ NETWORKS: dict[str, NetworkConfig] = {
         STAKEWISE_REST_API_URL='https://hoodi-api.stakewise.io',
         STAKEWISE_GRAPH_ENDPOINT='https://graphs.stakewise.io/hoodi/subgraphs/name/stakewise/prod',
         RATED_API_URL='https://api.rated.network',
-        CHECKPOINTS=CheckpointsConfig(
-            CONFIG_UPDATE_LAST_EVENT_BLOCK=BlockNumber(1279009),
-            CONFIG_UPDATE_CHECKPOINT_BLOCK=BlockNumber(3584000),
+        CHECKPOINTS=OperatorCheckpointsConfig(
+            **asdict(BASE_NETWORKS[HOODI].CHECKPOINTS),
             VAULT_VALIDATORS_IPFS_HASH=(
                 'bafkreihalltsgohglgsphglrbmbcnvbuohgwfqa5r5wnnsgiic53zpkliy'
             ),
@@ -250,9 +246,8 @@ NETWORKS: dict[str, NetworkConfig] = {
             'https://graphs.stakewise.io/gnosis/subgraphs/name/stakewise/prod'
         ),
         RATED_API_URL='https://api.rated.network',
-        CHECKPOINTS=CheckpointsConfig(
-            CONFIG_UPDATE_LAST_EVENT_BLOCK=BlockNumber(42392284),
-            CONFIG_UPDATE_CHECKPOINT_BLOCK=BlockNumber(48148000),
+        CHECKPOINTS=OperatorCheckpointsConfig(
+            **asdict(BASE_NETWORKS[GNOSIS].CHECKPOINTS),
             VAULT_VALIDATORS_IPFS_HASH=(
                 'bafybeicl67j5kcvn5lzhydi5pmp5wjnot23topveijwggodb2ueay2qk5a'
             ),
