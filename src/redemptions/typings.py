@@ -1,7 +1,7 @@
 from collections.abc import Iterator
 from dataclasses import dataclass
 
-from eth_typing import ChecksumAddress, HexStr
+from eth_typing import BlockNumber, ChecksumAddress, HexStr
 from multiproof.standard import standard_leaf_hash
 from web3 import Web3
 from web3.types import Wei
@@ -52,8 +52,8 @@ class Allocator:
         """
         Split ``redeemable_shares`` across vaults proportionally to each vault's (post-boost)
         redeemable share of the total. The last vault absorbs the rounding dust. Slices below
-        ``min_shares`` are dropped, but still count towards the running allocated total so the
-        dust rule stays exact.
+        ``min_shares``, and zero-amount slices regardless of ``min_shares``, are dropped, but
+        still count towards the running allocated total so the dust rule stays exact.
         """
         redeemable_amount = self.redeemable_shares
         if redeemable_amount == 0:
@@ -67,7 +67,7 @@ class Allocator:
             else:
                 vault_amount = int(redeemable_amount * (position.redeemable_shares / total))
             allocated_amount += vault_amount
-            if vault_amount < min_shares:
+            if vault_amount == 0 or vault_amount < min_shares:
                 continue
             yield VaultSlice(allocator=self, vault_position=position, amount=Wei(vault_amount))
 
@@ -114,6 +114,7 @@ class OsTokenPosition:
     owner: ChecksumAddress
     vault: ChecksumAddress
     leaf_shares: Wei
+    ltv: float = 0.0
     # Zero-based index of the position in the IPFS positions file. Used for logging only.
     index: int = 0
     processed_shares: Wei = Wei(0)
@@ -137,6 +138,7 @@ class OsTokenPosition:
             owner=Web3.to_checksum_address(data['owner']),
             vault=Web3.to_checksum_address(data['vault']),
             leaf_shares=Wei(int(data['leaf_shares'])),
+            ltv=float(data.get('ltv', 0)),
             index=index,
         )
 
@@ -148,6 +150,31 @@ class OsTokenPosition:
         return standard_leaf_hash(
             values=(nonce, self.vault, self.leaf_shares, self.owner),
             types=LEAF_TYPES,
+        )
+
+
+@dataclass
+class RedeemablePositionsSnapshot:
+    """The file written by ``fetch-redeemable-positions`` and read by
+    ``publish-redeemable-positions``."""
+
+    block_number: BlockNumber
+    positions: list[OsTokenPosition]
+
+    def as_dict(self) -> dict:
+        return {
+            'block_number': self.block_number,
+            'positions': [{**p.as_dict(), 'ltv': p.ltv} for p in self.positions],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'RedeemablePositionsSnapshot':
+        return cls(
+            block_number=BlockNumber(int(data['block_number'])),
+            positions=[
+                OsTokenPosition.from_dict(p, index=index)
+                for index, p in enumerate(data['positions'])
+            ],
         )
 
 

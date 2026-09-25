@@ -1,5 +1,7 @@
 import contextlib
-from unittest.mock import AsyncMock, MagicMock, patch
+import json
+from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from click.testing import CliRunner
@@ -10,12 +12,12 @@ from web3.types import ChecksumAddress, Wei
 
 from src.config.networks import MAINNET, NETWORKS
 from src.config.settings import settings
-from src.redemptions.commands.update_redeemable_positions import (
+from src.redemptions.commands.fetch_redeemable_positions import (
     _distribute_boosted_shares,
     _filter_min_redeemable_shares,
     calculate_boost_os_token_shares,
     create_os_token_positions,
-    update_redeemable_positions,
+    fetch_redeemable_positions,
 )
 from src.redemptions.typings import (
     Allocator,
@@ -25,6 +27,60 @@ from src.redemptions.typings import (
 )
 
 os_token_contract_address = NETWORKS[MAINNET].OS_TOKEN_CONTRACT_ADDRESS
+
+
+def test_filter_min_redeemable_shares_drops_allocators_left_with_no_positions():
+    address_1 = faker.eth_address()
+    address_2 = faker.eth_address()
+    vault_1 = faker.eth_address()
+    vault_2 = faker.eth_address()
+
+    allocator_a = Allocator(
+        address=Web3.to_checksum_address(address_1),
+        vault_os_token_positions=[
+            VaultOsTokenPosition(
+                address=Web3.to_checksum_address(vault_1), minted_shares=Wei(500), ltv=0.5
+            ),
+            VaultOsTokenPosition(
+                address=Web3.to_checksum_address(vault_2), minted_shares=Wei(100), ltv=0.5
+            ),
+        ],
+    )
+    allocator_b = Allocator(
+        address=Web3.to_checksum_address(address_2),
+        vault_os_token_positions=[
+            VaultOsTokenPosition(
+                address=Web3.to_checksum_address(vault_1), minted_shares=Wei(50), ltv=0.5
+            ),
+        ],
+    )
+
+    result = _filter_min_redeemable_shares([allocator_a, allocator_b], Wei(200))
+    assert result == [allocator_a]
+    assert result[0].vault_os_token_positions == [
+        VaultOsTokenPosition(
+            address=Web3.to_checksum_address(vault_1), minted_shares=Wei(500), ltv=0.5
+        ),
+    ]
+
+
+def test_filter_min_redeemable_shares_zero_threshold_keeps_everything():
+    address_1 = faker.eth_address()
+    vault_1 = faker.eth_address()
+
+    allocators = [
+        Allocator(
+            address=Web3.to_checksum_address(address_1),
+            vault_os_token_positions=[
+                VaultOsTokenPosition(
+                    address=Web3.to_checksum_address(vault_1), minted_shares=Wei(0), ltv=0.5
+                ),
+            ],
+        ),
+    ]
+
+    result = _filter_min_redeemable_shares(allocators, Wei(0))
+    assert result == allocators
 
 
 def test_create_os_token_positions_zero_allocators():
@@ -46,7 +102,9 @@ def test_create_os_token_positions_single_vault():
         )
     ]
     result = create_os_token_positions(allocators, Wei(0))
-    assert result == [OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(150))]
+    assert result == [
+        OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(150), ltv=0.5)
+    ]
 
 
 def test_create_os_token_positions_kept_tokens():
@@ -65,7 +123,7 @@ def test_create_os_token_positions_kept_tokens():
         )
     ]
     result = create_os_token_positions(allocators, Wei(0))
-    assert result == [OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(50))]
+    assert result == [OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(50), ltv=0.5)]
 
 
 def test_create_os_token_positions_multiple_allocators():
@@ -93,7 +151,9 @@ def test_create_os_token_positions_multiple_allocators():
         ),
     ]
     result = create_os_token_positions(allocators, Wei(0))
-    assert result == [OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(150))]
+    assert result == [
+        OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(150), ltv=0.5)
+    ]
 
 
 def test_create_os_token_positions_multiple_vaults_1():
@@ -116,8 +176,8 @@ def test_create_os_token_positions_multiple_vaults_1():
     ]
     result = create_os_token_positions(allocators, Wei(0))
     assert result == [
-        OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(150)),
-        OsTokenPosition(owner=address_1, vault=vault_2, leaf_shares=Wei(150)),
+        OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(150), ltv=0.5),
+        OsTokenPosition(owner=address_1, vault=vault_2, leaf_shares=Wei(150), ltv=0.5),
     ]
 
 
@@ -141,8 +201,8 @@ def test_create_os_token_positions_multiple_vaults_2():
     ]
     result = create_os_token_positions(allocators, Wei(0))
     assert result == [
-        OsTokenPosition(owner=address_1, vault=vault_2, leaf_shares=Wei(600)),
-        OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(299)),
+        OsTokenPosition(owner=address_1, vault=vault_2, leaf_shares=Wei(600), ltv=0.5),
+        OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(299), ltv=0.5),
     ]
 
 
@@ -166,8 +226,7 @@ def test_create_os_token_positions_multiple_vaults_3():
     ]
     result = create_os_token_positions(allocators, Wei(0))
     assert result == [
-        OsTokenPosition(owner=address_1, vault=vault_2, leaf_shares=Wei(900)),
-        OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(0)),
+        OsTokenPosition(owner=address_1, vault=vault_2, leaf_shares=Wei(900), ltv=0.5),
     ]
 
 
@@ -191,7 +250,7 @@ def test_create_os_token_positions_min_redeemable_shares():
     ]
     result = create_os_token_positions(allocators, Wei(300))
     assert result == [
-        OsTokenPosition(owner=address_1, vault=vault_2, leaf_shares=Wei(600)),
+        OsTokenPosition(owner=address_1, vault=vault_2, leaf_shares=Wei(600), ltv=0.5),
     ]
 
 
@@ -231,9 +290,9 @@ def test_create_os_token_positions_ordering_by_ltv_and_amount():
     result = create_os_token_positions(allocators, Wei(0))
     # sorted by ltv desc, then amount desc
     assert result == [
-        OsTokenPosition(owner=address_2, vault=vault_1, leaf_shares=Wei(500)),
-        OsTokenPosition(owner=address_3, vault=vault_2, leaf_shares=Wei(200)),
-        OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(1000)),
+        OsTokenPosition(owner=address_2, vault=vault_1, leaf_shares=Wei(500), ltv=0.9),
+        OsTokenPosition(owner=address_3, vault=vault_2, leaf_shares=Wei(200), ltv=0.9),
+        OsTokenPosition(owner=address_1, vault=vault_1, leaf_shares=Wei(1000), ltv=0.3),
     ]
 
 
@@ -297,60 +356,6 @@ async def test_calculate_boost_os_token_shares():
         (address_2, vault_1): 100,
         (address_2, vault_2): 3095,
     }
-
-
-def test_filter_min_redeemable_shares_drops_allocators_left_with_no_positions():
-    address_1 = faker.eth_address()
-    address_2 = faker.eth_address()
-    vault_1 = faker.eth_address()
-    vault_2 = faker.eth_address()
-
-    allocator_a = Allocator(
-        address=Web3.to_checksum_address(address_1),
-        vault_os_token_positions=[
-            VaultOsTokenPosition(
-                address=Web3.to_checksum_address(vault_1), minted_shares=Wei(500), ltv=0.5
-            ),
-            VaultOsTokenPosition(
-                address=Web3.to_checksum_address(vault_2), minted_shares=Wei(100), ltv=0.5
-            ),
-        ],
-    )
-    allocator_b = Allocator(
-        address=Web3.to_checksum_address(address_2),
-        vault_os_token_positions=[
-            VaultOsTokenPosition(
-                address=Web3.to_checksum_address(vault_1), minted_shares=Wei(50), ltv=0.5
-            ),
-        ],
-    )
-
-    result = _filter_min_redeemable_shares([allocator_a, allocator_b], Wei(200))
-    assert result == [allocator_a]
-    assert result[0].vault_os_token_positions == [
-        VaultOsTokenPosition(
-            address=Web3.to_checksum_address(vault_1), minted_shares=Wei(500), ltv=0.5
-        ),
-    ]
-
-
-def test_filter_min_redeemable_shares_zero_threshold_keeps_everything():
-    address_1 = faker.eth_address()
-    vault_1 = faker.eth_address()
-
-    allocators = [
-        Allocator(
-            address=Web3.to_checksum_address(address_1),
-            vault_os_token_positions=[
-                VaultOsTokenPosition(
-                    address=Web3.to_checksum_address(vault_1), minted_shares=Wei(0), ltv=0.5
-                ),
-            ],
-        ),
-    ]
-
-    result = _filter_min_redeemable_shares(allocators, Wei(0))
-    assert result == allocators
 
 
 def test_distributes_boosted_shares():
@@ -488,19 +493,16 @@ def test_distributes_boosted_shares_excess_over_same_vault_mint_becomes_residual
 
 
 @pytest.mark.usefixtures('_init_config')
-class TestUpdateOsTokenPositions:
+class TestFetchRedeemablePositions:
     @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
-    async def test_basic_call(
+    async def test_basic_call_writes_snapshot(
         self,
         vault_address: str,
         execution_endpoints: str,
         runner: CliRunner,
     ):
-        # hardcoded to check merkle root
         address_1 = Web3.to_checksum_address('0x2242b8ab71521f6abEE4B4D83195E70AcB08727a')
-        address_2 = Web3.to_checksum_address('0x24c8DBBC3d1C35C4159787b1f7a62bea1A814242')
         vault_1 = Web3.to_checksum_address('0xEd735de172272C03CA6F60c1d90D83D9CFB46D22')
-        vault_2 = Web3.to_checksum_address('0xe8Ea1025b49D2B51C536cFBc0833F021ba4c6903')
         allocators = [
             Allocator(
                 address=address_1,
@@ -510,48 +512,10 @@ class TestUpdateOsTokenPositions:
                     ),
                 ],
             ),
-            Allocator(
-                address=address_2,
-                vault_os_token_positions=[
-                    VaultOsTokenPosition(
-                        address=vault_2, minted_shares=Web3.to_wei(12, 'ether'), ltv=0.5
-                    ),
-                ],
-            ),
         ]
-        leverage_positions = [
-            LeverageStrategyPosition(
-                user=address_1,
-                vault=vault_1,
-                proxy=Web3.to_checksum_address(faker.eth_address()),
-                os_token_shares=Web3.to_wei(1, 'ether'),
-                exiting_os_token_shares=Web3.to_wei(0.1, 'ether'),
-                assets=Web3.to_wei(0.1, 'ether'),
-                exiting_assets=Web3.to_wei(0.05, 'ether'),
-            ),
-        ]
-        os_token_holders = {
-            address_1: Web3.to_wei(4, 'ether'),
-            address_2: Web3.to_wei(13, 'ether'),
-        }
+        leverage_positions: list[LeverageStrategyPosition] = []
+        os_token_holders = {address_1: Web3.to_wei(4, 'ether')}
         mock_protocol_data = [
-            {
-                'id': 'stakewise',
-                'chain': 'eth',
-                'portfolio_item_list': [
-                    {
-                        'detail': {
-                            'supply_token_list': [
-                                {
-                                    'id': '0x1234567890abcdef1234567890abcdef12345678',
-                                    'chain': 'eth',
-                                    'amount': '0.5',
-                                }
-                            ]
-                        }
-                    }
-                ],
-            },
             {
                 'id': 'aave3',
                 'chain': 'eth',
@@ -569,23 +533,6 @@ class TestUpdateOsTokenPositions:
                     }
                 ],
             },
-            {
-                'id': 'balancer',
-                'chain': 'eth',
-                'portfolio_item_list': [
-                    {
-                        'detail': {
-                            'supply_token_list': [
-                                {
-                                    'id': os_token_contract_address,
-                                    'chain': 'eth',
-                                    'amount': '0.2',
-                                }
-                            ]
-                        }
-                    }
-                ],
-            },
         ]
         os_token_converter = OsTokenConverter(110, 100)
         args = [
@@ -596,75 +543,35 @@ class TestUpdateOsTokenPositions:
             '--verbose',
         ]
         with (
-            patch_latest_block(11),
-            patch_os_token_redeemer_contract_nonce(6),
+            patch_finalized_block(11),
             patch_os_token_contract_address(os_token_contract_address),
             patch_os_token_converter(os_token_converter),
             patch_api_client(mock_protocol_data),
             patch_graph_calls(allocators, leverage_positions, os_token_holders),
-            patch_ipfs_client() as mock_upload_json,
             patch_startup_check(),
+            runner.isolated_filesystem(),
         ):
-            result = runner.invoke(update_redeemable_positions, args, input='\n')
+            result = runner.invoke(fetch_redeemable_positions, args, input='\n')
             assert result.exit_code == 0
-            mock_upload_json.assert_called_once_with(
-                [{'owner': address_1, 'vault': vault_1, 'leaf_shares': '2563636363636363637'}]
-            )
-            assert (
-                '0x9bb2ee30813b89e23e6bbfa1b78706c008f71489750571c81d3b33289647bec1'
-                in result.output.strip()
-            )
+            assert 'Fetching redeemable positions at block: 11' in result.output
 
-    @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
-    async def test_full_position(
-        self,
-        vault_address: str,
-        execution_endpoints: str,
-        runner: CliRunner,
-    ):
-        # hardcoded to check merkle root
-        address_1 = Web3.to_checksum_address('0x2242b8ab71521f6abEE4B4D83195E70AcB08727a')
-        vault_1 = Web3.to_checksum_address('0xEd735de172272C03CA6F60c1d90D83D9CFB46D22')
-        allocators = [
-            Allocator(
-                address=address_1,
-                vault_os_token_positions=[
-                    VaultOsTokenPosition(
-                        address=vault_1, minted_shares=Web3.to_wei(10, 'ether'), ltv=0.5
-                    ),
-                ],
-            ),
-        ]
-        leverage_positions: list[LeverageStrategyPosition] = []
-        os_token_holders: dict[ChecksumAddress, Wei] = {}
-        mock_protocol_data = []
-        os_token_converter = OsTokenConverter(110, 100)
-        args = [
-            '--network',
-            MAINNET,
-            '--execution-endpoints',
-            execution_endpoints,
-            '--verbose',
-        ]
-        with (
-            patch_latest_block(11),
-            patch_os_token_redeemer_contract_nonce(6),
-            patch_os_token_contract_address(os_token_contract_address),
-            patch_os_token_converter(os_token_converter),
-            patch_api_client(mock_protocol_data),
-            patch_graph_calls(allocators, leverage_positions, os_token_holders),
-            patch_ipfs_client() as mock_upload_json,
-            patch_startup_check(),
-        ):
-            result = runner.invoke(update_redeemable_positions, args, input='\n')
-            assert result.exit_code == 0
-            mock_upload_json.assert_called_once_with(
-                [{'owner': address_1, 'vault': vault_1, 'leaf_shares': '10000000000000000000'}]
-            )
-            assert (
-                '0x9b4419ebea301ed07e591b477e69499f35e4c3cd69538c2f22a6a014b06e5bbd'
-                in result.output.strip()
-            )
+            snapshot_file = Path('redeemable_positions_mainnet_11.json')
+            assert snapshot_file.exists()
+            assert f'Redeemable positions saved to {snapshot_file}' in result.output
+
+            with open(snapshot_file, encoding='utf-8') as f:
+                data = json.load(f)
+
+            assert data['block_number'] == 11
+            # redeemable = minted(10) - wallet(4) - locked(2) = 4 ether
+            assert data['positions'] == [
+                {
+                    'owner': address_1,
+                    'vault': vault_1,
+                    'leaf_shares': str(Web3.to_wei(4, 'ether')),
+                    'ltv': 0.5,
+                }
+            ]
 
     @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
     async def test_cross_vault_boost_reduces_redeemable_amount(
@@ -709,29 +616,37 @@ class TestUpdateOsTokenPositions:
             '--verbose',
         ]
         with (
-            patch_latest_block(11),
-            patch_os_token_redeemer_contract_nonce(6),
+            patch_finalized_block(11),
             patch_os_token_contract_address(os_token_contract_address),
             patch_os_token_converter(os_token_converter),
             patch_api_client(mock_protocol_data),
             patch_graph_calls(allocators, leverage_positions, os_token_holders),
-            patch_ipfs_client() as mock_upload_json,
             patch_startup_check(),
+            runner.isolated_filesystem(),
         ):
-            result = runner.invoke(update_redeemable_positions, args, input='\n')
+            result = runner.invoke(fetch_redeemable_positions, args, input='\n')
             assert result.exit_code == 0
-            mock_upload_json.assert_called_once_with(
-                [{'owner': address_1, 'vault': vault_1, 'leaf_shares': '7000000000000000000'}]
-            )
+
+            with open('redeemable_positions_mainnet_11.json', encoding='utf-8') as f:
+                data = json.load(f)
+
+            # redeemable = minted(10) - residual boost(3) = 7 ether
+            assert data['positions'] == [
+                {
+                    'owner': address_1,
+                    'vault': vault_1,
+                    'leaf_shares': str(Web3.to_wei(7, 'ether')),
+                    'ltv': 0.5,
+                }
+            ]
 
     @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
-    async def test_min_leaf_shares(
+    async def test_min_leaf_shares_writes_empty_snapshot(
         self,
         vault_address: str,
         execution_endpoints: str,
         runner: CliRunner,
     ):
-        # hardcoded to check merkle root
         address_1 = Web3.to_checksum_address('0x2242b8ab71521f6abEE4B4D83195E70AcB08727a')
         vault_1 = Web3.to_checksum_address('0xEd735de172272C03CA6F60c1d90D83D9CFB46D22')
         allocators = [
@@ -758,27 +673,29 @@ class TestUpdateOsTokenPositions:
             6 * 10**9,  # 6 ETH in Gwei
         ]
         with (
-            patch_latest_block(11),
-            patch_os_token_redeemer_contract_nonce(6),
+            patch_finalized_block(11),
             patch_os_token_contract_address(os_token_contract_address),
             patch_os_token_converter(os_token_converter),
             patch_api_client(mock_protocol_data),
             patch_graph_calls(allocators, leverage_positions, os_token_holders),
-            patch_ipfs_client() as mock_upload_json,
             patch_startup_check(),
+            runner.isolated_filesystem(),
         ):
-            result = runner.invoke(update_redeemable_positions, args, input='\n')
+            result = runner.invoke(fetch_redeemable_positions, args, input='\n')
             assert result.exit_code == 0
-            mock_upload_json.assert_not_called()
+
+            with open('redeemable_positions_mainnet_11.json', encoding='utf-8') as f:
+                data = json.load(f)
+
+            assert data['positions'] == []
 
     @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
-    async def test_min_leaf_shares_after_kept_shares(
+    async def test_second_fetch_run_at_same_block_refuses_to_overwrite(
         self,
         vault_address: str,
         execution_endpoints: str,
         runner: CliRunner,
     ):
-        # hardcoded to check merkle root
         address_1 = Web3.to_checksum_address('0x2242b8ab71521f6abEE4B4D83195E70AcB08727a')
         vault_1 = Web3.to_checksum_address('0xEd735de172272C03CA6F60c1d90D83D9CFB46D22')
         allocators = [
@@ -792,8 +709,8 @@ class TestUpdateOsTokenPositions:
             ),
         ]
         leverage_positions: list[LeverageStrategyPosition] = []
-        os_token_holders = {address_1: Web3.to_wei(7, 'ether')}
-        mock_protocol_data = []
+        os_token_holders: dict[ChecksumAddress, Wei] = {}
+        mock_protocol_data: list[dict] = []
         os_token_converter = OsTokenConverter(110, 100)
         args = [
             '--network',
@@ -801,22 +718,22 @@ class TestUpdateOsTokenPositions:
             '--execution-endpoints',
             execution_endpoints,
             '--verbose',
-            '--min-os-token-position-amount-gwei',
-            6 * 10**9,  # 6 ETH in Gwei
         ]
         with (
-            patch_latest_block(11),
-            patch_os_token_redeemer_contract_nonce(6),
+            patch_finalized_block(11),
             patch_os_token_contract_address(os_token_contract_address),
             patch_os_token_converter(os_token_converter),
             patch_api_client(mock_protocol_data),
             patch_graph_calls(allocators, leverage_positions, os_token_holders),
-            patch_ipfs_client() as mock_upload_json,
             patch_startup_check(),
+            runner.isolated_filesystem(),
         ):
-            result = runner.invoke(update_redeemable_positions, args, input='\n')
-            assert result.exit_code == 0
-            mock_upload_json.assert_not_called()
+            first_result = runner.invoke(fetch_redeemable_positions, args, input='\n')
+            assert first_result.exit_code == 0
+
+            second_result = runner.invoke(fetch_redeemable_positions, args, input='\n')
+            assert second_result.exit_code != 0
+            assert 'redeemable_positions_mainnet_11.json already exists' in second_result.output
 
 
 @contextlib.contextmanager
@@ -825,7 +742,7 @@ def patch_graph_calls(
     leverage_positions: list[LeverageStrategyPosition],
     os_token_holders: dict[ChecksumAddress, Wei],
 ):
-    target = 'src.redemptions.commands.update_redeemable_positions'
+    target = 'src.redemptions.commands.fetch_redeemable_positions'
     with (
         patch(f'{target}.graph_get_redeemable_allocators', return_value=allocators),
         patch(f'{target}.graph_get_leverage_positions', return_value=leverage_positions),
@@ -835,18 +752,18 @@ def patch_graph_calls(
 
 
 @contextlib.contextmanager
-def patch_latest_block(block_number):
+def patch_finalized_block(block_number: int):
     with patch(
-        'src.redemptions.commands.update_redeemable_positions.execution_client', new=AsyncMock()
+        'src.redemptions.commands.fetch_redeemable_positions.execution_client', new=AsyncMock()
     ) as execution_client_mock:
-        execution_client_mock.eth.get_block_number.return_value = block_number
+        execution_client_mock.eth.get_block.return_value = {'number': block_number}
         yield
 
 
 @contextlib.contextmanager
 def patch_os_token_converter(os_token_converter: OsTokenConverter):
     with patch(
-        'src.redemptions.commands.update_redeemable_positions.create_os_token_converter',
+        'src.redemptions.commands.fetch_redeemable_positions.create_os_token_converter',
         return_value=os_token_converter,
     ):
         yield
@@ -863,36 +780,15 @@ def patch_os_token_contract_address(address: ChecksumAddress):
 
 
 @contextlib.contextmanager
-def patch_os_token_redeemer_contract_nonce(nonce):
-    with patch(
-        'src.redemptions.commands.update_redeemable_positions.os_token_redeemer_contract.nonce',
-        return_value=nonce,
-    ):
-        yield
-
-
-@contextlib.contextmanager
 def patch_api_client(mock_protocol_data):
     with patch('src.redemptions.api_client.APIClient._fetch_json', return_value=mock_protocol_data):
         yield
 
 
 @contextlib.contextmanager
-def patch_ipfs_client():
-    mock_upload_json = AsyncMock(return_value=faker.ipfs_hash())
-    mock_ipfs_client = MagicMock()
-    mock_ipfs_client.upload_json = mock_upload_json
-    mock_build = MagicMock(return_value=mock_ipfs_client)
-    with patch(
-        'src.redemptions.commands.update_redeemable_positions.build_ipfs_upload_clients', mock_build
-    ):
-        yield mock_upload_json
-
-
-@contextlib.contextmanager
 def patch_startup_check():
     with patch(
-        'src.redemptions.commands.update_redeemable_positions._startup_check',
+        'src.redemptions.commands.fetch_redeemable_positions._startup_check',
         new=AsyncMock(),
     ):
         yield
