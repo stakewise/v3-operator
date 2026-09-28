@@ -51,10 +51,8 @@ async def update_oracles_cache() -> None:
         config = await _fetch_config(event) if event else oracles_cache.config
     else:
         # Cold cache: start from the release checkpoint instead of the keeper genesis block.
-        event = await _get_config_updated_event_since_checkpoint(to_block=to_block)
-        if not event:
-            raise ValueError('Failed to fetch IPFS hash of oracles config')
-        config = await _fetch_config(event)
+        config_ipfs_hash = await _get_config_ipfs_hash_since_checkpoint(to_block=to_block)
+        config = await _fetch_config_by_hash(config_ipfs_hash)
 
     rewards_threshold_call = keeper_contract.encode_abi(fn_name='rewardsMinOracles', args=[])
     validators_threshold_call = keeper_contract.encode_abi(fn_name='validatorsMinOracles', args=[])
@@ -76,10 +74,11 @@ async def update_oracles_cache() -> None:
     )
 
 
-async def _get_config_updated_event_since_checkpoint(to_block: BlockNumber) -> EventData | None:
+async def _get_config_ipfs_hash_since_checkpoint(to_block: BlockNumber) -> str:
     """
     Cold cache lookup. Scans from the checkpoint to avoid re-scanning the whole
-    history, and falls back to the last known event block when nothing is newer.
+    history, and falls back to the IPFS hash of the last known event when nothing is newer.
+    The fallback doesn't read old event logs, so it works on nodes with pruned history.
     """
     checkpoints = settings.network_config.CHECKPOINTS
     from_block = BlockNumber(checkpoints.CONFIG_UPDATE_CHECKPOINT_BLOCK + 1)
@@ -92,13 +91,14 @@ async def _get_config_updated_event_since_checkpoint(to_block: BlockNumber) -> E
             from_block=from_block, to_block=to_block
         )
         if event:
-            return event
+            return event['args']['configIpfsHash']
 
-    last_event_block = checkpoints.CONFIG_UPDATE_LAST_EVENT_BLOCK
-    return await keeper_contract.get_config_updated_event(
-        from_block=last_event_block, to_block=last_event_block
-    )
+    return checkpoints.CONFIG_UPDATE_LAST_EVENT_IPFS_HASH
 
 
 async def _fetch_config(event: EventData) -> dict:
-    return cast(dict, await ipfs_fetch_client.fetch_json(event['args']['configIpfsHash']))
+    return await _fetch_config_by_hash(event['args']['configIpfsHash'])
+
+
+async def _fetch_config_by_hash(config_ipfs_hash: str) -> dict:
+    return cast(dict, await ipfs_fetch_client.fetch_json(config_ipfs_hash))

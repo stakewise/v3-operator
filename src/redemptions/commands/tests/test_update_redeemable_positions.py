@@ -487,7 +487,14 @@ def test_distributes_boosted_shares_excess_over_same_vault_mint_becomes_residual
     assert allocators[0].residual_boosted_shares == Wei(200)
 
 
-@pytest.mark.usefixtures('_init_config')
+@pytest.fixture
+def _isolated_filesystem(runner: CliRunner):
+    # the command writes redeemable_positions_<timestamp>.json into cwd
+    with runner.isolated_filesystem():
+        yield
+
+
+@pytest.mark.usefixtures('_init_config', '_isolated_filesystem')
 class TestUpdateOsTokenPositions:
     @pytest.mark.usefixtures('fake_settings', 'setup_test_clients')
     async def test_basic_call(
