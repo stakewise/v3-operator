@@ -100,7 +100,7 @@ def calc_default_regular_sync_eta() -> float:
     """
     # Assume initial sync is 90% of the total sync process
     initial_sync_ratio = 0.9
-    initial_sync_eta = settings.network_config.NODE_CONFIG.INITIAL_SYNC_ETA
+    initial_sync_eta = settings.network_config.NODEWISE_CONFIG.INITIAL_SYNC_ETA
     regular_sync_eta = (1 - initial_sync_ratio) * initial_sync_eta
     return regular_sync_eta
 
@@ -298,13 +298,13 @@ async def _calc_initial_execution_sync_eta() -> float:
     current_stage = _get_current_stage(reth_log_file)
 
     # Get stage order and eta mapping from config
-    node_config = settings.network_config.NODE_CONFIG
-    initial_stage_to_eta = node_config.INITIAL_SYNC_STAGE_TO_ETA
+    nodewise_config = settings.network_config.NODEWISE_CONFIG
+    initial_stage_to_eta = nodewise_config.INITIAL_SYNC_STAGE_TO_ETA
     stages = list(initial_stage_to_eta.keys())
 
     if current_stage is None:
         # If can't detect stage, fallback to sum of all default ETAs
-        return node_config.INITIAL_SYNC_ETA
+        return nodewise_config.INITIAL_SYNC_ETA
 
     current_index = stages.index(current_stage) if current_stage in stages else None
     total_eta = 0.0
@@ -320,7 +320,7 @@ async def _calc_initial_execution_sync_eta() -> float:
                 total_eta += initial_stage_to_eta[stage]
         else:
             # If current stage not in list, fallback to sum of all default ETAs
-            total_eta = node_config.INITIAL_SYNC_ETA
+            total_eta = nodewise_config.INITIAL_SYNC_ETA
             break
 
     return total_eta
