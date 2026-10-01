@@ -379,8 +379,7 @@ async def load_vault_validators() -> None:
         return
 
     logger.info('Downloading vault validators data from IPFS...')
-    data = await _fetch_ipfs_dump(ipfs_hash)
-    validators = parse_vault_validators_dump(data, settings.vault, last_block)
+    validators = await fetch_vault_validators_dump()
 
     if validators:
         VaultValidatorCrud().save_vault_validators(validators)
@@ -395,6 +394,18 @@ async def load_vault_validators() -> None:
             settings.vault,
             last_block,
         )
+
+
+async def fetch_vault_validators_dump() -> list[VaultValidator]:
+    """
+    Fetches the vault validators registered up to `VAULT_VALIDATORS_LAST_BLOCK`
+    from the network-wide ipfs dump.
+    """
+    checkpoints = settings.network_config.CHECKPOINTS
+    data = await _fetch_ipfs_dump(checkpoints.VAULT_VALIDATORS_IPFS_HASH)
+    return parse_vault_validators_dump(
+        data, settings.vault, checkpoints.VAULT_VALIDATORS_LAST_BLOCK
+    )
 
 
 def parse_vault_validators_dump(

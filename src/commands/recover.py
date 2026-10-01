@@ -18,6 +18,7 @@ from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_NETWORK, settings
 from src.validators.consensus import iter_validators_by_ids
+from src.validators.tasks import fetch_vault_validators_dump
 
 
 @click.command(help='Recover config data directory and keystores.')
@@ -112,9 +113,9 @@ def recover(
     """
     Recover the config data directory and the keystores.
 
-    Vault validators are read from the vault contract events, never from the operator
-    database, so that the command also works in database-less setups. `--vault-first-block`
-    narrows the scanned block range.
+    Vault validators are read from the network-wide ipfs dump and the vault contract events
+    after the dump, never from the operator database, so that the command also works
+    in database-less setups. `--vault-first-block` narrows the scanned block range.
     """
     # pylint: disable=duplicate-code
     operator_config = OperatorConfig(
@@ -232,11 +233,25 @@ async def _fetch_registered_validators(
 ) -> dict[HexStr, ValidatorStatus | None]:
     """Fetch registered validators."""
     click.secho(f'Fetching registered validators for vault {vault}...', bold=True)
+    checkpoints = settings.network_config.CHECKPOINTS
+    from_block = settings.vault_first_block
+    public_keys: list[HexStr] = []
+    if (
+        checkpoints.VAULT_VALIDATORS_IPFS_HASH
+        and checkpoints.VAULT_VALIDATORS_LAST_BLOCK
+        and from_block <= checkpoints.VAULT_VALIDATORS_LAST_BLOCK
+    ):
+        click.secho('Downloading vault validators data from IPFS...', bold=True)
+        public_keys.extend(v.public_key for v in await fetch_vault_validators_dump())
+        from_block = BlockNumber(checkpoints.VAULT_VALIDATORS_LAST_BLOCK + 1)
+
     current_block = await execution_client.eth.get_block_number()
     vault_contract = VaultContract(vault)
-    public_keys = await vault_contract.get_registered_validators_public_keys(
-        from_block=settings.vault_first_block,
-        to_block=current_block,
+    public_keys.extend(
+        await vault_contract.get_registered_validators_public_keys(
+            from_block=from_block,
+            to_block=current_block,
+        )
     )
     click.secho(f'Fetched {len(public_keys)} registered validators', bold=True)
 
