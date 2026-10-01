@@ -8,7 +8,6 @@ from eth_utils import add_0x_prefix
 from sw_utils.consensus import EXITED_STATUSES, ValidatorStatus
 
 from src.common.clients import close_clients, execution_client, setup_clients
-from src.common.contracts import VaultContract
 from src.common.credentials import CredentialManager
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.password import generate_password, get_or_create_password_file
@@ -18,7 +17,7 @@ from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_NETWORK, settings
 from src.validators.consensus import iter_validators_by_ids
-from src.validators.tasks import fetch_vault_validators_dump
+from src.validators.tasks import fetch_vault_validators_public_keys
 
 
 @click.command(help='Recover config data directory and keystores.')
@@ -233,26 +232,8 @@ async def _fetch_registered_validators(
 ) -> dict[HexStr, ValidatorStatus | None]:
     """Fetch registered validators."""
     click.secho(f'Fetching registered validators for vault {vault}...', bold=True)
-    checkpoints = settings.network_config.CHECKPOINTS
-    from_block = settings.vault_first_block
-    public_keys: list[HexStr] = []
-    if (
-        checkpoints.VAULT_VALIDATORS_IPFS_HASH
-        and checkpoints.VAULT_VALIDATORS_LAST_BLOCK
-        and from_block <= checkpoints.VAULT_VALIDATORS_LAST_BLOCK
-    ):
-        click.secho('Downloading vault validators data from IPFS...', bold=True)
-        public_keys.extend(v.public_key for v in await fetch_vault_validators_dump())
-        from_block = BlockNumber(checkpoints.VAULT_VALIDATORS_LAST_BLOCK + 1)
-
     current_block = await execution_client.eth.get_block_number()
-    vault_contract = VaultContract(vault)
-    public_keys.extend(
-        await vault_contract.get_registered_validators_public_keys(
-            from_block=from_block,
-            to_block=current_block,
-        )
-    )
+    public_keys = await fetch_vault_validators_public_keys(vault=vault, to_block=current_block)
     click.secho(f'Fetched {len(public_keys)} registered validators', bold=True)
 
     click.secho('Fetching validators statuses...', bold=True)

@@ -408,6 +408,37 @@ async def fetch_vault_validators_dump() -> list[VaultValidator]:
     )
 
 
+async def fetch_vault_validators_public_keys(
+    vault: ChecksumAddress, to_block: BlockNumber
+) -> list[HexStr]:
+    """
+    Fetches the public keys of the validators registered in the vault up to `to_block`.
+
+    Validators registered up to `VAULT_VALIDATORS_LAST_BLOCK` are read from the network-wide
+    ipfs dump, the rest from the vault contract events. Does not use the operator database.
+    """
+    checkpoints = settings.network_config.CHECKPOINTS
+    from_block = settings.vault_first_block
+    public_keys: list[HexStr] = []
+    if (
+        checkpoints.VAULT_VALIDATORS_IPFS_HASH
+        and checkpoints.VAULT_VALIDATORS_LAST_BLOCK
+        and from_block <= checkpoints.VAULT_VALIDATORS_LAST_BLOCK
+    ):
+        logger.info('Downloading vault validators data from IPFS...')
+        public_keys.extend(v.public_key for v in await fetch_vault_validators_dump())
+        from_block = BlockNumber(checkpoints.VAULT_VALIDATORS_LAST_BLOCK + 1)
+
+    vault_contract = VaultContract(vault)
+    public_keys.extend(
+        await vault_contract.get_registered_validators_public_keys(
+            from_block=from_block,
+            to_block=to_block,
+        )
+    )
+    return public_keys
+
+
 def parse_vault_validators_dump(
     data: bytes, vault_address: ChecksumAddress, last_block: BlockNumber
 ) -> list[VaultValidator]:
