@@ -3393,13 +3393,13 @@ packaging = ">=22.0"
 
 [[package]]
 name = "pyjwt"
-version = "2.13.0"
+version = "2.15.1"
 description = "JSON Web Token implementation in Python"
 optional = false
 python-versions = ">=3.9"
 files = [
-    {file = "pyjwt-2.13.0-py3-none-any.whl", hash = "sha256:66adcc2aff09b3f1bbd95fc1e1577df8ac8723c978552fd43304c8a290ac5728"},
-    {file = "pyjwt-2.13.0.tar.gz", hash = "sha256:41571c89ca91598c79e8ef18a2d07367d4810fbbd6f637794879baf1b7703423"},
+    {file = "pyjwt-2.15.1-py3-none-any.whl", hash = "sha256:42d59d631f7768a1028a64c7ff581a9bf7519804daf91fc5b6c56e30eec5e193"},
+    {file = "pyjwt-2.15.1.tar.gz", hash = "sha256:4f259e80cdfb6b3fc18a7de51fd1ef9ec79652f25019bae68975ca2468a34df8"},
 ]
 
 [package.extras]
@@ -4043,7 +4043,7 @@ resolved_reference = "682bb34587398e5500fde72709425f57d402399f"
 
 [[package]]
 name = "sw-utils"
-version = "v0.15.1"
+version = "v0.15.3"
 description = "StakeWise Python utils"
 optional = false
 python-versions = "^3.12"
@@ -4055,7 +4055,7 @@ gql = {version = "==3.5.3", extras = ["aiohttp"]}
 ipfshttpclient = "^0.8.0a2"
 multiformats = "==0.3.1.post4"
 py-ecc = "^8.0.0"
-pyjwt = "==2.13.0"
+pyjwt = "==2.15.1"
 ssz = "==0.5.2"
 sw-milagro-bls-binding = {git = "https://github.com/stakewise/milagro_bls_binding.git", tag = "v1.9.1"}
 tenacity = "==8.2.3"
@@ -4064,8 +4064,8 @@ web3 = "==7.14.1"
 [package.source]
 type = "git"
 url = "https://github.com/stakewise/sw-utils.git"
-reference = "v0.15.1"
-resolved_reference = "0e6cc2bc1d329b8eb1878eec1b9aeeaff57c93fb"
+reference = "v0.15.3"
+resolved_reference = "8aeaa0181d309299d2fc93f3c52aee17a809875a"
 
 [[package]]
 name = "tenacity"
@@ -4514,4 +4514,4 @@ type = ["pytest-mypy (>=1.0.1)"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12,<3.13"
-content-hash = "4b42293375b6bf2e9c84e9ad9e5eff7e471d7448c66cf4bc162ef97e52e1c761"
+content-hash = "2d77077bdc07d6deb6677e51b4d402fab1cbaad85542da6431ac323da2b877ee"
