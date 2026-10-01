@@ -57,7 +57,7 @@ class NetworkConfig(BaseNetworkConfig):
     EXECUTION_REQUEST_QUEUE_STORAGE_OFFSET: int
     TARGET_WITHDRAWAL_REQUESTS_PER_BLOCK: int
     TARGET_CONSOLIDATION_REQUESTS_PER_BLOCK: int
-    NODE_CONFIG: NodeConfig
+    NODEWISE_CONFIG: NodeWiseConfig
 
 
 @dataclass
@@ -76,9 +76,22 @@ class OperatorCheckpointsConfig(CheckpointsConfig):
     EXIT_SIGNATURES_LAST_EVENT_BLOCK: BlockNumber | None
     EXIT_SIGNATURES_CHECKPOINT_BLOCK: BlockNumber
 
+    @property
+    def EVENT_LOGS_START_BLOCK(self) -> BlockNumber:
+        """
+        The earliest block the operator reads event logs from.
+        Execution client may prune receipts and bodies before this block.
+        """
+        return min(
+            self.GENESIS_VALIDATORS_LAST_BLOCK,
+            self.CONFIG_UPDATE_CHECKPOINT_BLOCK,
+            self.VAULT_VALIDATORS_LAST_BLOCK,
+            self.EXIT_SIGNATURES_CHECKPOINT_BLOCK,
+        )
+
 
 @dataclass
-class NodeConfig:
+class NodeWiseConfig:
     CONSENSUS_CHECKPOINT_SYNC_URL: str
     ERA_URL: str
     MIN_MEMORY_GB: int
@@ -152,7 +165,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         EXECUTION_REQUEST_QUEUE_STORAGE_OFFSET=4,
         TARGET_WITHDRAWAL_REQUESTS_PER_BLOCK=2,
         TARGET_CONSOLIDATION_REQUESTS_PER_BLOCK=1,
-        NODE_CONFIG=NodeConfig(
+        NODEWISE_CONFIG=NodeWiseConfig(
             CONSENSUS_CHECKPOINT_SYNC_URL='https://beaconstate.info/',
             ERA_URL='https://data.ethpandaops.io/era1/mainnet/',
             MIN_MEMORY_GB=16,
@@ -210,7 +223,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         EXECUTION_REQUEST_QUEUE_STORAGE_OFFSET=4,
         TARGET_WITHDRAWAL_REQUESTS_PER_BLOCK=2,
         TARGET_CONSOLIDATION_REQUESTS_PER_BLOCK=1,
-        NODE_CONFIG=NodeConfig(
+        NODEWISE_CONFIG=NodeWiseConfig(
             CONSENSUS_CHECKPOINT_SYNC_URL='https://hoodi.beaconstate.info/',
             ERA_URL='',
             MIN_MEMORY_GB=16,
@@ -270,7 +283,7 @@ NETWORKS: dict[str, NetworkConfig] = {
         EXECUTION_REQUEST_QUEUE_STORAGE_OFFSET=4,
         TARGET_WITHDRAWAL_REQUESTS_PER_BLOCK=2,
         TARGET_CONSOLIDATION_REQUESTS_PER_BLOCK=1,
-        NODE_CONFIG=NodeConfig(
+        NODEWISE_CONFIG=NodeWiseConfig(
             CONSENSUS_CHECKPOINT_SYNC_URL='https://beacon.gnosischain.com/',
             ERA_URL='',
             MIN_MEMORY_GB=16,

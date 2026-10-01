@@ -87,7 +87,7 @@ class RethProcess(BaseProcess):
         network: str,
         reth_dir: Path,
         streams: StdStreams,
-        prune_receipts_before: BlockNumber,
+        prune_before: BlockNumber,
         era_url: str,
     ):
         program = reth_dir / 'reth'
@@ -104,7 +104,6 @@ class RethProcess(BaseProcess):
             '30303',
             '--discovery.port',
             '30303',
-            '--enable-discv5-discovery',
             '--discovery.v5.port',
             '30304',
             '--http',
@@ -120,8 +119,10 @@ class RethProcess(BaseProcess):
             reth_dir / 'logs',
             '--nat',
             'upnp',
+            '--prune.bodies.before',
+            str(prune_before),
             '--prune.receipts.before',
-            str(prune_receipts_before),
+            str(prune_before),
         ]
 
         if era_url:
@@ -148,7 +149,7 @@ class LighthouseProcess(BaseProcess):
             '--staking',
             '--validator-monitor-auto',
             '--checkpoint-sync-url',
-            NETWORKS[network].NODE_CONFIG.CONSENSUS_CHECKPOINT_SYNC_URL,
+            NETWORKS[network].NODEWISE_CONFIG.CONSENSUS_CHECKPOINT_SYNC_URL,
             '--port',
             '9000',
             '--quic-port',
@@ -211,14 +212,16 @@ class ProcessBuilder:
 class RethProcessBuilder(ProcessBuilder):
     async def get_process(self) -> RethProcess:
         reth_dir = settings.nodes_dir / 'reth'
-        prune_receipts_before = settings.network_config.VALIDATORS_REGISTRY_GENESIS_BLOCK
-        era_url = NETWORKS[settings.network].NODE_CONFIG.ERA_URL
+        network_config = settings.network_config
+        # The specified block itself is not pruned.
+        prune_before = network_config.CHECKPOINTS.EVENT_LOGS_START_BLOCK
+        era_url = network_config.NODEWISE_CONFIG.ERA_URL
 
         return RethProcess(
             network=settings.network,
             reth_dir=reth_dir,
             streams=self.streams,
-            prune_receipts_before=prune_receipts_before,
+            prune_before=prune_before,
             era_url=era_url,
         )
 
