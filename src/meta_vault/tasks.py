@@ -1,4 +1,5 @@
 import logging
+import time
 
 from eth_typing import ChecksumAddress, HexStr
 from sw_utils import (
@@ -31,6 +32,10 @@ from src.meta_vault.typings import ContractCall, SubVaultExitRequest, Vault
 from src.reward_splitter.tasks import claim_reward_splitters
 
 logger = logging.getLogger(__name__)
+
+# Max claim delay across vault versions (24 hours) plus 1 hour for the subgraph
+# to update `isClaimable` after the delay ends.
+EXIT_REQUEST_OVERDUE_SECONDS = 25 * 60 * 60
 
 
 class ProcessMetaVaultTask(BaseTask):
@@ -107,7 +112,9 @@ async def process_meta_vault_tree(
             meta_vaults_map=meta_vaults_map,
         )
     except ClaimDelayNotPassedException as e:
-        logger.error(
+        is_overdue = time.time() > e.exit_request.timestamp + EXIT_REQUEST_OVERDUE_SECONDS
+        logger.log(
+            logging.ERROR if is_overdue else logging.WARNING,
             'Can not process meta vault %s because claim delay for exit request with '
             'position ticket %s has not passed yet',
             root_meta_vault.address,
