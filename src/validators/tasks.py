@@ -379,7 +379,7 @@ async def load_vault_validators() -> None:
         return
 
     logger.info('Downloading vault validators data from IPFS...')
-    validators = await fetch_vault_validators_dump()
+    validators = await _fetch_vault_validators_dump(settings.vault)
 
     if validators:
         VaultValidatorCrud().save_vault_validators(validators)
@@ -394,18 +394,6 @@ async def load_vault_validators() -> None:
             settings.vault,
             last_block,
         )
-
-
-async def fetch_vault_validators_dump() -> list[VaultValidator]:
-    """
-    Fetches the vault validators registered up to `VAULT_VALIDATORS_LAST_BLOCK`
-    from the network-wide ipfs dump.
-    """
-    checkpoints = settings.network_config.CHECKPOINTS
-    data = await _fetch_ipfs_dump(checkpoints.VAULT_VALIDATORS_IPFS_HASH)
-    return parse_vault_validators_dump(
-        data, settings.vault, checkpoints.VAULT_VALIDATORS_LAST_BLOCK
-    )
 
 
 async def fetch_vault_validators_public_keys(
@@ -426,7 +414,7 @@ async def fetch_vault_validators_public_keys(
         and from_block <= checkpoints.VAULT_VALIDATORS_LAST_BLOCK
     ):
         logger.info('Downloading vault validators data from IPFS...')
-        public_keys.extend(v.public_key for v in await fetch_vault_validators_dump())
+        public_keys.extend(v.public_key for v in await _fetch_vault_validators_dump(vault))
         from_block = BlockNumber(checkpoints.VAULT_VALIDATORS_LAST_BLOCK + 1)
 
     vault_contract = VaultContract(vault)
@@ -439,7 +427,17 @@ async def fetch_vault_validators_public_keys(
     return public_keys
 
 
-def parse_vault_validators_dump(
+async def _fetch_vault_validators_dump(vault: ChecksumAddress) -> list[VaultValidator]:
+    """
+    Fetches the vault validators registered up to `VAULT_VALIDATORS_LAST_BLOCK`
+    from the network-wide ipfs dump.
+    """
+    checkpoints = settings.network_config.CHECKPOINTS
+    data = await _fetch_ipfs_dump(checkpoints.VAULT_VALIDATORS_IPFS_HASH)
+    return _parse_vault_validators_dump(data, vault, checkpoints.VAULT_VALIDATORS_LAST_BLOCK)
+
+
+def _parse_vault_validators_dump(
     data: bytes, vault_address: ChecksumAddress, last_block: BlockNumber
 ) -> list[VaultValidator]:
     """
