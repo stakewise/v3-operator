@@ -5,6 +5,7 @@ from typing import Generator
 import milagro_bls_binding as bls
 import pytest
 from aioresponses import CallbackResult, aioresponses
+from eth_typing import HexStr
 from sw_utils.tests import faker
 from web3 import Web3
 
@@ -14,12 +15,11 @@ def hashi_vault_url() -> str:
     return 'http://vault:8200'
 
 
-def _generate_key_pair() -> tuple[str, str]:
+def _generate_key_pair() -> tuple[HexStr, HexStr]:
     """Generate a private key and the public key derived from it, the same way
     HashiVaultKeystore verifies loaded keys against their label."""
-    sk = Web3.to_hex(faker.private_key())
-    pk = Web3.to_hex(bls.SkToPk(Web3.to_bytes(hexstr=sk)))
-    return pk, sk
+    sk = faker.bls_private_key()
+    return Web3.to_hex(bls.SkToPk(sk)), Web3.to_hex(sk)
 
 
 class HashiVaultStub:
