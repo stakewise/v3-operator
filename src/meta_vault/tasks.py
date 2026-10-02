@@ -112,14 +112,22 @@ async def process_meta_vault_tree(
             meta_vaults_map=meta_vaults_map,
         )
     except ClaimDelayNotPassedException as e:
-        is_overdue = time.time() > e.exit_request.timestamp + EXIT_REQUEST_OVERDUE_SECONDS
-        logger.log(
-            logging.ERROR if is_overdue else logging.WARNING,
-            'Can not process meta vault %s because claim delay for exit request with '
-            'position ticket %s has not passed yet',
-            root_meta_vault.address,
-            e.exit_request.position_ticket,
-        )
+        if time.time() > e.exit_request.timestamp + EXIT_REQUEST_OVERDUE_SECONDS:
+            logger.error(
+                'Can not process meta vault %s because exit request with position ticket %s '
+                'in vault %s is still not claimable although the claim delay has passed',
+                root_meta_vault.address,
+                e.exit_request.position_ticket,
+                e.exit_request.vault,
+            )
+        else:
+            logger.warning(
+                'Can not process meta vault %s because claim delay for exit request with '
+                'position ticket %s in vault %s has not passed yet',
+                root_meta_vault.address,
+                e.exit_request.position_ticket,
+                e.exit_request.vault,
+            )
         return
 
     # Deposit to sub vaults for the entire meta vault tree (top-down order)
