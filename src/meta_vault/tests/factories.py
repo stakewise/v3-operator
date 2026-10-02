@@ -3,6 +3,7 @@ from hexbytes import HexBytes
 from sw_utils.tests import faker
 from web3.types import Wei
 
+from src.common.typings import ExitRequest
 from src.meta_vault.typings import Vault
 
 
@@ -23,4 +24,18 @@ def create_vault(
         proof=[],
         is_meta_vault=is_meta_vault,
         sub_vaults=[faker.eth_address() for _ in range(sub_vaults_count)],
+    )
+
+
+def create_exit_request(timestamp: int) -> ExitRequest:
+    return ExitRequest(
+        vault=faker.eth_address(),
+        position_ticket=faker.random_int(),
+        timestamp=timestamp,
+        exit_queue_index=1,
+        is_claimed=False,
+        is_claimable=False,
+        receiver=faker.eth_address(),
+        exited_assets=Wei(1),
+        total_assets=Wei(1),
     )

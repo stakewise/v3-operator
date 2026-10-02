@@ -1,3 +1,5 @@
+import logging
+import time
 from contextlib import contextmanager
 from unittest import mock
 
@@ -8,12 +10,15 @@ from sw_utils.tests import faker
 
 from src.config.settings import settings
 from src.meta_vault.contracts import MetaVaultContract
+from src.meta_vault.exceptions import ClaimDelayNotPassedException
 from src.meta_vault.tasks import (
+    EXIT_REQUEST_OVERDUE_SECONDS,
     ProcessMetaVaultTask,
     meta_vault_tree_update_state,
     multicall_contract,
+    process_meta_vault_tree,
 )
-from src.meta_vault.tests.factories import create_vault
+from src.meta_vault.tests.factories import create_exit_request, create_vault
 from src.meta_vault.typings import Vault
 
 
@@ -147,6 +152,42 @@ class TestProcessMetaVaultFeeSplitterClaim:
             'src.meta_vault.tasks.graph_get_vaults', return_value={}
         ), mock.patch('src.meta_vault.tasks.claim_reward_splitters') as claim_mock:
             yield claim_mock
+
+
+class TestProcessMetaVaultTreeClaimDelay:
+    @pytest.mark.parametrize(
+        ('seconds_until_overdue', 'expected_level'),
+        [(600, logging.WARNING), (-600, logging.ERROR)],
+    )
+    async def test_log_level(
+        self,
+        seconds_until_overdue: int,
+        expected_level: int,
+        caplog: pytest.LogCaptureFixture,
+    ):
+        # Arrange
+        meta_vault = create_vault(is_meta_vault=True, sub_vaults_count=1)
+        exit_request = create_exit_request(
+            timestamp=int(time.time()) - EXIT_REQUEST_OVERDUE_SECONDS + seconds_until_overdue
+        )
+
+        # Act
+        with mock.patch(
+            'src.meta_vault.tasks.meta_vault_tree_update_state',
+            side_effect=ClaimDelayNotPassedException(exit_request),
+        ), mock.patch(
+            'src.meta_vault.tasks.process_deposit_to_sub_vaults'
+        ) as deposit_mock, caplog.at_level(
+            logging.WARNING, logger='src.meta_vault.tasks'
+        ):
+            await process_meta_vault_tree(
+                root_meta_vault=meta_vault,
+                meta_vaults_map={meta_vault.address: meta_vault},
+            )
+
+        # Assert
+        assert [record.levelno for record in caplog.records] == [expected_level]
+        deposit_mock.assert_not_called()
 
 
 class GraphMock:
