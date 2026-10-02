@@ -11,7 +11,6 @@ from web3.types import Gwei, Wei
 
 from src.common.clients import close_clients, setup_clients
 from src.common.consensus import get_chain_justified_head
-from src.common.contracts import VaultContract
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.startup_check import check_validators_manager, check_vault_version
 from src.common.utils import log_verbose
@@ -22,6 +21,7 @@ from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI, settings
 from src.validators.consensus import EXITING_STATUSES, fetch_consensus_validators
 from src.validators.relayer import RelayerClient
+from src.validators.tasks import fetch_vault_validators_public_keys
 from src.validators.typings import ConsensusValidator
 from src.withdrawals.execution import submit_withdraw_validators
 
@@ -140,9 +140,9 @@ def exit_validators(
     Trigger vault validator exits via vault contract.
     To initiate a full validator exit, send a withdrawal request with a zero amount.
 
-    Vault validators are read from the vault contract events, never from the operator
-    database, so that the command also works in database-less setups. `--vault-first-block`
-    narrows the scanned block range.
+    Vault validators are read from the network-wide ipfs dump and the vault contract events
+    after the dump, never from the operator database, so that the command also works
+    in database-less setups. `--vault-first-block` narrows the scanned block range.
     """
     if all([indexes, count]):
         raise click.ClickException('Please provide either --indexes or --count, not both.')
@@ -233,10 +233,8 @@ async def process(
     max_activation_epoch = chain_head.epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
 
     logger.info('Fetching vault validators...')
-    vault_contract = VaultContract(vault_address)
-    public_keys = await vault_contract.get_registered_validators_public_keys(
-        from_block=settings.vault_first_block,
-        to_block=chain_head.block_number,
+    public_keys = await fetch_vault_validators_public_keys(
+        vault=vault_address, to_block=chain_head.block_number
     )
     if indexes:
         active_validators = await _check_exiting_validators(

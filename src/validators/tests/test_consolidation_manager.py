@@ -1,6 +1,6 @@
 import re
 from collections import defaultdict
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from eth_typing import HexStr
@@ -1442,13 +1442,10 @@ async def _create_manager_via_create(
     execution_consolidations: list[dict] | None = None,
 ) -> ConsolidationManager:
     """Exercises the real ``ConsolidationManager.create()`` assembly logic, mocking only the
-    network boundaries: vault event scan, consensus validator fetch, and the CL/EL
+    network boundaries: vault validators fetch, consensus validator fetch, and the CL/EL
     consolidation queues (the real ``get_pending_consolidations`` merge logic runs unmocked)."""
     if chain_head is None:
         chain_head = create_chain_head(epoch=1024)
-
-    vault_contract = MagicMock()
-    vault_contract.get_registered_validators_public_keys = AsyncMock(return_value=vault_validators)
 
     async def fetch_requested_consensus_validators(
         validator_ids: list[HexStr], slot: str = 'head'
@@ -1456,7 +1453,10 @@ async def _create_manager_via_create(
         return [val for val in consensus_validators if val.public_key in validator_ids]
 
     with (
-        patch('src.validators.consolidation_manager.VaultContract', return_value=vault_contract),
+        patch(
+            'src.validators.consolidation_manager.fetch_vault_validators_public_keys',
+            AsyncMock(return_value=vault_validators),
+        ),
         patch(
             'src.validators.consolidation_manager.fetch_consensus_validators',
             side_effect=fetch_requested_consensus_validators,

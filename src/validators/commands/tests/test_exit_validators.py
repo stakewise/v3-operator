@@ -94,7 +94,7 @@ class TestValidatorsExit:
         public_keys = [val.public_key for val in consensus_validators]
         with (
             mock.patch(
-                'src.validators.commands.exit_validators.VaultContract.get_registered_validators_public_keys',
+                'src.validators.commands.exit_validators.fetch_vault_validators_public_keys',
                 return_value=public_keys,
             ),
             mock.patch(
@@ -145,7 +145,7 @@ class TestValidatorsExit:
 
         with (
             mock.patch(
-                'src.validators.commands.exit_validators.VaultContract.get_registered_validators_public_keys',
+                'src.validators.commands.exit_validators.fetch_vault_validators_public_keys',
                 return_value=public_keys,
             ),
             mock.patch(
@@ -197,7 +197,7 @@ class TestValidatorsExit:
         ]
         with (
             mock.patch(
-                'src.validators.commands.exit_validators.VaultContract.get_registered_validators_public_keys',
+                'src.validators.commands.exit_validators.fetch_vault_validators_public_keys',
                 return_value=[validator.public_key for validator in consensus_validators],
             ),
             mock.patch(

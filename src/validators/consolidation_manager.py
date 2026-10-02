@@ -7,11 +7,11 @@ from sw_utils import ChainHead
 from web3.types import Gwei
 
 from src.common.consolidations import get_pending_consolidations
-from src.common.contracts import VaultContract
 from src.common.withdrawals import get_pending_partial_withdrawals
 from src.config.settings import settings
 from src.validators.consensus import EXITING_STATUSES, fetch_consensus_validators
 from src.validators.exceptions import ConsolidationError
+from src.validators.tasks import fetch_vault_validators_public_keys
 from src.validators.typings import ConsensusValidator, ConsolidationKeys
 
 logger = logging.getLogger(__name__)
@@ -51,11 +51,8 @@ class ConsolidationManager(ABC):
 
         # Fetch vault validators
         logger.info('Fetching vault validators...')
-        self.vault_validators = await VaultContract(
-            settings.vault
-        ).get_registered_validators_public_keys(
-            from_block=settings.vault_first_block,
-            to_block=self.chain_head.block_number,
+        self.vault_validators = await fetch_vault_validators_public_keys(
+            vault=settings.vault, to_block=self.chain_head.block_number
         )
 
         # Fetch consensus validators
