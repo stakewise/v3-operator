@@ -276,18 +276,19 @@ class Settings(metaclass=Singleton):
 
     @property
     def need_deposit_data_file(self) -> bool:
-        # Remote signer takes its public keys list from the deposit data file.
-        if self.remote_signer_use_deposit_data:
-            return True
+        if self.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
+            # Remote signer takes its public keys list from the deposit data file,
+            # so the file is required even when registrations are disabled.
+            if self.remote_signer_url and self.remote_signer_use_deposit_data:
+                return True
 
-        # The deposit data file is not read when registrations are disabled.
+            # The deposit data file is not read when registrations are disabled.
+            return not self.disable_validator_registrations
+
+        # At this point validators_registration_mode is API
         if self.disable_validator_registrations:
             return False
 
-        if self.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
-            return True
-
-        # At this point validators_registration_mode is API
         if self.relayer_type == RelayerTypes.DVT:
             # Validator registration data is taken from deposit data file.
             # DVT Relayer provides exit signature.
