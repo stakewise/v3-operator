@@ -262,10 +262,16 @@ async def wait_for_deposit_data_file() -> None:
     while not path.exists(settings.deposit_data_file):
         logger.warning("Can't find deposit data file (%s)", settings.deposit_data_file)
         time.sleep(15)
-    deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
     logger.info('Found deposit data file %s', settings.deposit_data_file)
 
-    if not settings.disable_deposit_data_warnings and not settings.disable_validator_registrations:
+    # The deposit data tree is only needed to compare roots. The file may be
+    # empty when registrations are disabled.
+    if settings.disable_validator_registrations:
+        return
+
+    deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
+
+    if not settings.disable_deposit_data_warnings:
         while True:
             try:
                 await check_deposit_data_root(deposit_data.tree.root)

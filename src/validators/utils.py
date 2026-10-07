@@ -6,7 +6,7 @@ import random
 from pathlib import Path
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
-from eth_typing import ChecksumAddress, HexAddress
+from eth_typing import ChecksumAddress, HexAddress, HexStr
 from eth_utils import add_0x_prefix
 from multiproof import StandardMerkleTree
 from sw_utils import ProtocolConfig, get_v1_withdrawal_credentials
@@ -138,6 +138,14 @@ def load_deposit_data(vault: HexAddress, deposit_data_file: Path) -> DepositData
 
     tree, validators = generate_validators_tree(vault, deposit_data)
     return DepositData(validators=validators, tree=tree)
+
+
+def load_deposit_data_public_keys(deposit_data_file: Path) -> list[HexStr]:
+    """Loads validators public keys from deposit data."""
+    with open(deposit_data_file, 'r', encoding='utf-8') as f:
+        deposit_data = json.load(f)
+
+    return [add_0x_prefix(data['pubkey']) for data in deposit_data]
 
 
 def generate_validators_tree(
