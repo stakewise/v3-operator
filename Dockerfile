@@ -48,6 +48,10 @@ WORKDIR $PYSETUP_PATH
 COPY poetry.lock pyproject.toml ./
 
 # install runtime deps - uses $POETRY_VIRTUALENVS_IN_PROJECT internally
+# sw-milagro-bls-binding ships an sdist only and pins rust 1.72.1 via its
+# rust-toolchain file. That cargo is too old to parse crates using the 2024
+# edition, so force the installed stable toolchain instead.
+ENV RUSTUP_TOOLCHAIN=stable
 RUN poetry install --only main
 
 

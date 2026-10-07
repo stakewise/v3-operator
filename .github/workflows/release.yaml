@@ -8,6 +8,11 @@ on:
     tags:
       - "v*.*.*"
 
+# sw-milagro-bls-binding is built from an sdist that pins rust 1.72.1,
+# which cannot parse crates using the 2024 edition.
+env:
+  RUSTUP_TOOLCHAIN: stable
+
 jobs:
   checks:
     name: Check version
