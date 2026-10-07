@@ -75,6 +75,8 @@ class ValidatorsTask(BaseTask):
                 keystore=self.keystore,
                 deposit_data=self.deposit_data,
             )
+        else:
+            metrics.unused_validator_keys.labels(network=settings.network).set(0)
         # check and register new validators
         await process_validators(
             keystore=self.keystore,
@@ -92,11 +94,12 @@ async def process_validators(
     """
     Calculates vault assets, requests oracles approval, submits registration tx
     """
-    if settings.disable_validator_registrations:
-        return None
-
     harvest_params = await get_harvest_params()
     validators_count = await get_validators_count_from_vault_assets(harvest_params)
+
+    # Vault assets are reported above to keep the metric exported.
+    if settings.disable_validator_registrations:
+        return None
 
     if not validators_count:
         # not enough balance to register validators
