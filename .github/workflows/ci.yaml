@@ -8,30 +8,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
       - name: Set up python
-        uses: actions/setup-python@v5
+        id: setup-python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
-          python-version: 3.12.8
-
-      # Install poetry
-      - name: Load cached Poetry installation
-        uses: actions/cache@v3
-        with:
-          path: ~/.local
-          key: poetry-0
+          python-version: 3.12.12
 
       - name: Install Poetry
-        uses: snok/install-poetry@v1
+        uses: snok/install-poetry@76e04a911780d5b312d89783f7b1cd627778900a # v1
         with:
           version: 1.8.3
           virtualenvs-create: true
           virtualenvs-in-project: true
           installer-parallel: true
 
+      - name: Cache Packages
+        id: cache-packages
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
+
       # Install dependencies
       - name: Install dependencies
+        if: steps.cache-packages.outputs.cache-hit != 'true'
         run: poetry install --no-interaction --no-root
 
       # Run precommit
@@ -40,7 +42,7 @@ jobs:
 
       # Markdown lint
       - name: markdownlint-cli
-        uses: nosborn/github-action-markdown-cli@v3.3.0
+        uses: nosborn/github-action-markdown-cli@9b5e871c11cc0649c5ac2526af22e23525fa344d # v3.3.0
         with:
           config_file: .markdownlint.yaml
           files: .
@@ -53,29 +55,32 @@ jobs:
       ENVIRONMENT: test
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
       - name: Set up python
-        uses: actions/setup-python@v5
+        id: setup-python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
-          python-version: 3.12.8
+          python-version: 3.12.12
 
-      # Install poetry
-      - name: Load cached Poetry installation
-        uses: actions/cache@v3
-        with:
-          path: ~/.local
-          key: poetry-0
       - name: Install Poetry
-        uses: snok/install-poetry@v1
+        uses: snok/install-poetry@76e04a911780d5b312d89783f7b1cd627778900a # v1
         with:
           version: 1.8.3
           virtualenvs-create: true
           virtualenvs-in-project: true
           installer-parallel: true
 
+      - name: Cache Packages
+        id: cache-packages
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
+
       # Install dependencies
       - name: Install dependencies
+        if: steps.cache-packages.outputs.cache-hit != 'true'
         run: poetry install --no-interaction --no-root
 
       # Run tests
@@ -91,34 +96,40 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
       - name: Set up python
-        uses: actions/setup-python@v5
+        id: setup-python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
-          python-version: 3.12.8
+          python-version: 3.12.12
 
-      # Install poetry
-      - name: Load cached Poetry installation
-        uses: actions/cache@v3
-        with:
-          path: ~/.local
-          key: poetry-0
       - name: Install Poetry
-        uses: snok/install-poetry@v1
+        uses: snok/install-poetry@76e04a911780d5b312d89783f7b1cd627778900a # v1
         with:
           version: 1.8.3
           virtualenvs-create: true
           virtualenvs-in-project: true
           installer-parallel: true
 
+      - name: Cache Packages
+        id: cache-packages
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
+
       - name: Install dependencies
+        if: steps.cache-packages.outputs.cache-hit != 'true'
         run: poetry install --no-interaction --no-root
 
       - name: Export requirements
-        run: poetry export -f requirements.txt --without-hashes > audit_requirements.txt
+        # Drop git-sourced deps: pip-audit only checks PyPI and skips them anyway, and
+        # keeping them causes resolution conflicts (e.g. milagro pinned by commit here but
+        # by tag in sw-utils' metadata).
+        run: poetry export -f requirements.txt --without-hashes | grep -v "git+" > audit_requirements.txt
 
       # Run audit
-      - uses: pypa/gh-action-pip-audit@v1.0.7
+      - uses: pypa/gh-action-pip-audit@3ac8fed01c7b32ab70210f182e557d4cb8c45fec # v1.0.7
         with:
           inputs: audit_requirements.txt

@@ -14,17 +14,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
       - name: Set up python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
-          python-version: 3.12.8
+          python-version: 3.12.12
 
       - name: Install Poetry
-        uses: Gr1N/setup-poetry@v8
+        uses: snok/install-poetry@76e04a911780d5b312d89783f7b1cd627778900a # v1
         with:
-          poetry-version: "1.8.3"
+          version: "1.8.3"
 
       - name: Check project version matches tag name
         run: |
@@ -35,31 +35,70 @@ jobs:
     strategy:
       matrix:
         include:
-          - OS: ubuntu-22.04
-            PYTHON_VERSION: 3.12.8
+          - OS: ubuntu-24.04
+            PYTHON_VERSION: 3.12.12
             BUILD_CMD: |
+              set -e
               export PYTHONHASHSEED=42
-              export BUILD_FILE_NAME=operator-${RELEASE_VERSION}-linux-amd64;
+              export BUILD_FILE_NAME=operator-${RELEASE_VERSION}-ubuntu-24.04-amd64;
               mkdir ${BUILD_FILE_NAME};
               git rev-parse --short HEAD > GIT_SHA
               poetry run pyinstaller \
                 --distpath ./${BUILD_FILE_NAME} \
                 ./operator.spec;
+              ./${BUILD_FILE_NAME}/operator --help;
               tar -zcvf ${BUILD_FILE_NAME}.tar.gz ${BUILD_FILE_NAME};
               mkdir /tmp/artifacts;
               cp ${BUILD_FILE_NAME}.tar.gz /tmp/artifacts;
               sha256sum ${BUILD_FILE_NAME}.tar.gz | head -c 64 > /tmp/artifacts/${BUILD_FILE_NAME}.sha256;
 
-          - OS: linux-arm-runner
-            PYTHON_VERSION: 3.12.8
+          - OS: ubuntu-22.04
+            PYTHON_VERSION: 3.12.12
             BUILD_CMD: |
+              set -e
               export PYTHONHASHSEED=42
-              export BUILD_FILE_NAME=operator-${RELEASE_VERSION}-linux-arm64;
+              export BUILD_FILE_NAME=operator-${RELEASE_VERSION}-ubuntu-22.04-amd64;
               mkdir ${BUILD_FILE_NAME};
               git rev-parse --short HEAD > GIT_SHA
               poetry run pyinstaller \
                 --distpath ./${BUILD_FILE_NAME} \
                 ./operator.spec;
+              ./${BUILD_FILE_NAME}/operator --help;
+              tar -zcvf ${BUILD_FILE_NAME}.tar.gz ${BUILD_FILE_NAME};
+              mkdir /tmp/artifacts;
+              cp ${BUILD_FILE_NAME}.tar.gz /tmp/artifacts;
+              sha256sum ${BUILD_FILE_NAME}.tar.gz | head -c 64 > /tmp/artifacts/${BUILD_FILE_NAME}.sha256;
+
+          - OS: ubuntu-24.04-arm
+            PYTHON_VERSION: 3.12.12
+            BUILD_CMD: |
+              set -e
+              export PYTHONHASHSEED=42
+              export BUILD_FILE_NAME=operator-${RELEASE_VERSION}-ubuntu-24.04-arm64;
+              mkdir ${BUILD_FILE_NAME};
+              git rev-parse --short HEAD > GIT_SHA
+              poetry run pyinstaller \
+                --distpath ./${BUILD_FILE_NAME} \
+                ./operator.spec;
+              ./${BUILD_FILE_NAME}/operator --help;
+              tar -zcvf ${BUILD_FILE_NAME}.tar.gz ${BUILD_FILE_NAME};
+              rm -rf /tmp/artifacts;
+              mkdir /tmp/artifacts;
+              cp ${BUILD_FILE_NAME}.tar.gz /tmp/artifacts;
+              sha256sum ${BUILD_FILE_NAME}.tar.gz | head -c 64 > /tmp/artifacts/${BUILD_FILE_NAME}.sha256;
+
+          - OS: ubuntu-22.04-arm
+            PYTHON_VERSION: 3.12.12
+            BUILD_CMD: |
+              set -e
+              export PYTHONHASHSEED=42
+              export BUILD_FILE_NAME=operator-${RELEASE_VERSION}-ubuntu-22.04-arm64;
+              mkdir ${BUILD_FILE_NAME};
+              git rev-parse --short HEAD > GIT_SHA
+              poetry run pyinstaller \
+                --distpath ./${BUILD_FILE_NAME} \
+                ./operator.spec;
+              ./${BUILD_FILE_NAME}/operator --help;
               tar -zcvf ${BUILD_FILE_NAME}.tar.gz ${BUILD_FILE_NAME};
               rm -rf /tmp/artifacts;
               mkdir /tmp/artifacts;
@@ -69,6 +108,7 @@ jobs:
           - OS: macos-14
             PYTHON_VERSION: 3.12.8
             BUILD_CMD: |
+              set -e
               export PYTHONHASHSEED=42
               export BUILD_FILE_NAME=operator-${RELEASE_VERSION}-darwin-arm64;
               mkdir ${BUILD_FILE_NAME};
@@ -76,6 +116,7 @@ jobs:
               poetry run pyinstaller \
                 --distpath ./${BUILD_FILE_NAME} \
                 ./operator.spec;
+              ./${BUILD_FILE_NAME}/operator --help;
               tar -zcvf ${BUILD_FILE_NAME}.tar.gz ${BUILD_FILE_NAME};
               mkdir /tmp/artifacts || true;
               cp -f ${BUILD_FILE_NAME}.tar.gz /tmp/artifacts;
@@ -84,6 +125,7 @@ jobs:
           - OS: windows-latest
             PYTHON_VERSION: 3.12.8
             BUILD_CMD: |
+              $ErrorActionPreference = "Stop"
               $RELEASE_VERSION = $env:GITHUB_REF.replace('refs/tags/', '')
               $BUILD_FILE_NAME = "operator-" + $RELEASE_VERSION + "-windows-amd64"
               $BUILD_FILE_NAME_PATH = ".\" + $BUILD_FILE_NAME
@@ -91,6 +133,7 @@ jobs:
               poetry run pyinstaller `
                 --distpath ./${BUILD_FILE_NAME} `
                 ./operator.spec;
+              & ".\$BUILD_FILE_NAME\operator.exe" --help
               $ZIP_FILE_NAME = $BUILD_FILE_NAME + ".zip"
               Compress-Archive -Path $BUILD_FILE_NAME_PATH -DestinationPath $ZIP_FILE_NAME
               mkdir \tmp\artifacts
@@ -99,29 +142,42 @@ jobs:
               certUtil -hashfile $ZIP_FILE_NAME SHA256 | findstr /i /v "SHA256" | findstr /i /v "CertUtil" > $CHECKSUM_FILE_NAME_PASH
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
-      - name: Install build dependencies for Linux
+      - name: Install build dependencies for Linux arm
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y build-essential curl libpq-dev postgresql-client
-        if: matrix.os == 'linux-arm-runner'
+        if: matrix.OS == 'ubuntu-24.04-arm' || matrix.OS == 'ubuntu-22.04-arm'
 
       - name: Install build dependencies for MacOS
         run: |
           brew install libpq
           brew link --force libpq
           brew install openssl@3.0
-        if: matrix.os == 'macos-14'
+        if: matrix.OS == 'macos-14'
 
-      - uses: actions/setup-python@v5
+      - name: Set up python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: ${{ matrix.PYTHON_VERSION }}
 
       - name: Install Poetry
-        uses: Gr1N/setup-poetry@v8
+        uses: snok/install-poetry@76e04a911780d5b312d89783f7b1cd627778900a # v1
         with:
-          poetry-version: "1.8.3"
+          version: "1.8.3"
+
+      - name: Fix Poetry PATH (Windows)
+        if: matrix.OS == 'windows-latest'
+        run: echo "$env:USERPROFILE\.local\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+        shell: pwsh
+
+      - name: Install Rust toolchain (Windows)
+        if: matrix.OS == 'windows-latest'
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+        with:
+          toolchain: stable
 
       - name: Install dependencies
         run: poetry install --with build --without dev --no-interaction --no-root
@@ -133,15 +189,13 @@ jobs:
 
       - name: Get the version
         id: get_version
-        run: echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3)
+        run: echo "RELEASE_VERSION=$(echo $GITHUB_REF | cut -d / -f 3)" >> "$GITHUB_ENV"
 
       - name: Build executable for ${{ matrix.OS }}
-        env:
-          RELEASE_VERSION: ${{ steps.get_version.outputs.VERSION }}
         run: ${{ matrix.BUILD_CMD }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ matrix.OS }}
           path: /tmp/artifacts/*
@@ -152,7 +206,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: /tmp/artifacts
 
@@ -162,18 +216,22 @@ jobs:
 
       - name: Get the version
         id: get_version
-        run: echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3)
+        run: echo "RELEASE_VERSION=$(echo $GITHUB_REF | cut -d / -f 3)" >> "$GITHUB_ENV"
 
       - name: Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
           fail_on_unmatched_files: true
           files: |
-            /tmp/artifacts/ubuntu-22.04/operator-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz
-            /tmp/artifacts/ubuntu-22.04/operator-${{ steps.get_version.outputs.VERSION }}-linux-amd64.sha256
-            /tmp/artifacts/linux-arm-runner/operator-${{ steps.get_version.outputs.VERSION }}-linux-arm64.tar.gz
-            /tmp/artifacts/linux-arm-runner/operator-${{ steps.get_version.outputs.VERSION }}-linux-arm64.sha256
-            /tmp/artifacts/macos-14/operator-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.tar.gz
-            /tmp/artifacts/macos-14/operator-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.sha256
-            /tmp/artifacts/windows-latest/operator-${{ steps.get_version.outputs.VERSION }}-windows-amd64.zip
-            /tmp/artifacts/windows-latest/operator-${{ steps.get_version.outputs.VERSION }}-windows-amd64.sha256
+            /tmp/artifacts/ubuntu-22.04/operator-${{ env.RELEASE_VERSION }}-ubuntu-22.04-amd64.tar.gz
+            /tmp/artifacts/ubuntu-22.04/operator-${{ env.RELEASE_VERSION }}-ubuntu-22.04-amd64.sha256
+            /tmp/artifacts/ubuntu-22.04-arm/operator-${{ env.RELEASE_VERSION }}-ubuntu-22.04-arm64.tar.gz
+            /tmp/artifacts/ubuntu-22.04-arm/operator-${{ env.RELEASE_VERSION }}-ubuntu-22.04-arm64.sha256
+            /tmp/artifacts/ubuntu-24.04/operator-${{ env.RELEASE_VERSION }}-ubuntu-24.04-amd64.tar.gz
+            /tmp/artifacts/ubuntu-24.04/operator-${{ env.RELEASE_VERSION }}-ubuntu-24.04-amd64.sha256
+            /tmp/artifacts/ubuntu-24.04-arm/operator-${{ env.RELEASE_VERSION }}-ubuntu-24.04-arm64.tar.gz
+            /tmp/artifacts/ubuntu-24.04-arm/operator-${{ env.RELEASE_VERSION }}-ubuntu-24.04-arm64.sha256
+            /tmp/artifacts/macos-14/operator-${{ env.RELEASE_VERSION }}-darwin-arm64.tar.gz
+            /tmp/artifacts/macos-14/operator-${{ env.RELEASE_VERSION }}-darwin-arm64.sha256
+            /tmp/artifacts/windows-latest/operator-${{ env.RELEASE_VERSION }}-windows-amd64.zip
+            /tmp/artifacts/windows-latest/operator-${{ env.RELEASE_VERSION }}-windows-amd64.sha256
