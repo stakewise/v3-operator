@@ -54,7 +54,7 @@ async def start_base() -> None:
         keystore = await load_keystore()
 
         if settings.disable_validator_registrations:
-            logger.info('Validator registrations are disabled, deposit data file is not used')
+            logger.info('Validator registrations are disabled')
         else:
             deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
             logger.info('Loaded deposit data file %s', settings.deposit_data_file)

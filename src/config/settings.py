@@ -276,6 +276,10 @@ class Settings(metaclass=Singleton):
 
     @property
     def need_deposit_data_file(self) -> bool:
+        # Remote signer takes its public keys list from the deposit data file.
+        if self.remote_signer_use_deposit_data:
+            return True
+
         # The deposit data file is not read when registrations are disabled.
         if self.disable_validator_registrations:
             return False

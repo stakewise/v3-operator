@@ -51,7 +51,7 @@ class RemoteSignerKeystore(BaseKeystore):
 
     @staticmethod
     async def load() -> 'BaseKeystore':
-        if settings.remote_signer_use_deposit_data and not settings.disable_validator_registrations:
+        if settings.remote_signer_use_deposit_data:
             deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
             return RemoteSignerKeystore(deposit_data.public_keys)
 

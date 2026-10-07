@@ -265,7 +265,7 @@ async def wait_for_deposit_data_file() -> None:
     deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
     logger.info('Found deposit data file %s', settings.deposit_data_file)
 
-    if not settings.disable_deposit_data_warnings:
+    if not settings.disable_deposit_data_warnings and not settings.disable_validator_registrations:
         while True:
             try:
                 await check_deposit_data_root(deposit_data.tree.root)
