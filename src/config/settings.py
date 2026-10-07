@@ -91,6 +91,10 @@ class Settings(metaclass=Singleton):
         'DISABLE_DEPOSIT_DATA_WARNINGS', default=False, cast=bool
     )
 
+    disable_validator_registrations: bool = decouple_config(
+        'DISABLE_VALIDATOR_REGISTRATIONS', default=False, cast=bool
+    )
+
     min_validators_registration: int
 
     # pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements
@@ -272,6 +276,10 @@ class Settings(metaclass=Singleton):
 
     @property
     def need_deposit_data_file(self) -> bool:
+        # The deposit data file is not read when registrations are disabled.
+        if self.disable_validator_registrations:
+            return False
+
         if self.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
             return True
 

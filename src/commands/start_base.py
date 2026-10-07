@@ -53,8 +53,13 @@ async def start_base() -> None:
     if settings.validators_registration_mode == ValidatorsRegistrationMode.AUTO:
         keystore = await load_keystore()
 
-        deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
-        logger.info('Loaded deposit data file %s', settings.deposit_data_file)
+        if settings.disable_validator_registrations:
+            logger.info('Validator registrations are disabled, deposit data file is not used')
+        else:
+            deposit_data = load_deposit_data(settings.vault, settings.deposit_data_file)
+            logger.info('Loaded deposit data file %s', settings.deposit_data_file)
+    elif settings.disable_validator_registrations:
+        logger.info('Validator registrations are disabled, relayer is not used')
     else:
         relayer_adapter = create_relayer_adapter()
 

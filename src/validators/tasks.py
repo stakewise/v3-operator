@@ -92,6 +92,9 @@ async def process_validators(
     """
     Calculates vault assets, requests oracles approval, submits registration tx
     """
+    if settings.disable_validator_registrations:
+        return None
+
     harvest_params = await get_harvest_params()
     validators_count = await get_validators_count_from_vault_assets(harvest_params)
 
