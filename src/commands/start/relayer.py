@@ -11,6 +11,7 @@ from src.commands.start.base import start_base
 from src.commands.start.common_option import add_common_options, start_common_options
 from src.common.typings import ValidatorType
 from src.common.utils import log_verbose
+from src.common.validators import validate_relayer_jwt_secret
 from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import settings
@@ -24,6 +25,15 @@ logger = logging.getLogger(__name__)
     help='Relayer endpoint.',
     prompt='Enter the relayer endpoint',
     envvar='RELAYER_ENDPOINT',
+)
+@click.option(
+    '--relayer-jwt-secret',
+    type=str,
+    envvar='RELAYER_JWT_SECRET',
+    help='Hex-encoded JWT secret shared with the relayer. '
+    'Used to authenticate requests to the relayer. '
+    'Required for DVT relayer, optional for relayers without authentication.',
+    callback=validate_relayer_jwt_secret,
 )
 @click.option(
     '--network',
@@ -69,6 +79,7 @@ def start_relayer(
     database_dir: str | None,
     network: str | None,
     relayer_endpoint: str,
+    relayer_jwt_secret: str | None,
     max_withdrawal_request_fee_gwei: int,
 ) -> None:
     operator_config = OperatorConfig(vault, Path(data_dir))
@@ -103,6 +114,7 @@ def start_relayer(
         log_level=log_level,
         log_format=log_format,
         relayer_endpoint=relayer_endpoint,
+        relayer_jwt_secret=relayer_jwt_secret,
         concurrency=concurrency,
         min_deposit_amount_gwei=Gwei(min_deposit_amount_gwei),
         vault_min_balance_gwei=Gwei(vault_min_balance_gwei),

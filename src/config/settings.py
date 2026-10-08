@@ -106,6 +106,7 @@ class Settings(metaclass=Singleton):
     concurrency: int | None
 
     relayer_endpoint: str
+    relayer_jwt_secret: str | None
     relayer_timeout: int
     skip_startup_checks: bool
 
@@ -202,6 +203,7 @@ class Settings(metaclass=Singleton):
         log_format: str | None = None,
         concurrency: int | None = None,
         relayer_endpoint: str | None = None,
+        relayer_jwt_secret: str | None = None,
         min_deposit_amount_gwei: Gwei = DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
         vault_min_balance_gwei: Gwei = DEFAULT_VAULT_MIN_BALANCE_GWEI,
         max_validator_balance_gwei: Gwei | None = None,
@@ -515,6 +517,7 @@ class Settings(metaclass=Singleton):
             description='Number of records requested from the subgraph per page.',
         )
         self.relayer_endpoint = relayer_endpoint or ''
+        self.relayer_jwt_secret = relayer_jwt_secret
         self.relayer_timeout = decouple_config(
             'RELAYER_TIMEOUT',
             default=10,
@@ -556,6 +559,10 @@ class Settings(metaclass=Singleton):
 settings = Settings()
 
 DEFAULT_NETWORK = MAINNET
+
+# Relayer JWT auth, same secret format as the execution client Engine API `jwt.hex`
+RELAYER_JWT_ALGORITHM = 'HS256'
+RELAYER_JWT_SECRET_MIN_LENGTH = 32
 
 # oracles
 UPDATE_SIGNATURES_URL_PATH = '/signatures'
