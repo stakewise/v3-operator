@@ -11,6 +11,7 @@ from aioresponses import aioresponses
 from sw_utils.tests import faker
 from web3.types import Gwei
 
+from src.common.tests.utils import patch_settings
 from src.config.settings import settings
 from src.validators.relayer import RelayerClient
 
@@ -20,9 +21,9 @@ RELAYER_RESPONSE = {'validators': [], 'validators_manager_signature': '0x'}
 
 @pytest.fixture
 def relayer_mock(fake_settings: None) -> Iterator[aioresponses]:
-    settings.relayer_endpoint = RELAYER_ENDPOINT
-    settings.relayer_jwt_secret = None
-    with aioresponses() as m:
+    with aioresponses() as m, patch_settings('relayer_endpoint', RELAYER_ENDPOINT), patch_settings(
+        'relayer_jwt_secret', None
+    ):
         for endpoint in ('register', 'fund', 'withdraw', 'consolidate'):
             m.post(f'{RELAYER_ENDPOINT}/{endpoint}', payload=RELAYER_RESPONSE, repeat=True)
         yield m
@@ -36,9 +37,9 @@ async def test_no_auth_header_without_secret(relayer_mock: aioresponses) -> None
 
 async def test_auth_header_with_secret(relayer_mock: aioresponses) -> None:
     secret_hex = token_hex(32)
-    settings.relayer_jwt_secret = secret_hex
 
-    await _call_all_endpoints(RelayerClient())
+    with patch_settings('relayer_jwt_secret', secret_hex):
+        await _call_all_endpoints(RelayerClient())
 
     auth_headers = _get_auth_headers(relayer_mock)
     assert len(auth_headers) == 4
@@ -51,23 +52,22 @@ async def test_auth_header_with_secret(relayer_mock: aioresponses) -> None:
 
 
 async def test_new_token_per_request(relayer_mock: aioresponses) -> None:
-    settings.relayer_jwt_secret = token_hex(32)
     client = RelayerClient()
     public_key = faker.validator_public_key()
 
-    await client.fund_validators([(public_key, Gwei(1_000_000_000))])
-    with mock.patch('src.validators.relayer.time', return_value=time() + 10):
+    with patch_settings('relayer_jwt_secret', token_hex(32)):
         await client.fund_validators([(public_key, Gwei(1_000_000_000))])
+        with mock.patch('src.validators.relayer.time', return_value=time() + 10):
+            await client.fund_validators([(public_key, Gwei(1_000_000_000))])
 
     first, second = _get_auth_headers(relayer_mock)
     assert first != second
 
 
 async def test_unauthorized_logged(caplog: pytest.LogCaptureFixture, fake_settings: None) -> None:
-    settings.relayer_endpoint = RELAYER_ENDPOINT
     public_key = faker.validator_public_key()
 
-    with aioresponses() as m, caplog.at_level(
+    with aioresponses() as m, patch_settings('relayer_endpoint', RELAYER_ENDPOINT), caplog.at_level(
         logging.ERROR, logger='src.validators.relayer'
     ), pytest.raises(ClientResponseError):
         m.post(f'{RELAYER_ENDPOINT}/fund', status=401)
