@@ -43,14 +43,6 @@ async def relayer_stub(fake_settings: None) -> AsyncIterator[RelayerStub]:
     await server.close()
 
 
-async def _call_all_endpoints(client: RelayerClient) -> None:
-    public_key = faker.validator_public_key()
-    await client._register_validators(settings.vault, 0, [Gwei(32_000_000_000)])
-    await client.fund_validators([(public_key, Gwei(1_000_000_000))])
-    await client.withdraw_validators({public_key: Gwei(1_000_000_000)})
-    await client.consolidate_validators(settings.vault, [(public_key, public_key)])
-
-
 async def test_no_auth_header_without_secret(relayer_stub: RelayerStub) -> None:
     await _call_all_endpoints(RelayerClient())
 
@@ -98,3 +90,11 @@ async def test_unauthorized_logged(
         await RelayerClient().fund_validators([(public_key, Gwei(1_000_000_000))])
 
     assert 'Check that RELAYER_JWT_SECRET matches' in caplog.text
+
+
+async def _call_all_endpoints(client: RelayerClient) -> None:
+    public_key = faker.validator_public_key()
+    await client._register_validators(settings.vault, 0, [Gwei(32_000_000_000)])
+    await client.fund_validators([(public_key, Gwei(1_000_000_000))])
+    await client.withdraw_validators({public_key: Gwei(1_000_000_000)})
+    await client.consolidate_validators(settings.vault, [(public_key, public_key)])
