@@ -563,6 +563,7 @@ DEFAULT_NETWORK = MAINNET
 # Relayer JWT auth, same secret format as the execution client Engine API `jwt.hex`
 RELAYER_JWT_ALGORITHM = 'HS256'
 RELAYER_JWT_SECRET_MIN_LENGTH = 32
+DEFAULT_RELAYER_JWT_SECRET_FILE = 'jwt.hex'  # nosec
 
 # oracles
 UPDATE_SIGNATURES_URL_PATH = '/signatures'

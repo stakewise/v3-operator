@@ -10,6 +10,10 @@ from sw_utils import ChainHead
 from web3 import Web3
 from web3.types import Gwei, Wei
 
+from src.commands.start.common_option import (
+    add_common_options,
+    relayer_jwt_secret_options,
+)
 from src.common.clients import close_clients, setup_clients
 from src.common.consensus import get_chain_latest_head
 from src.common.consolidations import (
@@ -27,7 +31,6 @@ from src.common.validators import (
     validate_public_key,
     validate_public_keys,
     validate_public_keys_file,
-    validate_relayer_jwt_secret,
 )
 from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS, GNOSIS, MAINNET, NETWORKS
@@ -124,15 +127,7 @@ logger = logging.getLogger(__name__)
     help='Relayer endpoint.',
     envvar='RELAYER_ENDPOINT',
 )
-@click.option(
-    '--relayer-jwt-secret',
-    type=str,
-    envvar='RELAYER_JWT_SECRET',
-    help='Hex-encoded JWT secret shared with the relayer. '
-    'Used to authenticate requests to the relayer. '
-    'Required for DVT relayer, optional for relayers without authentication.',
-    callback=validate_relayer_jwt_secret,
-)
+@add_common_options(relayer_jwt_secret_options)
 @click.option(
     '--max-validator-balance-gwei',
     type=int,
@@ -217,6 +212,7 @@ def consolidate(
     exclude_public_keys_file: Path | None,
     relayer_endpoint: str | None,
     relayer_jwt_secret: HexStr | None,
+    relayer_jwt_secret_file: HexStr | None,
     max_validator_balance_gwei: int | None,
     vault_first_block: BlockNumber | None,
 ) -> None:
@@ -272,7 +268,7 @@ def consolidate(
         wallet_file=wallet_file,
         wallet_password_file=wallet_password_file,
         relayer_endpoint=relayer_endpoint,
-        relayer_jwt_secret=relayer_jwt_secret,
+        relayer_jwt_secret=relayer_jwt_secret or relayer_jwt_secret_file,
         max_validator_balance_gwei=(
             Gwei(max_validator_balance_gwei) if max_validator_balance_gwei else None
         ),

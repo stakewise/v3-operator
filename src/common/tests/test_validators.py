@@ -14,6 +14,7 @@ from src.common.validators import (
     validate_public_keys,
     validate_public_keys_file,
     validate_relayer_jwt_secret,
+    validate_relayer_jwt_secret_file,
 )
 
 
@@ -185,3 +186,33 @@ def test_validate_relayer_jwt_secret() -> None:
         validate_relayer_jwt_secret(None, None, 'not-hex')
     with pytest.raises(BadParameter, match='at least 32 bytes'):
         validate_relayer_jwt_secret(None, None, token_hex(16))
+
+
+def test_validate_relayer_jwt_secret_file(tmp_path, monkeypatch) -> None:
+    secret_hex = token_hex(32)
+    monkeypatch.chdir(tmp_path)
+
+    # no file provided and no default file
+    assert validate_relayer_jwt_secret_file(None, None, None) is None
+
+    # explicit file
+    secret_file = tmp_path / 'secret.txt'
+    secret_file.write_text(f'0x{secret_hex}\n')
+    assert validate_relayer_jwt_secret_file(None, None, str(secret_file)) == f'0x{secret_hex}'
+
+    # default file in the current directory
+    (tmp_path / 'jwt.hex').write_text(secret_hex)
+    assert validate_relayer_jwt_secret_file(None, None, None) == f'0x{secret_hex}'
+
+    secret_file.write_text('not-hex')
+    with pytest.raises(BadParameter, match='hex string'):
+        validate_relayer_jwt_secret_file(None, None, str(secret_file))
+
+    secret_file.write_text(' \n')
+    with pytest.raises(BadParameter, match='is empty'):
+        validate_relayer_jwt_secret_file(None, None, str(secret_file))
+
+    # empty default file
+    (tmp_path / 'jwt.hex').write_text('')
+    with pytest.raises(BadParameter, match='is empty'):
+        validate_relayer_jwt_secret_file(None, None, None)

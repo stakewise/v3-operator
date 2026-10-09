@@ -1,5 +1,6 @@
 # pylint: disable=unused-argument
 import re
+from pathlib import Path
 
 import click
 from eth_typing import ChecksumAddress, HexStr
@@ -8,6 +9,7 @@ from web3 import Web3
 
 from src.common.language import validate_mnemonic as verify_mnemonic
 from src.config.settings import (
+    DEFAULT_RELAYER_JWT_SECRET_FILE,
     MAX_EFFECTIVE_BALANCE,
     MAX_EFFECTIVE_BALANCE_GWEI,
     MIN_ACTIVATION_BALANCE,
@@ -144,6 +146,22 @@ def validate_min_deposit_amount_gwei(ctx: click.Context, param: click.Parameter,
             f'({Web3.from_wei(MIN_DEPOSIT_AMOUNT, 'ether')} ETH)'
         )
     return value
+
+
+def validate_relayer_jwt_secret_file(
+    ctx: click.Context, param: click.Parameter, value: str | None
+) -> HexStr | None:
+    """
+    Loads the JWT secret from the file.
+    Falls back to the default file, if it exists, when no file is provided.
+    """
+    path = Path(value or DEFAULT_RELAYER_JWT_SECRET_FILE)
+    if not value and not path.exists():
+        return None
+    secret = path.read_text(encoding='utf-8').strip()
+    if not secret:
+        raise click.BadParameter(f'JWT secret file {path} is empty')
+    return validate_relayer_jwt_secret(ctx, param, secret)
 
 
 def validate_relayer_jwt_secret(
