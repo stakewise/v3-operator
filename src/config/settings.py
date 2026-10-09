@@ -46,6 +46,7 @@ class Settings(metaclass=Singleton):
     execution_transaction_timeout: int
     execution_retry_timeout: int
     events_blocks_range_interval: int
+    event_scanner_max_chunk_size: int | None
     execution_jwt_secret: str | None
     graph_endpoint: str
     graph_request_timeout: int
@@ -478,6 +479,17 @@ class Settings(metaclass=Singleton):
                 'Lower it when the RPC provider rejects the range as too large.'
             ),
             default_repr='12 hours of blocks (3600 on mainnet, 8640 on gnosis)',
+        )
+        self.event_scanner_max_chunk_size = decouple_config(
+            'EVENT_SCANNER_MAX_CHUNK_SIZE',
+            default=None,
+            cast=lambda x: int(x) if x else None,
+            group='Execution node',
+            description=(
+                'Max number of blocks per eth_getLogs request in event scanners. '
+                'Lower it when the RPC provider rejects the range as too large.'
+            ),
+            default_repr='sw-utils default',
         )
         self.consensus_timeout = decouple_config(
             'CONSENSUS_TIMEOUT',
