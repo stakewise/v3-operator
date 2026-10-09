@@ -177,8 +177,9 @@ def test_validate_relayer_jwt_secret() -> None:
     secret_hex = token_hex(32)
 
     assert validate_relayer_jwt_secret(None, None, None) is None
-    assert validate_relayer_jwt_secret(None, None, secret_hex) == secret_hex
-    assert validate_relayer_jwt_secret(None, None, f' 0x{secret_hex}\n') == secret_hex
+    assert validate_relayer_jwt_secret(None, None, secret_hex) == f'0x{secret_hex}'
+    assert validate_relayer_jwt_secret(None, None, f' 0x{secret_hex}\n') == f'0x{secret_hex}'
+    assert validate_relayer_jwt_secret(None, None, f'0X{secret_hex}') == f'0x{secret_hex}'
 
     with pytest.raises(BadParameter, match='hex string'):
         validate_relayer_jwt_secret(None, None, 'not-hex')

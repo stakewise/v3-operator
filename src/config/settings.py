@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from decouple import Csv
-from eth_typing import BlockNumber
+from eth_typing import BlockNumber, HexStr
 from web3 import Web3
 from web3.types import ChecksumAddress, Gwei, Wei
 
@@ -106,7 +106,7 @@ class Settings(metaclass=Singleton):
     concurrency: int | None
 
     relayer_endpoint: str
-    relayer_jwt_secret: str | None
+    relayer_jwt_secret: HexStr | None
     relayer_timeout: int
     skip_startup_checks: bool
 
@@ -203,7 +203,7 @@ class Settings(metaclass=Singleton):
         log_format: str | None = None,
         concurrency: int | None = None,
         relayer_endpoint: str | None = None,
-        relayer_jwt_secret: str | None = None,
+        relayer_jwt_secret: HexStr | None = None,
         min_deposit_amount_gwei: Gwei = DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
         vault_min_balance_gwei: Gwei = DEFAULT_VAULT_MIN_BALANCE_GWEI,
         max_validator_balance_gwei: Gwei | None = None,

@@ -147,7 +147,7 @@ def exit_validators(
     no_confirm: bool,
     log_level: str,
     relayer_endpoint: str | None,
-    relayer_jwt_secret: str | None,
+    relayer_jwt_secret: HexStr | None,
     vault_first_block: BlockNumber | None,
 ) -> None:
     """

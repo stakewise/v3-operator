@@ -1,5 +1,4 @@
 import logging
-from binascii import unhexlify
 from http import HTTPStatus
 from time import time
 from typing import Sequence
@@ -198,7 +197,7 @@ def _get_auth_headers() -> dict[str, str]:
         return {}
     token = jwt.encode(
         {'iat': int(time())},
-        unhexlify(settings.relayer_jwt_secret),
+        Web3.to_bytes(hexstr=settings.relayer_jwt_secret),
         algorithm=RELAYER_JWT_ALGORITHM,
     )
     return {'Authorization': f'Bearer {token}'}

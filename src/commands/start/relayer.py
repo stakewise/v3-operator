@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 import click
-from eth_typing import ChecksumAddress
+from eth_typing import ChecksumAddress, HexStr
 from web3.types import Gwei
 
 from src.commands.start.base import start_base
@@ -79,7 +79,7 @@ def start_relayer(
     database_dir: str | None,
     network: str | None,
     relayer_endpoint: str,
-    relayer_jwt_secret: str | None,
+    relayer_jwt_secret: HexStr | None,
     max_withdrawal_request_fee_gwei: int,
 ) -> None:
     operator_config = OperatorConfig(vault, Path(data_dir))

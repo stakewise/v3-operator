@@ -216,7 +216,7 @@ def consolidate(
     target_public_key: HexStr | None,
     exclude_public_keys_file: Path | None,
     relayer_endpoint: str | None,
-    relayer_jwt_secret: str | None,
+    relayer_jwt_secret: HexStr | None,
     max_validator_balance_gwei: int | None,
     vault_first_block: BlockNumber | None,
 ) -> None:

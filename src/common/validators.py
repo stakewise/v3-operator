@@ -1,6 +1,5 @@
 # pylint: disable=unused-argument
 import re
-from binascii import unhexlify
 
 import click
 from eth_typing import ChecksumAddress, HexStr
@@ -149,19 +148,18 @@ def validate_min_deposit_amount_gwei(ctx: click.Context, param: click.Parameter,
 
 def validate_relayer_jwt_secret(
     ctx: click.Context, param: click.Parameter, value: str | None
-) -> str | None:
+) -> HexStr | None:
     if not value:
         return None
-    secret_hex = value.strip().removeprefix('0x')
     try:
-        secret = unhexlify(secret_hex)
+        secret = Web3.to_bytes(hexstr=HexStr(value.strip()))
     except ValueError as e:
         raise click.BadParameter('JWT secret must be a hex string') from e
     if len(secret) < RELAYER_JWT_SECRET_MIN_LENGTH:
         raise click.BadParameter(
             f'JWT secret must be at least {RELAYER_JWT_SECRET_MIN_LENGTH} bytes'
         )
-    return secret_hex
+    return Web3.to_hex(secret)
 
 
 def _is_public_key(value: str) -> bool:
