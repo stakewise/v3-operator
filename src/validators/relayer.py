@@ -1,7 +1,10 @@
 import logging
+from http import HTTPStatus
+from time import time
 from typing import Sequence
 
 import aiohttp
+import jwt
 from aiohttp import ClientTimeout
 from eth_typing import BLSSignature, ChecksumAddress, HexStr
 from eth_utils import add_0x_prefix
@@ -10,7 +13,7 @@ from web3 import Web3
 from web3.types import Gwei
 
 from src.common.clients import OPERATOR_USER_AGENT
-from src.config.settings import settings
+from src.config.settings import RELAYER_JWT_ALGORITHM, settings
 from src.validators.event_processors import get_validators_start_index
 from src.validators.typings import (
     ExitSignatureShards,
@@ -167,16 +170,37 @@ class RelayerClient:
         url = urljoin(settings.relayer_endpoint, endpoint)
         async with aiohttp.ClientSession(
             timeout=ClientTimeout(settings.relayer_timeout),
-            headers={'User-Agent': OPERATOR_USER_AGENT},
+            headers={'User-Agent': OPERATOR_USER_AGENT} | _get_auth_headers(),
         ) as session:
             resp = await session.post(
                 url,
                 json=jsn,
             )
-            if 400 <= resp.status < 500:
+            if resp.status == HTTPStatus.UNAUTHORIZED:
+                logger.error(
+                    'Relayer rejected request with 401 Unauthorized: %s. '
+                    'Check that RELAYER_JWT_SECRET matches the relayer JWT secret '
+                    'and that system clocks are in sync.',
+                    await resp.read(),
+                )
+            elif 400 <= resp.status < 500:
                 logger.debug('Relayer response: %s', await resp.read())
             resp.raise_for_status()
             return await resp.json()
+
+
+def _get_auth_headers() -> dict[str, str]:
+    """
+    Creates a new token for every request because relayer rejects tokens with stale `iat`.
+    """
+    if not settings.relayer_jwt_secret:
+        return {}
+    token = jwt.encode(
+        {'iat': int(time())},
+        Web3.to_bytes(hexstr=settings.relayer_jwt_secret),
+        algorithm=RELAYER_JWT_ALGORITHM,
+    )
+    return {'Authorization': f'Bearer {token}'}
 
 
 def _parse_validator(v: dict) -> Validator:

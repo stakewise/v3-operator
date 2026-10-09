@@ -11,5 +11,6 @@ Dockerfile
 local.env
 __pycache__/
 *.env
+jwt.hex
 /logfile
 /deploy
