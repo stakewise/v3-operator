@@ -14,7 +14,11 @@ from src.common.consensus import get_chain_justified_head
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.startup_check import check_validators_manager, check_vault_version
 from src.common.utils import log_verbose
-from src.common.validators import validate_eth_address, validate_indexes
+from src.common.validators import (
+    validate_eth_address,
+    validate_indexes,
+    validate_relayer_jwt_secret,
+)
 from src.common.withdrawals import get_withdrawal_request_fee
 from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
@@ -84,6 +88,15 @@ logger = logging.getLogger(__name__)
     envvar='RELAYER_ENDPOINT',
 )
 @click.option(
+    '--relayer-jwt-secret',
+    type=str,
+    envvar='RELAYER_JWT_SECRET',
+    help='Hex-encoded JWT secret shared with the relayer. '
+    'Used to authenticate requests to the relayer. '
+    'Required for DVT relayer, optional for relayers without authentication.',
+    callback=validate_relayer_jwt_secret,
+)
+@click.option(
     '--max-withdrawal-request-fee-gwei',
     type=int,
     envvar='MAX_WITHDRAWAL_REQUEST_FEE_GWEI',
@@ -134,6 +147,7 @@ def exit_validators(
     no_confirm: bool,
     log_level: str,
     relayer_endpoint: str | None,
+    relayer_jwt_secret: str | None,
     vault_first_block: BlockNumber | None,
 ) -> None:
     """
@@ -165,6 +179,7 @@ def exit_validators(
         execution_endpoints=execution_endpoints,
         max_withdrawal_request_fee_gwei=Gwei(max_withdrawal_request_fee_gwei),
         relayer_endpoint=relayer_endpoint,
+        relayer_jwt_secret=relayer_jwt_secret,
         verbose=verbose,
         log_level=log_level,
         vault_first_block=vault_first_block,
