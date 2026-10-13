@@ -12,7 +12,11 @@ from web3.types import Gwei, Wei
 from src.common.clients import close_clients, setup_clients
 from src.common.consensus import get_chain_justified_head
 from src.common.logging import LOG_LEVELS, setup_logging
-from src.common.startup_check import check_validators_manager, check_vault_version
+from src.common.startup_check import (
+    check_events_logs,
+    check_validators_manager,
+    check_vault_version,
+)
 from src.common.utils import log_verbose
 from src.common.validators import validate_eth_address, validate_indexes
 from src.common.withdrawals import get_withdrawal_request_fee
@@ -228,6 +232,9 @@ async def process(
 
     await check_vault_version()
     await check_validators_manager()
+
+    logger.info('Checking event logs...')
+    await check_events_logs()
 
     chain_head = await get_chain_justified_head()
     max_activation_epoch = chain_head.epoch - settings.network_config.SHARD_COMMITTEE_PERIOD

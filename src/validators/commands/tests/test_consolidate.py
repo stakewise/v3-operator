@@ -33,6 +33,15 @@ def _patch_check_consolidations_queue() -> Generator:
 
 
 @pytest.fixture
+def _patch_check_events_logs() -> Generator:
+    with mock.patch(
+        'src.validators.commands.consolidate.check_events_logs',
+        return_value=None,
+    ):
+        yield
+
+
+@pytest.fixture
 def _patch_get_chain_latest_head() -> Generator:
     with mock.patch(
         'src.validators.commands.consolidate.get_chain_latest_head',
@@ -44,6 +53,7 @@ def _patch_get_chain_latest_head() -> Generator:
 @pytest.mark.usefixtures(
     '_patch_check_validators_manager',
     '_patch_check_consolidations_queue',
+    '_patch_check_events_logs',
     '_patch_get_chain_latest_head',
 )
 class TestConsolidate:

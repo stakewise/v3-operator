@@ -11,7 +11,10 @@ from src.common.execution import WalletTask
 from src.common.logging import setup_logging
 from src.common.metrics import metrics, metrics_server
 from src.common.protocol_config import update_oracles_cache
-from src.common.startup_check import wait_execution_catch_up_consensus
+from src.common.startup_check import (
+    check_db_events_logs,
+    wait_execution_catch_up_consensus,
+)
 from src.common.tasks import BaseTask, MetricsTask
 from src.common.utils import get_build_version
 from src.config.settings import settings
@@ -80,6 +83,10 @@ async def process() -> None:
 
     # load vault validators from ipfs dump
     await load_vault_validators()
+
+    if not settings.skip_startup_checks:
+        logger.info('Checking event logs from the database checkpoint...')
+        await check_db_events_logs()
 
     keystore: BaseKeystore | None = None
     relayer: RelayerClient | None = None

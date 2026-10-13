@@ -19,7 +19,7 @@ from src.common.consolidations import (
 from src.common.execution import check_gas_price
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.protocol_config import get_protocol_config
-from src.common.startup_check import check_validators_manager
+from src.common.startup_check import check_events_logs, check_validators_manager
 from src.common.utils import log_verbose
 from src.common.validators import (
     validate_eth_address,
@@ -330,6 +330,9 @@ async def process(
 
     await check_validators_manager()
     await _check_consolidations_queue(chain_head)
+
+    logger.info('Checking event logs...')
+    await check_events_logs()
 
     consolidation_keys = None
     if source_public_keys and target_public_key:
