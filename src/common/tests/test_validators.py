@@ -1,17 +1,21 @@
+from secrets import token_hex
 from unittest.mock import mock_open, patch
 
 import pytest
 from click import BadParameter
+from eth_typing import HexStr
 from sw_utils.tests import faker
 
 from src.common.validators import (
     _is_public_key,
+    load_relayer_jwt_secret,
     validate_db_uri,
     validate_eth_address,
     validate_eth_addresses,
     validate_public_key,
     validate_public_keys,
     validate_public_keys_file,
+    validate_relayer_jwt_secret,
 )
 
 
@@ -169,3 +173,42 @@ def test_validate_db_uri():
     # raises_error_for_missing_database_name
     with pytest.raises(BadParameter, match='Invalid database connection string'):
         validate_db_uri(None, None, 'postgresql://user:password@localhost/')
+
+
+def test_validate_relayer_jwt_secret() -> None:
+    secret_hex = token_hex(32)
+
+    assert validate_relayer_jwt_secret(None, None, None) is None
+    assert validate_relayer_jwt_secret(None, None, secret_hex) == f'0x{secret_hex}'
+    assert validate_relayer_jwt_secret(None, None, f' 0x{secret_hex}\n') == f'0x{secret_hex}'
+    assert validate_relayer_jwt_secret(None, None, f'0X{secret_hex}') == f'0x{secret_hex}'
+
+    with pytest.raises(BadParameter, match='hex string'):
+        validate_relayer_jwt_secret(None, None, 'not-hex')
+    with pytest.raises(BadParameter, match='at least 32 bytes'):
+        validate_relayer_jwt_secret(None, None, token_hex(16))
+
+
+def test_load_relayer_jwt_secret(tmp_path) -> None:
+    secret_hex = token_hex(32)
+    secret_file = tmp_path / 'secret.txt'
+
+    # nothing provided
+    assert load_relayer_jwt_secret(None, None) is None
+
+    # raw secret takes precedence, file is not read
+    other_secret = HexStr(f'0x{token_hex(32)}')
+    assert load_relayer_jwt_secret(other_secret, tmp_path / 'missing.txt') == other_secret
+
+    # secret from file
+    secret_file.write_text(f'0x{secret_hex}\n')
+    assert load_relayer_jwt_secret(None, secret_file) == f'0x{secret_hex}'
+
+    secret_file.write_text('not-hex')
+    with pytest.raises(BadParameter, match='hex string') as e:
+        load_relayer_jwt_secret(None, secret_file)
+    assert e.value.param_hint == '--relayer-jwt-secret-file'
+
+    secret_file.write_text(' \n')
+    with pytest.raises(BadParameter, match='is empty'):
+        load_relayer_jwt_secret(None, secret_file)

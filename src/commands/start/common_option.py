@@ -10,6 +10,7 @@ from src.common.validators import (
     validate_eth_address,
     validate_max_validator_balance_gwei,
     validate_min_deposit_amount_gwei,
+    validate_relayer_jwt_secret,
 )
 from src.config.networks import GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
@@ -263,6 +264,26 @@ start_common_options = [
         help='The maximum withdrawal request fee in Gwei.',
         default=DEFAULT_MAX_WITHDRAWAL_REQUEST_FEE_GWEI,
         show_default=True,
+    ),
+]
+
+
+relayer_jwt_secret_options = [
+    click.option(
+        '--relayer-jwt-secret',
+        type=str,
+        envvar='RELAYER_JWT_SECRET',
+        help='Hex-encoded JWT secret shared with the relayer. '
+        'Used to authenticate requests to the relayer. '
+        'Required for DVT relayer, optional for relayers without authentication. '
+        'Takes precedence over --relayer-jwt-secret-file.',
+        callback=validate_relayer_jwt_secret,
+    ),
+    click.option(
+        '--relayer-jwt-secret-file',
+        type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
+        envvar='RELAYER_JWT_SECRET_FILE',
+        help='Path to the file with the hex-encoded relayer JWT secret.',
     ),
 ]
 
