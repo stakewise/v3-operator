@@ -1,3 +1,5 @@
+import logging
+
 from eth_typing import BlockNumber, HexStr
 from sw_utils import ChainHead
 from web3 import Web3
@@ -8,6 +10,8 @@ from src.common.execution import fake_exponential
 from src.common.typings import PendingConsolidation
 from src.config.settings import settings
 from src.validators.typings import ConsensusValidator
+
+logger = logging.getLogger(__name__)
 
 
 async def get_pending_consolidations(
@@ -33,7 +37,21 @@ async def get_pending_consolidations(
             continue
 
         if has_source and not has_target:
-            raise ValueError(f'Target validator index {target_index} not found in vault validators')
+            # The submission flow guarantees consolidation targets are vault-registered
+            # validators, so an unresolved target here means `consensus_validators`
+            # (built from the local SQLite DB) is lagging the on-chain registration event
+            # -- e.g. after a restart or during event-scan catch-up. Warn instead of
+            # raising: aborting would stall the whole ValidatorTask.process_block cycle
+            # (registration + withdrawals) until indexing catches up. Both indexes are
+            # still known from the CL entry, so keep the source excluded from exit/partial
+            # selection; the target index is inert since it never matches a real validator.
+            logger.warning(
+                'Pending consolidation target validator index %s not found in vault '
+                'validators (source index %s); vault validator database may be lagging '
+                'on-chain registration',
+                target_index,
+                source_index,
+            )
 
         result.append(PendingConsolidation(source_index=source_index, target_index=target_index))
 
