@@ -11,7 +11,6 @@ from src.common.validators import (
     validate_max_validator_balance_gwei,
     validate_min_deposit_amount_gwei,
     validate_relayer_jwt_secret,
-    validate_relayer_jwt_secret_file,
 )
 from src.config.networks import GNOSIS, MAINNET, NETWORKS
 from src.config.settings import (
@@ -23,7 +22,6 @@ from src.config.settings import (
     DEFAULT_METRICS_PREFIX,
     DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
     DEFAULT_MIN_DEPOSIT_DELAY,
-    DEFAULT_RELAYER_JWT_SECRET_FILE,
     DEFAULT_VAULT_MIN_BALANCE_GWEI,
     LOG_FORMATS,
     LOG_PLAIN,
@@ -283,11 +281,9 @@ relayer_jwt_secret_options = [
     ),
     click.option(
         '--relayer-jwt-secret-file',
-        type=click.Path(exists=True, file_okay=True, dir_okay=False),
+        type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
         envvar='RELAYER_JWT_SECRET_FILE',
-        help='Path to the file with the hex-encoded relayer JWT secret. '
-        f'Default is {DEFAULT_RELAYER_JWT_SECRET_FILE} in the current directory, if it exists.',
-        callback=validate_relayer_jwt_secret_file,
+        help='Path to the file with the hex-encoded relayer JWT secret.',
     ),
 ]
 

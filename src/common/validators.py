@@ -9,7 +9,6 @@ from web3 import Web3
 
 from src.common.language import validate_mnemonic as verify_mnemonic
 from src.config.settings import (
-    DEFAULT_RELAYER_JWT_SECRET_FILE,
     MAX_EFFECTIVE_BALANCE,
     MAX_EFFECTIVE_BALANCE_GWEI,
     MIN_ACTIVATION_BALANCE,
@@ -148,24 +147,28 @@ def validate_min_deposit_amount_gwei(ctx: click.Context, param: click.Parameter,
     return value
 
 
-def validate_relayer_jwt_secret_file(
-    ctx: click.Context, param: click.Parameter, value: str | None
-) -> HexStr | None:
+def load_relayer_jwt_secret(secret: HexStr | None, secret_file: Path | None) -> HexStr | None:
     """
-    Loads the JWT secret from the file.
-    Falls back to the default file, if it exists, when no file is provided.
+    Returns the raw secret when it is set, otherwise reads it from the file.
     """
-    path = Path(value or DEFAULT_RELAYER_JWT_SECRET_FILE)
-    if not value and not path.exists():
+    if secret:
+        return secret
+    if not secret_file:
         return None
-    secret = path.read_text(encoding='utf-8').strip()
-    if not secret:
-        raise click.BadParameter(f'JWT secret file {path} is empty')
-    return validate_relayer_jwt_secret(ctx, param, secret)
+
+    content = secret_file.read_text(encoding='utf-8').strip()
+    if not content:
+        raise click.BadParameter(
+            f'JWT secret file {secret_file} is empty', param_hint='--relayer-jwt-secret-file'
+        )
+    try:
+        return validate_relayer_jwt_secret(None, None, content)
+    except click.BadParameter as e:
+        raise click.BadParameter(e.message, param_hint='--relayer-jwt-secret-file') from e
 
 
 def validate_relayer_jwt_secret(
-    ctx: click.Context, param: click.Parameter, value: str | None
+    ctx: click.Context | None, param: click.Parameter | None, value: str | None
 ) -> HexStr | None:
     if not value:
         return None

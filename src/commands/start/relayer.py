@@ -15,6 +15,7 @@ from src.commands.start.common_option import (
 )
 from src.common.typings import ValidatorType
 from src.common.utils import log_verbose
+from src.common.validators import load_relayer_jwt_secret
 from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import settings
@@ -75,7 +76,7 @@ def start_relayer(
     network: str | None,
     relayer_endpoint: str,
     relayer_jwt_secret: HexStr | None,
-    relayer_jwt_secret_file: HexStr | None,
+    relayer_jwt_secret_file: Path | None,
     max_withdrawal_request_fee_gwei: int,
 ) -> None:
     operator_config = OperatorConfig(vault, Path(data_dir))
@@ -110,7 +111,7 @@ def start_relayer(
         log_level=log_level,
         log_format=log_format,
         relayer_endpoint=relayer_endpoint,
-        relayer_jwt_secret=relayer_jwt_secret or relayer_jwt_secret_file,
+        relayer_jwt_secret=load_relayer_jwt_secret(relayer_jwt_secret, relayer_jwt_secret_file),
         concurrency=concurrency,
         min_deposit_amount_gwei=Gwei(min_deposit_amount_gwei),
         vault_min_balance_gwei=Gwei(vault_min_balance_gwei),

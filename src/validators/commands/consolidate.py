@@ -26,6 +26,7 @@ from src.common.protocol_config import get_protocol_config
 from src.common.startup_check import check_validators_manager
 from src.common.utils import log_verbose
 from src.common.validators import (
+    load_relayer_jwt_secret,
     validate_eth_address,
     validate_max_validator_balance_gwei,
     validate_public_key,
@@ -212,7 +213,7 @@ def consolidate(
     exclude_public_keys_file: Path | None,
     relayer_endpoint: str | None,
     relayer_jwt_secret: HexStr | None,
-    relayer_jwt_secret_file: HexStr | None,
+    relayer_jwt_secret_file: Path | None,
     max_validator_balance_gwei: int | None,
     vault_first_block: BlockNumber | None,
 ) -> None:
@@ -268,7 +269,7 @@ def consolidate(
         wallet_file=wallet_file,
         wallet_password_file=wallet_password_file,
         relayer_endpoint=relayer_endpoint,
-        relayer_jwt_secret=relayer_jwt_secret or relayer_jwt_secret_file,
+        relayer_jwt_secret=load_relayer_jwt_secret(relayer_jwt_secret, relayer_jwt_secret_file),
         max_validator_balance_gwei=(
             Gwei(max_validator_balance_gwei) if max_validator_balance_gwei else None
         ),
