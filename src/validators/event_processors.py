@@ -218,14 +218,18 @@ async def scan_validators_events(block_number: BlockNumber, is_startup: bool) ->
     else:
         network_validators_processor = NetworkValidatorsProcessor()
 
-    network_validators_scanner = EventScanner(network_validators_processor)
+    network_validators_scanner = create_event_scanner(network_validators_processor)
     await network_validators_scanner.process_new_events(block_number)
     vault_validators_processor = VaultValidatorsProcessor(settings.vault)
-    vault_validators_scanner = EventScanner(vault_validators_processor)
+    vault_validators_scanner = create_event_scanner(vault_validators_processor)
     await vault_validators_scanner.process_new_events(block_number)
 
     vault_v2_validators_processor = VaultV2ValidatorsProcessor(settings.vault)
-    vault_v2_validators_scanner = EventScanner(vault_v2_validators_processor)
+    vault_v2_validators_scanner = create_event_scanner(vault_v2_validators_processor)
     await vault_v2_validators_scanner.process_new_events(block_number)
 
     CheckpointCrud().update_validators_checkpoint(block_number=block_number)
+
+
+def create_event_scanner(processor: EventProcessor) -> EventScanner:
+    return EventScanner(processor, max_chunk_size=settings.event_scanner_max_chunk_size)

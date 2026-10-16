@@ -11,6 +11,7 @@ from src.common.clients import close_clients, execution_client, setup_clients
 from src.common.credentials import CredentialManager
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.password import generate_password, get_or_create_password_file
+from src.common.startup_check import check_events_logs
 from src.common.utils import greenify, log_verbose
 from src.common.validators import validate_eth_address, validate_mnemonic
 from src.config.config import OperatorConfig
@@ -175,6 +176,8 @@ async def process(
     no_confirm: bool,
     operator_config: OperatorConfig,
 ) -> None:
+    click.secho('Checking event logs...', bold=True)
+    await check_events_logs()
 
     validators: dict[HexStr, ValidatorStatus | None] = await _fetch_registered_validators(
         settings.vault

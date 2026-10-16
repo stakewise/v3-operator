@@ -9,6 +9,7 @@ import click
 import psutil
 from aiohttp import ClientSession, ClientTimeout
 from click import ClickException
+from eth_typing import BlockNumber
 from packaging.version import InvalidVersion, Version
 from sw_utils import (
     ChainHead,
@@ -37,6 +38,7 @@ from src.config.settings import (
     DEFAULT_EXECUTION_ENDPOINT,
     settings,
 )
+from src.validators.database import NetworkValidatorCrud
 from src.validators.execution import get_withdrawable_assets
 from src.validators.relayer import RelayerClient
 
@@ -420,15 +422,39 @@ async def check_operator_version() -> None:
 
 
 async def check_events_logs() -> None:
-    """Check that EL client didn't prune logs"""
+    """
+    Check that the EL client retains event logs from the operator's earliest checkpoint onward.
+
+    Probes the last block of the genesis validators dump,
+    which is known to contain a `DepositEvent` and is the earliest block the operator
+    reads event logs from.
+    """
     checkpoints = settings.network_config.CHECKPOINTS
+    await _check_deposit_event_at_block(checkpoints.GENESIS_VALIDATORS_LAST_BLOCK)
+
+
+async def check_db_events_logs() -> None:
+    """
+    Check that the EL client retains event logs from the point where
+    the database's event scans resume onward.
+
+    Useful for an operator that was offline for a long time.
+    """
+    last_validator = NetworkValidatorCrud().get_last_network_validator()
+    if last_validator is None:
+        return
+    await _check_deposit_event_at_block(last_validator.block_number)
+
+
+async def _check_deposit_event_at_block(block_number: BlockNumber) -> None:
+    """Raises if the block, which is known to contain a `DepositEvent`, has no logs."""
     events = await validators_registry_contract.events.DepositEvent.get_logs(
-        from_block=checkpoints.GENESIS_VALIDATORS_LAST_BLOCK,
-        to_block=checkpoints.GENESIS_VALIDATORS_LAST_BLOCK,
+        from_block=block_number,
+        to_block=block_number,
     )
     if not events:
         raise ValueError(
-            "Can't find network validator events. "
+            f"Can't find network validator events at block {block_number}. "
             "Please, ensure that EL client didn't prune event logs."
         )
 
