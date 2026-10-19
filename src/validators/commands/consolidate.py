@@ -10,6 +10,10 @@ from sw_utils import ChainHead
 from web3 import Web3
 from web3.types import Gwei, Wei
 
+from src.commands.start.common_option import (
+    add_common_options,
+    relayer_jwt_secret_options,
+)
 from src.common.clients import close_clients, setup_clients
 from src.common.consensus import get_chain_latest_head
 from src.common.consolidations import (
@@ -22,6 +26,7 @@ from src.common.protocol_config import get_protocol_config
 from src.common.startup_check import check_events_logs, check_validators_manager
 from src.common.utils import log_verbose
 from src.common.validators import (
+    load_relayer_jwt_secret,
     validate_eth_address,
     validate_max_validator_balance_gwei,
     validate_public_key,
@@ -123,6 +128,7 @@ logger = logging.getLogger(__name__)
     help='Relayer endpoint.',
     envvar='RELAYER_ENDPOINT',
 )
+@add_common_options(relayer_jwt_secret_options)
 @click.option(
     '--max-validator-balance-gwei',
     type=int,
@@ -206,6 +212,8 @@ def consolidate(
     target_public_key: HexStr | None,
     exclude_public_keys_file: Path | None,
     relayer_endpoint: str | None,
+    relayer_jwt_secret: HexStr | None,
+    relayer_jwt_secret_file: Path | None,
     max_validator_balance_gwei: int | None,
     vault_first_block: BlockNumber | None,
 ) -> None:
@@ -261,6 +269,7 @@ def consolidate(
         wallet_file=wallet_file,
         wallet_password_file=wallet_password_file,
         relayer_endpoint=relayer_endpoint,
+        relayer_jwt_secret=load_relayer_jwt_secret(relayer_jwt_secret, relayer_jwt_secret_file),
         max_validator_balance_gwei=(
             Gwei(max_validator_balance_gwei) if max_validator_balance_gwei else None
         ),

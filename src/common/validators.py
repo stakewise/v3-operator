@@ -1,5 +1,6 @@
 # pylint: disable=unused-argument
 import re
+from pathlib import Path
 
 import click
 from eth_typing import ChecksumAddress, HexStr
@@ -14,6 +15,7 @@ from src.config.settings import (
     MIN_ACTIVATION_BALANCE_GWEI,
     MIN_DEPOSIT_AMOUNT,
     MIN_DEPOSIT_AMOUNT_GWEI,
+    RELAYER_JWT_SECRET_MIN_LENGTH,
 )
 
 
@@ -143,6 +145,42 @@ def validate_min_deposit_amount_gwei(ctx: click.Context, param: click.Parameter,
             f'({Web3.from_wei(MIN_DEPOSIT_AMOUNT, 'ether')} ETH)'
         )
     return value
+
+
+def load_relayer_jwt_secret(secret: HexStr | None, secret_file: Path | None) -> HexStr | None:
+    """
+    Returns the raw secret when it is set, otherwise reads it from the file.
+    """
+    if secret:
+        return secret
+    if not secret_file:
+        return None
+
+    content = secret_file.read_text(encoding='utf-8').strip()
+    if not content:
+        raise click.BadParameter(
+            f'JWT secret file {secret_file} is empty', param_hint='--relayer-jwt-secret-file'
+        )
+    try:
+        return validate_relayer_jwt_secret(None, None, content)
+    except click.BadParameter as e:
+        raise click.BadParameter(e.message, param_hint='--relayer-jwt-secret-file') from e
+
+
+def validate_relayer_jwt_secret(
+    ctx: click.Context | None, param: click.Parameter | None, value: str | None
+) -> HexStr | None:
+    if not value:
+        return None
+    try:
+        secret = Web3.to_bytes(hexstr=HexStr(value.strip()))
+    except ValueError as e:
+        raise click.BadParameter('JWT secret must be a hex string') from e
+    if len(secret) < RELAYER_JWT_SECRET_MIN_LENGTH:
+        raise click.BadParameter(
+            f'JWT secret must be at least {RELAYER_JWT_SECRET_MIN_LENGTH} bytes'
+        )
+    return Web3.to_hex(secret)
 
 
 def _is_public_key(value: str) -> bool:
