@@ -1,10 +1,12 @@
 from contextlib import contextmanager
 from decimal import Decimal
-from typing import Generator
+from typing import Any, Generator
 from unittest.mock import AsyncMock, patch
 
 from web3 import Web3
 from web3.types import Gwei, Wei
+
+from src.config.settings import settings
 
 
 def ether_to_gwei(value: int | float | Decimal) -> Gwei:
@@ -23,6 +25,16 @@ def parse_wei(value: str | list | dict) -> Wei:
         return {key: parse_wei(value) for key, value in value.items()}
 
     raise ValueError(f'Unsupported type for parse_wei: {type(value)}')
+
+
+@contextmanager
+def patch_settings(key: str, value: Any) -> Generator[None, None, None]:
+    """
+    Temporarily overrides a settings attribute.
+    Settings is a global singleton, so direct assignment leaks into other tests.
+    """
+    with patch.object(settings, key, value):
+        yield
 
 
 @contextmanager

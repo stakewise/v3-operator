@@ -9,6 +9,10 @@ from eth_typing import BlockNumber, ChecksumAddress, HexStr
 from web3 import Web3
 from web3.types import Gwei, Wei
 
+from src.commands.start.common_option import (
+    add_common_options,
+    relayer_jwt_secret_options,
+)
 from src.common.clients import close_clients, setup_clients
 from src.common.consensus import get_chain_justified_head
 from src.common.logging import LOG_LEVELS, setup_logging
@@ -18,7 +22,11 @@ from src.common.startup_check import (
     check_vault_version,
 )
 from src.common.utils import log_verbose
-from src.common.validators import validate_eth_address, validate_indexes
+from src.common.validators import (
+    load_relayer_jwt_secret,
+    validate_eth_address,
+    validate_indexes,
+)
 from src.common.withdrawals import get_withdrawal_request_fee
 from src.config.config import OperatorConfig
 from src.config.networks import AVAILABLE_NETWORKS
@@ -87,6 +95,7 @@ logger = logging.getLogger(__name__)
     help='Relayer endpoint.',
     envvar='RELAYER_ENDPOINT',
 )
+@add_common_options(relayer_jwt_secret_options)
 @click.option(
     '--max-withdrawal-request-fee-gwei',
     type=int,
@@ -138,6 +147,8 @@ def exit_validators(
     no_confirm: bool,
     log_level: str,
     relayer_endpoint: str | None,
+    relayer_jwt_secret: HexStr | None,
+    relayer_jwt_secret_file: Path | None,
     vault_first_block: BlockNumber | None,
 ) -> None:
     """
@@ -169,6 +180,7 @@ def exit_validators(
         execution_endpoints=execution_endpoints,
         max_withdrawal_request_fee_gwei=Gwei(max_withdrawal_request_fee_gwei),
         relayer_endpoint=relayer_endpoint,
+        relayer_jwt_secret=load_relayer_jwt_secret(relayer_jwt_secret, relayer_jwt_secret_file),
         verbose=verbose,
         log_level=log_level,
         vault_first_block=vault_first_block,
