@@ -88,15 +88,16 @@ class TestFetchLastExitSignatureUpdateBlock:
     async def test_normal(self):
         get_event_func = 'src.exits.tasks.keeper_contract.get_exit_signatures_updated_event'
 
-        # no events, checkpoint moved from None to 8
+        # no events, cold cache: scan starts from the release checkpoint, not keeper genesis
         with (
+            mock.patch.object(settings.network_config, 'EXIT_SIGNATURES_CHECKPOINT_BLOCK', 5),
             mock.patch(get_event_func, return_value=None) as get_event_mock,
             patch_latest_block(8),
         ):
             last_update_block = await _fetch_last_update_block()
 
         assert last_update_block is None
-        get_event_mock.assert_called_once_with(vault=settings.vault, from_block=None, to_block=8)
+        get_event_mock.assert_called_once_with(vault=settings.vault, from_block=6, to_block=8)
 
         # no events, checkpoint moved to 9
         with (

@@ -20,14 +20,43 @@ class NetworkConfig(BaseNetworkConfig):
     HOT_WALLET_MIN_BALANCE: Wei
     STAKEWISE_API_URL: str
     RATED_API_URL: str
-    CONFIG_UPDATE_EVENT_BLOCK: BlockNumber
     DEFAULT_DVT_RELAYER_ENDPOINT: str
     MAX_FEE_PER_GAS_GWEI: Gwei
+    # Pinned points past which the operator does not need execution client event logs.
+    # `ConfigUpdated` scans on a cold cache start from `CONFIG_UPDATE_CHECKPOINT_BLOCK + 1`.
+    # `CONFIG_UPDATE_LAST_EVENT_IPFS_HASH` is the hash from the newest `ConfigUpdated` event
+    # before the checkpoint. It lets the operator skip reading that event,
+    # which may be pruned from the node.
+    CONFIG_UPDATE_CHECKPOINT_BLOCK: BlockNumber
+    CONFIG_UPDATE_LAST_EVENT_IPFS_HASH: str
+    # `ExitSignaturesUpdated` scans on a cold cache start from
+    # `EXIT_SIGNATURES_CHECKPOINT_BLOCK + 1`. Older rotations are long finalized
+    # and already synced by oracles, so they don't gate a new rotation.
+    EXIT_SIGNATURES_CHECKPOINT_BLOCK: BlockNumber
+
+
+def _base_config(network: str, **overrides: str | BlockNumber) -> dict:
+    """
+    Returns sw-utils network config as a dict with fields replaced by `overrides`.
+    Used to pin newer genesis validators dumps than the ones shipped with sw-utils.
+    """
+    config = asdict(BASE_NETWORKS[network])
+    for key, value in overrides.items():
+        if key not in config:
+            raise KeyError(f'Unknown network config field: {key}')
+        config[key] = value
+    return config
 
 
 NETWORKS: dict[str, NetworkConfig] = {
     MAINNET: NetworkConfig(
-        **asdict(BASE_NETWORKS[MAINNET]),
+        **_base_config(
+            MAINNET,
+            GENESIS_VALIDATORS_IPFS_HASH=(
+                'bafybeigp2oamkahzc6g2juy3wsuknlyj2m4f27vma276d4bg5z7d64rvue'
+            ),
+            GENESIS_VALIDATORS_LAST_BLOCK=BlockNumber(25933938),
+        ),
         WALLET_BALANCE_SYMBOL='ETH',
         VAULT_BALANCE_SYMBOL='ETH',
         DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
@@ -36,12 +65,20 @@ NETWORKS: dict[str, NetworkConfig] = {
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
         STAKEWISE_API_URL='https://mainnet-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
-        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(21471524),
         DEFAULT_DVT_RELAYER_ENDPOINT='https://mainnet-dvt-relayer.stakewise.io',
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
+        CONFIG_UPDATE_CHECKPOINT_BLOCK=BlockNumber(25934000),
+        CONFIG_UPDATE_LAST_EVENT_IPFS_HASH='QmeCywDfupWC7jz5EDHsU5yEb2unAhn8iSGWBUEdrMjdMc',
+        EXIT_SIGNATURES_CHECKPOINT_BLOCK=BlockNumber(25934000),
     ),
     HOODI: NetworkConfig(
-        **asdict(BASE_NETWORKS[HOODI]),
+        **_base_config(
+            HOODI,
+            GENESIS_VALIDATORS_IPFS_HASH=(
+                'bafybeiewzbkv7m53muugperb3w4j7uxvw6d5mmry7l73igcxutmaqmq3q4'
+            ),
+            GENESIS_VALIDATORS_LAST_BLOCK=BlockNumber(3583807),
+        ),
         WALLET_BALANCE_SYMBOL='HoodiETH',
         VAULT_BALANCE_SYMBOL='HoodiETH',
         DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
@@ -50,12 +87,20 @@ NETWORKS: dict[str, NetworkConfig] = {
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.03', 'ether'),
         STAKEWISE_API_URL='https://hoodi-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
-        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(94090),
         DEFAULT_DVT_RELAYER_ENDPOINT='https://hoodi-dvt-relayer.stakewise.io',
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
+        CONFIG_UPDATE_CHECKPOINT_BLOCK=BlockNumber(3584000),
+        CONFIG_UPDATE_LAST_EVENT_IPFS_HASH='QmVqQyJ1TckGVshvYP7iMXhG46w5i2JyciwDqPkEnXijDH',
+        EXIT_SIGNATURES_CHECKPOINT_BLOCK=BlockNumber(3584000),
     ),
     GNOSIS: NetworkConfig(
-        **asdict(BASE_NETWORKS[GNOSIS]),
+        **_base_config(
+            GNOSIS,
+            GENESIS_VALIDATORS_IPFS_HASH=(
+                'bafybeid432mdt244stggmmloubn2aoe2563abtyskdmipmd6p4lzh54jl4'
+            ),
+            GENESIS_VALIDATORS_LAST_BLOCK=BlockNumber(48127042),
+        ),
         WALLET_BALANCE_SYMBOL='xDAI',
         VAULT_BALANCE_SYMBOL='GNO',
         DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
@@ -64,12 +109,14 @@ NETWORKS: dict[str, NetworkConfig] = {
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
         STAKEWISE_API_URL='https://gnosis-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
-        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(37640206),
         DEFAULT_DVT_RELAYER_ENDPOINT='gnosis-dvt-relayer.stakewise.io',
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
+        CONFIG_UPDATE_CHECKPOINT_BLOCK=BlockNumber(48148000),
+        CONFIG_UPDATE_LAST_EVENT_IPFS_HASH='QmWCdkpTifsge6t2NTwyb89PCXDXFNkfee9T5ZctEfrDDw',
+        EXIT_SIGNATURES_CHECKPOINT_BLOCK=BlockNumber(48148000),
     ),
     CHIADO: NetworkConfig(
-        **asdict(BASE_NETWORKS[CHIADO]),
+        **_base_config(CHIADO),
         WALLET_BALANCE_SYMBOL='xDAI',
         VAULT_BALANCE_SYMBOL='GNO',
         DEPOSIT_DATA_REGISTRY_CONTRACT_ADDRESS=Web3.to_checksum_address(
@@ -78,8 +125,13 @@ NETWORKS: dict[str, NetworkConfig] = {
         HOT_WALLET_MIN_BALANCE=Web3.to_wei('0.01', 'ether'),
         STAKEWISE_API_URL='https://chiado-api.stakewise.io/graphql',
         RATED_API_URL='https://api.rated.network',
-        CONFIG_UPDATE_EVENT_BLOCK=BlockNumber(12896244),
         DEFAULT_DVT_RELAYER_ENDPOINT='chiado-dvt-relayer.stakewise.io',
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
+        # No checkpoints for Chiado: scan from the keeper genesis block as before.
+        CONFIG_UPDATE_CHECKPOINT_BLOCK=BlockNumber(BASE_NETWORKS[CHIADO].KEEPER_GENESIS_BLOCK - 1),
+        CONFIG_UPDATE_LAST_EVENT_IPFS_HASH='',
+        EXIT_SIGNATURES_CHECKPOINT_BLOCK=BlockNumber(
+            BASE_NETWORKS[CHIADO].KEEPER_GENESIS_BLOCK - 1
+        ),
     ),
 }

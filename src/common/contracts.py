@@ -17,7 +17,7 @@ from web3.types import BlockNumber, ChecksumAddress, EventData
 
 from src.common.clients import execution_client as default_execution_client
 from src.common.typings import HarvestParams, RewardVoteInfo
-from src.config.settings import settings
+from src.config.settings import SECONDS_PER_MONTH, settings
 
 
 class ContractWrapper:
@@ -189,10 +189,20 @@ class KeeperContract(ContractWrapper):
 
     async def get_last_rewards_update(self) -> RewardVoteInfo | None:
         """Fetches the last rewards update."""
+        to_block = await self.execution_client.eth.get_block_number()
+        # Rewards are updated regularly, so looking one month back is enough
+        # and avoids scanning all the way to the keeper genesis block.
+        approx_blocks_per_month = SECONDS_PER_MONTH // settings.network_config.SECONDS_PER_BLOCK
+        from_block = BlockNumber(
+            max(
+                settings.network_config.KEEPER_GENESIS_BLOCK,
+                to_block - approx_blocks_per_month,
+            )
+        )
         last_event = await self._get_last_event(
             self.events.RewardsUpdated,  # type: ignore
-            from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
-            to_block=await self.execution_client.eth.get_block_number(),
+            from_block=from_block,
+            to_block=to_block,
         )
         if not last_event:
             return None

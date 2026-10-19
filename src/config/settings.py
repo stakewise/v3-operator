@@ -314,6 +314,8 @@ ORACLES_VALIDATORS_TIMEOUT: int = decouple_config(
 DEPOSIT_AMOUNT = Web3.to_wei(32, 'ether')
 DEPOSIT_AMOUNT_GWEI = int(Web3.from_wei(DEPOSIT_AMOUNT, 'gwei'))
 
+SECONDS_PER_MONTH = 30 * 24 * 60 * 60
+
 # Backoff retries
 DEFAULT_RETRY_TIME = 60
 
