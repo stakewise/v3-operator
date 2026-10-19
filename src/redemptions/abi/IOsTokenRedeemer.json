@@ -88,9 +88,9 @@
     "type": "error"
   },
   {
-    "type": "error",
+    "inputs": [],
     "name": "InvalidFeePercent",
-    "inputs": []
+    "type": "error"
   },
   {
     "inputs": [],
@@ -206,41 +206,41 @@
     "type": "event"
   },
   {
-    "type": "event",
-    "name": "ExitQueueEntered",
+    "anonymous": false,
     "inputs": [
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "owner",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "receiver",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "indexed": false,
+        "internalType": "uint256",
         "name": "positionTicket",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
+        "type": "uint256"
       },
       {
+        "indexed": false,
+        "internalType": "uint256",
         "name": "shares",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
+        "type": "uint256"
       },
       {
-        "name": "fee",
-        "type": "uint256",
         "indexed": false,
-        "internalType": "uint256"
+        "internalType": "uint256",
+        "name": "fee",
+        "type": "uint256"
       }
     ],
-    "anonymous": false
+    "name": "ExitQueueEntered",
+    "type": "event"
   },
   {
     "anonymous": false,
@@ -274,36 +274,36 @@
     "type": "event"
   },
   {
-    "type": "event",
-    "name": "FeeUpdated",
+    "anonymous": false,
     "inputs": [
       {
-        "name": "redemptionFeePercent",
-        "type": "uint256",
         "indexed": false,
-        "internalType": "uint256"
+        "internalType": "uint256",
+        "name": "redemptionFeePercent",
+        "type": "uint256"
       }
     ],
-    "anonymous": false
+    "name": "FeeUpdated",
+    "type": "event"
   },
   {
-    "type": "event",
-    "name": "FeesClaimed",
+    "anonymous": false,
     "inputs": [
       {
-        "name": "receiver",
-        "type": "address",
         "indexed": true,
-        "internalType": "address"
+        "internalType": "address",
+        "name": "receiver",
+        "type": "address"
       },
       {
-        "name": "shares",
-        "type": "uint256",
         "indexed": false,
-        "internalType": "uint256"
+        "internalType": "uint256",
+        "name": "shares",
+        "type": "uint256"
       }
     ],
-    "anonymous": false
+    "name": "FeesClaimed",
+    "type": "event"
   },
   {
     "anonymous": false,
@@ -433,17 +433,17 @@
     "type": "function"
   },
   {
-    "type": "function",
-    "name": "accumulatedFees",
     "inputs": [],
+    "name": "accumulatedFees",
     "outputs": [
       {
+        "internalType": "uint256",
         "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
+        "type": "uint256"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "view",
+    "type": "function"
   },
   {
     "inputs": [
@@ -516,17 +516,17 @@
     "type": "function"
   },
   {
-    "type": "function",
-    "name": "claimFees",
     "inputs": [
       {
+        "internalType": "address",
         "name": "receiver",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       }
     ],
+    "name": "claimFees",
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
     "inputs": [
@@ -952,17 +952,17 @@
     "type": "function"
   },
   {
-    "type": "function",
-    "name": "redemptionFeePercent",
     "inputs": [],
+    "name": "redemptionFeePercent",
     "outputs": [
       {
+        "internalType": "uint256",
         "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
+        "type": "uint256"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "view",
+    "type": "function"
   },
   {
     "inputs": [],
@@ -1010,17 +1010,17 @@
     "type": "function"
   },
   {
-    "type": "function",
-    "name": "setRedemptionFeePercent",
     "inputs": [
       {
+        "internalType": "uint256",
         "name": "redemptionFeePercent_",
-        "type": "uint256",
-        "internalType": "uint256"
+        "type": "uint256"
       }
     ],
+    "name": "setRedemptionFeePercent",
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
     "inputs": [
