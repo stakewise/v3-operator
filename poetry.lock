@@ -4043,7 +4043,7 @@ resolved_reference = "682bb34587398e5500fde72709425f57d402399f"
 
 [[package]]
 name = "sw-utils"
-version = "v0.15.5"
+version = "v0.15.6"
 description = "StakeWise Python utils"
 optional = false
 python-versions = "^3.12"
@@ -4064,8 +4064,8 @@ web3 = "==7.14.1"
 [package.source]
 type = "git"
 url = "https://github.com/stakewise/sw-utils.git"
-reference = "v0.15.5"
-resolved_reference = "6f860b240b0060ad37eb514cadaa433f49bf5a37"
+reference = "v0.15.6"
+resolved_reference = "7ad2ecc243c1655edfe2201e5f2ed9c42116a828"
 
 [[package]]
 name = "tenacity"
@@ -4514,4 +4514,4 @@ type = ["pytest-mypy (>=1.0.1)"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12,<3.13"
-content-hash = "817612186e041576ee7b829fa269736504984f2267332ed94135129e53005587"
+content-hash = "9835a352b8f14dfbd71001f1f1e7d43340d8a9c1dd3d3ec50cfedc4aab7e5bc3"
