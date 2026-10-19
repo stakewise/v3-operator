@@ -88,6 +88,11 @@
     "type": "error"
   },
   {
+    "type": "error",
+    "name": "InvalidFeePercent",
+    "inputs": []
+  },
+  {
     "inputs": [],
     "name": "InvalidProof",
     "type": "error"
@@ -201,35 +206,41 @@
     "type": "event"
   },
   {
-    "anonymous": false,
+    "type": "event",
+    "name": "ExitQueueEntered",
     "inputs": [
       {
-        "indexed": true,
-        "internalType": "address",
         "name": "owner",
-        "type": "address"
-      },
-      {
+        "type": "address",
         "indexed": true,
-        "internalType": "address",
+        "internalType": "address"
+      },
+      {
         "name": "receiver",
-        "type": "address"
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
       },
       {
-        "indexed": false,
-        "internalType": "uint256",
         "name": "positionTicket",
-        "type": "uint256"
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       },
       {
-        "indexed": false,
-        "internalType": "uint256",
         "name": "shares",
-        "type": "uint256"
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "fee",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
-    "name": "ExitQueueEntered",
-    "type": "event"
+    "anonymous": false
   },
   {
     "anonymous": false,
@@ -261,6 +272,38 @@
     ],
     "name": "ExitedAssetsClaimed",
     "type": "event"
+  },
+  {
+    "type": "event",
+    "name": "FeeUpdated",
+    "inputs": [
+      {
+        "name": "redemptionFeePercent",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "FeesClaimed",
+    "inputs": [
+      {
+        "name": "receiver",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "shares",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
   },
   {
     "anonymous": false,
@@ -390,6 +433,19 @@
     "type": "function"
   },
   {
+    "type": "function",
+    "name": "accumulatedFees",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -458,6 +514,19 @@
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
+  },
+  {
+    "type": "function",
+    "name": "claimFees",
+    "inputs": [
+      {
+        "name": "receiver",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "inputs": [
@@ -883,6 +952,19 @@
     "type": "function"
   },
   {
+    "type": "function",
+    "name": "redemptionFeePercent",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
     "inputs": [],
     "name": "renounceOwnership",
     "outputs": [],
@@ -926,6 +1008,19 @@
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
+  },
+  {
+    "type": "function",
+    "name": "setRedemptionFeePercent",
+    "inputs": [
+      {
+        "name": "redemptionFeePercent_",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "inputs": [
