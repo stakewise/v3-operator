@@ -7,7 +7,7 @@ from unittest import mock
 # aioresponses (<=0.7.9) builds ClientResponse without the `stream_writer`
 # argument that aiohttp >=3.14 requires as a keyword-only parameter. Patch the
 # class it instantiates to supply a default so mocked responses keep working.
-import aioresponses.core  # noqa: E402  pylint: disable=wrong-import-position
+import aioresponses.core
 import ecies
 import pytest
 from _pytest.fixtures import SubRequest
