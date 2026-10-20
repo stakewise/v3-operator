@@ -90,7 +90,9 @@ class TestFetchLastExitSignatureUpdateBlock:
 
         # no events, cold cache: scan starts from the release checkpoint, not keeper genesis
         with (
-            mock.patch.object(settings.network_config, 'EXIT_SIGNATURES_CHECKPOINT_BLOCK', 5),
+            mock.patch.object(
+                settings.network_config.CHECKPOINTS, 'EXIT_SIGNATURES_CHECKPOINT_BLOCK', 5
+            ),
             mock.patch(get_event_func, return_value=None) as get_event_mock,
             patch_latest_block(8),
         ):

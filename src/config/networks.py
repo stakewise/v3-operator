@@ -12,6 +12,23 @@ RATED_NETWORKS = [MAINNET]
 
 
 @dataclass
+class CheckpointsConfig:
+    """
+    Pinned points past which the operator does not need execution client event logs.
+    """
+
+    # `ConfigUpdated` scans on a cold cache start from `CONFIG_UPDATE_CHECKPOINT_BLOCK + 1`.
+    CONFIG_UPDATE_CHECKPOINT_BLOCK: BlockNumber
+    # IPFS hash from the newest `ConfigUpdated` event before the checkpoint.
+    # Lets the operator skip reading that event, which may be pruned from the node.
+    CONFIG_UPDATE_LAST_EVENT_IPFS_HASH: str
+    # `ExitSignaturesUpdated` scans on a cold cache start from
+    # `EXIT_SIGNATURES_CHECKPOINT_BLOCK + 1`. Older rotations are long finalized
+    # and already synced by oracles, so they don't gate a new rotation.
+    EXIT_SIGNATURES_CHECKPOINT_BLOCK: BlockNumber
+
+
+@dataclass
 # pylint: disable-next=too-many-instance-attributes
 class NetworkConfig(BaseNetworkConfig):
     WALLET_BALANCE_SYMBOL: str
@@ -22,17 +39,7 @@ class NetworkConfig(BaseNetworkConfig):
     RATED_API_URL: str
     DEFAULT_DVT_RELAYER_ENDPOINT: str
     MAX_FEE_PER_GAS_GWEI: Gwei
-    # Pinned points past which the operator does not need execution client event logs.
-    # `ConfigUpdated` scans on a cold cache start from `CONFIG_UPDATE_CHECKPOINT_BLOCK + 1`.
-    # `CONFIG_UPDATE_LAST_EVENT_IPFS_HASH` is the hash from the newest `ConfigUpdated` event
-    # before the checkpoint. It lets the operator skip reading that event,
-    # which may be pruned from the node.
-    CONFIG_UPDATE_CHECKPOINT_BLOCK: BlockNumber
-    CONFIG_UPDATE_LAST_EVENT_IPFS_HASH: str
-    # `ExitSignaturesUpdated` scans on a cold cache start from
-    # `EXIT_SIGNATURES_CHECKPOINT_BLOCK + 1`. Older rotations are long finalized
-    # and already synced by oracles, so they don't gate a new rotation.
-    EXIT_SIGNATURES_CHECKPOINT_BLOCK: BlockNumber
+    CHECKPOINTS: CheckpointsConfig
 
 
 def _base_config(network: str, **overrides: str | BlockNumber) -> dict:
@@ -67,9 +74,11 @@ NETWORKS: dict[str, NetworkConfig] = {
         RATED_API_URL='https://api.rated.network',
         DEFAULT_DVT_RELAYER_ENDPOINT='https://mainnet-dvt-relayer.stakewise.io',
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
-        CONFIG_UPDATE_CHECKPOINT_BLOCK=BlockNumber(25934000),
-        CONFIG_UPDATE_LAST_EVENT_IPFS_HASH='QmeCywDfupWC7jz5EDHsU5yEb2unAhn8iSGWBUEdrMjdMc',
-        EXIT_SIGNATURES_CHECKPOINT_BLOCK=BlockNumber(25934000),
+        CHECKPOINTS=CheckpointsConfig(
+            CONFIG_UPDATE_CHECKPOINT_BLOCK=BlockNumber(25934000),
+            CONFIG_UPDATE_LAST_EVENT_IPFS_HASH='QmeCywDfupWC7jz5EDHsU5yEb2unAhn8iSGWBUEdrMjdMc',
+            EXIT_SIGNATURES_CHECKPOINT_BLOCK=BlockNumber(25934000),
+        ),
     ),
     HOODI: NetworkConfig(
         **_base_config(
@@ -89,9 +98,11 @@ NETWORKS: dict[str, NetworkConfig] = {
         RATED_API_URL='https://api.rated.network',
         DEFAULT_DVT_RELAYER_ENDPOINT='https://hoodi-dvt-relayer.stakewise.io',
         MAX_FEE_PER_GAS_GWEI=Gwei(10),
-        CONFIG_UPDATE_CHECKPOINT_BLOCK=BlockNumber(3584000),
-        CONFIG_UPDATE_LAST_EVENT_IPFS_HASH='QmVqQyJ1TckGVshvYP7iMXhG46w5i2JyciwDqPkEnXijDH',
-        EXIT_SIGNATURES_CHECKPOINT_BLOCK=BlockNumber(3584000),
+        CHECKPOINTS=CheckpointsConfig(
+            CONFIG_UPDATE_CHECKPOINT_BLOCK=BlockNumber(3584000),
+            CONFIG_UPDATE_LAST_EVENT_IPFS_HASH='QmVqQyJ1TckGVshvYP7iMXhG46w5i2JyciwDqPkEnXijDH',
+            EXIT_SIGNATURES_CHECKPOINT_BLOCK=BlockNumber(3584000),
+        ),
     ),
     GNOSIS: NetworkConfig(
         **_base_config(
@@ -111,9 +122,11 @@ NETWORKS: dict[str, NetworkConfig] = {
         RATED_API_URL='https://api.rated.network',
         DEFAULT_DVT_RELAYER_ENDPOINT='gnosis-dvt-relayer.stakewise.io',
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
-        CONFIG_UPDATE_CHECKPOINT_BLOCK=BlockNumber(48148000),
-        CONFIG_UPDATE_LAST_EVENT_IPFS_HASH='QmWCdkpTifsge6t2NTwyb89PCXDXFNkfee9T5ZctEfrDDw',
-        EXIT_SIGNATURES_CHECKPOINT_BLOCK=BlockNumber(48148000),
+        CHECKPOINTS=CheckpointsConfig(
+            CONFIG_UPDATE_CHECKPOINT_BLOCK=BlockNumber(48148000),
+            CONFIG_UPDATE_LAST_EVENT_IPFS_HASH='QmWCdkpTifsge6t2NTwyb89PCXDXFNkfee9T5ZctEfrDDw',
+            EXIT_SIGNATURES_CHECKPOINT_BLOCK=BlockNumber(48148000),
+        ),
     ),
     CHIADO: NetworkConfig(
         **_base_config(CHIADO),
@@ -128,10 +141,14 @@ NETWORKS: dict[str, NetworkConfig] = {
         DEFAULT_DVT_RELAYER_ENDPOINT='chiado-dvt-relayer.stakewise.io',
         MAX_FEE_PER_GAS_GWEI=Gwei(2),
         # No checkpoints for Chiado: scan from the keeper genesis block as before.
-        CONFIG_UPDATE_CHECKPOINT_BLOCK=BlockNumber(BASE_NETWORKS[CHIADO].KEEPER_GENESIS_BLOCK - 1),
-        CONFIG_UPDATE_LAST_EVENT_IPFS_HASH='',
-        EXIT_SIGNATURES_CHECKPOINT_BLOCK=BlockNumber(
-            BASE_NETWORKS[CHIADO].KEEPER_GENESIS_BLOCK - 1
+        CHECKPOINTS=CheckpointsConfig(
+            CONFIG_UPDATE_CHECKPOINT_BLOCK=BlockNumber(
+                BASE_NETWORKS[CHIADO].KEEPER_GENESIS_BLOCK - 1
+            ),
+            CONFIG_UPDATE_LAST_EVENT_IPFS_HASH='',
+            EXIT_SIGNATURES_CHECKPOINT_BLOCK=BlockNumber(
+                BASE_NETWORKS[CHIADO].KEEPER_GENESIS_BLOCK - 1
+            ),
         ),
     ),
 }

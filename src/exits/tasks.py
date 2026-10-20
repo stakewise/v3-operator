@@ -105,7 +105,9 @@ async def _fetch_last_update_block() -> BlockNumber | None:
 
     if update_cache.checkpoint_block is None:
         # Cold cache: start from the release checkpoint instead of the keeper genesis block.
-        update_cache.checkpoint_block = settings.network_config.EXIT_SIGNATURES_CHECKPOINT_BLOCK
+        update_cache.checkpoint_block = (
+            settings.network_config.CHECKPOINTS.EXIT_SIGNATURES_CHECKPOINT_BLOCK
+        )
         update_cache.last_event_block = None
 
     from_block = BlockNumber(update_cache.checkpoint_block + 1)

@@ -106,8 +106,8 @@ async def _get_config_ipfs_hash_since_checkpoint(to_block: BlockNumber) -> str:
     history, and falls back to the IPFS hash of the last known event when nothing is newer.
     The fallback doesn't read old event logs, so it works on nodes with pruned history.
     """
-    network_config = settings.network_config
-    from_block = BlockNumber(network_config.CONFIG_UPDATE_CHECKPOINT_BLOCK + 1)
+    checkpoints = settings.network_config.CHECKPOINTS
+    from_block = BlockNumber(checkpoints.CONFIG_UPDATE_CHECKPOINT_BLOCK + 1)
 
     if from_block <= to_block:
         logger.debug(
@@ -119,11 +119,11 @@ async def _get_config_ipfs_hash_since_checkpoint(to_block: BlockNumber) -> str:
         if event:
             return event['args']['configIpfsHash']
 
-    if not network_config.CONFIG_UPDATE_LAST_EVENT_IPFS_HASH:
+    if not checkpoints.CONFIG_UPDATE_LAST_EVENT_IPFS_HASH:
         raise RuntimeError(
             "Can't find oracle config. Please, ensure that EL client didn't prune event logs."
         )
-    return network_config.CONFIG_UPDATE_LAST_EVENT_IPFS_HASH
+    return checkpoints.CONFIG_UPDATE_LAST_EVENT_IPFS_HASH
 
 
 async def _fetch_config_by_hash(ipfs_hash: str) -> dict:

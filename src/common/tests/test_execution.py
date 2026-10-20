@@ -13,9 +13,13 @@ class TestGetConfigIpfsHashSinceCheckpoint:
     async def test_event_after_checkpoint(self):
         event = {'args': {'configIpfsHash': 'QmNewHash'}}
         with (
-            mock.patch.object(settings.network_config, 'CONFIG_UPDATE_CHECKPOINT_BLOCK', 100),
             mock.patch.object(
-                settings.network_config, 'CONFIG_UPDATE_LAST_EVENT_IPFS_HASH', 'QmOldHash'
+                settings.network_config.CHECKPOINTS, 'CONFIG_UPDATE_CHECKPOINT_BLOCK', 100
+            ),
+            mock.patch.object(
+                settings.network_config.CHECKPOINTS,
+                'CONFIG_UPDATE_LAST_EVENT_IPFS_HASH',
+                'QmOldHash',
             ),
             mock.patch(GET_EVENT_FUNC, return_value=event) as get_event_mock,
         ):
@@ -26,9 +30,13 @@ class TestGetConfigIpfsHashSinceCheckpoint:
 
     async def test_no_event_after_checkpoint(self):
         with (
-            mock.patch.object(settings.network_config, 'CONFIG_UPDATE_CHECKPOINT_BLOCK', 100),
             mock.patch.object(
-                settings.network_config, 'CONFIG_UPDATE_LAST_EVENT_IPFS_HASH', 'QmOldHash'
+                settings.network_config.CHECKPOINTS, 'CONFIG_UPDATE_CHECKPOINT_BLOCK', 100
+            ),
+            mock.patch.object(
+                settings.network_config.CHECKPOINTS,
+                'CONFIG_UPDATE_LAST_EVENT_IPFS_HASH',
+                'QmOldHash',
             ),
             mock.patch(GET_EVENT_FUNC, return_value=None) as get_event_mock,
         ):
@@ -40,9 +48,13 @@ class TestGetConfigIpfsHashSinceCheckpoint:
     async def test_head_below_checkpoint(self):
         """No event logs are read when the node is behind the checkpoint."""
         with (
-            mock.patch.object(settings.network_config, 'CONFIG_UPDATE_CHECKPOINT_BLOCK', 100),
             mock.patch.object(
-                settings.network_config, 'CONFIG_UPDATE_LAST_EVENT_IPFS_HASH', 'QmOldHash'
+                settings.network_config.CHECKPOINTS, 'CONFIG_UPDATE_CHECKPOINT_BLOCK', 100
+            ),
+            mock.patch.object(
+                settings.network_config.CHECKPOINTS,
+                'CONFIG_UPDATE_LAST_EVENT_IPFS_HASH',
+                'QmOldHash',
             ),
             mock.patch(GET_EVENT_FUNC, return_value=None) as get_event_mock,
         ):
@@ -53,8 +65,12 @@ class TestGetConfigIpfsHashSinceCheckpoint:
 
     async def test_no_fallback_hash(self):
         with (
-            mock.patch.object(settings.network_config, 'CONFIG_UPDATE_CHECKPOINT_BLOCK', 100),
-            mock.patch.object(settings.network_config, 'CONFIG_UPDATE_LAST_EVENT_IPFS_HASH', ''),
+            mock.patch.object(
+                settings.network_config.CHECKPOINTS, 'CONFIG_UPDATE_CHECKPOINT_BLOCK', 100
+            ),
+            mock.patch.object(
+                settings.network_config.CHECKPOINTS, 'CONFIG_UPDATE_LAST_EVENT_IPFS_HASH', ''
+            ),
             mock.patch(GET_EVENT_FUNC, return_value=None),
             pytest.raises(RuntimeError, match="Can't find oracle config"),
         ):
