@@ -58,24 +58,27 @@ async def update_oracles_cache() -> None:
     app_state = AppState()
     oracles_cache = app_state.oracles_cache
 
-    # Find the latest block for which oracle config is cached
-    if oracles_cache:
-        from_block = BlockNumber(oracles_cache.checkpoint_block + 1)
-    else:
-        from_block = settings.network_config.KEEPER_GENESIS_BLOCK
-
     to_block = await execution_client.eth.get_block_number()
 
-    if from_block > to_block:
-        return
+    if oracles_cache:
+        # Warm cache: scan only the blocks after the cached checkpoint
+        from_block = BlockNumber(oracles_cache.checkpoint_block + 1)
+        if from_block > to_block:
+            return
 
-    logger.debug('update_oracles_cache: get logs from block %s to block %s', from_block, to_block)
-    event = await keeper_contract.get_config_updated_event(from_block=from_block, to_block=to_block)
-    if event:
-        ipfs_hash = event['args']['configIpfsHash']
-        config = cast(dict, await ipfs_fetch_client.fetch_json(ipfs_hash))
+        logger.debug(
+            'update_oracles_cache: get logs from block %s to block %s', from_block, to_block
+        )
+        event = await keeper_contract.get_config_updated_event(
+            from_block=from_block, to_block=to_block
+        )
+        if event:
+            config = await _fetch_config_by_hash(event['args']['configIpfsHash'])
+        else:
+            config = oracles_cache.config
     else:
-        config = oracles_cache.config  # type: ignore
+        ipfs_hash = await _get_config_ipfs_hash_since_checkpoint(to_block)
+        config = await _fetch_config_by_hash(ipfs_hash)
 
     rewards_threshold_call = keeper_contract.encode_abi(fn_name='rewardsMinOracles', args=[])
     validators_threshold_call = keeper_contract.encode_abi(fn_name='validatorsMinOracles', args=[])
@@ -95,6 +98,36 @@ async def update_oracles_cache() -> None:
         rewards_threshold=rewards_threshold,
         checkpoint_block=to_block,
     )
+
+
+async def _get_config_ipfs_hash_since_checkpoint(to_block: BlockNumber) -> str:
+    """
+    Cold cache lookup. Scans from the checkpoint to avoid re-scanning the whole
+    history, and falls back to the IPFS hash of the last known event when nothing is newer.
+    The fallback doesn't read old event logs, so it works on nodes with pruned history.
+    """
+    checkpoints = settings.network_config.CHECKPOINTS
+    from_block = BlockNumber(checkpoints.CONFIG_UPDATE_CHECKPOINT_BLOCK + 1)
+
+    if from_block <= to_block:
+        logger.debug(
+            'update_oracles_cache: get logs from block %s to block %s', from_block, to_block
+        )
+        event = await keeper_contract.get_config_updated_event(
+            from_block=from_block, to_block=to_block
+        )
+        if event:
+            return event['args']['configIpfsHash']
+
+    if not checkpoints.CONFIG_UPDATE_LAST_EVENT_IPFS_HASH:
+        raise RuntimeError(
+            "Can't find oracle config. Please, ensure that EL client didn't prune event logs."
+        )
+    return checkpoints.CONFIG_UPDATE_LAST_EVENT_IPFS_HASH
+
+
+async def _fetch_config_by_hash(ipfs_hash: str) -> dict:
+    return cast(dict, await ipfs_fetch_client.fetch_json(ipfs_hash))
 
 
 class WalletTask(BaseTask):

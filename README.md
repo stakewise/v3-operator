@@ -77,6 +77,20 @@ Any execution client that supports [ETH Execution API specification](https://eth
 - [Erigon](https://launchpad.ethereum.org/en/erigon) (Ethereum, Gnosis)
 - [Geth](https://launchpad.ethereum.org/en/geth) (Ethereum)
 
+#### Event log retention
+
+The operator needs event logs only from the network's checkpoint onward. If your execution client prunes history, make sure logs are retained from at least these blocks:
+
+| Network          | Required from block | Recommended setting |
+|------------------|---------------------|---------------------|
+| Ethereum mainnet | 25,933,938          | 25,900,000          |
+| Hoodi            | 3,583,807           | 3,580,000           |
+| Gnosis           | 48,127,042          | 48,100,000          |
+
+The recommended value simply rounds down to leave a safety margin; anything at or below it works.
+
+Operator versions before v3.1.13 require the full log history since the keeper deployment, so do not prune before upgrading. The `recover` command still scans the vault's validator registrations from the keeper deployment block and needs an execution node with full event log history.
+
 ### Consensus node
 
 Any consensus client that supports [ETH Beacon Node API specification](https://ethereum.github.io/beacon-APIs/#/) can be used:
@@ -154,14 +168,14 @@ Head to [Usage](#usage) to launch your operator service.
 Pull the latest docker operator docker image:
 
 ```bash
-docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.12
+docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.13
 ```
 
 You can also build the docker image from source by cloning this repo and executing the following command from within
 the `v3-operator` folder:
 
 ```bash
-docker build --pull -t europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.12 .
+docker build --pull -t europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.13 .
 ```
 
 You will execute Operator Service commands using the format below (note the use of flags are optional):
@@ -170,7 +184,7 @@ You will execute Operator Service commands using the format below (note the use 
 docker run --rm -ti \
 -u $(id -u):$(id -g) \
 -v ~/.stakewise/:/data \
-europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.12 \
+europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.13 \
 src/main.py COMMAND \
 --flagA=123 \
 --flagB=xyz
@@ -393,7 +407,7 @@ below:
 docker run --restart on-failure:10 \
 -u $(id -u):$(id -g) \
 -v ~/.stakewise/:/data \
-europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.12 \
+europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.13 \
 src/main.py start \
 --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
 --data-dir=/data \

@@ -218,10 +218,7 @@ class Settings(metaclass=Singleton):
         self.ipfs_fetch_endpoints = decouple_config(
             'IPFS_FETCH_ENDPOINTS',
             cast=Csv(),
-            default='https://gateway.pinata.cloud,'
-            'https://ipfs.io,'
-            'https://stakewise.myfilebase.com,'
-            'https://stakewise-ipfs.quicknode-ipfs.com',
+            default='https://stakewise.myfilebase.com,https://stakewise-ipfs.quicknode-ipfs.com',
         )
         self.ipfs_timeout = decouple_config('IPFS_TIMEOUT', default=60, cast=int)
         self.ipfs_retry_timeout = decouple_config('IPFS_RETRY_TIMEOUT', default=120, cast=int)
@@ -313,6 +310,8 @@ ORACLES_VALIDATORS_TIMEOUT: int = decouple_config(
 # common
 DEPOSIT_AMOUNT = Web3.to_wei(32, 'ether')
 DEPOSIT_AMOUNT_GWEI = int(Web3.from_wei(DEPOSIT_AMOUNT, 'gwei'))
+
+SECONDS_PER_MONTH = 30 * 24 * 60 * 60
 
 # Backoff retries
 DEFAULT_RETRY_TIME = 60
