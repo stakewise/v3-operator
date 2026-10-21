@@ -89,7 +89,7 @@ The operator needs event logs only from the network's checkpoint onward. If your
 
 The recommended value simply rounds down to leave a safety margin; anything at or below it works.
 
-Operator versions before v3.1.13 require the full log history since the keeper deployment, so do not prune before upgrading. Since v3.1.14, the `recover` command reads the vault's validators registered before the checkpoint from an IPFS dump, so it works on a pruned node as well.
+Operator versions before v3.1.14 require the full log history since the keeper deployment, so do not prune before upgrading.
 
 ### Consensus node
 
