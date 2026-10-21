@@ -8,15 +8,16 @@ from eth_utils import add_0x_prefix
 from sw_utils.consensus import EXITED_STATUSES, ValidatorStatus
 
 from src.common.clients import consensus_client, execution_client, setup_clients
-from src.common.contracts import vault_contract
 from src.common.credentials import CredentialManager
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.password import generate_password, get_or_create_password_file
+from src.common.startup_check import check_events_logs
 from src.common.utils import greenify, log_verbose
 from src.common.validators import validate_eth_address, validate_mnemonic
 from src.common.vault_config import VaultConfig
 from src.config.networks import AVAILABLE_NETWORKS
 from src.config.settings import DEFAULT_NETWORK, settings
+from src.validators.tasks import fetch_vault_validators_public_keys
 
 
 @click.command(help='Recover vault data directory and keystores.')
@@ -149,6 +150,7 @@ async def main(
 ) -> None:
     setup_logging()
     await setup_clients()
+    await check_events_logs()
 
     validators = await _fetch_registered_validators()
     if not validators:
@@ -202,10 +204,7 @@ async def _fetch_registered_validators() -> dict[HexStr, ValidatorStatus | None]
     """Fetch registered validators."""
     click.secho('Fetching registered validators...', bold=True)
     current_block = await execution_client.eth.get_block_number()
-    public_keys = await vault_contract.get_registered_validators_public_keys(
-        from_block=settings.network_config.KEEPER_GENESIS_BLOCK,
-        to_block=current_block,
-    )
+    public_keys = await fetch_vault_validators_public_keys(to_block=current_block)
     click.secho(f'Fetched {len(public_keys)} registered validators', bold=True)
 
     click.secho('Fetching validators statuses...', bold=True)

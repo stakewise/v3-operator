@@ -26,6 +26,10 @@ class CheckpointsConfig:
     # `EXIT_SIGNATURES_CHECKPOINT_BLOCK + 1`. Older rotations are long finalized
     # and already synced by oracles, so they don't gate a new rotation.
     EXIT_SIGNATURES_CHECKPOINT_BLOCK: BlockNumber
+    # Network-wide dump of all vaults' `ValidatorRegistered` / `V2ValidatorRegistered`
+    # events up to `VAULT_VALIDATORS_LAST_BLOCK`.
+    VAULT_VALIDATORS_IPFS_HASH: str
+    VAULT_VALIDATORS_LAST_BLOCK: BlockNumber
 
 
 @dataclass
@@ -78,6 +82,10 @@ NETWORKS: dict[str, NetworkConfig] = {
             CONFIG_UPDATE_CHECKPOINT_BLOCK=BlockNumber(25934000),
             CONFIG_UPDATE_LAST_EVENT_IPFS_HASH='QmeCywDfupWC7jz5EDHsU5yEb2unAhn8iSGWBUEdrMjdMc',
             EXIT_SIGNATURES_CHECKPOINT_BLOCK=BlockNumber(25934000),
+            VAULT_VALIDATORS_IPFS_HASH=(
+                'bafybeigywptyz3lo7pb4rby2gwagdamyeahw2yklijupwfxqjjzfuqebpm'
+            ),
+            VAULT_VALIDATORS_LAST_BLOCK=BlockNumber(25934000),
         ),
     ),
     HOODI: NetworkConfig(
@@ -102,6 +110,10 @@ NETWORKS: dict[str, NetworkConfig] = {
             CONFIG_UPDATE_CHECKPOINT_BLOCK=BlockNumber(3584000),
             CONFIG_UPDATE_LAST_EVENT_IPFS_HASH='QmVqQyJ1TckGVshvYP7iMXhG46w5i2JyciwDqPkEnXijDH',
             EXIT_SIGNATURES_CHECKPOINT_BLOCK=BlockNumber(3584000),
+            VAULT_VALIDATORS_IPFS_HASH=(
+                'bafkreihalltsgohglgsphglrbmbcnvbuohgwfqa5r5wnnsgiic53zpkliy'
+            ),
+            VAULT_VALIDATORS_LAST_BLOCK=BlockNumber(3584000),
         ),
     ),
     GNOSIS: NetworkConfig(
@@ -126,6 +138,10 @@ NETWORKS: dict[str, NetworkConfig] = {
             CONFIG_UPDATE_CHECKPOINT_BLOCK=BlockNumber(48148000),
             CONFIG_UPDATE_LAST_EVENT_IPFS_HASH='QmWCdkpTifsge6t2NTwyb89PCXDXFNkfee9T5ZctEfrDDw',
             EXIT_SIGNATURES_CHECKPOINT_BLOCK=BlockNumber(48148000),
+            VAULT_VALIDATORS_IPFS_HASH=(
+                'bafybeicl67j5kcvn5lzhydi5pmp5wjnot23topveijwggodb2ueay2qk5a'
+            ),
+            VAULT_VALIDATORS_LAST_BLOCK=BlockNumber(48148000),
         ),
     ),
     CHIADO: NetworkConfig(
@@ -149,6 +165,8 @@ NETWORKS: dict[str, NetworkConfig] = {
             EXIT_SIGNATURES_CHECKPOINT_BLOCK=BlockNumber(
                 BASE_NETWORKS[CHIADO].KEEPER_GENESIS_BLOCK - 1
             ),
+            VAULT_VALIDATORS_IPFS_HASH='',
+            VAULT_VALIDATORS_LAST_BLOCK=BlockNumber(0),
         ),
     ),
 }
