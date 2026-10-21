@@ -21,24 +21,27 @@ class KeyPairsCrud:
         return f'{settings.network}_keypairs'
 
     def get_keypairs_count(self) -> int:
-        """Returns the number of keypairs in the database."""
+        """Returns the number of keypairs in the database for the current vault."""
         with self.db_connection.cursor() as cur:
             cur.execute(
-                f'SELECT COUNT(*) FROM {self.table}',
+                f'SELECT COUNT(*) FROM {self.table} WHERE vault = %s',
+                (settings.vault,),
             )
             row = cur.fetchone()
             return row[0]
 
     def get_first_keypair(self) -> RemoteDatabaseKeyPair | None:
-        """Returns the first keypair in the database."""
+        """Returns the first keypair in the database for the current vault."""
         with self.db_connection.cursor() as cur:
             cur.execute(
                 f'''
                     SELECT public_key, private_key, nonce
                     FROM {self.table}
+                    WHERE vault = %s
                     ORDER BY public_key
                     LIMIT 1
                 ''',
+                (settings.vault,),
             )
             row = cur.fetchone()
             if row is None:
@@ -50,15 +53,16 @@ class KeyPairsCrud:
             )
 
     def get_keypairs(self) -> list[RemoteDatabaseKeyPair]:
-        """Returns keypairs from the database."""
-        params: dict = {}
+        """Returns keypairs from the database for the current vault."""
+        params: dict = {'vault': settings.vault}
 
         query = f'''
                 SELECT public_key, private_key, nonce
                 FROM {self.table}
+                WHERE vault = %(vault)s
         '''
 
-        query += 'ORDER BY public_key'
+        query += ' ORDER BY public_key'
 
         with self.db_connection.cursor() as cur:
             cur.execute(query, params)
@@ -74,9 +78,9 @@ class KeyPairsCrud:
         ]
 
     def remove_keypairs(self, in_public_keys: set[HexStr] | None = None) -> None:
-        """Removes keypairs from the database."""
-        where_list = []
-        params: dict = {}
+        """Removes keypairs from the database for the current vault."""
+        where_list = ['vault = %(vault)s']
+        params: dict = {'vault': settings.vault}
 
         if in_public_keys is not None:
             where_list.append('public_key IN %(in_public_keys)s')
@@ -85,18 +89,18 @@ class KeyPairsCrud:
         query = f'''
                 DELETE FROM {self.table}
         '''
-        if where_list:
-            query += f'WHERE {' AND '.join(where_list)}\n'
+        query += f'WHERE {' AND '.join(where_list)}\n'
 
         with self.db_connection.cursor() as cur:
             cur.execute(query, params)
 
     def upload_keypairs(self, keypairs: list[RemoteDatabaseKeyPair]) -> None:
-        """Uploads keypairs to the database."""
+        """Uploads keypairs to the database for the current vault."""
         with self.db_connection.cursor() as cur:
             cur.executemany(
                 f'''
                     INSERT INTO {self.table} (
+                        vault,
                         public_key,
                         private_key,
                         nonce
@@ -106,6 +110,7 @@ class KeyPairsCrud:
                 ''',
                 [
                     (
+                        settings.vault,
                         keypair.public_key,
                         keypair.private_key,
                         keypair.nonce,
@@ -120,12 +125,17 @@ class KeyPairsCrud:
             cur.execute(
                 f'''
                     CREATE TABLE IF NOT EXISTS {self.table} (
-                        public_key VARCHAR(98) UNIQUE NOT NULL,
-                        private_key VARCHAR(66) UNIQUE NOT NULL,
-                        nonce VARCHAR(34) UNIQUE NOT NULL
+                        vault VARCHAR(42) NOT NULL,
+                        public_key VARCHAR(98) NOT NULL,
+                        private_key VARCHAR(66) NOT NULL,
+                        nonce VARCHAR(34) NOT NULL,
+                        UNIQUE (vault, public_key)
                     )
                 '''
             )
+            # Upgrades a pre-existing V4-schema table (created without the
+            # vault column) so it can be scoped per vault; a no-op otherwise.
+            cur.execute(f'ALTER TABLE {self.table} ADD COLUMN IF NOT EXISTS vault VARCHAR(42)')
 
 
 def check_db_connection(db_url: str) -> None:
