@@ -1,7 +1,7 @@
 import logging
 from typing import Sequence, cast
 
-from eth_typing import HexStr
+from eth_typing import ChecksumAddress, HexStr
 from multiproof.standard import MultiProof
 from sw_utils import EventScanner, InterruptHandler, IpfsFetchClient, convert_to_mgno
 from sw_utils.networks import GNO_NETWORKS
@@ -11,7 +11,7 @@ from web3.types import BlockNumber
 
 from src.common.checks import wait_execution_catch_up_consensus
 from src.common.consensus import get_chain_finalized_head
-from src.common.contracts import validators_registry_contract
+from src.common.contracts import validators_registry_contract, vault_contract
 from src.common.exceptions import NotEnoughOracleApprovalsError
 from src.common.execution import build_gas_manager, get_protocol_config
 from src.common.harvest import get_harvest_params
@@ -46,6 +46,9 @@ from src.validators.typings import (
 from src.validators.utils import send_approval_requests
 
 logger = logging.getLogger(__name__)
+
+# 4-byte block number + 20-byte vault address + 48-byte public key
+VAULT_VALIDATOR_RECORD_SIZE = 72
 
 
 class ValidatorsTask(BaseTask):
@@ -336,12 +339,7 @@ async def load_genesis_validators() -> None:
     if not (NetworkValidatorCrud().get_last_network_validator() is None and ipfs_hash):
         return
 
-    ipfs_fetch_client = IpfsFetchClient(
-        ipfs_endpoints=settings.ipfs_fetch_endpoints,
-        timeout=settings.genesis_validators_ipfs_timeout,
-        retry_timeout=settings.genesis_validators_ipfs_retry_timeout,
-    )
-    data = await ipfs_fetch_client.fetch_bytes(ipfs_hash)
+    data = await _fetch_ipfs_dump(ipfs_hash)
     genesis_validators: list[NetworkValidator] = []
     logger.info('Loading genesis validators...')
     for i in range(0, len(data), 52):
@@ -354,3 +352,77 @@ async def load_genesis_validators() -> None:
 
     NetworkValidatorCrud().save_network_validators(genesis_validators)
     logger.info('Loaded %d genesis validators', len(genesis_validators))
+
+
+async def fetch_vault_validators_public_keys(to_block: BlockNumber) -> list[HexStr]:
+    """
+    Fetches the public keys of the validators registered in the vault up to `to_block`.
+
+    Validators registered up to `VAULT_VALIDATORS_LAST_BLOCK` are read from the network-wide
+    ipfs dump, the rest from the vault contract events.
+    """
+    checkpoints = settings.network_config.CHECKPOINTS
+    from_block = settings.network_config.KEEPER_GENESIS_BLOCK
+    public_keys: list[HexStr] = []
+    if checkpoints.VAULT_VALIDATORS_IPFS_HASH and checkpoints.VAULT_VALIDATORS_LAST_BLOCK:
+        logger.info('Downloading vault validators data from IPFS...')
+        data = await _fetch_ipfs_dump(checkpoints.VAULT_VALIDATORS_IPFS_HASH)
+        public_keys.extend(
+            _parse_vault_validators_dump(
+                data, settings.vault, checkpoints.VAULT_VALIDATORS_LAST_BLOCK
+            )
+        )
+        from_block = BlockNumber(checkpoints.VAULT_VALIDATORS_LAST_BLOCK + 1)
+
+    public_keys.extend(
+        await vault_contract.get_registered_validators_public_keys(
+            from_block=from_block,
+            to_block=to_block,
+        )
+    )
+    return public_keys
+
+
+def _parse_vault_validators_dump(
+    data: bytes, vault_address: ChecksumAddress, last_block: BlockNumber
+) -> list[HexStr]:
+    """
+    Extracts the vault's validators public keys from the network-wide dump.
+
+    Record layout, ascending by block number:
+    4-byte big-endian block number | 20-byte vault address | 48-byte public key
+    """
+    if not data or len(data) % VAULT_VALIDATOR_RECORD_SIZE:
+        raise ValueError(f'Malformed vault validators dump: {len(data)} bytes')
+
+    vault_bytes = Web3.to_bytes(hexstr=vault_address)
+    view = memoryview(data)
+    public_keys: list[HexStr] = []
+    previous_block = 0
+
+    for offset in range(0, len(data), VAULT_VALIDATOR_RECORD_SIZE):
+        block_number = int.from_bytes(view[offset : offset + 4], 'big')
+        if block_number < previous_block:
+            raise ValueError('Vault validators dump is not sorted by block number')
+        if block_number > last_block:
+            raise ValueError(
+                f'Vault validators dump contains block {block_number} '
+                f'above its last block {last_block}'
+            )
+        previous_block = block_number
+
+        if view[offset + 4 : offset + 24] != vault_bytes:
+            continue
+
+        public_keys.append(Web3.to_hex(bytes(view[offset + 24 : offset + 72])))
+
+    return public_keys
+
+
+async def _fetch_ipfs_dump(ipfs_hash: str) -> bytes:
+    ipfs_fetch_client = IpfsFetchClient(
+        ipfs_endpoints=settings.ipfs_fetch_endpoints,
+        timeout=settings.genesis_validators_ipfs_timeout,
+        retry_timeout=settings.genesis_validators_ipfs_retry_timeout,
+    )
+    return await ipfs_fetch_client.fetch_bytes(ipfs_hash)

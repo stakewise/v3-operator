@@ -89,7 +89,7 @@ The operator needs event logs only from the network's checkpoint onward. If your
 
 The recommended value simply rounds down to leave a safety margin; anything at or below it works.
 
-Operator versions before v3.1.13 require the full log history since the keeper deployment, so do not prune before upgrading. The `recover` command still scans the vault's validator registrations from the keeper deployment block and needs an execution node with full event log history.
+Operator versions before v3.1.14 require the full log history since the keeper deployment, so do not prune before upgrading.
 
 ### Consensus node
 
@@ -168,14 +168,14 @@ Head to [Usage](#usage) to launch your operator service.
 Pull the latest docker operator docker image:
 
 ```bash
-docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.13
+docker pull europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.14
 ```
 
 You can also build the docker image from source by cloning this repo and executing the following command from within
 the `v3-operator` folder:
 
 ```bash
-docker build --pull -t europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.13 .
+docker build --pull -t europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.14 .
 ```
 
 You will execute Operator Service commands using the format below (note the use of flags are optional):
@@ -184,7 +184,7 @@ You will execute Operator Service commands using the format below (note the use 
 docker run --rm -ti \
 -u $(id -u):$(id -g) \
 -v ~/.stakewise/:/data \
-europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.13 \
+europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.14 \
 src/main.py COMMAND \
 --flagA=123 \
 --flagB=xyz
@@ -407,7 +407,7 @@ below:
 docker run --restart on-failure:10 \
 -u $(id -u):$(id -g) \
 -v ~/.stakewise/:/data \
-europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.13 \
+europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:v3.1.14 \
 src/main.py start \
 --vault=0x3320ad928c20187602a2b2c04eeaa813fa899468 \
 --data-dir=/data \

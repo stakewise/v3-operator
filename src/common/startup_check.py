@@ -53,7 +53,7 @@ async def startup_checks() -> None:
     await _check_execution_nodes_network()
 
     logger.info('Checking oracles config...')
-    await _check_events_logs()
+    await check_events_logs()
 
     logger.info('Checking vault address %s...', settings.vault)
     await check_vault_address()
@@ -354,8 +354,14 @@ async def _check_validators_manager() -> None:
                 )
 
 
-async def _check_events_logs() -> None:
-    """Check that EL client didn't prune logs"""
+async def check_events_logs() -> None:
+    """
+    Check that the EL client retains event logs from the operator's earliest checkpoint onward.
+
+    Probes the last block of the genesis validators dump,
+    which is known to contain a `DepositEvent` and is the earliest block the operator
+    reads event logs from.
+    """
     events = await validators_registry_contract.events.DepositEvent.get_logs(  # type: ignore
         fromBlock=settings.network_config.GENESIS_VALIDATORS_LAST_BLOCK,
         toBlock=settings.network_config.GENESIS_VALIDATORS_LAST_BLOCK,
