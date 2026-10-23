@@ -25,6 +25,11 @@
         "internalType": "uint256",
         "name": "exitQueueUpdateDelay_",
         "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "maxRedemptionFeePercent_",
+        "type": "uint256"
       }
     ],
     "stateMutability": "nonpayable",
@@ -684,6 +689,19 @@
       {
         "internalType": "uint256",
         "name": "processedShares",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "maxRedemptionFeePercent",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
         "type": "uint256"
       }
     ],
