@@ -6,7 +6,6 @@ import pytest
 from eth_typing import BlockNumber, HexStr
 from sw_utils import ValidatorStatus
 from sw_utils.tests import faker
-from sw_utils.typings import ChainHead
 from web3 import Web3
 from web3.types import Gwei, Wei
 
@@ -952,16 +951,12 @@ class TestProcessFunding:
         assert result == ether_to_gwei(7)
 
 
-def _make_chain_head() -> ChainHead:
-    return ChainHead(epoch=1, slot=32, block_number=BlockNumber(100), execution_ts=0)
-
-
 @pytest.mark.usefixtures('fake_settings')
 class TestGetVaultAssets:
     async def test_no_redemption_assets(self):
         withdrawable = Web3.to_wei(100, 'ether')
         with self.mock_assets(withdrawable_assets=Wei(withdrawable)):
-            result = await get_vault_assets(harvest_params=None, chain_head=_make_chain_head())
+            result = await get_vault_assets(harvest_params=None, block_number=BlockNumber(100))
         assert result == ether_to_gwei(100)
 
     async def test_redemption_assets_reduce_vault_assets(self):
@@ -970,7 +965,7 @@ class TestGetVaultAssets:
         with self.mock_assets(
             withdrawable_assets=Wei(withdrawable), redemption_assets=Wei(redemption)
         ):
-            result = await get_vault_assets(harvest_params=None, chain_head=_make_chain_head())
+            result = await get_vault_assets(harvest_params=None, block_number=BlockNumber(100))
         assert result == ether_to_gwei(70)
 
     async def test_over_reservation_clamped_to_zero(self):
@@ -979,7 +974,7 @@ class TestGetVaultAssets:
         with self.mock_assets(
             withdrawable_assets=Wei(withdrawable), redemption_assets=Wei(redemption)
         ):
-            result = await get_vault_assets(harvest_params=None, chain_head=_make_chain_head())
+            result = await get_vault_assets(harvest_params=None, block_number=BlockNumber(100))
         assert result == Gwei(0)
 
     async def test_gnosis_conversion_applied_after_subtraction(self):
@@ -998,7 +993,7 @@ class TestGetVaultAssets:
         ):
             mock_settings.network = 'gnosis'
             mock_settings.vault = settings.vault
-            result = await get_vault_assets(harvest_params=None, chain_head=_make_chain_head())
+            result = await get_vault_assets(harvest_params=None, block_number=BlockNumber(100))
         # 100 - 40 = 60 ETH → converted → 120 ETH → in Gwei
         assert result == ether_to_gwei(120)
 

@@ -4,7 +4,6 @@ from dataclasses import replace
 
 from eth_typing import BlockNumber, ChecksumAddress
 from sw_utils import OsTokenConverter
-from sw_utils.typings import ChainHead
 from web3.types import Wei
 
 from src.common.contracts import VaultContract
@@ -24,12 +23,12 @@ from src.redemptions.typings import OsTokenPosition, VaultOsTokenPosition
 logger = logging.getLogger(__name__)
 
 
-async def get_redemption_assets(chain_head: ChainHead) -> Wei:
+async def get_redemption_assets(block_number: BlockNumber) -> Wei:
     """
     Get redemption assets for operator's vault.
     For Gno networks return value in GNO-Wei.
     """
-    nonce = await os_token_redeemer_contract.nonce(chain_head.block_number)
+    nonce = await os_token_redeemer_contract.nonce(block_number)
     if nonce == 0:
         logger.info('Zero nonce for redemption. Skipping redemption assets.')
         return Wei(0)
@@ -39,10 +38,8 @@ async def get_redemption_assets(chain_head: ChainHead) -> Wei:
     await update_positions_cache(finalized_block_number)
     await update_processed_shares_cache(finalized_block_number)
 
-    queued_shares = await os_token_redeemer_contract.queued_shares(
-        block_number=chain_head.block_number
-    )
-    os_token_converter = await create_os_token_converter(chain_head.block_number)
+    queued_shares = await os_token_redeemer_contract.queued_shares(block_number=block_number)
+    os_token_converter = await create_os_token_converter(block_number)
     total_redemption_assets = os_token_converter.to_assets(queued_shares)
 
     # OsToken in-protocol rate may increase while vault assets are exiting.
@@ -57,7 +54,7 @@ async def get_redemption_assets(chain_head: ChainHead) -> Wei:
         total_redemption_assets,
         nonce=nonce,
         os_token_converter=os_token_converter,
-        block_number=chain_head.block_number,
+        block_number=block_number,
     )
     return vault_to_redemption_assets.get(settings.vault, Wei(0))
 

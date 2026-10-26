@@ -2,11 +2,11 @@ import contextlib
 from unittest import mock
 
 import pytest
+from eth_typing import BlockNumber
 from sw_utils import ValidatorStatus
 from web3 import Web3
 from web3.types import Gwei, Wei
 
-from src.common.tests.factories import create_chain_head
 from src.common.typings import PendingPartialWithdrawal
 from src.validators.tests.factories import create_consensus_validator
 from src.validators.typings import ValidatorConsolidationData
@@ -84,7 +84,7 @@ class TestGetQueuedAssets:
                 consensus_validators=[],
                 oracle_exiting_validators=[],
                 pending_partial_withdrawals=[],
-                chain_head=create_chain_head(),
+                block_number=BlockNumber(100),
                 redemption_assets=Wei(1),
             )
 
@@ -92,7 +92,7 @@ class TestGetQueuedAssets:
         mocks['missing_assets'].assert_awaited_once()
 
     async def test_total_assets_read_from_vault(self):
-        chain_head = create_chain_head()
+        block_number = BlockNumber(100)
 
         with _patch(
             cumulative_tickets=10,
@@ -103,12 +103,12 @@ class TestGetQueuedAssets:
                 consensus_validators=[],
                 oracle_exiting_validators=[],
                 pending_partial_withdrawals=[],
-                chain_head=chain_head,
+                block_number=block_number,
                 redemption_assets=Wei(123),
             )
 
         mocks['queued_exit_assets'].assert_awaited_once_with(
-            mocks['harvest_params'].return_value, chain_head.block_number
+            mocks['harvest_params'].return_value, block_number
         )
         assert result.total == Gwei(20)
 
@@ -118,7 +118,7 @@ class TestGetQueuedAssets:
                 consensus_validators=[],
                 oracle_exiting_validators=[],
                 pending_partial_withdrawals=[],
-                chain_head=create_chain_head(),
+                block_number=BlockNumber(100),
                 redemption_assets=Wei(0),
             )
 
@@ -146,7 +146,7 @@ class TestGetQueuedAssets:
                 consensus_validators=consensus_validators,
                 oracle_exiting_validators=oracle_exiting_validators,
                 pending_partial_withdrawals=pending_partial_withdrawals,
-                chain_head=create_chain_head(),
+                block_number=BlockNumber(100),
                 redemption_assets=Wei(0),
             )
 
