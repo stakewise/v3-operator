@@ -112,13 +112,13 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
             chain_head=chain_head,
             consensus_validators=non_exiting_validators,
         )
-        redemption_assets = await get_redemption_assets(chain_head=chain_head)
+        redemption_assets = await get_redemption_assets(block_number=chain_head.block_number)
 
         exit_queue = await get_queued_assets(
             consensus_validators=consensus_validators,
             oracle_exiting_validators=oracle_exiting_validators,
             pending_partial_withdrawals=pending_partial_withdrawals,
-            chain_head=chain_head,
+            block_number=chain_head.block_number,
             redemption_assets=redemption_assets,
         )
 
