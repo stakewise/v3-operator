@@ -60,9 +60,9 @@ def _patch_submit_withdraw_validators() -> Generator:
 
 
 @pytest.fixture
-def _patch_get_chain_justified_head() -> Generator:
+def _patch_get_chain_latest_head() -> Generator:
     with mock.patch(
-        'src.validators.commands.exit_validators.get_chain_justified_head',
+        'src.validators.commands.exit_validators.get_chain_latest_head',
         return_value=create_chain_head(epoch=DEFAULT_ACTIVATION_EPOCH),
     ):
         yield
@@ -73,7 +73,7 @@ def _patch_get_chain_justified_head() -> Generator:
     '_patch_check_validators_manager',
     '_patch_check_events_logs',
     '_patch_get_withdrawal_request_fee',
-    '_patch_get_chain_justified_head',
+    '_patch_get_chain_latest_head',
 )
 @pytest.mark.usefixtures('_init_config')
 class TestValidatorsExit:
