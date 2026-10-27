@@ -14,7 +14,7 @@ from src.commands.start.common_option import (
     relayer_jwt_secret_options,
 )
 from src.common.clients import close_clients, setup_clients
-from src.common.consensus import get_chain_justified_head
+from src.common.consensus import get_chain_latest_head
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.startup_check import (
     check_events_logs,
@@ -248,7 +248,7 @@ async def process(
     logger.info('Checking event logs...')
     await check_events_logs()
 
-    chain_head = await get_chain_justified_head()
+    chain_head = await get_chain_latest_head()
     max_activation_epoch = chain_head.epoch - settings.network_config.SHARD_COMMITTEE_PERIOD
 
     logger.info('Fetching vault validators...')
