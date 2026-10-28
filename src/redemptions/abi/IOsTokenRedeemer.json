@@ -521,13 +521,7 @@
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "receiver",
-        "type": "address"
-      }
-    ],
+    "inputs": [],
     "name": "claimFees",
     "outputs": [],
     "stateMutability": "nonpayable",
