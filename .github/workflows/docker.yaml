@@ -27,9 +27,8 @@ jobs:
           flavor: |
             latest=auto
           tags: |
-            type=ref,event=branch
             type=ref,event=tag
-            type=sha
+            type=sha,enable=${{ github.ref_type == 'branch' }}
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - name: Login to GAR
@@ -105,9 +104,8 @@ jobs:
           flavor: |
             latest=auto
           tags: |
-            type=ref,event=branch
             type=ref,event=tag
-            type=sha
+            type=sha,enable=${{ github.ref_type == 'branch' }}
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - name: Login to GAR
@@ -126,8 +124,14 @@ jobs:
         env:
           DOCKER_METADATA_OUTPUT_JSON: ${{ steps.meta.outputs.json }}
         run: |
-          docker buildx imagetools create \
-            $(jq -cr '.tags | map(select(startswith("europe-west4-docker.pkg.dev/"))) | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+          # `latest` has to move on every release, so it is published to Docker Hub only.
+          tag=$(jq -r '[.tags[] | select(startswith("europe-west4-docker.pkg.dev/")) | select(endswith(":latest") | not)][0]' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          # Tags are immutable. The same commit can be pushed to several branches, keep the first image.
+          if [ "$GITHUB_REF_TYPE" = "branch" ] && docker buildx imagetools inspect "$tag" > /dev/null 2>&1; then
+            echo "$tag already exists, skipping"
+            exit 0
+          fi
+          docker buildx imagetools create -t "$tag" \
             $(printf 'europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator@sha256:%s ' *)
       - name: Create and push manifest (Docker Hub)
         working-directory: /tmp/digests
@@ -153,7 +157,7 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
-          image-ref: "europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:sha-${{ steps.commit-hash.outputs.short }}"
+          image-ref: "europe-west4-docker.pkg.dev/stakewiselabs/public/v3-operator:${{ env.IMAGE_TAG }}"
           format: "table"
           exit-code: "1"
           vuln-type: "os,library"
@@ -161,4 +165,5 @@ jobs:
           ignore-unfixed: true
           trivyignores: ".trivyignore"
         env:
+          IMAGE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || format('sha-{0}', steps.commit-hash.outputs.short) }}
           TRIVY_DB_REPOSITORY: mirror.gcr.io/aquasec/trivy-db:2,public.ecr.aws/aquasecurity/trivy-db:2
