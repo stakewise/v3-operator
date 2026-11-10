@@ -74,8 +74,8 @@ logger = logging.getLogger(__name__)
     '--min-deposit-amount-gwei',
     type=int,
     envvar='MIN_DEPOSIT_AMOUNT_GWEI',
-    help='Minimum amount in gwei that must accumulate in the vault '
-    'to trigger deposits to the sub-vaults.',
+    help='Minimum amount of assets (ETH, or mGNO on Gnosis where 1 GNO = 32 mGNO) in Gwei '
+    'that must accumulate in the vault to trigger deposits to the sub-vaults.',
     default=DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
     show_default=True,
 )

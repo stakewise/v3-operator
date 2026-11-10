@@ -133,9 +133,9 @@ logger = logging.getLogger(__name__)
     '--max-validator-balance-gwei',
     type=int,
     envvar='MAX_VALIDATOR_BALANCE_GWEI',
-    help=f'The maximum validator balance in Gwei.'
+    help=f'The maximum validator balance in Gwei. '
     f'Default is {NETWORKS[MAINNET].MAX_VALIDATOR_BALANCE_GWEI} Gwei for Ethereum, '
-    f'{NETWORKS[GNOSIS].MAX_VALIDATOR_BALANCE_GWEI} Gwei for Gnosis.',
+    f'{NETWORKS[GNOSIS].MAX_VALIDATOR_BALANCE_GWEI} Gwei of mGNO for Gnosis (1 GNO = 32 mGNO).',
     callback=validate_max_validator_balance_gwei,
 )
 @click.option(
