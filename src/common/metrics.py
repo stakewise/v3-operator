@@ -49,7 +49,7 @@ class Metrics:
         )
         self.stakeable_assets = Gauge(
             'stakeable_assets',
-            'The amount of stakeable assets',
+            'The amount of stakeable assets in Wei (ETH, or mGNO on Gnosis)',
             namespace=settings.metrics_prefix,
             labelnames=['network'],
         )
@@ -73,7 +73,7 @@ class Metrics:
         )
         self.queued_assets = Gauge(
             'queued_assets',
-            'The amount of queued assets',
+            'The amount of queued assets in Gwei (ETH, or mGNO on Gnosis)',
             namespace=settings.metrics_prefix,
             labelnames=['network'],
         )

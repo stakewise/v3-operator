@@ -221,7 +221,8 @@ start_common_options = [
         '--min-deposit-amount-gwei',
         type=int,
         envvar='MIN_DEPOSIT_AMOUNT_GWEI',
-        help='Minimum amount in gwei to deposit into validator.',
+        help='Minimum amount of assets (ETH, or mGNO on Gnosis where 1 GNO = 32 mGNO) in Gwei '
+        'to deposit into validator.',
         default=DEFAULT_MIN_DEPOSIT_AMOUNT_GWEI,
         callback=validate_min_deposit_amount_gwei,
         show_default=True,
@@ -230,7 +231,7 @@ start_common_options = [
         '--vault-min-balance-gwei',
         type=int,
         envvar='VAULT_MIN_BALANCE_GWEI',
-        help='The amount of assets (ETH/GNO) in Gwei '
+        help='The amount of assets (ETH, or mGNO on Gnosis where 1 GNO = 32 mGNO) in Gwei '
         'that should be kept in the vault and not sent for staking.',
         default=DEFAULT_VAULT_MIN_BALANCE_GWEI,
         show_default=True,
@@ -242,7 +243,8 @@ start_common_options = [
         help=f'The maximum balance in Gwei a single 0x02 validator is topped up to. '
         f'Vault assets above that amount go to the next validator. '
         f'Default is {NETWORKS[MAINNET].MAX_VALIDATOR_BALANCE_GWEI} Gwei for Ethereum, '
-        f'{NETWORKS[GNOSIS].MAX_VALIDATOR_BALANCE_GWEI} Gwei for Gnosis. '
+        f'{NETWORKS[GNOSIS].MAX_VALIDATOR_BALANCE_GWEI} Gwei of mGNO for Gnosis '
+        f'(1 GNO = 32 mGNO). '
         f'A higher value means fewer validators to operate. '
         f'It also means a bigger drop in the vault APR when a validator exits. '
         f'Adjust the value to the expected size of your vault: '
