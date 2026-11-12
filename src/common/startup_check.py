@@ -12,8 +12,6 @@ from click import ClickException
 from eth_typing import BlockNumber
 from packaging.version import InvalidVersion, Version
 from sw_utils import (
-    ChainHead,
-    InterruptHandler,
     IpfsFetchClient,
     get_consensus_client,
     get_execution_client,
@@ -25,7 +23,6 @@ from web3.exceptions import BadFunctionCallOutput
 
 import src
 from src.common.clients import OPERATOR_USER_AGENT
-from src.common.clients import execution_client as default_execution_client
 from src.common.contracts import VaultContract, validators_registry_contract
 from src.common.execution import get_finalized_block_number
 from src.common.harvest import get_harvest_params
@@ -158,37 +155,6 @@ async def wait_for_execution_node() -> None:
             return
         logger.warning('Execution nodes are not ready. Retrying in 10 seconds...')
         await asyncio.sleep(10)
-
-
-async def wait_execution_catch_up_consensus(
-    chain_head: ChainHead, interrupt_handler: InterruptHandler | None = None
-) -> None:
-    """
-    Consider execution and consensus nodes are working independently of each other.
-    Check execution node is synced to the consensus finalized block.
-    """
-    execution_client = default_execution_client
-    while True:
-        if interrupt_handler and interrupt_handler.exit:
-            return
-
-        execution_block_number = await execution_client.eth.get_block_number()
-        if execution_block_number >= chain_head.block_number:
-            return
-
-        logger.warning(
-            'The execution client is behind the consensus client: '
-            'execution block %d, consensus finalized block %d, distance %d blocks',
-            execution_block_number,
-            chain_head.block_number,
-            chain_head.block_number - execution_block_number,
-        )
-        sleep_time = float(settings.network_config.SECONDS_PER_BLOCK)
-
-        if interrupt_handler:
-            await interrupt_handler.sleep(sleep_time)
-        else:
-            await asyncio.sleep(sleep_time)
 
 
 async def wait_for_graph_node_sync_to_chain_head() -> None:

@@ -6,15 +6,12 @@ from sw_utils import InterruptHandler
 import src
 from src.commands.start.startup_check import startup_checks
 from src.common.clients import close_clients, setup_clients
-from src.common.consensus import get_chain_finalized_head
+from src.common.consensus import get_chain_finalized_head, wait_for_chain_finalized_head
 from src.common.execution import WalletTask
 from src.common.logging import setup_logging
 from src.common.metrics import metrics, metrics_server
 from src.common.protocol_config import update_oracles_cache
-from src.common.startup_check import (
-    check_db_events_logs,
-    wait_execution_catch_up_consensus,
-)
+from src.common.startup_check import check_db_events_logs
 from src.common.tasks import BaseTask, MetricsTask
 from src.common.utils import get_build_version
 from src.config.settings import settings
@@ -100,7 +97,7 @@ async def process() -> None:
         keystore = await load_keystore()
 
     # start operator tasks
-    chain_state = await get_chain_finalized_head()
+    chain_state = await wait_for_chain_finalized_head()
 
     logger.info('Syncing validator events...')
     await scan_validators_events(chain_state.block_number, is_startup=True)
@@ -146,9 +143,6 @@ class ValidatorTask(BaseTask):
 
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         chain_head = await get_chain_finalized_head()
-        await wait_execution_catch_up_consensus(
-            chain_head=chain_head, interrupt_handler=interrupt_handler
-        )
         await scan_validators_events(block_number=chain_head.block_number, is_startup=False)
         subtasks = [self.validator_registration_subtask.process()]
         if not settings.disable_withdrawals:

@@ -2,7 +2,7 @@ import asyncio
 import logging
 
 from src.common.clients import db_client
-from src.common.consensus import get_chain_finalized_head
+from src.common.consensus import wait_for_chain_finalized_head
 from src.common.execution import check_wallet_balance
 from src.common.protocol_config import get_protocol_config
 from src.common.startup_check import (
@@ -19,7 +19,6 @@ from src.common.startup_check import (
     check_vault_withdrawable_assets,
     collect_healthy_oracles,
     validate_settings,
-    wait_execution_catch_up_consensus,
     wait_for_consensus_node,
     wait_for_execution_node,
     wait_for_graph_node_sync_to_chain_head,
@@ -83,8 +82,7 @@ async def startup_checks() -> None:
     await check_execution_nodes_network()
 
     logger.info('Checking that consensus and execution nodes are in sync...')
-    chain_state = await get_chain_finalized_head()
-    await wait_execution_catch_up_consensus(chain_state)
+    await wait_for_chain_finalized_head()
 
     if settings.claim_fee_splitter:
         logger.info('Checking graph nodes %s...', settings.graph_endpoint)

@@ -5,13 +5,9 @@ from pathlib import Path
 
 from eth_typing import BlockNumber, ChecksumAddress
 
-from src.common.consensus import get_chain_finalized_head
+from src.common.consensus import wait_for_chain_finalized_head
 from src.common.contracts import VaultContract
-from src.common.startup_check import (
-    wait_execution_catch_up_consensus,
-    wait_for_consensus_node,
-    wait_for_execution_node,
-)
+from src.common.startup_check import wait_for_consensus_node, wait_for_execution_node
 from src.config.networks import NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
 from src.nodewise.exceptions import NodeException, NodeFailedToStartError
@@ -262,8 +258,7 @@ class LighthouseVCProcessBuilder(ProcessBuilder):
         await wait_for_execution_node()
         await wait_for_consensus_node()
 
-        chain_state = await get_chain_finalized_head()
-        await wait_execution_catch_up_consensus(chain_state)
+        await wait_for_chain_finalized_head()
 
         # Fetch mev escrow address and cache it
         if not self.fee_recipient:

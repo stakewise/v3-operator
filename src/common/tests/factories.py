@@ -12,7 +12,7 @@ def create_chain_head(
     epoch: int | None = None,
     block_number: int | None = None,
     slot: int | None = None,
-    execution_ts: int | None = None,
+    consensus_ts: int | None = None,
 ) -> ChainHead:
     if epoch is None:
         epoch = random.randint(1, 10000)
@@ -27,21 +27,21 @@ def create_chain_head(
     if block_number is None:
         block_number = int(slot * 0.9)
 
-    if execution_ts is None:
+    if consensus_ts is None:
         if settings.network_config:
-            execution_ts = (
+            consensus_ts = (
                 settings.network_config.GENESIS_TIMESTAMP
-                + slot * settings.network_config.SLOTS_PER_EPOCH
+                + slot * settings.network_config.SECONDS_PER_SLOT
             )
         else:
             # Fallback for tests without network_config
-            execution_ts = (
-                NETWORKS[HOODI].GENESIS_TIMESTAMP + slot * NETWORKS[HOODI].SLOTS_PER_EPOCH
+            consensus_ts = (
+                NETWORKS[HOODI].GENESIS_TIMESTAMP + slot * NETWORKS[HOODI].SECONDS_PER_SLOT
             )
 
     return ChainHead(
         epoch=epoch,
         block_number=BlockNumber(block_number),
         slot=slot,
-        execution_ts=Timestamp(execution_ts),
+        consensus_ts=Timestamp(consensus_ts),
     )
