@@ -75,6 +75,14 @@ def mocked_sw_latest_head() -> Generator[mock.AsyncMock, None, None]:
 
 
 @pytest.fixture
+def mocked_sw_epoch_head() -> Generator[mock.AsyncMock, None, None]:
+    with mock.patch(
+        'src.common.consensus.sw_get_chain_epoch_head', new_callable=mock.AsyncMock
+    ) as sw_get_chain_epoch_head:
+        yield sw_get_chain_epoch_head
+
+
+@pytest.fixture
 def expired_deadline() -> Generator[None, None, None]:
     # The first reading sets the deadline, every later one is past it.
     monotonic = itertools.chain([0], itertools.repeat(1000))
@@ -104,14 +112,14 @@ class TestChainHeadWrappers:
             network_config=settings.network_config,
         )
 
-    async def test_get_chain_epoch_head(self):
-        with mock.patch(
-            'src.common.consensus.sw_get_chain_epoch_head', new_callable=mock.AsyncMock
-        ) as sw_get_chain_epoch_head:
-            chain_head = await get_chain_epoch_head(123)
+    async def test_get_chain_epoch_head(
+        self, mocked_sw_epoch_head: mock.AsyncMock, mocked_check_execution_has_block: mock.AsyncMock
+    ):
+        chain_head = await get_chain_epoch_head(123)
 
-        assert chain_head == sw_get_chain_epoch_head.return_value
-        sw_get_chain_epoch_head.assert_awaited_once_with(
+        assert chain_head == mocked_sw_epoch_head.return_value
+        mocked_check_execution_has_block.assert_awaited_once_with(chain_head)
+        mocked_sw_epoch_head.assert_awaited_once_with(
             epoch=123,
             consensus_client=consensus_client,
             execution_client=execution_client,
@@ -161,6 +169,24 @@ class TestGetChainFinalizedHead:
         mocked_sw_finalized_head.return_value = post_fork_head
 
         assert await get_chain_finalized_head() == post_fork_head
+
+
+@pytest.mark.usefixtures('mocked_execution_block_number')
+class TestGetChainEpochHead:
+    async def test_raises_when_execution_is_behind_pre_fork(
+        self, pre_fork_head: ChainHead, mocked_sw_epoch_head: mock.AsyncMock
+    ):
+        mocked_sw_epoch_head.return_value = pre_fork_head
+
+        with pytest.raises(ExecutionBehindConsensusError, match='execution block 98'):
+            await get_chain_epoch_head(123)
+
+    async def test_returns_head_post_fork(
+        self, post_fork_head: ChainHead, mocked_sw_epoch_head: mock.AsyncMock
+    ):
+        mocked_sw_epoch_head.return_value = post_fork_head
+
+        assert await get_chain_epoch_head(123) == post_fork_head
 
 
 @pytest.mark.usefixtures('mocked_execution_block_number', 'mocked_sleep')
