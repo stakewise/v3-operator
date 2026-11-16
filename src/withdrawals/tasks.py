@@ -3,7 +3,13 @@ from collections import defaultdict
 from typing import cast
 
 from eth_typing import HexStr
-from sw_utils import GNO_NETWORKS, ChainHead, ProtocolConfig, ValidatorStatus
+from sw_utils import (
+    GNO_NETWORKS,
+    ChainHead,
+    ExecutionBehindConsensusError,
+    ProtocolConfig,
+    ValidatorStatus,
+)
 from sw_utils.gnosis import convert_to_gno
 from web3 import Web3
 from web3.types import BlockNumber, Gwei, Wei
@@ -12,6 +18,7 @@ from src.common.app_state import AppState
 from src.common.clients import execution_client
 from src.common.consensus import get_chain_latest_head
 from src.common.contracts import VaultContract
+from src.common.execution import get_payload_expected_withdrawals
 from src.common.metrics import metrics
 from src.common.protocol_config import get_protocol_config
 from src.common.typings import PendingPartialWithdrawal
@@ -84,7 +91,7 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
     ):
         self.relayer = relayer
 
-    # pylint: disable-next=too-many-locals
+    # pylint: disable-next=too-many-locals,too-many-return-statements
     async def process(self) -> None:
         """
         Every N hours check the exit queue and submit partial withdrawals if needed.
@@ -93,6 +100,12 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
         protocol_config = await get_protocol_config()
         app_state = AppState()
         if not await self._is_withdrawal_interval_passed(app_state, chain_head):
+            return
+
+        try:
+            payload_expected_withdrawals = await get_payload_expected_withdrawals(chain_head)
+        except ExecutionBehindConsensusError as e:
+            logger.info('Skipping withdrawals check, waiting for the next execution block: %s', e)
             return
 
         vault_public_keys = {val.public_key for val in VaultValidatorCrud().get_vault_validators()}
@@ -120,6 +133,7 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
             pending_partial_withdrawals=pending_partial_withdrawals,
             block_number=chain_head.block_number,
             redemption_assets=redemption_assets,
+            payload_expected_withdrawals=payload_expected_withdrawals,
         )
 
         metrics.queued_assets.labels(network=settings.network).set(int(exit_queue.missing))

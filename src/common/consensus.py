@@ -11,6 +11,7 @@ post-Glamsterdam sw-utils fetches the block by hash, which already guarantees it
 import asyncio
 import logging
 import time
+from typing import Awaitable, Callable, TypeVar
 
 from sw_utils import ExecutionBehindConsensusError
 from sw_utils import get_chain_finalized_head as sw_get_chain_finalized_head
@@ -24,6 +25,8 @@ from src.config.settings import settings
 logger = logging.getLogger(__name__)
 
 EXECUTION_HEAD_SYNC_POLL_INTERVAL = 0.5
+
+T = TypeVar('T')
 
 
 async def wait_for_chain_finalized_head() -> ChainHead:
@@ -49,27 +52,35 @@ async def get_chain_finalized_head() -> ChainHead:
 
 async def get_chain_latest_head() -> ChainHead:
     """Retries for up to one slot before re-raising `ExecutionBehindConsensusError`."""
+    return await retry_within_slot(_fetch_chain_latest_head)
+
+
+async def retry_within_slot(fetch: Callable[[], Awaitable[T]]) -> T:
+    """Retries `fetch` on `ExecutionBehindConsensusError` for up to one slot, then re-raises."""
     deadline = time.monotonic() + settings.network_config.SECONDS_PER_BLOCK
     while True:
         try:
-            chain_head = await sw_get_chain_latest_head(
-                consensus_client=consensus_client,
-                execution_client=execution_client,
-                network_config=settings.network_config,
-            )
-            await _check_execution_has_block(chain_head)
+            return await fetch()
         except ExecutionBehindConsensusError:
             if time.monotonic() >= deadline:
                 raise
             await asyncio.sleep(EXECUTION_HEAD_SYNC_POLL_INTERVAL)
-        else:
-            return chain_head
 
 
 async def get_chain_epoch_head(epoch: int) -> ChainHead:
     """Raises `ExecutionBehindConsensusError` if the execution client lacks the head block."""
     chain_head = await sw_get_chain_epoch_head(
         epoch=epoch,
+        consensus_client=consensus_client,
+        execution_client=execution_client,
+        network_config=settings.network_config,
+    )
+    await _check_execution_has_block(chain_head)
+    return chain_head
+
+
+async def _fetch_chain_latest_head() -> ChainHead:
+    chain_head = await sw_get_chain_latest_head(
         consensus_client=consensus_client,
         execution_client=execution_client,
         network_config=settings.network_config,

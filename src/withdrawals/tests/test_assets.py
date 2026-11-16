@@ -3,14 +3,18 @@ from unittest import mock
 
 import pytest
 from eth_typing import BlockNumber
-from sw_utils import ValidatorStatus
+from sw_utils import ValidatorStatus, convert_to_gno
 from web3 import Web3
 from web3.types import Gwei, Wei
 
+from src.common.tests.factories import create_withdrawal
 from src.common.typings import PendingPartialWithdrawal
+from src.config.networks import GNOSIS
+from src.config.settings import settings
 from src.validators.tests.factories import create_consensus_validator
 from src.validators.typings import ValidatorConsolidationData
 from src.withdrawals.assets import (
+    _calculate_payload_expected_withdrawals_amount,
     _calculate_validators_exits_amount,
     calculate_withdrawal_buffer,
     get_queued_assets,
@@ -86,6 +90,7 @@ class TestGetQueuedAssets:
                 pending_partial_withdrawals=[],
                 block_number=BlockNumber(100),
                 redemption_assets=Wei(1),
+                payload_expected_withdrawals=[],
             )
 
         assert result == ExitQueueAssets(missing=Gwei(5), total=Gwei(9))
@@ -105,6 +110,7 @@ class TestGetQueuedAssets:
                 pending_partial_withdrawals=[],
                 block_number=block_number,
                 redemption_assets=Wei(123),
+                payload_expected_withdrawals=[],
             )
 
         mocks['queued_exit_assets'].assert_awaited_once_with(
@@ -120,13 +126,14 @@ class TestGetQueuedAssets:
                 pending_partial_withdrawals=[],
                 block_number=BlockNumber(100),
                 redemption_assets=Wei(0),
+                payload_expected_withdrawals=[],
             )
 
         assert result.total == Gwei(0)
         mocks['missing_assets'].assert_awaited_once()
         mocks['queued_exit_assets'].assert_not_awaited()
 
-    async def test_withdrawing_assets_sums_pending_partials_and_exiting_validators(self):
+    async def test_withdrawing_assets_sums_all_sources(self):
         pending_partial_withdrawals = [
             PendingPartialWithdrawal(validator_index=1, amount=Gwei(10)),
             PendingPartialWithdrawal(validator_index=2, amount=Gwei(20)),
@@ -139,7 +146,8 @@ class TestGetQueuedAssets:
         oracle_exiting_validators = [
             create_consensus_validator(index=4, balance=Gwei(16)),
         ]
-        expected_withdrawing_assets = Web3.to_wei(10 + 20 + 32 + 16, 'gwei')
+        payload_expected_withdrawals = [create_withdrawal(validator_index=3, amount=7)]
+        expected_withdrawing_assets = Web3.to_wei(10 + 20 + 32 + 16 + 7, 'gwei')
 
         with _patch(cumulative_tickets=0, missing_assets=Wei(0)) as mocks:
             await get_queued_assets(
@@ -148,11 +156,48 @@ class TestGetQueuedAssets:
                 pending_partial_withdrawals=pending_partial_withdrawals,
                 block_number=BlockNumber(100),
                 redemption_assets=Wei(0),
+                payload_expected_withdrawals=payload_expected_withdrawals,
             )
 
-        call_kwargs = mocks['missing_assets'].call_args_list[0].kwargs
-        params = call_kwargs['exit_queue_missing_assets_params']
-        assert params.withdrawing_assets == expected_withdrawing_assets
+        assert _get_withdrawing_assets(mocks) == expected_withdrawing_assets
+
+    async def test_payload_expected_withdrawals_are_converted_to_gno_with_other_assets(self):
+        consensus_validators = [create_consensus_validator(index=1)]
+        pending_partial_withdrawals = [PendingPartialWithdrawal(validator_index=1, amount=Gwei(32))]
+        payload_expected_withdrawals = [create_withdrawal(validator_index=1, amount=64)]
+        expected_withdrawing_assets = convert_to_gno(Web3.to_wei(32 + 64, 'gwei'))
+
+        with mock.patch.object(settings, 'network', GNOSIS), _patch(
+            cumulative_tickets=0, missing_assets=Wei(0)
+        ) as mocks:
+            await get_queued_assets(
+                consensus_validators=consensus_validators,
+                oracle_exiting_validators=[],
+                pending_partial_withdrawals=pending_partial_withdrawals,
+                block_number=BlockNumber(100),
+                redemption_assets=Wei(0),
+                payload_expected_withdrawals=payload_expected_withdrawals,
+            )
+
+        assert _get_withdrawing_assets(mocks) == expected_withdrawing_assets
+
+
+def test_calculate_payload_expected_withdrawals_amount():
+    consensus_validators = [
+        create_consensus_validator(index=1),
+        create_consensus_validator(index=2),
+    ]
+    withdrawals = [
+        create_withdrawal(validator_index=1, amount=3),
+        create_withdrawal(validator_index=1, amount=5),
+        create_withdrawal(validator_index=99, amount=100),
+        # builder indexes are never vault validator indexes
+        create_withdrawal(validator_index=2**40 + 1, amount=100),
+    ]
+
+    result = _calculate_payload_expected_withdrawals_amount(consensus_validators, withdrawals)
+
+    assert result == Web3.to_wei(3 + 5, 'gwei')
 
 
 class TestCalculateWithdrawalBuffer:
@@ -220,3 +265,8 @@ def _patch(
             'missing_assets': missing_assets_mock,
             'queued_exit_assets': queued_exit_assets_mock,
         }
+
+
+def _get_withdrawing_assets(mocks: dict[str, mock.AsyncMock]) -> Wei:
+    call_kwargs = mocks['missing_assets'].call_args_list[0].kwargs
+    return call_kwargs['exit_queue_missing_assets_params'].withdrawing_assets

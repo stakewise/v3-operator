@@ -3,7 +3,7 @@ from typing import cast
 from eth_typing import BlockNumber
 from sw_utils import GNO_NETWORKS, ValidatorStatus, convert_to_gno, convert_to_mgno
 from web3 import Web3
-from web3.types import Gwei, Wei
+from web3.types import Gwei, Wei, WithdrawalData
 
 from src.common.contracts import VaultContract, validators_checker_contract
 from src.common.harvest import get_harvest_params
@@ -33,10 +33,13 @@ async def get_queued_assets(
     pending_partial_withdrawals: list[PendingPartialWithdrawal],
     block_number: BlockNumber,
     redemption_assets: Wei,
+    payload_expected_withdrawals: list[WithdrawalData],
 ) -> ExitQueueAssets:
     """
     Get the exit queue shortfall and the value of the queued exit shares.
     For Gno networks both are in mGNO-Gwei.
+    `payload_expected_withdrawals` are the withdrawals of the block following `block_number`,
+    already debited from the consensus balances.
     """
     harvest_params = await get_harvest_params(settings.vault, block_number)
 
@@ -63,7 +66,13 @@ async def get_queued_assets(
 
     # Withdrawing assets are assets that are ready to cover the exit requests
     # but not yet used to fulfill exit requests.
-    withdrawing_assets = Wei(pending_partial_withdrawals_amount + validators_exits_amount)
+    withdrawing_assets = Wei(
+        pending_partial_withdrawals_amount
+        + validators_exits_amount
+        + _calculate_payload_expected_withdrawals_amount(
+            consensus_validators, payload_expected_withdrawals
+        )
+    )
     if settings.network in GNO_NETWORKS:
         # apply mGNO -> GNO exchange rate
         withdrawing_assets = convert_to_gno(withdrawing_assets)
@@ -137,3 +146,17 @@ def _calculate_validators_exits_amount(
             total_exiting_amount += val.balance
 
     return Web3.to_wei(total_exiting_amount, 'gwei')
+
+
+def _calculate_payload_expected_withdrawals_amount(
+    consensus_validators: list[ConsensusValidator],
+    payload_expected_withdrawals: list[WithdrawalData],
+) -> Wei:
+    """Sum of the vault validators' payload expected withdrawals, builder ones are ignored."""
+    vault_indexes = {val.index for val in consensus_validators}
+    total_amount = sum(
+        withdrawal['amount']
+        for withdrawal in payload_expected_withdrawals
+        if withdrawal['validatorIndex'] in vault_indexes
+    )
+    return Web3.to_wei(total_amount, 'gwei')

@@ -1,8 +1,10 @@
+import logging
+from typing import Generator
 from unittest import mock
 
 import pytest
 from eth_typing import HexStr
-from sw_utils import ValidatorStatus
+from sw_utils import ExecutionBehindConsensusError, ValidatorStatus
 from web3.types import BlockNumber, Gwei, Wei
 
 from src.common.app_state import AppState
@@ -34,6 +36,14 @@ def reset_app_state():
     Singleton._instances.pop(AppState, None)
     yield
     Singleton._instances.pop(AppState, None)
+
+
+@pytest.fixture(autouse=True)
+def _no_payload_expected_withdrawals() -> Generator[mock.AsyncMock, None, None]:
+    with mock.patch(
+        'src.withdrawals.tasks.get_payload_expected_withdrawals', return_value=[]
+    ) as mocked_payload_expected_withdrawals:
+        yield mocked_payload_expected_withdrawals
 
 
 def test_get_partial_withdrawals():
@@ -1696,7 +1706,9 @@ async def test_get_withdrawals_full_exit_shortfall_tail_still_gets_buffer(data_d
 
 
 # pylint: disable-next=too-many-locals
-async def test_process_submits_shortfall_plus_buffer(data_dir, reset_app_state):
+async def test_process_submits_shortfall_plus_buffer(
+    data_dir, reset_app_state, _no_payload_expected_withdrawals
+):
     settings.set(vault=None, vault_dir=data_dir, network=HOODI)
     chain_head = create_chain_head(epoch=500)
     protocol_config = mock.MagicMock(validator_min_active_epochs=10)
@@ -1713,6 +1725,7 @@ async def test_process_submits_shortfall_plus_buffer(data_dir, reset_app_state):
     pending_partials_count = 0
     exit_queue = ExitQueueAssets(missing=missing, total=total)
     expected_withdrawals = {'0x1': Gwei(missing + max(total // 1000, 10_000))}
+    _no_payload_expected_withdrawals.return_value = mock.sentinel.payload_expected_withdrawals
 
     with mock.patch(
         'src.withdrawals.tasks.get_chain_latest_head', return_value=chain_head
@@ -1732,7 +1745,7 @@ async def test_process_submits_shortfall_plus_buffer(data_dir, reset_app_state):
         'src.withdrawals.tasks.get_redemption_assets', return_value=Wei(0)
     ), mock.patch(
         'src.withdrawals.tasks.get_queued_assets', return_value=exit_queue
-    ), mock.patch(
+    ) as mocked_queued_assets, mock.patch(
         'src.withdrawals.tasks.get_withdrawals_count', return_value=pending_partials_count
     ), mock.patch(
         'src.withdrawals.tasks.apply_pending_deposits', return_value=([validator], [])
@@ -1747,6 +1760,11 @@ async def test_process_submits_shortfall_plus_buffer(data_dir, reset_app_state):
         subtask = ValidatorWithdrawalSubtask(relayer=None)
         await subtask.process()
 
+    _no_payload_expected_withdrawals.assert_awaited_once_with(chain_head)
+    assert (
+        mocked_queued_assets.call_args.kwargs['payload_expected_withdrawals']
+        is mock.sentinel.payload_expected_withdrawals
+    )
     mocked_submit.assert_called_once()
     assert mocked_submit.call_args.kwargs['withdrawals'] == expected_withdrawals
 
@@ -1897,3 +1915,43 @@ async def test_process_submits_shortfall_at_missing_assets_threshold(data_dir, r
         await subtask.process()
 
     mocked_submit.assert_called_once()
+
+
+async def test_process_skips_cycle_when_payload_expected_withdrawals_unavailable(
+    data_dir, reset_app_state, _no_payload_expected_withdrawals, caplog
+):
+    settings.set(vault=None, vault_dir=data_dir, network=HOODI)
+    _no_payload_expected_withdrawals.side_effect = ExecutionBehindConsensusError(
+        'block is not available'
+    )
+
+    with caplog.at_level(logging.INFO), mock.patch(
+        'src.withdrawals.tasks.get_chain_latest_head', return_value=create_chain_head(epoch=500)
+    ), mock.patch(
+        'src.withdrawals.tasks.get_protocol_config', return_value=mock.MagicMock()
+    ), mock.patch.object(
+        WithdrawalIntervalMixin, '_is_withdrawal_interval_passed', return_value=True
+    ), mock.patch(
+        'src.withdrawals.tasks.build_consensus_validators'
+    ) as mocked_build_consensus_validators:
+        await ValidatorWithdrawalSubtask(relayer=None).process()
+
+    assert 'Skipping withdrawals check' in caplog.text
+    mocked_build_consensus_validators.assert_not_called()
+
+
+async def test_process_does_not_fetch_payload_expected_withdrawals_before_interval_passed(
+    data_dir, reset_app_state, _no_payload_expected_withdrawals
+):
+    settings.set(vault=None, vault_dir=data_dir, network=HOODI)
+
+    with mock.patch(
+        'src.withdrawals.tasks.get_chain_latest_head', return_value=create_chain_head(epoch=500)
+    ), mock.patch(
+        'src.withdrawals.tasks.get_protocol_config', return_value=mock.MagicMock()
+    ), mock.patch.object(
+        WithdrawalIntervalMixin, '_is_withdrawal_interval_passed', return_value=False
+    ):
+        await ValidatorWithdrawalSubtask(relayer=None).process()
+
+    _no_payload_expected_withdrawals.assert_not_awaited()
