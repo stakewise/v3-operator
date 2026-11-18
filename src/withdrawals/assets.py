@@ -64,14 +64,18 @@ async def get_queued_assets(
         oracle_exiting_validators=oracle_exiting_validators,
     )
 
+    # fetch payload expected withdrawals
+    payload_expected_withdrawals_amount = _calculate_payload_expected_withdrawals_amount(
+        consensus_validators=consensus_validators,
+        payload_expected_withdrawals=payload_expected_withdrawals,
+    )
+
     # Withdrawing assets are assets that are ready to cover the exit requests
     # but not yet used to fulfill exit requests.
     withdrawing_assets = Wei(
         pending_partial_withdrawals_amount
         + validators_exits_amount
-        + _calculate_payload_expected_withdrawals_amount(
-            consensus_validators, payload_expected_withdrawals
-        )
+        + payload_expected_withdrawals_amount
     )
     if settings.network in GNO_NETWORKS:
         # apply mGNO -> GNO exchange rate

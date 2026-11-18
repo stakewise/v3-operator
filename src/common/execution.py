@@ -61,9 +61,6 @@ async def get_payload_expected_withdrawals(chain_head: ChainHead) -> list[Withdr
     Withdrawals deducted from CL balances at `chain_head.slot` that reach the EL only in block
     `chain_head.block_number + 1`. Always empty before Glamsterdam.
 
-    Without them the vault looks short and the operator could submit an extra, irreversible
-    withdrawal request.
-
     Waits up to one slot, then re-raises `ExecutionBehindConsensusError`; callers should skip
     the cycle.
     """
