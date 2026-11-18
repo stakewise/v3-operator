@@ -1,9 +1,8 @@
-import logging
 from unittest import mock
 
 import pytest
 from prometheus_client import REGISTRY
-from sw_utils import ExecutionBehindConsensusError, InterruptHandler
+from sw_utils import InterruptHandler
 
 from src.common.tasks import BaseTask
 from src.config.settings import settings
@@ -22,23 +21,6 @@ class _FailingTask(BaseTask):
 
 @pytest.mark.usefixtures('fake_settings')
 class TestBaseTaskRun:
-    async def test_execution_behind_consensus_is_skipped_with_warning_and_counted(
-        self, caplog: pytest.LogCaptureFixture
-    ):
-        task = _FailingTask(ExecutionBehindConsensusError('block is not available'))
-        exception_count = _exception_count()
-
-        with caplog.at_level(logging.WARNING, logger='src.common.tasks'):
-            await task.run(InterruptHandler())
-
-        task.process_block_mock.assert_awaited_once()
-        assert _exception_count() == exception_count + 1
-        records = [r for r in caplog.records if r.name == 'src.common.tasks']
-        assert len(records) == 1
-        assert records[0].levelno == logging.WARNING
-        assert 'block is not available' in records[0].getMessage()
-        assert records[0].exc_info is None
-
     async def test_other_errors_are_counted(self):
         task = _FailingTask(RuntimeError('boom'))
         exception_count = _exception_count()

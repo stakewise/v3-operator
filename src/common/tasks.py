@@ -1,7 +1,7 @@
 import logging
 import time
 
-from sw_utils import ExecutionBehindConsensusError, InterruptHandler
+from sw_utils import InterruptHandler
 
 from src.common.clients import execution_client
 from src.common.consensus import get_chain_finalized_head
@@ -18,9 +18,6 @@ class BaseTask:
             start_time = time.time()
             try:
                 await self.process_block(interrupt_handler)
-            except ExecutionBehindConsensusError as exc:
-                metrics.exception_count.labels(network=settings.network).inc()
-                logger.warning('Skipping block processing: %s', exc)
             except Exception as exc:
                 metrics.exception_count.labels(network=settings.network).inc()
                 log_verbose(exc)
