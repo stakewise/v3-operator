@@ -105,7 +105,7 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
         try:
             payload_expected_withdrawals = await get_payload_expected_withdrawals(chain_head)
         except ExecutionBehindConsensusError as e:
-            logger.info('Skipping withdrawals check, waiting for the next execution block: %s', e)
+            logger.warning('Skipping withdrawals check: %s', e)
             return
 
         vault_public_keys = {val.public_key for val in VaultValidatorCrud().get_vault_validators()}

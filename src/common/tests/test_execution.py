@@ -2,8 +2,10 @@ from typing import Generator
 from unittest import mock
 
 import pytest
+from sw_utils import ExecutionBehindConsensusError
 
 from src.common.clients import execution_client
+from src.common.consensus import EXECUTION_HEAD_SYNC_POLL_INTERVAL
 from src.common.execution import get_payload_expected_withdrawals
 from src.common.tests.factories import create_chain_head, create_withdrawal
 from src.config.settings import settings
@@ -32,3 +34,23 @@ async def test_get_payload_expected_withdrawals(
         chain_head=chain_head,
         network_config=settings.network_config,
     )
+
+
+@pytest.mark.usefixtures('fake_settings')
+async def test_get_payload_expected_withdrawals_retries_while_execution_is_behind(
+    mocked_sw_payload_expected_withdrawals: mock.AsyncMock,
+):
+    chain_head = create_chain_head()
+    withdrawals = [create_withdrawal(validator_index=1, amount=5)]
+    mocked_sw_payload_expected_withdrawals.side_effect = [
+        ExecutionBehindConsensusError('block is not available'),
+        withdrawals,
+    ]
+
+    with mock.patch(
+        'src.common.consensus.asyncio.sleep', new_callable=mock.AsyncMock
+    ) as mocked_sleep:
+        assert await get_payload_expected_withdrawals(chain_head) == withdrawals
+
+    assert mocked_sw_payload_expected_withdrawals.await_count == 2
+    mocked_sleep.assert_awaited_once_with(EXECUTION_HEAD_SYNC_POLL_INTERVAL)

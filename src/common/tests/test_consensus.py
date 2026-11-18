@@ -204,10 +204,19 @@ class TestRetryWithinSlot:
     async def test_returns_result_without_sleeping(self, mocked_sleep: mock.AsyncMock):
         fetch = mock.AsyncMock(return_value=mock.sentinel.result)
 
-        assert await retry_within_slot(fetch) == mock.sentinel.result
+        assert await retry_within_slot(fetch)() == mock.sentinel.result
 
         fetch.assert_awaited_once_with()
         mocked_sleep.assert_not_awaited()
+
+    async def test_forwards_args_and_kwargs(self):
+        fetch = mock.AsyncMock(return_value=mock.sentinel.result)
+
+        assert await retry_within_slot(fetch)(1, 'a', key=mock.sentinel.value) == (
+            mock.sentinel.result
+        )
+
+        fetch.assert_awaited_once_with(1, 'a', key=mock.sentinel.value)
 
     async def test_retries_until_fetch_succeeds(self, mocked_sleep: mock.AsyncMock):
         fetch = mock.AsyncMock(
@@ -218,7 +227,7 @@ class TestRetryWithinSlot:
             ]
         )
 
-        assert await retry_within_slot(fetch) == mock.sentinel.result
+        assert await retry_within_slot(fetch)() == mock.sentinel.result
 
         assert fetch.await_count == 3
         assert mocked_sleep.await_args_list == [mock.call(EXECUTION_HEAD_SYNC_POLL_INTERVAL)] * 2
@@ -229,7 +238,7 @@ class TestRetryWithinSlot:
         with _mocked_monotonic([0, 1000]), pytest.raises(
             ExecutionBehindConsensusError, match='block is not available'
         ):
-            await retry_within_slot(fetch)
+            await retry_within_slot(fetch)()
 
         assert fetch.await_count == 1
         mocked_sleep.assert_not_awaited()
@@ -240,7 +249,7 @@ class TestRetryWithinSlot:
         with _mocked_monotonic([0, 1, 2, 1000]), pytest.raises(
             ExecutionBehindConsensusError, match='block is not available'
         ):
-            await retry_within_slot(fetch)
+            await retry_within_slot(fetch)()
 
         assert fetch.await_count == 3
         assert mocked_sleep.await_count == 2
@@ -249,7 +258,7 @@ class TestRetryWithinSlot:
         fetch = mock.AsyncMock(side_effect=ValueError('boom'))
 
         with pytest.raises(ValueError, match='boom'):
-            await retry_within_slot(fetch)
+            await retry_within_slot(fetch)()
 
         mocked_sleep.assert_not_awaited()
 

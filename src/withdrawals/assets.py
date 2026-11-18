@@ -65,7 +65,7 @@ async def get_queued_assets(
     )
 
     # fetch payload expected withdrawals
-    payload_expected_withdrawals_amount = _calculate_payload_expected_withdrawals_amount(
+    payload_expected_withdrawals_amount = _sum_payload_expected_withdrawals(
         consensus_validators=consensus_validators,
         payload_expected_withdrawals=payload_expected_withdrawals,
     )
@@ -152,7 +152,7 @@ def _calculate_validators_exits_amount(
     return Web3.to_wei(total_exiting_amount, 'gwei')
 
 
-def _calculate_payload_expected_withdrawals_amount(
+def _sum_payload_expected_withdrawals(
     consensus_validators: list[ConsensusValidator],
     payload_expected_withdrawals: list[WithdrawalData],
 ) -> Wei:

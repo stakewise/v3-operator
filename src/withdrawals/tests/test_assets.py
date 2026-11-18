@@ -14,8 +14,8 @@ from src.config.settings import settings
 from src.validators.tests.factories import create_consensus_validator
 from src.validators.typings import ValidatorConsolidationData
 from src.withdrawals.assets import (
-    _calculate_payload_expected_withdrawals_amount,
     _calculate_validators_exits_amount,
+    _sum_payload_expected_withdrawals,
     calculate_withdrawal_buffer,
     get_queued_assets,
 )
@@ -182,7 +182,7 @@ class TestGetQueuedAssets:
         assert _get_withdrawing_assets(mocks) == expected_withdrawing_assets
 
 
-def test_calculate_payload_expected_withdrawals_amount():
+def test_sum_payload_expected_withdrawals():
     consensus_validators = [
         create_consensus_validator(index=1),
         create_consensus_validator(index=2),
@@ -195,7 +195,7 @@ def test_calculate_payload_expected_withdrawals_amount():
         create_withdrawal(validator_index=2**40 + 1, amount=100),
     ]
 
-    result = _calculate_payload_expected_withdrawals_amount(consensus_validators, withdrawals)
+    result = _sum_payload_expected_withdrawals(consensus_validators, withdrawals)
 
     assert result == Web3.to_wei(3 + 5, 'gwei')
 

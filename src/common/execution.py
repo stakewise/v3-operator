@@ -56,6 +56,7 @@ async def check_gas_price(high_priority: bool = False) -> bool:
     return await gas_manager.check_gas_price(high_priority)
 
 
+@retry_within_slot
 async def get_payload_expected_withdrawals(chain_head: ChainHead) -> list[WithdrawalData]:
     """
     Withdrawals deducted from CL balances at `chain_head.slot` that reach the EL only in block
@@ -64,12 +65,10 @@ async def get_payload_expected_withdrawals(chain_head: ChainHead) -> list[Withdr
     Waits up to one slot, then re-raises `ExecutionBehindConsensusError`; callers should skip
     the cycle.
     """
-    return await retry_within_slot(
-        lambda: sw_get_payload_expected_withdrawals(
-            execution_client=execution_client,
-            chain_head=chain_head,
-            network_config=settings.network_config,
-        )
+    return await sw_get_payload_expected_withdrawals(
+        execution_client=execution_client,
+        chain_head=chain_head,
+        network_config=settings.network_config,
     )
 
 
