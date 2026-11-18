@@ -1,4 +1,3 @@
-import itertools
 from typing import Generator
 from unittest import mock
 
@@ -13,6 +12,7 @@ from src.common.consensus import (
     get_chain_epoch_head,
     get_chain_finalized_head,
     get_chain_latest_head,
+    retry_within_slot,
     wait_for_chain_finalized_head,
 )
 from src.common.tests.factories import create_chain_head
@@ -80,14 +80,6 @@ def mocked_sw_epoch_head() -> Generator[mock.AsyncMock, None, None]:
         'src.common.consensus.sw_get_chain_epoch_head', new_callable=mock.AsyncMock
     ) as sw_get_chain_epoch_head:
         yield sw_get_chain_epoch_head
-
-
-@pytest.fixture
-def expired_deadline() -> Generator[None, None, None]:
-    # The first reading sets the deadline, every later one is past it.
-    monotonic = itertools.chain([0], itertools.repeat(1000))
-    with mock.patch('src.common.consensus.time', mock.Mock(monotonic=lambda: next(monotonic))):
-        yield
 
 
 @pytest.mark.usefixtures('fake_settings', 'mocked_check_execution_has_block')
@@ -206,36 +198,68 @@ class TestGetChainLatestHead:
         assert mocked_sw_latest_head.await_count == 3
         assert mocked_sleep.await_args_list == [mock.call(EXECUTION_HEAD_SYNC_POLL_INTERVAL)] * 2
 
-    async def test_retries_when_sw_utils_raises_post_fork(
-        self,
-        post_fork_head: ChainHead,
-        mocked_sw_latest_head: mock.AsyncMock,
-        mocked_sleep: mock.AsyncMock,
-    ):
-        mocked_sw_latest_head.side_effect = [
-            ExecutionBehindConsensusError('block is not available'),
-            post_fork_head,
-        ]
 
-        assert await get_chain_latest_head() == post_fork_head
+@pytest.mark.usefixtures('fake_settings', 'mocked_sleep')
+class TestRetryWithinSlot:
+    async def test_returns_result_without_sleeping(self, mocked_sleep: mock.AsyncMock):
+        fetch = mock.AsyncMock(return_value=mock.sentinel.result)
 
-        assert mocked_sw_latest_head.await_count == 2
-        mocked_sleep.assert_awaited_once_with(EXECUTION_HEAD_SYNC_POLL_INTERVAL)
+        assert await retry_within_slot(fetch)() == mock.sentinel.result
 
-    @pytest.mark.usefixtures('expired_deadline')
-    async def test_raises_after_deadline(
-        self,
-        pre_fork_head: ChainHead,
-        mocked_sw_latest_head: mock.AsyncMock,
-        mocked_sleep: mock.AsyncMock,
-    ):
-        mocked_sw_latest_head.return_value = pre_fork_head
+        fetch.assert_awaited_once_with()
+        mocked_sleep.assert_not_awaited()
 
-        with pytest.raises(ExecutionBehindConsensusError) as error:
-            await get_chain_latest_head()
+    async def test_forwards_args_and_kwargs(self):
+        fetch = mock.AsyncMock(return_value=mock.sentinel.result)
 
-        assert str(error.value) == EXECUTION_BEHIND_MESSAGE
-        assert mocked_sw_latest_head.await_count == 1
+        assert await retry_within_slot(fetch)(1, 'a', key=mock.sentinel.value) == (
+            mock.sentinel.result
+        )
+
+        fetch.assert_awaited_once_with(1, 'a', key=mock.sentinel.value)
+
+    async def test_retries_until_fetch_succeeds(self, mocked_sleep: mock.AsyncMock):
+        fetch = mock.AsyncMock(
+            side_effect=[
+                ExecutionBehindConsensusError('block is not available'),
+                ExecutionBehindConsensusError('block is not available'),
+                mock.sentinel.result,
+            ]
+        )
+
+        assert await retry_within_slot(fetch)() == mock.sentinel.result
+
+        assert fetch.await_count == 3
+        assert mocked_sleep.await_args_list == [mock.call(EXECUTION_HEAD_SYNC_POLL_INTERVAL)] * 2
+
+    async def test_raises_when_deadline_already_passed(self, mocked_sleep: mock.AsyncMock):
+        fetch = mock.AsyncMock(side_effect=ExecutionBehindConsensusError('block is not available'))
+
+        with _mocked_monotonic([0, 1000]), pytest.raises(
+            ExecutionBehindConsensusError, match='block is not available'
+        ):
+            await retry_within_slot(fetch)()
+
+        assert fetch.await_count == 1
+        mocked_sleep.assert_not_awaited()
+
+    async def test_retries_then_raises_at_deadline(self, mocked_sleep: mock.AsyncMock):
+        fetch = mock.AsyncMock(side_effect=ExecutionBehindConsensusError('block is not available'))
+
+        with _mocked_monotonic([0, 1, 2, 1000]), pytest.raises(
+            ExecutionBehindConsensusError, match='block is not available'
+        ):
+            await retry_within_slot(fetch)()
+
+        assert fetch.await_count == 3
+        assert mocked_sleep.await_count == 2
+
+    async def test_propagates_other_errors(self, mocked_sleep: mock.AsyncMock):
+        fetch = mock.AsyncMock(side_effect=ValueError('boom'))
+
+        with pytest.raises(ValueError, match='boom'):
+            await retry_within_slot(fetch)()
+
         mocked_sleep.assert_not_awaited()
 
 
@@ -271,3 +295,9 @@ class TestWaitForChainFinalizedHead:
                 await wait_for_chain_finalized_head()
 
         mocked_sleep.assert_not_awaited()
+
+
+def _mocked_monotonic(readings: list[float]) -> mock._patch:
+    return mock.patch(
+        'src.common.consensus.time', mock.Mock(monotonic=mock.Mock(side_effect=readings))
+    )

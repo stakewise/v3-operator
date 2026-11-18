@@ -2,7 +2,8 @@ import random
 
 from eth_typing import BlockNumber
 from sw_utils import ChainHead
-from web3.types import Timestamp
+from web3 import Web3
+from web3.types import Gwei, Timestamp, WithdrawalData
 
 from src.config.networks import HOODI, NETWORKS
 from src.config.settings import settings
@@ -44,4 +45,13 @@ def create_chain_head(
         block_number=BlockNumber(block_number),
         slot=slot,
         consensus_ts=Timestamp(consensus_ts),
+    )
+
+
+def create_withdrawal(validator_index: int, amount: int) -> WithdrawalData:
+    return WithdrawalData(
+        index=0,
+        validatorIndex=validator_index,
+        address=Web3.to_checksum_address('0x' + '11' * 20),
+        amount=Gwei(amount),
     )

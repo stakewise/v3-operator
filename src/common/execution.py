@@ -3,10 +3,15 @@ import logging
 
 from eth_typing import BlockNumber
 from sw_utils import GasManager, InterruptHandler
+from sw_utils import (
+    get_payload_expected_withdrawals as sw_get_payload_expected_withdrawals,
+)
+from sw_utils.typings import ChainHead
 from web3 import Web3
-from web3.types import Wei
+from web3.types import Wei, WithdrawalData
 
 from src.common.clients import execution_client
+from src.common.consensus import retry_within_slot
 from src.common.metrics import metrics
 from src.common.tasks import BaseTask
 from src.common.wallet import wallet
@@ -49,6 +54,22 @@ async def get_wallet_balance() -> Wei:
 async def check_gas_price(high_priority: bool = False) -> bool:
     gas_manager = build_gas_manager()
     return await gas_manager.check_gas_price(high_priority)
+
+
+@retry_within_slot
+async def get_payload_expected_withdrawals(chain_head: ChainHead) -> list[WithdrawalData]:
+    """
+    Withdrawals deducted from CL balances at `chain_head.slot` that reach the EL only in block
+    `chain_head.block_number + 1`. Always empty before Glamsterdam.
+
+    Waits up to one slot, then re-raises `ExecutionBehindConsensusError`; callers should skip
+    the cycle.
+    """
+    return await sw_get_payload_expected_withdrawals(
+        execution_client=execution_client,
+        chain_head=chain_head,
+        network_config=settings.network_config,
+    )
 
 
 async def wait_for_execution_endpoints_synced(target_block: BlockNumber) -> None:
