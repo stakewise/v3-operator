@@ -4,6 +4,7 @@ from unittest import mock
 
 import pytest
 from eth_typing import HexStr
+from prometheus_client import REGISTRY
 from sw_utils import ExecutionBehindConsensusError, ValidatorStatus
 from web3.types import BlockNumber, Gwei, Wei
 
@@ -1924,6 +1925,7 @@ async def test_process_skips_cycle_when_payload_expected_withdrawals_unavailable
     _no_payload_expected_withdrawals.side_effect = ExecutionBehindConsensusError(
         'block is not available'
     )
+    exception_count = _exception_count()
 
     with caplog.at_level(logging.INFO), mock.patch(
         'src.withdrawals.tasks.get_chain_latest_head', return_value=create_chain_head(epoch=500)
@@ -1937,6 +1939,7 @@ async def test_process_skips_cycle_when_payload_expected_withdrawals_unavailable
         await ValidatorWithdrawalSubtask(relayer=None).process()
 
     assert 'Skipping withdrawals check' in caplog.text
+    assert _exception_count() == exception_count + 1
     mocked_build_consensus_validators.assert_not_called()
 
 
@@ -1955,3 +1958,10 @@ async def test_process_does_not_fetch_payload_expected_withdrawals_before_interv
         await ValidatorWithdrawalSubtask(relayer=None).process()
 
     _no_payload_expected_withdrawals.assert_not_awaited()
+
+
+def _exception_count() -> float:
+    value = REGISTRY.get_sample_value(
+        f'{settings.metrics_prefix}_exception_count_total', {'network': settings.network}
+    )
+    return value or 0.0

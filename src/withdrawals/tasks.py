@@ -105,6 +105,7 @@ class ValidatorWithdrawalSubtask(WithdrawalIntervalMixin):
         try:
             payload_expected_withdrawals = await get_payload_expected_withdrawals(chain_head)
         except ExecutionBehindConsensusError as e:
+            metrics.exception_count.labels(network=settings.network).inc()
             logger.warning('Skipping withdrawals check: %s', e)
             return
 

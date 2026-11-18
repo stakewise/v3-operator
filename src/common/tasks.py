@@ -19,6 +19,7 @@ class BaseTask:
             try:
                 await self.process_block(interrupt_handler)
             except ExecutionBehindConsensusError as exc:
+                metrics.exception_count.labels(network=settings.network).inc()
                 logger.warning('Skipping block processing: %s', exc)
             except Exception as exc:
                 metrics.exception_count.labels(network=settings.network).inc()

@@ -22,7 +22,7 @@ class _FailingTask(BaseTask):
 
 @pytest.mark.usefixtures('fake_settings')
 class TestBaseTaskRun:
-    async def test_execution_behind_consensus_is_skipped_with_warning(
+    async def test_execution_behind_consensus_is_skipped_with_warning_and_counted(
         self, caplog: pytest.LogCaptureFixture
     ):
         task = _FailingTask(ExecutionBehindConsensusError('block is not available'))
@@ -32,7 +32,7 @@ class TestBaseTaskRun:
             await task.run(InterruptHandler())
 
         task.process_block_mock.assert_awaited_once()
-        assert _exception_count() == exception_count
+        assert _exception_count() == exception_count + 1
         records = [r for r in caplog.records if r.name == 'src.common.tasks']
         assert len(records) == 1
         assert records[0].levelno == logging.WARNING
