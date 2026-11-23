@@ -11,10 +11,11 @@ from sw_utils import (
     get_execution_client,
 )
 from web3 import AsyncWeb3
-from web3.middleware.signing import async_construct_sign_and_send_raw_middleware
+from web3.middleware import SignAndSendRawMiddlewareBuilder
 
 import src
 from src.common.wallet import hot_wallet
+from src.common.web3 import close_evicted_sessions
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -55,8 +56,10 @@ class ExecutionClient:
         # Account is required when emitting transactions.
         # For read-only queries account may be omitted.
         if hot_wallet.can_load():
-            w3.middleware_onion.add(
-                await async_construct_sign_and_send_raw_middleware(hot_wallet.account)
+            w3.middleware_onion.inject(
+                # pylint: disable-next=no-value-for-parameter
+                SignAndSendRawMiddlewareBuilder.build(hot_wallet.account),
+                layer=0,
             )
             w3.eth.default_account = hot_wallet.address
 
@@ -110,3 +113,15 @@ ipfs_fetch_client = IpfsLazyFetchClient()
 async def setup_clients() -> None:
     await execution_client.setup()  # type: ignore
     await execution_non_retry_client.setup()  # type: ignore
+
+
+async def close_clients() -> None:
+    logger.debug('Closing active sessions...')
+    for client in (execution_client, execution_non_retry_client):
+        # skip clients that were not set up, e.g. when no execution endpoints are given
+        if client.is_set_up:  # type: ignore[attr-defined]
+            await client.provider.disconnect()
+    # consensus client is created lazily, skip it if it was never used
+    if 'client' in vars(consensus_client):
+        await consensus_client.disconnect()
+    await close_evicted_sessions()

@@ -247,7 +247,7 @@ running Operator Service from binary, you would use:
 ```
 
 ```text
-Enter the network name (mainnet, hoodi, gnosis, chiado) [mainnet]:
+Enter the network name (mainnet, hoodi, gnosis) [mainnet]:
 Enter your vault address: 0x3320a...68
 Choose your mnemonic language (chinese_simplified, chinese_traditional, czech, english, italian, korean, portuguese, spanish) [english]:
 This is your seed phrase. Write it down and store it safely, it is the ONLY way to recover your validator keys.

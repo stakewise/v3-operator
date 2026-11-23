@@ -7,7 +7,12 @@ from eth_typing import HexAddress, HexStr
 from eth_utils import add_0x_prefix
 from sw_utils.consensus import EXITED_STATUSES, ValidatorStatus
 
-from src.common.clients import consensus_client, execution_client, setup_clients
+from src.common.clients import (
+    close_clients,
+    consensus_client,
+    execution_client,
+    setup_clients,
+)
 from src.common.credentials import CredentialManager
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.password import generate_password, get_or_create_password_file
@@ -150,6 +155,28 @@ async def main(
 ) -> None:
     setup_logging()
     await setup_clients()
+    try:
+        await process(
+            mnemonic=mnemonic,
+            keystores_dir=keystores_dir,
+            password_file=password_file,
+            per_keystore_password=per_keystore_password,
+            no_confirm=no_confirm,
+            config=config,
+        )
+    finally:
+        await close_clients()
+
+
+# pylint: disable-next=too-many-arguments
+async def process(
+    mnemonic: str,
+    keystores_dir: Path,
+    password_file: Path,
+    per_keystore_password: bool,
+    no_confirm: bool,
+    config: VaultConfig,
+) -> None:
     await check_events_logs()
 
     validators = await _fetch_registered_validators()

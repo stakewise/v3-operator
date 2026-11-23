@@ -34,17 +34,15 @@ class NetworkValidatorsProcessor(EventProcessor):
             execution_client=execution_non_retry_client
         ).contract
 
-    @staticmethod
-    async def get_from_block() -> BlockNumber:
+    async def get_from_block(self) -> BlockNumber:
         last_validator = NetworkValidatorCrud().get_last_network_validator()
         if not last_validator:
             return settings.network_config.VALIDATORS_REGISTRY_GENESIS_BLOCK
 
         return BlockNumber(last_validator.block_number + 1)
 
-    @staticmethod
     # pylint: disable-next=unused-argument
-    async def process_events(events: list[EventData], to_block: BlockNumber) -> None:
+    async def process_events(self, events: list[EventData], to_block: BlockNumber) -> None:
         validators = process_network_validator_events(events)
         NetworkValidatorCrud().save_network_validators(validators)
 
@@ -52,9 +50,8 @@ class NetworkValidatorsProcessor(EventProcessor):
 class NetworkValidatorsStartupProcessor(NetworkValidatorsProcessor):
     """Use multiprocessing event processor"""
 
-    @staticmethod
     # pylint: disable-next=unused-argument
-    async def process_events(events: list[EventData], to_block: BlockNumber) -> None:
+    async def process_events(self, events: list[EventData], to_block: BlockNumber) -> None:
         validators = process_network_validator_events_multiprocessing(events)
         NetworkValidatorCrud().save_network_validators(validators)
 
@@ -116,8 +113,8 @@ async def get_latest_network_validator_public_keys() -> Set[HexStr]:
     else:
         from_block = settings.network_config.VALIDATORS_REGISTRY_GENESIS_BLOCK
 
-    new_events = await validators_registry_contract.events.DepositEvent.get_logs(  # type: ignore
-        fromBlock=from_block
+    new_events = await validators_registry_contract.events.DepositEvent.get_logs(
+        from_block=from_block
     )
     new_public_keys: Set[HexStr] = set()
     for event in new_events:
