@@ -246,7 +246,9 @@ async def process(
         logger.info('No redeemable os token positions to upload, exiting...')
         return
 
-    await _publish_positions(os_token_positions)
+    positions_file = _save_positions_to_file([p.as_dict() for p in os_token_positions])
+    click.echo(f'Redeemable os token positions saved to {positions_file}')
+    await publish_positions(os_token_positions)
 
 
 async def _fetch_allocators(block_number: BlockNumber) -> list[Allocator]:
@@ -300,7 +302,11 @@ def _filter_min_redeemable_shares(
     return result
 
 
-async def _publish_positions(os_token_positions: list[OsTokenPosition]) -> None:
+async def publish_positions(
+    os_token_positions: list[OsTokenPosition], dry_run: bool = False
+) -> None:
+    """Computes the Merkle root for the current redeemer nonce and uploads the positions to IPFS.
+    With ``dry_run`` only the root is computed."""
     total_redeemable = sum(p.leaf_shares for p in os_token_positions)
     logger.info(
         'Created %(count)s redeemable os token positions. '
@@ -314,13 +320,15 @@ async def _publish_positions(os_token_positions: list[OsTokenPosition]) -> None:
         },
     )
     positions_payload = [p.as_dict() for p in os_token_positions]
-    positions_file = _save_positions_to_file(positions_payload)
-    click.echo(f'Redeemable os token positions saved to {positions_file}')
 
     # calculate merkle root
     nonce = await os_token_redeemer_contract.nonce()
     tree = PositionsMerkleTree(os_token_positions, leaf_nonce=nonce)
     click.echo(f'Generated Merkle Tree root: {tree.root}')
+
+    if dry_run:
+        click.echo('Dry run: skipping the IPFS upload')
+        return
 
     ipfs_upload_client = build_ipfs_upload_clients()
     ipfs_hash = await ipfs_upload_client.upload_json(positions_payload)
