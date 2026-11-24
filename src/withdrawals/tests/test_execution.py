@@ -124,7 +124,8 @@ def _mock_vault_contract(decoded_error: str | None = None) -> mock.Mock:
 
 @contextlib.contextmanager
 def _patch(vault_contract: mock.Mock, transact: mock.AsyncMock):
-    with mock.patch(
-        'src.withdrawals.execution.VaultContract', return_value=vault_contract
-    ), mock.patch('src.common.transaction.tx_manager', mock.Mock(transact=transact)):
+    with (
+        mock.patch('src.withdrawals.execution.VaultContract', return_value=vault_contract),
+        mock.patch('src.common.transaction.tx_manager', mock.Mock(transact=transact)),
+    ):
         yield

@@ -1075,19 +1075,22 @@ async def test_is_pending_partial_withdrawals_queue_full():
     limit = 100
     chain_head = create_chain_head(epoch=500)
 
-    with mock.patch.object(
-        settings.network_config, 'PENDING_PARTIAL_WITHDRAWALS_LIMIT', new=limit
-    ), mock.patch('src.withdrawals.tasks.get_withdrawals_count', return_value=limit - 1):
+    with (
+        mock.patch.object(settings.network_config, 'PENDING_PARTIAL_WITHDRAWALS_LIMIT', new=limit),
+        mock.patch('src.withdrawals.tasks.get_withdrawals_count', return_value=limit - 1),
+    ):
         assert await _is_pending_partial_withdrawals_queue_full(chain_head) is False
 
-    with mock.patch.object(
-        settings.network_config, 'PENDING_PARTIAL_WITHDRAWALS_LIMIT', new=limit
-    ), mock.patch('src.withdrawals.tasks.get_withdrawals_count', return_value=limit):
+    with (
+        mock.patch.object(settings.network_config, 'PENDING_PARTIAL_WITHDRAWALS_LIMIT', new=limit),
+        mock.patch('src.withdrawals.tasks.get_withdrawals_count', return_value=limit),
+    ):
         assert await _is_pending_partial_withdrawals_queue_full(chain_head) is True
 
-    with mock.patch.object(
-        settings.network_config, 'PENDING_PARTIAL_WITHDRAWALS_LIMIT', new=limit
-    ), mock.patch('src.withdrawals.tasks.get_withdrawals_count', return_value=limit + 1):
+    with (
+        mock.patch.object(settings.network_config, 'PENDING_PARTIAL_WITHDRAWALS_LIMIT', new=limit),
+        mock.patch('src.withdrawals.tasks.get_withdrawals_count', return_value=limit + 1),
+    ):
         assert await _is_pending_partial_withdrawals_queue_full(chain_head) is True
 
 
@@ -1714,35 +1717,30 @@ async def test_process_submits_shortfall_plus_buffer(data_dir, reset_app_state):
     exit_queue = ExitQueueAssets(missing=missing, total=total)
     expected_withdrawals = {'0x1': Gwei(missing + max(total // 1000, 10_000))}
 
-    with mock.patch(
-        'src.withdrawals.tasks.get_chain_latest_head', return_value=chain_head
-    ), mock.patch(
-        'src.withdrawals.tasks.get_protocol_config', return_value=protocol_config
-    ), mock.patch.object(
-        WithdrawalIntervalMixin, '_is_withdrawal_interval_passed', return_value=True
-    ), mock.patch.object(
-        VaultValidatorCrud, 'get_vault_validators', return_value=[validator]
-    ), mock.patch(
-        'src.withdrawals.tasks.build_consensus_validators', return_value=[validator]
-    ), mock.patch(
-        'src.withdrawals.tasks._fetch_oracle_exiting_validators', return_value=[]
-    ), mock.patch(
-        'src.withdrawals.tasks.get_pending_partial_withdrawals', return_value=[]
-    ), mock.patch(
-        'src.withdrawals.tasks.get_redemption_assets', return_value=Wei(0)
-    ), mock.patch(
-        'src.withdrawals.tasks.get_queued_assets', return_value=exit_queue
-    ), mock.patch(
-        'src.withdrawals.tasks.get_withdrawals_count', return_value=pending_partials_count
-    ), mock.patch(
-        'src.withdrawals.tasks.apply_pending_deposits', return_value=([validator], [])
-    ), mock.patch(
-        'src.withdrawals.tasks.get_withdrawal_request_fee', return_value=Wei(0)
-    ), mock.patch(
-        'src.withdrawals.tasks.submit_withdraw_validators', return_value=HexStr('0xabc')
-    ) as mocked_submit, mock.patch(
-        'src.withdrawals.tasks.execution_client', new=mock.AsyncMock()
-    ) as mocked_execution_client:
+    with (
+        mock.patch('src.withdrawals.tasks.get_chain_latest_head', return_value=chain_head),
+        mock.patch('src.withdrawals.tasks.get_protocol_config', return_value=protocol_config),
+        mock.patch.object(
+            WithdrawalIntervalMixin, '_is_withdrawal_interval_passed', return_value=True
+        ),
+        mock.patch.object(VaultValidatorCrud, 'get_vault_validators', return_value=[validator]),
+        mock.patch('src.withdrawals.tasks.build_consensus_validators', return_value=[validator]),
+        mock.patch('src.withdrawals.tasks._fetch_oracle_exiting_validators', return_value=[]),
+        mock.patch('src.withdrawals.tasks.get_pending_partial_withdrawals', return_value=[]),
+        mock.patch('src.withdrawals.tasks.get_redemption_assets', return_value=Wei(0)),
+        mock.patch('src.withdrawals.tasks.get_queued_assets', return_value=exit_queue),
+        mock.patch(
+            'src.withdrawals.tasks.get_withdrawals_count', return_value=pending_partials_count
+        ),
+        mock.patch('src.withdrawals.tasks.apply_pending_deposits', return_value=([validator], [])),
+        mock.patch('src.withdrawals.tasks.get_withdrawal_request_fee', return_value=Wei(0)),
+        mock.patch(
+            'src.withdrawals.tasks.submit_withdraw_validators', return_value=HexStr('0xabc')
+        ) as mocked_submit,
+        mock.patch(
+            'src.withdrawals.tasks.execution_client', new=mock.AsyncMock()
+        ) as mocked_execution_client,
+    ):
         mocked_execution_client.eth.get_transaction.return_value = {'blockNumber': 123}
         subtask = ValidatorWithdrawalSubtask(relayer=None)
         await subtask.process()
@@ -1766,35 +1764,28 @@ async def test_process_submits_tiny_shortfall_at_default_threshold(data_dir, res
     missing = Gwei(10)
     exit_queue = ExitQueueAssets(missing=missing, total=missing)
 
-    with mock.patch(
-        'src.withdrawals.tasks.get_chain_latest_head', return_value=chain_head
-    ), mock.patch(
-        'src.withdrawals.tasks.get_protocol_config', return_value=protocol_config
-    ), mock.patch.object(
-        WithdrawalIntervalMixin, '_is_withdrawal_interval_passed', return_value=True
-    ), mock.patch.object(
-        VaultValidatorCrud, 'get_vault_validators', return_value=[validator]
-    ), mock.patch(
-        'src.withdrawals.tasks.build_consensus_validators', return_value=[validator]
-    ), mock.patch(
-        'src.withdrawals.tasks._fetch_oracle_exiting_validators', return_value=[]
-    ), mock.patch(
-        'src.withdrawals.tasks.get_pending_partial_withdrawals', return_value=[]
-    ), mock.patch(
-        'src.withdrawals.tasks.get_redemption_assets', return_value=Wei(0)
-    ), mock.patch(
-        'src.withdrawals.tasks.get_queued_assets', return_value=exit_queue
-    ), mock.patch(
-        'src.withdrawals.tasks.get_withdrawals_count', return_value=0
-    ), mock.patch(
-        'src.withdrawals.tasks.apply_pending_deposits', return_value=([validator], [])
-    ), mock.patch(
-        'src.withdrawals.tasks.get_withdrawal_request_fee', return_value=Wei(0)
-    ), mock.patch(
-        'src.withdrawals.tasks.submit_withdraw_validators', return_value=HexStr('0xabc')
-    ) as mocked_submit, mock.patch(
-        'src.withdrawals.tasks.execution_client', new=mock.AsyncMock()
-    ) as mocked_execution_client:
+    with (
+        mock.patch('src.withdrawals.tasks.get_chain_latest_head', return_value=chain_head),
+        mock.patch('src.withdrawals.tasks.get_protocol_config', return_value=protocol_config),
+        mock.patch.object(
+            WithdrawalIntervalMixin, '_is_withdrawal_interval_passed', return_value=True
+        ),
+        mock.patch.object(VaultValidatorCrud, 'get_vault_validators', return_value=[validator]),
+        mock.patch('src.withdrawals.tasks.build_consensus_validators', return_value=[validator]),
+        mock.patch('src.withdrawals.tasks._fetch_oracle_exiting_validators', return_value=[]),
+        mock.patch('src.withdrawals.tasks.get_pending_partial_withdrawals', return_value=[]),
+        mock.patch('src.withdrawals.tasks.get_redemption_assets', return_value=Wei(0)),
+        mock.patch('src.withdrawals.tasks.get_queued_assets', return_value=exit_queue),
+        mock.patch('src.withdrawals.tasks.get_withdrawals_count', return_value=0),
+        mock.patch('src.withdrawals.tasks.apply_pending_deposits', return_value=([validator], [])),
+        mock.patch('src.withdrawals.tasks.get_withdrawal_request_fee', return_value=Wei(0)),
+        mock.patch(
+            'src.withdrawals.tasks.submit_withdraw_validators', return_value=HexStr('0xabc')
+        ) as mocked_submit,
+        mock.patch(
+            'src.withdrawals.tasks.execution_client', new=mock.AsyncMock()
+        ) as mocked_execution_client,
+    ):
         mocked_execution_client.eth.get_transaction.return_value = {'blockNumber': 123}
         subtask = ValidatorWithdrawalSubtask(relayer=None)
         await subtask.process()
@@ -1817,29 +1808,23 @@ async def test_process_skips_shortfall_below_missing_assets_threshold(data_dir, 
     missing = Gwei(999_999)
     exit_queue = ExitQueueAssets(missing=missing, total=missing)
 
-    with mock.patch(
-        'src.withdrawals.tasks.MISSING_ASSETS_THRESHOLD_GWEI', Gwei(1_000_000)
-    ), mock.patch(
-        'src.withdrawals.tasks.get_chain_latest_head', return_value=chain_head
-    ), mock.patch(
-        'src.withdrawals.tasks.get_protocol_config', return_value=protocol_config
-    ), mock.patch.object(
-        WithdrawalIntervalMixin, '_is_withdrawal_interval_passed', return_value=True
-    ), mock.patch.object(
-        VaultValidatorCrud, 'get_vault_validators', return_value=[validator]
-    ), mock.patch(
-        'src.withdrawals.tasks.build_consensus_validators', return_value=[validator]
-    ), mock.patch(
-        'src.withdrawals.tasks._fetch_oracle_exiting_validators', return_value=[]
-    ), mock.patch(
-        'src.withdrawals.tasks.get_pending_partial_withdrawals', return_value=[]
-    ), mock.patch(
-        'src.withdrawals.tasks.get_redemption_assets', return_value=Wei(0)
-    ), mock.patch(
-        'src.withdrawals.tasks.get_queued_assets', return_value=exit_queue
-    ), mock.patch(
-        'src.withdrawals.tasks.submit_withdraw_validators', return_value=HexStr('0xabc')
-    ) as mocked_submit:
+    with (
+        mock.patch('src.withdrawals.tasks.MISSING_ASSETS_THRESHOLD_GWEI', Gwei(1_000_000)),
+        mock.patch('src.withdrawals.tasks.get_chain_latest_head', return_value=chain_head),
+        mock.patch('src.withdrawals.tasks.get_protocol_config', return_value=protocol_config),
+        mock.patch.object(
+            WithdrawalIntervalMixin, '_is_withdrawal_interval_passed', return_value=True
+        ),
+        mock.patch.object(VaultValidatorCrud, 'get_vault_validators', return_value=[validator]),
+        mock.patch('src.withdrawals.tasks.build_consensus_validators', return_value=[validator]),
+        mock.patch('src.withdrawals.tasks._fetch_oracle_exiting_validators', return_value=[]),
+        mock.patch('src.withdrawals.tasks.get_pending_partial_withdrawals', return_value=[]),
+        mock.patch('src.withdrawals.tasks.get_redemption_assets', return_value=Wei(0)),
+        mock.patch('src.withdrawals.tasks.get_queued_assets', return_value=exit_queue),
+        mock.patch(
+            'src.withdrawals.tasks.submit_withdraw_validators', return_value=HexStr('0xabc')
+        ) as mocked_submit,
+    ):
         subtask = ValidatorWithdrawalSubtask(relayer=None)
         await subtask.process()
 
@@ -1861,37 +1846,29 @@ async def test_process_submits_shortfall_at_missing_assets_threshold(data_dir, r
     missing = Gwei(1_000_000)
     exit_queue = ExitQueueAssets(missing=missing, total=missing)
 
-    with mock.patch(
-        'src.withdrawals.tasks.MISSING_ASSETS_THRESHOLD_GWEI', Gwei(1_000_000)
-    ), mock.patch(
-        'src.withdrawals.tasks.get_chain_latest_head', return_value=chain_head
-    ), mock.patch(
-        'src.withdrawals.tasks.get_protocol_config', return_value=protocol_config
-    ), mock.patch.object(
-        WithdrawalIntervalMixin, '_is_withdrawal_interval_passed', return_value=True
-    ), mock.patch.object(
-        VaultValidatorCrud, 'get_vault_validators', return_value=[validator]
-    ), mock.patch(
-        'src.withdrawals.tasks.build_consensus_validators', return_value=[validator]
-    ), mock.patch(
-        'src.withdrawals.tasks._fetch_oracle_exiting_validators', return_value=[]
-    ), mock.patch(
-        'src.withdrawals.tasks.get_pending_partial_withdrawals', return_value=[]
-    ), mock.patch(
-        'src.withdrawals.tasks.get_redemption_assets', return_value=Wei(0)
-    ), mock.patch(
-        'src.withdrawals.tasks.get_queued_assets', return_value=exit_queue
-    ), mock.patch(
-        'src.withdrawals.tasks.get_withdrawals_count', return_value=0
-    ), mock.patch(
-        'src.withdrawals.tasks.apply_pending_deposits', return_value=([validator], [])
-    ), mock.patch(
-        'src.withdrawals.tasks.get_withdrawal_request_fee', return_value=Wei(0)
-    ), mock.patch(
-        'src.withdrawals.tasks.submit_withdraw_validators', return_value=HexStr('0xabc')
-    ) as mocked_submit, mock.patch(
-        'src.withdrawals.tasks.execution_client', new=mock.AsyncMock()
-    ) as mocked_execution_client:
+    with (
+        mock.patch('src.withdrawals.tasks.MISSING_ASSETS_THRESHOLD_GWEI', Gwei(1_000_000)),
+        mock.patch('src.withdrawals.tasks.get_chain_latest_head', return_value=chain_head),
+        mock.patch('src.withdrawals.tasks.get_protocol_config', return_value=protocol_config),
+        mock.patch.object(
+            WithdrawalIntervalMixin, '_is_withdrawal_interval_passed', return_value=True
+        ),
+        mock.patch.object(VaultValidatorCrud, 'get_vault_validators', return_value=[validator]),
+        mock.patch('src.withdrawals.tasks.build_consensus_validators', return_value=[validator]),
+        mock.patch('src.withdrawals.tasks._fetch_oracle_exiting_validators', return_value=[]),
+        mock.patch('src.withdrawals.tasks.get_pending_partial_withdrawals', return_value=[]),
+        mock.patch('src.withdrawals.tasks.get_redemption_assets', return_value=Wei(0)),
+        mock.patch('src.withdrawals.tasks.get_queued_assets', return_value=exit_queue),
+        mock.patch('src.withdrawals.tasks.get_withdrawals_count', return_value=0),
+        mock.patch('src.withdrawals.tasks.apply_pending_deposits', return_value=([validator], [])),
+        mock.patch('src.withdrawals.tasks.get_withdrawal_request_fee', return_value=Wei(0)),
+        mock.patch(
+            'src.withdrawals.tasks.submit_withdraw_validators', return_value=HexStr('0xabc')
+        ) as mocked_submit,
+        mock.patch(
+            'src.withdrawals.tasks.execution_client', new=mock.AsyncMock()
+        ) as mocked_execution_client,
+    ):
         mocked_execution_client.eth.get_transaction.return_value = {'blockNumber': 123}
         subtask = ValidatorWithdrawalSubtask(relayer=None)
         await subtask.process()

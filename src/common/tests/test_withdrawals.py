@@ -18,30 +18,41 @@ def test_fake_exponential_known_values():
 @pytest.mark.usefixtures('fake_settings')
 class TestGetWithdrawalRequestFee:
     async def test_zero_excess_returns_min_execution_request_fee(self):
-        with mock.patch(
-            'src.common.withdrawals.get_execution_withdrawals_count',
-            mock.AsyncMock(return_value=0),
-        ), mock.patch('src.common.withdrawals.execution_client', _execution_client_with_excess(0)):
+        with (
+            mock.patch(
+                'src.common.withdrawals.get_execution_withdrawals_count',
+                mock.AsyncMock(return_value=0),
+            ),
+            mock.patch('src.common.withdrawals.execution_client', _execution_client_with_excess(0)),
+        ):
             fee = await get_withdrawal_request_fee(count=0, gap_count=0)
 
         assert fee == Wei(1)
 
     async def test_known_excess_matches_fake_exponential_formula(self):
         # excess = previous_excess(15) + count(2) - target(2) = 15; fake_exponential(1, 15, 17) == 2
-        with mock.patch(
-            'src.common.withdrawals.get_execution_withdrawals_count',
-            mock.AsyncMock(return_value=0),
-        ), mock.patch('src.common.withdrawals.execution_client', _execution_client_with_excess(15)):
+        with (
+            mock.patch(
+                'src.common.withdrawals.get_execution_withdrawals_count',
+                mock.AsyncMock(return_value=0),
+            ),
+            mock.patch(
+                'src.common.withdrawals.execution_client', _execution_client_with_excess(15)
+            ),
+        ):
             fee = await get_withdrawal_request_fee(count=2, gap_count=0)
 
         assert fee == Wei(2)
 
     async def test_higher_count_yields_a_higher_or_equal_fee(self):
-        with mock.patch(
-            'src.common.withdrawals.get_execution_withdrawals_count',
-            mock.AsyncMock(return_value=0),
-        ), mock.patch(
-            'src.common.withdrawals.execution_client', _execution_client_with_excess(100)
+        with (
+            mock.patch(
+                'src.common.withdrawals.get_execution_withdrawals_count',
+                mock.AsyncMock(return_value=0),
+            ),
+            mock.patch(
+                'src.common.withdrawals.execution_client', _execution_client_with_excess(100)
+            ),
         ):
             low_count_fee = await get_withdrawal_request_fee(count=1)
             high_count_fee = await get_withdrawal_request_fee(count=5)
@@ -57,10 +68,13 @@ class TestGetWithdrawalsCount:
             get_pending_partial_withdrawals=mock.AsyncMock(return_value=[{}, {}, {}])
         )
 
-        with mock.patch(
-            'src.common.withdrawals.get_execution_withdrawals_count',
-            mock.AsyncMock(return_value=7),
-        ), mock.patch('src.common.withdrawals.consensus_client', consensus_client_mock):
+        with (
+            mock.patch(
+                'src.common.withdrawals.get_execution_withdrawals_count',
+                mock.AsyncMock(return_value=7),
+            ),
+            mock.patch('src.common.withdrawals.consensus_client', consensus_client_mock),
+        ):
             result = await get_withdrawals_count(chain_head)
 
         assert result == 10

@@ -79,14 +79,13 @@ class TestClaimRewardSplittersForVault:
     async def test_skips_submitting_when_no_splitters(self):
         # No fee splitters for the vault: the routine must return before fetching exit
         # requests or building/submitting any transactions.
-        with mock.patch(
-            'src.reward_splitter.tasks.graph_get_reward_splitters', return_value=[]
-        ), mock.patch(
-            'src.reward_splitter.tasks.graph_get_claimable_exit_requests'
-        ) as exit_requests_mock, mock.patch(
-            'src.reward_splitter.tasks.transact_checked'
-        ) as transact_checked_mock, mock.patch(
-            'src.reward_splitter.tasks.wallet', new=mock.MagicMock()
+        with (
+            mock.patch('src.reward_splitter.tasks.graph_get_reward_splitters', return_value=[]),
+            mock.patch(
+                'src.reward_splitter.tasks.graph_get_claimable_exit_requests'
+            ) as exit_requests_mock,
+            mock.patch('src.reward_splitter.tasks.transact_checked') as transact_checked_mock,
+            mock.patch('src.reward_splitter.tasks.wallet', new=mock.MagicMock()),
         ):
             await claim_reward_splitters_for_vault(
                 vault=ZERO_CHECKSUM_ADDRESS,
@@ -103,18 +102,18 @@ class TestClaimRewardSplittersForVault:
             shareholders_earned_assets=[Wei(Web3.to_wei('1', 'ether'))]
         )
 
-        with mock.patch(
-            'src.reward_splitter.tasks.graph_get_reward_splitters',
-            return_value=[reward_splitter],
-        ), mock.patch(
-            'src.reward_splitter.tasks.graph_get_claimable_exit_requests',
-            return_value={},
-        ), mock.patch(
-            'src.reward_splitter.tasks.transact_checked'
-        ) as transact_checked_mock, mock.patch(
-            'src.reward_splitter.tasks.RewardSplitterContract', new=mock.MagicMock()
-        ), mock.patch(
-            'src.reward_splitter.tasks.wallet', new=mock.MagicMock()
+        with (
+            mock.patch(
+                'src.reward_splitter.tasks.graph_get_reward_splitters',
+                return_value=[reward_splitter],
+            ),
+            mock.patch(
+                'src.reward_splitter.tasks.graph_get_claimable_exit_requests',
+                return_value={},
+            ),
+            mock.patch('src.reward_splitter.tasks.transact_checked') as transact_checked_mock,
+            mock.patch('src.reward_splitter.tasks.RewardSplitterContract', new=mock.MagicMock()),
+            mock.patch('src.reward_splitter.tasks.wallet', new=mock.MagicMock()),
         ):
             transact_checked_mock.return_value = {
                 'status': 1,
@@ -179,21 +178,23 @@ class TestClaimRewardSplitters:
             app_state = mock.MagicMock()
             app_state.reward_splitter_block = None
             block = {'number': 100}
-            with mock.patch(
-                'src.reward_splitter.tasks.execution_client'
-            ) as execution_client_mock, mock.patch(
-                'src.reward_splitter.tasks.AppState', return_value=app_state
-            ), mock.patch(
-                'src.reward_splitter.tasks._check_reward_splitter_block',
-                return_value=interval_passed,
-            ), mock.patch(
-                'src.reward_splitter.tasks.check_gas_price',
-                return_value=check_gas_price,
-            ), mock.patch(
-                'src.reward_splitter.tasks.claim_reward_splitters_for_vault',
-                return_value=per_vault_result,
-                side_effect=side_effect,
-            ) as claim_mock:
+            with (
+                mock.patch('src.reward_splitter.tasks.execution_client') as execution_client_mock,
+                mock.patch('src.reward_splitter.tasks.AppState', return_value=app_state),
+                mock.patch(
+                    'src.reward_splitter.tasks._check_reward_splitter_block',
+                    return_value=interval_passed,
+                ),
+                mock.patch(
+                    'src.reward_splitter.tasks.check_gas_price',
+                    return_value=check_gas_price,
+                ),
+                mock.patch(
+                    'src.reward_splitter.tasks.claim_reward_splitters_for_vault',
+                    return_value=per_vault_result,
+                    side_effect=side_effect,
+                ) as claim_mock,
+            ):
                 execution_client_mock.eth.get_block = mock.AsyncMock(return_value=block)
                 yield app_state, claim_mock
 

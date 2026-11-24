@@ -121,11 +121,12 @@ class TestUpdateProcessedSharesCache:
         cache.checkpoint_block = BlockNumber(90)
         cache.data = {'0xabc': Wei(123)}
 
-        with patch(
-            f'{MODULE}.os_token_redeemer_contract.nonce', new=AsyncMock(return_value=5)
-        ), patch(
-            f'{MODULE}.os_token_redeemer_contract.get_os_token_positions_redeemed_events',
-            new=AsyncMock(return_value=[]),
+        with (
+            patch(f'{MODULE}.os_token_redeemer_contract.nonce', new=AsyncMock(return_value=5)),
+            patch(
+                f'{MODULE}.os_token_redeemer_contract.get_os_token_positions_redeemed_events',
+                new=AsyncMock(return_value=[]),
+            ),
         ):
             await update_processed_shares_cache(BlockNumber(100))
 
@@ -143,17 +144,20 @@ class TestUpdateProcessedSharesCache:
         async def _iter_shares(*args, **kwargs):
             yield processed
 
-        with patch(
-            f'{MODULE}.os_token_redeemer_contract.nonce', new=AsyncMock(return_value=5)
-        ), patch(
-            f'{MODULE}.os_token_redeemer_contract.get_os_token_positions_redeemed_events',
-            new=AsyncMock(return_value=[object()]),
-        ), patch(
-            f'{MODULE}.fetch_positions_from_ipfs',
-            new=AsyncMock(return_value=[pos]),
-        ), patch(
-            f'{MODULE}.iter_processed_shares',
-            new=lambda *a, **kw: _iter_shares(),
+        with (
+            patch(f'{MODULE}.os_token_redeemer_contract.nonce', new=AsyncMock(return_value=5)),
+            patch(
+                f'{MODULE}.os_token_redeemer_contract.get_os_token_positions_redeemed_events',
+                new=AsyncMock(return_value=[object()]),
+            ),
+            patch(
+                f'{MODULE}.fetch_positions_from_ipfs',
+                new=AsyncMock(return_value=[pos]),
+            ),
+            patch(
+                f'{MODULE}.iter_processed_shares',
+                new=lambda *a, **kw: _iter_shares(),
+            ),
         ):
             await update_processed_shares_cache(BlockNumber(100))
 
@@ -218,11 +222,12 @@ class TestUpdatePositionsCache:
 
         new_positions = [make_position(leaf_shares=999)]
 
-        with patch(
-            f'{MODULE}.os_token_redeemer_contract.nonce', new=AsyncMock(return_value=NONCE)
-        ), patch(
-            f'{MODULE}.fetch_positions_from_ipfs',
-            new=AsyncMock(return_value=new_positions),
+        with (
+            patch(f'{MODULE}.os_token_redeemer_contract.nonce', new=AsyncMock(return_value=NONCE)),
+            patch(
+                f'{MODULE}.fetch_positions_from_ipfs',
+                new=AsyncMock(return_value=new_positions),
+            ),
         ):
             await update_positions_cache(BlockNumber(100))
 
@@ -257,10 +262,13 @@ class TestFetchPositionsFromIpfs:
         cache.data = [make_position()]
 
         mock_ipfs = AsyncMock(return_value=[make_position(leaf_shares=777).as_dict()])
-        with patch(
-            f'{MODULE}.os_token_redeemer_contract.redeemable_positions',
-            new=AsyncMock(return_value=create_redeemable_positions()),
-        ), patch(f'{MODULE}.ipfs_fetch_client.fetch_json', new=mock_ipfs):
+        with (
+            patch(
+                f'{MODULE}.os_token_redeemer_contract.redeemable_positions',
+                new=AsyncMock(return_value=create_redeemable_positions()),
+            ),
+            patch(f'{MODULE}.ipfs_fetch_client.fetch_json', new=mock_ipfs),
+        ):
             result = await fetch_positions_from_ipfs(block_number=BLOCK)
 
         mock_ipfs.assert_called_once()
@@ -270,12 +278,15 @@ class TestFetchPositionsFromIpfs:
         positions = [make_position(leaf_shares=i * 100, processed_shares=0) for i in range(1, 4)]
         redeemable = create_redeemable_positions()
 
-        with patch(
-            f'{MODULE}.os_token_redeemer_contract.redeemable_positions',
-            new=AsyncMock(return_value=redeemable),
-        ), patch(
-            f'{MODULE}.ipfs_fetch_client.fetch_json',
-            new=AsyncMock(return_value=[p.as_dict() for p in positions]),
+        with (
+            patch(
+                f'{MODULE}.os_token_redeemer_contract.redeemable_positions',
+                new=AsyncMock(return_value=redeemable),
+            ),
+            patch(
+                f'{MODULE}.ipfs_fetch_client.fetch_json',
+                new=AsyncMock(return_value=[p.as_dict() for p in positions]),
+            ),
         ):
             result = await fetch_positions_from_ipfs(block_number=BLOCK)
 
@@ -311,12 +322,15 @@ class TestFetchPositionsFromIpfsCached:
 
     async def test_cache_invalid_fetches_from_ipfs(self):
         pos = make_position(leaf_shares=888)
-        with patch(
-            f'{MODULE}.os_token_redeemer_contract.redeemable_positions',
-            new=AsyncMock(return_value=create_redeemable_positions()),
-        ), patch(
-            f'{MODULE}.ipfs_fetch_client.fetch_json',
-            new=AsyncMock(return_value=[pos.as_dict()]),
+        with (
+            patch(
+                f'{MODULE}.os_token_redeemer_contract.redeemable_positions',
+                new=AsyncMock(return_value=create_redeemable_positions()),
+            ),
+            patch(
+                f'{MODULE}.ipfs_fetch_client.fetch_json',
+                new=AsyncMock(return_value=[pos.as_dict()]),
+            ),
         ):
             result = await cached_fetch_positions_from_ipfs(nonce=NONCE, block_number=BLOCK)
 
@@ -382,11 +396,14 @@ class TestIterLiveShares:
 
     async def test_single_batch(self):
         positions = [make_position() for _ in range(3)]
-        with mock.patch.object(
-            multicall_contract,
-            'aggregate',
-            new=self._mock_aggregate([50, 200, 0]),
-        ), mock.patch.object(VaultContract, 'encode_abi', return_value=HexStr('0xabc')):
+        with (
+            mock.patch.object(
+                multicall_contract,
+                'aggregate',
+                new=self._mock_aggregate([50, 200, 0]),
+            ),
+            mock.patch.object(VaultContract, 'encode_abi', return_value=HexStr('0xabc')),
+        ):
             results = [v async for v in iter_live_shares(positions, block_number=BlockNumber(10))]
         assert results == [Wei(50), Wei(200), Wei(0)]
 
@@ -400,9 +417,10 @@ class TestIterLiveShares:
         batch2_values = [0] * 5
 
         aggregate_mock = self._mock_aggregate(batch1_values, batch2_values)
-        with mock.patch.object(
-            multicall_contract, 'aggregate', new=aggregate_mock
-        ), mock.patch.object(VaultContract, 'encode_abi', return_value=HexStr('0xabc')):
+        with (
+            mock.patch.object(multicall_contract, 'aggregate', new=aggregate_mock),
+            mock.patch.object(VaultContract, 'encode_abi', return_value=HexStr('0xabc')),
+        ):
             results = [v async for v in iter_live_shares(positions, block_number=BlockNumber(10))]
 
         assert len(results) == OS_TOKEN_REDEEMER_CHUNK_SIZE + 5
@@ -418,8 +436,9 @@ class TestIterLiveShares:
             captured_calls.extend(calls)
             return BlockNumber(10), [(0).to_bytes(32, 'big') for _ in calls]
 
-        with mock.patch.object(multicall_contract, 'aggregate', new=_aggregate), mock.patch.object(
-            VaultContract, 'encode_abi', return_value=HexStr('0xabc')
+        with (
+            mock.patch.object(multicall_contract, 'aggregate', new=_aggregate),
+            mock.patch.object(VaultContract, 'encode_abi', return_value=HexStr('0xabc')),
         ):
             [v async for v in iter_live_shares(positions, block_number=BlockNumber(10))]
 
@@ -464,9 +483,10 @@ class TestCachedIterProcessedShares:
         async def _fake_iter(*_):
             yield Wei(999)
 
-        with mock.patch.object(
-            cache, 'is_valid_on', mock.AsyncMock(return_value=False)
-        ), mock.patch(f'{MODULE}.iter_processed_shares', new=_fake_iter):
+        with (
+            mock.patch.object(cache, 'is_valid_on', mock.AsyncMock(return_value=False)),
+            mock.patch(f'{MODULE}.iter_processed_shares', new=_fake_iter),
+        ):
             results = [
                 v async for v in cached_iter_processed_shares(positions, nonce, block_number)
             ]

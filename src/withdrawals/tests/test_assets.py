@@ -205,14 +205,14 @@ def _patch(
     vault_contract_mock = mock.MagicMock()
     vault_contract_mock.return_value.get_queued_exit_assets = queued_exit_assets_mock
 
-    with mock.patch(
-        'src.withdrawals.assets.get_harvest_params', get_harvest_params_mock
-    ), mock.patch.multiple(
-        'src.withdrawals.assets.validators_checker_contract',
-        get_exit_queue_cumulative_tickets=cumulative_tickets_mock,
-        get_exit_queue_missing_assets=missing_assets_mock,
-    ), mock.patch(
-        'src.withdrawals.assets.VaultContract', vault_contract_mock
+    with (
+        mock.patch('src.withdrawals.assets.get_harvest_params', get_harvest_params_mock),
+        mock.patch.multiple(
+            'src.withdrawals.assets.validators_checker_contract',
+            get_exit_queue_cumulative_tickets=cumulative_tickets_mock,
+            get_exit_queue_missing_assets=missing_assets_mock,
+        ),
+        mock.patch('src.withdrawals.assets.VaultContract', vault_contract_mock),
     ):
         yield {
             'harvest_params': get_harvest_params_mock,

@@ -83,7 +83,7 @@ repos:
         entry: poetry
         language: system
         files: no-files
-        args: ["lock", "--check"]
+        args: ["check", "--lock"]
         always_run: true
 
   - repo: https://github.com/jendrikseipp/vulture

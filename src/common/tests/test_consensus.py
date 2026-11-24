@@ -21,8 +21,9 @@ class TestWaitExecutionCatchUpLatestHead:
     async def test_waits_until_execution_imports_the_block(self):
         execution_client = _execution_client_with_block_numbers(99, 99, 100)
 
-        with mock.patch('src.common.consensus.execution_client', execution_client), mock.patch(
-            'src.common.consensus.EXECUTION_HEAD_SYNC_POLL_INTERVAL', 0
+        with (
+            mock.patch('src.common.consensus.execution_client', execution_client),
+            mock.patch('src.common.consensus.EXECUTION_HEAD_SYNC_POLL_INTERVAL', 0),
         ):
             await wait_execution_catch_up_latest_head(BlockNumber(100))
 
@@ -34,9 +35,11 @@ class TestWaitExecutionCatchUpLatestHead:
         # first call sets the deadline, every later call is past it
         monotonic = itertools.chain([0], itertools.repeat(1000))
 
-        with mock.patch('src.common.consensus.execution_client', execution_client), mock.patch(
-            'src.common.consensus.EXECUTION_HEAD_SYNC_POLL_INTERVAL', 0
-        ), mock.patch('src.common.consensus.time.monotonic', side_effect=monotonic):
+        with (
+            mock.patch('src.common.consensus.execution_client', execution_client),
+            mock.patch('src.common.consensus.EXECUTION_HEAD_SYNC_POLL_INTERVAL', 0),
+            mock.patch('src.common.consensus.time.monotonic', side_effect=monotonic),
+        ):
             with pytest.raises(ExecutionBehindConsensusError) as error:
                 await wait_execution_catch_up_latest_head(BlockNumber(100))
 

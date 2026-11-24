@@ -144,10 +144,10 @@ class TestTransactionManager:
         transact = mock.AsyncMock(
             side_effect=[fee_too_low, fee_too_low, fee_too_low, HexBytes('0x02')]
         )
-        with _patch(
-            latest_nonce=5, pending_nonce=5, gas_manager=_gas_manager(GWEI, GWEI // 2)
-        ), mock.patch('src.common.transaction.ATTEMPTS_WITH_DEFAULT_GAS', 3), mock.patch(
-            'src.common.transaction.asyncio.sleep', mock.AsyncMock()
+        with (
+            _patch(latest_nonce=5, pending_nonce=5, gas_manager=_gas_manager(GWEI, GWEI // 2)),
+            mock.patch('src.common.transaction.ATTEMPTS_WITH_DEFAULT_GAS', 3),
+            mock.patch('src.common.transaction.asyncio.sleep', mock.AsyncMock()),
         ):
             manager = TransactionManager()
             receipt = await manager.transact(_tx_function(transact))
@@ -412,9 +412,11 @@ def _patch(
         )
     wallet = mock.Mock()
     wallet.address = '0x' + '11' * 20
-    with mock.patch('src.common.transaction.execution_client', execution_client), mock.patch(
-        'src.common.transaction.wallet', wallet
-    ), mock.patch('src.common.transaction.build_gas_manager', return_value=gas_manager):
+    with (
+        mock.patch('src.common.transaction.execution_client', execution_client),
+        mock.patch('src.common.transaction.wallet', wallet),
+        mock.patch('src.common.transaction.build_gas_manager', return_value=gas_manager),
+    ):
         yield
 
 
