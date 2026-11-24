@@ -21,8 +21,10 @@ RELAYER_RESPONSE = {'validators': [], 'validators_manager_signature': '0x'}
 
 @pytest.fixture
 def relayer_mock(fake_settings: None) -> Iterator[aioresponses]:
-    with aioresponses() as m, patch_settings('relayer_endpoint', RELAYER_ENDPOINT), patch_settings(
-        'relayer_jwt_secret', None
+    with (
+        aioresponses() as m,
+        patch_settings('relayer_endpoint', RELAYER_ENDPOINT),
+        patch_settings('relayer_jwt_secret', None),
     ):
         for endpoint in ('register', 'fund', 'withdraw', 'consolidate'):
             m.post(f'{RELAYER_ENDPOINT}/{endpoint}', payload=RELAYER_RESPONSE, repeat=True)
@@ -67,9 +69,12 @@ async def test_new_token_per_request(relayer_mock: aioresponses) -> None:
 async def test_unauthorized_logged(caplog: pytest.LogCaptureFixture, fake_settings: None) -> None:
     public_key = faker.validator_public_key()
 
-    with aioresponses() as m, patch_settings('relayer_endpoint', RELAYER_ENDPOINT), caplog.at_level(
-        logging.ERROR, logger='src.validators.relayer'
-    ), pytest.raises(ClientResponseError):
+    with (
+        aioresponses() as m,
+        patch_settings('relayer_endpoint', RELAYER_ENDPOINT),
+        caplog.at_level(logging.ERROR, logger='src.validators.relayer'),
+        pytest.raises(ClientResponseError),
+    ):
         m.post(f'{RELAYER_ENDPOINT}/fund', status=401)
         await RelayerClient().fund_validators([(public_key, Gwei(1_000_000_000))])
 

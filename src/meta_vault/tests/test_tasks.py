@@ -107,24 +107,30 @@ class TestMetaVaultTreeUpdateStateCalls:
 
     @contextmanager
     def patch(self, graph_mock: 'GraphMock'):
-        with mock.patch(
-            'src.meta_vault.tasks.graph_get_vaults',
-            graph_mock.graph_get_vaults,
-        ), mock.patch(
-            'src.meta_vault.tasks.wait_for_graph_node_sync',
-            return_value=True,
-        ), mock.patch(
-            'src.meta_vault.tasks.get_claimable_sub_vault_exit_requests', return_value=[]
-        ), mock.patch.object(
-            multicall_contract,
-            'tx_aggregate',
-            return_value={
-                'status': 1,
-                'transactionHash': HexBytes(b'\x12' * 32),
-                'blockNumber': 123,
-            },
-        ) as tx_aggregate_mock, mock.patch.object(
-            MetaVaultContract, 'sub_vaults_registry', return_value=faker.eth_address()
+        with (
+            mock.patch(
+                'src.meta_vault.tasks.graph_get_vaults',
+                graph_mock.graph_get_vaults,
+            ),
+            mock.patch(
+                'src.meta_vault.tasks.wait_for_graph_node_sync',
+                return_value=True,
+            ),
+            mock.patch(
+                'src.meta_vault.tasks.get_claimable_sub_vault_exit_requests', return_value=[]
+            ),
+            mock.patch.object(
+                multicall_contract,
+                'tx_aggregate',
+                return_value={
+                    'status': 1,
+                    'transactionHash': HexBytes(b'\x12' * 32),
+                    'blockNumber': 123,
+                },
+            ) as tx_aggregate_mock,
+            mock.patch.object(
+                MetaVaultContract, 'sub_vaults_registry', return_value=faker.eth_address()
+            ),
         ):
             yield tx_aggregate_mock
 
@@ -148,9 +154,11 @@ class TestProcessMetaVaultFeeSplitterClaim:
 
     @contextmanager
     def _patch(self):
-        with mock.patch('src.meta_vault.tasks.check_gas_price', return_value=True), mock.patch(
-            'src.meta_vault.tasks.graph_get_vaults', return_value={}
-        ), mock.patch('src.meta_vault.tasks.claim_reward_splitters') as claim_mock:
+        with (
+            mock.patch('src.meta_vault.tasks.check_gas_price', return_value=True),
+            mock.patch('src.meta_vault.tasks.graph_get_vaults', return_value={}),
+            mock.patch('src.meta_vault.tasks.claim_reward_splitters') as claim_mock,
+        ):
             yield claim_mock
 
 
@@ -172,13 +180,13 @@ class TestProcessMetaVaultTreeClaimDelay:
         )
 
         # Act
-        with mock.patch(
-            'src.meta_vault.tasks.meta_vault_tree_update_state',
-            side_effect=ClaimDelayNotPassedException(exit_request),
-        ), mock.patch(
-            'src.meta_vault.tasks.process_deposit_to_sub_vaults'
-        ) as deposit_mock, caplog.at_level(
-            logging.WARNING, logger='src.meta_vault.tasks'
+        with (
+            mock.patch(
+                'src.meta_vault.tasks.meta_vault_tree_update_state',
+                side_effect=ClaimDelayNotPassedException(exit_request),
+            ),
+            mock.patch('src.meta_vault.tasks.process_deposit_to_sub_vaults') as deposit_mock,
+            caplog.at_level(logging.WARNING, logger='src.meta_vault.tasks'),
         ):
             await process_meta_vault_tree(
                 root_meta_vault=meta_vault,

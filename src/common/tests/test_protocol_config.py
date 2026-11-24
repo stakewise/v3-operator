@@ -16,11 +16,14 @@ from src.config.settings import settings
 class TestGetConfigIpfsHashSinceCheckpoint:
     async def test_returns_recent_event_hash(self):
         """An event after the checkpoint is used instead of the shipped hash."""
-        with patch(
-            'src.common.protocol_config.keeper_contract.get_config_updated_event',
-            new_callable=AsyncMock,
-            return_value=_config_event('hash1'),
-        ) as mock_event, _mock_checkpoints():
+        with (
+            patch(
+                'src.common.protocol_config.keeper_contract.get_config_updated_event',
+                new_callable=AsyncMock,
+                return_value=_config_event('hash1'),
+            ) as mock_event,
+            _mock_checkpoints(),
+        ):
             result = await _get_config_ipfs_hash_since_checkpoint(to_block=BlockNumber(100000))
 
         assert result == 'hash1'
@@ -30,11 +33,14 @@ class TestGetConfigIpfsHashSinceCheckpoint:
 
     async def test_falls_back_to_last_event_hash(self):
         """With no event since the checkpoint, the shipped hash is used without reading old logs."""
-        with patch(
-            'src.common.protocol_config.keeper_contract.get_config_updated_event',
-            new_callable=AsyncMock,
-            return_value=None,
-        ) as mock_event, _mock_checkpoints():
+        with (
+            patch(
+                'src.common.protocol_config.keeper_contract.get_config_updated_event',
+                new_callable=AsyncMock,
+                return_value=None,
+            ) as mock_event,
+            _mock_checkpoints(),
+        ):
             result = await _get_config_ipfs_hash_since_checkpoint(to_block=BlockNumber(100000))
 
         assert result == 'last'
@@ -44,10 +50,13 @@ class TestGetConfigIpfsHashSinceCheckpoint:
 
     async def test_node_behind_checkpoint_skips_scan(self):
         """Node lagging behind the checkpoint uses the shipped hash without any log query."""
-        with patch(
-            'src.common.protocol_config.keeper_contract.get_config_updated_event',
-            new_callable=AsyncMock,
-        ) as mock_event, _mock_checkpoints():
+        with (
+            patch(
+                'src.common.protocol_config.keeper_contract.get_config_updated_event',
+                new_callable=AsyncMock,
+            ) as mock_event,
+            _mock_checkpoints(),
+        ):
             result = await _get_config_ipfs_hash_since_checkpoint(to_block=BlockNumber(85000))
 
         assert result == 'last'
@@ -61,15 +70,20 @@ class TestUpdateOraclesCache:
         AppState().oracles_cache = None
 
     async def test_cold_cache_fetches_and_populates(self):
-        with _mock_block_number(BlockNumber(100)), patch(
-            'src.common.protocol_config._get_config_ipfs_hash_since_checkpoint',
-            new_callable=AsyncMock,
-            return_value='hash1',
-        ) as mock_hash, patch(
-            'src.common.protocol_config.ipfs_fetch_client.fetch_json',
-            new_callable=AsyncMock,
-            return_value={'k': 'v1'},
-        ) as mock_fetch, self._mock_thresholds():
+        with (
+            _mock_block_number(BlockNumber(100)),
+            patch(
+                'src.common.protocol_config._get_config_ipfs_hash_since_checkpoint',
+                new_callable=AsyncMock,
+                return_value='hash1',
+            ) as mock_hash,
+            patch(
+                'src.common.protocol_config.ipfs_fetch_client.fetch_json',
+                new_callable=AsyncMock,
+                return_value={'k': 'v1'},
+            ) as mock_fetch,
+            self._mock_thresholds(),
+        ):
             await update_oracles_cache()
 
         # Cold path: delegates to the checkpoint-aware lookup.
@@ -90,13 +104,18 @@ class TestUpdateOraclesCache:
             rewards_threshold=3,
         )
 
-        with _mock_block_number(BlockNumber(105)), patch(
-            'src.common.protocol_config.keeper_contract.get_config_updated_event',
-            new_callable=AsyncMock,
-            return_value=None,
-        ) as mock_event, patch(
-            'src.common.protocol_config.ipfs_fetch_client.fetch_json', new_callable=AsyncMock
-        ) as mock_fetch, self._mock_thresholds():
+        with (
+            _mock_block_number(BlockNumber(105)),
+            patch(
+                'src.common.protocol_config.keeper_contract.get_config_updated_event',
+                new_callable=AsyncMock,
+                return_value=None,
+            ) as mock_event,
+            patch(
+                'src.common.protocol_config.ipfs_fetch_client.fetch_json', new_callable=AsyncMock
+            ) as mock_fetch,
+            self._mock_thresholds(),
+        ):
             await update_oracles_cache()
 
         # Warm path: incremental scan only, no IPFS fetch when nothing changed.
@@ -115,15 +134,20 @@ class TestUpdateOraclesCache:
             rewards_threshold=3,
         )
 
-        with _mock_block_number(BlockNumber(110)), patch(
-            'src.common.protocol_config.keeper_contract.get_config_updated_event',
-            new_callable=AsyncMock,
-            return_value=_config_event('hash2'),
-        ) as mock_event, patch(
-            'src.common.protocol_config.ipfs_fetch_client.fetch_json',
-            new_callable=AsyncMock,
-            return_value={'k': 'new'},
-        ) as mock_fetch, self._mock_thresholds():
+        with (
+            _mock_block_number(BlockNumber(110)),
+            patch(
+                'src.common.protocol_config.keeper_contract.get_config_updated_event',
+                new_callable=AsyncMock,
+                return_value=_config_event('hash2'),
+            ) as mock_event,
+            patch(
+                'src.common.protocol_config.ipfs_fetch_client.fetch_json',
+                new_callable=AsyncMock,
+                return_value={'k': 'new'},
+            ) as mock_fetch,
+            self._mock_thresholds(),
+        ):
             await update_oracles_cache()
 
         mock_event.assert_awaited_once_with(from_block=BlockNumber(101), to_block=BlockNumber(110))
@@ -141,12 +165,17 @@ class TestUpdateOraclesCache:
             rewards_threshold=3,
         )
 
-        with _mock_block_number(BlockNumber(100)), patch(
-            'src.common.protocol_config.keeper_contract.get_config_updated_event',
-            new_callable=AsyncMock,
-        ) as mock_event, patch(
-            'src.common.protocol_config.ipfs_fetch_client.fetch_json', new_callable=AsyncMock
-        ) as mock_fetch, self._mock_thresholds():
+        with (
+            _mock_block_number(BlockNumber(100)),
+            patch(
+                'src.common.protocol_config.keeper_contract.get_config_updated_event',
+                new_callable=AsyncMock,
+            ) as mock_event,
+            patch(
+                'src.common.protocol_config.ipfs_fetch_client.fetch_json', new_callable=AsyncMock
+            ) as mock_fetch,
+            self._mock_thresholds(),
+        ):
             await update_oracles_cache()
 
         mock_event.assert_not_awaited()

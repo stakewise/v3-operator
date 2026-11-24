@@ -1,9 +1,14 @@
-[tool.poetry]
+[project]
 name = "v3-operator"
-version = "v5.1.2"
+version = "5.1.2"
 description = "StakeWise operator service for managing vault validators and other vault maintenance tasks"
-authors = ["StakeWise Labs <info@stakewise.io>"]
+authors = [{ name = "StakeWise Labs", email = "info@stakewise.io" }]
+requires-python = ">=3.12,<3.13"
+dynamic = ["dependencies"]
+
+[tool.poetry]
 package-mode = false
+requires-poetry = ">=2.4"
 
 [tool.poetry.dependencies]
 python = ">=3.12,<3.13"

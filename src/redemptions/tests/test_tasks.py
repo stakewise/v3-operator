@@ -398,21 +398,29 @@ class TestAggregateRedemptionAssetsByVaults:
             # aggregation behaves exactly as if every owner still holds the full position.
             live_shares = [int(item['leaf_shares']) for item in redeemable_positions_ipfs_data]
 
-        with mock.patch.object(
-            os_token_redeemer_contract, 'redeemable_positions', return_value=redeemable_positions
-        ), mock.patch.object(
-            os_token_redeemer_contract, 'nonce', return_value=0
-        ), mock.patch.object(
-            os_token_vault_controller_contract, 'total_assets', return_value=total_assets
-        ), mock.patch.object(
-            os_token_vault_controller_contract, 'total_shares', return_value=total_shares
-        ), mock.patch.object(
-            ipfs_fetch_client, 'fetch_json', return_value=redeemable_positions_ipfs_data
-        ), mock.patch(
-            'src.redemptions.fetch_positions.iter_processed_shares',
-            new=make_async_gen(processed_shares),
-        ), mock.patch(
-            'src.redemptions.tasks.iter_live_shares',
-            new=make_async_gen(live_shares),
+        with (
+            mock.patch.object(
+                os_token_redeemer_contract,
+                'redeemable_positions',
+                return_value=redeemable_positions,
+            ),
+            mock.patch.object(os_token_redeemer_contract, 'nonce', return_value=0),
+            mock.patch.object(
+                os_token_vault_controller_contract, 'total_assets', return_value=total_assets
+            ),
+            mock.patch.object(
+                os_token_vault_controller_contract, 'total_shares', return_value=total_shares
+            ),
+            mock.patch.object(
+                ipfs_fetch_client, 'fetch_json', return_value=redeemable_positions_ipfs_data
+            ),
+            mock.patch(
+                'src.redemptions.fetch_positions.iter_processed_shares',
+                new=make_async_gen(processed_shares),
+            ),
+            mock.patch(
+                'src.redemptions.tasks.iter_live_shares',
+                new=make_async_gen(live_shares),
+            ),
         ):
             yield

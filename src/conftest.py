@@ -235,9 +235,11 @@ def fake_settings(
 
 @pytest.fixture
 async def setup_test_clients():
-    with mock.patch.object(SWGraphClient, 'setup'), mock.patch.object(
-        SWGraphClient, 'disconnect'
-    ), mock.patch('asyncio.sleep'):
+    with (
+        mock.patch.object(SWGraphClient, 'setup'),
+        mock.patch.object(SWGraphClient, 'disconnect'),
+        mock.patch('asyncio.sleep'),
+    ):
         await setup_clients()
         yield
 

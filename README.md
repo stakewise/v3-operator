@@ -124,7 +124,7 @@ src/main.py COMMAND \
 
 Build requirements:
 
-- [Python 3.10+](https://www.python.org/downloads/)
+- [Python 3.12+](https://www.python.org/downloads/)
 - [Poetry](https://python-poetry.org/docs/)
 
 Clone this repo and install dependencies by executing the following command from within the `v3-operator` folder:

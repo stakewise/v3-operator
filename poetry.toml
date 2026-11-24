@@ -1,0 +1,3 @@
+[solver]
+# Ignore package releases newer than 3 days (supply chain attack protection)
+min-release-age = 3
