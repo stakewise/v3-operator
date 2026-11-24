@@ -1,5 +1,4 @@
 import time
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from functools import cached_property
 from multiprocessing import Pool
@@ -27,7 +26,6 @@ from sw_utils.signing import (
 )
 from sw_utils.typings import Bytes32
 from web3 import Web3
-from web3._utils import request
 
 from src.common.utils import chunkify
 from src.config.networks import NETWORKS
@@ -170,10 +168,6 @@ class CredentialManager:
         vault: HexAddress,
         mnemonic: str,
     ) -> list[Credential]:
-        # Hack to run web3 sessions in multiprocessing mode
-        # pylint: disable-next=protected-access
-        request._async_session_pool = ThreadPoolExecutor(max_workers=1)
-
         credentials: list[Credential] = []
         for index in indexes:
             credential = CredentialManager.generate_credential(network, vault, mnemonic, index)

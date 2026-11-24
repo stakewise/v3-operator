@@ -15,28 +15,28 @@ def hashi_vault_url() -> str:
 
 class HashiVaultStub:
     bundled_pk_1 = faker.validator_public_key()
-    bundled_sk_1 = Web3.to_hex(faker.private_key())
+    bundled_sk_1 = Web3.to_hex(faker.bls_private_key())
 
     bundled_pk_2 = faker.validator_public_key()
-    bundled_sk_2 = Web3.to_hex(faker.private_key())
+    bundled_sk_2 = Web3.to_hex(faker.bls_private_key())
 
     bundled_pk_3 = faker.validator_public_key()
-    bundled_sk_3 = Web3.to_hex(faker.private_key())
+    bundled_sk_3 = Web3.to_hex(faker.bls_private_key())
 
     bundled_pk_4 = faker.validator_public_key()
-    bundled_sk_4 = Web3.to_hex(faker.private_key())
+    bundled_sk_4 = Web3.to_hex(faker.bls_private_key())
 
     prefixed_pk_1 = faker.validator_public_key()
-    prefixed_sk_1 = Web3.to_hex(faker.private_key())
+    prefixed_sk_1 = Web3.to_hex(faker.bls_private_key())
 
     prefixed_pk_2 = faker.validator_public_key()
-    prefixed_sk_2 = Web3.to_hex(faker.private_key())
+    prefixed_sk_2 = Web3.to_hex(faker.bls_private_key())
 
     prefixed_pk_3 = faker.validator_public_key()
-    prefixed_sk_3 = Web3.to_hex(faker.private_key())
+    prefixed_sk_3 = Web3.to_hex(faker.bls_private_key())
 
     prefixed_pk_4 = faker.validator_public_key()
-    prefixed_sk_4 = Web3.to_hex(faker.private_key())
+    prefixed_sk_4 = Web3.to_hex(faker.bls_private_key())
 
 
 @pytest.fixture

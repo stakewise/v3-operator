@@ -5,18 +5,15 @@ from eth_typing import ChecksumAddress, HexStr
 from multiproof import MultiProof
 from sw_utils.typings import Bytes32
 from web3 import Web3
-from web3.exceptions import ContractLogicError
 
-from src.common.clients import execution_client
 from src.common.contracts import (
     deposit_data_registry_contract,
     multicall_contract,
     vault_contract,
     vault_v1_contract,
 )
-from src.common.execution import build_gas_manager
+from src.common.transaction import transact_checked
 from src.common.typings import HarvestParams, OraclesApproval
-from src.common.utils import format_error
 from src.config.settings import settings
 from src.harvest.execution import get_update_state_calls
 from src.validators.signing.common import encode_tx_validator_list
@@ -71,39 +68,22 @@ async def register_validators(
 
     calls.append(validators_registration_call)
 
+    # Simulate (estimate_gas) and send transaction with high-priority fees.
     logger.info('Submitting registration transaction')
-    try:
-        await multicall_contract.functions.aggregate(calls).estimate_gas()
-    except (ValueError, ContractLogicError) as e:
-        logger.error(
-            'Failed to register validator(s): %s. '
-            'Most likely registry root has changed during validators registration. Retrying...',
-            format_error(e),
-        )
-        if settings.verbose:
-            logger.exception(e)
-        return None
-
-    try:
-        gas_manager = build_gas_manager()
-        tx_params = await gas_manager.get_high_priority_tx_params()
-        tx = await multicall_contract.functions.aggregate(calls).transact(tx_params)
-    except Exception as e:
-        logger.error('Failed to register validator(s): %s', format_error(e))
-        if settings.verbose:
-            logger.exception(e)
-        return None
-
-    tx_hash = Web3.to_hex(tx)
-    logger.info('Waiting for transaction %s confirmation', tx_hash)
-    tx_receipt = await execution_client.eth.wait_for_transaction_receipt(
-        tx, timeout=settings.execution_transaction_timeout
+    tx_receipt = await transact_checked(
+        multicall_contract.functions.aggregate(calls),
+        contract=multicall_contract,
+        action='register validator(s)',
+        high_priority=True,
+        estimate_gas=True,
+        revert_hint=(
+            ' Most likely registry root has changed during validators registration. Retrying...'
+        ),
     )
-    if not tx_receipt['status']:
-        logger.error('Registration transaction failed')
+    if tx_receipt is None:
         return None
 
-    return tx_hash
+    return Web3.to_hex(tx_receipt['transactionHash'])
 
 
 def _get_single_validator_registration_call(

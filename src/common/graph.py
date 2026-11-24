@@ -1,8 +1,7 @@
 from typing import Any
 
-from gql import Client, gql
+from gql import Client, GraphQLRequest, gql
 from gql.transport.aiohttp import AIOHTTPTransport
-from graphql import DocumentNode
 
 from src.common.decorators import retry_gql_errors
 from src.config.settings import DEFAULT_RETRY_TIME, GRAPH_API_TIMEOUT, settings
@@ -52,6 +51,7 @@ class GraphClient:
         return all_validators
 
     @retry_gql_errors(delay=DEFAULT_RETRY_TIME)
-    async def run_query(self, query: DocumentNode, params: dict | None = None) -> dict:
-        result = await self.gql_client.execute_async(query, variable_values=params)
+    async def run_query(self, query: GraphQLRequest, params: dict | None = None) -> dict:
+        request = GraphQLRequest(query, variable_values=params)
+        result = await self.gql_client.execute_async(request)
         return result
