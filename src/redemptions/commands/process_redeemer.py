@@ -59,12 +59,13 @@ DEFAULT_MIN_QUEUED_ASSETS_GWEI = Web3.from_wei(DEFAULT_MIN_QUEUED_ASSETS, 'gwei'
 #
 # Why:
 # - The osToken rate grows every second.
-# - Shares worth exactly the withdrawable assets at simulation time are worth more
-#   on tx inclusion, so the vault reverts with InvalidReceivedAssets.
+# - Shares worth exactly the withdrawable assets when the redeemable shares are
+#   calculated are worth more on tx inclusion, so the vault reverts with
+#   InvalidReceivedAssets.
 #
 # Why 1 bps:
 # - Covers ~1.5 days of rate growth at 2-3% APR (~9 hours at 10% APR).
-# - Well beyond any delay between the converter snapshot and tx inclusion.
+# - Well beyond the duration of a redemption round.
 # - The residual is redeemed in later rounds.
 WITHDRAWABLE_ASSETS_HAIRCUT_BPS = 1
 
