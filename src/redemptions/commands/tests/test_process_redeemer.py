@@ -10,6 +10,7 @@ from web3 import Web3
 from web3.types import Gwei, Wei
 
 from src.redemptions.commands.process_redeemer import (
+    WITHDRAWABLE_ASSETS_HAIRCUT_BPS,
     _startup_check,
     process,
     redeem_positions,
@@ -63,7 +64,33 @@ class TestRedeemPositions:
             )
 
         assert mocks['submit_mock'].await_count == 1
-        assert _submitted_position(mocks).shares_to_redeem == Wei(100)
+        # Capped by withdrawable minus the haircut (floored)
+        assert _submitted_position(mocks).shares_to_redeem == Wei(99)
+
+    async def test_capped_position_haircut_absorbs_rate_growth(self) -> None:
+        """Capped shares stay redeemable after the osToken rate grows, so the vault
+        does not revert with InvalidReceivedAssets."""
+        position = make_position(leaf_shares=10**21, processed_shares=0, shares_to_redeem=10**21)
+        withdrawable = Wei(26 * 10**18)
+        converter = make_converter(108 * 10**18, 100 * 10**18)
+
+        with _mock_redeem_positions(withdrawable=withdrawable) as mocks:
+            await redeem_positions(
+                tree=make_tree([position]),
+                os_token_positions=[position],
+                converter=converter,
+                block_number=BlockNumber(100),
+            )
+
+        haircut_assets = Wei(withdrawable * (10_000 - WITHDRAWABLE_ASSETS_HAIRCUT_BPS) // 10_000)
+        shares = _submitted_position(mocks).shares_to_redeem
+        assert shares == converter.to_shares(haircut_assets)
+
+        # The rate grew by 63 ppm (~1 day at 2.3% APR) before inclusion:
+        # haircut shares stay within withdrawable assets, uncapped shares do not
+        grown_converter = make_converter(108 * 10**18 + 6804 * 10**12, 100 * 10**18)
+        assert grown_converter.to_assets(shares) <= withdrawable
+        assert grown_converter.to_assets(converter.to_shares(withdrawable)) > withdrawable
 
     async def test_single_position_zero_withdrawable_skipped(self) -> None:
         position = make_position(processed_shares=500)
@@ -100,7 +127,8 @@ class TestRedeemPositions:
         first_position = _submitted_position(mocks, 0)
         second_position = _submitted_position(mocks, 1)
         assert first_position.owner == OWNER_1 and first_position.shares_to_redeem == Wei(500)
-        assert second_position.owner == OWNER_2 and second_position.shares_to_redeem == Wei(200)
+        # Remaining withdrawable after pos1 is 200, minus the haircut (floored)
+        assert second_position.owner == OWNER_2 and second_position.shares_to_redeem == Wei(199)
 
     async def test_pre_capped_shares_to_redeem_submitted_not_unprocessed(self) -> None:
         """assign_shares_to_redeem may cap shares_to_redeem below unprocessed_shares.
@@ -327,6 +355,26 @@ class TestProcess:
         # The merkle tree is built from the fetched nonce; leaves use nonce - 1
         assert redeem_call.kwargs['tree'].leaf_nonce == 4
 
+    async def test_converter_refreshed_after_vault_state_update(self) -> None:
+        """The converter passed to redeem_positions is recreated at the block fetched
+        after update_vaults_state, not reused from the start of the round."""
+        positions = [make_position(leaf_shares=1000, processed_shares=500, shares_to_redeem=500)]
+        initial_converter = make_converter(110, 100)
+        refreshed_converter = make_converter(111, 100)
+
+        with _mock_process(positions=positions) as mocks:
+            mocks['mock_redeemer'].queued_shares = AsyncMock(return_value=Wei(1000))
+            mocks['mock_redeemer'].nonce = AsyncMock(return_value=5)
+            mocks['mock_create_converter'].side_effect = [initial_converter, refreshed_converter]
+
+            await process(min_queued_assets=Gwei(0))
+
+        assert mocks['mock_create_converter'].await_count == 2
+        assert mocks['mock_create_converter'].await_args_list[1].args == (BlockNumber(101),)
+        redeem_kwargs = mocks['mock_redeem'].await_args.kwargs
+        assert redeem_kwargs['converter'] is refreshed_converter
+        assert redeem_kwargs['block_number'] == BlockNumber(101)
+
     async def test_stale_vault_state_skips_redemption(self) -> None:
         """A failed vault state update leaves stale withdrawable assets and LTVs,
         so the redemption pass is skipped until the next interval."""
@@ -458,7 +506,7 @@ def _mock_process(
         patch(
             f'{MODULE}.create_os_token_converter',
             new=AsyncMock(return_value=make_converter()),
-        ),
+        ) as mock_create_converter,
         patch(f'{MODULE}.settings') as mock_settings,
         patch(f'{MODULE}.get_finalized_block_number', new=AsyncMock(return_value=BlockNumber(100))),
         patch(f'{MODULE}.update_positions_cache', new=AsyncMock()),
@@ -494,6 +542,7 @@ def _mock_process(
             'mock_redeemer': mock_redeemer,
             'mock_redeem': mock_redeem,
             'mock_update_state': mock_update_state,
+            'mock_create_converter': mock_create_converter,
         }
 
 
