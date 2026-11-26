@@ -10,6 +10,7 @@ from web3 import Web3
 from web3.types import Gwei, Wei
 
 from src.redemptions.commands.process_redeemer import (
+    MIN_CAPPED_REDEEM_ASSETS,
     WITHDRAWABLE_ASSETS_HAIRCUT_BPS,
     _startup_check,
     process,
@@ -91,6 +92,60 @@ class TestRedeemPositions:
         grown_converter = make_converter(108 * 10**18 + 6804 * 10**12, 100 * 10**18)
         assert grown_converter.to_assets(shares) <= withdrawable
         assert grown_converter.to_assets(converter.to_shares(withdrawable)) > withdrawable
+
+    async def test_capped_position_below_min_assets_skipped(self) -> None:
+        """A capped redemption below MIN_CAPPED_REDEEM_ASSETS is dust left by the haircut."""
+        position = make_position(leaf_shares=10**21, processed_shares=0, shares_to_redeem=10**21)
+        withdrawable = Wei(MIN_CAPPED_REDEEM_ASSETS)
+
+        with _mock_redeem_positions(
+            withdrawable=withdrawable, min_capped_redeem_assets=MIN_CAPPED_REDEEM_ASSETS
+        ) as mocks:
+            await redeem_positions(
+                tree=make_tree([position]),
+                os_token_positions=[position],
+                converter=make_converter(100, 100),
+                block_number=BlockNumber(100),
+            )
+
+        mocks['simulate_mock'].assert_not_called()
+        mocks['submit_mock'].assert_not_called()
+
+    async def test_capped_position_above_min_assets_redeemed(self) -> None:
+        position = make_position(leaf_shares=10**21, processed_shares=0, shares_to_redeem=10**21)
+        withdrawable = Wei(2 * MIN_CAPPED_REDEEM_ASSETS)
+
+        with _mock_redeem_positions(
+            withdrawable=withdrawable, min_capped_redeem_assets=MIN_CAPPED_REDEEM_ASSETS
+        ) as mocks:
+            await redeem_positions(
+                tree=make_tree([position]),
+                os_token_positions=[position],
+                converter=make_converter(100, 100),
+                block_number=BlockNumber(100),
+            )
+
+        assert mocks['submit_mock'].await_count == 1
+        haircut_assets = withdrawable * (10_000 - WITHDRAWABLE_ASSETS_HAIRCUT_BPS) // 10_000
+        assert _submitted_position(mocks).shares_to_redeem == Wei(haircut_assets)
+
+    async def test_uncapped_position_below_min_assets_redeemed_in_full(self) -> None:
+        """The threshold applies only to capped redemptions."""
+        shares = MIN_CAPPED_REDEEM_ASSETS // 10
+        position = make_position(leaf_shares=shares, processed_shares=0, shares_to_redeem=shares)
+
+        with _mock_redeem_positions(
+            withdrawable=Wei(10**18), min_capped_redeem_assets=MIN_CAPPED_REDEEM_ASSETS
+        ) as mocks:
+            await redeem_positions(
+                tree=make_tree([position]),
+                os_token_positions=[position],
+                converter=make_converter(100, 100),
+                block_number=BlockNumber(100),
+            )
+
+        assert mocks['submit_mock'].await_count == 1
+        assert _submitted_position(mocks).shares_to_redeem == Wei(shares)
 
     async def test_single_position_zero_withdrawable_skipped(self) -> None:
         position = make_position(processed_shares=500)
@@ -290,6 +345,8 @@ class TestStartupCheck:
                 await _startup_check()
 
 
+# format_os_token_shares reads the network from the unpatched execution settings.
+@pytest.mark.usefixtures('fake_settings')
 class TestProcess:
     async def test_no_queued_shares(self) -> None:
         with _mock_process() as mocks:
@@ -414,6 +471,7 @@ def _mock_redeem_positions(
     submit_results: list[bool] | None = None,
     ltv_exceeded: bool = False,
     minted_shares: Wei | list[Wei] | None = None,
+    min_capped_redeem_assets: int = 1,
 ) -> Generator[dict[str, MagicMock], None, None]:
     """Mock setup for redeem_positions tests.
 
@@ -429,6 +487,8 @@ def _mock_redeem_positions(
     returned VaultOsTokenPosition; a constant applies to every call, a list is consumed in
     call order (one entry per position). Defaults to an effectively unbounded value so
     the unprocessed_shares cap is the only one exercised unless a test overrides it.
+    ``min_capped_redeem_assets`` overrides MIN_CAPPED_REDEEM_ASSETS; it defaults to 1 wei so
+    tests can use wei-sized amounts for capped positions while zero is still skipped.
     """
     if isinstance(withdrawable, AsyncMock):
         get_withdrawable = withdrawable
@@ -475,6 +535,7 @@ def _mock_redeem_positions(
         ),
         patch(f'{MODULE}.simulate_redeem_position', new=simulate_mock),
         patch(f'{MODULE}.tx_redeem_position', new=submit_mock),
+        patch(f'{MODULE}.MIN_CAPPED_REDEEM_ASSETS', min_capped_redeem_assets),
     ):
         yield {
             'submit_mock': submit_mock,

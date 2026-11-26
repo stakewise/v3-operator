@@ -11,7 +11,7 @@ from src.common.execution import wait_for_execution_endpoints_synced
 from src.common.harvest import get_multiple_harvest_params
 from src.common.transaction import tx_manager
 from src.common.utils import error_verbose, format_error
-from src.config.settings import MULTICALL_CHUNK_SIZE
+from src.config.settings import MULTICALL_CHUNK_SIZE, settings
 from src.meta_vault.service import is_meta_vault
 from src.redemptions.contracts import os_token_redeemer_contract
 from src.redemptions.merkle_tree import PositionsMerkleTree
@@ -147,10 +147,14 @@ async def simulate_redeem_position(
         )
         return False
     logger.debug(
-        'Simulated redeeming %s shares for position (vault %s, owner %s) successfully',
-        position.shares_to_redeem,
-        position.vault,
-        position.owner,
+        'Simulated redeeming %(shares)s shares (%(os_token)s) '
+        'for position (vault %(vault)s, owner %(owner)s) successfully',
+        {
+            'shares': position.shares_to_redeem,
+            'os_token': format_os_token_shares(position.shares_to_redeem),
+            'vault': position.vault,
+            'owner': position.owner,
+        },
     )
     return True
 
@@ -195,15 +199,24 @@ async def tx_redeem_position(
 
     tx_hash = Web3.to_hex(tx_receipt['transactionHash'])
     logger.info(
-        'Redeemed %s shares for position (vault %s, owner %s). Tx Hash: %s',
-        position.shares_to_redeem,
-        position.vault,
-        position.owner,
-        tx_hash,
+        'Redeemed %(shares)s shares (%(os_token)s) '
+        'for position (vault %(vault)s, owner %(owner)s). Tx Hash: %(tx_hash)s',
+        {
+            'shares': position.shares_to_redeem,
+            'os_token': format_os_token_shares(position.shares_to_redeem),
+            'vault': position.vault,
+            'owner': position.owner,
+            'tx_hash': tx_hash,
+        },
     )
     # Barrier against fallback endpoints lagging behind the receipt block.
     await wait_for_execution_endpoints_synced(tx_receipt['blockNumber'])
     return True
+
+
+def format_os_token_shares(shares: int) -> str:
+    """Human-readable osToken amount, e.g. '4.767899607186542728 osETH'."""
+    return f'{Web3.from_wei(shares, 'ether')} {settings.network_config.OS_TOKEN_BALANCE_SYMBOL}'
 
 
 def _build_redeem_tx_function(

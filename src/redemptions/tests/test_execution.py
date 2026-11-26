@@ -5,10 +5,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from eth_typing import BlockNumber
 from hexbytes import HexBytes
+from sw_utils.networks import GNOSIS, MAINNET
 from web3 import Web3
 from web3.exceptions import ContractCustomError
 
+from src.common.tests.utils import patch_settings
 from src.redemptions.execution import (
+    format_os_token_shares,
     simulate_redeem_position,
     tx_process_exit_queue,
     tx_redeem_position,
@@ -24,6 +27,18 @@ pytestmark = pytest.mark.usefixtures('fake_settings')
 VAULT_1 = Web3.to_checksum_address('0x' + '11' * 20)
 VAULT_2 = Web3.to_checksum_address('0x' + '22' * 20)
 OWNER_1 = Web3.to_checksum_address('0x' + '33' * 20)
+
+
+@pytest.mark.parametrize(
+    'network, expected',
+    [
+        (MAINNET, '4.767899607186542728 osETH'),
+        (GNOSIS, '4.767899607186542728 osGNO'),
+    ],
+)
+def test_format_os_token_shares(network: str, expected: str) -> None:
+    with patch_settings('network', network):
+        assert format_os_token_shares(4767899607186542728) == expected
 
 
 class TestTxRedeemPosition:
