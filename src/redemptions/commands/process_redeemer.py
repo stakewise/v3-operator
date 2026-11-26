@@ -55,6 +55,20 @@ DEFAULT_INTERVAL = 60  # 1 minute
 DEFAULT_MIN_QUEUED_ASSETS = Web3.to_wei(0.1, 'ether')
 DEFAULT_MIN_QUEUED_ASSETS_GWEI = Web3.from_wei(DEFAULT_MIN_QUEUED_ASSETS, 'gwei')
 
+# Haircut (0.01%) applied when a position is capped to a vault's withdrawable assets.
+#
+# Why:
+# - The osToken rate grows every second.
+# - Shares worth exactly the withdrawable assets when the redeemable shares are
+#   calculated are worth more on tx inclusion, so the vault reverts with
+#   InvalidReceivedAssets.
+#
+# Why 1 bps:
+# - Covers ~1.5 days of rate growth at 2-3% APR (~9 hours at 10% APR).
+# - Well beyond the duration of a redemption round.
+# - The residual is redeemed in later rounds.
+WITHDRAWABLE_ASSETS_HAIRCUT_BPS = 1
+
 
 @click.option(
     '--wallet-password-file',
@@ -287,6 +301,9 @@ async def _redeem_os_token_positions(
 
         # Re-fetch the block number so the freshly-updated state is visible downstream.
         block_number = await execution_client.eth.block_number
+        # Recreate the converter: the osToken rate grows every second, so the snapshot
+        # taken before waiting for updateState receipts is already stale.
+        os_token_converter = await create_os_token_converter(block_number)
 
     # Leaves use `nonce - 1`: setting the positions root increments the
     # on-chain nonce, leaving it one ahead of the nonce baked into the leaves.
@@ -315,7 +332,8 @@ async def redeem_positions(
     - A live position with LTV > 1 is skipped.
     - shares_to_redeem is capped by the owner's live minted shares.
     - A vault requiring a state update is marked unharvested and its positions skipped.
-    - shares_to_redeem is capped by the vault's remaining withdrawable assets.
+    - shares_to_redeem is capped by the vault's remaining withdrawable assets, minus
+      a small haircut (see WITHDRAWABLE_ASSETS_HAIRCUT_BPS).
     - A position that fails to simulate or submit is skipped; the rest continue.
     """
     vault_to_withdrawable: dict[ChecksumAddress, Wei] = {}
@@ -364,8 +382,8 @@ async def redeem_positions(
         withdrawable = vault_to_withdrawable[position.vault]
 
         if withdrawable < assets_to_redeem:
-            shares_to_redeem = converter.to_shares(withdrawable)
-            assets_to_redeem = withdrawable
+            assets_to_redeem = _apply_withdrawable_haircut(withdrawable)
+            shares_to_redeem = converter.to_shares(assets_to_redeem)
 
         if shares_to_redeem <= 0:
             continue
@@ -382,6 +400,11 @@ async def redeem_positions(
                 continue
 
         vault_to_withdrawable[position.vault] = Wei(withdrawable - assets_to_redeem)
+
+
+def _apply_withdrawable_haircut(withdrawable: Wei) -> Wei:
+    """Assets to redeem when a position is capped by the vault's withdrawable assets."""
+    return Wei(withdrawable * (10_000 - WITHDRAWABLE_ASSETS_HAIRCUT_BPS) // 10_000)
 
 
 async def _startup_check() -> None:
