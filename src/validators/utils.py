@@ -10,7 +10,7 @@ from web3.types import Gwei
 from src.common.typings import ValidatorType
 from src.config.settings import settings
 from src.validators.database import NetworkValidatorCrud
-from src.validators.event_processors import get_latest_network_validator_public_keys
+from src.validators.event_processors import get_latest_deposits
 from src.validators.keystores.base import BaseKeystore
 from src.validators.typings import Validator
 
@@ -53,7 +53,7 @@ async def _filter_nonregistered_public_keys(
     count: int,
 ) -> list[HexStr]:
     public_keys: list[HexStr] = []
-    latest_network_validator_public_keys = await get_latest_network_validator_public_keys()
+    latest_network_validator_public_keys, _ = await get_latest_deposits()
     for public_key in available_public_keys:
         if NetworkValidatorCrud().is_validator_registered(public_key):
             continue

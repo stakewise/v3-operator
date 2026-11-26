@@ -14,7 +14,8 @@ from web3.types import Gwei
 
 from src.common.clients import OPERATOR_USER_AGENT
 from src.config.settings import RELAYER_JWT_ALGORITHM, settings
-from src.validators.event_processors import get_validators_start_index
+from src.validators.builders_onboarding import get_validators_start_index
+from src.validators.exceptions import ValidatorIndexUnknownError
 from src.validators.typings import (
     ExitSignatureShards,
     RelayerInfoResponse,
@@ -29,6 +30,8 @@ logger = logging.getLogger(__name__)
 class RelayerClient:
     async def register_validators(self, amounts: list[Gwei]) -> RelayerValidatorsResponse:
         validators_start_index = await get_validators_start_index()
+        if validators_start_index is None:
+            raise ValidatorIndexUnknownError()
 
         relayer_response = await self._register_validators(
             settings.vault, validators_start_index, amounts

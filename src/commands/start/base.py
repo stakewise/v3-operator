@@ -13,27 +13,29 @@ from src.common.metrics import metrics, metrics_server
 from src.common.protocol_config import update_oracles_cache
 from src.common.startup_check import check_db_events_logs
 from src.common.tasks import BaseTask, MetricsTask
-from src.common.utils import get_build_version
+from src.common.utils import get_build_version, log_verbose
 from src.config.settings import settings
 from src.exits.tasks import ExitSignatureTask
 from src.harvest.tasks import HarvestTask
 from src.nodewise.commands.node_start import main as run_nodes
 from src.reward_splitter.tasks import SplitRewardTask
 from src.telemetry.tasks import TelemetryTask
+from src.validators.builders_onboarding import (
+    mark_fresh_network_validators,
+    resolve_builders_onboarding,
+)
 from src.validators.database import (
+    BuilderDepositCrud,
     CheckpointCrud,
     NetworkValidatorCrud,
     VaultValidatorCrud,
 )
 from src.validators.event_processors import scan_validators_events
+from src.validators.ipfs_dumps import load_genesis_validators
 from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
 from src.validators.relayer import RelayerClient
-from src.validators.tasks import (
-    ValidatorRegistrationSubtask,
-    load_genesis_validators,
-    load_vault_validators,
-)
+from src.validators.tasks import ValidatorRegistrationSubtask, load_vault_validators
 from src.withdrawals.tasks import ValidatorWithdrawalSubtask
 
 logger = logging.getLogger(__name__)
@@ -72,8 +74,10 @@ async def process() -> None:
         await metrics_server()
 
     NetworkValidatorCrud().setup()
+    BuilderDepositCrud().setup()
     VaultValidatorCrud().setup()
     CheckpointCrud().setup()
+    mark_fresh_network_validators()
 
     # load network validators from ipfs dump
     await load_genesis_validators()
@@ -144,6 +148,12 @@ class ValidatorTask(BaseTask):
     async def process_block(self, interrupt_handler: InterruptHandler) -> None:
         chain_head = await get_chain_finalized_head()
         await scan_validators_events(block_number=chain_head.block_number, is_startup=False)
+        try:
+            await resolve_builders_onboarding(chain_head)
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            # Approvals stay blocked until resolved, other subtasks must keep running
+            metrics.exception_count.labels(network=settings.network).inc()
+            log_verbose(exc)
         subtasks = [self.validator_registration_subtask.process()]
         if not settings.disable_withdrawals:
             subtasks.append(self.validator_withdrawal_subtask.process())

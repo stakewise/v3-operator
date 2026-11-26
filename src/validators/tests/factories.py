@@ -1,10 +1,27 @@
-from eth_typing import ChecksumAddress, HexStr
+import struct
+from contextlib import contextmanager
+from random import randbytes
+from typing import Any, Callable, Iterator, cast
+from unittest import mock
+
+from eth_typing import BlockNumber, ChecksumAddress, HexStr
 from sw_utils import ValidatorStatus
 from sw_utils.tests import faker
-from web3.types import Gwei
+from web3 import Web3
+from web3.datastructures import AttributeDict
+from web3.types import EventData, Gwei
 
+from src.config.networks import HOODI, NETWORKS
 from src.config.settings import MIN_ACTIVATION_BALANCE_GWEI, settings
-from src.validators.typings import ConsensusValidator, ValidatorConsolidationData
+from src.validators.database import CheckpointCrud, NetworkValidatorCrud
+from src.validators.typings import (
+    ConsensusValidator,
+    NetworkValidator,
+    ValidatorConsolidationData,
+)
+
+FORK_EPOCH = 10
+FORK_SLOT = FORK_EPOCH * NETWORKS[HOODI].SLOTS_PER_EPOCH
 
 
 def create_consensus_validator(
@@ -41,6 +58,77 @@ def create_consensus_validator(
         pending_balance=pending_balance,
         consolidation_data=consolidation_data,
     )
+
+
+def create_deposit_event(
+    public_key: HexStr | None = None,
+    withdrawal_credentials_prefix: bytes = b'\x01',
+    block_number: int | None = None,
+    amount_gwei: int = 32 * 10**9,
+) -> EventData:
+    """`DepositEvent` of the validators registry, the signature is random."""
+    public_key = public_key or faker.validator_public_key()
+    return cast(
+        EventData,
+        AttributeDict(
+            {
+                'blockNumber': BlockNumber(block_number or faker.random_int(10, 100000)),
+                'args': AttributeDict(
+                    {
+                        'pubkey': Web3.to_bytes(hexstr=public_key),
+                        'withdrawal_credentials': (
+                            withdrawal_credentials_prefix + b'\x00' * 11 + randbytes(20)
+                        ),
+                        'amount': struct.pack('<Q', amount_gwei),
+                        'signature': randbytes(96),
+                        'index': struct.pack('<Q', 0),
+                    }
+                ),
+            }
+        ),
+    )
+
+
+def get_public_key(event: EventData) -> HexStr:
+    return Web3.to_hex(event['args']['pubkey'])
+
+
+def save_network_validator(block_number: BlockNumber, public_key: HexStr | None = None) -> HexStr:
+    public_key = public_key or faker.validator_public_key()
+    NetworkValidatorCrud().save_network_validators(
+        [NetworkValidator(public_key=public_key, block_number=block_number)]
+    )
+    return public_key
+
+
+def set_network_validators_checkpoint(block_number: BlockNumber) -> None:
+    CheckpointCrud().update_checkpoint(CheckpointCrud.CHECKPOINT_NETWORK_VALIDATORS, block_number)
+
+
+@contextmanager
+def patch_deposit_signature(is_valid: bool | Callable[..., bool] = True) -> Iterator[None]:
+    options: dict[str, Any] = (
+        {'side_effect': is_valid} if callable(is_valid) else {'return_value': is_valid}
+    )
+    with mock.patch('src.validators.event_processors.is_valid_deposit_data_signature', **options):
+        yield
+
+
+@contextmanager
+def patch_block_slot(slot_by_block: Callable[[int], int]) -> Iterator[mock.AsyncMock]:
+    with mock.patch(
+        'src.validators.event_processors.calc_slot_by_block_number', side_effect=slot_by_block
+    ) as slot_mock:
+        yield slot_mock
+
+
+@contextmanager
+def patch_tail_events(events: list[EventData]) -> Iterator[mock.AsyncMock]:
+    with mock.patch(
+        'src.validators.event_processors.validators_registry_contract.get_deposit_events',
+        return_value=events,
+    ) as events_mock:
+        yield events_mock
 
 
 def _build_non_compound_credentials(withdrawal_address: ChecksumAddress) -> HexStr:

@@ -4205,8 +4205,8 @@ web3 = "==7.14.1"
 [package.source]
 type = "git"
 url = "https://github.com/stakewise/sw-utils.git"
-reference = "v0.17.0a1"
-resolved_reference = "06014b70d4ca73117352466fef5f17a688442f0b"
+reference = "v0.17.0a2"
+resolved_reference = "9f55a1cfbaf247d90c55e7c6392ab524d4259576"
 
 [[package]]
 name = "tenacity"
@@ -4702,4 +4702,4 @@ type = ["pytest-mypy (>=1.0.1)"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12,<3.13"
-content-hash = "20b02a511a9271601146a3d6cf7ef55b329e3a1c03055c52522c413d54429e95"
+content-hash = "6f08d92ead7142d1d619c740a35b2718e8182af5fc2c21e82d9926c5f5711bd6"
