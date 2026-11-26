@@ -26,14 +26,11 @@ from src.validators.database import (
     VaultValidatorCrud,
 )
 from src.validators.event_processors import scan_validators_events
+from src.validators.ipfs import load_genesis_validators
 from src.validators.keystores.base import BaseKeystore
 from src.validators.keystores.load import load_keystore
 from src.validators.relayer import RelayerClient
-from src.validators.tasks import (
-    ValidatorRegistrationSubtask,
-    load_genesis_validators,
-    load_vault_validators,
-)
+from src.validators.tasks import ValidatorRegistrationSubtask, load_vault_validators
 from src.withdrawals.tasks import ValidatorWithdrawalSubtask
 
 logger = logging.getLogger(__name__)
