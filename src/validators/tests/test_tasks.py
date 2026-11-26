@@ -1091,7 +1091,7 @@ class TestLoadVaultValidators:
     async def test_skips_without_ipfs_hash(self, checkpoint_crud, vault_validator_crud):
         with (
             patch.object(NETWORKS[HOODI].CHECKPOINTS, 'VAULT_VALIDATORS_IPFS_HASH', ''),
-            patch('src.validators.tasks._fetch_ipfs_dump', AsyncMock()) as fetch_mock,
+            patch('src.validators.tasks.fetch_ipfs_dump', AsyncMock()) as fetch_mock,
         ):
             await load_vault_validators()
 
@@ -1180,6 +1180,6 @@ def patch_vault_validators_dump(data: bytes, last_block: int = 3_500_000):
         patch.object(
             NETWORKS[HOODI].CHECKPOINTS, 'VAULT_VALIDATORS_LAST_BLOCK', BlockNumber(last_block)
         ),
-        patch('src.validators.tasks._fetch_ipfs_dump', AsyncMock(return_value=data)) as fetch_mock,
+        patch('src.validators.tasks.fetch_ipfs_dump', AsyncMock(return_value=data)) as fetch_mock,
     ):
         yield fetch_mock
