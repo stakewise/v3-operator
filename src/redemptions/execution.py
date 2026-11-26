@@ -151,7 +151,7 @@ async def simulate_redeem_position(
         'for position (vault %(vault)s, owner %(owner)s) successfully',
         {
             'shares': position.shares_to_redeem,
-            'os_token': _format_os_token_shares(position.shares_to_redeem),
+            'os_token': format_os_token_shares(position.shares_to_redeem),
             'vault': position.vault,
             'owner': position.owner,
         },
@@ -203,7 +203,7 @@ async def tx_redeem_position(
         'for position (vault %(vault)s, owner %(owner)s). Tx Hash: %(tx_hash)s',
         {
             'shares': position.shares_to_redeem,
-            'os_token': _format_os_token_shares(position.shares_to_redeem),
+            'os_token': format_os_token_shares(position.shares_to_redeem),
             'vault': position.vault,
             'owner': position.owner,
             'tx_hash': tx_hash,
@@ -214,7 +214,7 @@ async def tx_redeem_position(
     return True
 
 
-def _format_os_token_shares(shares: int) -> str:
+def format_os_token_shares(shares: int) -> str:
     """Human-readable osToken amount, e.g. '4.767899607186542728 osETH'."""
     return f'{Web3.from_wei(shares, 'ether')} {settings.network_config.OS_TOKEN_BALANCE_SYMBOL}'
 

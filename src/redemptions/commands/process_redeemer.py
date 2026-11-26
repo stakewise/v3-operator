@@ -29,6 +29,7 @@ from src.config.settings import settings
 from src.meta_vault.service import is_meta_vault
 from src.redemptions.contracts import os_token_redeemer_contract
 from src.redemptions.execution import (
+    format_os_token_shares,
     simulate_redeem_position,
     tx_process_exit_queue,
     tx_redeem_position,
@@ -270,10 +271,11 @@ async def _redeem_os_token_positions(
         return
 
     logger.info(
-        'Process queued shares for redemption: %s (~%s %s)',
-        queued_shares,
-        Web3.from_wei(queued_assets, 'ether'),
-        settings.network_config.VAULT_BALANCE_SYMBOL,
+        'Process queued shares for redemption: %(shares)s (%(os_token)s)',
+        {
+            'shares': queued_shares,
+            'os_token': format_os_token_shares(queued_shares),
+        },
     )
 
     # Update both caches at the finalized block

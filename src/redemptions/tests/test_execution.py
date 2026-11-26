@@ -11,7 +11,7 @@ from web3.exceptions import ContractCustomError
 
 from src.common.tests.utils import patch_settings
 from src.redemptions.execution import (
-    _format_os_token_shares,
+    format_os_token_shares,
     simulate_redeem_position,
     tx_process_exit_queue,
     tx_redeem_position,
@@ -38,7 +38,7 @@ OWNER_1 = Web3.to_checksum_address('0x' + '33' * 20)
 )
 def test_format_os_token_shares(network: str, expected: str) -> None:
     with patch_settings('network', network):
-        assert _format_os_token_shares(4767899607186542728) == expected
+        assert format_os_token_shares(4767899607186542728) == expected
 
 
 class TestTxRedeemPosition:

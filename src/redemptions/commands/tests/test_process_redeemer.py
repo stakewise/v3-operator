@@ -345,6 +345,8 @@ class TestStartupCheck:
                 await _startup_check()
 
 
+# format_os_token_shares reads the network from the unpatched execution settings.
+@pytest.mark.usefixtures('fake_settings')
 class TestProcess:
     async def test_no_queued_shares(self) -> None:
         with _mock_process() as mocks:
