@@ -69,6 +69,15 @@ DEFAULT_MIN_QUEUED_ASSETS_GWEI = Web3.from_wei(DEFAULT_MIN_QUEUED_ASSETS, 'gwei'
 # - The residual is redeemed in later rounds.
 WITHDRAWABLE_ASSETS_HAIRCUT_BPS = 1
 
+# Minimum assets to redeem when a position is capped to a vault's withdrawable assets.
+#
+# Why:
+# - The haircut leaves a residual, so each later round redeems 1 bps of the previous one
+#   until the vault gets new liquidity.
+# - Such dust redemptions cost more gas than they are worth.
+# - Uncapped redemptions are not affected: they redeem the assigned shares in full.
+MIN_CAPPED_REDEEM_ASSETS = Web3.to_wei(0.001, 'ether')
+
 
 @click.option(
     '--wallet-password-file',
@@ -334,6 +343,7 @@ async def redeem_positions(
     - A vault requiring a state update is marked unharvested and its positions skipped.
     - shares_to_redeem is capped by the vault's remaining withdrawable assets, minus
       a small haircut (see WITHDRAWABLE_ASSETS_HAIRCUT_BPS).
+    - A capped position below MIN_CAPPED_REDEEM_ASSETS is skipped.
     - A position that fails to simulate or submit is skipped; the rest continue.
     """
     vault_to_withdrawable: dict[ChecksumAddress, Wei] = {}
@@ -383,10 +393,14 @@ async def redeem_positions(
 
         if withdrawable < assets_to_redeem:
             assets_to_redeem = _apply_withdrawable_haircut(withdrawable)
+            if assets_to_redeem < MIN_CAPPED_REDEEM_ASSETS:
+                logger.info(
+                    'Skipping position index=%d: vault %s withdrawable assets are too low',
+                    position.index,
+                    position.vault,
+                )
+                continue
             shares_to_redeem = converter.to_shares(assets_to_redeem)
-
-        if shares_to_redeem <= 0:
-            continue
 
         position_to_redeem = replace(position, shares_to_redeem=shares_to_redeem)
 
