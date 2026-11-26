@@ -3,6 +3,10 @@ class RegistryRootChangedError(ValueError):
         super().__init__('Validators registry root has changed')
 
 
+class ValidatorIndexUnknownError(Exception):
+    """Validator approvals are blocked until the builders onboarding at the fork is resolved."""
+
+
 class KeystoreException(Exception): ...
 
 

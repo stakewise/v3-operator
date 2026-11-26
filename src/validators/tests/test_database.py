@@ -1,9 +1,15 @@
+import pytest
 from eth_typing import BlockNumber
 from sw_utils.tests import faker
 
 from src.config.settings import settings
-from src.validators.database import CheckpointCrud
-from src.validators.typings import NetworkValidator, VaultValidator
+from src.validators.database import (
+    BuilderDepositCrud,
+    CheckpointCrud,
+    NetworkValidatorCrud,
+    transaction,
+)
+from src.validators.typings import BuilderDeposit, NetworkValidator, VaultValidator
 
 
 class TestNetworkValidatorCrud:
@@ -114,6 +120,105 @@ class TestNetworkValidatorCrud:
         assert network_validator_crud.NETWORK_VALIDATORS_TABLE == expected
 
 
+class TestNetworkValidatorCrudBuilders:
+    def test_get_registered_public_keys(self, network_validator_crud):
+        registered = faker.validator_public_key()
+        other = faker.validator_public_key()
+        network_validator_crud.save_network_validators(
+            [NetworkValidator(public_key=registered, block_number=BlockNumber(1))]
+        )
+
+        assert network_validator_crud.get_registered_public_keys([registered, other]) == {
+            registered
+        }
+        assert network_validator_crud.get_registered_public_keys([]) == set()
+
+    def test_delete_network_validators(self, network_validator_crud):
+        removed = faker.validator_public_key()
+        kept = faker.validator_public_key()
+        network_validator_crud.save_network_validators(
+            [
+                NetworkValidator(public_key=removed, block_number=BlockNumber(1)),
+                NetworkValidator(public_key=kept, block_number=BlockNumber(2)),
+            ]
+        )
+
+        network_validator_crud.delete_network_validators([removed])
+        network_validator_crud.delete_network_validators([])
+
+        assert network_validator_crud.get_registered_public_keys([removed, kept]) == {kept}
+
+    def test_delete_all_network_validators(self, network_validator_crud):
+        network_validator_crud.save_network_validators(
+            [NetworkValidator(public_key=faker.validator_public_key(), block_number=BlockNumber(1))]
+        )
+
+        network_validator_crud.delete_all_network_validators()
+
+        assert network_validator_crud.get_last_network_validator() is None
+
+
+class TestBuilderDepositCrud:
+    def test_save_and_get_ordered_by_block(self, builder_deposit_crud):
+        late = BuilderDeposit(public_key=faker.validator_public_key(), block_number=BlockNumber(20))
+        early = BuilderDeposit(
+            public_key=faker.validator_public_key(), block_number=BlockNumber(10)
+        )
+
+        builder_deposit_crud.save_builder_deposits([late, early])
+
+        assert builder_deposit_crud.get_builder_deposits() == [early, late]
+
+    def test_keeps_first_deposit_block(self, builder_deposit_crud):
+        public_key = faker.validator_public_key()
+        first = BuilderDeposit(public_key=public_key, block_number=BlockNumber(10))
+        second = BuilderDeposit(public_key=public_key, block_number=BlockNumber(20))
+
+        builder_deposit_crud.save_builder_deposits([first])
+        builder_deposit_crud.save_builder_deposits([second])
+
+        assert builder_deposit_crud.get_builder_deposits() == [first]
+
+    def test_delete_all(self, builder_deposit_crud):
+        builder_deposit_crud.save_builder_deposits(
+            [BuilderDeposit(public_key=faker.validator_public_key(), block_number=BlockNumber(1))]
+        )
+
+        builder_deposit_crud.delete_all_builder_deposits()
+
+        assert builder_deposit_crud.get_builder_deposits() == []
+
+
+class TestTransaction:
+    def test_commits_on_success(self, validators_db):
+        public_key = faker.validator_public_key()
+
+        with transaction() as connection:
+            NetworkValidatorCrud(connection).save_network_validators(
+                [NetworkValidator(public_key=public_key, block_number=BlockNumber(1))]
+            )
+            # The transaction sees its own writes
+            assert NetworkValidatorCrud(connection).get_registered_public_keys([public_key])
+
+        assert NetworkValidatorCrud().get_registered_public_keys([public_key]) == {public_key}
+
+    def test_rolls_back_on_error(self, validators_db):
+        public_key = faker.validator_public_key()
+
+        with pytest.raises(RuntimeError):
+            with transaction() as connection:
+                NetworkValidatorCrud(connection).save_network_validators(
+                    [NetworkValidator(public_key=public_key, block_number=BlockNumber(1))]
+                )
+                BuilderDepositCrud(connection).save_builder_deposits(
+                    [BuilderDeposit(public_key=public_key, block_number=BlockNumber(1))]
+                )
+                raise RuntimeError
+
+        assert NetworkValidatorCrud().get_registered_public_keys([public_key]) == set()
+        assert BuilderDepositCrud().get_builder_deposits() == []
+
+
 class TestCheckpointCrud:
     def test_setup_creates_table(self, checkpoint_crud):
         checkpoint_crud.setup()
@@ -142,6 +247,26 @@ class TestCheckpointCrud:
 
         cp = checkpoint_crud.get_validators_checkpoint()
         assert cp == BlockNumber(200)
+
+    def test_generic_checkpoint(self, checkpoint_crud):
+        name = CheckpointCrud.CHECKPOINT_NETWORK_VALIDATORS
+        assert checkpoint_crud.get_checkpoint(name) is None
+
+        checkpoint_crud.update_checkpoint(name, 0)
+        assert checkpoint_crud.get_checkpoint(name) == 0
+
+        checkpoint_crud.update_checkpoint(name, 50)
+        checkpoint_crud.update_checkpoint(name, 40)
+        assert checkpoint_crud.get_checkpoint(name) == 50
+
+        checkpoint_crud.delete_checkpoint(name)
+        assert checkpoint_crud.get_checkpoint(name) is None
+
+    def test_checkpoints_are_independent(self, checkpoint_crud):
+        checkpoint_crud.update_validators_checkpoint(BlockNumber(7))
+
+        assert checkpoint_crud.get_checkpoint(CheckpointCrud.CHECKPOINT_NETWORK_VALIDATORS) is None
+        assert checkpoint_crud.get_validators_checkpoint() == BlockNumber(7)
 
     def test_setup_idempotent(self, checkpoint_crud):
         checkpoint_crud.setup()

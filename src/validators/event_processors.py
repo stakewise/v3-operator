@@ -4,24 +4,33 @@ from multiprocessing import Pool
 from typing import Set
 
 from eth_typing import BlockNumber, ChecksumAddress, HexStr
-from sw_utils import EventProcessor, EventScanner, is_valid_deposit_data_signature
+from sw_utils import (
+    FAR_FUTURE_EPOCH,
+    EventProcessor,
+    EventScanner,
+    is_valid_deposit_data_signature,
+)
 from web3 import Web3
 from web3.types import EventData
 
-from src.common.app_state import AppState
 from src.common.clients import execution_non_retry_client
 from src.common.contracts import (
     ValidatorsRegistryContract,
     VaultContract,
     validators_registry_contract,
 )
+from src.common.utils import calc_slot_by_block_number
 from src.config.settings import settings
 from src.validators.database import (
+    BuilderDepositCrud,
     CheckpointCrud,
     NetworkValidatorCrud,
     VaultValidatorCrud,
+    transaction,
 )
-from src.validators.typings import NetworkValidator, VaultValidator
+from src.validators.typings import BuilderDeposit, NetworkValidator, VaultValidator
+
+BUILDER_WITHDRAWAL_PREFIX = b'\xb0'
 
 logger = logging.getLogger(__name__)
 
@@ -35,71 +44,25 @@ class NetworkValidatorsProcessor(EventProcessor):
         ).contract
 
     async def get_from_block(self) -> BlockNumber:
-        app_state = AppState()
-        if app_state.network_validators_block is not None:
-            return BlockNumber(app_state.network_validators_block + 1)
-        last_validator = NetworkValidatorCrud().get_last_network_validator()
-        if not last_validator:
-            return settings.network_config.VALIDATORS_REGISTRY_GENESIS_BLOCK
+        return await get_network_validators_from_block()
 
-        return BlockNumber(last_validator.block_number + 1)
-
-    # pylint: disable-next=unused-argument
     async def process_events(self, events: list[EventData], to_block: BlockNumber) -> None:
-        validators = process_network_validator_events(events)
-        NetworkValidatorCrud().save_network_validators(validators)
-        AppState().network_validators_block = to_block
+        validators, builder_deposits = await self._process_deposit_events(events)
+        _save_network_validator_events(validators, builder_deposits, to_block)
+
+    async def _process_deposit_events(
+        self, events: list[EventData]
+    ) -> tuple[list[NetworkValidator], list[BuilderDeposit]]:
+        return await process_network_validator_events(events)
 
 
 class NetworkValidatorsStartupProcessor(NetworkValidatorsProcessor):
     """Use multiprocessing event processor"""
 
-    # pylint: disable-next=unused-argument
-    async def process_events(self, events: list[EventData], to_block: BlockNumber) -> None:
-        validators = process_network_validator_events_multiprocessing(events)
-        NetworkValidatorCrud().save_network_validators(validators)
-        AppState().network_validators_block = to_block
-
-
-def process_network_validator_events_multiprocessing(
-    events: list[EventData],
-) -> list[NetworkValidator]:
-    """
-    Processes `ValidatorsRegistry` registration events
-    and returns the list of valid validators.
-    Use multiprocessing to speed up operator startup.
-    """
-    with Pool(processes=settings.concurrency) as pool:
-        results = [
-            pool.apply_async(
-                process_network_validator_event,
-                [event, settings.network_config.GENESIS_FORK_VERSION],
-            )
-            for event in events
-        ]
-        for result in results:
-            result.wait()
-        validators = [result.get() for result in results]
-        return [val for val in validators if val]
-
-
-def process_network_validator_events(events: list[EventData]) -> list[NetworkValidator]:
-    """
-    Processes `ValidatorsRegistry` registration events
-    and returns the list of valid validators.
-    Multiprocessing version works slowly on small blocks ranges.
-    """
-    result: list[NetworkValidator] = []
-    for event in events:
-        validator = process_network_validator_event(
-            event, settings.network_config.GENESIS_FORK_VERSION
-        )
-        if not validator:
-            continue
-
-        result.append(validator)
-
-    return result
+    async def _process_deposit_events(
+        self, events: list[EventData]
+    ) -> tuple[list[NetworkValidator], list[BuilderDeposit]]:
+        return await process_network_validator_events_multiprocessing(events)
 
 
 class VaultValidatorsProcessor(EventProcessor):
@@ -142,32 +105,83 @@ class VaultV2ValidatorsProcessor(VaultValidatorsProcessor):
         return _v2_validators_genesis_block()
 
 
-async def get_validators_start_index() -> int:
-    latest_public_keys = await get_latest_network_validator_public_keys()
-    validators_start_index = NetworkValidatorCrud().get_next_validator_index(
-        list(latest_public_keys)
-    )
-    return validators_start_index
-
-
-async def get_latest_network_validator_public_keys() -> Set[HexStr]:
-    """Fetches the latest network validator public keys."""
-    last_validator = NetworkValidatorCrud().get_last_network_validator()
-    if last_validator:
-        from_block = BlockNumber(last_validator.block_number + 1)
-    else:
-        from_block = settings.network_config.VALIDATORS_REGISTRY_GENESIS_BLOCK
-
+async def get_latest_deposits() -> tuple[Set[HexStr], list[BuilderDeposit]]:
+    """
+    Processes deposit events not yet saved by the scanner.
+    Returns public keys of new validators and builder deposits affecting validator index.
+    """
+    from_block = await get_network_validators_from_block()
     new_events = await validators_registry_contract.get_deposit_events(from_block=from_block)
-    new_public_keys: Set[HexStr] = set()
-    for event in new_events:
-        validator = process_network_validator_event(
-            event, settings.network_config.GENESIS_FORK_VERSION
-        )
-        if validator:
-            new_public_keys.add(validator.public_key)
+    new_validators, builder_deposits = await process_network_validator_events(new_events)
+    builder_deposits = _exclude_counted_builder_deposits(
+        builder_deposits, validators=new_validators, crud=NetworkValidatorCrud()
+    )
+    return {v.public_key for v in new_validators}, builder_deposits
 
-    return new_public_keys
+
+async def get_network_validators_from_block() -> BlockNumber:
+    """
+    Returns the block to start scanning deposit events from.
+    The explicit checkpoint is not derived from the last validator: it advances over blocks
+    without validators, and builder deposits resolved at the fork may remove the last ones.
+    """
+    checkpoint = CheckpointCrud().get_checkpoint(CheckpointCrud.CHECKPOINT_NETWORK_VALIDATORS)
+    if checkpoint is not None:
+        return BlockNumber(checkpoint + 1)
+
+    # Fallback for databases created before the checkpoint was introduced
+    last_validator = NetworkValidatorCrud().get_last_network_validator()
+    if not last_validator:
+        return settings.network_config.VALIDATORS_REGISTRY_GENESIS_BLOCK
+
+    checkpoints = settings.network_config.CHECKPOINTS
+    return BlockNumber(
+        max(last_validator.block_number, checkpoints.GENESIS_VALIDATORS_LAST_BLOCK) + 1
+    )
+
+
+async def process_network_validator_events(
+    events: list[EventData],
+) -> tuple[list[NetworkValidator], list[BuilderDeposit]]:
+    """
+    Processes `ValidatorsRegistry` deposit events.
+    Returns valid validators and builder deposits.
+    Multiprocessing version works slowly on small blocks ranges.
+
+    A valid deposit with builder withdrawal credentials (0xB0):
+    - made before Glamsterdam is a builder deposit, not a validator:
+      - processed by the consensus layer before the fork, it takes a validator index
+      - still pending at the fork, it is onboarded as a builder,
+        see `onboard_builders_from_pending_deposits` in the Gloas fork spec
+      Builder deposits are resolved at the fork, see `src.validators.builders_onboarding`.
+    - made after Glamsterdam is a regular validator deposit
+    """
+    parsed_validators = [
+        process_network_validator_event(event, settings.network_config.GENESIS_FORK_VERSION)
+        for event in events
+    ]
+    return await _split_builder_deposits(events, parsed_validators)
+
+
+async def process_network_validator_events_multiprocessing(
+    events: list[EventData],
+) -> tuple[list[NetworkValidator], list[BuilderDeposit]]:
+    """
+    Same as `process_network_validator_events`.
+    Use multiprocessing to speed up operator startup.
+    """
+    with Pool(processes=settings.concurrency) as pool:
+        results = [
+            pool.apply_async(
+                process_network_validator_event,
+                [event, settings.network_config.GENESIS_FORK_VERSION],
+            )
+            for event in events
+        ]
+        for result in results:
+            result.wait()
+        parsed_validators = [result.get() for result in results]
+    return await _split_builder_deposits(events, parsed_validators)
 
 
 async def get_latest_vault_v2_validator_public_keys(vault_address: ChecksumAddress) -> Set[HexStr]:
@@ -233,3 +247,81 @@ async def scan_validators_events(block_number: BlockNumber, is_startup: bool) ->
 
 def create_event_scanner(processor: EventProcessor) -> EventScanner:
     return EventScanner(processor, max_chunk_size=settings.event_scanner_max_chunk_size)
+
+
+def _save_network_validator_events(
+    validators: list[NetworkValidator],
+    builder_deposits: list[BuilderDeposit],
+    to_block: BlockNumber,
+) -> None:
+    with transaction() as connection:
+        network_validator_crud = NetworkValidatorCrud(connection)
+        network_validator_crud.save_network_validators(validators)
+
+        builder_deposits = _exclude_counted_builder_deposits(
+            builder_deposits, validators=validators, crud=network_validator_crud
+        )
+        if builder_deposits:
+            logger.warning(
+                'Found %d builder deposit(s) made before Glamsterdam: %s. '
+                'Validator approvals are blocked until the Glamsterdam fork.',
+                len(builder_deposits),
+                [d.public_key for d in builder_deposits],
+            )
+        BuilderDepositCrud(connection).save_builder_deposits(builder_deposits)
+
+        CheckpointCrud(connection).update_checkpoint(
+            CheckpointCrud.CHECKPOINT_NETWORK_VALIDATORS, to_block
+        )
+
+
+def _exclude_counted_builder_deposits(
+    builder_deposits: list[BuilderDeposit],
+    validators: list[NetworkValidator],
+    crud: NetworkValidatorCrud,
+) -> list[BuilderDeposit]:
+    """
+    Leaves out builder deposits for public keys that are already counted as validators:
+    such a deposit tops up the validator, so the validator index is not affected.
+    """
+    counted_public_keys = {v.public_key for v in validators}
+    counted_public_keys |= crud.get_registered_public_keys([d.public_key for d in builder_deposits])
+    return [d for d in builder_deposits if d.public_key not in counted_public_keys]
+
+
+async def _split_builder_deposits(
+    events: list[EventData], parsed_validators: list[NetworkValidator | None]
+) -> tuple[list[NetworkValidator], list[BuilderDeposit]]:
+    """
+    Splits valid deposits into validators and builder deposits.
+    Runs in the main process: the fork check calls the execution client.
+    """
+    validators: list[NetworkValidator] = []
+    builder_deposits: list[BuilderDeposit] = []
+    for event, validator in zip(events, parsed_validators):
+        if validator is None:
+            continue
+
+        if _is_builder_withdrawal_credentials(
+            event['args']['withdrawal_credentials']
+        ) and not await _is_glamsterdam_block(validator.block_number):
+            builder_deposits.append(
+                BuilderDeposit(public_key=validator.public_key, block_number=validator.block_number)
+            )
+            continue
+
+        validators.append(validator)
+
+    return validators, builder_deposits
+
+
+def _is_builder_withdrawal_credentials(withdrawal_credentials: bytes) -> bool:
+    return withdrawal_credentials[:1] == BUILDER_WITHDRAWAL_PREFIX
+
+
+async def _is_glamsterdam_block(block_number: BlockNumber) -> bool:
+    """Whether the execution block is processed by Glamsterdam consensus rules."""
+    if settings.network_config.GLAMSTERDAM_EPOCH == FAR_FUTURE_EPOCH:
+        # Glamsterdam is not scheduled, skip the execution client call
+        return False
+    return await calc_slot_by_block_number(block_number) >= settings.network_config.GLAMSTERDAM_SLOT

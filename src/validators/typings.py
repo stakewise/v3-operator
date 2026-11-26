@@ -19,6 +19,18 @@ class NetworkValidator:
 
 
 @dataclass
+class BuilderDeposit:
+    """
+    Public key with a valid pre-Glamsterdam deposit to the validators registry
+    with builder withdrawal credentials (0xB0).
+    Deposits still pending at the fork become builders, not validators.
+    """
+
+    public_key: HexStr
+    block_number: BlockNumber
+
+
+@dataclass
 class VaultValidator:
     public_key: HexStr
     block_number: BlockNumber

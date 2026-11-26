@@ -3,7 +3,7 @@ from itertools import batched
 from typing import Sequence, cast
 
 from eth_typing import ChecksumAddress, HexStr
-from sw_utils import IpfsFetchClient, convert_to_mgno
+from sw_utils import convert_to_mgno
 from sw_utils.networks import GNO_NETWORKS
 from web3 import Web3
 from web3.types import BlockNumber, Gwei, Wei
@@ -22,24 +22,28 @@ from src.config.settings import (
     settings,
 )
 from src.redemptions.tasks import get_redemption_assets
-from src.validators.consensus import fetch_funding_validators_balances
-from src.validators.database import (
-    CheckpointCrud,
-    NetworkValidatorCrud,
-    VaultValidatorCrud,
+from src.validators.builders_onboarding import (
+    get_validators_start_index,
+    is_validator_approvals_blocked,
 )
-from src.validators.event_processors import get_validators_start_index
-from src.validators.exceptions import EmptyRelayerResponseException, FundingException
+from src.validators.consensus import fetch_funding_validators_balances
+from src.validators.database import CheckpointCrud, VaultValidatorCrud
+from src.validators.exceptions import (
+    EmptyRelayerResponseException,
+    FundingException,
+    ValidatorIndexUnknownError,
+)
 from src.validators.execution import (
     get_withdrawable_assets,
     tx_fund_validators,
     tx_register_validators,
 )
+from src.validators.ipfs_dumps import fetch_ipfs_dump
 from src.validators.keystores.base import BaseKeystore
 from src.validators.metrics import update_unused_validator_keys_metric
 from src.validators.oracles import poll_validation_approval
 from src.validators.relayer import RelayerClient
-from src.validators.typings import NetworkValidator, Validator, VaultValidator
+from src.validators.typings import Validator, VaultValidator
 from src.validators.utils import get_validators_for_registration
 from src.validators.validators_manager import get_validators_manager_signature
 
@@ -200,8 +204,21 @@ async def fund_validators_chunk(
     return tx_hash
 
 
-# pylint: disable-next=too-many-locals
 async def register_new_validators(
+    vault_assets: Gwei,
+    harvest_params: HarvestParams | None,
+    keystore: BaseKeystore | None,
+    relayer: RelayerClient | None = None,
+) -> HexStr | None:
+    try:
+        return await _register_new_validators(vault_assets, harvest_params, keystore, relayer)
+    except ValidatorIndexUnknownError:
+        # The next validator index is unknown, wait for the next cycle
+        return None
+
+
+# pylint: disable-next=too-many-locals
+async def _register_new_validators(
     vault_assets: Gwei,
     harvest_params: HarvestParams | None,
     keystore: BaseKeystore | None,
@@ -211,6 +228,14 @@ async def register_new_validators(
     validators_count = len(validators_amounts)
     if not validators_amounts:
         # not enough balance to register validators
+        return None
+
+    # Cheap check, avoids the keystore and relayer work while the database already says blocked
+    if is_validator_approvals_blocked():
+        logger.warning(
+            'Skipping validators registration until the builders onboarding '
+            'at the Glamsterdam fork is resolved.'
+        )
         return None
 
     # get latest config
@@ -322,6 +347,8 @@ async def validate_index_and_register_validators(
 
     # Check that validator index has not changed
     current_validator_index = await get_validators_start_index()
+    if current_validator_index is None:
+        return None
 
     if current_validator_index != validator_index:
         logger.info('Validator index has changed. Retrying...')
@@ -334,32 +361,6 @@ async def validate_index_and_register_validators(
         validators_registry_root=validators_registry_root,
         validators_manager_signature=validators_manager_signature,
     )
-
-
-async def load_genesis_validators() -> None:
-    """
-    Load consensus network validators from the ipfs dump.
-    Used to speed up service startup
-    """
-    checkpoints = settings.network_config.CHECKPOINTS
-    ipfs_hash = checkpoints.GENESIS_VALIDATORS_IPFS_HASH
-    if not (NetworkValidatorCrud().get_last_network_validator() is None and ipfs_hash):
-        return
-
-    logger.info('Downloading validators data from IPFS...')
-    data = await _fetch_ipfs_dump(ipfs_hash)
-    genesis_validators: list[NetworkValidator] = []
-    logger.info('Loading genesis validators into the database...')
-    for i in range(0, len(data), 52):
-        genesis_validators.append(
-            NetworkValidator(
-                public_key=Web3.to_hex(data[i + 4 : i + 52]),
-                block_number=BlockNumber(int.from_bytes(data[i : i + 4], 'big')),
-            )
-        )
-
-    NetworkValidatorCrud().save_network_validators(genesis_validators)
-    logger.info('Loaded %d genesis validators', len(genesis_validators))
 
 
 async def load_vault_validators() -> None:
@@ -435,7 +436,7 @@ async def _fetch_vault_validators_dump(vault: ChecksumAddress) -> list[VaultVali
     from the network-wide ipfs dump.
     """
     checkpoints = settings.network_config.CHECKPOINTS
-    data = await _fetch_ipfs_dump(checkpoints.VAULT_VALIDATORS_IPFS_HASH)
+    data = await fetch_ipfs_dump(checkpoints.VAULT_VALIDATORS_IPFS_HASH)
     return _parse_vault_validators_dump(data, vault, checkpoints.VAULT_VALIDATORS_LAST_BLOCK)
 
 
@@ -478,15 +479,6 @@ def _parse_vault_validators_dump(
         )
 
     return validators
-
-
-async def _fetch_ipfs_dump(ipfs_hash: str) -> bytes:
-    ipfs_fetch_client = IpfsFetchClient(
-        ipfs_endpoints=settings.ipfs_fetch_endpoints,
-        timeout=settings.genesis_validators_ipfs_timeout,
-        retry_timeout=settings.genesis_validators_ipfs_retry_timeout,
-    )
-    return await ipfs_fetch_client.fetch_bytes(ipfs_hash)
 
 
 def _get_deposits_amounts(vault_assets: Gwei, validator_type: ValidatorType) -> list[Gwei]:
