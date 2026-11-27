@@ -6,7 +6,7 @@ from typing import Any
 from unittest import mock
 
 import pytest
-from eth_typing import BlockNumber, HexStr
+from eth_typing import BlockNumber, ChecksumAddress, HexStr
 from sw_utils.tests import faker
 from web3 import Web3
 from web3.types import Wei
@@ -16,12 +16,14 @@ from src.config.settings import OS_TOKEN_REDEEMER_CHUNK_SIZE
 from src.redemptions.contracts import os_token_redeemer_contract
 from src.redemptions.fetch_positions import ipfs_fetch_client
 from src.redemptions.os_token_converter import (
+    OsTokenConverter,
     create_os_token_converter,
     os_token_vault_controller_contract,
 )
 from src.redemptions.tasks import (
     aggregate_redemption_assets_by_vaults,
     assign_shares_to_redeem,
+    get_redemption_assets,
 )
 from src.redemptions.tests.factories import create_redeemable_positions, make_position
 from src.redemptions.typings import RedeemablePositions
@@ -38,7 +40,55 @@ def make_async_gen(values: list[int]) -> Any:
 VAULT_1 = Web3.to_checksum_address('0x' + '11' * 20)
 VAULT_2 = Web3.to_checksum_address('0x' + '22' * 20)
 OWNER_1 = Web3.to_checksum_address('0x' + '33' * 20)
+META_VAULT = Web3.to_checksum_address('0x' + '55' * 20)
 OWNER_2 = Web3.to_checksum_address('0x' + '44' * 20)
+
+
+class TestGetRedemptionAssets:
+    async def test_zero_nonce(self) -> None:
+        with mock.patch.object(os_token_redeemer_contract, 'nonce', return_value=0):
+            assert await get_redemption_assets(BlockNumber(100)) == Wei(0)
+
+    @pytest.mark.parametrize(
+        'operator_vault, expected',
+        [
+            pytest.param(VAULT_1, Wei(100), id='regular vault'),
+            pytest.param(VAULT_2, Wei(300), id='meta vault sub vault'),
+            pytest.param(OWNER_1, Wei(0), id='vault without redemptions'),
+        ],
+    )
+    async def test_includes_meta_vault_redemptions(
+        self, operator_vault: ChecksumAddress, expected: Wei
+    ) -> None:
+        """Redemptions of meta vaults are passed down to their sub vaults."""
+        aggregated = {VAULT_1: Wei(100), META_VAULT: Wei(300)}
+        distributed = {VAULT_1: Wei(100), META_VAULT: Wei(300), VAULT_2: Wei(300)}
+        protocol_config = mock.MagicMock(os_token_redeem_multiplier=1)
+        module = 'src.redemptions.tasks'
+
+        with (
+            mock.patch.object(os_token_redeemer_contract, 'nonce', return_value=1),
+            mock.patch.object(os_token_redeemer_contract, 'queued_shares', return_value=400),
+            mock.patch(f'{module}.get_finalized_block_number', return_value=BlockNumber(90)),
+            mock.patch(f'{module}.update_positions_cache'),
+            mock.patch(f'{module}.update_processed_shares_cache'),
+            mock.patch(
+                f'{module}.create_os_token_converter',
+                return_value=OsTokenConverter(Wei(1), Wei(1)),
+            ),
+            mock.patch(f'{module}.get_protocol_config', return_value=protocol_config),
+            mock.patch(f'{module}.aggregate_redemption_assets_by_vaults', return_value=aggregated),
+            mock.patch(
+                f'{module}.distribute_meta_vault_redemption_assets', return_value=distributed
+            ) as distribute_mock,
+            mock.patch(f'{module}.settings') as mock_settings,
+        ):
+            mock_settings.vault = operator_vault
+            assert await get_redemption_assets(BlockNumber(100)) == expected
+
+        distribute_mock.assert_awaited_once_with(
+            vault_to_redemption_assets=aggregated, block_number=BlockNumber(100)
+        )
 
 
 class TestAssignSharesToRedeem:

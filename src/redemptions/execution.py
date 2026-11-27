@@ -1,18 +1,22 @@
 import logging
 from itertools import batched
 
-from eth_typing import ChecksumAddress, HexStr
+from eth_typing import BlockNumber, ChecksumAddress, HexStr
+from sw_utils import is_meta_vault_upgraded_to_release
+from sw_utils.networks import ContractReleaseVersion
 from web3 import Web3
 from web3.contract.async_contract import AsyncContractFunction
-from web3.exceptions import ContractCustomError
+from web3.types import Wei
 
 from src.common.contracts import VaultContract, multicall_contract
 from src.common.execution import wait_for_execution_endpoints_synced
 from src.common.harvest import get_multiple_harvest_params
-from src.common.transaction import tx_manager
+from src.common.transaction import simulate_checked, transact_checked
 from src.common.utils import error_verbose, format_error
 from src.config.settings import MULTICALL_CHUNK_SIZE, settings
+from src.meta_vault.graph import graph_get_vaults
 from src.meta_vault.service import is_meta_vault
+from src.meta_vault.tasks import meta_vault_tree_update_state
 from src.redemptions.contracts import os_token_redeemer_contract
 from src.redemptions.merkle_tree import PositionsMerkleTree
 from src.redemptions.typings import OsTokenPosition
@@ -23,23 +27,30 @@ logger = logging.getLogger(__name__)
 async def update_vaults_state(
     vaults: list[ChecksumAddress],
 ) -> bool:
-    """Bring every regular vault in ``vaults`` up to date on-chain via batched
-    updateState multicalls.
+    """Bring every vault in ``vaults`` up to date on-chain.
 
-    Meta vaults are skipped. Vaults are selected via ``can_harvest`` at the
-    latest state. Fresh on-chain state lets ``get_withdrawable_assets`` (and
-    position LTV) read accurate values without threading harvest_params through
-    every call.
+    Meta vaults are harvested first, each together with its sub-vault tree.
+    A meta vault that fails to update is left stale: redeem_positions skips it.
+    Regular vaults are then selected via ``can_harvest`` at the latest state and
+    updated via batched updateState multicalls. Fresh on-chain state lets
+    ``get_withdrawable_assets`` (and position LTV) read accurate values without
+    threading harvest_params through every call.
 
-    Returns ``True`` when every vault is up to date, ``False`` when a multicall
-    was not confirmed and some vaults are left with stale state.
+    Returns ``True`` when every regular vault is up to date, ``False`` when a
+    multicall was not confirmed and some vaults are left with stale state.
     """
     logger.info('Processing vault state updates')
     regular_vaults: list[ChecksumAddress] = []
+    meta_vaults: list[ChecksumAddress] = []
     for vault in vaults:
         if await is_meta_vault(vault):
-            continue
-        regular_vaults.append(vault)
+            meta_vaults.append(vault)
+        else:
+            regular_vaults.append(vault)
+
+    # Harvesting a meta vault tree also updates its sub vaults,
+    # so do it before selecting harvestable regular vaults.
+    await update_meta_vaults_state(meta_vaults)
 
     if not regular_vaults:
         return True
@@ -73,21 +84,47 @@ async def update_vaults_state(
     return True
 
 
+async def update_meta_vaults_state(meta_vaults: list[ChecksumAddress]) -> None:
+    """Update state of every meta vault tree in ``meta_vaults``, bottom-up.
+    Failures are logged and leave the meta vault stale."""
+    if not meta_vaults:
+        return
+
+    meta_vaults_map = await graph_get_vaults(is_meta_vault=True)
+    for vault in meta_vaults:
+        root_meta_vault = meta_vaults_map.get(vault)
+        if root_meta_vault is None:
+            logger.error('Meta vault %s not found in subgraph', vault)
+            continue
+        if not is_meta_vault_upgraded_to_release(
+            network=settings.network,
+            vault_address=vault,
+            vault_version=root_meta_vault.version,
+            release_version=ContractReleaseVersion.V5,
+        ):
+            logger.warning('Meta vault %s is not upgraded to contracts release v5', vault)
+            continue
+        if not root_meta_vault.sub_vaults:
+            continue
+        try:
+            await meta_vault_tree_update_state(
+                root_meta_vault=root_meta_vault,
+                meta_vaults_map=meta_vaults_map,
+            )
+        except Exception as e:  # pylint: disable=broad-except
+            error_verbose(
+                'Failed to update meta vault tree state for vault %s: %s', vault, format_error(e)
+            )
+
+
 async def tx_update_vaults_state(calls: list[tuple[ChecksumAddress, HexStr]]) -> HexStr | None:
     """Submit a single updateState multicall and wait for its receipt.
 
     Returns the tx hash on success, ``None`` when the tx was not submitted or
     not confirmed.
     """
-
-    try:
-        tx_receipt = await multicall_contract.tx_aggregate(calls)
-    except Exception as e:  # pylint: disable=broad-except
-        error_verbose('Failed to submit updateState multicall tx: %s', format_error(e))
-        return None
-
+    tx_receipt = await multicall_contract.tx_aggregate(calls)
     if tx_receipt is None:
-        logger.error('Failed to confirm updateState multicall tx')
         return None
 
     tx_hash = Web3.to_hex(tx_receipt['transactionHash'])
@@ -98,22 +135,40 @@ async def tx_update_vaults_state(calls: list[tuple[ChecksumAddress, HexStr]]) ->
 async def tx_process_exit_queue() -> None:
     """Call processExitQueue() on the redeemer contract."""
     tx_function = os_token_redeemer_contract.contract.functions.processExitQueue()
-    try:
-        tx_receipt = await tx_manager.transact(tx_function)
-    except ContractCustomError as e:
-        reason = os_token_redeemer_contract.decode_custom_error(str(e.data)) or e.data
-        logger.error('Failed to process exit queue: execution reverted with %s', reason)
-        return
-    except Exception as e:  # pylint: disable=broad-except
-        error_verbose('Failed to submit processExitQueue tx: %s', format_error(e))
-        return
-
+    tx_receipt = await transact_checked(
+        tx_function, contract=os_token_redeemer_contract, action='process exit queue'
+    )
     if tx_receipt is None:
-        logger.error('Failed to confirm processExitQueue tx')
         return
 
     tx_hash = Web3.to_hex(tx_receipt['transactionHash'])
     logger.info('processExitQueue confirmed. Tx Hash: %s', tx_hash)
+
+
+async def tx_redeem_sub_vaults_assets(
+    meta_vault: ChecksumAddress, assets_to_redeem: Wei
+) -> BlockNumber | None:
+    """Call redeemSubVaultsAssets() on the redeemer contract to move assets
+    from the meta vault's sub vaults into the meta vault.
+
+    Returns the receipt block number on success, ``None`` otherwise.
+    """
+    tx_function = os_token_redeemer_contract.contract.functions.redeemSubVaultsAssets(
+        meta_vault, assets_to_redeem
+    )
+    tx_receipt = await transact_checked(
+        tx_function,
+        contract=os_token_redeemer_contract,
+        action=f'redeem sub vaults assets for meta vault {meta_vault}',
+    )
+    if tx_receipt is None:
+        return None
+
+    tx_hash = Web3.to_hex(tx_receipt['transactionHash'])
+    logger.info(
+        'redeemSubVaultsAssets confirmed for meta vault %s. Tx Hash: %s', meta_vault, tx_hash
+    )
+    return tx_receipt['blockNumber']
 
 
 async def simulate_redeem_position(
@@ -125,27 +180,13 @@ async def simulate_redeem_position(
     Returns ``True`` when the call would succeed, ``False`` otherwise.
     """
     tx_function = _build_redeem_tx_function(position, tree)
+    if not await simulate_checked(
+        tx_function,
+        contract=os_token_redeemer_contract,
+        action=f'simulate redeem position (vault {position.vault}, owner {position.owner})',
+    ):
+        return False
 
-    try:
-        await tx_function.call()
-    except ContractCustomError as e:
-        reason = os_token_redeemer_contract.decode_custom_error(str(e.data)) or e.data
-        logger.error(
-            'Failed to simulate redeem position (vault %s, owner %s): '
-            'execution reverted with %s',
-            position.vault,
-            position.owner,
-            reason,
-        )
-        return False
-    except Exception as e:  # pylint: disable=broad-except
-        error_verbose(
-            'Failed to simulate redeem position (vault %s, owner %s): %s',
-            position.vault,
-            position.owner,
-            format_error(e),
-        )
-        return False
     logger.debug(
         'Simulated redeeming %(shares)s shares (%(os_token)s) '
         'for position (vault %(vault)s, owner %(owner)s) successfully',
@@ -168,33 +209,12 @@ async def tx_redeem_position(
     Returns ``True`` on success, ``False`` otherwise.
     """
     tx_function = _build_redeem_tx_function(position, tree)
-
-    try:
-        tx_receipt = await tx_manager.transact(tx_function)
-    except ContractCustomError as e:
-        reason = os_token_redeemer_contract.decode_custom_error(str(e.data)) or e.data
-        logger.error(
-            'Failed to redeem position (vault %s, owner %s): execution reverted with %s',
-            position.vault,
-            position.owner,
-            reason,
-        )
-        return False
-    except Exception as e:  # pylint: disable=broad-except
-        error_verbose(
-            'Failed to redeem position (vault %s, owner %s): %s',
-            position.vault,
-            position.owner,
-            format_error(e),
-        )
-        return False
-
+    tx_receipt = await transact_checked(
+        tx_function,
+        contract=os_token_redeemer_contract,
+        action=f'redeem position (vault {position.vault}, owner {position.owner})',
+    )
     if tx_receipt is None:
-        logger.error(
-            'Failed to confirm redeem position tx (vault %s, owner %s)',
-            position.vault,
-            position.owner,
-        )
         return False
 
     tx_hash = Web3.to_hex(tx_receipt['transactionHash'])

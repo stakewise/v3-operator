@@ -1,11 +1,11 @@
-from eth_typing import HexStr
-from web3 import AsyncWeb3
+from eth_typing import BlockNumber, HexStr
+from web3 import AsyncWeb3, Web3
 from web3.types import ChecksumAddress, TxReceipt, Wei
 
 from src.common.contracts import BaseEncoder, ContractWrapper, ErrorMixin
 from src.common.transaction import transact_checked
 from src.common.typings import HarvestParams
-from src.meta_vault.typings import SubVaultExitRequest
+from src.meta_vault.typings import SubVaultExitRequest, SubVaultRedemption
 
 
 class MetaVaultContract(ContractWrapper, ErrorMixin):
@@ -54,6 +54,22 @@ class SubVaultsRegistryContract(ContractWrapper, ErrorMixin):
     async def deposit_to_sub_vaults(self) -> TxReceipt | None:
         tx_function = self.contract.functions.depositToSubVaults()
         return await transact_checked(tx_function, contract=self, action='deposit to sub vaults')
+
+    async def calculate_sub_vaults_redemptions(
+        self, assets_to_redeem: Wei, block_number: BlockNumber | None = None
+    ) -> list[SubVaultRedemption]:
+        """Split the assets to redeem from the meta vault across its direct sub-vaults.
+        The meta vault's own withdrawable assets are deducted by the contract."""
+        res = await self.contract.functions.calculateSubVaultsRedemptions(assets_to_redeem).call(
+            block_identifier=block_number
+        )
+        return [
+            SubVaultRedemption(
+                vault=Web3.to_checksum_address(entry[0]),
+                assets=Wei(entry[1]),
+            )
+            for entry in res
+        ]
 
 
 class SubVaultsRegistryEncoder(BaseEncoder):

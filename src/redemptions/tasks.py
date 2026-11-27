@@ -10,6 +10,7 @@ from src.common.contracts import VaultContract
 from src.common.execution import get_finalized_block_number
 from src.common.protocol_config import get_protocol_config
 from src.config.settings import settings
+from src.meta_vault.service import distribute_meta_vault_redemption_assets
 from src.redemptions.contracts import os_token_redeemer_contract
 from src.redemptions.fetch_positions import (
     fetch_positions_with_processed_shares,
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 async def get_redemption_assets(block_number: BlockNumber) -> Wei:
     """
     Get redemption assets for operator's vault.
+    Includes the vault's share of redemptions from meta vaults it belongs to.
     For Gno networks return value in GNO-Wei.
     """
     nonce = await os_token_redeemer_contract.nonce(block_number)
@@ -54,6 +56,11 @@ async def get_redemption_assets(block_number: BlockNumber) -> Wei:
         total_redemption_assets,
         nonce=nonce,
         os_token_converter=os_token_converter,
+        block_number=block_number,
+    )
+    # Pass meta vault redemptions down to their sub vaults
+    vault_to_redemption_assets = await distribute_meta_vault_redemption_assets(
+        vault_to_redemption_assets=vault_to_redemption_assets,
         block_number=block_number,
     )
     return vault_to_redemption_assets.get(settings.vault, Wei(0))
