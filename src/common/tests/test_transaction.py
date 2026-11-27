@@ -13,6 +13,7 @@ from src.common.transaction import (
     Fees,
     TransactionManager,
     _is_fee_too_low_error,
+    simulate_checked,
     transact_checked,
 )
 
@@ -344,6 +345,33 @@ class TestTransactChecked:
             result = await transact_checked(mock.Mock(), contract=mock.Mock(), action='do stuff')
 
         assert result is None
+
+
+@pytest.mark.usefixtures('fake_settings')
+class TestSimulateChecked:
+    async def test_success_returns_true(self):
+        tx_function = mock.Mock(call=mock.AsyncMock(return_value=None))
+        result = await simulate_checked(tx_function, contract=mock.Mock(), action='do stuff')
+
+        assert result is True
+        tx_function.call.assert_awaited_once_with(None)
+
+    async def test_revert_returns_false(self):
+        contract = mock.Mock()
+        contract.decode_custom_error = mock.Mock(return_value='InvalidValidators()')
+        tx_function = mock.Mock(
+            call=mock.AsyncMock(side_effect=ContractCustomError('reverted', data='0xdeadbeef'))
+        )
+        result = await simulate_checked(tx_function, contract=contract, action='do stuff')
+
+        assert result is False
+        contract.decode_custom_error.assert_called_once_with('0xdeadbeef')
+
+    async def test_generic_exception_returns_false(self):
+        tx_function = mock.Mock(call=mock.AsyncMock(side_effect=ValueError('boom')))
+        result = await simulate_checked(tx_function, contract=mock.Mock(), action='do stuff')
+
+        assert result is False
 
 
 @pytest.mark.parametrize(

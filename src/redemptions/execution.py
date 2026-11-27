@@ -6,13 +6,12 @@ from sw_utils import is_meta_vault_upgraded_to_release
 from sw_utils.networks import ContractReleaseVersion
 from web3 import Web3
 from web3.contract.async_contract import AsyncContractFunction
-from web3.exceptions import ContractCustomError
 from web3.types import Wei
 
 from src.common.contracts import VaultContract, multicall_contract
 from src.common.execution import wait_for_execution_endpoints_synced
 from src.common.harvest import get_multiple_harvest_params
-from src.common.transaction import tx_manager
+from src.common.transaction import simulate_checked, transact_checked
 from src.common.utils import error_verbose, format_error
 from src.config.settings import MULTICALL_CHUNK_SIZE, settings
 from src.meta_vault.graph import graph_get_vaults
@@ -124,15 +123,8 @@ async def tx_update_vaults_state(calls: list[tuple[ChecksumAddress, HexStr]]) ->
     Returns the tx hash on success, ``None`` when the tx was not submitted or
     not confirmed.
     """
-
-    try:
-        tx_receipt = await multicall_contract.tx_aggregate(calls)
-    except Exception as e:  # pylint: disable=broad-except
-        error_verbose('Failed to submit updateState multicall tx: %s', format_error(e))
-        return None
-
+    tx_receipt = await multicall_contract.tx_aggregate(calls)
     if tx_receipt is None:
-        logger.error('Failed to confirm updateState multicall tx')
         return None
 
     tx_hash = Web3.to_hex(tx_receipt['transactionHash'])
@@ -143,18 +135,10 @@ async def tx_update_vaults_state(calls: list[tuple[ChecksumAddress, HexStr]]) ->
 async def tx_process_exit_queue() -> None:
     """Call processExitQueue() on the redeemer contract."""
     tx_function = os_token_redeemer_contract.contract.functions.processExitQueue()
-    try:
-        tx_receipt = await tx_manager.transact(tx_function)
-    except ContractCustomError as e:
-        reason = os_token_redeemer_contract.decode_custom_error(str(e.data)) or e.data
-        logger.error('Failed to process exit queue: execution reverted with %s', reason)
-        return
-    except Exception as e:  # pylint: disable=broad-except
-        error_verbose('Failed to submit processExitQueue tx: %s', format_error(e))
-        return
-
+    tx_receipt = await transact_checked(
+        tx_function, contract=os_token_redeemer_contract, action='process exit queue'
+    )
     if tx_receipt is None:
-        logger.error('Failed to confirm processExitQueue tx')
         return
 
     tx_hash = Web3.to_hex(tx_receipt['transactionHash'])
@@ -172,26 +156,12 @@ async def tx_redeem_sub_vaults_assets(
     tx_function = os_token_redeemer_contract.contract.functions.redeemSubVaultsAssets(
         meta_vault, assets_to_redeem
     )
-    try:
-        tx_receipt = await tx_manager.transact(tx_function)
-    except ContractCustomError as e:
-        reason = os_token_redeemer_contract.decode_custom_error(str(e.data)) or e.data
-        logger.error(
-            'Failed to redeem sub vaults assets for meta vault %s: execution reverted with %s',
-            meta_vault,
-            reason,
-        )
-        return None
-    except Exception as e:  # pylint: disable=broad-except
-        error_verbose(
-            'Failed to redeem sub vaults assets for meta vault %s: %s',
-            meta_vault,
-            format_error(e),
-        )
-        return None
-
+    tx_receipt = await transact_checked(
+        tx_function,
+        contract=os_token_redeemer_contract,
+        action=f'redeem sub vaults assets for meta vault {meta_vault}',
+    )
     if tx_receipt is None:
-        logger.error('Failed to confirm redeemSubVaultsAssets tx for meta vault %s', meta_vault)
         return None
 
     tx_hash = Web3.to_hex(tx_receipt['transactionHash'])
@@ -210,27 +180,13 @@ async def simulate_redeem_position(
     Returns ``True`` when the call would succeed, ``False`` otherwise.
     """
     tx_function = _build_redeem_tx_function(position, tree)
+    if not await simulate_checked(
+        tx_function,
+        contract=os_token_redeemer_contract,
+        action=f'simulate redeem position (vault {position.vault}, owner {position.owner})',
+    ):
+        return False
 
-    try:
-        await tx_function.call()
-    except ContractCustomError as e:
-        reason = os_token_redeemer_contract.decode_custom_error(str(e.data)) or e.data
-        logger.error(
-            'Failed to simulate redeem position (vault %s, owner %s): '
-            'execution reverted with %s',
-            position.vault,
-            position.owner,
-            reason,
-        )
-        return False
-    except Exception as e:  # pylint: disable=broad-except
-        error_verbose(
-            'Failed to simulate redeem position (vault %s, owner %s): %s',
-            position.vault,
-            position.owner,
-            format_error(e),
-        )
-        return False
     logger.debug(
         'Simulated redeeming %(shares)s shares (%(os_token)s) '
         'for position (vault %(vault)s, owner %(owner)s) successfully',
@@ -253,33 +209,12 @@ async def tx_redeem_position(
     Returns ``True`` on success, ``False`` otherwise.
     """
     tx_function = _build_redeem_tx_function(position, tree)
-
-    try:
-        tx_receipt = await tx_manager.transact(tx_function)
-    except ContractCustomError as e:
-        reason = os_token_redeemer_contract.decode_custom_error(str(e.data)) or e.data
-        logger.error(
-            'Failed to redeem position (vault %s, owner %s): execution reverted with %s',
-            position.vault,
-            position.owner,
-            reason,
-        )
-        return False
-    except Exception as e:  # pylint: disable=broad-except
-        error_verbose(
-            'Failed to redeem position (vault %s, owner %s): %s',
-            position.vault,
-            position.owner,
-            format_error(e),
-        )
-        return False
-
+    tx_receipt = await transact_checked(
+        tx_function,
+        contract=os_token_redeemer_contract,
+        action=f'redeem position (vault {position.vault}, owner {position.owner})',
+    )
     if tx_receipt is None:
-        logger.error(
-            'Failed to confirm redeem position tx (vault %s, owner %s)',
-            position.vault,
-            position.owner,
-        )
         return False
 
     tx_hash = Web3.to_hex(tx_receipt['transactionHash'])

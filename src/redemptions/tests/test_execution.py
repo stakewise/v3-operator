@@ -22,6 +22,7 @@ from src.redemptions.execution import (
 from src.redemptions.tests.factories import make_position, make_tree
 
 MODULE = 'src.redemptions.execution'
+TX_MODULE = 'src.common.transaction'
 
 # error_verbose reads settings.verbose on the failure paths exercised below.
 pytestmark = pytest.mark.usefixtures('fake_settings')
@@ -140,7 +141,7 @@ class TestTxProcessExitQueue:
         mock_tx_manager.transact = AsyncMock(return_value=tx_receipt)
         with (
             patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
-            patch(f'{MODULE}.tx_manager', new=mock_tx_manager),
+            patch(f'{TX_MODULE}.tx_manager', new=mock_tx_manager),
         ):
             await tx_process_exit_queue()
             mock_redeemer.contract.functions.processExitQueue.assert_called_once()
@@ -154,7 +155,7 @@ class TestTxProcessExitQueue:
         )
         with (
             patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
-            patch(f'{MODULE}.tx_manager', new=mock_tx_manager),
+            patch(f'{TX_MODULE}.tx_manager', new=mock_tx_manager),
         ):
             await tx_process_exit_queue()
             mock_redeemer.decode_custom_error.assert_called_once_with('0x1234abcd')
@@ -209,13 +210,6 @@ class TestUpdateVaultsState:
         # First chunk was not confirmed, so the second chunk is never submitted.
         assert mocks['tx_aggregate'].await_count == 1
 
-    async def test_stops_on_send_failure(self) -> None:
-        """An error while submitting stops the loop without raising."""
-        with _mock_update_vaults_state(send_exception=Exception('boom'), chunk_size=1) as mocks:
-            result = await update_vaults_state(vaults=[VAULT_1, VAULT_2])
-        assert result is False
-        assert mocks['tx_aggregate'].await_count == 1
-
 
 class TestUpdateMetaVaultsState:
     async def test_no_meta_vaults(self) -> None:
@@ -257,24 +251,13 @@ class TestTxRedeemSubVaultsAssets:
             result = await tx_redeem_sub_vaults_assets(META_VAULT, Web3.to_wei(1, 'ether'))
         assert result == BlockNumber(123)
         mocks['redeem_fn'].assert_called_once_with(META_VAULT, Web3.to_wei(1, 'ether'))
+        mocks['transact_checked'].assert_awaited_once()
+        assert mocks['transact_checked'].await_args.kwargs['contract'] is mocks['redeemer']
 
-    async def test_unconfirmed_returns_none(self) -> None:
+    async def test_failure_returns_none(self) -> None:
         with _mock_tx_redeem_sub_vaults_assets(tx_status=0):
             result = await tx_redeem_sub_vaults_assets(META_VAULT, Web3.to_wei(1, 'ether'))
         assert result is None
-
-    async def test_send_failure_returns_none(self) -> None:
-        with _mock_tx_redeem_sub_vaults_assets(send_exception=Exception('boom')):
-            result = await tx_redeem_sub_vaults_assets(META_VAULT, Web3.to_wei(1, 'ether'))
-        assert result is None
-
-    async def test_custom_error_returns_none(self) -> None:
-        with _mock_tx_redeem_sub_vaults_assets(
-            send_exception=ContractCustomError('0x1234abcd', data='0x1234abcd')
-        ) as mocks:
-            result = await tx_redeem_sub_vaults_assets(META_VAULT, Web3.to_wei(1, 'ether'))
-        assert result is None
-        mocks['redeemer'].decode_custom_error.assert_called_once_with('0x1234abcd')
 
 
 # --- Helpers ---
@@ -303,10 +286,9 @@ def _mock_update_meta_vaults_state(
 
 
 @contextmanager
-def _mock_tx_redeem_sub_vaults_assets(
-    tx_status: int = 1,
-    send_exception: BaseException | None = None,
-) -> Iterator[dict[str, MagicMock]]:
+def _mock_tx_redeem_sub_vaults_assets(tx_status: int = 1) -> Iterator[dict[str, MagicMock]]:
+    """``tx_status=0`` models transact_checked returning no receipt
+    (revert, send failure or unconfirmed tx)."""
     tx_receipt = (
         {
             'status': 1,
@@ -317,19 +299,18 @@ def _mock_tx_redeem_sub_vaults_assets(
         else None
     )
     mock_redeemer = MagicMock()
-    mock_redeemer.decode_custom_error = MagicMock(return_value='SomeError')
     redeem_fn = mock_redeemer.contract.functions.redeemSubVaultsAssets
-    mock_tx_manager = MagicMock()
-    if send_exception is not None:
-        mock_tx_manager.transact = AsyncMock(side_effect=send_exception)
-    else:
-        mock_tx_manager.transact = AsyncMock(return_value=tx_receipt)
+    transact_checked = AsyncMock(return_value=tx_receipt)
 
     with (
         patch(f'{MODULE}.os_token_redeemer_contract', new=mock_redeemer),
-        patch(f'{MODULE}.tx_manager', new=mock_tx_manager),
+        patch(f'{MODULE}.transact_checked', new=transact_checked),
     ):
-        yield {'redeemer': mock_redeemer, 'redeem_fn': redeem_fn}
+        yield {
+            'redeemer': mock_redeemer,
+            'redeem_fn': redeem_fn,
+            'transact_checked': transact_checked,
+        }
 
 
 @contextmanager
@@ -338,23 +319,19 @@ def _mock_update_vaults_state(
     harvest_params: object = object(),
     tx_status: int = 1,
     chunk_size: int | None = None,
-    send_exception: BaseException | None = None,
 ) -> Iterator[dict[str, AsyncMock]]:
     """Mock setup for update_vaults_state tests. VaultContract, harvest params and
     the multicall contract are all stubbed so only the orchestration logic is
     exercised. ``harvest_params=None`` models a vault that can_harvest filtered
     out. ``tx_status=0`` models an unconfirmed multicall tx, i.e. ``tx_aggregate``
-    returning no receipt, while ``send_exception`` makes ``tx_aggregate`` raise.
+    returning no receipt.
     ``chunk_size`` overrides MULTICALL_CHUNK_SIZE."""
     vault_contract = MagicMock()
     vault_contract.contract_address = VAULT_1
     vault_contract.get_update_state_call = MagicMock(return_value='0xdeadbeef')
 
     tx_receipt = {'status': 1, 'transactionHash': HexBytes(b'\xab' * 32)} if tx_status else None
-    if send_exception is not None:
-        tx_aggregate = AsyncMock(side_effect=send_exception)
-    else:
-        tx_aggregate = AsyncMock(return_value=tx_receipt)
+    tx_aggregate = AsyncMock(return_value=tx_receipt)
     mock_multicall = MagicMock()
     mock_multicall.tx_aggregate = tx_aggregate
 
@@ -407,7 +384,7 @@ def _mock_tx_redeem_position(
     synced_mock = AsyncMock()
     with (
         patch(f'{MODULE}.os_token_redeemer_contract') as mock_redeemer,
-        patch(f'{MODULE}.tx_manager', new=mock_tx_manager),
+        patch(f'{TX_MODULE}.tx_manager', new=mock_tx_manager),
         patch(f'{MODULE}.wait_for_execution_endpoints_synced', new=synced_mock),
     ):
         mock_redeemer.contract.functions.redeemOsTokenPositions = MagicMock()

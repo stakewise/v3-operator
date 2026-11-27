@@ -311,16 +311,41 @@ async def transact_checked(
         tx_receipt = await tx_manager.transact(
             tx_function, tx_params, high_priority=high_priority, estimate_gas=estimate_gas
         )
-    except ContractCustomError as e:
-        reason = contract.decode_custom_error(str(e.data)) or e.data
-        logger.error('Failed to %s: execution reverted with %s.%s', action, reason, revert_hint)
-        return None
     except Exception as e:  # pylint: disable=broad-except
-        logger.error('Failed to %s: %s', action, format_error(e))
-        if settings.verbose:
-            logger.exception(e)
+        _log_tx_error(e, contract=contract, action=action, revert_hint=revert_hint)
         return None
     if tx_receipt is None:
         logger.error('Failed to %s: transaction was not confirmed', action)
         return None
     return tx_receipt
+
+
+async def simulate_checked(
+    tx_function: AsyncContractFunction,
+    *,
+    contract: 'ErrorMixin',
+    action: str,
+    tx_params: TxParams | None = None,
+    revert_hint: str = '',
+) -> bool:
+    """Simulates `tx_function` via `eth_call` without submitting it.
+
+    Returns `True` when the call would succeed. On revert or call error,
+    logs the error the same way as `transact_checked` and returns `False`.
+    """
+    try:
+        await tx_function.call(tx_params)
+    except Exception as e:  # pylint: disable=broad-except
+        _log_tx_error(e, contract=contract, action=action, revert_hint=revert_hint)
+        return False
+    return True
+
+
+def _log_tx_error(e: Exception, *, contract: 'ErrorMixin', action: str, revert_hint: str) -> None:
+    if isinstance(e, ContractCustomError):
+        reason = contract.decode_custom_error(str(e.data)) or e.data
+        logger.error('Failed to %s: execution reverted with %s.%s', action, reason, revert_hint)
+        return
+    logger.error('Failed to %s: %s', action, format_error(e))
+    if settings.verbose:
+        logger.exception(e)
