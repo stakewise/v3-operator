@@ -16,23 +16,26 @@ from src.common.execution import (
     check_gas_price,
     check_wallet_balance,
     get_finalized_block_number,
+    wait_for_execution_endpoints_synced,
 )
 from src.common.logging import LOG_LEVELS, setup_logging
 from src.common.startup_check import (
     check_execution_nodes_network,
     wait_for_execution_node,
 )
-from src.common.utils import log_verbose
+from src.common.utils import error_verbose, format_error, log_verbose
 from src.common.wallet import wallet
 from src.config.networks import AVAILABLE_NETWORKS, ZERO_CHECKSUM_ADDRESS
 from src.config.settings import settings
-from src.meta_vault.service import is_meta_vault
+from src.meta_vault.service import get_sub_vaults_redemptions, is_meta_vault
+from src.meta_vault.typings import SubVaultRedemption
 from src.redemptions.contracts import os_token_redeemer_contract
 from src.redemptions.execution import (
     format_os_token_shares,
     simulate_redeem_position,
     tx_process_exit_queue,
     tx_redeem_position,
+    tx_redeem_sub_vaults_assets,
     update_vaults_state,
 )
 from src.redemptions.fetch_positions import (
@@ -338,11 +341,12 @@ async def redeem_positions(
     """Redeem positions one by one, applying skips and caps on top of the shares_to_redeem
     already assigned by assign_shares_to_redeem:
 
-    - Meta-vault positions are skipped (unexpected; logged as a warning).
     - Positions on a vault already marked unharvested this round are skipped.
     - A live position with LTV > 1 is skipped.
     - shares_to_redeem is capped by the owner's live minted shares.
     - A vault requiring a state update is marked unharvested and its positions skipped.
+    - A meta vault short on withdrawable assets first redeems assets from its sub vaults
+      (skipped in dry-run mode).
     - shares_to_redeem is capped by the vault's remaining withdrawable assets, minus
       a small haircut (see WITHDRAWABLE_ASSETS_HAIRCUT_BPS).
     - A capped position below MIN_CAPPED_REDEEM_ASSETS is skipped.
@@ -354,14 +358,6 @@ async def redeem_positions(
     for position in os_token_positions:
         logger.info('Processing position index=%d', position.index)
         shares_to_redeem = position.shares_to_redeem
-
-        if await is_meta_vault(position.vault):
-            logger.warning(
-                'Unexpected meta vault position for %s; '
-                'redeemable positions should not include meta vaults.',
-                position.vault,
-            )
-            continue
 
         if position.vault in unharvested_vaults:
             continue
@@ -393,6 +389,15 @@ async def redeem_positions(
             )
         withdrawable = vault_to_withdrawable[position.vault]
 
+        if withdrawable < assets_to_redeem and await is_meta_vault(position.vault):
+            withdrawable = await _redeem_meta_vault_sub_vaults(
+                meta_vault=position.vault,
+                assets_to_redeem=assets_to_redeem,
+                withdrawable=withdrawable,
+                dry_run=dry_run,
+            )
+            vault_to_withdrawable[position.vault] = withdrawable
+
         if withdrawable < assets_to_redeem:
             assets_to_redeem = _apply_withdrawable_haircut(withdrawable)
             if assets_to_redeem < MIN_CAPPED_REDEEM_ASSETS:
@@ -416,6 +421,68 @@ async def redeem_positions(
                 continue
 
         vault_to_withdrawable[position.vault] = Wei(withdrawable - assets_to_redeem)
+
+
+async def _redeem_meta_vault_sub_vaults(
+    meta_vault: ChecksumAddress,
+    assets_to_redeem: Wei,
+    withdrawable: Wei,
+    dry_run: bool,
+) -> Wei:
+    """Redeem assets from the meta vault's sub vaults so it can cover ``assets_to_redeem``.
+
+    Nested meta vaults are redeemed bottom-up, so their withdrawable assets are
+    topped up before the parent meta vault redeems from them. Stops at the first
+    failed transaction.
+
+    Returns the meta vault's withdrawable assets after redemption, or
+    ``withdrawable`` when nothing was redeemed.
+    """
+    if dry_run:
+        logger.info('Dry run: skipping redeemSubVaultsAssets for meta vault %s', meta_vault)
+        return withdrawable
+
+    try:
+        redeem_order = await _build_meta_vault_redeem_order(meta_vault, assets_to_redeem)
+    except Exception as e:  # pylint: disable=broad-except
+        error_verbose(
+            'Failed to build sub vaults redeem order for meta vault %s: %s',
+            meta_vault,
+            format_error(e),
+        )
+        return withdrawable
+
+    last_receipt_block: BlockNumber | None = None
+    for redemption in redeem_order:
+        receipt_block = await tx_redeem_sub_vaults_assets(redemption.vault, redemption.assets)
+        if receipt_block is None:
+            break
+        last_receipt_block = receipt_block
+
+    if last_receipt_block is None:
+        return withdrawable
+
+    # Barrier against fallback endpoints lagging behind the receipt block.
+    await wait_for_execution_endpoints_synced(last_receipt_block)
+    return await get_withdrawable_assets(meta_vault, block_number=last_receipt_block)
+
+
+async def _build_meta_vault_redeem_order(
+    meta_vault: ChecksumAddress,
+    assets_to_redeem: Wei,
+) -> list[SubVaultRedemption]:
+    """Build bottom-up order of sub vaults redemptions for nested meta vaults.
+
+    For meta vault A with sub vault B (also a meta vault) with sub vaults C, D:
+    returns [(B, assets_B), (A, assets_A)] so B is redeemed first.
+    """
+    order: list[SubVaultRedemption] = []
+    for redemption in await get_sub_vaults_redemptions(meta_vault, assets_to_redeem):
+        if redemption.assets > 0 and await is_meta_vault(redemption.vault):
+            order.extend(await _build_meta_vault_redeem_order(redemption.vault, redemption.assets))
+
+    order.append(SubVaultRedemption(vault=meta_vault, assets=assets_to_redeem))
+    return order
 
 
 def _apply_withdrawable_haircut(withdrawable: Wei) -> Wei:

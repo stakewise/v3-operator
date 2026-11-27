@@ -15,6 +15,8 @@ from src.redemptions.execution import (
     simulate_redeem_position,
     tx_process_exit_queue,
     tx_redeem_position,
+    tx_redeem_sub_vaults_assets,
+    update_meta_vaults_state,
     update_vaults_state,
 )
 from src.redemptions.tests.factories import make_position, make_tree
@@ -27,6 +29,7 @@ pytestmark = pytest.mark.usefixtures('fake_settings')
 VAULT_1 = Web3.to_checksum_address('0x' + '11' * 20)
 VAULT_2 = Web3.to_checksum_address('0x' + '22' * 20)
 OWNER_1 = Web3.to_checksum_address('0x' + '33' * 20)
+META_VAULT = Web3.to_checksum_address('0x' + '55' * 20)
 
 
 @pytest.mark.parametrize(
@@ -168,12 +171,18 @@ class TestUpdateVaultsState:
         # One updateState call per harvestable vault.
         assert len(await_args.args[0]) == 2
 
-    async def test_skips_meta_vaults(self) -> None:
-        """Nothing to update is still up to date, so the caller may proceed."""
+    async def test_meta_vaults_updated_separately(self) -> None:
+        """Meta vaults go through the meta vault tree update, not the regular multicall."""
         with _mock_update_vaults_state(is_meta_vault=True) as mocks:
             result = await update_vaults_state(vaults=[VAULT_1])
         assert result is True
         mocks['tx_aggregate'].assert_not_awaited()
+        mocks['update_meta_vaults_state'].assert_awaited_once_with([VAULT_1])
+
+    async def test_regular_vaults_not_passed_to_meta_update(self) -> None:
+        with _mock_update_vaults_state() as mocks:
+            await update_vaults_state(vaults=[VAULT_1])
+        mocks['update_meta_vaults_state'].assert_awaited_once_with([])
 
     async def test_skips_when_not_harvestable(self) -> None:
         """can_harvest returns no harvest params, so there is nothing to update."""
@@ -208,7 +217,119 @@ class TestUpdateVaultsState:
         assert mocks['tx_aggregate'].await_count == 1
 
 
+class TestUpdateMetaVaultsState:
+    async def test_no_meta_vaults(self) -> None:
+        with _mock_update_meta_vaults_state() as mocks:
+            await update_meta_vaults_state([])
+        mocks['graph_get_vaults'].assert_not_awaited()
+
+    async def test_updates_meta_vault_tree(self) -> None:
+        with _mock_update_meta_vaults_state() as mocks:
+            await update_meta_vaults_state([META_VAULT])
+        mocks['tree_update'].assert_awaited_once()
+        assert mocks['tree_update'].await_args.kwargs['root_meta_vault'].address == META_VAULT
+
+    async def test_skips_meta_vault_missing_in_subgraph(self) -> None:
+        with _mock_update_meta_vaults_state(in_subgraph=False) as mocks:
+            await update_meta_vaults_state([META_VAULT])
+        mocks['tree_update'].assert_not_awaited()
+
+    async def test_skips_meta_vault_not_upgraded_to_v5(self) -> None:
+        with _mock_update_meta_vaults_state(upgraded=False) as mocks:
+            await update_meta_vaults_state([META_VAULT])
+        mocks['tree_update'].assert_not_awaited()
+
+    async def test_skips_meta_vault_without_sub_vaults(self) -> None:
+        with _mock_update_meta_vaults_state(sub_vaults=[]) as mocks:
+            await update_meta_vaults_state([META_VAULT])
+        mocks['tree_update'].assert_not_awaited()
+
+    async def test_failure_does_not_raise(self) -> None:
+        """A failed tree update leaves the meta vault stale and continues with the rest."""
+        with _mock_update_meta_vaults_state(tree_update_exception=RuntimeError('boom')) as mocks:
+            await update_meta_vaults_state([META_VAULT, META_VAULT])
+        assert mocks['tree_update'].await_count == 2
+
+
+class TestTxRedeemSubVaultsAssets:
+    async def test_success_returns_receipt_block(self) -> None:
+        with _mock_tx_redeem_sub_vaults_assets() as mocks:
+            result = await tx_redeem_sub_vaults_assets(META_VAULT, Web3.to_wei(1, 'ether'))
+        assert result == BlockNumber(123)
+        mocks['redeem_fn'].assert_called_once_with(META_VAULT, Web3.to_wei(1, 'ether'))
+
+    async def test_unconfirmed_returns_none(self) -> None:
+        with _mock_tx_redeem_sub_vaults_assets(tx_status=0):
+            result = await tx_redeem_sub_vaults_assets(META_VAULT, Web3.to_wei(1, 'ether'))
+        assert result is None
+
+    async def test_send_failure_returns_none(self) -> None:
+        with _mock_tx_redeem_sub_vaults_assets(send_exception=Exception('boom')):
+            result = await tx_redeem_sub_vaults_assets(META_VAULT, Web3.to_wei(1, 'ether'))
+        assert result is None
+
+    async def test_custom_error_returns_none(self) -> None:
+        with _mock_tx_redeem_sub_vaults_assets(
+            send_exception=ContractCustomError('0x1234abcd', data='0x1234abcd')
+        ) as mocks:
+            result = await tx_redeem_sub_vaults_assets(META_VAULT, Web3.to_wei(1, 'ether'))
+        assert result is None
+        mocks['redeemer'].decode_custom_error.assert_called_once_with('0x1234abcd')
+
+
 # --- Helpers ---
+
+
+@contextmanager
+def _mock_update_meta_vaults_state(
+    in_subgraph: bool = True,
+    upgraded: bool = True,
+    sub_vaults: list | None = None,
+    tree_update_exception: BaseException | None = None,
+) -> Iterator[dict[str, AsyncMock]]:
+    meta_vault = MagicMock()
+    meta_vault.address = META_VAULT
+    meta_vault.version = 6
+    meta_vault.sub_vaults = sub_vaults if sub_vaults is not None else [VAULT_1]
+    graph_get_vaults = AsyncMock(return_value={META_VAULT: meta_vault} if in_subgraph else {})
+    tree_update = AsyncMock(side_effect=tree_update_exception)
+
+    with (
+        patch(f'{MODULE}.graph_get_vaults', new=graph_get_vaults),
+        patch(f'{MODULE}.is_meta_vault_upgraded_to_release', return_value=upgraded),
+        patch(f'{MODULE}.meta_vault_tree_update_state', new=tree_update),
+    ):
+        yield {'graph_get_vaults': graph_get_vaults, 'tree_update': tree_update}
+
+
+@contextmanager
+def _mock_tx_redeem_sub_vaults_assets(
+    tx_status: int = 1,
+    send_exception: BaseException | None = None,
+) -> Iterator[dict[str, MagicMock]]:
+    tx_receipt = (
+        {
+            'status': 1,
+            'transactionHash': HexBytes(b'\xab' * 32),
+            'blockNumber': BlockNumber(123),
+        }
+        if tx_status
+        else None
+    )
+    mock_redeemer = MagicMock()
+    mock_redeemer.decode_custom_error = MagicMock(return_value='SomeError')
+    redeem_fn = mock_redeemer.contract.functions.redeemSubVaultsAssets
+    mock_tx_manager = MagicMock()
+    if send_exception is not None:
+        mock_tx_manager.transact = AsyncMock(side_effect=send_exception)
+    else:
+        mock_tx_manager.transact = AsyncMock(return_value=tx_receipt)
+
+    with (
+        patch(f'{MODULE}.os_token_redeemer_contract', new=mock_redeemer),
+        patch(f'{MODULE}.tx_manager', new=mock_tx_manager),
+    ):
+        yield {'redeemer': mock_redeemer, 'redeem_fn': redeem_fn}
 
 
 @contextmanager
@@ -240,8 +361,11 @@ def _mock_update_vaults_state(
     def harvest_params_for(vaults: list, _block: BlockNumber | None = None) -> dict:
         return {vault: harvest_params for vault in vaults}
 
+    update_meta_vaults_state = AsyncMock()
+
     with (
         patch(f'{MODULE}.is_meta_vault', new=AsyncMock(return_value=is_meta_vault)),
+        patch(f'{MODULE}.update_meta_vaults_state', new=update_meta_vaults_state),
         patch(f'{MODULE}.VaultContract', return_value=vault_contract),
         patch(
             f'{MODULE}.get_multiple_harvest_params',
@@ -250,7 +374,7 @@ def _mock_update_vaults_state(
         patch(f'{MODULE}.multicall_contract', new=mock_multicall),
         patch(f'{MODULE}.MULTICALL_CHUNK_SIZE', new=chunk_size if chunk_size is not None else 20),
     ):
-        yield {'tx_aggregate': tx_aggregate}
+        yield {'tx_aggregate': tx_aggregate, 'update_meta_vaults_state': update_meta_vaults_state}
 
 
 @contextmanager
